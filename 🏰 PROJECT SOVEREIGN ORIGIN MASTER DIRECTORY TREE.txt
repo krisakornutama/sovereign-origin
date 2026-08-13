@@ -1,0 +1,57 @@
+PROJECT SOVEREIGN ORIGIN/
+│
+├── 🎨 sovereign-frontend/                  # [Frontend UI] Next.js Framework
+│   ├── public/
+│   │   └── icons/                          # ไอคอนและ Asset ไฟล์สาธารณะ
+│   ├── src/
+│   │   ├── components/                     # UI Components ทั้งหมด
+│   │   │   ├── auth/                       # ระบบเข้าสู่ระบบ / ยืนยันตัวตน
+│   │   │   ├── dashboard/                  # แผงควบคุมและ Card แสดงผล
+│   │   │   ├── layout/                     # Sidebar, Header, Footer
+│   │   │   └── ui/                         # Buttons, Inputs, Modals
+│   │   ├── hooks/                          # Custom React Hooks
+│   │   │   ├── useOfflineSync.ts           # จัดการ Sync ข้อมูลเวลาขาดอินเทอร์เน็ต
+│   │   │   └── useSocket.ts                # เชื่อมต่อ WebSocket Real-time
+│   │   ├── lib/                            # Helper Library และ Client API setup
+│   │   ├── pages/                          # หน้าเว็บหลัก
+│   │   │   └── dashboard.tsx               # หน้า Command Center หลัก
+│   │   ├── stores/                         # State Management (Zustand / Redux)
+│   │   │   ├── useAuthStore.ts             # เก็บสถานะการเข้าใช้ระบบ
+│   │   │   └── useTelemetryStore.ts        # เก็บค่าเซนเซอร์สด (แบต, น้ำ, ดิน)
+│   │   ├── styles/                         # Tailwind CSS / Global CSS
+│   │   ├── types/                          # TypeScript Interface / Type definition
+│   │   │   └── index.ts
+│   │   └── utils/                          # Utility Functions
+│   │       └── notifications.ts            # ระบบแจ้งเตือนฉุกเฉิน
+│   ├── Complete Frontend Directory Tree.txt
+│   └── next.config.js                      # คอนฟิก Next.js
+│
+└── ⚙️ sovereign-os/                         # [Backend Systems & Edge Nodes]
+    ├── core-api/                           # [Main Backend Server] Node.js / Express
+    │   ├── migrations/                     # ประวัติ DB Migration
+    │   ├── prisma/                         # Database ORM Management
+    │   │   ├── migrations/
+    │   │   └── schema.prisma               # โมเดลฐานข้อมูล (Asset, Telemetry, Log)
+    │   ├── src/                            # โค้ดหลักระบบหลังบ้าน
+    │   │   ├── config/                     # ค่า Config ต่างๆ (Port, Secret Key)
+    │   │   ├── middleware/
+    │   │   │   └── auth.middleware.ts      # ตัวเช็คความปลอดภัย API Request
+    │   │   ├── modules/                    # โมดูลฟังก์ชันย่อย
+    │   │   ├── services/                   # Business Logic & Core Functions
+    │   │   │   ├── AiAgentService.ts       # AI Agent คุยกับ Ollama & Tool Calling
+    │   │   │   ├── audit.service.ts        # บันทึกประวัติความปลอดภัย (Audit Log)
+    │   │   │   ├── mqtt-listener.ts        # ฟังข้อมูลเซนเซอร์จาก EMQX Broker
+    │   │   │   ├── notification.service.ts # ส่งแจ้งเตือนฉุกเฉิน
+    │   │   │   └── wealth.service.ts       # ดึงราคา Crypto, หุ้น, คำนวณพอร์ต
+    │   │   ├── workers/
+    │   │   │   └── mqttIngest.ts           # Worker บันทึกค่าเซนเซอร์ลง TimescaleDB
+    │   │   └── server.ts                   # 📍 [Entrypoint] ศูนย์รวม Express & WebSocket
+    │   ├── .env                            # ไฟล์เก็บ API Keys & Secret Variables
+    │   ├── package.json
+    │   └── package-lock.json
+    │
+    ├── edge-ai/                            # [Local AI Engine] Ollama & Python FastAPI
+    ├── infra/                              # [Infrastructure] Docker Compose, EMQX, TimescaleDB
+    ├── scripts/                            # [DevOps Tools] ota-sync.sh, Backup Scripts
+    ├── Complete Directory Tree.txt
+    └── Usage example in routes.txt

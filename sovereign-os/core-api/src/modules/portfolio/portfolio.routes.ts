@@ -1,0 +1,310 @@
+import { Router } from 'express';
+import { authenticate } from '../../middleware/auth.middleware';
+import { PrismaClient } from '@prisma/client';
+import { wealthEmitter } from '../../services/wealth.service';
+import {
+  computePortfolioValue,
+  computeInventoryValue,
+  computeSurvivalRunway,
+  type AssetHolding,
+  type InventoryLine,
+} from '../../services/wealth.service';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
+
+// ── Assets (พอร์ต) ──
+
+// GET /api/portfolio/assets — asset ทั้งหมด + ราคาล่าสุดจาก asset_prices
+router.get('/assets', authenticate, async (req, res) => {
+  try {
+    const rows = await prisma.asset.findMany({ orderBy: { symbol: 'asc' } });
+    const assets: AssetHolding[] = rows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }));
+    const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
+      `SELECT DISTINCT ON (symbol) symbol, price_usd
+       FROM asset_prices ORDER BY symbol, time DESC`
+    );
+    const prices = latest.map((r) => ({ symbol: r.symbol, priceUsd: Number(r.price_usd) }));
+    const result = computePortfolioValue(assets, prices);
+    // แมป id/หมายเหตุ กลับจากแถว DB (asset เรียงตามลำดับเดียวกับ assets)
+    const idBySymbol = new Map(rows.map((r) => [r.symbol.toUpperCase(), r]));
+    res.json({
+      assets: result.assets.map((a) => {
+        const row = idBySymbol.get(a.symbol.toUpperCase());
+        return { ...a, id: row?.id, wallet_address: row?.wallet_address ?? null, notes: row?.notes ?? null };
+      }),
+      totalUsd: result.totalUsd,
+      missingPrices: result.missingPrices,
+    });
+  } catch (err) {
+    console.error('Portfolio assets error:', err);
+    res.status(500).json({ error: 'Failed to load assets' });
+  }
+});
+
+// POST /api/portfolio/assets — เพิ่ม asset
+router.post('/assets', authenticate, async (req, res) => {
+  try {
+    const { symbol, type, quantity, wallet_address, notes } = req.body || {};
+    if (!symbol || !VALID_ASSET_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'symbol and type (CRYPTO|STOCK|COMMODITY) are required' });
+    }
+    const asset = await prisma.asset.create({
+      data: {
+        symbol: String(symbol).toUpperCase(),
+        type,
+        quantity: Number(quantity) || 0,
+        wallet_address: wallet_address || null,
+        notes: notes || null,
+      },
+    });
+    res.status(201).json({ success: true, id: asset.id });
+  } catch (err) {
+    console.error('Create asset error:', err);
+    res.status(500).json({ error: 'Failed to create asset' });
+  }
+});
+
+// DELETE /api/portfolio/assets/:id
+router.delete('/assets/:id', authenticate, async (req, res) => {
+  try {
+    await prisma.asset.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete asset' });
+  }
+});
+
+// PUT /api/portfolio/assets/:id — แก้ไข quantity / notes
+router.put('/assets/:id', authenticate, async (req, res) => {
+  try {
+    const { quantity, notes } = req.body || {};
+    const data: Record<string, unknown> = {};
+    if (quantity !== undefined) data.quantity = Number(quantity);
+    if (notes !== undefined) data.notes = notes;
+    await prisma.asset.update({ where: { id: req.params.id }, data });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update asset' });
+  }
+});
+
+// ── Tangible Inventory (เสบียงกายภาพ) ──
+
+// GET /api/portfolio/inventory — รายการเสบียง + มูลค่ารวม
+router.get('/inventory', authenticate, async (req, res) => {
+  try {
+    const rows = await prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } });
+    const items: InventoryLine[] = rows.map((r) => ({
+      name: r.name,
+      category: r.category,
+      quantity: r.quantity,
+      unit: r.unit,
+      unitPriceUsd: r.unit_price_usd,
+    }));
+    res.json({ items: rows, totalUsd: computeInventoryValue(items) });
+  } catch (err) {
+    console.error('Inventory error:', err);
+    res.status(500).json({ error: 'Failed to load inventory' });
+  }
+});
+
+// POST /api/portfolio/inventory — เพิ่มรายการเสบียง
+router.post('/inventory', authenticate, async (req, res) => {
+  try {
+    const { name, category, quantity, unit, unit_price_usd, notes } = req.body || {};
+    if (!name || !(Number(quantity) >= 0) || !(Number(unit_price_usd) >= 0)) {
+      return res.status(400).json({ error: 'name, quantity and unit_price_usd are required' });
+    }
+    const item = await prisma.inventoryItem.create({
+      data: {
+        name: String(name),
+        category: String(category || 'OTHER'),
+        quantity: Number(quantity),
+        unit: String(unit || 'piece'),
+        unit_price_usd: Number(unit_price_usd),
+        notes: notes || null,
+      },
+    });
+    res.status(201).json({ success: true, id: item.id });
+  } catch (err) {
+    console.error('Create inventory error:', err);
+    res.status(500).json({ error: 'Failed to create inventory item' });
+  }
+});
+
+// PUT /api/portfolio/inventory/:id
+router.put('/inventory/:id', authenticate, async (req, res) => {
+  try {
+    const { quantity, unit_price_usd, notes, name } = req.body || {};
+    const data: Record<string, unknown> = {};
+    if (quantity !== undefined) data.quantity = Number(quantity);
+    if (unit_price_usd !== undefined) data.unit_price_usd = Number(unit_price_usd);
+    if (notes !== undefined) data.notes = notes;
+    if (name !== undefined) data.name = name;
+    await prisma.inventoryItem.update({ where: { id: req.params.id }, data });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update inventory item' });
+  }
+});
+
+// DELETE /api/portfolio/inventory/:id
+router.delete('/inventory/:id', authenticate, async (req, res) => {
+  try {
+    await prisma.inventoryItem.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete inventory item' });
+  }
+});
+
+// ── Summary + Survival Runway ──
+
+// GET /api/portfolio/summary — มูลค่าพอร์ต + เสบียง + runway + history
+router.get('/summary', authenticate, async (req, res) => {
+  try {
+    const [assetRows, inventoryRows, avgRow, latestHistory] = await Promise.all([
+      prisma.asset.findMany(),
+      prisma.inventoryItem.findMany(),
+      prisma.$queryRawUnsafe<Array<{ avg_power: number | null }>>(
+        `SELECT AVG(value) AS avg_power FROM sensor_telemetry
+         WHERE metric = 'power_kw' AND time >= NOW() - INTERVAL '24 hours'`
+      ),
+      prisma.wealthHistory.findMany({ orderBy: { timestamp: 'desc' }, take: 30 }),
+    ]);
+
+    const assets: AssetHolding[] = assetRows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }));
+    const inventory: InventoryLine[] = inventoryRows.map((r) => ({
+      name: r.name,
+      category: r.category,
+      quantity: r.quantity,
+      unit: r.unit,
+      unitPriceUsd: r.unit_price_usd,
+    }));
+
+    const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
+      `SELECT DISTINCT ON (symbol) symbol, price_usd FROM asset_prices ORDER BY symbol, time DESC`
+    );
+    const { totalUsd, missingPrices } = computePortfolioValue(
+      assets,
+      latest.map((r) => ({ symbol: r.symbol, priceUsd: Number(r.price_usd) }))
+    );
+    const inventoryUsd = computeInventoryValue(inventory);
+
+    const cashUsd = parseFloat(process.env.PORTFOLIO_CASH_USD || '0');
+    const monthlyExpensesUsd = parseFloat(process.env.PORTFOLIO_MONTHLY_EXPENSES_USD || '0');
+    const electricityPricePerKwh = parseFloat(process.env.ELECTRICITY_PRICE_USD_PER_KWH || '0.12');
+    const avgPowerKw = avgRow[0]?.avg_power != null ? Number(avgRow[0].avg_power) : 0;
+
+    const runway = computeSurvivalRunway({
+      cashUsd,
+      liquidAssetUsd: totalUsd,
+      monthlyExpensesUsd,
+      avgPowerKw,
+      electricityPricePerKwh,
+    });
+
+    res.json({
+      portfolioUsd: totalUsd,
+      inventoryUsd,
+      grandTotalUsd: totalUsd + inventoryUsd,
+      cashUsd,
+      runway,
+      missingPrices,
+      history: latestHistory.map((h) => ({ timestamp: h.timestamp, totalUsd: h.total_usd_value })),
+    });
+  } catch (err) {
+    console.error('Portfolio summary error:', err);
+    res.status(500).json({ error: 'Failed to load summary' });
+  }
+});
+
+// GET /api/portfolio/history — ประวัติมูลค่ารวม
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 60, 500);
+    const rows = await prisma.wealthHistory.findMany({ orderBy: { timestamp: 'desc' }, take: limit });
+    res.json(rows.map((r) => ({ timestamp: r.timestamp, totalUsd: r.total_usd_value, payload: r.payload })));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load history' });
+  }
+});
+
+// POST /api/portfolio/refresh — บังคับดึงราคาทันที (จากหน้า UI)
+router.post('/refresh', authenticate, async (req, res) => {
+  try {
+    const { wealthWorker } = req.app.locals as { wealthWorker?: { runOnce: () => Promise<Record<string, unknown>> } };
+    if (!wealthWorker) return res.status(503).json({ error: 'Wealth worker not running (PORTFOLIO_ENABLED=false?)' });
+    const result = await wealthWorker.runOnce();
+    res.json({ success: true, ...(result as object) });
+  } catch (err) {
+    console.error('Portfolio refresh error:', err);
+    res.status(500).json({ error: 'Failed to refresh prices' });
+  }
+});
+
+// ── Aladdin Risk Engine — ใช้ข้อมูลอดีตทำนายอนาคต (สไตล์ BlackRock Aladdin) ──
+
+// GET /api/portfolio/risk — รายงานความเสี่ยงเต็มรูปแบบ: วิเคราะห์รายตัว + Monte Carlo + VaR + สิ่งที่ต้องทำ
+router.get('/risk', authenticate, async (_req, res) => {
+  try {
+    const { analyzeAssetRisk, simulatePortfolio, portfolioRisk, buildRiskActions } = await import('../../services/aladdin-risk.service');
+    const assets = await prisma.asset.findMany({ orderBy: { symbol: 'asc' } });
+    const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
+      `SELECT DISTINCT ON (symbol) symbol, price_usd FROM asset_prices ORDER BY symbol, time DESC`
+    );
+    const priceMap = new Map(latest.map((r) => [r.symbol.toUpperCase(), Number(r.price_usd)]));
+
+    const historyRows = await prisma.$queryRawUnsafe<Array<{ symbol: string; time: Date; price_usd: number }>>(
+      `SELECT symbol, time, price_usd FROM asset_prices ORDER BY symbol, time ASC`
+    );
+    const bySymbol = new Map<string, Array<{ time: string; price: number }>>();
+    for (const r of historyRows) {
+      const arr = bySymbol.get(r.symbol.toUpperCase()) || [];
+      arr.push({ time: new Date(r.time).toISOString(), price: Number(r.price_usd) });
+      bySymbol.set(r.symbol.toUpperCase(), arr);
+    }
+
+    const analyses = assets.map((a) => {
+      const sym = a.symbol.toUpperCase();
+      return analyzeAssetRisk({
+        symbol: a.symbol,
+        type: a.type,
+        history: bySymbol.get(sym) ?? [],
+        valueUsd: (priceMap.get(sym) ?? 0) * a.quantity,
+      });
+    });
+
+    const simInputs = assets
+      .filter((a) => (priceMap.get(a.symbol.toUpperCase()) ?? 0) > 0)
+      .map((a) => ({
+        symbol: a.symbol.toUpperCase(),
+        valueUsd: (priceMap.get(a.symbol.toUpperCase()) ?? 0) * a.quantity,
+        history: bySymbol.get(a.symbol.toUpperCase()) ?? [],
+      }));
+
+    const sim = simInputs.length > 0
+      ? simulatePortfolio(simInputs, { horizonDays: 30, paths: 1000, seed: 20260812 })
+      : null;
+    const pRisk = simInputs.length > 0 ? portfolioRisk(simInputs) : null;
+    const actions = buildRiskActions(analyses.map((a) => ({ symbol: a.symbol, signal: a.signal, trend: a.trend })));
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      engine: 'Aladdin-style',
+      assets: analyses,
+      simulation: sim,
+      portfolio: pRisk,
+      actions,
+    });
+  } catch (err) {
+    console.error('Portfolio risk error:', err);
+    res.status(500).json({ error: 'Failed to compute risk report' });
+  }
+});
+
+export { wealthEmitter };
+export default router;

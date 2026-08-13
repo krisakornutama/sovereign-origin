@@ -1,0 +1,4 @@
+// nodes.router.ts
+router.get('/nodes', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), nodesController.list);
+router.post('/nodes', authenticate, requireRole('SUPERADMIN'), auditStateChange, nodesController.create);
+router.get('/nodes/:nodeId/devices', authenticate, ensureNodeAccess(), devicesController.listByNode);

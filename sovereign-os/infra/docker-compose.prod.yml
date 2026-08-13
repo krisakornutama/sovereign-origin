@@ -1,0 +1,98 @@
+# ── PRODUCTION compose ──
+# ต่างจาก docker-compose.yml (dev):
+#   • ไม่ mount source code เข้า container (ใช้ image ที่ build แล้ว)
+#   • NODE_ENV=production, build แบบ multi-stage
+#   • รองรับ TLS (mount ไฟล์ cert + ตั้ง TLS_CERT/TLS_KEY ใน .env)
+# วิธีใช้:
+#   cd sovereign-os/infra
+#   cp .env.example .env && <เติมค่า>
+#   docker compose -f docker-compose.prod.yml up -d --build
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: sovereign-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sovereign}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-sovereign}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../scripts/init-timescaledb.sql:/docker-entrypoint-initdb.d/01_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sovereign}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  emqx:
+    image: emqx/emqx:latest
+    container_name: sovereign-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_USERNAME:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?EMQX_PASSWORD is required}
+    ports:
+      - "0.0.0.0:1883:1883"
+      - "0.0.0.0:18083:18083"
+    networks: [internal]
+
+  core-api:
+    build:
+      context: ../core-api
+      dockerfile: Dockerfile.prod
+    container_name: sovereign-core-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@timescaledb:5432/${POSTGRES_DB:-sovereign}
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
+      OLLAMA_URL: http://host.docker.internal:11434
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      OTA_BASE_URL: ${OTA_BASE_URL:-http://localhost:3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # HTTPS (optional) — mount certs จากโฮสต์
+      TLS_CERT: ${TLS_CERT:-}
+      TLS_KEY: ${TLS_KEY:-}
+    ports:
+      - "${CORE_API_PORT:-3001}:3001"
+    volumes:
+      - ./backups:/app/backups
+      - ./knowledge:/app/knowledge
+      - ./ota_firmwares:/app/ota_firmwares
+      # เปิด mount certs ถ้าจะใช้ HTTPS:
+      # - ./certs:/app/certs:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ../../sovereign-frontend
+      dockerfile: Dockerfile.prod
+    container_name: sovereign-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      core-api:
+        condition: service_healthy
+    networks: [internal]
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    driver: bridge

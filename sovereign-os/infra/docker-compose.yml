@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # -------------------- DATABASE --------------------
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: sovereign-db
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sovereign}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-sovereign}
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+      - ../scripts/init-timescaledb.sql:/docker-entrypoint-initdb.d/01_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sovereign}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # -------------------- MQTT BROKER --------------------
+  emqx:
+    image: emqx/emqx:latest
+    container_name: sovereign-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_USERNAME:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?EMQX_PASSWORD is required (see .env.example)}
+    ports:
+      - "0.0.0.0:1883:1883"
+      - "0.0.0.0:18083:18083"
+    networks:
+      - internal
+
+  # -------------------- CORE BACKEND --------------------
+  core-api:
+    build:
+      context: ../core-api
+      dockerfile: Dockerfile
+    container_name: sovereign-core-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@timescaledb:5432/${POSTGRES_DB:-sovereign}
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
+      OLLAMA_URL: http://host.docker.internal:11434
+      # ── runtime settings (ค่าทั้งหมดกำหนดได้ใน infra/.env) ──
+      OTA_BASE_URL: ${OTA_BASE_URL:-http://localhost:3001}
+      OTA_TOKEN: ${OTA_TOKEN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      # ── Feature Modules (เว้นว่าง = เปิดทุกโมดูล เช่น ENABLED_MODULES=inventory,farm) ──
+      ENABLED_MODULES: ${ENABLED_MODULES:-}
+      ENERGY_CAPACITY_KWH: ${ENERGY_CAPACITY_KWH:-5}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      THREAT_DETECTION_ENABLED: ${THREAT_DETECTION_ENABLED:-true}
+      THREAT_CONNECTION_THRESHOLD: ${THREAT_CONNECTION_THRESHOLD:-100}
+      THREAT_ALLOWLIST_IPS: ${THREAT_ALLOWLIST_IPS:-}
+      FIREWALL_BLOCK_CMD: ${FIREWALL_BLOCK_CMD:-}
+      # ── Phase 4: Risk & Wealth Infrastructure (opt-in — เปิดใน infra/.env) ──
+      PORTFOLIO_ENABLED: ${PORTFOLIO_ENABLED:-false}
+      PORTFOLIO_FETCH_CRON: ${PORTFOLIO_FETCH_CRON:-0 */4 * * *}
+      PORTFOLIO_CASH_USD: ${PORTFOLIO_CASH_USD:-0}
+      PORTFOLIO_MONTHLY_EXPENSES_USD: ${PORTFOLIO_MONTHLY_EXPENSES_USD:-0}
+      ELECTRICITY_PRICE_USD_PER_KWH: ${ELECTRICITY_PRICE_USD_PER_KWH:-0.12}
+      RISK_MONITOR_ENABLED: ${RISK_MONITOR_ENABLED:-false}
+      RISK_FEEDS: ${RISK_FEEDS:-}
+      RISK_MODEL: ${RISK_MODEL:-gemma3:4b}
+      DEFCON_ENABLED: ${DEFCON_ENABLED:-false}
+      DEFCON_WAN_DISCONNECT_CMD: ${DEFCON_WAN_DISCONNECT_CMD:-}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ../core-api/src:/app/src          # โค้ด Backend ในเครื่อง → ใน container
+      - ../core-api/prisma:/app/prisma    # schema/migrations ล่าสุดเสมอ (กัน Prisma client ล้าสมัย)
+      - /app/node_modules                 # กัน node_modules ถูกทับ
+    # สร้าง Prisma Client ใหม่ทุกครั้งที่ container เริ่ม (schema ถูก mount แบบ live)
+    # ป้องกัน crash "Cannot read properties of undefined (reading 'groupBy')" หลัง recreate
+    command: sh -c "npx prisma generate && npm run dev"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+    networks:
+      - internal
+
+  # -------------------- FRONTEND --------------------
+  frontend:
+    build:
+      context: ../../sovereign-frontend
+      dockerfile: Dockerfile
+    container_name: sovereign-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001   # ใช้ host.docker.internal เพื่อให้เบราว์เซอร์ฝั่ง client เข้าถึงได้
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../sovereign-frontend:/app          # mount source code
+      - /app/node_modules
+    depends_on:
+      - core-api
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
