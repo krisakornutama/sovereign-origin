@@ -1,0 +1,53 @@
+sovereign-os/
+├── core-api/                          # Node.js + TypeScript Core Backend
+│   ├── src/
+│   │   ├── config/                    # Environment, DB, MQTT config
+│   │   │   ├── database.ts
+│   │   │   ├── mqtt.ts
+│   │   │   └── env.ts
+│   │   ├── middleware/
+│   │   │   ├── auth.middleware.ts     # JWT + MFA + RBAC
+│   │   │   ├── audit.middleware.ts    # Writes AuditLog on state changes
+│   │   │   └── error.middleware.ts
+│   │   ├── modules/
+│   │   │   ├── auth/                  # Login, MFA setup/verify
+│   │   │   ├── nodes/                 # Node CRUD
+│   │   │   ├── devices/               # Device management
+│   │   │   └── telemetry/             # Query telemetry
+│   │   ├── services/
+│   │   │   ├── mqtt-listener.ts       # Core MQTT → TimescaleDB pipeline
+│   │   │   ├── audit.service.ts
+│   │   │   └── notification.service.ts
+│   │   ├── app.ts                     # Express app setup
+│   │   ├── server.ts                  # Entry point
+│   │   └── types/                     # Shared TS types
+│   ├── prisma/
+│   │   └── schema.prisma
+│   ├── migrations/
+│   ├── Dockerfile
+│   ├── tsconfig.json
+│   └── package.json
+│
+├── edge-ai/                           # Python FastAPI for Edge AI + RAG
+│   ├── app/
+│   │   ├── main.py                    # FastAPI entrypoint
+│   │   ├── rag.py                     # LangChain + ChromaDB RAG
+│   │   ├── watchdog.py                # /health/heartbeat endpoint
+│   │   └── models/                    # Ollama config, embeddings
+│   ├── scripts/
+│   │   ├── oobm_alert.py              # LoRa/Iridium serial alert script
+│   │   └── seed_knowledge.py          # Convert TXT/PDF → ChromaDB
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── infra/                             # Infrastructure as Code
+│   ├── docker-compose.yml             # EMQX, PostgreSQL+TimescaleDB, etc.
+│   ├── wireguard/                     # VPN config templates
+│   └── terraform/                     # (optional) Cloud resources
+│
+├── scripts/
+│   ├── init-timescaledb.sql           # Raw SQL for TimescaleDB setup
+│   └── seed-master-node.ts
+│
+├── .env.example
+└── README.md

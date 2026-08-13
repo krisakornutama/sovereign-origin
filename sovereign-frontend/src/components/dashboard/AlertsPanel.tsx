@@ -1,0 +1,102 @@
+"use client";
+import { useState, useEffect } from 'react';
+import { authFetch } from '../../lib/apiFetch';
+
+interface Alert {
+  ruleId: string;
+  metric: string;
+  value: number;
+  threshold: number;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: string;
+}
+
+export default function AlertsPanel() {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  useEffect(() => {
+    // Poll alerts every 5 seconds
+    const fetchAlerts = async () => {
+      try {
+        const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/stats`);
+        const data = await res.json();
+        
+        // Check metrics against rules
+        if (data.metrics) {
+          const checkRes = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ metrics: data.metrics }),
+          });
+          const checkData = await checkRes.json();
+          
+          if (checkData.alerts?.length > 0) {
+            setAlerts(prev => {
+              // Keep last 5 alerts, avoid duplicates
+              const newAlerts = [...prev];
+              checkData.alerts.forEach((msg: string, i: number) => {
+                // Show notification
+                if (Notification.permission === 'granted') {
+                  new Notification('🚨 Sovereign Alert', { body: msg });
+                }
+              });
+              return [...newAlerts.slice(-4), ...checkData.alerts.map((m: string) => ({
+                ruleId: '',
+                metric: '',
+                value: 0,
+                threshold: 0,
+                message: m,
+                severity: 'warning' as const,
+                timestamp: new Date().toISOString(),
+              }))].slice(-5);
+            });
+          }
+        }
+      } catch (err) {
+        // Silent fail
+      }
+    };
+
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 5000);
+    
+    // Request notification permission
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    return () => clearInterval(interval);
+  }, []);
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {alerts.map((alert, i) => (
+        <div
+          key={i}
+          className={`p-3 rounded-lg border text-sm animate-slide-in ${
+            alert.severity === 'critical'
+              ? 'bg-red-900/40 border-red-500/50 text-red-300'
+              : alert.severity === 'warning'
+              ? 'bg-amber-900/40 border-amber-500/50 text-amber-300'
+              : 'bg-blue-900/40 border-blue-500/50 text-blue-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">
+              {alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️'}
+            </span>
+            <div>
+              <p className="font-semibold">{alert.message}</p>
+              <p className="text-xs opacity-75 mt-0.5">
+                {new Date(alert.timestamp).toLocaleTimeString('th-TH')}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

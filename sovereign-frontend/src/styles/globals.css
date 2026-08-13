@@ -1,0 +1,324 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+   SOVEREIGN OS — Design System
+   ฟอนต์ไทยหัวกลม (Prompt) + โทน command-center สมัยใหม่
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --font-thai: 'Prompt', 'Noto Sans Thai Looped', 'IBM Plex Sans Thai', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace;
+  --accent: #10b981;
+  --accent-2: #22d3ee;
+  --radius: 1rem;
+}
+
+/* ── หน้าเยียวยา: เสียงพระคัมภีร์ (Sarabun — ฟอนต์จารีตไทย) ── */
+.font-script {
+  font-family: 'Sarabun', var(--font-thai);
+}
+
+/* ── หน้าคลัง: เสียงสมุดบัญชีสลัก (Noto Serif Thai) ── */
+.font-ledger {
+  font-family: 'Noto Serif Thai', var(--font-thai);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── ระบบ polish ทั่วแอป (ทุกหน้าได้อานิสงส์) ── */
+::selection {
+  background: rgba(16, 185, 129, 0.35);
+  color: #ecfdf5;
+}
+
+/* scrollbar เล็ก กลมกลืนกับโทนเข้ม */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.6);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+/* focus ต้องเห็นชัด (คีย์บอร์ด/ผู้พิการทางสายตา) */
+:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ลิงก์/ปุ่มทั่วไป — hover สื่น ไม่กระตุก */
+a,
+button {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  @apply bg-gray-950 text-gray-100;
+  margin: 0;
+  font-family: var(--font-thai);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.01em;
+}
+
+/* ── พื้นหลัง aurora (เฉพาะ dark theme) — ให้ความรู้สึกลึกขึ้นกว่าสีดำแบน ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
+    radial-gradient(800px 500px at 88% 0%, rgba(34, 211, 238, 0.08), transparent 60%),
+    radial-gradient(1000px 600px at 50% 110%, rgba(139, 92, 246, 0.08), transparent 60%);
+}
+
+/* ── หน้า app ใช้คลาส font-mono บน root div (สไตล์ terminal เดิม) ──
+   ผู้ใช้ต้องการฟอนต์ไทย → ให้ font-mono ใช้ฟอนต์ไทยแทน
+   (code/pre/kbd ยังเป็น mono ตามกฎด้านล่าง) */
+.font-mono {
+  font-family: var(--font-thai);
+}
+
+/* ── ตัวเลข/ค่าเซ็นเซอร์ — mono ดูเป็นระเบียบ ── */
+.mono,
+code,
+kbd,
+pre,
+.metric-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── มือถือ/แท็บเล็ต: กันเนื้อหาถูกบังโดยแถบนำทางด้านล่าง (MobileNav) ── */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 5rem;
+  }
+  /* ซ่อน scrollbar ของแถบนำทางแนวนอน (ยังเลื่อนได้ด้วยนิ้ว) */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(16, 185, 129, 0.35);
+  color: #fff;
+}
+
+/* ── Focus ring ที่มองเห็นชัด ── */
+:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Component classes (ใช้ซ้ำได้ทุกหน้า) ── */
+@layer components {
+  .card {
+    @apply bg-gray-900/60 border border-gray-700/60 rounded-2xl backdrop-blur-sm;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  }
+  .card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.12);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40;
+  }
+  .btn-secondary {
+    @apply btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-200;
+  }
+  .input {
+    @apply bg-gray-800/70 border border-gray-600/70 rounded-xl px-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors;
+  }
+  .label {
+    @apply text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5 block;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+/* ═══════════ ธีมสว่าง (Light theme) ═══════════
+   หน้าเว็บใช้คลาสเข้มฮาร์ดโค้ด (bg-gray-950 ฯลฯ) จึง override ด้วย CSS
+   ตามคลาสที่ใช้งานบ่อย – เปิด/ปิดผ่าน html[data-theme='light']
+   (ตั้งได้ที่หน้า /settings) */
+
+html[data-theme='light'] body {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+html[data-theme='light'] body::before {
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
+    radial-gradient(800px 500px at 88% 0%, rgba(34, 211, 238, 0.08), transparent 60%);
+}
+
+html[data-theme='light'] .bg-gray-950 { background-color: #f1f5f9; }
+html[data-theme='light'] .bg-gray-900 { background-color: #ffffff; }
+html[data-theme='light'] .bg-gray-900\/80 { background-color: #ffffff; }
+html[data-theme='light'] .bg-gray-900\/90 { background-color: #ffffff; }
+html[data-theme='light'] .bg-gray-800 { background-color: #eef2f7; }
+html[data-theme='light'] .bg-gray-800\/50 { background-color: #eef2f7; }
+html[data-theme='light'] .bg-gray-800\/70 { background-color: #eef2f7; }
+html[data-theme='light'] .bg-gray-700 { background-color: #e2e8f0; }
+
+html[data-theme='light'] .text-white { color: #0f172a; }
+html[data-theme='light'] .text-gray-100 { color: #1e293b; }
+html[data-theme='light'] .text-gray-200 { color: #334155; }
+html[data-theme='light'] .text-gray-300 { color: #475569; }
+html[data-theme='light'] .text-gray-400 { color: #64748b; }
+html[data-theme='light'] .text-gray-500 { color: #94a3b8; }
+html[data-theme='light'] .text-green-400 { color: #059669; }
+html[data-theme='light'] .text-blue-400 { color: #2563eb; }
+html[data-theme='light'] .text-red-400 { color: #dc2626; }
+html[data-theme='light'] .text-amber-400 { color: #d97706; }
+html[data-theme='light'] .text-cyan-400 { color: #0891b2; }
+
+html[data-theme='light'] .border-gray-700 { border-color: #e2e8f0; }
+html[data-theme='light'] .border-gray-800 { border-color: #e2e8f0; }
+html[data-theme='light'] .border-gray-600 { border-color: #cbd5e1; }
+
+html[data-theme='light'] ::selection {
+  background: rgba(16, 185, 129, 0.3);
+  color: #0f172a;
+}
+
+/* ═══════════ Hover Card Animations ═══════════ */
+
+/* 3D flip utilities */
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Hover card glow pulse on the border */
+.hover-card-glow {
+  position: relative;
+}
+.hover-card-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(34,211,238,0.3), rgba(139,92,246,0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.hover-card-glow:hover::before {
+  opacity: 1;
+}
+
+/* Sparkline mini chart animation */
+@keyframes sparkle-draw {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
+.sparkline-path {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: sparkle-draw 1.2s ease-out forwards;
+}
+
+/* Shimmer effect for loading states */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Card lift with shadow bloom */
+@keyframes shadow-bloom {
+  from { box-shadow: 0 4px 24px rgba(0,0,0,0.25); }
+  to { box-shadow: 0 12px 40px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.3); }
+}
+.hover-card-lift:hover {
+  animation: shadow-bloom 0.4s ease-out forwards;
+}
+
+/* Ripple on click */
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  pointer-events: none;
+}

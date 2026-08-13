@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Sovereign Origin — Command Center v2.0</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #12171f;
+            --bg-card: #161c26;
+            --border: #1e293b;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            letter-spacing: 0.01em;
+        }
+
+        /* Glow effects */
+        .glow-green {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .glow-amber {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .glow-blue {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .glow-red {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        /* Pulse animation for live indicators */
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.3);
+            }
+        }
+        .pulse-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        /* Slide transitions */
+        .view-panel {
+            display: none;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+        .view-panel.active {
+            display: block;
+        }
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Sidebar active state */
+        .nav-item {
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-left-color: #334155;
+        }
+        .nav-item.active {
+            background: rgba(16, 185, 129, 0.08);
+            border-left-color: var(--accent-green);
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        /* Terminal-style text */
+        .terminal-line {
+            font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+        }
+
+        /* Progress bar animation */
+        @keyframes fillBar {
+            from {
+                width: 0%;
+            }
+            to {
+                width: var(--target-width);
+            }
+        }
+        .progress-fill {
+            animation: fillBar 1s ease-out forwards;
+        }
+
+        /* Modal overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="w-72 lg:w-80 flex-shrink-0 bg-[var(--bg-secondary)] border-r border-[var(--border)] flex flex-col z-20">
+        <!-- Header -->
+        <div class="p-5 border-b border-[var(--border)]">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-2xl">🏰</span>
+                <h1 class="text-lg font-bold text-[var(--accent-green)] tracking-wide">Sovereign OS</h1>
+            </div>
+            <p class="text-xs text-[var(--text-muted)]">Command Center · Offline Ready · v2.0</p>
+            <div class="flex items-center gap-2 mt-3">
+                <span class="w-2 h-2 rounded-full bg-green-500 pulse-dot"></span>
+                <span class="text-xs text-green-400">All Systems Nominal</span>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5" id="sidebarNav">
+            <div class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="dashboard">
+                <span class="text-lg">📊</span> <span>Dashboard ภาพรวม</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="land">
+                <span class="text-lg">📍</span> <span>ที่ดิน & ชัยภูมิ</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="infra">
+                <span class="text-lg">🏗️</span> <span>โครงสร้างพื้นฐาน</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="energy">
+                <span class="text-lg">⚡</span> <span>พลังงาน & น้ำ</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="finance">
+                <span class="text-lg">💰</span> <span>การคลัง & ลงทุน</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="curriculum">
+                <span class="text-lg">🧠</span> <span>Sovereign Curriculum</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="security">
+                <span class="text-lg">🛡️</span> <span>Security & Survival</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="medical">
+                <span class="text-lg">🧬</span> <span>Medical & Bio-Security</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="economy">
+                <span class="text-lg">🌐</span> <span>Economic Engine</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="knowledge">
+                <span class="text-lg">📚</span> <span>Knowledge Base</span>
+            </div>
+            <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm" data-view="notes">
+                <span class="text-lg">📝</span> <span>บันทึก & Journal</span>
+            </div>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-4 border-t border-[var(--border)] text-xs text-[var(--text-muted)]">
+            <div class="flex justify-between">
+                <span>🕐 <span id="sidebarClock">--:--</span></span>
+                <span>🔒 Local Secure</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT AREA ==================== -->
+    <main class="flex-1 overflow-y-auto bg-[var(--bg-primary)] p-4 lg:p-6 xl:p-8" id="mainContent">
+
+        <!-- ========== DASHBOARD VIEW ========== -->
+        <div class="view-panel active space-y-6" id="view-dashboard">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h2 class="text-2xl lg:text-3xl font-bold">📊 Command Dashboard</h2>
+                    <p class="text-[var(--text-secondary)] text-sm mt-1">ภาพรวมระบบทั้งหมด · <span id="dashboardDateTime"
+                            class="text-[var(--accent-cyan)]">--</span></p>
+                </div>
+                <div class="flex gap-3 flex-wrap">
+                    <span class="px-3 py-1.5 bg-green-900/40 text-green-400 rounded-full text-xs font-medium border border-green-700/50">🟢 Phase 1 — Incubation</span>
+                    <span class="px-3 py-1.5 bg-blue-900/30 text-blue-400 rounded-full text-xs font-medium border border-blue-700/50">อายุ 23-25</span>
+                </div>
+            </div>
+
+            <!-- Key Metrics Row -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-green">
+                    <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">💰 Portfolio Value</div>
+                    <div class="text-2xl font-bold text-white">$2,800<span class="text-sm text-green-400 ml-1">+12%</span>
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-2">CCJ · NVDA · PLTR</div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-amber">
+                    <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">⚡ Battery Reserve</div>
+                    <div class="text-2xl font-bold text-white">85<span class="text-sm text-amber-400 ml-1">%</span></div>
+                    <div class="w-full bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-amber-400 h-1.5 rounded-full" style="width:85%"></div>
+                    </div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-blue">
+                    <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">💧 Water Level</div>
+                    <div class="text-2xl font-bold text-white">92<span class="text-sm text-cyan-400 ml-1">%</span></div>
+                    <div class="w-full bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div class="bg-cyan-400 h-1.5 rounded-full" style="width:92%"></div>
+                    </div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-red">
+                    <div class="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">🛡️ Security Status</div>
+                    <div class="text-2xl font-bold text-green-400">SECURE</div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-2">Motion sensors active</div>
+                </div>
+            </div>
+
+            <!-- Two Column: AI Chat + Project Timeline -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- AI Assistant -->
+                <div class="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">🧠 Sovereign AI Assistant <span
+                            class="text-xs text-[var(--text-muted)]">(Local Mode)</span></h3>
+                    <div class="bg-[var(--bg-primary)] rounded-lg p-4 h-56 overflow-y-auto mb-4 text-sm space-y-2 terminal-line"
+                        id="aiChatLog">
+                        <div class="text-[var(--text-muted)]">> ระบบพร้อมให้คำปรึกษาเกี่ยวกับอาณาจักร</div>
+                        <div class="text-[var(--text-muted)]">> ลองถาม: "เช็คดินเค็ม", "แผนPhase2", " EmergencyProtocol"
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="aiInput"
+                        class="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                        placeholder="ถามคำถามเกี่ยวกับอาณาจักร...">
+                        <button onclick="sendAiMessage()"
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition active:scale-95">▶ ส่ง</button>
+                    </div>
+                    <div class="flex gap-2 mt-2 flex-wrap">
+                        <button onclick="quickAsk('ตรวจดินเค็มทำยังไง')"
+                        class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded-full transition">🔍 ตรวจดินเค็ม</button>
+                        <button onclick="quickAsk('แผนฉุกเฉินไฟไหม้')"
+                        class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded-full transition">🔥 แผนไฟไหม้</button>
+                        <button onclick="quickAsk('Phase 2 ทำอะไรบ้าง')"
+                        class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded-full transition">📅 Phase 2</button>
+                        <button onclick="quickAsk('สมุนไพรที่ควรปลูก')"
+                        class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded-full transition">🌿 สมุนไพร</button>
+                    </div>
+                </div>
+
+                <!-- Project Timeline -->
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="text-lg font-semibold text-amber-400 mb-3">⏳ Master Timeline</h3>
+                    <div class="space-y-4">
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold flex-shrink-0">1</div>
+                            <div>
+                                <div class="text-sm font-semibold text-green-400">Phase 1 — Incubation</div>
+                                <div class="text-xs text-[var(--text-muted)]">อายุ 23-25 · สะสมทุน · ศึกษา</div>
+                                <div class="w-full bg-gray-700 h-1 rounded-full mt-1"><div class="bg-green-500 h-1 rounded-full"
+                                style="width:70%"></div></div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold flex-shrink-0">2</div>
+                            <div>
+                                <div class="text-sm font-semibold">Phase 2 — Groundbreaking</div>
+                                <div class="text-xs text-[var(--text-muted)]">อายุ 25-27 · ซื้อที่ดิน · สร้างค่ายกล</div>
+                                <div class="w-full bg-gray-700 h-1 rounded-full mt-1"><div class="bg-gray-500 h-1 rounded-full"
+                                style="width:0%"></div></div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold flex-shrink-0">3</div>
+                            <div>
+                                <div class="text-sm font-semibold">Phase 3 — The Oasis</div>
+                                <div class="text-xs text-[var(--text-muted)]">อายุ 27-30 · ระบบนิเวศปิด · ครอบครัว</div>
+                                <div class="w-full bg-gray-700 h-1 rounded-full mt-1"><div class="bg-gray-500 h-1 rounded-full"
+                                style="width:0%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                <h3 class="text-lg font-semibold text-white mb-3">⚡ Quick Actions</h3>
+                <div class="flex gap-3 flex-wrap">
+                    <button onclick="switchView('notes')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition">📝 จดบันทึก</button>
+                    <button onclick="switchView('knowledge')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition">📚 ค้นหาความรู้</button>
+                    <button onclick="switchView('finance')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition">📈 เช็คพอร์ต</button>
+                    <button onclick="switchView('security')" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition">🛡️ Emergency Protocols</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== LAND VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-land">
+            <h2 class="text-2xl font-bold">📍 ที่ดิน & ชัยภูมิ — สกลนคร</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-green-400 mb-3">🔍 เช็คลิสต์การเลือกที่ดิน</h3>
+                    <div class="space-y-2 text-sm">
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> พื้นที่
+                            1-3 ไร่ (สูงสุด 5-8 ไร่)</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> เช็คประวัติน้ำท่วม
+                            ปี 54/60</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500">
+                            ห่างไกลชุมชนแออัด แต่ไม่เปลี่ยว</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> ตรวจคราบขาวบนดิน
+                            (ขี้กะทา)</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> พืชบ่งชี้:
+                            ไม่พบหนามแดง/แสม</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> ทดสอบ EC Meter
+                            จุ่มดินเปียก</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> ชิมน้ำบ่อใกล้เคียง
+                            — ไม่เค็ม/ไม่กร่อย</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500"> ไม่ใช่ที่ตาบอด
+                            หรือมีภาระจำยอมจดทะเบียน</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="accent-green-500">
+                            เอกสารสิทธิ์: โฉนด น.ส.4 จ. (ไม่ใช่ ส.ป.ก.)</label>
+                    </div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-amber-400 mb-3">🧪 การตรวจดินเค็ม (สำคัญมาก!)</h3>
+                    <div class="space-y-3 text-sm text-[var(--text-secondary)]">
+                        <p><strong class="text-white">Visual Inspection:</strong> ดูคราบขาวบนดิน (ขี้กะทา) ในหน้าแล้ง</p>
+                        <p><strong class="text-white">พืชบ่งชี้ดินเค็ม:</strong> 🚫 หนามแดง, แสม = เค็มจัด | ✅ กระถิน, มะขาม =
+                            ดินดี</p>
+                        <p><strong class="text-white">Scientific Test:</strong> ซื้อ EC Meter วัดค่าการนำไฟฟ้า จุ่มดินเปียก</p>
+                        <p><strong class="text-white">Water Taste:</strong> ชิมน้ำจากบ่อใกล้เคียง — ถ้าเค็ม/กร่อย ให้หนี</p>
+                        <div class="bg-red-900/20 border border-red-700/30 rounded-lg p-3 mt-3">
+                            <span class="text-red-400 text-xs">⚠️ คำเตือน: ดินเค็มแก้ยากมาก ถ้าพบร่องรอย ให้หาที่อื่นดีกว่า</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== INFRASTRUCTURE VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-infra">
+            <h2 class="text-2xl font-bold">🏗️ โครงสร้างพื้นฐาน — Land OS</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-amber-400">🕳️ Earth Smiles (หลุมขนมครก)</h3>
+                    <p class="text-sm text-[var(--text-secondary)]">ขุดดักน้ำฝนทุกระยะ 4 เมตร ช่วยเพิ่มความชุ่มชื้นให้ดิน</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-cyan-400">🌊 Swales (คลองไส้ไก่)</h3>
+                    <p class="text-sm text-[var(--text-secondary)]">ขุดขวาง Slope เพื่อชะลอน้ำ ป้องกันการกัดเซาะ</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-green-400">🌿 Vetiver Grass (หญ้าแฝก)</h3>
+                    <p class="text-sm text-[var(--text-secondary)]">ปลูกกันดินพัง รากเจาะทะลุดินดาน</p>
+                </div>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                <h3 class="font-semibold text-white mb-3">🏠 Command Center Specs</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div><strong>โครงสร้าง:</strong> เหล็กกัลวาไนซ์ (กันสนิม)</div>
+                    <div><strong>ผนัง:</strong> Sandwich Panel EPS Foam 2-3 นิ้ว</div>
+                    <div><strong>Zone A (Work):</strong> Server/Com/Starlink</div>
+                    <div><strong>Zone B (Life):</strong> ครัวไทยนอกบ้าน/ห้องน้ำแยก</div>
+                    <div><strong>สี:</strong> Earth Tone (เขียวขี้ม้า/น้ำตาล) — Gray Man</div>
+                    <div><strong>หลักการ:</strong> พรางตา กลมกลืนธรรมชาติ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== ENERGY VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-energy">
+            <h2 class="text-2xl font-bold">⚡ พลังงาน & ระบบน้ำ</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-amber">
+                    <h3 class="font-semibold text-amber-400 mb-3">🔋 ระบบพลังงาน</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm"><span>Hybrid Inverter 3-5KW</span><span
+                                    class="text-green-400">Online</span></div>
+                            <div class="w-full bg-gray-700 h-2 rounded-full mt-1"><div class="bg-green-500 h-2 rounded-full"
+                            style="width:95%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm"><span>LiFePO4 Battery Bank</span><span>85%</span></div>
+                            <div class="w-full bg-gray-700 h-2 rounded-full mt-1"><div class="bg-amber-400 h-2 rounded-full"
+                            style="width:85%"></div></div>
+                        </div>
+                        <div class="text-xs text-[var(--text-muted)]">💡 แนะนำ: ใช้แบตมือสองสภาพดีเพื่อลดงบประมาณ</div>
+                    </div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-blue">
+                    <h3 class="font-semibold text-cyan-400 mb-3">💧 ระบบน้ำ 3 Layer</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="p-2 bg-blue-900/20 rounded"><strong>Layer 1 (เกษตร):</strong> Solar Pump 300-500W → สระพัก
+                            → Gravity → Swales</div>
+                        <div class="p-2 bg-blue-900/20 rounded"><strong>Layer 2 (ใช้):</strong> บาดาล Submersible → ถังพัก
+                            1000L → กรองแมงกานีส/คาร์บอน</div>
+                        <div class="p-2 bg-blue-900/20 rounded"><strong>Layer 3 (ดื่ม):</strong> ก๊อกน้ำในบ้าน → เครื่องกรอง RO
+                            → เปลี่ยนไส้กรองทุก 6 เดือน</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== FINANCE VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-finance">
+            <h2 class="text-2xl font-bold">💰 การคลัง & การลงทุน</h2>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-green">
+                <h3 class="font-semibold text-green-400 mb-3">📈 The "Transition" Portfolio ($2,800)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="border-b border-[var(--border)]">
+                            <tr class="text-[var(--text-muted)]">
+                                <th class="pb-2">Ticker</th>
+                                <th class="pb-2">Thesis</th>
+                                <th class="pb-2">Exit Strategy</th>
+                                <th class="pb-2">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-[var(--border)]/30">
+                                <td class="py-2 font-bold text-amber-400">☢️ CCJ</td>
+                                <td class="py-2">Data Center ต้องใช้ Nuclear</td>
+                                <td class="py-2">ขายเมื่อกำไร 30-50% → ซื้อโครงเหล็ก</td>
+                                <td class="py-2"><span class="text-green-400">ถืออยู่</span></td>
+                            </tr>
+                            <tr class="border-b border-[var(--border)]/30">
+                                <td class="py-2 font-bold text-green-400">🎮 NVDA</td>
+                                <td class="py-2">เจ้ามือ Hardware AI</td>
+                                <td class="py-2">ขายบางส่วน → ซื้อ Solar Cell</td>
+                                <td class="py-2"><span class="text-green-400">ถืออยู่</span></td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 font-bold text-blue-400">🧠 PLTR</td>
+                                <td class="py-2">สงครามและ AI</td>
+                                <td class="py-2">ถือยาว (Moonshot) → ทุนเกษียณ</td>
+                                <td class="py-2"><span class="text-green-400">ถืออยู่</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg text-xs text-amber-300">
+                    💡 แยกบัญชี "ส่วนตัว" กับ "โครงการ" เด็ดขาด · ตั้งงบเผื่อเหลือเผื่อขาด 15%
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== CURRICULUM VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-curriculum">
+            <h2 class="text-2xl font-bold">🧠 Sovereign Curriculum — หลักสูตรสร้างยอดคน</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 1: Inner OS</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">ฝึกสมาธิ เช้า-เย็น · อ่านสามก๊ก / The Art of War</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 2: Micro-Economy</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">สอนลูกทำบัญชีครัวเรือน · จ้างลูกทำงานในไร่</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 3: Engineering</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">Workshop ต่อท่อ PVC · เดินสายไฟ · ตอนกิ่ง/เพาะเมล็ด</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 4: Bio-Optimization</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">กินไข่จากเล้า · ผักจากแปลง · วิ่งรอบที่ดิน 8 ไร่</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 5: Defense & Tactics</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">ประเมินสถานการณ์ · กฎหมายที่ดิน · การครอบครองปรปักษ์</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
+                    <h3 class="font-semibold text-purple-400">Module 6: Social & Power</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-1">วิเคราะห์ข่าวการเมืองหลังมื้อเย็น</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SECURITY VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-security">
+            <h2 class="text-2xl font-bold">🛡️ Security & Survival</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 glow-red">
+                    <h3 class="font-semibold text-red-400 mb-3">🚨 Emergency Protocols</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="p-3 bg-red-900/20 rounded border border-red-700/30">
+                            <strong>🔥 แผนไฟไหม้:</strong> จุดรวมพลหน้าบ้าน · ดับเพลิงสำรอง
+                        </div>
+                        <div class="p-3 bg-red-900/20 rounded border border-red-700/30">
+                            <strong>⚔️ แผนภัยสงคราม/จลาจล:</strong> ปิดบ้านเงียบ · เตรียมเสบียง 3 เดือน
+                        </div>
+                        <div class="p-3 bg-red-900/20 rounded border border-red-700/30">
+                            <strong>📻 Radio Comms:</strong> วิทยุ Ham Radio / วอแดง ประจำฐานทัพ
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-blue-400 mb-3">💾 Digital & Cold Storage</h3>
+                    <div class="text-sm text-[var(--text-secondary)] space-y-2">
+                        <p>📥 โหลด Wikipedia Offline</p>
+                        <p>📥 How-to งานช่าง</p>
+                        <p>📥 คัมภีร์การแพทย์</p>
+                        <p>📥 คลิปธรรมะพุทธวจน</p>
+                        <p>💾 เก็บใน Harddisk (Cold Storage) เผื่อ EMP</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== MEDICAL VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-medical">
+            <h2 class="text-2xl font-bold">🧬 Medical & Bio-Security</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-red-400 mb-3">🩹 First-Aid OS — ตู้ยาสามัญ</h3>
+                    <div class="space-y-1 text-sm">
+                        <p>✅ อุปกรณ์ทำแผลสด</p>
+                        <p>✅ ยาปฏิชีวนะ</p>
+                        <p>✅ ยาแก้แพ้รุนแรง</p>
+                        <p>✅ อุปกรณ์ฉุกเฉิน</p>
+                    </div>
+                    <p class="text-xs text-[var(--text-muted)] mt-3">เป้าหมาย: รักษาตัวเองได้โดยไม่ต้องพึ่งโรงพยาบาลในสถานการณ์วิกฤต</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-green-400 mb-3">🌿 Herbal Arsenal — สมุนไพรเชิงยุทธศาสตร์</h3>
+                    <div class="space-y-2 text-sm">
+                        <p><strong>ฟ้าทะลายโจร</strong> — ลดไข้ / ต้านอักเสบ</p>
+                        <p><strong>ขมิ้นชัน</strong> — ระบบทางเดินอาหาร</p>
+                        <p><strong>เสลดพังพอน</strong> — แก้พิษแมลงสัตว์กัดต่อย</p>
+                    </div>
+                    <p class="text-xs text-[var(--text-muted)] mt-3">แนวคิด: ให้ธรรมชาติเป็น "คลังยา" ของฐานทัพ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== ECONOMY VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-economy">
+            <h2 class="text-2xl font-bold">🌐 Economic Engine & Export</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-blue-400">💻 Digital Export</h3>
+                    <p class="text-sm text-[var(--text-secondary)]">เทรดหุ้น · รับงาน Consult · เขียนโปรแกรม · Digital Nomad
+                    </p>
+                    <p class="text-xs text-[var(--text-muted)] mt-2">ใช้อินเทอร์เน็ตดาวเทียม · รับรายได้สกุลเงินแข็ง · เติม FCD</p>
+                </div>
+                <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                    <h3 class="font-semibold text-green-400">🌾 Physical Export</h3>
+                    <p class="text-sm text-[var(--text-secondary)]">ส่งออกเมล็ดพันธุ์หายาก · ต้นไม้สายพันธุ์ดี ·
+                        ผลิตภัณฑ์แปรรูป</p>
+                    <p class="text-xs text-[var(--text-muted)] mt-2">สร้างแบรนด์ "Organic 100% จากฟาร์มปิด" ขายออนไลน์ราคาสูง</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== KNOWLEDGE BASE VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-knowledge">
+            <h2 class="text-2xl font-bold">📚 Offline Knowledge Base</h2>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                <input type="text" id="kbSearch" oninput="searchKnowledge()"
+                class="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 mb-4"
+                placeholder="🔍 ค้นหาจากฐานความรู้ (Wikipedia, How-to, การแพทย์, ธรรมะ)...">
+                <div id="kbResults" class="space-y-2 text-sm max-h-96 overflow-y-auto">
+                    <p class="text-[var(--text-muted)]">พิมพ์เพื่อค้นหาจากฐานข้อมูลออฟไลน์...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== NOTES VIEW ========== -->
+        <div class="view-panel space-y-6" id="view-notes">
+            <h2 class="text-2xl font-bold">📝 บันทึก & Journal</h2>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
+                <textarea id="noteInput"
+                class="w-full bg-[var(--bg-primary)] border border-[var(--border)] text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 mb-3 h-32"
+                placeholder="เขียนบันทึกส่วนตัว... (บันทึกอัตโนมัติในเครื่อง)"></textarea>
+                <div class="flex gap-2">
+                    <button onclick="saveNote()"
+                    class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm transition active:scale-95">💾 บันทึก</button>
+                    <button onclick="clearNotes()"
+                    class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm transition">🗑️ ล้างทั้งหมด</button>
+                </div>
+                <div id="savedNotes" class="mt-4 space-y-2 text-sm max-h-64 overflow-y-auto"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ==================== NAVIGATION SYSTEM ====================
+        function switchView(viewName) {
+            // Update sidebar active state
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            const targetNav = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+            if (targetNav) targetNav.classList.add('active');
+
+            // Switch view panels
+            document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+            const targetView = document.getElementById(`view-${viewName}`);
+            if (targetView) targetView.classList.add('active');
+        }
+
+        // Sidebar click handlers
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const viewName = item.getAttribute('data-view');
+                switchView(viewName);
+            });
+        });
+
+        // ==================== CLOCK ====================
+        function updateClocks() {
+            const now = new Date();
+            const thTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // UTC+7
+            const timeStr = thTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = thTime.toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            const sidebarClock = document.getElementById('sidebarClock');
+            const dashboardDateTime = document.getElementById('dashboardDateTime');
+            if (sidebarClock) sidebarClock.textContent = timeStr;
+            if (dashboardDateTime) dashboardDateTime.textContent = `${dateStr} · ${timeStr}`;
+        }
+        setInterval(updateClocks, 1000);
+        updateClocks();
+
+        // ==================== AI CHAT (Simulated Local Knowledge Base) ====================
+        const knowledgeBase = {
+            'ตรวจดินเค็ม': '🔍 **การตรวจดินเค็ม:**\n1. Visual: ดูคราบขาว (ขี้กะทา) บนดินในหน้าแล้ง\n2. พืชบ่งชี้: หนามแดง/แสม = เค็มจัด | กระถิน/มะขาม = ดินดี\n3. ใช้ EC Meter จุ่มดินเปียกวัดค่าการนำไฟฟ้า\n4. ชิมน้ำบ่อใกล้เคียง — ถ้าเค็ม/กร่อย ให้หนี\n\n⚠️ ดินเค็มแก้ยากมาก ถ้าพบร่องรอย แนะนำให้หาที่อื่น',
+            'แผนฉุกเฉิน': '🚨 **Emergency Protocols:**\n- ไฟไหม้: จุดรวมพลหน้าบ้าน ดับเพลิงสำรอง\n- สงคราม/จลาจล: ปิดบ้านเงียบ เตรียมเสบียง 3 เดือน\n- สื่อสารสำรอง: วิทยุ Ham Radio / วอแดง\n- Cold Storage: ข้อมูลสำคัญเก็บใน Harddisk เผื่อ EMP',
+            'phase 2': '📅 **Phase 2 — Groundbreaking (อายุ 25-27):**\n- ซื้อที่ดิน 1-3 ไร่\n- ขุดสระตามแบบแปลน\n- สร้างเนินป้องกัน\n- สร้าง Command Center (เหล็กกัลวาไนซ์ + Sandwich Panel)\n- ติดตั้ง Solar Off-Grid\n- ปลูกป่า 3 อย่าง (ไม้พี่เลี้ยง → ไม้ผล → ไม้ป่า)',
+            'phase 1': '📅 **Phase 1 — Incubation (อายุ 23-25):**\n- เก็บเงินเข้า FCD\n- DCA หุ้น CCJ, NVDA, PLTR\n- ศึกษาโคกหนองนา\n- ฝึกคำนวณระบบน้ำ\n- พัฒนาทักษะ Digital (เขียนโปรแกรม/เทรด)',
+            'phase 3': '📅 **Phase 3 — The Oasis (อายุ 27-30):**\n- ระบบน้ำสมบูรณ์\n- ป่าอาหารเติบโต\n- ปลาเต็มสระ\n- พบ Co-Founder\n- เริ่มชีวิต Sovereign Family',
+            'สมุนไพร': '🌿 **Herbal Arsenal:**\n- ฟ้าทะลายโจร → ลดไข้ / ต้านอักเสบ\n- ขมิ้นชัน → ระบบทางเดินอาหาร\n- เสลดพังพอน → แก้พิษแมลงสัตว์กัดต่อย\n\nแนวคิด: ให้ธรรมชาติเป็น "คลังยา" ของฐานทัพ',
+            'portfolio': '💰 **Transition Portfolio ($2,800):**\n- ☢️ CCJ: Nuclear/Data Center → ขายกำไร 30-50% ซื้อโครงเหล็ก\n- 🎮 NVDA: AI Hardware → ขายบางส่วนซื้อ Solar Cell\n- 🧠 PLTR: War/AI → ถือยาวเป็นทุนเกษียณ\n\nแยกบัญชีส่วนตัวกับโครงการ · Contingency 15%',
+            'น้ำ': '💧 **ระบบน้ำ 3 Layer:**\n- Layer 1 (เกษตร): Solar Pump → สระพัก → Gravity → Swales\n- Layer 2 (ใช้): บาดาล → ถังพัก 1000L → กรองแมงกานีส/คาร์บอน\n- Layer 3 (ดื่ม): ก๊อกน้ำ → RO → เปลี่ยนไส้กรองทุก 6 เดือน',
+            'พลังงาน': '⚡ **ระบบพลังงาน:**\n- Hybrid Inverter 3-5KW\n- แบตเตอรี่ LiFePO4 (แนะนำมือสองสภาพดี)\n- Solar Panel + Backup\n- Gray Man Design: สี Earth Tone พรางตา',
+            'co-founder': '💍 **Co-Founder Selection:**\n- Mindset Over Beauty\n- Anti-Fragile · ทนต่อความเปลี่ยนแปลง\n- ไม่ยึดติดวัตถุนิยม · เข้าใจหลักเหตุปัจจัย\n- พาไปดูฐานทัพต้นแบบ → ถ้ามองว่าเป็นความร่มเย็น = ผ่าน',
+        };
+
+        function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const query = input.value.trim();
+            if (!query) return;
+            appendAiMessage('user', query);
+            input.value = '';
+            const response = searchKnowledgeBase(query);
+            setTimeout(() => appendAiMessage('ai', response), 400 + Math.random() * 600);
+        }
+
+        function quickAsk(query) {
+            document.getElementById('aiInput').value = query;
+            sendAiMessage();
+        }
+
+        function searchKnowledgeBase(query) {
+            const q = query.toLowerCase();
+            for (const [key, value] of Object.entries(knowledgeBase)) {
+                if (q.includes(key)) return value;
+            }
+            // Partial matching
+            const words = q.split(/\s+/);
+            for (const [key, value] of Object.entries(knowledgeBase)) {
+                for (const word of words) {
+                    if (word.length > 2 && key.includes(word)) return value;
+                }
+            }
+            return '🤔 ขออภัย ฉันไม่พบข้อมูลที่ตรงกับคำถามของคุณในฐานข้อมูลออฟไลน์\n\nลองถามเกี่ยวกับ:\n- "ตรวจดินเค็ม" / "สมุนไพร" / "Phase 2"\n- "แผนฉุกเฉิน" / "portfolio" / "น้ำ"\n- "พลังงาน" / "co-founder"';
+        }
+
+        function appendAiMessage(type, text) {
+            const log = document.getElementById('aiChatLog');
+            const div = document.createElement('div');
+            if (type === 'user') {
+                div.className = 'text-blue-400';
+                div.innerHTML = `<strong>🧑 คุณ:</strong> ${text}`;
+            } else {
+                div.className = 'text-green-400 whitespace-pre-line';
+                div.innerHTML = `<strong>🤖 AI:</strong><br>${text.replace(/\n/g, '<br>')}`;
+            }
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Enter key to send
+        document.getElementById('aiInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendAiMessage();
+        });
+
+        // ==================== KNOWLEDGE BASE SEARCH ====================
+        const kbArticles = [
+            { title: 'การตรวจดินเค็มด้วย EC Meter', category: 'ที่ดิน', snippet: 'ใช้ EC Meter จุ่มดินเปียก...' },
+            { title: 'Swales และ Earth Smiles — การจัดการน้ำแบบแอฟริกัน', category: 'เกษตร',
+                snippet: 'ขุดหลุมขนมครกและคลองไส้ไก่เพื่อชะลอน้ำ...' },
+            { title: 'การปลูกหญ้าแฝกกันดินพัง', category: 'เกษตร', snippet: 'หญ้าแฝกรากลึกเจาะทะลุดินดาน...' },
+            { title: 'LiFePO4 Battery Maintenance', category: 'พลังงาน', snippet: 'ดูแลแบตเตอรี่ลิเธียมให้อายุยืน...' },
+            { title: 'First Aid — การปฐมพยาบาลเบื้องต้น', category: 'การแพทย์', snippet: 'ทำแผล ห้ามเลือด CPR...' },
+            { title: 'ฟ้าทะลายโจร — สมุนไพรต้านไวรัส', category: 'สมุนไพร', snippet: 'ลดไข้ ต้านอักเสบ ใช้ในช่วงไข้หวัด...' },
+            { title: 'การตอนกิ่งไม้ผล', category: 'เกษตร', snippet: 'เทคนิคการขยายพันธุ์ไม้ผล...' },
+            { title: 'Ham Radio — การสื่อสารฉุกเฉิน', category: 'ความปลอดภัย', snippet: 'วิทยุคลื่นสั้นเมื่อระบบสื่อสารล่ม...' },
+            { title: 'กฎหมายที่ดิน — การครอบครองปรปักษ์', category: 'กฎหมาย', snippet: 'สิทธิครอบครองที่ดินตามกฎหมาย...' },
+            { title: 'Emergency Food Storage — เสบียง 3 เดือน', category: 'ความปลอดภัย',
+            snippet: 'การเก็บอาหารแห้งและน้ำสำรอง...' },
+        ];
+
+        function searchKnowledge() {
+            const query = document.getElementById('kbSearch').value.toLowerCase().trim();
+            const resultsDiv = document.getElementById('kbResults');
+            if (!query) {
+                resultsDiv.innerHTML =
+                    '<p class="text-[var(--text-muted)]">พิมพ์เพื่อค้นหาจากฐานข้อมูลออฟไลน์... (ลอง: ดินเค็ม, ปฐมพยาบาล, หญ้าแฝก, LiFePO4, Ham Radio)</p>';
+                return;
+            }
+            const results = kbArticles.filter(a =>
+                a.title.toLowerCase().includes(query) ||
+                a.category.toLowerCase().includes(query) ||
+                a.snippet.toLowerCase().includes(query)
+            );
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<p class="text-red-400">❌ ไม่พบผลลัพธ์</p>';
+            } else {
+                resultsDiv.innerHTML = results.map(r => `
+                <div class="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border)]">
+                    <span class="text-xs px-2 py-0.5 bg-gray-700 rounded-full text-[var(--text-muted)]">${r.category}</span>
+                    <div class="font-semibold text-white mt-1">${r.title}</div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5">${r.snippet}</div>
+                </div>
+            `).join('');
+        }
+
+        // ==================== NOTES (LocalStorage) ====================
+        function saveNote() {
+            const input = document.getElementById('noteInput');
+            const text = input.value.trim();
+            if (!text) return;
+            const notes = JSON.parse(localStorage.getItem('sovereign_notes') || '[]');
+            notes.push({
+                text,
+                timestamp: new Date().toLocaleString('th-TH')
+            });
+            localStorage.setItem('sovereign_notes', JSON.stringify(notes));
+            input.value = '';
+            renderNotes();
+        }
+
+        function clearNotes() {
+            if (confirm('ลบบันทึกทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+                localStorage.removeItem('sovereign_notes');
+                renderNotes();
+            }
+        }
+
+        function renderNotes() {
+            const notes = JSON.parse(localStorage.getItem('sovereign_notes') || '[]');
+            const container = document.getElementById('savedNotes');
+            if (notes.length === 0) {
+                container.innerHTML =
+                    '<p class="text-[var(--text-muted)] text-sm">ยังไม่มีบันทึก — เขียนบันทึกแรกของคุณด้านบน</p>';
+                return;
+            }
+            container.innerHTML = notes.slice().reverse().map((n, i) => `
+                <div class="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border)] flex justify-between items-start">
+                    <div>
+                        <div class="text-sm text-white">${n.text}</div>
+                        <div class="text-xs text-[var(--text-muted)] mt-1">${n.timestamp}</div>
+                    </div>
+                    <button onclick="deleteNote(${notes.length - 1 - i})" class="text-red-400 hover:text-red-300 text-xs ml-2 flex-shrink-0">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteNote(index) {
+            const notes = JSON.parse(localStorage.getItem('sovereign_notes') || '[]');
+            notes.splice(index, 1);
+            localStorage.setItem('sovereign_notes', JSON.stringify(notes));
+            renderNotes();
+        }
+
+        // Load notes on startup
+        renderNotes();
+
+        // ==================== INITIALIZATION ====================
+        console.log('🏰 Sovereign Origin — Command Center v2.0 Ready');
+        console.log('📡 Offline Mode | 🔒 Local Storage Active | 🧠 AI Knowledge Base Loaded');
+        console.log('💡 Tip: คลิกเมนูด้านซ้ายเพื่อสำรวจระบบทั้งหมด');
+    </script>
+</body>
+</html>

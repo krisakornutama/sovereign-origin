@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Sovereign OS — Launch Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #12171f;
+            --bg-card: #161c26;
+            --border: #1e293b;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --cyan: #06b6d4;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+        * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+        body {
+            font-family: 'Segoe UI', 'IBM Plex Sans Thai', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
+        .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: .75rem;
+        }
+        .btn { transition: all .15s ease; cursor: pointer; }
+        .btn:active { transform: scale(.96); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .fade-in { animation: fadeIn .25s ease-out; }
+    </style>
+</head>
+<body class="flex items-start justify-center p-4 lg:p-8">
+
+    <div class="w-full max-w-4xl space-y-6">
+
+        <!-- ===== Header ===== -->
+        <header class="card p-6 glow-green" style="box-shadow: 0 0 24px rgba(16,185,129,.12)">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h1 class="text-2xl font-bold text-green-400">🏰 Sovereign OS — Launch Panel</h1>
+                    <p class="text-sm text-[var(--text-secondary)] mt-1">กดปุ่มเพื่อเริ่ม / ติดตั้ง / หยุดระบบ · สถานะอัปเดตอัตโนมัติทุก 3 วินาที</p>
+                </div>
+                <span class="px-3 py-1.5 rounded-full text-xs font-medium border" id="bannerPill">…</span>
+            </div>
+            <div id="bannerMsg" class="mt-4 text-sm rounded-lg p-3 hidden"></div>
+        </header>
+
+        <!-- ===== Status Grid ===== -->
+        <section>
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">สถานะระบบ</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="statusGrid">
+                <!-- injected -->
+            </div>
+        </section>
+
+        <!-- ===== Action Buttons ===== -->
+        <section>
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">ปุ่มกด</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button id="btnStart" onclick="doAction('start')"
+                    class="btn p-5 rounded-xl bg-green-600/90 hover:bg-green-500 text-left">
+                    <div class="text-2xl">🚀</div>
+                    <div class="font-bold text-lg mt-1">เริ่มระบบ</div>
+                    <div class="text-xs text-green-100/80 mt-1">รัน start-sovereign.bat<br>Docker + Backend + Frontend</div>
+                </button>
+                <button id="btnSetup" onclick="doAction('setup')"
+                    class="btn p-5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-left">
+                    <div class="text-2xl">⚙️</div>
+                    <div class="font-bold text-lg mt-1">ติดตั้งครั้งแรก</div>
+                    <div class="text-xs text-amber-100/80 mt-1">รัน setup-first-time.bat<br>สร้าง .env + migrations + seed</div>
+                </button>
+                <button id="btnStop" onclick="doAction('stop', true)"
+                    class="btn p-5 rounded-xl bg-red-600/90 hover:bg-red-500 text-left">
+                    <div class="text-2xl">🛑</div>
+                    <div class="font-bold text-lg mt-1">หยุดทั้งหมด</div>
+                    <div class="text-xs text-red-100/80 mt-1">docker compose down<br>+ ปิด backend/frontend</div>
+                </button>
+            </div>
+            <div class="flex gap-3 mt-3 flex-wrap">
+                <a id="linkDashboard" href="http://localhost:3000" target="_blank"
+                   class="btn px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm">🌐 เปิด Dashboard (3000)</a>
+                <a href="http://localhost:18083" target="_blank"
+                   class="btn px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm">🔧 EMQX UI (18083)</a>
+                <button onclick="loadStatus(true)" class="btn px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm">🔄 รีเฟรช</button>
+            </div>
+        </section>
+
+        <!-- ===== ความเชื่อถือได้: ออโตสตาร์ท ===== -->
+        <section>
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">ความเชื่อถือได้</h2>
+            <div class="card p-4 flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex-1 min-w-[220px] text-sm">
+                    <div class="font-medium">🪄 เปิดระบบอัตโนมัติเมื่อเข้า Windows</div>
+                    <div class="text-xs text-[var(--text-muted)] mt-1">หลังรีสตาร์ทเครื่อง ระบบจะขึ้นเอง (DB + API + Dashboard + Launcher) — ไม่ต้องเปิด launcher.bat อีก ไม่ต้องกังวลเรื่องหน้าต่างปิด</div>
+                </div>
+                <button id="btnAutostart" onclick="toggleAutostart()" class="btn px-4 py-2 rounded-lg text-sm whitespace-nowrap"></button>
+            </div>
+        </section>
+
+        <!-- ===== History ===== -->
+        <section>
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">ประวัติการกด</h2>
+            <div class="card p-4 space-y-2 text-sm max-h-56 overflow-y-auto" id="history">
+                <p class="text-[var(--text-muted)]">ยังไม่มีรายการ — กดปุ่มด้านบนเพื่อเริ่ม</p>
+            </div>
+        </section>
+
+        <!-- ===== 📦 จัดแพ็กเกจ (ติดตั้งเครื่องอื่น) ===== -->
+        <section class="card p-5 text-sm">
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-3">📦 จัดแพ็กเกจ (ติดตั้งเครื่องอื่น)</h2>
+
+            <!-- ตรวจ Ollama -->
+            <div class="bg-gray-800/40 border border-[var(--border)] rounded-lg p-3 mb-4" id="ollamaPanel">
+                <div class="text-[var(--text-secondary)]">กำลังตรวจโฟลเดอร์ Ollama…</div>
+            </div>
+
+            <!-- เลือกฟังก์ชั่น -->
+            <div class="text-[var(--text-secondary)] mb-2">เลือกฟังก์ชั่นที่ต้องการแพ็ก (ระบบหลักบังคับเลือก):</div>
+            <div class="space-y-1.5 mb-4" id="featureList"></div>
+
+            <!-- ปลายทาง -->
+            <div class="flex gap-2 mb-4">
+                <input id="installDest" type="text" placeholder="หรือพิมพ์ path ปลายทาง เช่น D:\sovereign-package"
+                    class="flex-1 bg-gray-800 border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)]" />
+                <button onclick="pickFolder()" class="btn px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm whitespace-nowrap">📁 เลือกโฟลเดอร์</button>
+            </div>
+            <button id="btnInstall" onclick="runInstall()" class="btn px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold">🚚 สร้างแพ็กเกจ</button>
+            <div id="installResult" class="mt-3 text-sm rounded-lg p-3 hidden"></div>
+        </section>
+
+        <!-- ===== How to ===== -->
+        <section class="card p-5 text-sm text-[var(--text-secondary)] space-y-2">
+            <h2 class="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-1">วิธีใช้</h2>
+            <p>1. ดับเบิลคลิก <code class="text-green-400">launcher.bat</code> — เปิดหน้านี้ + ตัวรับคำสั่ง (Launcher Server)</p>
+            <p>2. กด <strong class="text-green-400">🚀 เริ่มระบบ</strong> — หน้าต่าง console จะเปิดขึ้นเอง ทำตามที่มันบอก (ครั้งแรกกด ⚙️ ก่อน)</p>
+            <p>3. ทุกปุ่มเปิด .bat ในหน้าต่างแยก — ปิดหน้าต่างไหนก็ได้ ไม่กระทบตัวอื่น</p>
+            <p class="text-[var(--text-muted)]">💡 ถ้าหน้าแสดง "หา Launcher Server ไม่เจอ" → ยังไม่ได้รัน launcher.bat หรือปิดหน้าต่าง "Sovereign-Launcher" ไปแล้ว</p>
+        </section>
+
+        <footer class="text-center text-xs text-[var(--text-muted)] pb-6">Sovereign OS · Launch Panel · localhost only</footer>
+    </div>
+
+    <script>
+        // ถ้าเปิดผ่าน launcher server โดยตรง → ใช้ same-origin, ไม่งั้นชี้ไป 127.0.0.1:4100
+        const API = ['http://127.0.0.1:4100', 'http://localhost:4100'].includes(location.origin)
+            ? '' : 'http://127.0.0.1:4100';
+
+        const STATUS_CARDS = [
+            { key: 'docker',   label: '🐳 Docker Desktop',    on: 'รันอยู่',     off: 'ยังไม่เปิด' },
+            { key: 'db',       label: '🗄️ Database (5432)',   on: 'พร้อม',       off: 'ปิดอยู่' },
+            { key: 'backend',  label: '⚙️ Backend API (3001)', on: 'ออนไลน์',    off: 'ออฟไลน์' },
+            { key: 'frontend', label: '🖥️ Frontend (3000)',   on: 'ออนไลน์',    off: 'ออฟไลน์' },
+            { key: 'emqx',     label: '🔧 EMQX (18083)',      on: 'ออนไลน์',    off: 'ออฟไลน์' },
+            { key: 'config',   label: '📄 Config (.env)',     on: 'ครบ',        off: 'ขาดไฟล์' },
+        ];
+
+        let busy = false;
+        let AUTOSTART = false;
+
+        function statusOf(s) {
+            const parts = [];
+            parts.push(['docker', s.docker]);
+            parts.push(['db', s.ports.db]);
+            parts.push(['backend', s.ports.backend]);
+            parts.push(['frontend', s.ports.frontend]);
+            parts.push(['emqx', s.ports.emqx]);
+            parts.push(['config', s.config.infraEnv && s.config.coreEnv && s.config.frontendEnv]);
+            return Object.fromEntries(parts);
+        }
+
+        function renderStatus(s) {
+            const st = statusOf(s);
+            const grid = document.getElementById('statusGrid');
+            grid.innerHTML = STATUS_CARDS.map(c => {
+                const ok = st[c.key];
+                const dot = ok ? 'bg-green-500' : 'bg-gray-600';
+                const text = ok ? 'text-green-400' : 'text-[var(--text-muted)]';
+                const label = ok ? c.on : c.off;
+                return `
+                <div class="card p-4 fade-in">
+                    <div class="flex items-center gap-2 text-sm">${c.label}</div>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="w-2 h-2 rounded-full ${dot} ${ok ? 'pulse-dot' : ''}"></span>
+                        <span class="text-xs ${text}">${label}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Banner
+            const pill = document.getElementById('bannerPill');
+            const msg = document.getElementById('bannerMsg');
+            if (!s.docker) {
+                pill.textContent = '⚠️ Docker ยังไม่เปิด';
+                pill.className = 'px-3 py-1.5 rounded-full text-xs font-medium border border-amber-700/50 bg-amber-900/30 text-amber-400';
+                msg.className = 'mt-4 text-sm rounded-lg p-3 bg-amber-900/20 border border-amber-700/40 text-amber-200';
+                msg.classList.remove('hidden');
+                msg.innerHTML = '⚠️ <strong>เปิด Docker Desktop ก่อน</strong> แล้วกด 🚀 เริ่มระบบ หรือ ⚙️ ติดตั้งครั้งแรก';
+            } else if (!s.ports.backend) {
+                pill.textContent = '✅ พร้อมเริ่ม';
+                pill.className = 'px-3 py-1.5 rounded-full text-xs font-medium border border-green-700/50 bg-green-900/30 text-green-400';
+                msg.className = 'hidden';
+            } else {
+                pill.textContent = '🟢 ระบบรันอยู่';
+                pill.className = 'px-3 py-1.5 rounded-full text-xs font-medium border border-green-700/50 bg-green-900/30 text-green-400';
+                msg.className = 'hidden';
+            }
+
+            // Dashboard link
+            const link = document.getElementById('linkDashboard');
+            if (s.ports.frontend) { link.classList.remove('opacity-40','pointer-events-none'); }
+            else { link.classList.add('opacity-40','pointer-events-none'); }
+
+            // Autostart toggle
+            AUTOSTART = !!s.autostart;
+            const ab = document.getElementById('btnAutostart');
+            if (AUTOSTART) {
+                ab.textContent = '✅ เปิดอยู่ — กดเพื่อปิด';
+                ab.className = 'btn px-4 py-2 rounded-lg text-sm whitespace-nowrap bg-green-600/90 hover:bg-green-500';
+            } else {
+                ab.textContent = 'เปิดอัตโนมัติ (แนะนำ)';
+                ab.className = 'btn px-4 py-2 rounded-lg text-sm whitespace-nowrap bg-gray-700 hover:bg-gray-600';
+            }
+        }
+
+        async function toggleAutostart() {
+            const btn = document.getElementById('btnAutostart');
+            btn.disabled = true;
+            try {
+                const r = await fetch(`${API}/api/autostart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable: !AUTOSTART }),
+                });
+                const d = await r.json();
+                alert(d.message || (d.ok ? 'สำเร็จ' : 'ล้มเหลว'));
+            } catch (e) {
+                alert('ติดต่อ Launcher Server ไม่ได้: ' + e.message);
+            }
+            btn.disabled = false;
+            loadStatus(true);
+        }
+
+        function renderHistory(history) {
+            const el = document.getElementById('history');
+            if (!history || history.length === 0) {
+                el.innerHTML = '<p class="text-[var(--text-muted)]">ยังไม่มีรายการ — กดปุ่มด้านบนเพื่อเริ่ม</p>';
+                return;
+            }
+            el.innerHTML = history.map(h => `
+                <div class="flex gap-2 items-start border-b border-[var(--border)]/40 pb-2 last:border-0">
+                    <span class="text-[var(--text-muted)] text-xs whitespace-nowrap pt-0.5">${h.time}</span>
+                    <span class="text-green-400 font-medium whitespace-nowrap">${h.action}</span>
+                    <span class="text-[var(--text-secondary)] text-xs">${h.result}</span>
+                </div>`).join('');
+        }
+
+        async function loadStatus(force) {
+            try {
+                const r = await fetch(`${API}/api/status`, { cache: 'no-store' });
+                if (!r.ok) throw new Error(r.status);
+                const s = await r.json();
+                renderStatus(s);
+                renderHistory(s.history);
+            } catch (e) {
+                const pill = document.getElementById('bannerPill');
+                pill.textContent = '❌ ไม่พบ Launcher Server';
+                pill.className = 'px-3 py-1.5 rounded-full text-xs font-medium border border-red-700/50 bg-red-900/30 text-red-400';
+                const msg = document.getElementById('bannerMsg');
+                msg.className = 'mt-4 text-sm rounded-lg p-3 bg-red-900/20 border border-red-700/40 text-red-200';
+                msg.classList.remove('hidden');
+                msg.innerHTML = `
+                    <div class="flex items-start gap-3 flex-wrap">
+                        <div class="flex-1 min-w-[220px]">
+                            <strong>หา Launcher Server ไม่เจอ</strong> — ตัวรับคำสั่งยังไม่รัน
+                            <ol class="list-decimal ml-4 mt-2 space-y-1 text-xs">
+                                <li>ปิดหน้านี้ แล้ว<strong>ดับเบิลคลิก <code>launcher.bat</code></strong> ที่โฟลเดอร์โปรเจกต์</li>
+                                <li>ห้ามปิดหน้าต่าง <strong>Sovereign-Launcher</strong> ที่เปิดขึ้นมา</li>
+                                <li>ถ้าเปิดแล้ว error — ดูไฟล์ <code>launcher-server.log</code> หน้าโปรเจกต์</li>
+                            </ol>
+                        </div>
+                        <button onclick="loadStatus(true)" class="btn px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-sm whitespace-nowrap">
+                            🔄 ลองใหม่ (รีเฟรชอัตโนมัติทุก 3 วิ)
+                        </button>
+                    </div>`;
+            }
+        }
+
+        async function doAction(name, needConfirm) {
+            if (busy) return;
+            if (needConfirm && !confirm('หยุดทั้งหมด? จะปิด containers + backend + frontend')) return;
+            busy = true;
+            const btn = document.getElementById({ start: 'btnStart', setup: 'btnSetup', stop: 'btnStop' }[name]);
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="text-lg">⏳ กำลังสั่ง…</div>';
+            try {
+                const r = await fetch(`${API}/api/action/${name}`, { method: 'POST' });
+                const data = await r.json();
+                if (!data.ok) throw new Error(data.message || 'fail');
+                btn.innerHTML = '<div class="text-lg">✅ สั่งแล้ว</div>';
+            } catch (e) {
+                btn.innerHTML = `<div class="text-sm">❌ ${e.message}</div>`;
+            }
+            setTimeout(() => { btn.innerHTML = original; btn.disabled = false; busy = false; }, 2500);
+            setTimeout(() => loadStatus(true), 2000);
+        }
+
+        // ===== 📦 จัดแพ็กเกจ (ติดตั้งเครื่องอื่น) =====
+        let FEATURES = [];
+
+        async function loadFeatures() {
+            try {
+                const r = await fetch(`${API}/api/features`, { cache: 'no-store' });
+                const d = await r.json();
+                FEATURES = d.features || [];
+                renderFeatures();
+                loadOllamaCheck();
+            } catch (e) {
+                document.getElementById('featureList').innerHTML =
+                    '<div class="text-red-400 text-xs">โหลดรายการฟังก์ชั่นไม่สำเร็จ — ตรวจ Launcher Server</div>';
+            }
+        }
+
+        function renderFeatures() {
+            const el = document.getElementById('featureList');
+            if (FEATURES.length === 0) {
+                el.innerHTML = '<div class="text-[var(--text-muted)] text-xs">ยังไม่มีฟังก์ชั่น</div>';
+                return;
+            }
+            el.innerHTML = FEATURES.map((f) => `
+                <label class="flex items-center gap-2.5 bg-gray-800/40 border border-[var(--border)] rounded-lg px-3 py-2 cursor-pointer hover:border-gray-600 ${f.required ? 'opacity-70' : ''}">
+                    <input type="checkbox" data-id="${f.id}" ${f.required ? 'checked disabled' : ''} class="accent-green-500" />
+                    <span class="flex-1 text-[var(--text-primary)] text-sm">${f.label}</span>
+                    <span class="text-[10px] text-[var(--text-muted)] whitespace-nowrap">${f.sizeLabel}${!f.exists ? ' · ไม่พบไฟล์' : ''}</span>
+                </label>`).join('');
+        }
+
+        async function loadOllamaCheck() {
+            try {
+                const r = await fetch(`${API}/api/ollama-check`, { cache: 'no-store' });
+                const d = await r.json();
+                const panel = document.getElementById('ollamaPanel');
+                const ok = d.modelsInProject && d.setupExe;
+                panel.innerHTML = `
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+                        <span class="font-medium ${ok ? 'text-green-400' : 'text-amber-400'}">🤖 ${ok ? 'Ollama ครบในโฟลเดอร์เดียว' : 'Ollama ยังไม่ครบ'}</span>
+                        <span class="text-[10px] text-[var(--text-muted)]">ขนาดรวม ${d.projectSize} · OLLAMA_MODELS=${d.envModels || '—'}</span>
+                    </div>
+                    <div class="space-y-0.5 text-xs text-[var(--text-secondary)]">
+                        ${d.notes.map((n) => `<div>${n}</div>`).join('')}
+                    </div>`;
+            } catch (e) { /* Launcher เก่า — ข้าม */ }
+        }
+
+        async function pickFolder() {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            try {
+                const r = await fetch(`${API}/api/pick-folder`, { method: 'POST' });
+                const d = await r.json();
+                if (d.ok && d.dest) document.getElementById('installDest').value = d.dest;
+                else if (d.message) alert(d.message);
+            } catch (e) {
+                alert('เลือกโฟลเดอร์ไม่สำเร็จ: ' + e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function runInstall() {
+            const selected = [...document.querySelectorAll('#featureList input:checked')].map((c) => c.dataset.id);
+            const dest = document.getElementById('installDest').value.trim();
+            if (!dest) { alert('เลือกโฟลเดอร์ปลายทางก่อน (📁 เลือกโฟลเดอร์ หรือพิมพ์ path)'); return; }
+            const btn = document.getElementById('btnInstall');
+            const res = document.getElementById('installResult');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ กำลังคัดลอก… (ถ้าเลือก Ollama 20GB อาจใช้เวลาหลายนาที)';
+            res.className = 'mt-3 text-sm rounded-lg p-3 bg-blue-900/20 border border-blue-700/40 text-blue-200';
+            res.classList.remove('hidden');
+            res.innerHTML = '⏳ กำลังสร้างแพ็กเกจ…';
+            try {
+                const r = await fetch(`${API}/api/install`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ features: selected, dest }),
+                });
+                const d = await r.json();
+                if (!d.ok) throw new Error(d.message || 'สร้างแพ็กเกจไม่สำเร็จ');
+                res.className = 'mt-3 text-sm rounded-lg p-3 bg-green-900/20 border border-green-700/40 text-green-200';
+                res.innerHTML = `
+                    <div class="font-bold mb-1">✅ สร้างแพ็กเกจเสร็จ: ${d.dest}</div>
+                    <div class="text-xs space-y-0.5">
+                        ${d.features.map((f) => `<div>• ${f.label}</div>`).join('')}
+                        <div class="pt-1">ไฟล์คัดลอก ${d.filesCopied} รายการ · ไฟล์ติดตั้ง: ${d.installBat}</div>
+                        <div class="text-[var(--text-muted)] pt-1">ขั้นถัดไปที่เครื่องปลายทาง: รัน install.bat → setup-first-time.bat → launcher.bat</div>
+                    </div>`;
+            } catch (e) {
+                res.className = 'mt-3 text-sm rounded-lg p-3 bg-red-900/20 border border-red-700/40 text-red-200';
+                res.innerHTML = '❌ ' + (e.message || 'สร้างแพ็กเกจไม่สำเร็จ');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚚 สร้างแพ็กเกจ';
+            }
+        }
+
+        loadFeatures();
+        loadStatus(true);
+        setInterval(loadStatus, 3000);
+    </script>
+</body>
+</html>

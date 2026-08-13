@@ -1,0 +1,11 @@
+-- TimescaleDB setup สำหรับ sensor_telemetry
+--
+-- IMPORTANT:
+-- ตาราง sensor_telemetry + hypertable + index + compression ถูกจัดการผ่าน
+-- Prisma migration `20260811000003_sensor_telemetry_timescale` แทน
+-- เพื่อไม่ให้ชนกับ `prisma migrate dev` บน DB ใหม่ (เดิมไฟล์นี้สร้างตารางก่อน
+-- แล้ว migration 1 ก็สร้างซ้ำ → error relation already exists)
+--
+-- ไฟล์นี้เหลือหน้าที่เดียว: enable extension ตอน container เริ่มครั้งแรก
+-- (migration จะรัน CREATE EXTENSION IF NOT EXISTS ซ้ำได้ ไม่ชนกัน)
+CREATE EXTENSION IF NOT EXISTS timescaledb;

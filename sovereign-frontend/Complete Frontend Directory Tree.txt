@@ -1,0 +1,48 @@
+sovereign-frontend/
+├── public/
+│   ├── manifest.json
+│   ├── icons/                    # PWA icons
+│   └── service-worker.js         # (generated or custom)
+├── src/
+│   ├── components/
+│   │   ├── dashboard/
+│   │   │   ├── GlobalMap.tsx      # Leaflet map (SUPERADMIN only)
+│   │   │   ├── NodeTelemetryCard.tsx
+│   │   │   ├── BatteryGauge.tsx
+│   │   │   ├── WaterLevelBar.tsx
+│   │   │   └── AlertsPanel.tsx
+│   │   ├── auth/
+│   │   │   ├── LoginForm.tsx
+│   │   │   └── MfaInput.tsx
+│   │   ├── layout/
+│   │   │   ├── Sidebar.tsx
+│   │   │   ├── Header.tsx
+│   │   │   └── Layout.tsx
+│   │   └── ui/
+│   │       └── CriticalAlert.tsx
+│   ├── hooks/
+│   │   ├── useSocket.ts          # WebSocket service
+│   │   └── useOfflineSync.ts     # IndexedDB sync logic
+│   ├── lib/
+│   │   ├── axios.ts              # Axios instance with JWT interceptor
+│   │   └── jwt.ts                # JWT decode & validation
+│   ├── pages/
+│   │   ├── _app.tsx              # Global providers
+│   │   ├── index.tsx             # Login page
+│   │   ├── dashboard.tsx         # Main dashboard (the core)
+│   │   └── _document.tsx
+│   ├── stores/
+│   │   ├── useAuthStore.ts
+│   │   ├── useTelemetryStore.ts
+│   │   └── useUiStore.ts
+│   ├── styles/
+│   │   └── globals.css           # Tailwind + tactical dark theme
+│   ├── types/
+│   │   └── index.ts
+│   └── utils/
+│       ├── notifications.ts
+│       └── offlineQueue.ts
+├── tailwind.config.ts
+├── tsconfig.json
+├── next.config.js
+└── package.json
