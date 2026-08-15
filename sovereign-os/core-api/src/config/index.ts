@@ -146,6 +146,13 @@ export const config = {
     checkIntervalMs: parseInt(process.env.UPS_CHECK_INTERVAL_MS || '30000', 10),
     lowBatteryThreshold: parseInt(process.env.UPS_LOW_BATTERY_THRESHOLD || '20', 10),
     lowBatteryCooldownMs: parseInt(process.env.UPS_LOW_BATTERY_COOLDOWN_MS || '600000', 10),
+    // UPS Graceful Shutdown — trigger เมื่อแบตเตอรี่ถึงขีด (หรือเหลือเวลาไม่ถึง) แล้วทำ
+    // CHECKPOINT → drain telemetry → emergency bundle → audit → สั่งปิดเครื่อง
+    shutdownBatteryPct: parseInt(process.env.UPS_SHUTDOWN_BATTERY_PCT || '15', 10),
+    shutdownRuntimeSec: parseInt(process.env.UPS_SHUTDOWN_RUNTIME_SEC || '180', 10),
+    shutdownCheckIntervalMs: parseInt(process.env.UPS_SHUTDOWN_CHECK_INTERVAL_MS || '15000', 10),
+    shutdownCommand: process.env.UPS_SHUTDOWN_CMD || process.env.POWER_SHUTDOWN_CMD || 'shutdown -h now',
+    dryRun: (process.env.UPS_DRY_RUN || 'false') === 'true',
   },
   // ── Phase 4: Risk & Wealth Infrastructure ──
   // Module 13: Wealth & Asset Tracker

@@ -10,7 +10,8 @@ FROM node:18-slim
 WORKDIR /app
 ENV NODE_ENV=production
 # Survival: pg_dump/psql ใน container — backup DB ผ่าน docker network ได้โดยไม่ต้อง mount docker socket
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+# + rsync/openssh-client สำหรับ offsite replication ไป remote server (MESH_RSYNC_TARGET / MESH_SCP_TARGET)
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client rsync openssh-client && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

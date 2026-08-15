@@ -4,27 +4,37 @@ import crypto from 'crypto';
 import { gzipSync, gunzipSync } from 'zlib';
 import cron from 'node-cron';
 import axios from 'axios';
+import { promisify } from 'util';
+import { execFile as execFileCb } from 'child_process';
 import { BACKUP_DIR } from './backup.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { securityStream } from './security-stream.service';
 import { PrismaClient } from '@prisma/client';
 import { sendTelegram } from '../modules/telegram/telegram.routes';
 
+const execFile = promisify(execFileCb);
 const prisma = new PrismaClient();
 
 // ── Sovereign Mesh Lite: สำรองข้อมูลนอกสถานที่แบบเข้ารหัส (AES-256-GCM) ──
 // หลักการ: ทุกครั้งที่มี backup ใหม่ (DB dump + state bundle) → เข้ารหัสด้วย key เฉพาะเครื่อง
-// แล้ว 1) stage ไปยังโฟลเดอร์ปลายทาง (NAS/USB/SMB mount) 2) push ไปยัง remote server (ถ้าตั้ง)
-// 3) remote อื่น pull ผ่าน GET /api/mesh/latest — ปลายทางต้องได้ key ไปถอดรหัสเอง (คัดลอกมือ)
+// แล้วส่งออกนอกเครื่องผ่านช่องทางที่ตั้งไว้:
+//   1) MESH_OUTPUT_DIR  — local mount (NAS/SMB/NFS/USB) — copy + retention ที่ปลายทาง
+//   2) MESH_PUSH_URL    — remote server ผ่าน HTTP POST (bundle .enc.json)
+//   3) MESH_RSYNC_TARGET — rsync ไป remote/local (เช่น user@host:/path หรือ /mnt/nas)
+//   4) MESH_SCP_TARGET   — scp ไป remote (user@host:/path)
+// ปลายทางต้องได้ key ไปถอดรหัสเอง (คัดลอกมือ ห้ามส่งผ่าน network)
 
 export const MESH_DIR = process.env.MESH_DIR || path.join(BACKUP_DIR, 'mesh');
 export const MESH_KEY_FILE = process.env.MESH_KEY_FILE || path.resolve(process.cwd(), 'data', 'mesh-key');
 const MESH_ENABLED = process.env.MESH_ENABLED !== 'false';
 const MESH_RETAIN = parseInt(process.env.MESH_RETAIN || '30', 10);
+const OFFSITE_RETAIN = parseInt(process.env.OFFSITE_RETAIN || String(MESH_RETAIN), 10);
 const MESH_MIN_INTERVAL_MS = parseInt(process.env.MESH_MIN_INTERVAL_MS || (15 * 60 * 1000).toString(), 10);
 const MESH_OUTPUT_DIR = process.env.MESH_OUTPUT_DIR || null;
 const MESH_PUSH_URL = process.env.MESH_PUSH_URL || null;
 const MESH_PUSH_TOKEN = process.env.MESH_PUSH_TOKEN || null;
+const MESH_RSYNC_TARGET = process.env.MESH_RSYNC_TARGET || null;
+const MESH_SCP_TARGET = process.env.MESH_SCP_TARGET || null;
 const MESH_PUSH_TIMEOUT_MS = parseInt(process.env.MESH_PUSH_TIMEOUT_MS || '60000', 10);
 const STATE_FILE = path.resolve(process.cwd(), 'data', 'mesh-lite.json');
 
@@ -51,6 +61,9 @@ export interface MeshStatus {
   bundles: MeshBundleInfo[];
   outputDir: string | null;
   pushUrl: string | null;
+  rsyncTarget: string | null;
+  scpTarget: string | null;
+  offsiteRetain: number;
   pending: boolean;
 }
 
@@ -120,6 +133,23 @@ function latestOf(dir: string, suffix: string): { file: string; path: string; si
   return candidates[0] || null;
 }
 
+/** ลบ .enc.json ที่เก่าที่สุดใน dir เก็บ retain รายการล่าสุด — ใช้กับทั้ง meshDir และปลายทาง offsite */
+export function pruneEncBundles(dir: string, retain: number): void {
+  if (!dir || !fs.existsSync(dir)) return;
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.enc.json') && !f.includes('..'))
+    .map((f) => ({ f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  for (const { f } of files.slice(retain)) {
+    try {
+      fs.unlinkSync(path.join(dir, f));
+    } catch {
+      // ข้าม
+    }
+  }
+}
+
 export class MeshLiteService {
   private backupDir: string;
   private meshDir: string;
@@ -128,6 +158,9 @@ export class MeshLiteService {
   private outputDir: string | null;
   private pushUrl: string | null;
   private pushToken: string | null;
+  private rsyncTarget: string | null;
+  private scpTarget: string | null;
+  private offsiteRetain: number;
   private enabled: boolean;
   private minIntervalMs: number;
   private state: MeshState;
@@ -140,6 +173,9 @@ export class MeshLiteService {
     outputDir?: string | null;
     pushUrl?: string | null;
     pushToken?: string | null;
+    rsyncTarget?: string | null;
+    scpTarget?: string | null;
+    offsiteRetain?: number;
     enabled?: boolean;
     minIntervalMs?: number;
   }) {
@@ -150,6 +186,9 @@ export class MeshLiteService {
     this.outputDir = opts?.outputDir !== undefined ? opts.outputDir : MESH_OUTPUT_DIR;
     this.pushUrl = opts?.pushUrl !== undefined ? opts.pushUrl : MESH_PUSH_URL;
     this.pushToken = opts?.pushToken !== undefined ? opts.pushToken : MESH_PUSH_TOKEN;
+    this.rsyncTarget = opts?.rsyncTarget !== undefined ? opts.rsyncTarget : MESH_RSYNC_TARGET;
+    this.scpTarget = opts?.scpTarget !== undefined ? opts.scpTarget : MESH_SCP_TARGET;
+    this.offsiteRetain = opts?.offsiteRetain !== undefined ? opts.offsiteRetain : OFFSITE_RETAIN;
     this.enabled = opts?.enabled !== undefined ? opts.enabled : MESH_ENABLED;
     this.minIntervalMs = opts?.minIntervalMs !== undefined ? opts.minIntervalMs : MESH_MIN_INTERVAL_MS;
     this.state = this.loadState();
@@ -245,19 +284,33 @@ export class MeshLiteService {
   }
 
   private applyRetention(): void {
-    if (!fs.existsSync(this.meshDir)) return;
-    const files = fs
-      .readdirSync(this.meshDir)
-      .filter((f) => f.endsWith('.enc.json'))
-      .map((f) => ({ f, mtime: fs.statSync(path.join(this.meshDir, f)).mtimeMs }))
-      .sort((a, b) => b.mtime - a.mtime);
-    for (const { f } of files.slice(MESH_RETAIN)) {
-      try {
-        fs.unlinkSync(path.join(this.meshDir, f));
-      } catch {
-        // ข้าม
-      }
+    pruneEncBundles(this.meshDir, MESH_RETAIN);
+  }
+
+  /** ลบ bundle เก่าที่ปลายทาง (เก็บ 1 รายการแยกต่อโฟลเดอร์) */
+  private applyOffsiteRetention(dir: string): void {
+    pruneEncBundles(dir, this.offsiteRetain);
+  }
+
+  private async hasBinary(name: string): Promise<boolean> {
+    try {
+      await execFile('which', [name]);
+      return true;
+    } catch {
+      return false;
     }
+  }
+
+  private async pushRsync(src: string, target: string): Promise<void> {
+    await execFile('rsync', ['-az', '--quiet', '--timeout=60', src, target], { timeout: MESH_PUSH_TIMEOUT_MS });
+  }
+
+  private async pushScp(src: string, target: string): Promise<void> {
+    await execFile(
+      'scp',
+      ['-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=30', src, target],
+      { timeout: MESH_PUSH_TIMEOUT_MS }
+    );
   }
 
   listBundles(): MeshBundleInfo[] {
@@ -324,29 +377,57 @@ export class MeshLiteService {
     }
   }
 
-  /** replicate รอบเดียว: สร้าง bundle → stage ปลายทาง → push remote → อัปเดต state */
+  /** replicate รอบเดียว: สร้าง bundle → ส่งไปทุกปลายทางที่ตั้งไว้ → retention → audit log */
   async replicate(): Promise<{ ok: boolean; reason?: string; info?: MeshBundleInfo }> {
     if (!this.enabled) return { ok: false, reason: 'Mesh Lite ถูกปิด (MESH_ENABLED=false)' };
-    if (!this.outputDir && !this.pushUrl) {
-      return { ok: false, reason: 'ยังไม่ได้ตั้งปลายทาง (MESH_OUTPUT_DIR หรือ MESH_PUSH_URL)' };
+    if (!this.outputDir && !this.pushUrl && !this.rsyncTarget && !this.scpTarget) {
+      return { ok: false, reason: 'ยังไม่ได้ตั้งปลายทาง (MESH_OUTPUT_DIR / MESH_PUSH_URL / MESH_RSYNC_TARGET / MESH_SCP_TARGET)' };
     }
     const info = this.createBundle();
     if (!info) return { ok: false, reason: this.state.lastError || 'สร้าง bundle ไม่สำเร็จ' };
 
     this.state.lastReplicateAt = new Date().toISOString();
-    const errors: string[] = [];
+    const src = path.join(this.meshDir, info.file);
+    const attempts: Array<{ target: string; ok: boolean; detail?: string }> = [];
 
+    // 1) local mount (NAS/SMB/NFS/USB) — copy + retention ที่ปลายทาง
     if (this.outputDir) {
       try {
         fs.mkdirSync(this.outputDir, { recursive: true });
-        const src = path.join(this.meshDir, info.file);
         fs.copyFileSync(src, path.join(this.outputDir, info.file));
+        this.applyOffsiteRetention(this.outputDir);
+        attempts.push({ target: `dir:${this.outputDir}`, ok: true });
         console.log(`📡 Staged to ${this.outputDir}/${info.file}`);
       } catch (err) {
-        errors.push(`stage ปลายทางล้มเหลว: ${err instanceof Error ? err.message : err}`);
+        attempts.push({ target: `dir:${this.outputDir}`, ok: false, detail: err instanceof Error ? err.message : String(err) });
       }
     }
 
+    // 2) rsync → remote/local
+    if (this.rsyncTarget) {
+      try {
+        if (!(await this.hasBinary('rsync'))) throw new Error('ไม่พบ rsync ใน container (เพิ่ม rsync ใน Dockerfile)');
+        await this.pushRsync(src, this.rsyncTarget);
+        attempts.push({ target: `rsync:${this.rsyncTarget}`, ok: true });
+        console.log(`📡 rsync → ${this.rsyncTarget}`);
+      } catch (err) {
+        attempts.push({ target: `rsync:${this.rsyncTarget}`, ok: false, detail: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    // 3) scp → remote
+    if (this.scpTarget) {
+      try {
+        if (!(await this.hasBinary('scp'))) throw new Error('ไม่พบ scp ใน container (เพิ่ม openssh-client ใน Dockerfile)');
+        await this.pushScp(src, this.scpTarget);
+        attempts.push({ target: `scp:${this.scpTarget}`, ok: true });
+        console.log(`📡 scp → ${this.scpTarget}`);
+      } catch (err) {
+        attempts.push({ target: `scp:${this.scpTarget}`, ok: false, detail: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    // 4) HTTP push → remote server
     if (this.pushUrl) {
       try {
         const latest = this.readLatestBundle();
@@ -357,23 +438,29 @@ export class MeshLiteService {
           maxBodyLength: 1024 * 1024 * 1024,
           maxContentLength: 1024 * 1024 * 1024,
         });
+        attempts.push({ target: `http:${this.pushUrl}`, ok: true });
         console.log(`📡 Pushed to ${this.pushUrl} (${info.file})`);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`push remote ล้มเหลว: ${msg}`);
+        attempts.push({ target: `http:${this.pushUrl}`, ok: false, detail: err instanceof Error ? err.message : String(err) });
       }
     }
 
-    if (errors.length > 0) {
-      this.state.lastError = errors.join('; ');
+    const failed = attempts.filter((a) => !a.ok);
+    if (failed.length > 0) {
+      this.state.lastError = failed.map((a) => `${a.target}: ${a.detail}`).join('; ');
       this.state.lastSuccessAt = null;
       this.saveState();
       await this.raise(
         'failed',
-        { text: `Replication ล้มเหลว: ${this.state.lastError}`, file: info.file, errors },
+        { text: `Replication ล้มเหลว: ${this.state.lastError}`, file: info.file, errors: failed },
         'critical',
         true
       );
+      await this.recordOffsiteEvent('FAILED', {
+        text: `Offsite replication ล้มเหลว: ${this.state.lastError}`,
+        file: info.file,
+        attempts: failed,
+      });
       return { ok: false, reason: this.state.lastError, info };
     }
 
@@ -381,7 +468,31 @@ export class MeshLiteService {
     this.state.lastError = null;
     this.saveState();
     await this.raise('ok', { text: `Replicated ${info.file} (${(info.payloadSize / 1024).toFixed(1)} KB)`, file: info.file });
+    await this.recordOffsiteEvent('SUCCESS', {
+      text: `Offsite replication สำเร็จ: ${info.file}`,
+      file: info.file,
+      attempts,
+    });
     return { ok: true, info };
+  }
+
+  /** บันทึกผลลง Security Audit Log (ตาราง securityEvent — ดูในหน้า Security) */
+  private async recordOffsiteEvent(
+    event: 'SUCCESS' | 'FAILED',
+    data: { text: string; file: string; attempts: Array<{ target: string; ok: boolean; detail?: string }> }
+  ): Promise<void> {
+    try {
+      await prisma.securityEvent.create({
+        data: {
+          event_type: `OFFSITE_SYNC_${event}`,
+          severity: event === 'FAILED' ? 'critical' : 'info',
+          description: `🔐 [OFFSITE] ${data.text}`,
+          raw_data: data,
+        },
+      });
+    } catch {
+      // DB เข้าไม่ถึง = แจ้งผ่าน SSE แล้ว
+    }
   }
 
   status(): MeshStatus {
@@ -396,6 +507,9 @@ export class MeshLiteService {
       bundles: this.listBundles(),
       outputDir: this.outputDir,
       pushUrl: this.pushUrl,
+      rsyncTarget: this.rsyncTarget,
+      scpTarget: this.scpTarget,
+      offsiteRetain: this.offsiteRetain,
       pending: this.hasPendingBackup(),
     };
   }
