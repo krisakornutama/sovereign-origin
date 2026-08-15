@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import mqtt from 'mqtt';
+import { relayGuard } from '../../services/relay-guard.service';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -53,6 +54,17 @@ router.get('/status', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/relay/guard — สถานะ anti-chatter locks (ทุก role อ่านได้)
+router.get('/guard', authenticate, async (_req, res) => {
+  res.json(relayGuard.status());
+});
+
+// POST /api/relay/unlock/:relayId — ปลดล็อก relay ที่ anti-chatter ล็อกไว้ (SUPERADMIN เท่านั้น)
+router.post('/unlock/:relayId', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const released = relayGuard.unlock(req.params.relayId);
+  res.json({ success: true, released, message: released ? 'ปลดล็อกแล้ว' : 'relay นี้ไม่ได้ถูกล็อก' });
+});
+
 // POST /api/relay/control – อัปเดตสถานะใน DB แล้วส่งคำสั่งผ่าน MQTT
 router.post('/control', authenticate, async (req, res) => {
   try {
@@ -67,6 +79,16 @@ router.post('/control', authenticate, async (req, res) => {
     const relay = await prisma.relay.findUnique({ where: { id: relayId } });
     if (!relay) {
       return res.status(404).json({ error: `Relay ${relayId} not found` });
+    }
+
+    // Relay Anti-Chatter Guard (Phase 6): ห้ามสับถี่เกิน 1 ครั้ง/3 วิ — ล็อกอัตโนมัติถ้าฝืนซ้ำ
+    const gate = relayGuard.check(relayId);
+    if (!gate.allowed) {
+      return res.status(429).json({
+        error: gate.reason,
+        locked: gate.locked,
+        unlockAt: gate.unlockAt ?? null,
+      });
     }
 
     const effectiveNode = nodeId || relay.node_id;

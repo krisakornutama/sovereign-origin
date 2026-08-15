@@ -7,6 +7,7 @@ import { buildReportPng } from './chart-snapshot.service';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.AI_MODEL || 'gemma3:4b';
 
 // metric ที่ส่งกราฟแนวโน้มไป Telegram ด้วย (เฉพาะที่มีข้อมูลจริง)
@@ -95,7 +96,7 @@ ${JSON.stringify(stats, null, 2)}
 
     const response = await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: '5m' },
+      { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 120000 }
     );
     const text = (response.data?.response || '').trim();

@@ -113,8 +113,19 @@ function IngotStack({ value, baseline }: { value: number; baseline: number | nul
   );
 }
 
+// ── พอร์ตแยกต่อคน — สมาชิกในครอบครัวแต่ละคนมีพอร์ตของตัวเอง ──
+interface Member {
+  id: string;
+  username: string;
+  role: string;
+}
+
 export default function PortfolioPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const [members, setMembers] = useState<Member[]>([]);
+  // พอร์ตที่กำลังดู: default = ตัวเอง; SUPERADMIN เปลี่ยนดูพอร์ตสมาชิกคนอื่นได้
+  const [viewOwnerId, setViewOwnerId] = useState<string>('');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -133,7 +144,7 @@ export default function PortfolioPage() {
     setRiskLoading(true);
     setRiskError('');
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/risk`);
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/risk${ownerQuery}`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'คำนวณความเสี่ยงไม่สำเร็จ');
       setRisk(d);
@@ -144,28 +155,44 @@ export default function PortfolioPage() {
     }
   };
 
+  // ค่า ?userId= — สมาชิกทั่วไปจะถูก backend บังคับเป็นพอร์ตตัวเองเสมอ (ส่งไปด้วยก็ไม่เสียหาย)
+  const ownerQuery = viewOwnerId ? `?userId=${encodeURIComponent(viewOwnerId)}` : '';
+
+  // SUPERADMIN: โหลดรายชื่อสมาชิกเพื่อสลับดูพอร์ต
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated || !user || !isSuperadmin) return;
+    authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: Member[]) => setMembers(list))
+      .catch(() => setMembers([]));
+    // default ดูพอร์ตตัวเอง
+    setViewOwnerId(user.id);
+  }, [isHydrated, isAuthenticated, user, isSuperadmin]);
+
   const load = async () => {
     const [sumRes, invRes] = await Promise.all([
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/summary`),
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory`),
+      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/summary${ownerQuery}`),
+      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory${ownerQuery}`),
     ]);
     setSummary(await sumRes.json());
     const inv = await invRes.json();
     setInventory(inv.items || []);
-    const assetsRes = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets`);
+    const assetsRes = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets${ownerQuery}`);
     const assetsData = await assetsRes.json();
     setAssets(assetsData.assets || []);
   };
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
+    if (isSuperadmin && !viewOwnerId) return; // ยังไม่ได้เลือกพอร์ต
+    setLoading(true);
     load()
       .catch((err) => {
         console.error(err);
         setError('โหลดข้อมูลพอร์ตไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
       })
       .finally(() => setLoading(false));
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, viewOwnerId]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -187,7 +214,7 @@ export default function PortfolioPage() {
 
   const addAsset = async () => {
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets`, {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets${ownerQuery}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, quantity: Number(form.quantity) }),
@@ -209,7 +236,7 @@ export default function PortfolioPage() {
   const deleteAsset = async (id: string) => {
     if (!id) return;
     if (!confirm('ลบ asset นี้? (กระทบพอร์ตทันที)')) return;
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets/${id}`, { method: 'DELETE' });
+    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets/${id}${ownerQuery}`, { method: 'DELETE' });
     await load();
   };
 
@@ -223,7 +250,7 @@ export default function PortfolioPage() {
     }
     setInvSaving(true);
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory`, {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory${ownerQuery}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -255,7 +282,7 @@ export default function PortfolioPage() {
     if (!id) return;
     if (!confirm('ลบรายการเสบียงนี้? (ห้ามกู้คืน)')) return;
     try {
-      await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory/${id}`, { method: 'DELETE' });
+      await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory/${id}${ownerQuery}`, { method: 'DELETE' });
       setError('');
       await load();
     } catch (err) {
@@ -263,6 +290,10 @@ export default function PortfolioPage() {
       setError('ลบเสบียงไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
     }
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 
@@ -303,6 +334,20 @@ export default function PortfolioPage() {
             <h1 className="font-ledger text-xl font-bold text-[#D4AF37]">ห้องคลัง</h1>
           </div>
           <div className="flex items-center gap-3">
+            {isSuperadmin && members.length > 0 && (
+              <select
+                value={viewOwnerId}
+                onChange={(e) => setViewOwnerId(e.target.value)}
+                title="สลับดูพอร์ตของสมาชิกในครอบครัว"
+                className={`${INPUT} max-w-[220px]`}
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id === user?.id ? '👑 ' : ''}{m.username}{m.id === user?.id ? ' (คุณ)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
             <button onClick={refresh} disabled={refreshing} className={`${BTN} bg-[#262B2C] text-[#E8E2D5] hover:bg-[#33383A]`}>
               {refreshing ? '⏳ กำลังดึงราคา…' : '🔄 ดึงราคาล่าสุด'}
             </button>

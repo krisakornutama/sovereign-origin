@@ -23,7 +23,7 @@ const ZONE_TYPES = ['บ้าน', 'สวน', 'รั้ว', 'ประต�
 const POINT_TYPES = ['กล้อง', 'เซ็นเซอร์ตรวจจับ', 'กับดัก', 'ไฟ'];
 
 export default function PropertyPage() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, isHydrated } = useAuthStore();
   const [zones, setZones] = useState<Zone[]>([]);
   const [points, setPoints] = useState<Point[]>([]);
   const [scored, setScored] = useState<ScoredPoint[]>([]);
@@ -212,6 +212,10 @@ export default function PropertyPage() {
       setError(e.message);
     }
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

@@ -85,12 +85,12 @@ export interface WealthWorkerConfig {
 }
 
 export interface WealthWorkerDeps {
-  listAssets: () => Promise<AssetHolding[]>;
-  listInventory: () => Promise<InventoryLine[]>;
+  listAssets: () => Promise<Array<AssetHolding & { userId: string }>>;
+  listInventory: () => Promise<Array<InventoryLine & { userId: string }>>;
   latestPrices: (symbols: string[]) => Promise<LatestPrice[]>;
   loadAvgPowerKw: () => Promise<number | null>;
   savePrice: (quote: PriceQuote) => Promise<void>;
-  saveWealthHistory: (totalUsd: number, payload: Prisma.InputJsonValue) => Promise<void>;
+  saveWealthHistory: (userId: string, totalUsd: number, payload: Prisma.InputJsonValue) => Promise<void>;
   fetchPrice: (symbol: string, type: 'CRYPTO' | 'STOCK' | 'COMMODITY') => Promise<PriceQuote | null>;
   log: (message: string) => void;
 }
@@ -106,8 +106,9 @@ export class WealthWorker {
     this.cache = new PriceCache(cfg.priceCacheTtlMs);
   }
 
-  /** รอบเดียว: ดึงราคา symbol ทั้งหมด (ใช้ cache ถ้ายังสด) → บันทึก history + emit event */
+  /** รอบเดียว: ดึงราคา symbol ทั้งหมด (ใช้ cache ถ้ายังสด) → คำนวณพอร์ตแยกต่อคน → บันทึก history + emit event */
   async runOnce(): Promise<{
+    users: number;
     totalUsd: number;
     inventoryUsd: number;
     missingPrices: string[];
@@ -115,7 +116,7 @@ export class WealthWorker {
   }> {
     const [assets, inventory] = await Promise.all([this.deps.listAssets(), this.deps.listInventory()]);
 
-    // 1) ดึงราคา — ใช้ cache ภายใน TTL กัน rate limit
+    // 1) ดึงราคา — ใช้ cache ภายใน TTL กัน rate limit (ราคาเป็นข้อมูลกลาง ไม่แยกต่อคน)
     const freshQuotes: PriceQuote[] = [];
     const priceMap = new Map<string, number>();
     for (const asset of assets) {
@@ -133,37 +134,78 @@ export class WealthWorker {
       }
     }
 
-    // 2) มูลค่า
+    // 2) จัดกลุ่มตามเจ้าของ (user_id) — แต่ละคนมีพอร์ตของตัวเอง
     const prices: LatestPrice[] = [...priceMap.entries()].map(([symbol, priceUsd]) => ({ symbol, priceUsd }));
-    const { totalUsd, missingPrices } = computePortfolioValue(assets, prices);
-    const inventoryUsd = computeInventoryValue(inventory);
+    const byUser = new Map<string, { assets: AssetHolding[]; inventory: InventoryLine[] }>();
+    for (const a of assets) {
+      const entry = byUser.get(a.userId) || { assets: [], inventory: [] };
+      entry.assets.push({ symbol: a.symbol, type: a.type, quantity: a.quantity });
+      byUser.set(a.userId, entry);
+    }
+    for (const i of inventory) {
+      const entry = byUser.get(i.userId) || { assets: [], inventory: [] };
+      entry.inventory.push({
+        name: i.name,
+        category: i.category,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitPriceUsd: i.unitPriceUsd,
+      });
+      byUser.set(i.userId, entry);
+    }
 
-    // 3) Survival runway (อ่านกำลังไฟฟ้าเฉลี่ยจาก telemetry)
+    // 3) คำนวณต่อคน + บันทึก history + emit (รวมทุกคนใน payload)
     const avgPowerKw = await this.deps.loadAvgPowerKw();
-    const runway = computeSurvivalRunway({
-      cashUsd: this.cfg.cashUsd,
-      liquidAssetUsd: totalUsd, // สภาพคล่อง = พอร์ตที่ขายได้ + เงินสด
-      monthlyExpensesUsd: this.cfg.monthlyExpensesUsd,
-      avgPowerKw: avgPowerKw ?? 0,
-      electricityPricePerKwh: this.cfg.electricityPricePerKwh,
-    });
+    const usersPayload: Array<Record<string, unknown>> = [];
+    let grandTotal = 0;
+    let grandInventory = 0;
+    const allMissing = new Set<string>();
 
-    // 4) บันทึก history + emit
-    const payload = {
-      totalUsd,
-      inventoryUsd,
-      grandTotalUsd: totalUsd + inventoryUsd,
-      runway,
-      missingPrices,
-      cashUsd: this.cfg.cashUsd,
+    for (const [userId, { assets: userAssets, inventory: userInventory }] of byUser) {
+      const { totalUsd, missingPrices } = computePortfolioValue(userAssets, prices);
+      const inventoryUsd = computeInventoryValue(userInventory);
+      const runway = computeSurvivalRunway({
+        cashUsd: this.cfg.cashUsd,
+        liquidAssetUsd: totalUsd,
+        monthlyExpensesUsd: this.cfg.monthlyExpensesUsd,
+        avgPowerKw: avgPowerKw ?? 0,
+        electricityPricePerKwh: this.cfg.electricityPricePerKwh,
+      });
+      const payload = {
+        userId,
+        totalUsd,
+        inventoryUsd,
+        grandTotalUsd: totalUsd + inventoryUsd,
+        runway,
+        missingPrices,
+        cashUsd: this.cfg.cashUsd,
+        timestamp: new Date().toISOString(),
+      };
+      await this.deps.saveWealthHistory(userId, totalUsd + inventoryUsd, payload);
+      usersPayload.push(payload);
+      grandTotal += totalUsd;
+      grandInventory += inventoryUsd;
+      missingPrices.forEach((m) => allMissing.add(m));
+    }
+
+    wealthEmitter.emit('wealth_update', {
+      users: usersPayload,
+      totalUsd: grandTotal,
+      inventoryUsd: grandInventory,
+      grandTotalUsd: grandTotal + grandInventory,
+      missingPrices: [...allMissing],
       timestamp: new Date().toISOString(),
-    };
-    await this.deps.saveWealthHistory(totalUsd + inventoryUsd, payload);
-    wealthEmitter.emit('wealth_update', payload);
+    });
     this.deps.log(
-      `💰 Wealth: total $${totalUsd.toFixed(2)} + inventory $${inventoryUsd.toFixed(2)} (${freshQuotes.length} fresh quotes)`
+      `💰 Wealth: ${usersPayload.length} portfolio(s), total $${grandTotal.toFixed(2)} + inventory $${grandInventory.toFixed(2)} (${freshQuotes.length} fresh quotes)`
     );
-    return { totalUsd, inventoryUsd, missingPrices, freshQuotes: freshQuotes.length };
+    return {
+      users: usersPayload.length,
+      totalUsd: grandTotal,
+      inventoryUsd: grandInventory,
+      missingPrices: [...allMissing],
+      freshQuotes: freshQuotes.length,
+    };
   }
 
   start(): void {
@@ -195,11 +237,12 @@ export function createWealthWorker(cfg: WealthWorkerConfig): WealthWorker {
     {
       listAssets: async () =>
         prisma.asset.findMany().then((rows) =>
-          rows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }))
+          rows.map((r) => ({ userId: r.user_id, symbol: r.symbol, type: r.type, quantity: r.quantity }))
         ),
       listInventory: async () =>
         prisma.inventoryItem.findMany().then((rows) =>
           rows.map((r) => ({
+            userId: r.user_id,
             name: r.name,
             category: r.category,
             quantity: r.quantity,
@@ -234,8 +277,8 @@ export function createWealthWorker(cfg: WealthWorkerConfig): WealthWorker {
           quote.source
         );
       },
-      saveWealthHistory: async (totalUsd, payload) => {
-        await prisma.wealthHistory.create({ data: { total_usd_value: totalUsd, payload } });
+      saveWealthHistory: async (userId, totalUsd, payload) => {
+        await prisma.wealthHistory.create({ data: { user_id: userId, total_usd_value: totalUsd, payload } });
       },
       fetchPrice,
       log: (m) => console.log(m),

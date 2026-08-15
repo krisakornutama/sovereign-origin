@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { automationEngine, automationEmitter } from '../../services/automation.service';
+import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
 
 const router = Router();
 
@@ -94,6 +95,8 @@ router.get('/alerts/stream', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  warRoomSessionOpened(); // ข้อ 3: หน้า Dashboard เปิดอยู่ = War Room ตื่น
+
   const listener = (alert: any) => {
     res.write(`data: ${JSON.stringify(alert)}\n\n`);
   };
@@ -102,6 +105,7 @@ router.get('/alerts/stream', (req, res) => {
 
   req.on('close', () => {
     automationEmitter.off('alert', listener);
+    warRoomSessionClosed();
   });
 });
 

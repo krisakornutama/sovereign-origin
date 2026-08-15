@@ -8,6 +8,7 @@ import axios from 'axios';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.DHAMMA_MODEL || process.env.OLLAMA_MODEL || 'qwen3:8b';
 
 // ── ฐานข้อมูลสมุนไพรไทย (คู่กับยาแผนปัจจุบัน) ──
@@ -153,7 +154,7 @@ export async function dhammaCompanion(userMessage: string): Promise<{ reply: str
     teachings[0] ||
     null;
   const prompt = buildDhammaPrompt(userMessage, teaching);
-  const resp = await axios.post(`${OLLAMA_URL}/api/generate`, { model: MODEL, prompt, stream: false }, { timeout: 180000 });
+  const resp = await axios.post(`${OLLAMA_URL}/api/generate`, { model: MODEL, prompt, stream: false, keep_alive: OLLAMA_KEEP_ALIVE }, { timeout: 180000 });
   return { reply: parseDhammaReply(resp.data?.response ?? ''), teaching };
 }
 

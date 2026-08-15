@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import { wealthEmitter } from '../../services/wealth.service';
@@ -15,12 +15,25 @@ const prisma = new PrismaClient();
 
 const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
 
+// ── พอร์ตแยกต่อคน: ใครเป็นเจ้าของพอร์ตที่กำลังดู/แก้ ──
+// - สมาชิกทั่วไป → เห็นได้เฉพาะพอร์ตของตัวเองเท่านั้น (backend บังคับ ไม่เชื่อฝั่ง UI)
+// - SUPERADMIN → ดูได้ทุกคน โดยส่ง ?userId=<uuid> (ถ้าไม่ส่ง = พอร์ตของตัวเอง)
+export function resolveOwnerId(req: Request): string {
+  const me = req.user?.id;
+  if (req.user?.role === 'SUPERADMIN' && typeof req.query.userId === 'string' && req.query.userId.trim()) {
+    return req.query.userId.trim();
+  }
+  return me ?? '';
+}
+
 // ── Assets (พอร์ต) ──
 
-// GET /api/portfolio/assets — asset ทั้งหมด + ราคาล่าสุดจาก asset_prices
+// GET /api/portfolio/assets — asset ของเจ้าของพอร์ต + ราคาล่าสุดจาก asset_prices
+// SUPERADMIN ดูพอร์ตสมาชิกคนอื่นได้ผ่าน ?userId=<uuid>
 router.get('/assets', authenticate, async (req, res) => {
   try {
-    const rows = await prisma.asset.findMany({ orderBy: { symbol: 'asc' } });
+    const ownerId = resolveOwnerId(req);
+    const rows = await prisma.asset.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
     const assets: AssetHolding[] = rows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }));
     const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
       `SELECT DISTINCT ON (symbol) symbol, price_usd
@@ -44,7 +57,7 @@ router.get('/assets', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/portfolio/assets — เพิ่ม asset
+// POST /api/portfolio/assets — เพิ่ม asset เข้าพอร์ตของตัวเอง (SUPERADMIN ผ่าน ?userId= เพิ่มให้สมาชิกได้)
 router.post('/assets', authenticate, async (req, res) => {
   try {
     const { symbol, type, quantity, wallet_address, notes } = req.body || {};
@@ -53,6 +66,7 @@ router.post('/assets', authenticate, async (req, res) => {
     }
     const asset = await prisma.asset.create({
       data: {
+        user_id: resolveOwnerId(req),
         symbol: String(symbol).toUpperCase(),
         type,
         quantity: Number(quantity) || 0,
@@ -67,9 +81,12 @@ router.post('/assets', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/portfolio/assets/:id
+// DELETE /api/portfolio/assets/:id — ลบได้เฉพาะของตัวเอง (SUPERADMIN ลบพอร์ตสมาชิกได้ผ่าน ?userId=)
 router.delete('/assets/:id', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
+    const owned = await prisma.asset.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    if (!owned) return res.status(404).json({ error: 'Asset not found in this portfolio' });
     await prisma.asset.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {
@@ -77,10 +94,13 @@ router.delete('/assets/:id', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/portfolio/assets/:id — แก้ไข quantity / notes
+// PUT /api/portfolio/assets/:id — แก้ไข quantity / notes (เฉพาะของตัวเอง)
 router.put('/assets/:id', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
     const { quantity, notes } = req.body || {};
+    const owned = await prisma.asset.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    if (!owned) return res.status(404).json({ error: 'Asset not found in this portfolio' });
     const data: Record<string, unknown> = {};
     if (quantity !== undefined) data.quantity = Number(quantity);
     if (notes !== undefined) data.notes = notes;
@@ -93,10 +113,11 @@ router.put('/assets/:id', authenticate, async (req, res) => {
 
 // ── Tangible Inventory (เสบียงกายภาพ) ──
 
-// GET /api/portfolio/inventory — รายการเสบียง + มูลค่ารวม
+// GET /api/portfolio/inventory — รายการเสบียงของเจ้าของพอร์ต + มูลค่ารวม
 router.get('/inventory', authenticate, async (req, res) => {
   try {
-    const rows = await prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } });
+    const ownerId = resolveOwnerId(req);
+    const rows = await prisma.inventoryItem.findMany({ where: { user_id: ownerId }, orderBy: { name: 'asc' } });
     const items: InventoryLine[] = rows.map((r) => ({
       name: r.name,
       category: r.category,
@@ -111,7 +132,7 @@ router.get('/inventory', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/portfolio/inventory — เพิ่มรายการเสบียง
+// POST /api/portfolio/inventory — เพิ่มรายการเสบียงเข้าพอร์ตของตัวเอง
 router.post('/inventory', authenticate, async (req, res) => {
   try {
     const { name, category, quantity, unit, unit_price_usd, notes } = req.body || {};
@@ -120,6 +141,7 @@ router.post('/inventory', authenticate, async (req, res) => {
     }
     const item = await prisma.inventoryItem.create({
       data: {
+        user_id: resolveOwnerId(req),
         name: String(name),
         category: String(category || 'OTHER'),
         quantity: Number(quantity),
@@ -135,10 +157,13 @@ router.post('/inventory', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/portfolio/inventory/:id
+// PUT /api/portfolio/inventory/:id (เฉพาะของตัวเอง)
 router.put('/inventory/:id', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
     const { quantity, unit_price_usd, notes, name } = req.body || {};
+    const owned = await prisma.inventoryItem.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    if (!owned) return res.status(404).json({ error: 'Inventory item not found in this portfolio' });
     const data: Record<string, unknown> = {};
     if (quantity !== undefined) data.quantity = Number(quantity);
     if (unit_price_usd !== undefined) data.unit_price_usd = Number(unit_price_usd);
@@ -151,9 +176,12 @@ router.put('/inventory/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/portfolio/inventory/:id
+// DELETE /api/portfolio/inventory/:id (เฉพาะของตัวเอง)
 router.delete('/inventory/:id', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
+    const owned = await prisma.inventoryItem.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    if (!owned) return res.status(404).json({ error: 'Inventory item not found in this portfolio' });
     await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {
@@ -163,17 +191,19 @@ router.delete('/inventory/:id', authenticate, async (req, res) => {
 
 // ── Summary + Survival Runway ──
 
-// GET /api/portfolio/summary — มูลค่าพอร์ต + เสบียง + runway + history
+// GET /api/portfolio/summary — มูลค่าพอร์ตของเจ้าของ + เสบียง + runway + history
+// SUPERADMIN ดูพอร์ตสมาชิกคนอื่นได้ผ่าน ?userId=<uuid>
 router.get('/summary', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
     const [assetRows, inventoryRows, avgRow, latestHistory] = await Promise.all([
-      prisma.asset.findMany(),
-      prisma.inventoryItem.findMany(),
+      prisma.asset.findMany({ where: { user_id: ownerId } }),
+      prisma.inventoryItem.findMany({ where: { user_id: ownerId } }),
       prisma.$queryRawUnsafe<Array<{ avg_power: number | null }>>(
         `SELECT AVG(value) AS avg_power FROM sensor_telemetry
          WHERE metric = 'power_kw' AND time >= NOW() - INTERVAL '24 hours'`
       ),
-      prisma.wealthHistory.findMany({ orderBy: { timestamp: 'desc' }, take: 30 }),
+      prisma.wealthHistory.findMany({ where: { user_id: ownerId }, orderBy: { timestamp: 'desc' }, take: 30 }),
     ]);
 
     const assets: AssetHolding[] = assetRows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }));
@@ -222,11 +252,12 @@ router.get('/summary', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/portfolio/history — ประวัติมูลค่ารวม
+// GET /api/portfolio/history — ประวัติมูลค่ารวมของเจ้าของพอร์ต
 router.get('/history', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
     const limit = Math.min(parseInt(req.query.limit as string) || 60, 500);
-    const rows = await prisma.wealthHistory.findMany({ orderBy: { timestamp: 'desc' }, take: limit });
+    const rows = await prisma.wealthHistory.findMany({ where: { user_id: ownerId }, orderBy: { timestamp: 'desc' }, take: limit });
     res.json(rows.map((r) => ({ timestamp: r.timestamp, totalUsd: r.total_usd_value, payload: r.payload })));
   } catch (err) {
     res.status(500).json({ error: 'Failed to load history' });
@@ -249,10 +280,11 @@ router.post('/refresh', authenticate, async (req, res) => {
 // ── Aladdin Risk Engine — ใช้ข้อมูลอดีตทำนายอนาคต (สไตล์ BlackRock Aladdin) ──
 
 // GET /api/portfolio/risk — รายงานความเสี่ยงเต็มรูปแบบ: วิเคราะห์รายตัว + Monte Carlo + VaR + สิ่งที่ต้องทำ
-router.get('/risk', authenticate, async (_req, res) => {
+router.get('/risk', authenticate, async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
     const { analyzeAssetRisk, simulatePortfolio, portfolioRisk, buildRiskActions } = await import('../../services/aladdin-risk.service');
-    const assets = await prisma.asset.findMany({ orderBy: { symbol: 'asc' } });
+    const assets = await prisma.asset.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
     const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
       `SELECT DISTINCT ON (symbol) symbol, price_usd FROM asset_prices ORDER BY symbol, time DESC`
     );
@@ -306,5 +338,5 @@ router.get('/risk', authenticate, async (_req, res) => {
   }
 });
 
-export { wealthEmitter };
+export { wealthEmitter, prisma };
 export default router;

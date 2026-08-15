@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { PrismaClient } from '@prisma/client';
 import { config } from '../config';
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 export class AuthService {
   static async createUser(username: string, password: string, role: string = 'OPERATOR', nodeId?: string) {
@@ -16,6 +16,8 @@ export class AuthService {
         password_hash: hash,
         role: role as any,
         assigned_node_id: nodeId || null,
+        // สมาชิกใหม่ทุกคนต้องเปลี่ยนรหัสผ่านหลัง login ครั้งแรก (รหัสแรกเข้าเป็นของ admin)
+        must_change_password: true,
       },
     });
     return user;
@@ -118,12 +120,52 @@ export class AuthService {
     };
   }
 
+  /** เปลี่ยนรหัสผ่านด้วยตัวเอง — ต้องกรอกรหัสปัจจุบันถูกต้องก่อน */
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('User not found');
+
+    const valid = await bcrypt.compare(currentPassword || '', user.password_hash);
+    if (!valid) throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+
+    if (typeof newPassword !== 'string' || newPassword === currentPassword) {
+      throw new Error('รหัสผ่านใหม่ต้องต่างจากรหัสผ่านเดิม');
+    }
+    this.validateNewPassword(newPassword);
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password_hash: hash, must_change_password: false },
+    });
+
+    // คืน token ใหม่ (ไม่มี flag บังคับเปลี่ยน) — session ต่อเนื่อง ไม่ต้อง login ใหม่
+    return {
+      token: this.generateToken({ ...user, password_hash: hash, must_change_password: false }, true),
+    };
+  }
+
+  static validateNewPassword(password: string) {
+    if (typeof password !== 'string' || password.length < 8) {
+      throw new Error('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
+    }
+    if (password.length > 128) {
+      throw new Error('รหัสผ่านยาวเกินไป (สูงสุด 128 ตัวอักษร)');
+    }
+    // กันรหัสยอดฮิตที่เดาง่าย
+    const WEAK = new Set(['password', 'password1', 'password123', '12345678', '123456789', '1234567890', 'qwerty123', 'abc12345', 'admin123', 'letmein1', 'welcome1', 'monkey123']);
+    if (WEAK.has(password.toLowerCase())) {
+      throw new Error('รหัสผ่านนี้อ่อนเกินไป — เลือกรหัสที่คาดเดายากกว่านี้');
+    }
+  }
+
   private static generateToken(user: any, mfaVerified: boolean) {
     const payload = {
       userId: user.id,
       role: user.role,
       assigned_node_id: user.assigned_node_id,
       mfa_verified: mfaVerified,
+      must_change_password: user.must_change_password === true,
     };
     return jwt.sign(payload, config.jwtSecret, { expiresIn: '24h' });
   }

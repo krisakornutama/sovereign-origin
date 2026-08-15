@@ -15,7 +15,7 @@ const OBJECT_LABELS: Record<string, string> = { person: 'คน', vehicle: 'ย�
 const CHANNEL_LABELS: Record<string, string> = { sdr: '📻 SDR', meshtastic: '📡 Meshtastic', lora: '📶 LoRa', fm: '🔊 FM' };
 
 export default function InfrastructurePage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [water, setWater] = useState<{ latest: WaterReading[] }>({ latest: [] });
@@ -95,6 +95,10 @@ export default function InfrastructurePage() {
     });
     setRadioText(''); setFlash('✅ ส่งข้อความผ่าน mesh แล้ว'); await load();
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

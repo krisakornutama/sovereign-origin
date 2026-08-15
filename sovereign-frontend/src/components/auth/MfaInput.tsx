@@ -88,7 +88,8 @@ export default function MfaInput() {
 
       // token เต็ม (mfa_verified=true)
       login(data.token);
-      router.push('/dashboard');
+      // ยังไม่ได้เปลี่ยนรหัสผ่านครั้งแรก → บังคับไปเปลี่ยนก่อนเข้า dashboard
+      router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {

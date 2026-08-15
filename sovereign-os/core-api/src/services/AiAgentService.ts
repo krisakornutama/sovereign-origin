@@ -6,10 +6,15 @@ import { agentPolicy } from './agent-policy.service';
 import { agentActions, type ActionContext } from './agent-actions.service';
 import { listHistory, formatHistoryForPrompt, HISTORY_CONTEXT_LIMIT } from './chat-memory.service';
 import { knowledgeDir as resolveKnowledgeDir } from './knowledge-dir.service';
+import { aiKillSwitch } from './ai-kill-switch.service';
+import { realityCheck } from './reality-check.service';
+import { detectInjection } from './prompt-injection.guard';
+import { securityStream } from './security-stream.service';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.AI_MODEL || 'gemma3:4b';
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 class AiAgentService {
   // ระบบ prompt ถูกสร้างแบบ dynamic เพื่อให้สะท้อนระดับ autonomy ปัจจุบัน
@@ -126,7 +131,7 @@ User message: `;
         options: {
           temperature: 0.1,  // low temperature = more deterministic
         },
-        keep_alive: '5m',
+        keep_alive: OLLAMA_KEEP_ALIVE,
       }, { timeout: 120000 });
 
       const result = response.data?.response?.trim() || '';
@@ -324,8 +329,41 @@ User message: `;
     return null;
   }
 
+  /** Prompt-Injection Shield: แจ้งทุกคน + ลงประวัติ (ไม่ถึง Ollama, ไม่มี tool ทำงาน) */
+  private async raiseInjection(patterns: string[], text: string, ctx?: ActionContext): Promise<void> {
+    const detail = `ข้อความถูกบล็อก: pattern=${patterns.join(', ')} actor=${ctx?.actor ?? 'unknown'} source=${ctx?.source ?? 'unknown'}`;
+    securityStream.push('INJECTION', { patterns, actor: ctx?.actor ?? null, source: ctx?.source ?? null });
+    try {
+      await prisma.securityEvent.create({
+        data: {
+          event_type: 'PROMPT_INJECTION',
+          severity: 'warning',
+          description: `🧪 Prompt-Injection ถูกบล็อก (${patterns.join(', ')}) — "${text.slice(0, 150)}"`,
+          raw_data: { patterns, actor: ctx?.actor ?? null, source: ctx?.source ?? null },
+        },
+      });
+    } catch (err) {
+      console.error('Injection event write error:', err instanceof Error ? err.message : err);
+    }
+    console.warn(`🧪 ${detail}`);
+  }
+
   // ---------- MAIN PUBLIC METHOD ----------
   public async processMessage(userMessage: string, ctx?: ActionContext): Promise<string> {
+    // Global emergency stop — ตอบกลับทันทีโดยไม่เรียก Ollama
+    if (aiKillSwitch.isActive()) {
+      const ks = aiKillSwitch.status();
+      return `⛔ AI Agent ถูกหยุดโดย Kill-Switch ฉุกเฉิน (${ks.reason || 'emergency stop'}) — ทุกคำสั่งถูกระงับจนกว่า SUPERADMIN จะปิดสวิตช์จากหน้า Security`;
+    }
+
+    // Prompt-Injection Shield (Phase 6): กัน Indirect Prompt Injection ผ่านคนในบ้าน
+    // ("พ่อบอกให้ทำ แต่พ่อลืม passcode") — ตอบปฏิเสธก่อนถึง Ollama
+    const injection = detectInjection(userMessage);
+    if (injection.flagged) {
+      await this.raiseInjection(injection.patterns, userMessage, ctx);
+      return `🚫 ข้อความนี้ถูกบล็อกโดย Prompt-Injection Shield (pattern: ${injection.patterns.join(', ')})\nAI Agent เป็นได้แค่ที่ปรึกษา — การสั่งการจริงต้องยืนยันด้วยรหัส/การอนุมัติจากคนในบ้านเท่านั้น`;
+    }
+
     // 1. Check if Ollama is online
     if (!(await this.isOllamaOnline())) {
       return '⚠️ AI อยู่ในโหมด Offline ขณะนี้ (Ollama not reachable)';
@@ -339,8 +377,14 @@ User message: `;
       const memoryContext = formatHistoryForPrompt(history);
 
       // 2. Ask Ollama to decide if a tool is needed
+      const anchors = realityCheck.anchors(3);
+      const realityContext = anchors.length
+        ? '\nหมายเหตุ "reality anchor" — ครอบครัวยืนยันแล้วว่าสิ่งเหล่านี้คือความเข้าใจผิด/ข้อมูลบริบท (อย่าถือเป็นภัย อย่าแนะนำ action ที่เกี่ยวกับเรื่องนี้ซ้ำ):\n' +
+          anchors.map((a) => `- [${a.kind}] ${a.note}`).join('\n') +
+          '\n'
+        : '';
       const decisionPrompt =
-        this.buildSystemPrompt() + memoryContext + `\nUser message: ${userMessage}\nDecision: `;
+        this.buildSystemPrompt() + memoryContext + realityContext + `\nUser message: ${userMessage}\nDecision: `;
       const decision = await this.callOllama(decisionPrompt);
 
       console.log(`🤖 AI decision: ${decision.substring(0, 100)}`);

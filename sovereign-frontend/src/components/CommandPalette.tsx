@@ -8,6 +8,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ALL_PAGES } from '../lib/navigation';
+import { useFeatureStore } from '../stores/useFeatureStore';
+import { useAuthStore } from '../stores/useAuthStore';
 
 const PALETTE_EVENT = 'sovereign:palette';
 
@@ -52,19 +54,35 @@ function scoreItem(q: string, item: { label: string; href: string; keywords?: st
 
 export default function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const hasFeature = useFeatureStore((s) => s.has);
+  const loadFeatures = useFeatureStore((s) => s.load);
+  const isSuperadmin = user?.role === 'SUPERADMIN';
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // หน้า admin (system/backup/users/audit/settings) — SUPERADMIN เท่านั้น
+  const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
+  const visiblePages = useMemo(() => {
+    if (isSuperadmin) return ALL_PAGES;
+    return ALL_PAGES.filter((p) => !ADMIN_PAGES.has(p.href) && hasFeature(p.href));
+  }, [isSuperadmin, hasFeature]);
+
+  // โหลดสิทธิ์เมื่อเปิด palette (เผื่อ store ยังไม่โหลด)
+  useEffect(() => {
+    if (open && user && !isSuperadmin) loadFeatures();
+  }, [open, user, isSuperadmin, loadFeatures]);
+
   const results: Result[] = useMemo(() => {
     const q = query.trim();
-    if (!q) return ALL_PAGES.map((p) => ({ ...p, score: 50 }));
-    return ALL_PAGES.map((p) => ({ ...p, score: scoreItem(q, p) }))
+    if (!q) return visiblePages.map((p) => ({ ...p, score: 50 }));
+    return visiblePages.map((p) => ({ ...p, score: scoreItem(q, p) }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 14);
-  }, [query]);
+  }, [query, visiblePages]);
 
   useEffect(() => {
     if (open) {

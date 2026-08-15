@@ -14,6 +14,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AgentPolicy, agentPolicy } from './agent-policy.service';
 import { AuditService } from './audit.service';
+import { aiKillSwitch } from './ai-kill-switch.service';
+
+// Phase 6 — Strict AI/Actuator Separation: เครื่องมือที่แตะความปลอดภัยต้องมีมนุษย์ยืนยันเสมอ
+export const SENSITIVE_TOOLS = new Set(['blockIP', 'unblockIP', 'killProcess']);
 
 const execFileAsync = promisify(execFile);
 
@@ -187,6 +191,12 @@ export class AgentActionsService {
   //   { status: 'denied', reason }            — blocked by guards or view mode
   //   { status: 'requires_approval', ... }    — queued, waiting for a superadmin
   async executeAction(tool: string, args: any, ctx: ActionContext = {}): Promise<ActionResult> {
+    // Global emergency stop — ทุก action tool ถูกระงับจนกว่า SUPERADMIN จะปิดสวิตช์
+    if (aiKillSwitch.isActive()) {
+      const ks = aiKillSwitch.status();
+      this.logAudit('AI_AGENT_ACTION_DENIED', { tool, args, reason: `kill-switch active: ${ks.reason}`, by: ks.by }, ctx);
+      return { status: 'denied', reason: `⛔ Kill-Switch เปิดอยู่ (${ks.reason || 'emergency stop'}) — ทุกคำสั่ง AI ถูกระงับ จนกว่า SUPERADMIN จะปิดสวิตช์จากหน้า Security` };
+    }
     if (!this.policy.isActionTool(tool)) {
       this.logAudit('AI_AGENT_ACTION_DENIED', { tool, args, reason: `"${tool}" is not an action tool` }, ctx);
       return { status: 'denied', reason: `"${tool}" is not an action tool` };
@@ -205,9 +215,13 @@ export class AgentActionsService {
       this.logAudit('AI_AGENT_ACTION_DENIED', { tool, args, reason, autonomy }, ctx);
       return { status: 'denied', reason };
     }
-    if (autonomy === 'suggest') {
+    // Phase 6 — Strict AI/Actuator Separation:
+    // เครื่องมือกระทบความปลอดภัย (blockIP/unblockIP/killProcess) ต้องผ่านมนุษย์เสมอ
+    // ต่อให้ autonomy = autonomous ก็ไม่ยกเว้น — AI เป็นได้แค่ Adviser
+    const alwaysRequireHuman = SENSITIVE_TOOLS.has(tool);
+    if (autonomy === 'suggest' || alwaysRequireHuman) {
       const approval = this.createApproval(tool, args);
-      this.logAudit('AI_AGENT_ACTION_REQUESTED', { tool, args, approval_id: approval.id, autonomy }, ctx);
+      this.logAudit('AI_AGENT_ACTION_REQUESTED', { tool, args, approval_id: approval.id, autonomy, alwaysRequireHuman }, ctx);
       try {
         this.approvalNotifier?.({ tool, args, approval_id: approval.id, source: ctx.source });
       } catch (err) {
@@ -218,7 +232,9 @@ export class AgentActionsService {
         approval_id: approval.id,
         tool,
         args,
-        reason: 'awaiting superadmin approval',
+        reason: alwaysRequireHuman
+          ? 'เครื่องมือความปลอดภัยต้องยืนยันโดยมนุษย์เสมอ (Strict AI/Actuator Separation) — รอการอนุมัติ SUPERADMIN'
+          : 'awaiting superadmin approval',
       };
     }
 
@@ -233,6 +249,13 @@ export class AgentActionsService {
     const approval = this.approvals.get(id);
     if (!approval || approval.status !== 'pending') {
       return { status: 'denied', reason: `approval "${id}" not found or already decided` };
+    }
+
+    // Global emergency stop — ไม่อนุมัติคำสั่งใด ๆ ระหว่าง kill-switch (ปล่อยค้างไว้ ไม่กด reject)
+    if (aiKillSwitch.isActive()) {
+      const ks = aiKillSwitch.status();
+      this.logAudit('AI_AGENT_APPROVAL_DENIED', { approval_id: id, tool: approval.tool, args: approval.args, reason: `kill-switch active: ${ks.reason}` }, { actor, source: 'approval' });
+      return { status: 'denied', reason: `⛔ Kill-Switch เปิดอยู่ (${ks.reason || 'emergency stop'}) — ไม่อนุมัติคำสั่ง AI ใด ๆ จนกว่าจะปิดสวิตช์` };
     }
 
     const ctx: ActionContext = { actor, source: 'approval' };

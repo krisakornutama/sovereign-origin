@@ -9,6 +9,8 @@ RUN npx prisma generate && npm run build
 FROM node:18-slim
 WORKDIR /app
 ENV NODE_ENV=production
+# Survival: pg_dump/psql ใน container — backup DB ผ่าน docker network ได้โดยไม่ต้อง mount docker socket
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
@@ -17,5 +19,5 @@ COPY --from=build /app/knowledge ./knowledge
 COPY --from=build /app/scripts ./scripts
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["npm", "start"]

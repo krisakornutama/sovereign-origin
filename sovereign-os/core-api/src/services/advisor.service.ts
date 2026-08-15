@@ -16,6 +16,7 @@ import { classifyDefcon } from './defcon-engine.service';
 export const prisma = new PrismaClient();
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 export const MODEL = process.env.AI_MODEL || 'gemma3:4b';
 /** ความจุแบตเตอรี่ (kWh) — ค่าเดียวกับ energy.routes.ts */
 export const CAPACITY_KWH = parseFloat(process.env.ENERGY_CAPACITY_KWH || '5');
@@ -482,7 +483,7 @@ export function runWhatIf(ctx: SituationContext, params: WhatIfParams): WhatIfRe
 async function callOllama(prompt: string): Promise<string> {
   const response = await axios.post(
     `${OLLAMA_URL}/api/generate`,
-    { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: '5m' },
+    { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
     { timeout: 120000 }
   );
   const text = response.data?.response?.trim();

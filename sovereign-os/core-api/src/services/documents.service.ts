@@ -196,8 +196,9 @@ export async function analyzeProductLabel(base64: string, deps: CallVisionDeps =
   return parseLabelResponse(text);
 }
 
-/** บันทึกสินค้าเข้าคลัง (หลังคนยืนยันจาก preview) — คำนวณ expiry จาก shelf_life_days เหมือน /api/inventory */
-export async function createInventoryItem(label: ProductLabel): Promise<string> {
+/** บันทึกสินค้าเข้าคลัง (หลังคนยืนยันจาก preview) — คำนวณ expiry จาก shelf_life_days เหมือน /api/inventory
+ *  user_id = เจ้าของ (req.user.id จาก caller) — เสบียงแยกต่อคน */
+export async function createInventoryItem(label: ProductLabel, userId?: string): Promise<string> {
   let expiry: Date | null = null;
   if (label.expiry_date) {
     const parsed = new Date(`${label.expiry_date}T00:00:00Z`);
@@ -206,6 +207,7 @@ export async function createInventoryItem(label: ProductLabel): Promise<string> 
   if (expiry == null && label.shelf_life_days != null) expiry = computeExpiryDate(label.shelf_life_days);
   const item = await prisma.inventoryItem.create({
     data: {
+      user_id: userId || '',
       name: label.name,
       category: label.category,
       quantity: label.quantity ?? 0,

@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function Home() {
-  const { isAuthenticated, isHydrated } = useAuthStore();
+  const { isAuthenticated, isHydrated, mustChangePassword } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
-      router.push('/dashboard');
+      // ยังไม่ได้เปลี่ยนรหัสผ่านครั้งแรก → บังคับไปหน้าเปลี่ยนรหัสก่อน
+      router.push(mustChangePassword ? '/change-password' : '/dashboard');
     }
-  }, [isHydrated, isAuthenticated]);
+  }, [isHydrated, isAuthenticated, mustChangePassword]);
 
   // รอจนกว่า store จะ hydrate ก่อนแสดงอะไร
   if (!isHydrated) {

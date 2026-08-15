@@ -12,6 +12,7 @@ enum Role {
   NODE_ADMIN
   OPERATOR
   SYSTEM_AI
+  KID // ลูก/สมาชิกในครอบครัว (มีอยู่ใน DB จริงแล้ว — สอดคล้องกับ teach-kids)
 }
 
 model User {
@@ -22,10 +23,18 @@ model User {
   mfa_secret       String?
   // MFA ใหม่ที่รอ confirm (ตั้งค่าแล้วยังไม่ activate — ต้องกรอกรหัสจากแอปยืนยันก่อน)
   pending_mfa_secret String?
+  // true = ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน (บังคับหลัง login ครั้งแรก / admin ตั้งให้)
+  must_change_password Boolean @default(false)
   assigned_node_id String?  @db.Uuid
 
   assigned_node    Node?    @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs       AuditLog[]
+
+  // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
+  assets           Asset[]
+  inventory_items  InventoryItem[]
+  wealth_history   WealthHistory[]
+  feature_grants   UserFeatureGrant[]
 
   @@map("users")
 }
@@ -122,21 +131,29 @@ enum AssetType {
 
 model Asset {
   id             String    @id @default(uuid()) @db.Uuid
+  user_id        String    @db.Uuid // เจ้าของพอร์ต — สมาชิกแต่ละคนมีพอร์ตแยก
   symbol         String
   type           AssetType
   quantity       Float     @default(0)
   wallet_address String?
   notes          String?
 
+  user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
   @@map("assets")
 }
 
 model WealthHistory {
   id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @db.Uuid // เจ้าของพอร์ต — ประวัติมูลค่าแยกต่อคน
   timestamp      DateTime @default(now()) @db.Timestamptz
   total_usd_value Float
   payload        Json
 
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, timestamp])
   @@map("wealth_history")
 }
 
@@ -239,6 +256,7 @@ model AssetPrice {
 // category: WATER | FOOD | FUEL | MATERIAL | PRECIOUS_METAL | OTHER
 model InventoryItem {
   id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @db.Uuid // เจ้าของ — เสบียงแยกต่อคน
   name           String // "น้ำดื่มขวด 1.5L"
   category       String // WATER | FOOD | FUEL | MATERIAL | PRECIOUS_METAL | OTHER
   quantity       Float
@@ -252,7 +270,29 @@ model InventoryItem {
   created_at     DateTime @default(now()) @db.Timestamptz
   updated_at     DateTime @updatedAt @db.Timestamptz
 
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
   @@map("inventory_items")
+}
+
+// ─────────────────────────────────────────────────────────────
+// สิทธิ์ฟังก์ชั่นต่อคน (Family member feature grants)
+// feature = key ของหน้า เช่น "/portfolio" | "/health" | "/farm"
+// SUPERADMIN เห็นทุกอย่างเสมอ — สมาชิกเห็นเฉพาะหน้าที่ถูกกำหนด
+// ─────────────────────────────────────────────────────────────
+model UserFeatureGrant {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  feature    String   // key ของหน้า (ตรงกับ href ใน navigation)
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, feature])
+  @@index([user_id])
+  @@map("user_feature_grants")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1014,4 +1054,27 @@ model CodingJob {
   completed_at DateTime? @db.Timestamptz
 
   @@map("coding_jobs")
+}
+
+// ── Next-Gen Security: Threat Intelligence database ──
+// ฐานข้อมูล IOC (Indicator of Compromise): IP / โดเมนที่รู้จักว่าเป็นภัย
+// เติมจาก seed list, feed อัตโนมัติ, หรือ manual — ใช้ match กับ
+// connection/query/traffic ที่ไหลผ่านระบบ (Pillar 1: Virus & Threat DB)
+model ThreatIntelItem {
+  id         String    @id @default(uuid()) @db.Uuid
+  type       String // "IP" | "DOMAIN"
+  value      String
+  category   String    @default("unknown") // malware | phishing | cnc | scam | ad | tracking | gambling | piracy | violence | unknown
+  source     String    @default("manual") // manual | seed | feed | suricata | threat-detect | app-control
+  confidence Float     @default(0.5)
+  active     Boolean   @default(true)
+  hits       Int       @default(0)
+  note       String?
+  first_seen DateTime  @default(now()) @db.Timestamptz
+  last_seen  DateTime? @db.Timestamptz
+  updated_at DateTime  @default(now()) @db.Timestamptz
+
+  @@unique([type, value])
+  @@index([active])
+  @@map("threat_intel_items")
 }

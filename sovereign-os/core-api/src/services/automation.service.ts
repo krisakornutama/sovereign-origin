@@ -1,8 +1,16 @@
 import { PrismaClient } from '@prisma/client';
-import EventEmitter from 'events';
+import { EventEmitter } from 'events';
+import { livingMode } from './living-mode.service';
 
 export const prisma = new PrismaClient();
 export const automationEmitter = new EventEmitter();
+
+// Anti-Goodhart Shield (ภัย 2): metrics ที่เป็น "ร่องรอยการมีชีวิต" — ระบบห้ามลงโทษ/เตือนรบกวน
+// (ควันจากการทำอาหาร, ค่าไฟ, เสียง ฯลฯ) เมื่อ Living Mode เปิดอยู่
+export const LIFESTYLE_METRICS = new Set<string>([
+  'power_kw', 'energy_kwh', 'smoke', 'sound_level', 'co2_level', 'pm25',
+  'light_intensity', 'temperature', 'humidity',
+]);
 
 export interface Rule {
   id: string;
@@ -103,6 +111,8 @@ export class AutomationEngine {
   private rules: Rule[] = [];
   private lastTriggered: Record<string, number> = {};
   private cooldownMs = 60000;
+  paused = false; // Manual Day — พัก automation ทั้งหมด (embracing chaos: มนุษย์เป็นคนควบคุมเองวันนี้)
+  pausedBy = '';
 
   constructor() {
     // โหลดกฎจาก DB (seed กฎเริ่มต้นถ้ายังไม่มี) — ทำแบบไม่บล็อก
@@ -152,8 +162,12 @@ export class AutomationEngine {
 
   checkMetrics(metrics: Record<string, number>): string[] {
     const alerts: string[] = [];
+    // Manual Day: พักกฎทั้งหมด — วันนี้ใช้มือเปิดไฟ เปิดน้ำเอง (Cognitive Grounding)
+    if (this.paused) return alerts;
     for (const rule of this.rules) {
       if (!rule.enabled) continue;
+      // Living Mode (Anti-Goodhart): กฎที่วัด "การมีชีวิต" (ควันจากการทำอาหาร, ค่าไฟ, เสียง) ห้ามเตือน/ลงโทษ
+      if (livingMode.isActive() && LIFESTYLE_METRICS.has(rule.metric)) continue;
       const value = metrics[rule.metric];
       if (value === undefined || value === null) continue;
       let triggered = false;

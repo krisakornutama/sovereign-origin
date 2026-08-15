@@ -92,3 +92,6 @@ structure.txt
 # ── Tests / coverage ─────────────────────────
 coverage/
 .nyc_output/
+
+# Next-Gen Security runtime state (app-control blocklist, ids offset, ai analyst report)
+**/core-api/data/

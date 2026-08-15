@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { AuditService } from '../services/audit.service';
 import { config } from '../config';
+import { warRoomPulse } from '../services/war-room.service';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = config.jwtSecret;
@@ -43,6 +44,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       assigned_node_id: decoded.assigned_node_id,
       mfa_verified: true,
     };
+    warRoomPulse(); // ข้อ 3: ทุก request ที่ผ่าน auth = สัญญาณ "มนุษย์กำลังใช้ War Room"
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' });

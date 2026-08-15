@@ -28,6 +28,24 @@ import ttsRoutes from './modules/tts/tts.routes';
 import automationRoutes from './modules/automation/automation.routes';
 import sensorRoutes from './modules/sensors/sensor.routes';
 import securityRoutes from './modules/security/security.routes';
+import nextgenRoutes, { securityEventsSse } from './modules/security/nextgen.routes';
+import { threatIntel } from './services/threat-intel.service';
+import { idsReader } from './services/ids-reader.service';
+import { aiAnalyst } from './services/ai-analyst.service';
+import { appControl } from './services/app-control.service';
+import { aiKillSwitch } from './services/ai-kill-switch.service';
+import { firstResponder } from './services/first-responder.service';
+import { realityCheck } from './services/reality-check.service';
+import { livingMode } from './services/living-mode.service';
+import { manualDay } from './services/manual-day.service';
+import { maintenanceRadar } from './services/maintenance-radar.service';
+import { timeConsensus } from './services/time-consensus.service';
+import { runBitRotScan } from './services/data-integrity.service';
+import govsimRoutes from './modules/govsim/govsim.routes';
+import governorRoutes from './modules/governor/governor.routes';
+import warRoomRoutes from './modules/war-room/war-room.routes';
+import { warRoomActive, warRoomSessionClosed, warRoomSessionOpened } from './services/war-room.service';
+import actuationRoutes from './modules/actuation/actuation.routes';
 import aiRoutes from './modules/ai/ai.routes';
 import whisperRoutes from './modules/whisper/whisper.routes';
 import visionRoutes from './modules/vision/vision.routes';
@@ -37,6 +55,8 @@ import telegramRoutes, { sendTelegram, sendTelegramPhoto } from './modules/teleg
 import { buildSnapshotForAlert } from './services/chart-snapshot.service';
 import reportRoutes from './modules/reports/reports.routes';
 import backupRoutes from './modules/backup/backup.routes';
+import meshRoutes from './modules/mesh/mesh.routes';
+import { meshLiteService } from './services/mesh-lite.service';
 import energyRoutes from './modules/energy/energy.routes';
 import otaRoutes from './modules/ota/ota.routes';
 import searchRoutes from './modules/search/search.routes';
@@ -47,6 +67,7 @@ import visionRuleRoutes from './modules/vision/vision-rule.routes';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from './services/teach-kids.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from './services/agent-team.service';
 import { processCodingQueue } from './services/coding-agent.service';
+import { initGovernor, runGovernorCycle } from './services/governor.service';
 import { runVisionCheck } from './services/vision-rule.service';
 import { knowledgeDir } from './services/knowledge-dir.service';
 import healthReadingsRoutes from './modules/health/health-readings.routes';
@@ -54,12 +75,15 @@ import { OtaStatusService } from './services/ota-status.service';
 import { threatDetector, threatEmitter } from './services/threat-detection.service';
 import { agentActions } from './services/agent-actions.service';
 import { listProcesses } from './services/system-processes.service';
+import { systemMonitor, getDiskInfo } from './services/system-monitor.service';
+import { actuationService } from './services/actuation.service';
 import { telegramAgentBot } from './services/telegram-agent-bot.service';
 import { PowerGuardWorker } from './services/power-guard.service';
 import { UpsMonitorWorker, fetchNutVars } from './services/ups-monitor.service';
 import { createWealthWorker, wealthEmitter } from './services/wealth.service';
 import { createRiskWorker, riskEmitter } from './services/risk-monitor.service';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from './services/defcon-engine.service';
+import { runDefconAction } from './services/defcon-actions.service';
 import portfolioRoutes from './modules/portfolio/portfolio.routes';
 import healingRoutes from './modules/healing/healing.routes';
 import codingRoutes from './modules/coding/coding.routes';
@@ -67,10 +91,13 @@ import cloneRoutes from './modules/clone/clone.routes';
 import riskRoutes from './modules/risk/risk.routes';
 import healthRoutes from './modules/health/health.routes';
 import infrastructureRoutes from './modules/infrastructure/infrastructure.routes';
+import { lifestyleRoutes } from './modules/lifestyle/lifestyle.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import farmRoutes from './modules/farm/farm.routes';
 import propertyRoutes from './modules/property/property.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
+import featureRoutes from './modules/features/feature.routes';
+import { featureGuard } from './services/feature-grant.service';
 import { predictiveWorker } from './services/predictive.service';
 import mqtt from 'mqtt';
 
@@ -105,6 +132,9 @@ app.use(express.json({ limit: '25mb' })); // 25MB — รองรับแพ�
 app.use(auditStateChange);
 
 // Mount route modules
+// ── สิทธิ์ฟังก์ชั่นต่อคน: แต่ละหน้า mount พร้อม requireFeature(featureKey) —
+// SUPERADMIN ผ่านเสมอ, สมาชิกต้องได้รับ grant ในตาราง user_feature_grants
+// (หน้า auth/devices/telemetry/sensors เป็นโครงสร้างพื้นฐาน — ใคร login แล้วใช้ได้)
 app.use('/api/auth', authRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/devices', deviceRoutes);
@@ -114,44 +144,56 @@ if (config.modules.isEnabled('vision')) {
   app.use('/api/vision', visionRoutes); // P3 Vision AI
 }
 app.use('/api/tts', ttsRoutes);
-app.use('/api/automation', automationRoutes);
+app.use('/api/automation', featureGuard('/automation'), automationRoutes);
 app.use('/api/sensors', sensorRoutes);
-app.use('/api/security', securityRoutes);
-app.use('/api/ai', aiRoutes); // agent policy + approvals (blockIP/unblockIP/killProcess)
-app.use('/api/relay', relayRoutes);
+// SSE ต้องอยู่ก่อน mount /api/security ทั้งคู่ (featureGuard=header-auth จะ block request ที่ไม่มี Bearer header)
+app.get('/api/security/nextgen/events', securityEventsSse);
+app.use('/api/security', featureGuard('/security'), securityRoutes);
+app.use('/api/security/nextgen', featureGuard('/security'), nextgenRoutes); // Next-Gen Security: Threat Intel / Pi-hole / IDS / ClamAV / App Control / AI Analyst
+app.use('/api/ai', featureGuard('/ai'), aiRoutes); // agent policy + approvals (blockIP/unblockIP/killProcess)
+app.use('/api/relay', featureGuard('/relay'), relayRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/timescale', timescaleRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/backup', backupRoutes);
-app.use('/api/energy', energyRoutes);
-app.use('/api/ota', otaRoutes);
-app.use('/api/knowledge', searchRoutes); // semantic search + index (POST /search, POST /index)
-app.use('/api/knowledge', knowledgeRoutes); // Knowledge Base 2.0 — items / import / upload (ลิงก์, วิดีโอ, PDF, TXT, บันทึก)
-app.use('/api/knowledge', teachRoutes); // AI สอนลูก — POST /teach/generate, POST /teach/save (RAG + Ollama)
-app.use('/api/agent', agentTeamRoutes); // Agentic AI team — บทบาท + งานเบื้องหลัง
-app.use('/api/vision', visionRuleRoutes); // Vision AI คนแปลกหน้า — ใบหน้าคุ้นเคย + กฎ + แจ้งเตือน
-app.use('/api/portfolio', portfolioRoutes); // Phase 4: Wealth & Asset Tracker
-app.use('/api/healing', healingRoutes); // Sovereign Buddhist Healing Module — ธรรมะ/สมาธิ/สมุนไพร/ติดตาม
-app.use('/api/coding', codingRoutes); // Coding Agent — เขียนโค้ดจากภาพรวม + ตรวจงาน + เสนอทางต่อ
-app.use('/api/clone', cloneRoutes); // Export & Clone — ถอดแบบฟังก์ชั่นไปติดตั้งเครื่องอื่น
-app.use('/api/risk-monitor', riskRoutes);
-  app.use('/api/predictive', predictiveRoutes); // Phase 4: Risk Monitor + DEFCON
-app.use('/api/health', healthRoutes); // Phase 5: Ambient Conversational Health Screening
-app.use('/api/health/readings', healthReadingsRoutes); // P6: Health Reading Tracker + AI trend
-app.use('/api/infrastructure', infrastructureRoutes); // Phase 5: Off-Grid Infrastructure Hub (CV/Water/Radio/Equipment)
+app.use('/api/reports', featureGuard('/reports'), reportRoutes);
+app.use('/api/backup', featureGuard('/backup'), backupRoutes);
+app.use('/api/mesh', featureGuard('/backup'), meshRoutes); // Mesh Lite — สำรองนอกสถานที่แบบเข้ารหัส
+app.use('/api/energy', featureGuard('/energy'), energyRoutes);
+app.use('/api/ota', featureGuard('/ota'), otaRoutes);
+app.use('/api/knowledge', featureGuard('/knowledge'), searchRoutes); // semantic search + index (POST /search, POST /index)
+app.use('/api/knowledge', featureGuard('/knowledge'), knowledgeRoutes); // Knowledge Base 2.0 — items / import / upload
+app.use('/api/knowledge', featureGuard('/knowledge'), teachRoutes); // AI สอนลูก — POST /teach/generate, POST /teach/save
+app.use('/api/agent', featureGuard('/ai-agent'), agentTeamRoutes); // Agentic AI team — บทบาท + งานเบื้องหลัง
+app.use('/api/vision', featureGuard('/vision'), visionRuleRoutes); // Vision AI คนแปลกหน้า
+app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes); // Phase 4: Wealth & Asset Tracker
+app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
+app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
+app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
+app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);
+app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON
+app.use('/api/health', featureGuard('/health'), healthRoutes); // Phase 5: Health Screening
+app.use('/api/health/readings', featureGuard('/health'), healthReadingsRoutes); // P6: Health Reading Tracker + AI trend
+app.use('/api/infrastructure', featureGuard('/infrastructure'), infrastructureRoutes); // Phase 5: Off-Grid Infrastructure Hub
+app.use('/api/lifestyle', featureGuard('/lifestyle'), lifestyleRoutes); // Phase 5: Embracing Chaos — จังหวะธรรมชาติ / Living Mode / Manual Day / Maintenance Radar
 
 // ── Feature Modules (ENABLED_MODULES) ──
 // เปิด-ปิดกลุ่ม API ระดับโมดูลผ่าน infra/.env — ปิดแล้ว route ไม่ถูก mount (404)
 if (config.modules.isEnabled('inventory')) {
-  app.use('/api/inventory', inventoryRoutes); // Water & Food Inventory + วันหมดอายุ
+  app.use('/api/inventory', featureGuard('/inventory'), inventoryRoutes); // Water & Food Inventory + วันหมดอายุ
 }
 if (config.modules.isEnabled('documents')) {
-  app.use('/api/documents', documentsRoutes); // P5 Document Understanding
+  app.use('/api/documents', featureGuard('/inventory'), documentsRoutes); // P5 Document Understanding
 }
 if (config.modules.isEnabled('farm')) {
-  app.use('/api/farm/plots', farmRoutes); // Farm Plot Manager
-app.use('/api/property', propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์
+  app.use('/api/farm/plots', featureGuard('/farm'), farmRoutes); // Farm Plot Manager
 }
+app.use('/api/property', featureGuard('/property'), propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์
+app.use('/api/govsim', govsimRoutes); // Governance & Socio-Political Simulation (War Room)
+app.use('/api/governor', governorRoutes); // Governor AI — คุมเมืองอัตโนมัติ + มนุษย์ approve เรื่องใหญ่
+app.use('/api/war-room', warRoomRoutes); // War Room Activity Gate — ข้อ 3: simulation หลับ-ตื่น
+app.use('/api/actuation', actuationRoutes); // Phase 7: Closed-Loop Actuation Sandbox — Safety Envelope + Mapper + Verifier
+
+// ── สิทธิ์ฟังก์ชั่นต่อคน: API ตั้งสิทธิ์ (catalog / me / users/:id) ──
+app.use('/api/features', featureRoutes);
 
 // GET /api/modules — รายชื่อโมดูลที่เปิดใช้งาน (ฝั่ง UI ใช้ซ่อนเมนูที่ไม่เปิด)
 app.get('/api/modules', (_, res) => {
@@ -285,7 +327,7 @@ app.post('/api/ai/chat', authenticate, async (req, res) => {
 app.get('/api/users', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true, role: true, assigned_node_id: true },
+      select: { id: true, username: true, role: true, assigned_node_id: true, must_change_password: true },
     });
     res.json(users);
   } catch (err) {
@@ -296,7 +338,15 @@ app.get('/api/users', authenticate, requireRole('SUPERADMIN'), async (req, res) 
 app.post('/api/users', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const { username, password, role } = req.body;
   const hash = await bcrypt.hash(password, 12);
-  await prisma.user.create({ data: { username, password_hash: hash, role: role || 'OPERATOR' } });
+  await prisma.user.create({
+    data: {
+      username,
+      password_hash: hash,
+      role: role || 'OPERATOR',
+      // สมาชิกใหม่ต้องเปลี่ยนรหัสผ่านหลัง login ครั้งแรก (รหัสแรกเข้าเป็นรหัสชั่วคราว)
+      must_change_password: true,
+    },
+  });
   res.json({ success: true });
 });
 app.delete('/api/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
@@ -305,7 +355,7 @@ app.delete('/api/users/:id', authenticate, requireRole('SUPERADMIN'), async (req
 });
 app.put('/api/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
-    const { role, assigned_node_id } = req.body;
+    const { role, assigned_node_id, must_change_password } = req.body;
     const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI'];
     if (role !== undefined && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
@@ -313,6 +363,8 @@ app.put('/api/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, r
     const data: any = {};
     if (role !== undefined) data.role = role;
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
+    // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
+    if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
     await prisma.user.update({ where: { id: req.params.id }, data });
     res.json({ success: true });
   } catch (err) {
@@ -368,17 +420,29 @@ app.post('/api/knowledge/file/:file', authenticate, (req, res) => {
 });
 
 // System Health
-app.get('/api/system/health', authenticate, (req, res) => {
+// ── Liveness probe (ไม่มี auth) — ใช้กับ Docker healthcheck + watchdog ──
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, uptime: Math.floor(process.uptime()) });
+});
+
+app.get('/api/system/health', authenticate, async (req, res) => {
   const uptime = os.uptime();
   const cpuUsage = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const memory = ((totalMem - freeMem) / totalMem * 100).toFixed(1) + '%';
+  let disk = 'N/A';
+  try {
+    const info = await getDiskInfo();
+    if (info) disk = `${info.usedPct}% เต็ม · เหลือ ${(info.freeMb / 1024).toFixed(1)} GB / ${(info.totalMb / 1024).toFixed(1)} GB`;
+  } catch {
+    // ไม่ได้ข้อมูลดิสก์ = แสดง N/A
+  }
   res.json({
     uptime: Math.floor(uptime / 3600) + 'h ' + Math.floor((uptime % 3600) / 60) + 'm',
     cpuUsage,
     memory,
-    disk: 'N/A'
+    disk
   });
 });
 
@@ -559,6 +623,24 @@ setInterval(() => {
   processCodingQueue().catch((err) => console.error('Coding queue error:', err));
 }, 15 * 1000);
 
+// ── Governor AI: คุมเมืองอัตโนมัติ (loop ทุก GOVERNOR_INTERVAL_MS — เริ่มแบบปิด รอมนุษย์เปิดที่ War Room) ──
+// ข้อ 3 (Event-Driven Simulation): Governor/GovSim "หลับ" เมื่อไม่มีมนุษย์เปิด War Room
+// (warRoomActive() = มี SSE session + API activity ภายใน 10 นาที) — หลับ = ข้ามรอบ ไม่โหลด Ollama
+// ตื่นทันทีเมื่อมี activity: เพิ่งตื่น → kick รอบทันที ไม่รอรอบถัดไป
+initGovernor();
+let warRoomWasAwake = true;
+setInterval(() => {
+  const awake = warRoomActive();
+  if (!awake) {
+    warRoomWasAwake = false; // War Room หลับ — ข้ามรอบ Governor (simulation หยุดพัก)
+    return;
+  }
+  const justWoke = !warRoomWasAwake; // มนุษย์เพิ่งเปิดหน้า → รันรอบทันที
+  warRoomWasAwake = true;
+  runGovernorCycle().catch((err) => console.error('Governor cycle error:', err));
+  if (justWoke) console.log('⚡ War Room ตื่น — Governor รันรอบทันที');
+}, parseInt(process.env.GOVERNOR_INTERVAL_MS || '120000', 10));
+
 // ── AI สอนลูก: บันทึกมูลค่าพอร์ตหุ้นรายวัน (snapshot ต่อคน) — วันละครั้ง + ตอนเริ่มระบบ ──
 async function runPortfolioSnapshot() {
   try {
@@ -595,8 +677,44 @@ async function runVisionCheckWorker() {
 setInterval(runVisionCheckWorker, 60 * 1000);
 reportService.start();
 backupService.startScheduler();
+meshLiteService.start();
 new OtaStatusService();
 threatDetector.start();
+
+// ── Next-Gen Security ──
+// Pillar 1: Threat Intelligence — seed ฐาน IOC + cron อัปเดต feed (ทุก N ชม.)
+appControl.init();
+aiKillSwitch.init();
+firstResponder.init();
+realityCheck.init();
+livingMode.init();
+manualDay.init();
+maintenanceRadar.init();
+threatIntel.seedIfEmpty().then((n) => console.log(`🧬 Threat Intel: seed ${n} IOC รายการ`)).catch(() => {});
+threatIntel.updateFromFeeds().then((r) => console.log(`🧬 Threat Intel: feed +${r.added} (รวม ${r.total})`)).catch(() => {});
+setInterval(() => {
+  if (threatIntel.shouldRunFeed()) {
+    threatIntel.updateFromFeeds().catch(() => {});
+  }
+}, 6 * 3600 * 1000); // ตรวจทุก 6 ชม. ว่าถึงเวลาอัปเดต feed หรือยัง
+
+// ── Phase 6: The Final Hardening (Epistemic Isolation) ──
+// 1) Time-Consensus — เฝ้าเวลาทุก 60 วิ (clock jump / DB desync / non-causal logs)
+timeConsensus.check().catch(() => {});
+setInterval(() => timeConsensus.check().catch(() => {}), 60 * 1000);
+// 2) Bit-Rot Scan — สแกน checksum ไฟล์ state ตอน boot + ทุกสัปดาห์
+runBitRotScan().then((r) => {
+  console.log(`💾 Bit-rot scan: ${r.scanned} ไฟล์ · ${r.ok} ok · baseline ${r.baselineCreated} · corrupt ${r.corrupt.length}`);
+}).catch(() => {});
+setInterval(() => runBitRotScan().catch(() => {}), 7 * 24 * 3600 * 1000);
+// 3) System Monitor — ดิสก์/เมม/CPU (alert ก่อนตายเงียบ ๆ)
+systemMonitor.start();
+
+// Pillar 3: IDS reader (Suricata eve.json — opt-in: ตั้ง IDS_EVE_LOG เท่านั้น, ว่าง = ปิดเงียบ ไม่ใช้ทรัพยากร) + Pillar 6: AI Analyst
+const idsStarted = idsReader.start();
+if (idsStarted) console.log(`🛡️ IDS reader เริ่มติดตาม ${config.nextgen.idsEveLog}`);
+const analystStarted = aiAnalyst.start();
+if (analystStarted) console.log('🤖 AI Security Analyst เริ่มทำงาน (Ollama + Telegram)');
 
 // ── Phase 4: Risk & Wealth Infrastructure ──
 
@@ -614,47 +732,63 @@ const defconMqtt = mqtt.connect({
 });
 const DEFAULT_NODE_ID = '11111111-1111-1111-1111-111111111111';
 
+// ── Phase 7: Closed-Loop Actuation Sandbox — ใส่ตัวอ่าน snapshot จริง (TimescaleDB) ──
+actuationService.setDeps({
+  loadSnapshot: async () => {
+    try {
+      const latestRows = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT DISTINCT ON (metric) metric, value
+         FROM sensor_telemetry
+         WHERE metric IN ('battery_soc', 'power_kw')
+         ORDER BY metric, time DESC`
+      );
+      const latest: Record<string, number> = {};
+      for (const r of latestRows) latest[r.metric] = Number(r.value);
+      const tempRows = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT MAX(value) AS max_temp
+         FROM sensor_telemetry
+         WHERE metric IN ('temperature', 'temp', 'temp_c')
+           AND time >= NOW() - INTERVAL '10 minutes'`
+      );
+      const occRows = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT value FROM sensor_telemetry
+         WHERE metric IN ('presence', 'motion', 'occupancy')
+           AND time >= NOW() - INTERVAL '30 minutes'
+         ORDER BY time DESC LIMIT 1`
+      );
+      return {
+        batterySoc: latest.battery_soc != null ? Number(latest.battery_soc) : null,
+        powerKw: latest.power_kw != null ? Number(latest.power_kw) : null,
+        tempC: tempRows[0]?.max_temp != null ? Number(tempRows[0].max_temp) : null,
+        occupied: occRows.length ? Number(occRows[0].value) > 0 : false,
+      };
+    } catch (err) {
+      console.error('Actuation: snapshot load failed:', err instanceof Error ? err.message : err);
+      return { batterySoc: null, powerKw: null, tempC: null, occupied: false };
+    }
+  },
+  publishReal: (actuatorId, state) => {
+    defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${actuatorId}`, state === 'on' ? '1' : '0');
+  },
+});
+
 async function defconRunAction(level: DefconLevel, action: DefconAction): Promise<void> {
-  const log = (detail: string) =>
-    console.log(`🛡️ DEFCON ${level}: ${action.id} — ${detail}`);
-  switch (action.id) {
-    case 'charge_battery':
-      // สั่งชาร์จแบตเตอรี่โซลาร์เต็ม 100% ล่วงหน้า — ส่งผ่าน MQTT ไป inverter/ESP32
-      defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${process.env.DEFCON_CHARGE_RELAY_ID || 'relay1'}`, '1');
-      log(`MQTT publish → charge relay ON (${process.env.DEFCON_CHARGE_RELAY_ID || 'relay1'})`);
-      break;
-    case 'telegram_stats':
-      await sendTelegram(`⚠️ DEFCON 3: Threat Index สูงขึ้น — ชาร์จแบตเตอรี่ไว้แล้ว + สถิติพลังงานอยู่ในหน้า Energy`);
-      break;
-    case 'backup_cold_storage':
-      // Backup ฐานข้อมูลลง Cold Storage (ใช้ backupService เดิม)
-      await backupService.createBackup();
-      log('backup created');
-      break;
-    case 'relays_off':
-      // ปิด relay ที่ไม่จำเป็น (กำหนดด้วย DEFCON_NON_ESSENTIAL_RELAYS เช่น "relay2,relay3")
-      for (const relayId of (process.env.DEFCON_NON_ESSENTIAL_RELAYS || 'relay2,relay3').split(',')) {
-        const id = relayId.trim();
-        if (id) defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${id}`, '0');
-      }
-      log('non-essential relays → OFF');
-      break;
-    case 'wan_disconnect':
-      // ตัด WAN (Isolated LAN Mode) — ตั้งคำสั่งผ่าน DEFCON_WAN_DISCONNECT_CMD (ว่าง = ข้าม)
-      if (process.env.DEFCON_WAN_DISCONNECT_CMD) {
-        await execAsync(process.env.DEFCON_WAN_DISCONNECT_CMD, { timeout: 15000 });
-        log('WAN disconnected');
-      } else {
-        log('DEFCON_WAN_DISCONNECT_CMD not set — skipped');
-      }
-      break;
-    case 'security_on':
-      defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${process.env.DEFCON_SECURITY_RELAY_ID || 'relay4'}`, '1');
-      log(`MQTT publish → security relay ON (${process.env.DEFCON_SECURITY_RELAY_ID || 'relay4'})`);
-      break;
-    default:
-      log('unknown action');
-  }
+  // DEFCON_DRY_RUN=true (default): มาตรการทางกายภาพวิ่งผ่าน actuation sandbox — ดูผลใน history + envelope ทำงานจริง
+  // DEFCON_DRY_RUN=false: พฤติกรรมเดิม — MQTT จริง + exec คำสั่ง
+  const dryRun = process.env.DEFCON_DRY_RUN !== 'false';
+  await runDefconAction(level, action, {
+    dryRun,
+    executeActuator: async (id, state, reason) => {
+      const r = await actuationService.executeCommand({ actuatorId: id, desiredState: state, actor: 'system', reason });
+      return { ok: r.ok, rule: r.rule };
+    },
+    backup: () => backupService.createBackup(),
+    meshReplicate: () => meshLiteService.replicate(),
+    sendTelegramMsg: (text) => sendTelegram(text),
+    mqttRelay: (relayId, state) => defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${relayId}`, state),
+    execCmd: (cmd) => execAsync(cmd, { timeout: 15000 }),
+    log: (detail) => console.log(`🛡️ DEFCON ${level}: ${action.id} — ${detail}`),
+  });
 }
 
 const defconEngine = createDefconEngine({
@@ -756,6 +890,7 @@ if (config.ups.enabled) {
 
 // Forward internal events to websocket clients
 wealthEmitter.on('wealth_update', (data) => io.emit('wealth_update', data));
+riskEmitter.on('risk_error', (err) => io.emit('risk_error', err));
 riskEmitter.on('threat_update', (threat) => {
   io.emit('threat_update', threat);
   // DEFCON Engine: แปลง Threat Index → คำสั่งอุปกรณ์กายภาพ (Module 15)
@@ -817,6 +952,7 @@ console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' :
 // 1) error middleware — 500 ที่อ่านง่ายแทน crash
 app.use((err: any, _req: any, res: any, _next: any) => {
   console.error('❌ Unhandled route error:', err?.message || err);
+  if (err?.stack) console.error(err.stack);
   if (!res.headersSent) {
     res.status(500).json({ error: 'Internal server error' });
   } else {

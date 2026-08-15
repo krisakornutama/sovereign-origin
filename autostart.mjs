@@ -116,6 +116,10 @@ async function main() {
     }
   }
 
+  // 5) Frontend Watchdog — คอยเริ่ม dev server ใหม่ถ้ามันตายกลางคัน (idempotent: ตัวเดียวเท่านั้น)
+  detachSpawn('node.exe', ['frontend-watchdog.mjs'], ROOT, join(ROOT, '.freebuff', 'frontend-watchdog-spawn.log'));
+  log('👀 Frontend Watchdog เริ่มแล้ว (ถ้ายังไม่มี)');
+
   log('═══ autostart เสร็จ — ทุกอย่างที่เป็นไปได้ถูกเปิดแล้ว ═══');
 }
 

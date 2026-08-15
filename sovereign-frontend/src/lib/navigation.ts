@@ -35,6 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/property', label: 'Property Map', icon: '🗺️', keywords: 'แผนที่ ที่ดิน บ้าน ทรัพย์สิน 3d' },
       { href: '/alerts', label: 'Alert History', icon: '🚨', keywords: 'แจ้งเตือน ประวัติ เตือนภัย' },
       { href: '/risk-monitor', label: 'Risk Monitor', icon: '📰', keywords: 'ความเสี่ยง ข่าว monitor' },
+      { href: '/governance-sim', label: 'Governance Sim', icon: '🏛️', keywords: 'จำลอง การปกครอง สังคม เศรษฐศาสตร์ การเมือง simul govsim war room' },
       { href: '/infrastructure', label: 'Infrastructure', icon: '🏭', keywords: 'โครงสร้างพื้นฐาน เน็ตเวิร์ก' },
     ],
   },
@@ -47,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/portfolio', label: 'Wealth & Assets', icon: '💰', keywords: 'เงิน การเงิน หุ้น พอร์ต ทรัพย์สิน ลงทุน' },
       { href: '/knowledge', label: 'Knowledge Base', icon: '📚', keywords: 'ความรู้ บทเรียน เรียน เด็ก สอน' },
       { href: '/healing', label: 'Buddhist Healing', icon: '🧘', keywords: 'ธรรมะ สมาธิ สมุนไพร เยียวยา วัด' },
+      { href: '/lifestyle', label: 'วิถีชีวิต', icon: '🌿', keywords: 'วิถี ชีวิต ธรรมชาติ จังหวะ หน้าต่าง อากาศ แสง circadian manual day ไร้ระบบ' },
     ],
   },
   {
@@ -54,6 +56,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/history', label: 'History', icon: '📈', keywords: 'ประวัติ ข้อมูล ย้อนหลัง' },
       { href: '/reports', label: 'AI Reports', icon: '📊', keywords: 'รายงาน สรุป ai' },
+    ],
+  },
+  {
+    title: 'บัญชีของฉัน',
+    items: [
+      { href: '/change-password', label: 'เปลี่ยนรหัสผ่าน', icon: '🔑', keywords: 'รหัสผ่าน เปลี่ยนรหัส password บัญชี login' },
     ],
   },
   {

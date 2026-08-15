@@ -15,6 +15,69 @@ const SCHEDULE_FILE = path.join(BACKUP_DIR, 'schedule.json');
 const DB_URL = process.env.DATABASE_URL || '';
 const DB_CONTAINER = process.env.DB_CONTAINER || 'sovereign-db';
 
+// จำนวน backup ต่อชนิดที่เก็บไว้ (ลบไฟล์เก่าอัตโนมัติ) — ตั้งได้ผ่าน env BACKUP_RETAIN
+const BACKUP_RETAIN = parseInt(process.env.BACKUP_RETAIN || '30', 10);
+
+// ไฟล์ state (.json.gz) ที่เก็บคู่กับ DB dump — กันการตั้งค่าหายเมื่อ container recreate
+// ครอบคลุม: data/*.json (state ทั้งหมด) + .env (secret/config) ถ้าหาเจอ
+export function stateBundleName(now: Date): string {
+  return `sovereign_state_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(
+    now.getHours()
+  )}${pad(now.getMinutes())}${pad(now.getSeconds())}.json.gz`;
+}
+
+/** รวบรวมไฟล์ state สำหรับ bundle — data/*.json + .env (host หรือที่ mount เข้า container) */
+export function collectStateFiles(cwd: string): { name: string; content: string }[] {
+  const out: { name: string; content: string }[] = [];
+  const dataDir = path.join(cwd, 'data');
+  try {
+    if (fs.existsSync(dataDir)) {
+      for (const f of fs.readdirSync(dataDir)) {
+        if (!f.endsWith('.json') || f.includes('..')) continue;
+        try {
+          out.push({ name: `data/${f}`, content: fs.readFileSync(path.join(dataDir, f), 'utf8') });
+        } catch {
+          // ข้ามไฟล์ที่อ่านไม่ได้
+        }
+      }
+    }
+  } catch {
+    // data dir ไม่มี = ข้าม
+  }
+  const envCandidates = [path.join(cwd, 'host-infra.env'), path.join(cwd, '..', 'infra', '.env')];
+  for (const envFile of envCandidates) {
+    try {
+      if (fs.existsSync(envFile)) {
+        out.push({ name: 'host-infra.env', content: fs.readFileSync(envFile, 'utf8') });
+        break;
+      }
+    } catch {
+      // ข้าม
+    }
+  }
+  return out;
+}
+
+/** ลบไฟล์เก่าเกิน BACKUP_RETAIN ตาม suffix (เรียงตาม mtime ใหม่สุดก่อน) */
+export function applyRetention(dir: string, suffix: string, keep: number): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(suffix))
+    .map((f) => ({ f, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  const removed: string[] = [];
+  for (const { f } of files.slice(keep)) {
+    try {
+      fs.unlinkSync(path.join(dir, f));
+      removed.push(f);
+    } catch {
+      // ข้ามไฟล์ที่ลบไม่ได้
+    }
+  }
+  return removed;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -102,6 +165,26 @@ class BackupService {
     const gz = await dumpDatabase();
     fs.writeFileSync(path.join(BACKUP_DIR, file), gz);
     console.log(`💾 Backup created: ${file} (${(gz.length / 1024 / 1024).toFixed(2)} MB)`);
+    await this.createStateBundle();
+    return { file, size: gz.length };
+  }
+
+  /** bundle ไฟล์ state (data/*.json + .env) เก็บคู่กับ DB dump — กัน state หายเวลา container recreate */
+  async createStateBundle(): Promise<{ file: string; size: number } | null> {
+    const files = collectStateFiles(process.cwd());
+    if (files.length === 0) return null;
+    const file = stateBundleName(new Date());
+    const gz = gzipSync(
+      JSON.stringify({ at: new Date().toISOString(), files }, null, 2),
+      { level: 9 }
+    );
+    fs.writeFileSync(path.join(BACKUP_DIR, file), gz);
+    console.log(`🗃️ State bundle: ${file} (${files.length} ไฟล์, ${(gz.length / 1024).toFixed(1)} KB)`);
+    const removedSql = applyRetention(BACKUP_DIR, '.sql.gz', BACKUP_RETAIN);
+    const removedState = applyRetention(BACKUP_DIR, '.json.gz', BACKUP_RETAIN);
+    if (removedSql.length || removedState.length) {
+      console.log(`🧹 Retention: ลบไฟล์เก่า ${removedSql.length} sql.gz + ${removedState.length} state (เก็บ ${BACKUP_RETAIN} ล่าสุด)`);
+    }
     return { file, size: gz.length };
   }
 
@@ -125,7 +208,8 @@ class BackupService {
       const raw = JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf-8'));
       return { enabled: !!raw.enabled, time: raw.time || '02:00' };
     } catch {
-      return { enabled: false, time: '02:00' };
+      // ไม่มี schedule.json = เปิด backup รายวันอัตโนมัติ 02:00 (กันลืมตั้ง)
+      return { enabled: true, time: '02:00' };
     }
   }
 

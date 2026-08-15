@@ -8,6 +8,7 @@ import axios from 'axios';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const VL_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 const TEXT_EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text';
 // คลิป/โมเดล embed ภาพตรง ๆ (ถ้ามี → ไม่ต้องเรียก LLM ทุกครั้ง)
@@ -143,6 +144,7 @@ export async function embedFace(photo: string): Promise<FaceEmbedResult> {
       const resp = await faceDeps.embed?.(`${OLLAMA_URL}/api/embed`, {
         model: IMAGE_EMBED_MODEL,
         input: stripDataUri(image),
+        keep_alive: OLLAMA_KEEP_ALIVE,
       });
       const emb = resp?.data?.embeddings?.[0];
       if (Array.isArray(emb) && emb.length > 0) return { embedding: emb, method: 'image-embed' };
@@ -156,6 +158,7 @@ export async function embedFace(photo: string): Promise<FaceEmbedResult> {
         'เพื่อใช้เป็นลายเซ็นเปรียบเทียบความคล้าย เช่น "ใบหน้าชายไทยวัยกลางคน หนวดเคราบาง ผมสั้น" — ตอบเฉพาะประโยคเดียว ไม่มีคำอธิบายอื่น',
       images: [stripDataUri(image)],
       stream: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     });
     const description = String(gen?.data?.response ?? '').trim().slice(0, 200);
     if (!description) return { embedding: null, method: 'none' };
@@ -163,6 +166,7 @@ export async function embedFace(photo: string): Promise<FaceEmbedResult> {
     const emb = await faceDeps.embed?.(`${OLLAMA_URL}/api/embed`, {
       model: TEXT_EMBED_MODEL,
       input: description,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     });
     const vec = emb?.data?.embeddings?.[0];
     if (Array.isArray(vec) && vec.length > 0) return { embedding: vec, method: 'describe-nomic', description };
@@ -208,12 +212,14 @@ export async function matchFaceInImage(
           'เพื่อใช้เปรียบเทียบความคล้าย — ตอบเฉพาะประโยคเดียว',
         images: [stripDataUri(image)],
         stream: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
       });
       const description = String(gen?.data?.response ?? '').trim();
       if (description) {
         const emb = await faceDeps.embed?.(`${OLLAMA_URL}/api/embed`, {
           model: TEXT_EMBED_MODEL,
           input: description,
+          keep_alive: OLLAMA_KEEP_ALIVE,
         });
         const vec = emb?.data?.embeddings?.[0];
         if (Array.isArray(vec) && vec.length > 0) {

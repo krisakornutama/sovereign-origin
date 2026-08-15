@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 export const prisma = new PrismaClient();
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 export const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 export const VISION_ENABLED = (process.env.VISION_ENABLED || 'true') !== 'false';
 export const VISION_MAX_IMAGE_MB = parseInt(process.env.VISION_MAX_IMAGE_MB || '10', 10);
@@ -137,7 +138,7 @@ export async function callVision(base64: string, prompt: string, deps: CallVisio
       images: [base64],
       stream: false,
       options: { temperature: 0.1 },
-      keep_alive: '5m',
+      keep_alive: OLLAMA_KEEP_ALIVE,
     },
     { timeout: 120000 }
   );

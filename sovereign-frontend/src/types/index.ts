@@ -3,6 +3,7 @@ export interface JwtPayload {
     role: 'SUPERADMIN' | 'NODE_ADMIN' | 'OPERATOR';
     assigned_node_id?: string | null;
     mfa_verified: boolean;
+    must_change_password?: boolean;
     iat: number;
     exp: number;
   }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import { riskEmitter } from '../../services/risk-monitor.service';
 import { classifyDefcon, type DefconLevel } from '../../services/defcon-engine.service';
@@ -20,10 +20,11 @@ const VALID_CATEGORIES = ['war', 'banking', 'energy', 'inflation'];
 // GET /api/risk-monitor/overview
 router.get('/overview', authenticate, async (req, res) => {
   try {
-    const [latestThreat, recentHeadlines, defconEngine] = await Promise.all([
+    const [latestThreat, recentHeadlines, defconEngine, riskWorker] = await Promise.all([
       prisma.threatIndex.findFirst({ orderBy: { timestamp: 'desc' } }),
       prisma.riskHeadline.findMany({ orderBy: { published: 'desc' }, take: 20 }),
       Promise.resolve((req.app.locals as { defconEngine?: { getLevel: () => DefconLevel } }).defconEngine),
+      Promise.resolve((req.app.locals as { riskWorker?: { getStatus: () => { enabled: boolean; lastError: string | null; lastErrorAt: Date | null } } }).riskWorker),
     ]);
     const categories =
       latestThreat && typeof latestThreat.categories === 'object'
@@ -41,6 +42,7 @@ router.get('/overview', authenticate, async (req, res) => {
         : null,
       defconLevel: defconEngine ? defconEngine.getLevel() : classifyDefcon(latestThreat?.overall ?? 0),
       headlines: recentHeadlines,
+      worker: riskWorker ? riskWorker.getStatus() : null,
     });
   } catch (err) {
     console.error('Risk overview error:', err);
@@ -89,6 +91,26 @@ router.post('/refresh', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Risk refresh error:', err);
     res.status(500).json({ error: 'Failed to refresh risk data' });
+  }
+});
+
+// ── DEFCON Controlled Dry-Run (drill) ──
+// POST /api/risk-monitor/defcon/drill { index } — จำลอง Threat Index 0-100 → engine ทำงานจริง
+// (hysteresis + ยิง actions ตาม level — มาตรการทางกายภาพไป actuation sandbox เมื่อ DEFCON_DRY_RUN=true)
+// ใช้ index=0 หลังจบ drill เพื่อลดระดับ (de-escalation ต้องผ่าน hysteresis)
+router.post('/defcon/drill', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const engine = (req.app.locals as { defconEngine?: { check: (n: number) => Promise<{ level: number; actionsRun: { id: string }[] }> } }).defconEngine;
+    if (!engine) return res.status(503).json({ error: 'DEFCON engine ไม่พร้อม' });
+    const index = Number(req.body?.index);
+    if (!Number.isFinite(index) || index < 0 || index > 100) {
+      return res.status(400).json({ error: 'index ต้องเป็นตัวเลข 0-100' });
+    }
+    const result = await engine.check(index);
+    res.json({ level: result.level, actionsRun: result.actionsRun.map((a) => a.id) });
+  } catch (err) {
+    console.error('DEFCON drill error:', err);
+    res.status(500).json({ error: 'DEFCON drill failed' });
   }
 });
 

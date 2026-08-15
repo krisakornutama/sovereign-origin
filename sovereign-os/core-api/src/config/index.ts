@@ -171,4 +171,57 @@ export const config = {
     enabled: (process.env.DEFCON_ENABLED || 'false') === 'true',
     hysteresis: parseInt(process.env.DEFCON_HYSTERESIS || '10', 10),
   },
+  // ── Next-Gen Security (Pillar 1-6) ──
+  // Threat Intelligence / Pi-hole / Suricata / ntopng / ClamAV / App Control / AI Analyst
+  // ทุกจุดเป็น best-effort: ถ้าเครื่องมือไม่ configure ไว้ ระบบทำงานต่อและแสดงสถานะ "ไม่เชื่อมต่อ"
+  nextgen: {
+    // 1) Threat Intelligence — ฐาน IOC + feed อัปเดต
+    intelFeedUrls: splitList(process.env.THREAT_INTEL_FEED_URLS).length
+      ? splitList(process.env.THREAT_INTEL_FEED_URLS)
+      : ['https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'],
+    intelMaxItems: parseInt(process.env.THREAT_INTEL_MAX_ITEMS || '5000', 10),
+    intelFeedIntervalHours: parseInt(process.env.THREAT_INTEL_FEED_INTERVAL_HOURS || '24', 10),
+    intelFeedTimeoutMs: parseInt(process.env.THREAT_INTEL_FEED_TIMEOUT_MS || '30000', 10),
+    // 2) Pi-hole DNS — URL แบบ http://host:port/admin (v5) หรือ root (v6)
+    piholeUrl: process.env.PIHOLE_URL || '',
+    piholeToken: process.env.PIHOLE_TOKEN || '',
+    piholeTimeoutMs: parseInt(process.env.PIHOLE_TIMEOUT_MS || '5000', 10),
+    // 3) Suricata IDS — ตำแหน่ง eve.json (ว่าง = ปิด)
+    idsEveLog: process.env.IDS_EVE_LOG || '',
+    idsPollIntervalMs: parseInt(process.env.IDS_POLL_INTERVAL_MS || '10000', 10),
+    idsTailBytes: parseInt(process.env.IDS_TAIL_BYTES || '4194304', 10),
+    // 4) (ลบ ClamAV daemon แล้ว — ใช้ SHA-256 hash engine แทน: src/services/hash-engine.service.ts)
+    // 5) ntopng — ใช้ตรวจว่า reachable (แสดงสถานะใน UI เท่านั้น)
+    ntopngUrl: process.env.NTOPNG_URL || '',
+    ntopngTimeoutMs: parseInt(process.env.NTOPNG_TIMEOUT_MS || '5000', 10),
+    // 6) AI Analyst — วิเคราะห์เหตุการณ์รวมด้วย Ollama + แจ้งเตือน Telegram
+    aiAnalystEnabled: (process.env.AI_ANALYST_ENABLED || 'false') === 'true',
+    aiAnalystModel: process.env.AI_ANALYST_MODEL || 'gemma3:4b',
+    aiAnalystIntervalMin: parseInt(process.env.AI_ANALYST_INTERVAL_MIN || '60', 10),
+    aiAnalystTelegram: (process.env.AI_ANALYST_TELEGRAM || 'false') === 'true',
+    aiAnalystMaxEvents: parseInt(process.env.AI_ANALYST_MAX_EVENTS || '25', 10),
+    // 7) First-Responder Mode — โหมดรับมือเหตุฉุกเฉิน (ปลดล็อกประตู/หยุด stranger-alert) — หมดอายุอัตโนมัติ
+    firstResponderDurationMs: parseInt(process.env.FIRST_RESPONDER_DURATION_MS || '7200000', 10), // default 2 ชม.
+  },
+  // ── Phase 6 — The Final Hardening (Epistemic Isolation) ──
+  storage: {
+    // อายุ SSD/NVMe โดยประมาณ (TBW) — ใช้คำนวณ write-budget ใน Chaos Drill
+    ssdTbw: parseInt(process.env.SSD_TBW || '150', 10),
+  },
+  // 17) Lifestyle / Phase 5 "Embracing Chaos" — ออกแบบให้ระบบยอมรับความผันผวนของธรรมชาติ
+  lifestyle: {
+    enabled: (process.env.LIFESTYLE_ENABLED || 'true') === 'true',
+    // ภัย 1 (Hygiene Hypothesis): เป้าเปิดรับอากาศธรรมชาติต่อวัน (นาที) + AQI สูงสุดที่ยอมเปิดหน้าต่าง
+    targetExposureMin: parseInt(process.env.TARGET_EXPOSURE_MIN || '60', 10),
+    minExposureMin: parseInt(process.env.MIN_EXPOSURE_MIN || '30', 10),
+    aqiCap: parseInt(process.env.EXPOSURE_AQI_CAP || '50', 10),
+    // ภัย 3 (Circadian): ตำแหน่งบ้านสำหรับคำนวณพระอาทิตย์ขึ้น/ตก + ขนาดอุณหภูมิ drift ที่ "ควรปล่อยให้ธรรมชาติทำ"
+    latitude: parseFloat(process.env.HOME_LATITUDE || '15.0'),
+    longitude: parseFloat(process.env.HOME_LONGITUDE || '100.0'),
+    // +UTC นาที (ไทย = 420) — container รัน TZ=UTC จึงต้องคำนวณเวลาแสดงเอง
+    utcOffsetMin: parseInt(process.env.HOME_UTC_OFFSET_MIN || '420', 10),
+    tempDriftC: parseInt(process.env.NATURAL_TEMP_DRIFT_C || '3', 10),
+    // ภัย 5 (Generational): วันไร้ระบบอัตโนมัติเริ่มต้น 24 ชม.
+    manualDayHours: parseInt(process.env.MANUAL_DAY_HOURS || '24', 10),
+  },
 };

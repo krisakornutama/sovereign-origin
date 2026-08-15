@@ -9,10 +9,12 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { embedFace, matchFaceInImage } from './face-embed.service';
+import { firstResponder } from './first-responder.service';
 
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const VL_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 
 export interface KnownFaceInput {
@@ -146,6 +148,7 @@ export async function analyzeStranger(
       `ใบหน้าที่คุ้นเคยที่ลงทะเบียน:\n${faceList}\n\n` +
       'ตอบเป็น JSON เท่านั้น รูปแบบ {"persons": <จำนวนคน>, "familiar": ["ชื่อคนคุ้นเคย..."], "strangers": <จำนวนคนแปลกหน้า>}',
     stream: false,
+    keep_alive: OLLAMA_KEEP_ALIVE,
   });
   const raw = String(resp.data?.response ?? '').trim();
   return parseStrangerJson(raw);
@@ -200,19 +203,25 @@ function toDataUri(photo: string): string | null {
 export async function runVisionCheck(opts?: { photo?: string }): Promise<{
   alerted: boolean;
   skipped?: string;
+  honeypot?: boolean;
   persons?: number;
   strangers?: number;
   familiar?: string[];
   message?: string;
 }> {
+  // First-Responder Mode (Phase 6 — Zero-Trust + Honeypot):
+  // ไม่หยุดดู — วิเคราะห์ต่อแบบเงียบ ๆ บันทึก VisionAlert kind='honeypot' (ลับ, ไม่มี Telegram, ไม่ขึ้น alert)
+  // ใช้วิเคราะห์ย้อนหลังว่า "เหตุฉุกเฉิน" เป็นของจริงหรือถูกจัดฉาก (Emergency Exploitation)
+  const frActive = firstResponder.isActive();
   const rule = await getVisionRule();
   if (!rule.enabled) return { alerted: false, skipped: 'disabled' };
   const now = new Date();
-  if (rule.last_check_at && now.getTime() - new Date(rule.last_check_at).getTime() < (rule.interval_min ?? 10) * 60000) {
-    return { alerted: false, skipped: 'not_due' };
-  }
+  const lastAt = rule.last_check_at ? new Date(rule.last_check_at).getTime() : 0;
 
-  // แหล่งภาพ: ที่ส่งมา → DetectionEvent ล่าสุดที่มีภาพ
+  // Lazy Vision AI (Lean): ตรวจเฉพาะเมื่อมี Trigger ใหม่จริง
+  // 1) ภาพจากผู้ใช้ (manual) → ตรวจได้เสมอ
+  // 2) ภาพจาก DetectionEvent (เช่น Motion/PIR) เฉพาะเหตุการณ์ที่ใหม่กว่า check ล่าสุด
+  //    — ไม่มีเหตุการณ์ใหม่ → ข้ามทันที (ไม่แตะ DB เขียน / ไม่โหลด VL model)
   let photo = opts?.photo ? toDataUri(opts.photo) : null;
   let source = opts?.photo ?? '';
   if (!photo) {
@@ -221,14 +230,18 @@ export async function runVisionCheck(opts?: { photo?: string }): Promise<{
       orderBy: { detected_at: 'desc' },
       select: { image_path: true, detected_at: true },
     });
-    if (ev?.image_path) {
-      photo = toDataUri(ev.image_path);
-      source = ev.image_path;
+    if (!ev?.image_path || (lastAt > 0 && ev.detected_at.getTime() <= lastAt)) {
+      return { alerted: false, skipped: 'no_new_trigger' };
     }
+    photo = toDataUri(ev.image_path);
+    source = ev.image_path;
+  }
+  // กันการตรวจซ้ำถี่เกิน (interval_min — pacing ของกฎ ยังคงเดิม)
+  if (lastAt > 0 && now.getTime() - lastAt < (rule.interval_min ?? 10) * 60000) {
+    return { alerted: false, skipped: 'not_due' };
   }
   if (!photo) {
-    await prisma.visionRule.update({ where: { id: 1 }, data: { last_check_at: now } });
-    return { alerted: false, skipped: 'no_image' };
+    return { alerted: false, skipped: 'no_image' }; // safety: ภาพใช้ไม่ได้ → ข้าม
   }
 
   // ── เปรียบเทียบด้วย embedding/dhash ก่อน (เชิงตัวเลข ไม่ต้องพึ่ง LLM ตัดสิน) ──
@@ -264,6 +277,31 @@ export async function runVisionCheck(opts?: { photo?: string }): Promise<{
   if (!suspicious) {
     await prisma.visionRule.update({ where: { id: 1 }, data: { last_check_at: now } });
     return { alerted: false, persons: result.persons, strangers: result.strangers, familiar: result.familiar };
+  }
+
+  if (frActive) {
+    // Honeypot: บันทึกภาพ/ใบหน้าลับขณะโหมดฉุกเฉิน — ไม่แจ้งเตือน, ไม่รบกวนเจ้าหน้าที่
+    const message =
+      `🧊 HONEPYOT: บันทึกเงียบระหว่าง First-Responder Mode\n` +
+      `👥 คนในภาพ: ${result.persons} | คนแปลกหน้า: ${result.strangers} | คุ้นเคย: ${result.familiar.length ? result.familiar.join(', ') : 'ไม่มี'}\n` +
+      `📸 แหล่งภาพ: ${source || 'snapshot'}`;
+    await prisma.visionAlert.create({
+      data: {
+        image_url: source || null,
+        message,
+        kind: 'honeypot',
+        confidence: result.persons > 0 ? Math.min(1, 0.5 + result.strangers * 0.15) : 0,
+      },
+    });
+    await prisma.visionRule.update({ where: { id: 1 }, data: { last_check_at: now } });
+    return {
+      alerted: false,
+      honeypot: true,
+      persons: result.persons,
+      strangers: result.strangers,
+      familiar: result.familiar,
+      message,
+    };
   }
 
   const message =

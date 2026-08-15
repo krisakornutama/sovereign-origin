@@ -8,6 +8,7 @@ import axios from 'axios';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const CODING_MODEL = process.env.CODING_MODEL || process.env.OLLAMA_MODEL || 'qwen3:8b';
 
 // ── Pure: ตัวแยก JSON จากคำตอบของ AI ──
@@ -105,6 +106,7 @@ export async function planTask(task: string, context?: string): Promise<CodePlan
       system: 'คุณเป็นสถาปนิกโค้ด ตอบเป็นภาษาไทย ให้ JSON ตามรูปแบบที่ขอ',
       prompt: buildPlanPrompt(task, context),
       stream: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     },
     { timeout: 300000 }
   );
@@ -128,6 +130,7 @@ export async function generateFile(file: PlanFile, task: string, existingCode?: 
       system: 'คุณเป็นวิศวกรซอฟต์แวร์ เขียนโค้ดภาษา TypeScript/Python/Shell ที่รันได้จริง ตอบเฉพาะโค้ด',
       prompt: buildCodePrompt(file, task, existingCode),
       stream: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     },
     { timeout: 300000 }
   );
@@ -177,6 +180,7 @@ export async function suggestNext(task: string, resultSummary: string): Promise<
         `ผลลัพธ์: ${String(resultSummary).slice(0, 500)}\n\n` +
         'เสนอสิ่งที่อยากทำต่อ 2-4 ตัวเลือก เป็น JSON array ของสตริงภาษาไทย เช่น ["เพิ่มการทดสอบ", "เพิ่มหน้า UI"] ตอบเฉพาะ array',
       stream: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     },
     { timeout: 300000 }
   );

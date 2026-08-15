@@ -10,6 +10,7 @@ import axios from 'axios';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const AGENT_MODEL = process.env.AI_MODEL || 'gemma3:4b';
 
 export interface AgentRoleInput {
@@ -305,6 +306,7 @@ async function executeAgentJob(job: any): Promise<string | null> {
         `ข้อมูลปัจจุบัน:\n${context}\n\nภารกิจ: ${job.prompt}\n\n` +
         'ตอบเป็นภาษาไทย สั้น กระชับ อ้างตัวเลขจริงจากข้อมูล ถ้าข้อมูลไม่พอให้บอกว่าต้องการข้อมูลอะไร',
       stream: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
     });
     const result = String(resp.data?.response ?? '').trim().slice(0, 8000);
     await prisma.agentJob.update({

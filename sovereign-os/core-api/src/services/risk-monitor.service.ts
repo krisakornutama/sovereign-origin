@@ -133,11 +133,18 @@ export interface RiskWorkerDeps {
 
 export class RiskWorker {
   private task: ReturnType<typeof cron.schedule> | null = null;
+  private lastError: string | null = null;
+  private lastErrorAt: Date | null = null;
 
   constructor(
     private deps: RiskWorkerDeps,
     private cfg: RiskWorkerConfig
   ) {}
+
+  /** สถานะ worker — เอาไว้ให้ UI ตรวจว่า AI analysis กำลังล้มเงียบหรือเปล่า */
+  getStatus(): { enabled: boolean; lastError: string | null; lastErrorAt: Date | null } {
+    return { enabled: this.cfg.enabled, lastError: this.lastError, lastErrorAt: this.lastErrorAt };
+  }
 
   /** รอบเดียว: ดึงทุก feed → เก็บข่าวใหม่ → วิเคราะห์ Threat Index → บันทึก + emit */
   async runOnce(): Promise<{ fetched: number; added: number; threat: ThreatResult | null }> {
@@ -171,6 +178,8 @@ export class RiskWorker {
       if (recent.length > 0) {
         const threat = await this.deps.analyzeWithOllama(recent);
         if (threat) {
+          this.lastError = null;
+          this.lastErrorAt = null;
           await this.deps.saveThreatIndex(threat, recent.length, this.cfg.model);
           riskEmitter.emit('threat_update', threat);
           this.deps.log(
@@ -178,6 +187,10 @@ export class RiskWorker {
           );
           return { fetched, added, threat };
         }
+        // Ollama ล้ม (ปิดอยู่/model ผิด) → บันทึกสถานะ + แจ้ง SSE — กันระบบพังเงียบ ๆ
+        this.lastError = `Ollama วิเคราะห์ไม่สำเร็จ (ตรวจ OLLAMA_URL=${this.cfg.ollamaUrl} + โมเดล ${this.cfg.model})`;
+        this.lastErrorAt = new Date();
+        riskEmitter.emit('risk_error', { lastError: this.lastError, lastErrorAt: this.lastErrorAt });
       }
     }
     return { fetched, added, threat: null };
@@ -206,6 +219,7 @@ export class RiskWorker {
 // ── Ollama analysis + instance สำหรับ wiring ──
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const prisma = new PrismaClient();
 
 /** ตรวจว่ามีตัวอักษรภาษาไทย (ก-ฮ / เ-ไ / ฯ ๆ ุ ู ึ ื ั ้ ๊ ๋ ็ ์ ํ) อย่างน้อย 2 ตัวหรือไม่ */
@@ -244,7 +258,7 @@ async function translateSummaryToThai(summary: string, model: string): Promise<s
         prompt: `Translate the following English text into Thai (ภาษาไทย). Output ONLY the Thai translation, no quotes, no explanation, no markdown.\n\nText: ${summary}`,
         stream: false,
         options: { temperature: 0.1 },
-        keep_alive: '5m',
+        keep_alive: OLLAMA_KEEP_ALIVE,
       },
       { timeout: 60000 }
     );
@@ -269,7 +283,7 @@ export async function analyzeWithOllama(
         prompt: buildThreatPrompt(headlines),
         stream: false,
         options: { temperature: 0.1 },
-        keep_alive: '5m',
+        keep_alive: OLLAMA_KEEP_ALIVE,
       },
       { timeout: 120000 }
     );

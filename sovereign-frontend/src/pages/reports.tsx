@@ -14,7 +14,7 @@ interface Report {
 }
 
 export default function ReportsPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -65,6 +65,10 @@ export default function ReportsPage() {
       setGenerating(false);
     }
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

@@ -154,7 +154,7 @@ const EMPTY_FORM = {
 };
 
 export default function FarmPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [plots, setPlots] = useState<FarmPlot[]>([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -184,6 +184,10 @@ export default function FarmPage() {
   useEffect(() => {
     if (isAuthenticated) load();
   }, [isAuthenticated, load]);
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) {
     return <div className="text-white p-8">Unauthorized</div>;

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
@@ -49,11 +49,20 @@ function parseNullableDate(value: unknown): Date | null | 'invalid' {
 
 // ── รายการเสบียง ──
 
-// GET /api/inventory — รายการทั้งหมด พร้อม filter: ?category=&status=&low=true
+// ── พอร์ตแยกต่อคน: สมาชิกเห็นเสบียงของตัวเองเท่านั้น (backend บังคับ ไม่เชื่อฝั่ง UI)
+// SUPERADMIN ดูเสบียงสมาชิกคนอื่นได้ผ่าน ?userId=<uuid> (ถ้าไม่ส่ง = ของตัวเอง)
+function resolveOwnerId(req: Request): string {
+  if (req.user?.role === 'SUPERADMIN' && typeof req.query.userId === 'string' && req.query.userId.trim()) {
+    return req.query.userId.trim();
+  }
+  return req.user?.id ?? '';
+}
+
+// GET /api/inventory — รายการของเจ้าของ พร้อม filter: ?category=&status=&low=true
 router.get('/', authenticate, async (req, res) => {
   try {
     const { category, status, low } = req.query;
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { user_id: resolveOwnerId(req) };
     if (category && category !== 'ALL') where.category = String(category);
 
     const rows = (await prisma.inventoryItem.findMany({
@@ -78,7 +87,9 @@ router.get('/', authenticate, async (req, res) => {
 // GET /api/inventory/status — ตัวเลขสรุปสำหรับหน้าแรก (หมดอายุ / ใกล้หมด / น้ำ / อาหาร)
 router.get('/status', authenticate, async (req, res) => {
   try {
-    const rows = (await prisma.inventoryItem.findMany()) as InventoryRow[];
+    const rows = (await prisma.inventoryItem.findMany({
+      where: { user_id: resolveOwnerId(req) },
+    })) as InventoryRow[];
     const items = rows.map(enrich);
     const countBy = (status: ExpiryStatus | 'low') =>
       status === 'low'
@@ -156,6 +167,7 @@ router.post('/', authenticate, requireRole(...WRITE_ROLES), async (req, res) => 
 
     const item = await prisma.inventoryItem.create({
       data: {
+        user_id: req.user?.id || '',
         name: String(name),
         category: cat,
         quantity: Number(quantity),
@@ -178,11 +190,11 @@ router.post('/', authenticate, requireRole(...WRITE_ROLES), async (req, res) => 
   }
 });
 
-// PUT /api/inventory/:id — แก้ไขรายการ (fields ที่ไม่ส่ง = คงค่าเดิม)
+// PUT /api/inventory/:id — แก้ไขรายการของตัวเอง (fields ที่ไม่ส่ง = คงค่าเดิม)
 router.put('/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await prisma.inventoryItem.findUnique({ where: { id } });
+    const existing = await prisma.inventoryItem.findFirst({ where: { id, user_id: resolveOwnerId(req) } });
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const body = req.body || {};
@@ -227,9 +239,12 @@ router.put('/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) =
   }
 });
 
-// DELETE /api/inventory/:id — ลบรายการ (ขาย/ใช้หมด/ทิ้ง)
+// DELETE /api/inventory/:id — ลบรายการของตัวเอง (ขาย/ใช้หมด/ทิ้ง)
 router.delete('/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
+    const ownerId = resolveOwnerId(req);
+    const existing = await prisma.inventoryItem.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    if (!existing) return res.status(404).json({ error: 'Not found' });
     await prisma.inventoryItem.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {
