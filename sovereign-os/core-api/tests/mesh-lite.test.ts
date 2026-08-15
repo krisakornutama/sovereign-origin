@@ -193,4 +193,56 @@ describe('Mesh Lite: bundle + replicate (sandbox dirs)', () => {
     assert.equal(typeof st.enabled, 'boolean');
     assert.ok(Array.isArray(st.bundles));
   });
+
+  test('status() มีช่องทาง offsite + retention (rsyncTarget/scpTarget/offsiteRetain)', () => {
+    const d = freshDirs();
+    const svc = new MeshLiteService({ ...d, enabled: true, rsyncTarget: 'user@host:/offsite', scpTarget: 'user@host:/offsite', offsiteRetain: 7 });
+    const st = svc.status();
+    assert.equal(st.rsyncTarget, 'user@host:/offsite');
+    assert.equal(st.scpTarget, 'user@host:/offsite');
+    assert.equal(st.offsiteRetain, 7);
+  });
+
+  test('pruneEncBundles: ลบ .enc.json เก่าที่ปลายทาง เก็บ retain ล่าสุด', () => {
+    const dir = path.join(TMP, `prune-${Math.random().toString(36).slice(2, 7)}`);
+    fs.mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < 5; i++) {
+      const f = `sovereign_mesh_20260815_${String(i).padStart(2, '0')}0000_${i}.enc.json`;
+      fs.writeFileSync(path.join(dir, f), '{}');
+      const st = fs.statSync(path.join(dir, f));
+      fs.utimesSync(path.join(dir, f), st.atime, new Date(Date.now() - (5 - i) * 60000));
+    }
+    fs.writeFileSync(path.join(dir, 'keep.txt'), 'x'); // ไฟล์อื่นไม่โดนลบ
+    const { pruneEncBundles } = require('../src/services/mesh-lite.service');
+    pruneEncBundles(dir, 2);
+    const enc = fs.readdirSync(dir).filter((f) => f.endsWith('.enc.json'));
+    assert.equal(enc.length, 2);
+    assert.ok(fs.existsSync(path.join(dir, 'keep.txt')));
+  });
+
+  test('replicate: retention ปลายทาง (offsiteRetain) หลัง stage', async () => {
+    const d = freshDirs();
+    writeFakeBackup(d.backupDir);
+    const svc = new MeshLiteService({ ...d, enabled: true, offsiteRetain: 2 });
+    for (let i = 0; i < 4; i++) {
+      const r = await svc.replicate();
+      assert.equal(r.ok, true);
+      fs.writeFileSync(path.join(d.backupDir, `sovereign_backup_2026081${i}_020000.sql.gz`), Buffer.from(`dump-${i}`));
+      await new Promise((res) => setTimeout(res, 10)); // กัน mtime ซ้ำกัน
+    }
+    const staged = fs.readdirSync(d.outputDir).filter((f) => f.endsWith('.enc.json'));
+    assert.equal(staged.length, 2); // เก็บแค่ 2 ล่าสุดที่ปลายทาง
+  });
+
+  test('rsync target: สำเร็จถ้ามี rsync (sync จริง) หรือ fail พร้อมข้อความชัดเจนถ้าไม่มี', async () => {
+    const d = freshDirs();
+    writeFakeBackup(d.backupDir);
+    const svc = new MeshLiteService({ ...d, enabled: true, outputDir: null, pushUrl: null, rsyncTarget: path.join(d.outputDir, 'r') });
+    const r = await svc.replicate();
+    if (r.ok) {
+      assert.ok(fs.existsSync(path.join(d.outputDir, 'r', r.info!.file)));
+    } else {
+      assert.match(r.reason!, /rsync/);
+    }
+  });
 });

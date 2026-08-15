@@ -37,6 +37,11 @@ async function flushTelemetry() {
   }
 }
 
+// เรียกจากภายนอก (เช่น UPS graceful shutdown) ให้เท buffer ลง DB ทันที
+export async function flushTelemetryNow(): Promise<void> {
+  await flushTelemetry();
+}
+
 function parseTopic(topic: string): { nodeId: string; category: string; deviceId?: string } | null {
   const parts = topic.split('/');
   if (parts.length === 4 && parts[0] === 'sovereign' && parts[2] === 'sensor') {

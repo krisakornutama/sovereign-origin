@@ -18,7 +18,7 @@ import { relayScheduler } from './services/relay-scheduler.service';
 import { reportService } from './services/report.service';
 import { backupService } from './services/backup.service';
 import { authenticate, requireRole, auditStateChange } from './middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 import authRoutes from './modules/auth/auth.routes';
 import nodeRoutes from './modules/nodes/node.routes';
@@ -80,6 +80,9 @@ import { actuationService } from './services/actuation.service';
 import { telegramAgentBot } from './services/telegram-agent-bot.service';
 import { PowerGuardWorker } from './services/power-guard.service';
 import { UpsMonitorWorker, fetchNutVars } from './services/ups-monitor.service';
+import { UpsShutdownService } from './services/ups-shutdown.service';
+import { flushTelemetryNow } from './workers/mqttIngest';
+import { securityStream } from './services/security-stream.service';
 import { createWealthWorker, wealthEmitter } from './services/wealth.service';
 import { createRiskWorker, riskEmitter } from './services/risk-monitor.service';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from './services/defcon-engine.service';
@@ -884,6 +887,53 @@ if (config.ups.enabled) {
     config.ups
   );
   upsMonitor.start();
+  // UPS Graceful Shutdown — trigger เมื่อแบตเตอรี่ถึงขีด → CHECKPOINT → drain → bundle → audit → ปิดเครื่อง
+  const upsShutdown = new UpsShutdownService(
+    {
+      readUps: () => fetchNutVars(config.ups.host, config.ups.port, config.ups.upsName),
+      checkpointDb: async () => {
+        try {
+          await prisma.$executeRawUnsafe('CHECKPOINT;');
+          console.log('🔌 [UPS] CHECKPOINT สำเร็จ (WAL ลง disk แล้ว)');
+        } catch (err) {
+          console.error('🔌 [UPS] CHECKPOINT ล้มเหลว:', err instanceof Error ? err.message : err);
+        }
+      },
+      drainTelemetry: flushTelemetryNow,
+      emergencyBackup: async () => {
+        const info = meshLiteService.createBundle();
+        if (info) console.log(`🔌 [UPS] Emergency bundle: ${info.file}`);
+        else console.error('🔌 [UPS] Emergency bundle ล้มเหลว:', meshLiteService.status().lastError);
+      },
+      audit: async (payload) => {
+        securityStream.push('SYSTEM', { event: 'ups_shutdown_initiated', ...payload.raw, at: new Date().toISOString() });
+        await prisma.securityEvent.create({
+          data: {
+            event_type: 'SYSTEM_UPS_SHUTDOWN_INITIATED',
+            severity: 'critical',
+            description: `🔌 ${payload.text}`,
+            raw_data: payload.raw as unknown as Prisma.InputJsonValue,
+          },
+        });
+      },
+      runShutdown: async (command) => {
+        try {
+          await execAsync(command);
+          console.log(`🔌 [UPS] Shutdown command executed: ${command}`);
+        } catch (err) {
+          console.error('🔌 [UPS] Shutdown command failed:', err instanceof Error ? err.message : err);
+        }
+      },
+    },
+    {
+      batteryPct: config.ups.shutdownBatteryPct,
+      runtimeSec: config.ups.shutdownRuntimeSec,
+      command: config.ups.shutdownCommand,
+      dryRun: config.ups.dryRun,
+      checkIntervalMs: config.ups.shutdownCheckIntervalMs,
+    }
+  );
+  upsShutdown.start();
 } else {
   console.warn('🔌 UPS monitor disabled — set UPS_ENABLED=true + NUT server to enable');
 }
