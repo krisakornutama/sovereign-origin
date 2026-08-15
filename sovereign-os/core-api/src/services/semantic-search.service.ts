@@ -7,6 +7,7 @@ import { knowledgeDir } from './knowledge-dir.service';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 export const EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text';
 const KNOWLEDGE_DIR = knowledgeDir();
 
@@ -37,7 +38,7 @@ export async function embed(text: string): Promise<number[] | null> {
   try {
     const res = await axios.post(
       `${OLLAMA_URL}/api/embeddings`,
-      { model: EMBED_MODEL, prompt: text },
+      { model: EMBED_MODEL, prompt: text, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 60000 }
     );
     const emb = res.data?.embedding;

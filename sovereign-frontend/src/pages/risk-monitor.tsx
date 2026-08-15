@@ -57,7 +57,7 @@ function defconLabel(level: number): { label: string; color: string } {
 }
 
 export default function RiskMonitorPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [threat, setThreat] = useState<ThreatIndex | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [defcon, setDefcon] = useState<DefconInfo | null>(null);
@@ -121,6 +121,10 @@ export default function RiskMonitorPage() {
       setStressing(false);
     }
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

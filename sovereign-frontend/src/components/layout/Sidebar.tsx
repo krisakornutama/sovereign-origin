@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { authFetch } from '../../lib/apiFetch';
 import { NAV_GROUPS } from '../../lib/navigation';
+import { useFeatureStore } from '../../stores/useFeatureStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { openCommandPalette } from '../CommandPalette';
 
 const GROUP_COLORS = [
@@ -16,6 +18,10 @@ const GROUP_COLORS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const hasFeature = useFeatureStore((s) => s.has);
+  const loadFeatures = useFeatureStore((s) => s.load);
+  const isSuperadmin = user?.role === 'SUPERADMIN';
   // โมดูลที่เปิดใช้งาน (จาก GET /api/modules) — fetch ไม่สำเร็จ = แสดงทุกเมนู
   const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
 
@@ -36,10 +42,21 @@ export default function Sidebar() {
     };
   }, []);
 
+  // สิทธิ์ฟังก์ชั่นต่อคน: โหลด feature ที่เห็นได้ (ซ้ำได้ ไม่พัง)
+  useEffect(() => {
+    if (user && !isSuperadmin) loadFeatures();
+  }, [user, isSuperadmin, loadFeatures]);
+
   const hidden = new Set<string>();
   if (enabledModules) {
     if (!enabledModules.includes('inventory')) hidden.add('/inventory');
     if (!enabledModules.includes('farm')) hidden.add('/farm');
+  }
+  // ซ่อนหน้าที่ไม่มีสิทธิ์ — SUPERADMIN เห็นหมด (has() คืน true เมื่อยังไม่รู้สิทธิ์)
+  if (!isSuperadmin) {
+    for (const item of NAV_GROUPS.flatMap((g) => g.items)) {
+      if (!hasFeature(item.href)) hidden.add(item.href);
+    }
   }
   const navGroups = NAV_GROUPS
     .map((group) => ({ ...group, items: group.items.filter((item) => !hidden.has(item.href)) }))

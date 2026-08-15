@@ -13,6 +13,7 @@ import multer from 'multer';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
+import { hashEngine } from '../../services/hash-engine.service';
 import { knowledgeDir, uploadsDir } from '../../services/knowledge-dir.service';
 
 const router = Router();
@@ -281,6 +282,19 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     const file = req.file as Express.Multer.File | undefined;
     if (!file) return res.status(400).json({ error: 'file is required (.pdf / .txt / .md)' });
 
+    // Lite AV: SHA-256 scan (MIME magic bytes + EICAR + Threat Intel FILE) ก่อนบันทึก
+    const buf = fs.readFileSync(file.path);
+    const av = await hashEngine.scanBuffer(buf, { originalName: file.originalname });
+    if (!av.ok) {
+      fs.unlinkSync(file.path); // ลบทิ้ง — ต้นฉบับไปอยู่ quarantine แล้ว
+      return res.status(403).json({
+        error: `ไฟล์ถูกปฏิเสธ: ${av.error} (sha256: ${av.hash?.slice(0, 12)}…)`,
+        verdict: av.verdict,
+        hash: av.hash,
+        quarantinedTo: av.quarantinedTo,
+      });
+    }
+
     const ext = path.extname(file.filename).toLowerCase();
     const isPdf = ext === '.pdf';
     const relPath = path.join('uploads', file.filename);
@@ -290,7 +304,6 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       try {
         // lazy import — pdf-parse โหลด pdf.js ตอนเรียกจริง (กันหน่วงตอน start)
         const pdfParse = (await import('pdf-parse')).default;
-        const buf = fs.readFileSync(file.path);
         const data = await pdfParse(buf);
         content = String(data.text || '').slice(0, 500000);
       } catch (err) {
@@ -298,7 +311,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         content = ''; // เก็บไฟล์ไว้ก่อน — ผู้ใช้เพิ่มบันทึกเองได้
       }
     } else {
-      content = fs.readFileSync(file.path, 'utf-8').slice(0, 500000);
+      content = buf.toString('utf-8').slice(0, 500000);
     }
 
     const fallbackTitle = (file.originalname || 'file').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();

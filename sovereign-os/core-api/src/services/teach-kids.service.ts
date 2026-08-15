@@ -39,6 +39,7 @@ async function notifyParent(message: string): Promise<void> {
 export const prisma = new PrismaClient();
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 export const TEACH_MODEL = process.env.AI_MODEL || 'gemma3:4b';
 
 // ระดับอายุ — ผู้ใหญ่เลือกตอนสร้างบทเรียน
@@ -259,7 +260,7 @@ export async function generateLesson(
       prompt,
       stream: false,
       options: { temperature: 0.4 },
-      keep_alive: '5m',
+      keep_alive: OLLAMA_KEEP_ALIVE,
     },
     { timeout: 180000 }
   );

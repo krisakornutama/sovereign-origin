@@ -2,6 +2,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import EventEmitter from 'events';
 import { PrismaClient } from '@prisma/client';
+import { threatIntel } from './threat-intel.service';
+import { securityStream } from './security-stream.service';
 
 export const prisma = new PrismaClient();
 export const threatEmitter = new EventEmitter();
@@ -95,6 +97,27 @@ export class ThreatDetectionService {
     const now = Date.now();
     const external = ips.filter((ip) => !isPrivateIp(ip) && !ALLOWLIST.has(ip));
 
+    // 0) ตรวจ IP ภายนอกกับ Threat Intelligence DB (Next-Gen Pillar 1)
+    if (external.length > 0) {
+      let matched: Array<any> = [];
+      try {
+        matched = await threatIntel.matchIps(external);
+      } catch {
+        matched = [];
+      }
+      for (const m of matched) {
+        if ((this.lastAlert.get(m.value) || 0) + IP_COOLDOWN_MS > now) continue;
+        this.lastAlert.set(m.value, now);
+        const evt = await this.recordAnomaly(
+          m.value,
+          `⚠️ IP ตรงกับ Threat Database: ${m.value} (${m.category}, เชื่อมั่น ${Math.round((m.confidence || 0.5) * 100)}%)`,
+          'critical',
+          { intel: { category: m.category, source: m.source, confidence: m.confidence, note: m.note } }
+        );
+        if (evt) events.push(evt);
+      }
+    }
+
     // 1) IP ภายนอกตัวใหม่ (ไม่เคยเห็นใน baseline)
     for (const ip of external) {
       const known = this.seen.has(ip);
@@ -154,6 +177,7 @@ export class ThreatDetectionService {
         }
       }
       threatEmitter.emit('threat', { ...event, blocked });
+      securityStream.push('THREAT', { ...event, blocked });
       return { ...event, blocked };
     } catch (err) {
       console.error('Failed to record anomaly:', err instanceof Error ? err.message : err);

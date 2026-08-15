@@ -4,6 +4,8 @@ import assert from 'node:assert';
 import {
   parseRss,
   parseThreatResponse,
+  RiskWorker,
+  riskEmitter,
   type RssItem,
   type ThreatResult,
 } from '../src/services/risk-monitor.service';
@@ -136,4 +138,53 @@ test('parseThreatResponse fills missing categories with 0', () => {
   assert.strictEqual(result!.categories.banking, 0);
   assert.strictEqual(result!.categories.energy, 0);
   assert.strictEqual(result!.categories.inflation, 0);
+});
+
+// ─────────────────── RiskWorker: AI On-Demand visibility ───────────────────
+
+function workerWithAnalyze(analyze: () => Promise<ThreatResult | null>) {
+  return new RiskWorker(
+    {
+      fetchFeed: async () => '<rss><channel><title>t</title></channel></rss>',
+      headlineExists: async () => true,
+      saveHeadline: async () => {},
+      loadRecentHeadlines: async () => [{ title: 'ข่าวทดสอบ', summary: null }],
+      saveThreatIndex: async () => {},
+      analyzeWithOllama: analyze,
+      log: () => {},
+    },
+    { enabled: true, feeds: [{ name: 'test', url: 'https://x/rss' }], pollCron: '', ollamaUrl: 'http://ollama:11434', model: 'gemma3:4b', analyzeTop: 5 }
+  );
+}
+
+test('RiskWorker: Ollama ล้ม → บันทึก lastError + emit risk_error (กันพังเงียบ)', async () => {
+  const events: Array<{ lastError: string }> = [];
+  const onError = (e: { lastError: string }) => events.push(e);
+  riskEmitter.on('risk_error', onError);
+  try {
+    const w = workerWithAnalyze(async () => null);
+    const r = await w.runOnce();
+    assert.strictEqual(r.threat, null);
+    assert.ok(w.getStatus().lastError);
+    assert.ok(w.getStatus().lastErrorAt);
+    assert.strictEqual(events.length, 1);
+    assert.ok(events[0].lastError.includes('http://ollama:11434'));
+  } finally {
+    riskEmitter.off('risk_error', onError);
+  }
+});
+
+test('RiskWorker: วิเคราะห์สำเร็จ → ล้าง lastError + ไม่ emit risk_error', async () => {
+  const events: unknown[] = [];
+  const onError = (e: unknown) => events.push(e);
+  riskEmitter.on('risk_error', onError);
+  try {
+    const w = workerWithAnalyze(async () => ({ overall: 30, categories: { war: 10, banking: 5, energy: 8, inflation: 7 }, summary: 'ปกติ' }));
+    const r = await w.runOnce();
+    assert.ok(r.threat);
+    assert.strictEqual(w.getStatus().lastError, null);
+    assert.strictEqual(events.length, 0);
+  } finally {
+    riskEmitter.off('risk_error', onError);
+  }
 });

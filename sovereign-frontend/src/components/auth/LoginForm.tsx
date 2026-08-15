@@ -49,9 +49,9 @@ export default function LoginForm() {
         login(data.token); // token นี้จะทำให้ store มี token แต่ isAuthenticated=false
         setMfaRequired(true);
       } else {
-        // token สมบูรณ์ → เข้าระบบและ redirect ไป dashboard
+        // token สมบูรณ์ → เข้าระบบ (redirect ไปเปลี่ยนรหัสก่อนถ้ายังไม่ได้เปลี่ยนครั้งแรก)
         login(data.token);
-        router.push('/dashboard');
+        router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาด');

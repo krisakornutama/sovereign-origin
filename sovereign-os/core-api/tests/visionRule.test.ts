@@ -85,6 +85,40 @@ describe('analyzeStranger + runVisionCheck', () => {
     mockModel(prisma, 'visionRule', {
       findFirst: async () => ({ id: 1, enabled: true, interval_min: 10, last_check_at: new Date(Date.now() - 1000) }),
     });
+    mockModel(prisma, 'detectionEvent', {
+      findFirst: async () => ({ image_path: 'data:image/jpeg;base64,new', detected_at: new Date() }),
+    });
+    const res = await runVisionCheck();
+    assert.equal(res.skipped, 'not_due');
+  });
+
+  test('Lazy gate: ไม่มี DetectionEvent ใหม่ → ข้ามทันที (no_new_trigger — ไม่แตะ AI)', async () => {
+    mockModel(prisma, 'visionRule', {
+      findFirst: async () => ({ id: 1, enabled: true, interval_min: 10, last_check_at: new Date(Date.now() - 600000) }),
+    });
+    mockModel(prisma, 'detectionEvent', { findFirst: async () => null });
+    const res = await runVisionCheck();
+    assert.equal(res.skipped, 'no_new_trigger');
+  });
+
+  test('Lazy gate: DetectionEvent เก่ากว่า check ล่าสุด → ข้าม (no_new_trigger)', async () => {
+    mockModel(prisma, 'visionRule', {
+      findFirst: async () => ({ id: 1, enabled: true, interval_min: 10, last_check_at: new Date() }),
+    });
+    mockModel(prisma, 'detectionEvent', {
+      findFirst: async () => ({ image_path: 'data:image/jpeg;base64,old', detected_at: new Date(Date.now() - 3600000) }),
+    });
+    const res = await runVisionCheck();
+    assert.equal(res.skipped, 'no_new_trigger');
+  });
+
+  test('Lazy gate: DetectionEvent ใหม่กว่า check ล่าสุด → ผ่าน lazy gate (ต่อไป pacing)', async () => {
+    mockModel(prisma, 'visionRule', {
+      findFirst: async () => ({ id: 1, enabled: true, interval_min: 10, last_check_at: new Date(Date.now() - 1000) }),
+    });
+    mockModel(prisma, 'detectionEvent', {
+      findFirst: async () => ({ image_path: 'data:image/jpeg;base64,new', detected_at: new Date() }),
+    });
     const res = await runVisionCheck();
     assert.equal(res.skipped, 'not_due');
   });
@@ -119,5 +153,32 @@ describe('analyzeStranger + runVisionCheck', () => {
     const res = await runVisionCheck({ photo: 'data:image/jpeg;base64,abc' });
     assert.equal(res.alerted, false);
     assert.equal(msgs.length, 0);
+  });
+
+  test('Honeypot (Phase 6): FR mode ON → บันทึกเงียบ kind=honeypot ไม่ส่ง Telegram ไม่ alert', async () => {
+    const { firstResponder } = await import('../src/services/first-responder.service');
+    await firstResponder.set(true, 'admin', 'เจ้าหน้าที่เข้าพื้นที่');
+    try {
+      mockModel(prisma, 'visionRule', {
+        findFirst: async () => ({ id: 1, enabled: true, interval_min: 10, last_check_at: new Date(Date.now() - 600000), notify_telegram: true, confidence_min: 0, only_strangers: true }),
+        update: async (args: any) => ({ id: 1, ...args.data }),
+      });
+      mockModel(prisma, 'knownFace', { findMany: async () => [] });
+      let honeypotAlert: any = null;
+      mockModel(prisma, 'visionAlert', {
+        create: async (args: any) => { honeypotAlert = args.data; return { id: 'v-9', ...args.data }; },
+      });
+      const msgs: string[] = [];
+      setVisionNotify(async (m: string) => { msgs.push(m); });
+      setVisionOllama({ post: async () => ({ data: { response: '{"persons": 1, "familiar": [], "strangers": 1}' } }) });
+      const res = await runVisionCheck({ photo: 'data:image/jpeg;base64,abc' });
+      assert.equal(res.alerted, false, 'ห้าม alert ระหว่าง FR mode');
+      assert.equal(res.honeypot, true, 'ต้องบอกว่าเป็นการบันทึก honeypot');
+      assert.ok(honeypotAlert, 'ต้องบันทึก visionAlert แบบเงียบ');
+      assert.equal(honeypotAlert.kind, 'honeypot');
+      assert.equal(msgs.length, 0, 'ห้ามส่ง Telegram ระหว่าง FR mode');
+    } finally {
+      await firstResponder.set(false, 'admin', 'test cleanup');
+    }
   });
 });

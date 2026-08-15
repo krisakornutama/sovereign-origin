@@ -34,8 +34,8 @@ const baseRow = (overrides: Record<string, any> = {}) => ({
 
 before(async () => {
   db = mockModel(prisma, 'inventoryItem', {
-    findMany: async () => [baseRow()],
-    findUnique: async () => baseRow(),
+    findMany: async ({ where }: any) => [baseRow({ user_id: where?.user_id })],
+    findFirst: async () => baseRow(),
     create: async ({ data }: any) => ({ id: 'new-1', ...data }),
     update: async ({ data }: any) => ({ id: '11111111-1111-1111-1111-111111111111', ...data }),
     delete: async () => ({}),
@@ -182,7 +182,7 @@ test('PUT /:id allows OPERATOR and returns 404 for missing', async () => {
   });
   assert.strictEqual(res.status, 200);
 
-  mock.method(db, 'findUnique', async () => null);
+  mock.method(db, 'findFirst', async () => null);
   const miss = await fetch(server.baseUrl + '/api/inventory/00000000-0000-0000-0000-000000000000', {
     method: 'PUT',
     headers: { ...auth(adminToken), 'Content-Type': 'application/json' },

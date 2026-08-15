@@ -102,16 +102,21 @@ test('view mode denies action tools without queueing anything', async () => {
   assert.strictEqual(service.listApprovals().length, 0);
 });
 
-test('autonomous mode executes action tools directly, guards still apply', async () => {
+test('Phase 6 — autonomous mode: sensitive tools STILL require human approval (AI = adviser only)', async () => {
   const { executor, service } = makeActions('autonomous');
   const ok = await service.executeAction('killProcess', { pid: 12345 });
-  assert.strictEqual(ok.status, 'ok');
-  assert.deepStrictEqual(executor.calls, ['killProcessByPid:12345']);
+  assert.strictEqual(ok.status, 'requires_approval', 'killProcess ต้องมีมนุษย์อนุมัติเสมอ แม้ autonomy=autonomous');
+  assert.deepStrictEqual(executor.calls, [], 'ห้าม execute ก่อนอนุมัติ');
 
   executor.calls.length = 0;
   const denied = await service.executeAction('blockIP', { ip: '127.0.0.1' });
-  assert.strictEqual(denied.status, 'denied');
+  assert.strictEqual(denied.status, 'denied', 'guard ยังทำงานก่อนเสมอ');
   assert.strictEqual(executor.calls.length, 0);
+
+  // อนุมัติโดยมนุษย์ → ถึง execute ได้
+  const approved = await service.approveApproval(ok.approval_id!, 'admin-1');
+  assert.strictEqual(approved.status, 'ok');
+  assert.deepStrictEqual(executor.calls, ['killProcessByPid:12345']);
 });
 
 test('suggest mode still blocks dangerous targets before queueing', async () => {
@@ -136,14 +141,18 @@ test('expired approvals cannot be approved', async () => {
   assert.strictEqual(executor.calls.length, 0);
 });
 
-test('tracks blocked IPs after successful execution and clears them on unblock', async () => {
+test('tracks blocked IPs after approval and clears them on unblock', async () => {
   const { executor, service } = makeActions('autonomous');
-  await service.executeAction('blockIP', { ip: '8.8.8.8' });
-  await service.executeAction('blockIP', { ip: '203.0.113.5' });
+  const a1 = await service.executeAction('blockIP', { ip: '8.8.8.8' });
+  const a2 = await service.executeAction('blockIP', { ip: '203.0.113.5' });
+  assert.strictEqual(a1.status, 'requires_approval');
+  await service.approveApproval(a1.approval_id!, 'admin-1');
+  await service.approveApproval(a2.approval_id!, 'admin-1');
   assert.deepStrictEqual(service.listBlockedIps(), ['203.0.113.5', '8.8.8.8']);
 
   executor.calls.length = 0;
-  await service.executeAction('unblockIP', { ip: '8.8.8.8' });
+  const u = await service.executeAction('unblockIP', { ip: '8.8.8.8' });
+  await service.approveApproval(u.approval_id!, 'admin-1');
   assert.deepStrictEqual(service.listBlockedIps(), ['203.0.113.5']);
 });
 
@@ -157,7 +166,7 @@ test('tracks blocked IPs only after the approval is granted', async () => {
   assert.deepStrictEqual(service.listBlockedIps(), ['203.0.113.9']);
 });
 
-test('does not track IPs when the underlying command failed', async () => {
+test('does not track IPs when the underlying command failed (หลังมนุษย์อนุมัติ)', async () => {
   const policy = new AgentPolicy({ autonomy: 'autonomous' });
   const executor: SystemExecutor = {
     async blockIp() {
@@ -175,7 +184,9 @@ test('does not track IPs when the underlying command failed', async () => {
   };
   const service = new AgentActionsService(policy, executor);
   const result = await service.executeAction('blockIP', { ip: '8.8.8.8' });
-  assert.strictEqual(result.status, 'ok');
+  assert.strictEqual(result.status, 'requires_approval');
+  const approved = await service.approveApproval(result.approval_id!, 'admin-1');
+  assert.strictEqual(approved.status, 'ok');
   assert.deepStrictEqual(service.listBlockedIps(), []);
 });
 
@@ -186,21 +197,21 @@ test('view mode never records blocked IPs', async () => {
   assert.deepStrictEqual(service.listBlockedIps(), []);
 });
 
-test('records audit entry when an action is executed', async () => {
+test('records audit entry when an action is executed (หลังอนุมัติโดยมนุษย์)', async () => {
   const entries: any[] = [];
   const policy = new AgentPolicy({ autonomy: 'autonomous' });
   const executor = makeFakeExecutor();
   const service = new AgentActionsService(policy, executor, (e) => entries.push(e));
 
-  await service.executeAction('blockIP', { ip: '8.8.8.8' }, { actor: 'user-1', source: 'chat' });
+  const result = await service.executeAction('blockIP', { ip: '8.8.8.8' }, { actor: 'user-1', source: 'chat' });
+  assert.strictEqual(result.status, 'requires_approval');
+  await service.approveApproval(result.approval_id!, 'admin-1');
 
-  assert.strictEqual(entries.length, 1);
-  assert.strictEqual(entries[0].actionType, 'AI_AGENT_ACTION_EXECUTED');
-  assert.strictEqual(entries[0].userId, 'user-1');
-  assert.strictEqual(entries[0].payload.tool, 'blockIP');
-  assert.strictEqual(entries[0].payload.args.ip, '8.8.8.8');
-  assert.strictEqual(entries[0].payload.source, 'chat');
-  assert.ok(entries[0].payload.result);
+  const decided = entries.find((e) => e.actionType === 'AI_AGENT_APPROVAL_DECIDED');
+  assert.ok(decided, 'ต้องมี audit ตอนมนุษย์อนุมัติ');
+  assert.strictEqual(decided.payload.decision, 'approved');
+  assert.strictEqual(decided.payload.tool, 'blockIP');
+  assert.ok(decided.payload.result);
 });
 
 test('records audit entry when an action is denied', async () => {
@@ -250,7 +261,7 @@ test('records audit entry when an approval is rejected', async () => {
   assert.strictEqual(decided.payload.tool, 'killProcess');
 });
 
-test('a broken audit sink never breaks action execution', async () => {
+test('a broken audit sink never breaks queueing or execution', async () => {
   const policy = new AgentPolicy({ autonomy: 'autonomous' });
   const executor = makeFakeExecutor();
   const service = new AgentActionsService(policy, executor, () => {
@@ -258,7 +269,9 @@ test('a broken audit sink never breaks action execution', async () => {
   });
 
   const result = await service.executeAction('blockIP', { ip: '8.8.8.8' });
-  assert.strictEqual(result.status, 'ok');
+  assert.strictEqual(result.status, 'requires_approval', 'audit ล่มต้องไม่ทำลาย approval queue');
+  const approved = await service.approveApproval(result.approval_id!, 'admin-1');
+  assert.strictEqual(approved.status, 'ok');
 });
 
 test('calls the approval notifier when an action is queued', async () => {

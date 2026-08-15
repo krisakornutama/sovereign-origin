@@ -21,6 +21,7 @@ import { PrismaClient } from '@prisma/client';
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.RISK_MODEL || process.env.AI_MODEL || 'gemma3:4b';
 
 export type ForecastFocus = 'general' | 'politics' | 'governance' | 'economy' | 'energy' | 'security' | 'climate';
@@ -429,7 +430,7 @@ export async function generateScenarios(params: {
     const prompt = buildPrompt({ focus, horizonDays, recent: headlines.recent, past: headlines.past, threat, previous });
     const res = await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: MODEL, prompt, stream: false, options: { temperature: 0.2 }, keep_alive: '5m' },
+      { model: MODEL, prompt, stream: false, options: { temperature: 0.2 }, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 180000 }
     );
     const parsed = parseForecastResponse(res.data?.response || '', focus, horizonDays);

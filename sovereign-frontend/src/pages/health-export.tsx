@@ -6,7 +6,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 
 export default function HealthExportPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [html, setHtml] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,6 +33,10 @@ export default function HealthExportPage() {
     link.download = 'health-report-30d.csv';
     link.click();
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

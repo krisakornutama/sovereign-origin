@@ -34,6 +34,9 @@ services:
     ports:
       - "0.0.0.0:1883:1883"
       - "0.0.0.0:18083:18083"
+    volumes:
+      - ./data/emqx:/opt/emqx/data
+      - ./data/emqx-logs:/opt/emqx/log
     networks:
       - internal
 
@@ -47,18 +50,25 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@timescaledb:5432/${POSTGRES_DB:-sovereign}
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      TIMESCALE_DB: ${POSTGRES_DB:-sovereign}
+      TIMESCALE_USER: ${POSTGRES_USER:-sovereign}
+      TIMESCALE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       MQTT_HOST: emqx
       MQTT_PORT: 1883
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
       OLLAMA_URL: http://host.docker.internal:11434
-      # ── runtime settings (ค่าทั้งหมดกำหนดได้ใน infra/.env) ──
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-2m}
+      TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}
+      # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ runtime settings (ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â³ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¹Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ infra/.env) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
       OTA_BASE_URL: ${OTA_BASE_URL:-http://localhost:3001}
       OTA_TOKEN: ${OTA_TOKEN:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
-      # ── Feature Modules (เว้นว่าง = เปิดทุกโมดูล เช่น ENABLED_MODULES=inventory,farm) ──
+      # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Feature Modules (ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã‚Â§ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ÃƒÂ Ã‚Â¸Ã‚Â§ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ = ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂºÃƒÂ Ã‚Â¸Ã‚Â´ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚Â¸ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¹Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¸Ã‚Â¹ÃƒÂ Ã‚Â¸Ã‚Â¥ ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã…Â ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ ENABLED_MODULES=inventory,farm) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
       ENABLED_MODULES: ${ENABLED_MODULES:-}
       ENERGY_CAPACITY_KWH: ${ENERGY_CAPACITY_KWH:-5}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
@@ -66,7 +76,7 @@ services:
       THREAT_CONNECTION_THRESHOLD: ${THREAT_CONNECTION_THRESHOLD:-100}
       THREAT_ALLOWLIST_IPS: ${THREAT_ALLOWLIST_IPS:-}
       FIREWALL_BLOCK_CMD: ${FIREWALL_BLOCK_CMD:-}
-      # ── Phase 4: Risk & Wealth Infrastructure (opt-in — เปิดใน infra/.env) ──
+      # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Phase 4: Risk & Wealth Infrastructure (opt-in ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂºÃƒÂ Ã‚Â¸Ã‚Â´ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ infra/.env) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
       PORTFOLIO_ENABLED: ${PORTFOLIO_ENABLED:-false}
       PORTFOLIO_FETCH_CRON: ${PORTFOLIO_FETCH_CRON:-0 */4 * * *}
       PORTFOLIO_CASH_USD: ${PORTFOLIO_CASH_USD:-0}
@@ -77,15 +87,50 @@ services:
       RISK_MODEL: ${RISK_MODEL:-gemma3:4b}
       DEFCON_ENABLED: ${DEFCON_ENABLED:-false}
       DEFCON_WAN_DISCONNECT_CMD: ${DEFCON_WAN_DISCONNECT_CMD:-}
+      # ---- Next-Gen Security (opt-in - ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¢ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ infra/.env) ----
+      THREAT_INTEL_FEED_URLS: ${THREAT_INTEL_FEED_URLS:-https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts}
+      THREAT_INTEL_MAX_ITEMS: ${THREAT_INTEL_MAX_ITEMS:-5000}
+      THREAT_INTEL_FEED_INTERVAL_HOURS: ${THREAT_INTEL_FEED_INTERVAL_HOURS:-24}
+      PIHOLE_URL: ${PIHOLE_URL:-}
+      PIHOLE_TOKEN: ${PIHOLE_TOKEN:-}
+      IDS_EVE_LOG: ${IDS_EVE_LOG:-}
+      NTOPNG_URL: ${NTOPNG_URL:-}
+      AI_ANALYST_ENABLED: ${AI_ANALYST_ENABLED:-false}
+      AI_ANALYST_MODEL: ${AI_ANALYST_MODEL:-gemma3:4b}
+      AI_ANALYST_INTERVAL_MIN: ${AI_ANALYST_INTERVAL_MIN:-60}
+      AI_ANALYST_TELEGRAM: ${AI_ANALYST_TELEGRAM:-false}
+      FIRST_RESPONDER_DURATION_MS: ${FIRST_RESPONDER_DURATION_MS:-7200000}
+      LIFESTYLE_ENABLED: ${LIFESTYLE_ENABLED:-true}
+      TARGET_EXPOSURE_MIN: ${TARGET_EXPOSURE_MIN:-60}
+      EXPOSURE_AQI_CAP: ${EXPOSURE_AQI_CAP:-50}
+      HOME_LATITUDE: ${HOME_LATITUDE:-15.0}
+      HOME_LONGITUDE: ${HOME_LONGITUDE:-100.0}
+      MANUAL_DAY_HOURS: ${MANUAL_DAY_HOURS:-24}
+      MESH_ENABLED: "true"
+      MESH_OUTPUT_DIR: /app/offsite
+      DEFCON_DRY_RUN: ${DEFCON_DRY_RUN:-true}
     ports:
       - "3001:3001"
     volumes:
-      - ../core-api/src:/app/src          # โค้ด Backend ในเครื่อง → ใน container
-      - ../core-api/prisma:/app/prisma    # schema/migrations ล่าสุดเสมอ (กัน Prisma client ล้าสมัย)
-      - /app/node_modules                 # กัน node_modules ถูกทับ
-    # สร้าง Prisma Client ใหม่ทุกครั้งที่ container เริ่ม (schema ถูก mount แบบ live)
-    # ป้องกัน crash "Cannot read properties of undefined (reading 'groupBy')" หลัง recreate
-    command: sh -c "npx prisma generate && npm run dev"
+      - ../core-api/src:/app/src          # ÃƒÂ Ã‚Â¹Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â‚¬Â Backend ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¸Ã‚Â·ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ container
+      - ../core-api/prisma:/app/prisma    # schema/migrations ÃƒÂ Ã‚Â¸Ã‚Â¥ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã‚ÂªÃƒÂ Ã‚Â¸Ã‚Â¸ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã‚ÂªÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã‚Â­ (ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ Prisma client ÃƒÂ Ã‚Â¸Ã‚Â¥ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã‚ÂªÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã‚Â¢)
+      - /app/node_modules                 # ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ node_modules ÃƒÂ Ã‚Â¸Ã¢â‚¬â€œÃƒÂ Ã‚Â¸Ã‚Â¹ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã…Â¡
+      # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Survival: mount ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã‚Â¹ÃƒÂ Ã‚Â¸Ã‚Â¥ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¹Ã¢â‚¬Â° persist ÃƒÂ Ã‚Â¸Ã…Â¡ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ host (ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã‚Â¢ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã‚Â·ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â­ container recreate) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+      - ../core-api/data:/app/data                 # state files ÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬Â (bit-rot scan, governor, govsim, ...)
+      - ../core-api/backups:/app/backups           # DB dump + state bundles + schedule.json
+      - ../core-api/knowledge:/app/knowledge       # ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¹Ã…â€™ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¸Ã‚Â§ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¸Ã‚Â¹ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°
+      - ../core-api/ota_firmwares:/app/ota_firmwares # firmware ÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚ÂµÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂºÃƒÂ Ã‚Â¹Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â¥ÃƒÂ Ã‚Â¸Ã¢â‚¬Â
+      - ../infra/.env:/app/host-infra.env:ro
+      - ../infra/offsite:/app/offsite       # ÃƒÂ Ã‚Â¸Ã‚ÂªÃƒÂ Ã‚Â¸Ã‚Â³ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ÃƒÂ Ã‚Â¸Ã‚Â² .env ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¹Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã…Â¡ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â² state bundle ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¢ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ backup
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # ÃƒÂ Ã‚Â¸Ã‚ÂªÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ Prisma Client ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â¡ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚Â¸ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã¢â‚¬â€ÃƒÂ Ã‚Â¸Ã‚ÂµÃƒÂ Ã‚Â¹Ã‹â€  container ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¸Ã‚Â´ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â¡ (schema ÃƒÂ Ã‚Â¸Ã¢â‚¬â€œÃƒÂ Ã‚Â¸Ã‚Â¹ÃƒÂ Ã‚Â¸Ã‚Â mount ÃƒÂ Ã‚Â¹Ã‚ÂÃƒÂ Ã‚Â¸Ã…Â¡ÃƒÂ Ã‚Â¸Ã…Â¡ live)
+    # ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂºÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â€žÂ¢ crash "Cannot read properties of undefined (reading 'groupBy')" ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¸Ã‚Â¥ÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ recreate
+    command: sh -c "npx prisma generate && npm run build && npm start"
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -102,7 +147,7 @@ services:
     container_name: sovereign-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001   # ใช้ host.docker.internal เพื่อให้เบราว์เซอร์ฝั่ง client เข้าถึงได้
+      NEXT_PUBLIC_API_URL: http://localhost:3001   # ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã…Â ÃƒÂ Ã‚Â¹Ã¢â‚¬Â° host.docker.internal ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã…Â¾ÃƒÂ Ã‚Â¸Ã‚Â·ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¹Ã†â€™ÃƒÂ Ã‚Â¸Ã‚Â«ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã…Â¡ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã‚Â§ÃƒÂ Ã‚Â¹Ã…â€™ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ Ã‚Â¸Ã‚Â­ÃƒÂ Ã‚Â¸Ã‚Â£ÃƒÂ Ã‚Â¹Ã…â€™ÃƒÂ Ã‚Â¸Ã‚ÂÃƒÂ Ã‚Â¸Ã‚Â±ÃƒÂ Ã‚Â¹Ã‹â€ ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ client ÃƒÂ Ã‚Â¹Ã¢â€šÂ¬ÃƒÂ Ã‚Â¸Ã¢â‚¬Å¡ÃƒÂ Ã‚Â¹Ã¢â‚¬Â°ÃƒÂ Ã‚Â¸Ã‚Â²ÃƒÂ Ã‚Â¸Ã¢â‚¬â€œÃƒÂ Ã‚Â¸Ã‚Â¶ÃƒÂ Ã‚Â¸Ã¢â‚¬Â¡ÃƒÂ Ã‚Â¹Ã¢â‚¬Å¾ÃƒÂ Ã‚Â¸Ã¢â‚¬ÂÃƒÂ Ã‚Â¹Ã¢â‚¬Â°
     ports:
       - "3000:3000"
     volumes:

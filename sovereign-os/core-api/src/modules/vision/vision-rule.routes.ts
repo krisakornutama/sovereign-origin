@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   prisma,
   listKnownFaces,
@@ -80,6 +80,21 @@ router.get('/alerts', authenticate, async (_req, res) => {
     res.json({ success: true, alerts });
   } catch (err: any) {
     res.status(500).json({ error: String(err?.message || 'โหลดประวัติไม่สำเร็จ') });
+  }
+});
+
+// GET /api/vision/honeypot — บันทึกเงียบระหว่าง First-Responder Mode (SUPERADMIN เท่านั้น)
+// ใช้วิเคราะห์ย้อนหลังว่าเหตุฉุกเฉินถูกจัดฉากหรือไม่ (Emergency Exploitation)
+router.get('/honeypot', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  try {
+    const alerts = await prisma.visionAlert.findMany({
+      where: { kind: 'honeypot' },
+      orderBy: { created_at: 'desc' },
+      take: 100,
+    });
+    res.json({ success: true, alerts });
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message || 'โหลด honeypot ไม่สำเร็จ') });
   }
 });
 

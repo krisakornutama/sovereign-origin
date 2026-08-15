@@ -33,6 +33,13 @@ const clearLimiter = rateLimit({
   message: 'Too many clear attempts, please try again later',
 });
 
+// เปลี่ยนรหัสผ่าน — จำกัดจำนวนครั้ง กัน brute-force ของรหัสปัจจุบัน
+const changePasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many password change attempts, please try again later',
+});
+
 // POST /api/auth/login (ไม่ต้องใช้ middleware แต่มี rate-limit)
 router.post('/login', loginLimiter, async (req, res) => {
   try {
@@ -49,6 +56,25 @@ router.post('/verify-mfa', mfaLimiter, authenticatePartial, async (req, res) => 
   try {
     const { code } = req.body;
     const token = await AuthService.verifyMfa(req.user!.id, code);
+    res.json({ token });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/change-password — เปลี่ยนรหัสผ่านด้วยตัวเอง (ต้องรู้รหัสปัจจุบัน)
+// ใช้ได้กับทุกบทบาทรวมถึงสมาชิก — สมาชิกที่เพิ่งได้บัญชี (must_change_password=true)
+// จะถูกบังคับให้เปลี่ยนที่หน้านี้ก่อนเข้าหน้าอื่น
+router.post('/change-password', changePasswordLimiter, authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (typeof currentPassword !== 'string' || !currentPassword) {
+      return res.status(400).json({ error: 'currentPassword is required' });
+    }
+    if (typeof newPassword !== 'string' || !newPassword) {
+      return res.status(400).json({ error: 'newPassword is required' });
+    }
+    const { token } = await AuthService.changePassword(req.user!.id, currentPassword, newPassword);
     res.json({ token });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

@@ -88,7 +88,7 @@ router.post('/scan-to-inventory', authenticate, requireRole(...WRITE_ROLES), asy
       const label = parseLabelResponse(JSON.stringify(raw));
       const err = validateLabel(label);
       if (err) return res.status(400).json({ error: err });
-      const id = await createInventoryItem(label);
+      const id = await createInventoryItem(label, req.user?.id);
       return res.status(201).json({ success: true, id });
     } catch (e: any) {
       return res.status(500).json({ error: 'Failed to save inventory item', detail: e?.message || 'unknown' });
@@ -107,7 +107,7 @@ router.post('/scan-to-inventory', authenticate, requireRole(...WRITE_ROLES), asy
         unlinkSync(req.file.path);
         return res.status(400).json({ error: e2 });
       }
-      const id = await createInventoryItem(label);
+      const id = await createInventoryItem(label, req.user?.id);
       unlinkSync(req.file.path);
       res.status(201).json({ success: true, id });
     } catch (e: any) {

@@ -23,7 +23,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function BackupPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [schedule, setSchedule] = useState<Schedule>({ enabled: false, time: '02:00' });
   const [loading, setLoading] = useState(false);
@@ -130,6 +130,10 @@ export default function BackupPage() {
       setError('ลบไม่สำเร็จ');
     }
   };
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

@@ -11,6 +11,7 @@ import DefconWidget from '../components/dashboard/DefconWidget';
 import WealthWidget from '../components/dashboard/WealthWidget';
 import PageHeader from '../components/ui/PageHeader';
 import { authFetch } from '../lib/apiFetch';
+import { useFeatureStore } from '../stores/useFeatureStore';
 import Sidebar from '../components/layout/Sidebar';
 
 const categoryMap: Record<string, { name: string; icon: string; metrics: string[] }> = {
@@ -179,6 +180,13 @@ export default function Dashboard() {
     pendingChores: number;
     unpaidBills: number;
   }> | null>(null);
+
+  // สิทธิ์ฟังก์ชั่นต่อคน: ซ่อน widget ที่ไม่มีสิทธิ์ (เช่น ลูกไม่เห็นพอร์ต/ฟาร์ม ถ้าพ่อไม่เปิด)
+  const hasFeature = useFeatureStore((s) => s.has);
+  const loadFeatures = useFeatureStore((s) => s.load);
+  useEffect(() => {
+    if (isHydrated && isAuthenticated && user && user.role !== 'SUPERADMIN') loadFeatures();
+  }, [isHydrated, isAuthenticated, user, loadFeatures]);
 
   // layout: ลำดับ + ซ่อน/แสดง (persist ใน localStorage)
   const [order, setOrder] = useState<WidgetKey[]>(() =>
@@ -532,7 +540,21 @@ export default function Dashboard() {
   };
 
   // โหมด edit: แสดงทุก widget (รวมที่ซ่อน — ติ่มๆ) เพื่อให้กด "แสดง" ได้
-  const isVisibleForUser = (k: WidgetKey) => k !== 'map' || user.role === 'SUPERADMIN';
+  // สิทธิ์: map/defcon/wealth/inventory/farm/kids ต้องมี grant ตรง (superadmin เห็นหมด)
+  const FEATURE_BY_WIDGET: Partial<Record<WidgetKey, string>> = {
+    alerts: '/automation',
+    defcon: '/risk-monitor',
+    wealth: '/portfolio',
+    inventory: '/inventory',
+    farm: '/farm',
+    kids: '/knowledge',
+  };
+  const isVisibleForUser = (k: WidgetKey) => {
+    if (k === 'map') return user.role === 'SUPERADMIN';
+    const feat = FEATURE_BY_WIDGET[k];
+    if (feat && user.role !== 'SUPERADMIN' && !hasFeature(feat)) return false;
+    return true;
+  };
   const visibleOrder = order.filter((k) => isVisibleForUser(k) && (editMode || !hidden[k]));
 
   return (

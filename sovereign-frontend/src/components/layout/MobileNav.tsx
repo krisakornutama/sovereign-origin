@@ -1,11 +1,15 @@
 "use client";
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { openCommandPalette } from '../CommandPalette';
+import { useFeatureStore } from '../../stores/useFeatureStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 // เมนูหลักบนมือถือ/แท็บเล็ต — Sidebar จะหายไปบนจอเล็ก เลยต้องมีทางนำทางนี้
 // (เลื่อนแนวนอนได้ — มีครบทุกหน้า ไม่ต้องไปหาเมนู)
 const ITEMS: Array<{ href: string; label: string; icon: string }> = [
   { href: '/dashboard', label: 'หน้าหลัก', icon: '🏰' },
+  { href: '/change-password', label: 'รหัสผ่าน', icon: '🔑' },
   { href: '/sensors', label: 'อุปกรณ์และเซ็นเซอร์', icon: '📡' },
   { href: '/energy', label: 'พลังงาน', icon: '⚡' },
   { href: '/predictive', label: 'พยากรณ์', icon: '🔮' },
@@ -27,6 +31,19 @@ const ITEMS: Array<{ href: string; label: string; icon: string }> = [
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const hasFeature = useFeatureStore((s) => s.has);
+  const loadFeatures = useFeatureStore((s) => s.load);
+  const isSuperadmin = user?.role === 'SUPERADMIN';
+
+  useEffect(() => {
+    if (user && !isSuperadmin) loadFeatures();
+  }, [user, isSuperadmin, loadFeatures]);
+
+  // ซ่อนหน้าที่ไม่มีสิทธิ์ — SUPERADMIN เห็นหมด (has() คืน true เมื่อยังไม่รู้สิทธิ์)
+  const visibleItems = ITEMS.filter(
+    (item) => item.href === 'palette' || isSuperadmin || hasFeature(item.href)
+  );
   const active = (href: string) =>
     pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
 
@@ -35,13 +52,14 @@ export default function MobileNav() {
       aria-label="เมนูหลัก (มือถือ)"
       className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-900/95 border-t border-gray-800 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.35)]"
     >
-      <div className="flex overflow-x-auto scrollbar-none">
-        {ITEMS.map((item) =>
+      {/* flex-wrap: แสดงครบทุกเมนู (เดิมเลื่อนแนวนอนแล้วคนไม่รู้ว่ามีเมนูต่อ) */}
+      <div className="flex flex-wrap justify-center">
+        {visibleItems.map((item) =>
           item.href === 'palette' ? (
             <button
               key="palette"
               onClick={openCommandPalette}
-              className="flex flex-col items-center justify-center gap-0.5 px-4 py-2.5 min-w-max border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+              className="flex flex-col items-center justify-center gap-0.5 px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
             >
               <span className="text-lg leading-none">{item.icon}</span>
               <span className="text-[10px] font-medium">{item.label}</span>
@@ -50,7 +68,7 @@ export default function MobileNav() {
           <a
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 px-4 py-2.5 min-w-max border-b-2 transition ${
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 py-2 border-b-2 transition ${
               active(item.href)
                 ? 'border-emerald-400 text-emerald-300 bg-emerald-500/10'
                 : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'

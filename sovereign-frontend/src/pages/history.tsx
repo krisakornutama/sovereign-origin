@@ -34,7 +34,7 @@ const CANVAS_HEIGHT = 400;
 const PADDING = { top: 20, right: 30, bottom: 40, left: 60 };
 
 export default function HistoryPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   const [range, setRange] = useState<Range>(() => {
@@ -256,6 +256,10 @@ export default function HistoryPage() {
   useEffect(() => {
     drawChart();
   }, [drawChart]);
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+  }
 
   if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
 

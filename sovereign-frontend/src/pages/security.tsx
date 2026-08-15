@@ -6,6 +6,14 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import StatCard from '../components/ui/StatCard';
 import StatusPill from '../components/ui/StatusPill';
+import NextGenPanel from '../components/security/NextGenPanel';
+import FirewallEnginePanel from '../components/security/FirewallEnginePanel';
+import KillSwitchCard, { type KillSwitchState } from '../components/security/KillSwitchCard';
+import LiveEventStreamPanel from '../components/security/LiveEventStreamPanel';
+import FirstResponderCard, { type FirstResponderState } from '../components/security/FirstResponderCard';
+import RealityCard, { type RealityStats, type RealityCorrection } from '../components/security/RealityCard';
+import { extractIp, fmtTime, fmtArgs, ACTION_STYLES } from '../components/security/security-ui';
+import type { ActionMsg } from '../components/security/security-ui';
 
 interface Connection {
   protocol: string;
@@ -25,12 +33,6 @@ interface SecurityEvent {
   description: string;
 }
 
-type ActionMsgType = 'success' | 'info' | 'error';
-interface ActionMsg {
-  type: ActionMsgType;
-  text: string;
-}
-
 interface Approval {
   id: string;
   tool: string;
@@ -40,36 +42,6 @@ interface Approval {
   status: 'pending' | 'approved' | 'rejected';
   result?: string;
   decidedAt?: number;
-}
-
-// แยก IP ออกจาก address ที่อาจมี port ต่อท้าย ([::1]:80, 1.2.3.4:5432, ...)
-function extractIp(addr: string): string {
-  const t = (addr || '').trim();
-  const bracket = t.match(/^\[([^\]]+)\]/);
-  if (bracket) return bracket[1];
-  const parts = t.split(':');
-  if (parts.length === 2 && parts[0].includes('.')) return parts[0];
-  return t;
-}
-
-const ACTION_STYLES: Record<ActionMsgType, string> = {
-  success: 'bg-green-900/30 text-green-400 border-green-800',
-  info: 'bg-amber-900/30 text-amber-300 border-amber-700',
-  error: 'bg-red-900/30 text-red-400 border-red-800',
-};
-
-function fmtTime(ts?: number): string {
-  if (!ts) return '-';
-  return new Date(ts).toLocaleString('th-TH');
-}
-
-function fmtArgs(args: any): string {
-  if (!args || Object.keys(args).length === 0) return '{}';
-  try {
-    return JSON.stringify(args, null, 2);
-  } catch {
-    return String(args);
-  }
 }
 
 export default function SecurityPage() {
@@ -85,9 +57,16 @@ export default function SecurityPage() {
   const [actionMsg, setActionMsg] = useState<ActionMsg | null>(null);
   const [busyIp, setBusyIp] = useState<string | null>(null);
   const [busyApproval, setBusyApproval] = useState<string | null>(null);
+  const [killSwitch, setKillSwitch] = useState<KillSwitchState | null>(null);
+  const [busyKillSwitch, setBusyKillSwitch] = useState(false);
+  const [firstResponder, setFirstResponder] = useState<FirstResponderState | null>(null);
+  const [busyFirstResponder, setBusyFirstResponder] = useState(false);
+  const [realityStats, setRealityStats] = useState<RealityStats | null>(null);
+  const [busyReality, setBusyReality] = useState(false);
+  const [busyCorrectId, setBusyCorrectId] = useState<string | null>(null);
 
   // ── 2 แท็บ: ภาพรวม (default) | ตั้งค่าขั้นสูง (Firewall Engine ซ่อนอยู่หลังปุ่ม Advanced) ──
-  const [secTab, setSecTab] = useState<'overview' | 'advanced'>('overview');
+  const [secTab, setSecTab] = useState<'overview' | 'advanced' | 'nextgen'>('overview');
 
   const loadApprovals = useCallback(async () => {
     if (!isSuperadmin) return;
@@ -112,23 +91,32 @@ export default function SecurityPage() {
 
   const loadData = async () => {
     try {
-      const [connRes, eventRes, fwRes, blocksRes] = await Promise.all([
+      const [connRes, eventRes, fwRes, blocksRes, ksRes, frRes, realityRes] = await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/connections`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/events`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/blocks`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/kill-switch`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/first-responder`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/reality`),
       ]);
-      const [connData, eventData, fwData, blocksData] = await Promise.all([
+      const [connData, eventData, fwData, blocksData, ksData, frData, realityData] = await Promise.all([
         connRes.json(),
         eventRes.json(),
         fwRes.json(),
         blocksRes.ok ? blocksRes.json() : { blockedIps: [], pendingApprovals: 0 },
+        ksRes.ok ? ksRes.json() : null,
+        frRes.ok ? frRes.json() : null,
+        realityRes.ok ? realityRes.json() : null,
       ]);
       setConnections(connData);
       setEvents(eventData);
       setFirewallStatus(fwData.status || 'unknown');
       setBlockedIps(blocksData.blockedIps || []);
       setPendingApprovals(blocksData.pendingApprovals || 0);
+      if (ksData) setKillSwitch(ksData);
+      if (frData) setFirstResponder(frData);
+      if (realityData) setRealityStats(realityData);
     } catch (err) {
       console.error('Security data fetch error:', err);
     } finally {
@@ -145,6 +133,31 @@ export default function SecurityPage() {
       setPendingApprovals(data.pendingApprovals || 0);
     } catch (err) {
       // เงียบๆ
+    }
+  };
+
+  // Emergency Kill-Switch — SUPERADMIN เท่านั้น (guard อีกชั้นจาก backend)
+  const toggleKillSwitch = async (active: boolean, reason: string) => {
+    setBusyKillSwitch(true);
+    setActionMsg(null);
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/kill-switch`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'เปลี่ยนสถานะไม่สำเร็จ');
+      setKillSwitch(data);
+      setActionMsg(
+        active
+          ? { type: 'error', text: `⛔ Kill-Switch เปิดแล้ว — AI Agent ทุกตัวหยุดทำงานทันที (เหตุผล: ${data.reason})` }
+          : { type: 'success', text: '🟢 Kill-Switch ปลดล็อกแล้ว — AI Agent ทำงานได้ตามปกติ' }
+      );
+    } catch (e: any) {
+      setActionMsg({ type: 'error', text: e.message });
+    } finally {
+      setBusyKillSwitch(false);
     }
   };
 
@@ -223,6 +236,51 @@ export default function SecurityPage() {
     }
   };
 
+  // First-Responder Mode (SOS) — SUPERADMIN เท่านั้น
+  const toggleFirstResponder = async (active: boolean, note: string) => {
+    setBusyFirstResponder(true);
+    setActionMsg(null);
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/first-responder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active, note }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'เปลี่ยนสถานะไม่สำเร็จ');
+      setFirstResponder(data);
+      setActionMsg(
+        active
+          ? { type: 'error', text: '🚨 First-Responder Mode เปิดแล้ว — Vision AI หยุดแจ้งเตือนคนแปลกหน้า หมดอายุอัตโนมัติใน 2 ชม.' }
+          : { type: 'success', text: '🟢 First-Responder Mode ปิดแล้ว — ระบบกลับสู่การเฝ้าระวังปกติ' }
+      );
+    } catch (e: any) {
+      setActionMsg({ type: 'error', text: e.message });
+    } finally {
+      setBusyFirstResponder(false);
+    }
+  };
+
+  // Reality-Check — ครอบครัวยืนยันว่า AI เตือนผิด / เพิ่มบริบท (reality anchor)
+  const submitCorrection = async (kind: RealityCorrection['kind'], note: string, sourceType?: string) => {
+    setBusyReality(true);
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/nextgen/reality/correct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, note, source_type: sourceType }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ');
+      setRealityStats(data);
+      setActionMsg({ type: 'success', text: '🧠 บันทึก reality anchor แล้ว — AI จะไม่อ้างเหตุการณ์นี้ซ้ำในการตัดสินใจ' });
+    } catch (e: any) {
+      setActionMsg({ type: 'error', text: e.message });
+    } finally {
+      setBusyReality(false);
+    }
+  };
+
   const severityColor = (s: string) =>
     s === 'critical' ? 'text-red-400' : s === 'warning' ? 'text-amber-400' : 'text-blue-400';
 
@@ -251,6 +309,17 @@ export default function SecurityPage() {
       </header>
 
       <main className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* ⛔ แบนเนอร์ฉุกเฉิน — ทุก role เห็น เมื่อ Kill-Switch เปิดอยู่ */}
+        {killSwitch?.active && (
+          <div className="p-4 rounded-xl border-2 border-red-600 bg-red-950/60 space-y-1.5 animate-pulse">
+            <div className="text-red-300 font-bold">⛔ EMERGENCY — AI KILL-SWITCH เปิดอยู่: AI Agent ถูกหยุดทั่วทั้งระบบ</div>
+            <div className="text-xs text-red-200">
+              เหตุผล: {killSwitch.reason || 'ไม่ระบุ'} · เปิดโดย: {killSwitch.by || '-'} · เวลา: {killSwitch.at ? new Date(killSwitch.at).toLocaleString('th-TH') : '-'}
+              {!isSuperadmin && <span className="ml-2 text-red-300/70">เฉพาะ SUPERADMIN เท่านั้นที่ปลดล็อกได้</span>}
+            </div>
+          </div>
+        )}
+
         {/* ── แท็บ: ภาพรวม / ตั้งค่าขั้นสูง ── */}
         <div className="flex gap-2">
           <button
@@ -265,8 +334,14 @@ export default function SecurityPage() {
           >
             ⚙️ ตั้งค่าขั้นสูง (Firewall Engine)
           </button>
+          <button
+            onClick={() => setSecTab('nextgen')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${secTab === 'nextgen' ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}`}
+          >
+            🧬 Next-Gen Security
+          </button>
           <span className="self-center text-[10px] text-gray-500 ml-1">
-            ภาพรวม = สถานะ/การอนุมัติ/การเชื่อมต่อ · ขั้นสูง = กฎไฟร์วอลล์ + จำแนก unknown + สคริปต์ติดตั้ง
+            ภาพรวม = สถานะ/การอนุมัติ/การเชื่อมต่อ · ขั้นสูง = กฎไฟร์วอลล์ + จำแนก unknown + สคริปต์ติดตั้ง · Next-Gen = Threat DB + Pi-hole + IDS + App Control
           </span>
         </div>
 
@@ -288,6 +363,29 @@ export default function SecurityPage() {
           <StatCard label="🔗 Active Connections" value={connections.length} />
           <StatCard label="🚨 Security Events" value={events.length} />
         </div>
+
+        {/* Kill-Switch — ปุ่มหยุดฉุกเฉิน AI Agent ทั้งระบบ */}
+        <KillSwitchCard
+          state={killSwitch}
+          isSuperadmin={isSuperadmin}
+          busy={busyKillSwitch}
+          onToggle={toggleKillSwitch}
+        />
+
+        {/* First-Responder Mode (SOS) — รับมือเหตุฉุกเฉิน/หน่วยกู้ภัย */}
+        <FirstResponderCard
+          state={firstResponder}
+          isSuperadmin={isSuperadmin}
+          busy={busyFirstResponder}
+          onToggle={toggleFirstResponder}
+        />
+
+        {/* Reality-Check / Paranoia Index — ป้องกัน AI เตือนผิดซ้ำ ๆ */}
+        <RealityCard
+          stats={realityStats}
+          busy={busyReality}
+          onCorrect={submitCorrection}
+        />
 
         {/* คำขออนุมัติ action (block/unblock) — จัดการที่นี่ ครบในหน้าเดียว */}
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
@@ -480,6 +578,7 @@ export default function SecurityPage() {
                 <th className="px-4 py-3">Severity <span className="normal-case text-gray-600">(ความรุนแรง)</span></th>
                 <th className="px-4 py-3">Source IP <span className="normal-case text-gray-600">(ต้นทาง)</span></th>
                 <th className="px-4 py-3">Description <span className="normal-case text-gray-600">(รายละเอียด)</span></th>
+                <th className="px-4 py-3">AI <span className="normal-case text-gray-600">(เข้าใจผิด?)</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
@@ -490,14 +589,39 @@ export default function SecurityPage() {
                   <td className={`px-4 py-2 font-bold ${severityColor(e.severity)}`}>{e.severity}</td>
                   <td className="px-4 py-2 text-xs">{e.source_ip || '-'}</td>
                   <td className="px-4 py-2 text-xs">{e.description}</td>
+                  <td className="px-4 py-2">
+                    <button
+                      onClick={async () => {
+                        const note = window.prompt('AI เตือนผิด — บอกครอบครัว/ระบบว่าเกิดอะไรขึ้นจริง (เช่น "นี่คือช่างที่เราจ้าง")', '');
+                        if (note === null) return;
+                        if (!note.trim()) return alert('ต้องใส่รายละเอียด');
+                        setBusyCorrectId(e.id);
+                        await submitCorrection('false_positive', note.trim(), e.event_type);
+                        setBusyCorrectId(null);
+                      }}
+                      disabled={busyCorrectId === e.id}
+                      title="ยืนยันว่าเหตุการณ์นี้ AI เตือนผิด — จะกลายเป็น reality anchor ให้ AI เรียนรู้"
+                      className="text-[10px] px-2 py-1 rounded bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition disabled:opacity-50"
+                    >
+                      {busyCorrectId === e.id ? '⏳' : '🧠 เตือนผิด'}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {events.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">ยังไม่มีเหตุการณ์ด้านความปลอดภัย</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">ยังไม่มีเหตุการณ์ด้านความปลอดภัย</td></tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Live Real-time Stream — เหตุการณ์สดจากทุก service */}
+        <LiveEventStreamPanel
+          apiBase={process.env.NEXT_PUBLIC_API_URL || ''}
+          token={token}
+          onKillSwitch={(s) => setKillSwitch(s)}
+          onFirstResponder={(s) => setFirstResponder(s)}
+        />
         </>
         )}
 
@@ -510,184 +634,12 @@ export default function SecurityPage() {
           </>
         )}
 
+        {secTab === 'nextgen' && (
+          <NextGenPanel />
+        )}
+
         </main>
     </div>
       </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// Firewall Engine Panel — กฎ + สแกนการเชื่อมต่อ + จำแนก unknown + สร้างสคริปต์ Windows
-// ─────────────────────────────────────────────
-interface FwRule {
-  id: string; name: string; action: string; direction: string; protocol: string;
-  remote_ip: string | null; remote_port: string | null; local_port: string | null;
-  priority: number; description?: string | null; enabled: boolean;
-}
-
-function FirewallEnginePanel() {
-  const [rules, setRules] = useState<FwRule[]>([]);
-  const [defaultPolicy, setDefaultPolicy] = useState('ALLOW');
-  const [conns, setConns] = useState<any[]>([]);
-  const [ruleForm, setRuleForm] = useState({ name: '', action: 'DENY', direction: 'IN', protocol: 'TCP', remote_ip: '', remote_port: '', local_port: '', priority: '10', description: '' });
-  const [testIp, setTestIp] = useState('');
-  const [testPort, setTestPort] = useState('80');
-  const [evalResult, setEvalResult] = useState('');
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [scanning, setScanning] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/rules`);
-      const d = await r.json();
-      if (r.ok) { setRules(d.rules || []); setDefaultPolicy(d.defaultPolicy || 'ALLOW'); }
-    } catch { /* เงียบ */ }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const saveRule = async (patch: Partial<FwRule>, id?: string) => {
-    setErr(''); setMsg('');
-    try {
-      const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/rules${id ? '/' + id : ''}`, {
-        method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'บันทึกกฎไม่สำเร็จ');
-      setMsg(id ? '✅ อัปเดตกฎแล้ว' : `✅ เพิ่มกฎ "${patch.name}" แล้ว`);
-      if (!id) setRuleForm({ name: '', action: 'DENY', direction: 'IN', protocol: 'TCP', remote_ip: '', remote_port: '', local_port: '', priority: '10', description: '' });
-      load();
-    } catch (e: any) { setErr(e.message); }
-  };
-
-  const deleteRule = async (r: FwRule) => {
-    if (!window.confirm(`ลบกฎ "${r.name}"?`)) return;
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/rules/${r.id}`, { method: 'DELETE' });
-    load();
-  };
-
-  const setPolicy = async (p: string) => {
-    const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/policy`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ default_policy: p }),
-    });
-    if (r.ok) { setDefaultPolicy(p); setMsg(`นโยบายเริ่มต้น = ${p === 'DENY' ? 'บล็อกทั้งหมด' : 'อนุญาต'}`); }
-  };
-
-  const scan = async () => {
-    setScanning(true); setErr('');
-    try {
-      const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/scan`, { method: 'POST' });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'สแกนไม่สำเร็จ');
-      setConns(d.connections || []);
-      setMsg(`🔍 สแกนพบ ${d.total ?? 0} การเชื่อมต่อ`);
-    } catch (e: any) { setErr(e.message); } finally { setScanning(false); }
-  };
-
-  const evaluate = async () => {
-    if (!testIp.trim()) { setErr('ใส่ IP ที่ต้องการทดสอบ'); return; }
-    setErr('');
-    try {
-      const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/evaluate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ protocol: 'TCP', remote: `${testIp.trim()}:${testPort || '80'}`, local: '192.168.1.100:3001' }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'evaluate ไม่สำเร็จ');
-      setEvalResult(`การเชื่อมต่อไปยัง ${testIp.trim()}:${testPort} → ${d.action} (${d.rule ? 'กฎ: ' + d.rule.name : 'ไม่ตรงกฎ → นโยบายเริ่มต้น ' + (d.defaultPolicy || 'ALLOW')})`);
-    } catch (e: any) { setErr(e.message); }
-  };
-
-  const downloadScript = async () => {
-    const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/host-script`);
-    const text = await r.text();
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'sovereign-firewall.bat';
-    a.click();
-    setMsg('📜 ดาวน์โหลดสคริปต์แล้ว — รันบนเครื่องจริงด้วยสิทธิ์ Administrator เพื่อบังคับใช้กับ Windows Firewall');
-  };
-
-  return (
-    <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-bold">🧱 Firewall Engine <span className="text-[10px] text-gray-500 font-normal">— จำแนก unknown + กฎ allow/deny + บังคับใช้จริงผ่าน Windows Firewall (สคริปต์ netsh)</span></h2>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-400">นโยบายเริ่มต้น:</span>
-          <button onClick={() => setPolicy('ALLOW')} className={`px-2 py-1 rounded border ${defaultPolicy === 'ALLOW' ? 'bg-emerald-900/60 border-emerald-600 text-emerald-300' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>อนุญาต</button>
-          <button onClick={() => setPolicy('DENY')} className={`px-2 py-1 rounded border ${defaultPolicy === 'DENY' ? 'bg-red-900/60 border-red-600 text-red-300' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>บล็อกทั้งหมด</button>
-          <button onClick={scan} disabled={scanning} className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded font-bold disabled:opacity-50">{scanning ? '⏳...' : '🔍 สแกนการเชื่อมต่อ'}</button>
-          <button onClick={downloadScript} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-bold">📜 สคริปต์ Windows Firewall</button>
-        </div>
-      </div>
-      {msg && <div className="text-xs text-emerald-400">{msg}</div>}
-      {err && <div className="text-xs text-red-400">{err}</div>}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* กฎ */}
-        <div className="space-y-2">
-          <div className="text-sm font-bold text-gray-300">📏 กฎไฟร์วอลล์ ({rules.length}) — เลข priority สูงตรวจก่อน</div>
-          <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-            {rules.length === 0 && <div className="text-xs text-gray-600">ยังไม่มีกฎ — เพิ่มกฎด้านล่าง (เช่น block IP ที่ไม่รู้จัก, allow เฉพาะ Telegram)</div>}
-            {rules.map((r) => (
-              <div key={r.id} className={`flex items-center gap-2 text-xs bg-gray-950/60 border rounded px-2 py-1.5 ${r.enabled ? 'border-gray-700' : 'border-gray-800 opacity-50'}`}>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.action === 'DENY' ? 'bg-red-900/60 text-red-300' : 'bg-emerald-900/60 text-emerald-300'}`}>{r.action}</span>
-                <span className="font-bold flex-1 truncate">{r.name}</span>
-                <span className="text-gray-500">{r.protocol} {r.direction} {r.remote_ip || ''} {r.remote_port ? ':' + r.remote_port : ''}{r.local_port ? ' ←:' + r.local_port : ''}</span>
-                <button onClick={() => saveRule({ enabled: !r.enabled }, r.id)} title="เปิด/ปิด">{r.enabled ? '🟢' : '⚪'}</button>
-                <button onClick={() => deleteRule(r)} className="text-red-400 hover:text-red-300">🗑️</button>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1.5 border-t border-gray-800 pt-2">
-            <div className="flex gap-1.5">
-              <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder="ชื่อกฎ เช่น block-unknown-scanner" className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-              <select value={ruleForm.action} onChange={(e) => setRuleForm({ ...ruleForm, action: e.target.value })} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-1.5 text-xs">
-                <option value="ALLOW">อนุญาต</option><option value="DENY">บล็อก</option>
-              </select>
-              <select value={ruleForm.direction} onChange={(e) => setRuleForm({ ...ruleForm, direction: e.target.value })} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-1.5 text-xs">
-                <option value="IN">IN</option><option value="OUT">OUT</option><option value="BOTH">BOTH</option>
-              </select>
-              <select value={ruleForm.protocol} onChange={(e) => setRuleForm({ ...ruleForm, protocol: e.target.value })} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-1.5 text-xs">
-                <option value="ANY">ANY</option><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="ICMP">ICMP</option>
-              </select>
-            </div>
-            <div className="flex gap-1.5">
-              <input value={ruleForm.remote_ip} onChange={(e) => setRuleForm({ ...ruleForm, remote_ip: e.target.value })} placeholder="IP/CIDR เช่น 10.12.55.0/24 (เว้น = ทั้งหมด)" className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-              <input value={ruleForm.remote_port} onChange={(e) => setRuleForm({ ...ruleForm, remote_port: e.target.value })} placeholder="พอร์ต (เช่น 443, 8000-8100)" className="w-28 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-              <input value={ruleForm.priority} onChange={(e) => setRuleForm({ ...ruleForm, priority: e.target.value })} placeholder="pri" className="w-14 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-            </div>
-            <button onClick={() => saveRule({ name: ruleForm.name, action: ruleForm.action, direction: ruleForm.direction, protocol: ruleForm.protocol, remote_ip: ruleForm.remote_ip || null, remote_port: ruleForm.remote_port || null, local_port: ruleForm.local_port || null, priority: Number(ruleForm.priority) || 10, description: ruleForm.description })} className="w-full py-1.5 bg-cyan-700 hover:bg-cyan-600 rounded text-xs font-bold">➕ เพิ่มกฎ</button>
-          </div>
-        </div>
-
-        {/* สแกน + ทดสอบ */}
-        <div className="space-y-3">
-          <div className="text-sm font-bold text-gray-300">🌐 การเชื่อมต่อที่สแกน ({conns.length})</div>
-          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-            {conns.length === 0 && <div className="text-xs text-gray-600">กด "สแกนการเชื่อมต่อ" เพื่อจำแนก known/unknown ตามกฎ</div>}
-            {conns.map((c, i) => (
-              <div key={i} className={`flex items-center gap-2 text-[11px] rounded px-2 py-1 border ${c.label === 'BLOCKED' ? 'bg-red-950/40 border-red-800 text-red-200' : c.label === 'UNKNOWN' ? 'bg-amber-950/30 border-amber-800 text-amber-200' : 'bg-emerald-950/30 border-emerald-800 text-emerald-200'}`}>
-                <span>{c.label === 'BLOCKED' ? '🚫' : c.label === 'UNKNOWN' ? '⚠️' : '✅'}</span>
-                <span className="flex-1 truncate">{c.protocol} {c.local} → {c.remote}</span>
-                <span className="text-gray-500">PID {c.pid}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-gray-800 pt-2 space-y-1.5">
-            <div className="text-xs font-bold text-gray-300">🧪 ทดสอบกฎกับ IP ใด ๆ</div>
-            <div className="flex gap-1.5">
-              <input value={testIp} onChange={(e) => setTestIp(e.target.value)} placeholder="IP เช่น 45.33.1.2" className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-              <input value={testPort} onChange={(e) => setTestPort(e.target.value)} placeholder="พอร์ต" className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-              <button onClick={evaluate} className="px-3 py-1.5 bg-violet-700 hover:bg-violet-600 rounded text-xs font-bold">ทดสอบ</button>
-            </div>
-            {evalResult && <div className="text-xs text-gray-200 bg-gray-950/60 border border-gray-800 rounded px-2 py-1.5">{evalResult}</div>}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
