@@ -1,0 +1,87 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #0d1117; color: #e6edf3; min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 28px; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.brand { display: flex; align-items: center; gap: 14px; }
+.logo { font-size: 34px; }
+h1 { font-size: 20px; font-weight: 600; }
+#subtitle { color: #8b949e; font-size: 13px; margin-top: 2px; }
+.pill {
+  padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: #21262d; color: #8b949e;
+}
+.pill.ok { background: #1f6f2f33; color: #3fb950; border: 1px solid #23863666; }
+.pill.bad { background: #da363333; color: #f85149; border: 1px solid #da363366; }
+.pill.warn { background: #9e6a0333; color: #d29922; border: 1px solid #9e6a0366; }
+main { flex: 1; max-width: 980px; width: 100%; margin: 0 auto; padding: 20px 28px 40px; }
+.card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+  padding: 20px 22px; margin-bottom: 18px;
+}
+.card h2 { font-size: 15px; margin-bottom: 12px; color: #58a6ff; }
+.hint { color: #8b949e; font-size: 12.5px; margin-bottom: 12px; }
+
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.pf { display: flex; gap: 10px; align-items: center; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+.pf b { display: block; font-size: 13px; }
+.pf small { color: #8b949e; font-size: 11.5px; }
+.dot { font-size: 20px; line-height: 1; }
+.dot.good { color: #3fb950; } .dot.bad { color: #f85149; } .dot.mid { color: #d29922; }
+
+.feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px; }
+.feat {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px 14px;
+  display: flex; gap: 10px; cursor: pointer; transition: border-color .15s;
+}
+.feat:hover { border-color: #58a6ff66; }
+.feat.off { opacity: .55; }
+.feat input { width: 17px; height: 17px; accent-color: #2f81f7; margin-top: 2px; flex-shrink: 0; }
+.feat b { font-size: 13.5px; }
+.feat small { display: block; color: #8b949e; font-size: 11.5px; margin-top: 3px; }
+.tag {
+  display: inline-block; font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  background: #21262d; color: #8b949e; margin-left: 6px; vertical-align: 1px;
+}
+.tag.core { background: #1f6f2f33; color: #3fb950; }
+.tag.ram { background: #9e6a0333; color: #d29922; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button {
+  border: 1px solid #30363d; background: #21262d; color: #e6edf3;
+  padding: 10px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+}
+button:hover { background: #30363d; }
+button.primary { background: #238636; border-color: #2ea043; }
+button.primary:hover { background: #2ea043; }
+button.danger { background: #da3633; border-color: #f85149; }
+button.danger:hover { background: #f85149; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.result {
+  margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px;
+  background: #0d1117; border: 1px solid #30363d; white-space: pre-wrap; max-height: 220px; overflow: auto;
+}
+.result.err { border-color: #da363366; color: #f85149; }
+.result.ok { border-color: #23863666; color: #3fb950; }
+.hidden { display: none; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #21262d; }
+th { color: #8b949e; font-weight: 500; font-size: 12px; }
+td .st { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
+.st.running { background: #1f6f2f33; color: #3fb950; }
+.st.exited { background: #da363333; color: #f85149; }
+.st.paused, .st.restarting { background: #9e6a0333; color: #d29922; }
+
+.log {
+  margin-top: 12px; padding: 14px; background: #010409; border: 1px solid #30363d;
+  border-radius: 8px; font-size: 12px; max-height: 320px; overflow: auto; line-height: 1.5;
+  color: #8b949e; white-space: pre-wrap;
+}
+footer { text-align: center; color: #484f58; font-size: 12px; padding: 14px; }
