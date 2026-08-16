@@ -9,8 +9,8 @@ import { execFile as execFileCb } from 'child_process';
 import { BACKUP_DIR } from './backup.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { securityStream } from './security-stream.service';
+import { sendTelegramAlert } from './telegram-alert.service';
 import { PrismaClient } from '@prisma/client';
-import { sendTelegram } from '../modules/telegram/telegram.routes';
 
 const execFile = promisify(execFileCb);
 const prisma = new PrismaClient();
@@ -373,7 +373,11 @@ export class MeshLiteService {
       } catch {
         // DB เข้าไม่ถึง = แจ้งผ่าน SSE แล้ว
       }
-      if (process.env.TELEGRAM_BOT_TOKEN) sendTelegram(`📡 ${data.text || event}`).catch(() => {});
+      sendTelegramAlert({
+        text: data.text || event,
+        severity: severity === 'critical' ? 'critical' : severity === 'warning' ? 'warn' : 'info',
+        eventKey: `mesh:${event}`,
+      }).catch(() => {});
     }
   }
 
