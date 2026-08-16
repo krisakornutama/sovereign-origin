@@ -154,6 +154,15 @@ export const config = {
     shutdownCommand: process.env.UPS_SHUTDOWN_CMD || process.env.POWER_SHUTDOWN_CMD || 'shutdown -h now',
     dryRun: (process.env.UPS_DRY_RUN || 'false') === 'true',
   },
+  // Telegram Remote Alerts — dispatcher เกรด production (ชุด 🟡 ข้อ 3)
+  // กรองตาม severity → dedup 5 นาที → rate-limit (critical 5/min) → HTML + dashboard link
+  telegramAlert: {
+    minSeverity: (process.env.TELEGRAM_MIN_SEVERITY || 'warn') as 'critical' | 'warn' | 'info',
+    dedupWindowMs: parseInt(process.env.TELEGRAM_DEDUP_WINDOW_MS || '300000', 10), // 5 นาที
+    criticalRatePerMin: parseInt(process.env.TELEGRAM_CRITICAL_RATE_PER_MIN || '5', 10),
+    globalRatePerMin: parseInt(process.env.TELEGRAM_GLOBAL_RATE_PER_MIN || '60', 10),
+    dashboardUrl: process.env.TELEGRAM_DASHBOARD_URL || '',
+  },
   // ── Phase 4: Risk & Wealth Infrastructure ──
   // Module 13: Wealth & Asset Tracker
   portfolio: {

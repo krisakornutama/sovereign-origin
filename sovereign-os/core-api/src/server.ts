@@ -83,6 +83,7 @@ import { UpsMonitorWorker, fetchNutVars } from './services/ups-monitor.service';
 import { UpsShutdownService } from './services/ups-shutdown.service';
 import { flushTelemetryNow } from './workers/mqttIngest';
 import { securityStream } from './services/security-stream.service';
+import { sendTelegramAlert } from './services/telegram-alert.service';
 import { createWealthWorker, wealthEmitter } from './services/wealth.service';
 import { createRiskWorker, riskEmitter } from './services/risk-monitor.service';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from './services/defcon-engine.service';
@@ -529,8 +530,13 @@ automationEmitter.on('alert', async (alert) => {
 
   io.emit('new_alert', alert);
 
-  // ส่งแจ้งเตือนผ่าน Telegram
-  await sendTelegram(`🚨 ${alert.severity.toUpperCase()}: ${alert.message}`);
+  // ส่งแจ้งเตือนผ่าน Telegram (ผ่าน dispatcher: severity gate + dedup + rate-limit)
+  const alertSeverity = alert.severity === 'critical' ? 'critical' : alert.severity === 'warning' ? 'warn' : 'info';
+  await sendTelegramAlert({
+    text: alert.message,
+    severity: alertSeverity,
+    eventKey: `automation:${alert.metric ?? 'alert'}`,
+  });
 
   // Alert ระดับ critical → ส่งภาพกราฟแนวโน้ม metric 12 ชม. ไป Telegram ด้วย
   if (alert.severity === 'critical') {
@@ -787,7 +793,7 @@ async function defconRunAction(level: DefconLevel, action: DefconAction): Promis
     },
     backup: () => backupService.createBackup(),
     meshReplicate: () => meshLiteService.replicate(),
-    sendTelegramMsg: (text) => sendTelegram(text),
+    sendTelegramMsg: (text) => sendTelegramAlert({ text, severity: 'critical', eventKey: `defcon:${level}` }).then((r) => r.sent),
     mqttRelay: (relayId, state) => defconMqtt.publish(`sovereign/${DEFAULT_NODE_ID}/relay/${relayId}`, state),
     execCmd: (cmd) => execAsync(cmd, { timeout: 15000 }),
     log: (detail) => console.log(`🛡️ DEFCON ${level}: ${action.id} — ${detail}`),
@@ -915,6 +921,7 @@ if (config.ups.enabled) {
             raw_data: payload.raw as unknown as Prisma.InputJsonValue,
           },
         });
+        sendTelegramAlert({ text: payload.text, severity: 'critical', eventKey: 'ups_shutdown' }).catch(() => {});
       },
       runShutdown: async (command) => {
         try {
@@ -954,14 +961,21 @@ riskEmitter.on('threat_update', (threat) => {
 // payload: { level, direction, overall, from? }
 defconEmitter.on('defcon', (data) => io.emit('defcon_update', data));
 systemEvents.on('telemetry_update', (data) => io.emit('telemetry_update', data));
-systemEvents.on('alert:battery_low', (alert) => io.emit('critical_alert', alert));
+systemEvents.on('alert:battery_low', (alert) => {
+  io.emit('critical_alert', alert);
+  sendTelegramAlert({ text: `แบตเตอรี่ต่ำ: ${JSON.stringify(alert)}`, severity: 'warn', eventKey: 'battery_low' }).catch(() => {});
+});
 // Power guard alerts → หน้าเว็บ (Socket.IO) — Telegram ส่งที่ notify() ด้านบนแล้ว
 
-// Threat detection → ส่งให้ UI + แจ้งเตือน Telegram
+// Threat detection → ส่งให้ UI + แจ้งเตือน Telegram (ผ่าน dispatcher — critical ส่งทันที, warn throttled)
 threatEmitter.on('threat', (event) => {
   io.emit('security_alert', event);
-  const icon = event.severity === 'critical' ? '🚨' : '⚠️';
-  sendTelegram(`🛡️ ${icon} [${String(event.severity).toUpperCase()}] ${event.description}${event.blocked ? ' — 🚫 ได้ block IP แล้ว' : ''}`);
+  const sev = event.severity === 'critical' ? 'critical' : 'warn';
+  sendTelegramAlert({
+    text: `[${String(event.severity).toUpperCase()}] ${event.description}${event.blocked ? ' — 🚫 ได้ block IP แล้ว' : ''}`,
+    severity: sev,
+    eventKey: `threat:${event.rule_id ?? event.description}`,
+  }).catch(() => {});
 });
 
 // AI agent approvals → แจ้งเตือน Telegram พร้อมปุ่ม อนุมัติ/ปฏิเสธ
