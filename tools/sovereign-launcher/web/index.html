@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sovereign OS — Launcher</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">🛡️</span>
+    <div>
+      <h1>Sovereign OS Launcher</h1>
+      <p id="subtitle">ระบบบ้านอัจฉริยะที่ดูแลตัวเองได้ — ติดตั้ง เลือกฟีเจอร์ และควบคุมในที่เดียว</p>
+    </div>
+  </div>
+  <span id="statusPill" class="pill">…</span>
+</header>
+
+<main>
+  <!-- 1. Pre-flight -->
+  <section class="card">
+    <h2>1 · ตรวจความพร้อมเครื่อง (Pre-flight)</h2>
+    <div id="preflight" class="grid4">
+      <div class="pf"><span id="pfDocker" class="dot">◌</span><div><b>Docker</b><small id="pfDockerTxt">ตรวจ…</small></div></div>
+      <div class="pf"><span id="pfRam" class="dot">◌</span><div><b>RAM</b><small id="pfRamTxt">ตรวจ…</small></div></div>
+      <div class="pf"><span id="pfPorts" class="dot">◌</span><div><b>พอร์ต 3000/3001</b><small id="pfPortsTxt">ตรวจ…</small></div></div>
+      <div class="pf"><span id="pfHealth" class="dot">◌</span><div><b>ระบบรันอยู่</b><small id="pfHealthTxt">ตรวจ…</small></div></div>
+    </div>
+  </section>
+
+  <!-- 2. Feature Matrix -->
+  <section class="card">
+    <h2>2 · เลือกฟีเจอร์ที่ต้องการ</h2>
+    <p class="hint">Core Guard บังคับรันเสมอ (ความปลอดภัย + สำรองข้อมูล) — ส่วนอื่นเลือกเพิ่มได้ ตัวเลขคือ RAM ที่เพิ่มขึ้นโดยประมาณ</p>
+    <div id="features" class="feats"></div>
+  </section>
+
+  <!-- 3. Control -->
+  <section class="card">
+    <h2>3 · ควบคุมระบบ</h2>
+    <div class="actions">
+      <button id="btnStart" class="primary">▶ เริ่มระบบ (Start Sovereign OS)</button>
+      <button id="btnStop" class="danger">⏹ หยุดระบบ</button>
+      <button id="btnDash">🖥️ เปิด Dashboard</button>
+      <button id="btnLogs">📄 ดู Log</button>
+    </div>
+    <div id="result" class="result hidden"></div>
+  </section>
+
+  <!-- Status -->
+  <section class="card">
+    <h2>สถานะ Container</h2>
+    <table id="contTable">
+      <thead><tr><th>Container</th><th>สถานะ</th><th>รายละเอียด</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <pre id="logBox" class="log hidden"></pre>
+  </section>
+</main>
+
+<footer>Sovereign OS · v1.0 Launcher · ระบบทำงานผ่าน Docker บนเครื่องคุณเท่านั้น (Local-only)</footer>
+<script src="/app.js"></script>
+</body>
+</html>

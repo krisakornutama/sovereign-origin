@@ -75,7 +75,20 @@ Thumbs.db
 Docker/
 
 # ── Installers / binaries ──────────────────────
-tools/
+tools/*
+!tools/
+!tools/install/
+tools/install/*
+!tools/install/install.sh
+!tools/install/install.ps1
+!tools/install/sovereign.env.template
+!tools/sovereign-launcher/
+tools/sovereign-launcher/*
+!tools/sovereign-launcher/go.mod
+!tools/sovereign-launcher/main.go
+!tools/sovereign-launcher/build.ps1
+!tools/sovereign-launcher/web/
+tools/sovereign-launcher/SovereignOS-Setup.exe
 Ollama/
 
 # ── Keys & certificates (เพิ่มเติม) ─────────────
@@ -95,3 +108,7 @@ coverage/
 
 # Next-Gen Security runtime state (app-control blocklist, ids offset, ai analyst report)
 **/core-api/data/
+
+# Runtime data (offsite encrypted backups, knowledge uploads) — ไม่ควรเข้าสู่ git
+**/infra/offsite/
+**/knowledge/uploads/
