@@ -1,9 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
 
 interface Rule {
   id: string;
@@ -38,6 +40,7 @@ const emptyForm = { metric: '', condition: 'gt', threshold: 30, severity: 'warni
 
 export default function AutomationPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -77,7 +80,7 @@ export default function AutomationPage() {
     setMessage('');
     setError('');
     if (!form.metric.trim() || !form.message.trim()) {
-      setError('กรอก metric และข้อความแจ้งเตือนก่อน');
+      setError(t('automation.fillRequired', 'กรอก metric และข้อความแจ้งเตือนก่อน'));
       return;
     }
     try {
@@ -90,13 +93,13 @@ export default function AutomationPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage('✅ สร้างกฎใหม่แล้ว');
+      setMessage(t('automation.ruleCreated', 'สร้างกฎใหม่แล้ว'));
       setForm({ ...emptyForm });
       setShowForm(false);
       await loadRules();
     } catch (err) {
       console.error(err);
-      setError('สร้างกฎไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('automation.createFailed', 'สร้างกฎไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     }
   };
 
@@ -115,7 +118,7 @@ export default function AutomationPage() {
     setMessage('');
     setError('');
     if (!editForm.metric.trim() || !editForm.message.trim()) {
-      setError('กรอก metric และข้อความแจ้งเตือนก่อน');
+      setError(t('automation.fillRequired', 'กรอก metric และข้อความแจ้งเตือนก่อน'));
       return;
     }
     try {
@@ -128,17 +131,17 @@ export default function AutomationPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage('✅ บันทึกการแก้ไขแล้ว');
+      setMessage(t('automation.editSaved', 'บันทึกการแก้ไขแล้ว'));
       setEditingId(null);
       await loadRules();
     } catch (err) {
       console.error(err);
-      setError('แก้ไขไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('automation.editFailed', 'แก้ไขไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     }
   };
 
   const deleteRule = async (id: string) => {
-    if (!window.confirm('ลบกฎนี้? (กฎสำเร็จรูปลบไม่ได้)')) return;
+    if (!window.confirm(t('automation.deleteConfirm', 'ลบกฎนี้? (กฎสำเร็จรูปลบไม่ได้)'))) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/rules/${id}`, {
         method: 'DELETE',
@@ -150,26 +153,26 @@ export default function AutomationPage() {
       await loadRules();
     } catch (err) {
       console.error(err);
-      setError('ลบกฎไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('automation.deleteFailed', 'ลบกฎไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     }
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   if (!isAuthenticated || !user) {
-    return <div className="text-white p-8">Unauthorized</div>;
+    return <div className="text-white p-8">{t('automation.unauthorized', 'Unauthorized')}</div>;
   }
 
   const ruleForm = (isEdit: boolean) => (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
       <input
         list="metric-suggestions"
-        placeholder="metric เช่น temperature"
+        placeholder={t('automation.metricPlaceholder', 'metric เช่น temperature')}
         value={isEdit ? editForm.metric : form.metric}
         onChange={(e) => (isEdit ? setEditForm({ ...editForm, metric: e.target.value }) : setForm({ ...form, metric: e.target.value }))}
-        className="col-span-2 md:col-span-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+        className="input col-span-2 md:col-span-1"
       />
       <datalist id="metric-suggestions">
         {METRIC_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
@@ -177,49 +180,49 @@ export default function AutomationPage() {
       <select
         value={isEdit ? editForm.condition : form.condition}
         onChange={(e) => (isEdit ? setEditForm({ ...editForm, condition: e.target.value as any }) : setForm({ ...form, condition: e.target.value as any }))}
-        className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+        className="input"
       >
-        <option value="gt">&gt; มากกว่า</option>
-        <option value="lt">&lt; น้อยกว่า</option>
-        <option value="eq">= เท่ากับ</option>
+        <option value="gt">{t('automation.conditionOption.gt', '> มากกว่า')}</option>
+        <option value="lt">{t('automation.conditionOption.lt', '< น้อยกว่า')}</option>
+        <option value="eq">{t('automation.conditionOption.eq', '= เท่ากับ')}</option>
       </select>
       <input
         type="number"
         step="any"
-        placeholder="ค่า threshold"
+        placeholder={t('automation.thresholdPlaceholder', 'ค่า threshold')}
         value={isEdit ? editForm.threshold : form.threshold}
         onChange={(e) => (isEdit ? setEditForm({ ...editForm, threshold: Number(e.target.value) }) : setForm({ ...form, threshold: Number(e.target.value) }))}
-        className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+        className="input"
       />
       <select
         value={isEdit ? editForm.severity : form.severity}
         onChange={(e) => (isEdit ? setEditForm({ ...editForm, severity: e.target.value as any }) : setForm({ ...form, severity: e.target.value as any }))}
-        className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+        className="input"
       >
-        <option value="info">ℹ️ info</option>
-        <option value="warning">⚠️ warning</option>
-        <option value="critical">🚨 critical</option>
+        <option value="info">info</option>
+        <option value="warning">warning</option>
+        <option value="critical">critical</option>
       </select>
       <input
-        placeholder="ข้อความแจ้งเตือน เช่น แบตเตอรี่ต่ำ!"
+        placeholder={t('automation.messagePlaceholder', 'ข้อความแจ้งเตือน เช่น แบตเตอรี่ต่ำ!')}
         value={isEdit ? editForm.message : form.message}
         onChange={(e) => (isEdit ? setEditForm({ ...editForm, message: e.target.value }) : setForm({ ...form, message: e.target.value }))}
-        className="col-span-2 md:col-span-3 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+        className="input col-span-2 md:col-span-3"
       />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="อุปกรณ์ &amp; พลังงาน"
-          title="🏰 SOVEREIGN OS"
+          eyebrow={t('automation.eyebrow', 'อุปกรณ์ & พลังงาน')}
+          title="SOVEREIGN OS" icon={<Icon name="automation" size={18} />}
           subtitle="Automation Rules" actions={<div className="flex gap-3">
-          <a href="/dashboard" className="text-sm text-blue-400 hover:underline">📊 Dashboard</a>
-          <a href="/sensors" className="text-sm text-green-400 hover:underline">➕ เซ็นเซอร์</a>
+          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>
+          <a href="/sensors" className="text-sm text-sky-400 hover:underline">{t('automation.sensorsLink', 'เซ็นเซอร์')}</a>
         </div>}
         />
       </header>
@@ -227,57 +230,57 @@ export default function AutomationPage() {
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex justify-between items-start gap-4">
           <div>
-            <h2 className="text-xl font-bold text-white mb-2">⚙️ กฎอัตโนมัติ</h2>
+            <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-2">{t('automation.rulesTitle', 'กฎอัตโนมัติ')}</h2>
             <p className="text-sm text-gray-400">
-              เมื่อเซ็นเซอร์ถึงเงื่อนไขที่กำหนด ระบบจะส่งการแจ้งเตือนอัตโนมัติ
+              {t('automation.rulesDesc', 'เมื่อเซ็นเซอร์ถึงเงื่อนไขที่กำหนด ระบบจะส่งการแจ้งเตือนอัตโนมัติ')}
             </p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold whitespace-nowrap"
+            className="btn-primary whitespace-nowrap"
           >
-            {showForm ? '✖️ ปิด' : '➕ สร้างกฎใหม่'}
+            {showForm ? t('common.close', 'ปิด') : t('automation.newRule', 'สร้างกฎใหม่')}
           </button>
         </div>
 
-        {message && <div className="text-sm text-green-400 bg-green-900/30 border border-green-700 rounded-lg px-4 py-3">{message}</div>}
-        {error && <div className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3">{error}</div>}
+        {message && <div className="card px-4 py-3 text-sm text-emerald-400">{message}</div>}
+        {error && <div className="card px-4 py-3 text-sm text-rose-400">{error}</div>}
 
         {showForm && (
-          <div className="bg-gray-900 border border-green-700 rounded-xl p-4">
-            <h3 className="text-sm font-bold text-green-400 mb-3">🛠️ สร้างกฎใหม่ (IF-THEN)</h3>
+          <div className="card panel-glow p-4">
+            <h3 className="text-sm font-semibold text-gray-200 glow-text mb-3">{t('automation.newRuleIfThen', 'สร้างกฎใหม่ (IF-THEN)')}</h3>
             {ruleForm(false)}
             <div className="flex gap-3">
-              <button onClick={createRule} className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold">
-                💾 บันทึกกฎ
+              <button onClick={createRule} className="btn-primary">
+                {t('automation.saveRule', 'บันทึกกฎ')}
               </button>
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded-lg text-sm">
-                ยกเลิก
+              <button onClick={() => setShowForm(false)} className="btn-secondary">
+                {t('common.cancel', 'ยกเลิก')}
               </button>
             </div>
           </div>
         )}
 
         {loading ? (
-          <div className="text-gray-400">⏳ กำลังโหลด...</div>
+          <div className="text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>
         ) : (
           <div className="space-y-3">
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className={`bg-gray-900 border rounded-xl p-4 transition ${
-                  rule.enabled ? 'border-gray-700' : 'border-gray-800 opacity-60'
+                className={`card panel-cyan p-4 transition ${
+                  rule.enabled ? '' : 'opacity-60'
                 }`}
               >
                 {editingId === rule.id ? (
                   <div>
                     {ruleForm(true)}
                     <div className="flex gap-3">
-                      <button onClick={() => saveEdit(rule.id)} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold">
-                        💾 บันทึก
+                      <button onClick={() => saveEdit(rule.id)} className="btn-primary">
+                        {t('common.save', 'บันทึก')}
                       </button>
-                      <button onClick={() => setEditingId(null)} className="px-4 py-2 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded-lg text-sm">
-                        ยกเลิก
+                      <button onClick={() => setEditingId(null)} className="btn-secondary">
+                        {t('common.cancel', 'ยกเลิก')}
                       </button>
                     </div>
                   </div>
@@ -290,15 +293,15 @@ export default function AutomationPage() {
                         </span>
                         {rule.is_default && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 border border-gray-600 text-gray-400">
-                            ค่าเริ่มต้น
+                            {t('automation.isDefault', 'ค่าเริ่มต้น')}
                           </span>
                         )}
                         <span className="text-sm text-gray-300">
-                          📡 <span className="text-green-400">{rule.metric}</span>
+                          <span className="text-emerald-400 glow-text">{rule.metric}</span>
                           {' '}
-                          <span className="text-white font-bold">{conditionLabels[rule.condition]}</span>
+                          <span className="text-white font-bold">{t('automation.condition.' + rule.condition, conditionLabels[rule.condition] || '')}</span>
                           {' '}
-                          <span className="text-white font-bold">{rule.threshold}</span>
+                          <span className="text-white font-bold glow-text">{rule.threshold}</span>
                         </span>
                       </div>
                       <p className="text-sm text-gray-400">{rule.message}</p>
@@ -310,25 +313,25 @@ export default function AutomationPage() {
                         onClick={() => toggleRule(rule.id, !rule.enabled)}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
                           rule.enabled
-                            ? 'bg-green-600 hover:bg-green-500 text-white'
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                             : 'bg-gray-700 hover:bg-gray-600 text-gray-400'
                         }`}
                       >
-                        {rule.enabled ? '🟢 ON' : '🔴 OFF'}
+                        {rule.enabled ? 'ON' : 'OFF'}
                       </button>
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEdit(rule)}
-                          className="text-xs px-2.5 py-1 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded"
+                          className="btn-secondary text-xs px-2.5 py-1"
                         >
-                          ✏️ แก้ไข
+                          {t('common.edit', 'แก้ไข')}
                         </button>
                         {!rule.is_default && (
                           <button
                             onClick={() => deleteRule(rule.id)}
-                            className="text-xs px-2.5 py-1 bg-red-900/50 border border-red-700 hover:bg-red-900 rounded"
+                            className="btn-danger text-xs px-2.5 py-1"
                           >
-                            🗑️ ลบ
+                            {t('common.delete', 'ลบ')}
                           </button>
                         )}
                       </div>
@@ -340,7 +343,7 @@ export default function AutomationPage() {
 
             {rules.length === 0 && (
               <div className="text-gray-500 text-center py-8">
-                ไม่มีกฎอัตโนมัติ — กด "➕ สร้างกฎใหม่" เพื่อเพิ่ม
+                {t('automation.noRules', 'ไม่มีกฎอัตโนมัติ — กด "สร้างกฎใหม่" เพื่อเพิ่ม')}
               </div>
             )}
           </div>

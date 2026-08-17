@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 import MfaInput from './MfaInput';
 import { useRouter } from 'next/navigation';
+import Icon from '../ui/Icon';
+import LanguageToggle from '../ui/LanguageToggle';
 
 function formatCountdown(totalSec: number): string {
   const m = Math.floor(totalSec / 60);
@@ -15,6 +18,7 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const { login, setMfaRequired, mfaRequired } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const router = useRouter();
 
   // นับถอยหลัง Retry-After; ปิดปุ่ม submit ระหว่างรอ
@@ -41,7 +45,7 @@ export default function LoginForm() {
           const retryAfter = Number(res.headers.get('Retry-After') || 0);
           if (retryAfter > 0) setCooldown(retryAfter);
         }
-        throw new Error(data.error || 'เข้าสู่ระบบล้มเหลว');
+        throw new Error(data.error || t('login.loginFailed', 'เข้าสู่ระบบล้มเหลว'));
       }
 
       if (data.mfa_required) {
@@ -54,7 +58,7 @@ export default function LoginForm() {
         router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'เกิดข้อผิดพลาด');
+      setError(err.message || t('login.genericError', 'เกิดข้อผิดพลาด'));
     }
   };
 
@@ -64,6 +68,10 @@ export default function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center relative overflow-hidden">
+      {/* สลับภาษาไทย/อังกฤษ */}
+      <div className="absolute top-4 right-4 z-10">
+        <LanguageToggle compact />
+      </div>
       {/* พื้นหลัง: grid + glow แบบ command center (ตรงกับหน้า MFA) */}
       <div
         className="absolute inset-0 opacity-[0.07] pointer-events-none"
@@ -78,12 +86,14 @@ export default function LoginForm() {
       <div className="relative w-full max-w-md px-6">
         <form
           onSubmit={handleSubmit}
-          className="bg-gray-900/90 border border-gray-700 rounded-2xl p-8 shadow-2xl shadow-black/60 backdrop-blur space-y-4"
+          className="card panel-glow p-8 space-y-4"
         >
           <div className="text-center">
-            <div className="text-3xl">🏰</div>
-            <h1 className="mt-2 text-xl font-bold text-green-400 tracking-wide">SOVEREIGN OS</h1>
-            <p className="text-gray-500 text-xs mt-1">Off-Grid Command Center · เข้าสู่ระบบ</p>
+            <div className="flex justify-center text-emerald-400">
+              <Icon name="crown" size={28} />
+            </div>
+            <h1 className="mt-2 text-sm font-semibold text-gray-200 tracking-wide glow-text">SOVEREIGN OS</h1>
+            <p className="text-gray-500 text-xs mt-1">{t('login.subtitle')}</p>
           </div>
 
           {cooldown > 0 ? (
@@ -91,7 +101,7 @@ export default function LoginForm() {
               className="p-3 rounded-lg bg-amber-900/30 border border-amber-700/50 text-amber-300 text-sm text-center font-mono"
               role="status"
             >
-              ⏳ ระบบจำกัดจำนวนครั้ง — ลองอีกครั้งใน {formatCountdown(cooldown)}
+              {t('login.rateLimited', 'ระบบจำกัดจำนวนครั้ง — ลองอีกครั้งใน {time}', { time: formatCountdown(cooldown) })}
             </div>
           ) : (
             error && (
@@ -102,11 +112,11 @@ export default function LoginForm() {
           )}
 
           <div>
-            <label className="text-sm text-gray-400">Username</label>
+            <label className="label">{t('login.username')}</label>
             <input
               type="text"
               autoComplete="username"
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 mt-1 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="input w-full text-white"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin"
@@ -115,11 +125,11 @@ export default function LoginForm() {
             />
           </div>
           <div>
-            <label className="text-sm text-gray-400">Password</label>
+            <label className="label">{t('login.password')}</label>
             <input
               type="password"
               autoComplete="current-password"
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 mt-1 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="input w-full text-white"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -129,9 +139,9 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={cooldown > 0}
-            className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg text-white font-semibold tracking-wide transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary w-full"
           >
-            {cooldown > 0 ? `รอ ${formatCountdown(cooldown)}` : 'เข้าสู่ระบบ'}
+            {cooldown > 0 ? t('login.wait', 'รอ {time}', { time: formatCountdown(cooldown) }) : t('login.signIn')}
           </button>
 
           <p className="pt-1 text-center text-[11px] text-gray-500 font-mono">

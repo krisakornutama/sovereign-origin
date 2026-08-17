@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
 import { useRiskStore, ThreatUpdate, DefconUpdate } from '../stores/useRiskStore';
 import { useWealthStore } from '../stores/useWealthStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
 import { showCriticalNotification } from '../utils/notifications';
 import { TelemetryUpdate } from '../types';
 import { getWsUrl } from '../lib/config';
@@ -52,7 +53,7 @@ export function useSocket() {
       setDefcon(data);
       if (data.direction === 'up' && data.level > 0) {
         const label = ['', 'DEFCON 1 — CRITICAL', 'DEFCON 2 — SEVERE', 'DEFCON 3 — ELEVATED'][data.level] || '';
-        showCriticalNotification(`🛡️ ${label} — ระดับความเสี่ยงสูงขึ้น (Threat Index ${data.overall ?? '?'})`);
+        showCriticalNotification(useLanguageStore.getState().t('riskMonitor.defconUp', '🛡️ {label} — ระดับความเสี่ยงสูงขึ้น (Threat Index {index})', { label, index: data.overall ?? '?' }));
       }
     });
 

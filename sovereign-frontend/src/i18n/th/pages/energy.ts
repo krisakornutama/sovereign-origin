@@ -1,0 +1,27 @@
+// หน้า Energy (energy.tsx) — ภาษาไทย
+export default {
+  unauthorized: 'Unauthorized',
+  loadFailed: 'โหลดข้อมูลพลังงานไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลเซ็นเซอร์',
+  eyebrow: 'อุปกรณ์ & พลังงาน',
+  title: 'Energy Management',
+  backDashboard: '← กลับ Dashboard',
+  chartNoData: 'ยังไม่มีข้อมูล power_kw',
+  battery: 'แบตเตอรี่',
+  avgPower: 'กำลังไฟเฉลี่ย 24 ชม.',
+  latest: 'ล่าสุด: ',
+  signHint: '(− = ใช้ไฟ, + = ชาร์จ)',
+  netUsage: 'ใช้ไป 24 ชม. (สุทธิ)',
+  fromBattery: 'ใช้จากแบตเตอรี่',
+  chargingInto: 'ผลิต/ชาร์จเข้าสะสม',
+  timeRemaining: 'ประมาณเวลาที่เหลือ',
+  hoursShort: '{n} ชม.',
+  calcNote: 'คำนวณจากความจุแบตเตอรี่ {capacity} kWh (ตั้งได้ผ่าน env ENERGY_CAPACITY_KWH) และค่า power_kw เฉลี่ย 24 ชม. — ตัวเลขเป็นค่าประมาณ',
+  chartTitle: 'กำลังไฟ 7 วัน (kW)',
+  chartLegend: 'เส้น = power_kw | เส้นกลาง = ศูนย์',
+  status: {
+    discharging: 'ใช้แบตเตอรี่ (discharge)',
+    charging: 'กำลังชาร์จ / ผลิตไฟเกิน',
+    balanced: 'สมดุล',
+    no_data: 'ไม่มีข้อมูล',
+  },
+} as const;

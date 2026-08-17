@@ -4,17 +4,32 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
 import type { FarmPlot } from '../types';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 
 const STATUS_LABEL: Record<string, string> = {
-  active: '⏳ ปลูกอยู่',
-  growing: '🌱 กำลังโต',
-  harvested: '🌾 เก็บเกี่ยวแล้ว',
-  fallow: '🪧 พักแปลง',
+  active: 'ปลูกอยู่',
+  growing: 'กำลังโต',
+  harvested: 'เก็บเกี่ยวแล้ว',
+  fallow: 'พักแปลง',
+};
+
+const CROP_KEYS: Record<string, string> = {
+  ทุเรียน: 'durian',
+  มะเขือเทศ: 'tomato',
+  ข้าว: 'rice',
+  ผักสลัด: 'lettuce',
+  กล้วย: 'banana',
+  อ้อย: 'sugarcane',
+  มะนาว: 'lime',
+  พริก: 'chili',
 };
 
 // ── วิเคราะห์ดิน + NPK/ความชื้น + แผนบำรุงดิน (ต่อแปลง) ──
 function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
+  const t = useLanguageStore((s) => s.t);
   const [form, setForm] = useState({ n: '', p: '', k: '', ph: '', moisture_pct: '', ec: '', note: '' });
   const [crop, setCrop] = useState(plot.crop || 'ทุเรียน');
   const [analysis, setAnalysis] = useState<any>(null);
@@ -29,8 +44,8 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
     try {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots/${plot.id}/analysis?crop=${encodeURIComponent(crop)}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'วิเคราะห์ไม่สำเร็จ');
-      if (!d.analysis) { setErr(d.message || 'ยังไม่มีค่าดิน'); setAnalysis(null); setPlan(null); return; }
+      if (!r.ok) throw new Error(d.error || t('farm.analyzer.analyzeFailed', 'วิเคราะห์ไม่สำเร็จ'));
+      if (!d.analysis) { setErr(d.message || t('farm.analyzer.noSoilData', 'ยังไม่มีค่าดิน')); setAnalysis(null); setPlan(null); return; }
       setAnalysis(d.analysis);
       setPlan(d.plan || null);
       setHistory((await (await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots/${plot.id}/soil-readings`)).json()).readings || []);
@@ -50,8 +65,8 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
         body: JSON.stringify({ n: num(form.n), p: num(form.p), k: num(form.k), ph: num(form.ph), moisture_pct: num(form.moisture_pct), ec: num(form.ec), note: form.note }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
-      setMsg('✅ บันทึกค่าดินแล้ว');
+      if (!r.ok) throw new Error(d.error || t('farm.analyzer.saveFailed', 'บันทึกไม่สำเร็จ'));
+      setMsg(t('farm.analyzer.saved', 'บันทึกค่าดินแล้ว'));
       setForm({ n: '', p: '', k: '', ph: '', moisture_pct: '', ec: '', note: '' });
       await runAnalysis();
     } catch (e: any) {
@@ -63,14 +78,14 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
   const moistureAlert = analysis?.findings?.find((f: any) => f.kind === 'moisture');
 
   return (
-    <div className="border-t border-gray-800 pt-2 space-y-2">
+    <div className="border-t border-cyan-800/50 pt-2 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-lime-300">🧪 วิเคราะห์ดิน</span>
+        <span className="text-xs font-bold text-lime-300">{t('farm.analyzer.title', 'วิเคราะห์ดิน')}</span>
         <select value={crop} onChange={(e) => setCrop(e.target.value)} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[11px] flex-1">
-          {['ทุเรียน', 'มะเขือเทศ', 'ข้าว', 'ผักสลัด', 'กล้วย', 'อ้อย', 'มะนาว', 'พริก'].map((c) => <option key={c}>{c}</option>)}
+          {['ทุเรียน', 'มะเขือเทศ', 'ข้าว', 'ผักสลัด', 'กล้วย', 'อ้อย', 'มะนาว', 'พริก'].map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
         </select>
         <button onClick={runAnalysis} disabled={loading} className="shrink-0 px-2 py-1 bg-lime-700/60 hover:bg-lime-700 border border-lime-600/50 rounded text-[11px] font-bold disabled:opacity-50">
-          {loading ? '⏳...' : '🔬 วิเคราะห์'}
+          {loading ? t('farm.analyzer.analyzing', 'กำลังวิเคราะห์...') : t('farm.analyzer.analyze', 'วิเคราะห์')}
         </button>
       </div>
 
@@ -78,24 +93,24 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
       <div className="grid grid-cols-4 gap-1.5 text-[11px]">
         {[['n', 'N'], ['p', 'P'], ['k', 'K'], ['ph', 'pH'], ['moisture_pct', 'ชื้น%'], ['ec', 'EC']].map(([key, label]) => (
           <input key={key} value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-            placeholder={`${label}`} className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px]" />
+            placeholder={t('farm.analyzer.' + key, label)} className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px]" />
         ))}
-        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="หมายเหตุ" className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px] col-span-2" />
+        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder={t('farm.analyzer.notesPlaceholder', 'หมายเหตุ')} className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px] col-span-2" />
       </div>
       <div className="flex gap-2">
-        <button onClick={saveReading} className="px-2.5 py-1 bg-emerald-700/60 hover:bg-emerald-700 rounded text-[11px] font-bold">💾 บันทึกค่า + วิเคราะห์</button>
-        <button onClick={runAnalysis} className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-[11px]">🔁 วิเคราะห์จากค่าล่าสุด</button>
+        <button onClick={saveReading} className="px-2.5 py-1 bg-emerald-700/60 hover:bg-emerald-700 rounded text-[11px] font-bold inline-flex items-center gap-1"><Icon name="save" size={12} />{t('farm.analyzer.saveAndAnalyze', 'บันทึกค่า + วิเคราะห์')}</button>
+        <button onClick={runAnalysis} className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-[11px] inline-flex items-center gap-1"><Icon name="refresh" size={12} />{t('farm.analyzer.analyzeLatest', 'วิเคราะห์จากค่าล่าสุด')}</button>
       </div>
       {msg && <div className="text-[11px] text-emerald-400">{msg}</div>}
       {err && <div className="text-[11px] text-red-400">{err}</div>}
 
       {/* ผลวิเคราะห์ */}
       {analysis && (
-        <div className="bg-gray-950/60 border border-lime-900 rounded-lg p-2 space-y-1.5">
+        <div className="bg-gray-950/60 border border-lime-900 rounded-lg p-2 space-y-1.5 panel-cyan">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-lime-300">ผลวิเคราะห์สำหรับ {analysis.crop}</span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${analysis.score >= 70 ? 'bg-emerald-900/60 text-emerald-300' : analysis.score >= 40 ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300'}`}>
-              คะแนน {analysis.score}/100
+            <span className="text-[11px] font-bold text-lime-300 glow-text-cyan">{t('farm.analyzer.resultFor', 'ผลวิเคราะห์สำหรับ {crop}', { crop: analysis.crop })}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold glow-text ${analysis.score >= 70 ? 'bg-emerald-900/60 text-emerald-300' : analysis.score >= 40 ? 'bg-amber-900/60 text-amber-300' : 'bg-red-900/60 text-red-300'}`}>
+              {t('farm.analyzer.score', 'คะแนน {score}/100', { score: analysis.score })}
             </span>
           </div>
           <div className="text-[11px] text-gray-400">{analysis.summary}</div>
@@ -103,7 +118,7 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
           {/* แจ้งเตือนรดน้ำด่วน */}
           {moistureAlert?.severity === 'high' && moistureAlert.kind === 'moisture' && (
             <div className="flex items-center gap-2 bg-red-950/50 border border-red-700 rounded px-2 py-1.5 text-[11px] text-red-200">
-              💧 {moistureAlert.action}
+              <Icon name="droplet" size={12} className="shrink-0" /> {moistureAlert.action}
             </div>
           )}
 
@@ -117,12 +132,12 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
               ))}
             </ul>
           ) : (
-            <div className="text-[11px] text-emerald-400">✅ ดินพร้อมสำหรับ {analysis.crop} — รักษาระดับนี้ไว้</div>
+            <div className="text-[11px] text-emerald-400 flex items-center gap-1"><Icon name="check-circle" size={12} />{t('farm.analyzer.readyFor', 'ดินพร้อมสำหรับ {crop} — รักษาระดับนี้ไว้', { crop: analysis.crop })}</div>
           )}
 
           {plan && plan.length > 0 && (
             <details className="text-[11px]">
-              <summary className="cursor-pointer text-amber-300 font-bold">📋 แผนบำรุงดินให้เหมาะกับ {analysis.crop} (ทีละขั้น)</summary>
+              <summary className="cursor-pointer text-amber-300 font-bold">{t('farm.analyzer.planTitle', 'แผนบำรุงดินให้เหมาะกับ {crop} (ทีละขั้น)', { crop: analysis.crop })}</summary>
               <ol className="mt-1.5 space-y-1 pl-1">
                 {plan.map((s: string, i: number) => <li key={i}>• {s}</li>)}
               </ol>
@@ -155,6 +170,7 @@ const EMPTY_FORM = {
 
 export default function FarmPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [plots, setPlots] = useState<FarmPlot[]>([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -175,7 +191,7 @@ export default function FarmPage() {
       const body = await res.json();
       setPlots(body.plots ?? []);
     } catch (e: any) {
-      setError(e.message || 'โหลดข้อมูลไม่สำเร็จ');
+      setError(e.message || t('farm.page.loadFailed', 'โหลดข้อมูลไม่สำเร็จ'));
     } finally {
       setLoading(false);
     }
@@ -186,15 +202,15 @@ export default function FarmPage() {
   }, [isAuthenticated, load]);
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   if (!isAuthenticated || !user) {
-    return <div className="text-white p-8">Unauthorized</div>;
+    return <div className="text-white p-8">{t('farm.unauthorized', 'Unauthorized')}</div>;
   }
 
   const create = async () => {
-    if (!form.name.trim()) return setMessage('⚠️ ต้องระบุชื่อแปลง');
+    if (!form.name.trim()) return setMessage(t('farm.page.nameRequired', 'ต้องระบุชื่อแปลง'));
     setSaving(true);
     setMessage('');
     setError('');
@@ -217,12 +233,12 @@ export default function FarmPage() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ');
-      setMessage(`✅ เพิ่มแปลง "${form.name}" แล้ว`);
+      if (!res.ok) throw new Error(data.error || t('farm.page.saveFailed', 'บันทึกไม่สำเร็จ'));
+      setMessage(t('farm.page.added', 'เพิ่มแปลง "{name}" แล้ว', { name: form.name }));
       setForm(EMPTY_FORM);
       load();
     } catch (e: any) {
-      setError(e.message || 'เกิดข้อผิดพลาด');
+      setError(e.message || t('farm.page.error', 'เกิดข้อผิดพลาด'));
     } finally {
       setSaving(false);
     }
@@ -236,47 +252,48 @@ export default function FarmPage() {
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'อัปเดตไม่สำเร็จ');
-      setMessage(`✅ "${plot.name}" → ${STATUS_LABEL[status] ?? status}`);
+      if (!res.ok) throw new Error(data.error || t('farm.page.updateFailed', 'อัปเดตไม่สำเร็จ'));
+      setMessage(t('farm.page.statusChanged', '"{name}" → {status}', { name: plot.name, status: t('farm.status.' + status, STATUS_LABEL[status] ?? status) }));
       load();
     } catch (e: any) {
-      setError(e.message || 'เกิดข้อผิดพลาด');
+      setError(e.message || t('farm.page.error', 'เกิดข้อผิดพลาด'));
     }
   };
 
   const remove = async (plot: FarmPlot) => {
-    if (!window.confirm(`ลบแปลง "${plot.name}"?`)) return;
+    if (!window.confirm(t('farm.page.deleteConfirm', 'ลบแปลง "{name}"?', { name: plot.name }))) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots/${plot.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('ลบไม่สำเร็จ');
-      setMessage(`🗑️ ลบ "${plot.name}" แล้ว`);
+      if (!res.ok) throw new Error(t('farm.page.deleteFailed', 'ลบไม่สำเร็จ'));
+      setMessage(t('farm.page.deleted', 'ลบ "{name}" แล้ว', { name: plot.name }));
       load();
     } catch (e: any) {
-      setError(e.message || 'เกิดข้อผิดพลาด');
+      setError(e.message || t('farm.page.error', 'เกิดข้อผิดพลาด'));
     }
   };
 
-  const formatDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('th-TH') : '—');
+  const formatDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString(fmtLocale()) : '—');
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
-          eyebrow="ชีวิต &amp; การเงิน"
-          title="🏰 SOVEREIGN OS"
-          subtitle="Farm Plots" actions={<div className="flex gap-3 items-center">
-            <a href="/dashboard" className="text-sm text-blue-400 hover:underline">📊 Dashboard</a>
-          </div>}
-        />
-      </header>
+          <PageHeader
+            eyebrow={t('farm.page.eyebrow', 'ชีวิต & การเงิน')}
+            title={t('farm.page.title', 'SOVEREIGN OS')}
+            icon={<Icon name="farm" size={18} />}
+            subtitle={t('farm.page.subtitle', 'Farm Plots')} actions={<div className="flex gap-3 items-center">
+              <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('farm.page.dashboardLink', 'Dashboard')}</a>
+            </div>}
+          />
+        </header>
 
         <main className="max-w-7xl mx-auto p-6 space-y-4 w-full">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">🌱 แปลงเกษตร (Farm Plots)</h2>
+            <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('farm.page.h2', 'แปลงเกษตร (Farm Plots)')}</h2>
             <div className="text-sm text-gray-400">
-              ทั้งหมด {plots.length} แปลง
+              {t('farm.page.total', 'ทั้งหมด {n} แปลง', { n: plots.length })}
             </div>
           </div>
 
@@ -285,80 +302,81 @@ export default function FarmPage() {
 
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-center">
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-              <option value="ALL">ทุกสถานะ</option>
-              {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input">
+              <option value="ALL">{t('farm.page.allStatus', 'ทุกสถานะ')}</option>
+              {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{t('farm.status.' + key, label)}</option>)}
             </select>
-            <button onClick={load} className="ml-auto bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200">
-              🔄 รีโหลด
+            <button onClick={load} className="btn-secondary ml-auto">
+              <Icon name="refresh" size={14} /> {t('farm.page.reload', 'รีโหลด')}
             </button>
           </div>
 
           {/* Add form */}
           {canWrite && (
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
-              <div className="text-sm font-bold text-cyan-300">➕ เพิ่มแปลงใหม่</div>
+            <div className="card panel-glow p-4 space-y-3">
+              <div className="text-sm font-semibold text-gray-200 flex items-center gap-1.5"><Icon name="plus" size={14} className="text-gray-400" />{t('farm.page.addTitle', 'เพิ่มแปลงใหม่')}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ชื่อแปลง *" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="ตำแหน่ง/โซน" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.crop} onChange={(e) => setForm({ ...form, crop: e.target.value })} placeholder="พืชที่ปลูก" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.area_sqm} onChange={(e) => setForm({ ...form, area_sqm: e.target.value })} placeholder="พื้นที่ (ตร.ม.)" type="number" min="0" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.planted_at} onChange={(e) => setForm({ ...form, planted_at: e.target.value })} type="date" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.expected_harvest_at} onChange={(e) => setForm({ ...form, expected_harvest_at: e.target.value })} type="date" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-                  {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('farm.page.namePlaceholder', 'ชื่อแปลง *')} className="input" />
+                <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder={t('farm.page.locationPlaceholder', 'ตำแหน่ง/โซน')} className="input" />
+                <input value={form.crop} onChange={(e) => setForm({ ...form, crop: e.target.value })} placeholder={t('farm.page.cropPlaceholder', 'พืชที่ปลูก')} className="input" />
+                <input value={form.area_sqm} onChange={(e) => setForm({ ...form, area_sqm: e.target.value })} placeholder={t('farm.page.areaPlaceholder', 'พื้นที่ (ตร.ม.)')} type="number" min="0" className="input" />
+                <input value={form.planted_at} onChange={(e) => setForm({ ...form, planted_at: e.target.value })} type="date" className="input" />
+                <input value={form.expected_harvest_at} onChange={(e) => setForm({ ...form, expected_harvest_at: e.target.value })} type="date" className="input" />
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input">
+                  {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{t('farm.status.' + key, label)}</option>)}
                 </select>
-                <input value={form.soil_notes} onChange={(e) => setForm({ ...form, soil_notes: e.target.value })} placeholder="ดิน/ปุ๋ย (pH ฯลฯ)" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="หมายเหตุ" className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm col-span-2" />
+                <input value={form.soil_notes} onChange={(e) => setForm({ ...form, soil_notes: e.target.value })} placeholder={t('farm.page.soilPlaceholder', 'ดิน/ปุ๋ย (pH ฯลฯ)')} className="input" />
+                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('farm.page.notesPlaceholder', 'หมายเหตุ')} className="input col-span-2" />
               </div>
-              <button onClick={create} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded px-4 py-2 text-sm font-bold">
-                {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+              <button onClick={create} disabled={saving} className="btn-primary">
+                {saving ? t('farm.page.saving', 'กำลังบันทึก…') : t('common.save', 'บันทึก')}
               </button>
             </div>
           )}
 
           {/* Plots */}
           {loading ? (
-            <div className="text-gray-500 text-center py-12">กำลังโหลด…</div>
+            <div className="text-gray-500 text-center py-12">{t('farm.page.loading', 'กำลังโหลด…')}</div>
           ) : plots.length === 0 ? (
-            <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">ยังไม่มีแปลง</div>
+            <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">{t('farm.page.noPlots', 'ยังไม่มีแปลง')}</div>
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {plots.map((plot) => (
-                <div key={plot.id} className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-2">
+                <div key={plot.id} className="card p-4 space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-bold text-white">{plot.name}</div>
-                      <div className="text-xs text-gray-400">
-                        {plot.location ? `📍 ${plot.location}` : '📍 ไม่ระบุตำแหน่ง'}
-                        {plot.area_sqm ? ` · ${plot.area_sqm} ตร.ม.` : ''}
+                      <div className="text-xs text-gray-400 flex items-center gap-1">
+                        <Icon name="map-pin" size={12} className="text-gray-500 shrink-0" />
+                        {plot.location ? plot.location : t('farm.page.unknownLocation', 'ไม่ระบุตำแหน่ง')}
+                        {plot.area_sqm ? t('farm.page.areaSuffix', ' · {n} ตร.ม.', { n: plot.area_sqm }) : ''}
                       </div>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-xs border whitespace-nowrap ${STATUS_COLOR[plot.status] ?? STATUS_COLOR.fallow}`}>
-                      {STATUS_LABEL[plot.status] ?? plot.status}
+                      {t('farm.status.' + plot.status, STATUS_LABEL[plot.status] ?? plot.status)}
                     </span>
                   </div>
 
                   {plot.crop && (
-                    <div className="text-sm text-emerald-300">🌾 {plot.crop}</div>
+                    <div className="text-sm text-emerald-300">{plot.crop}</div>
                   )}
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-                    <div>🌱 ปลูก: <span className="text-gray-200">{formatDate(plot.planted_at)}</span></div>
-                    <div>🌾 เก็บเกี่ยว: <span className="text-gray-200">{formatDate(plot.expected_harvest_at)}</span></div>
+                    <div>{t('farm.page.planted', 'ปลูก:')} <span className="text-gray-200">{formatDate(plot.planted_at)}</span></div>
+                    <div>{t('farm.page.harvest', 'เก็บเกี่ยว:')} <span className="text-gray-200">{formatDate(plot.expected_harvest_at)}</span></div>
                   </div>
 
                   {typeof plot.daysToHarvest === 'number' && (
                     <div className="text-xs">
                       {plot.daysToHarvest > 0 ? (
-                        <span className="text-amber-300">⏳ เหลืออีก {plot.daysToHarvest} วันถึงเก็บเกี่ยว</span>
+                        <span className="text-amber-300">{t('farm.page.daysToHarvest', 'เหลืออีก {n} วันถึงเก็บเกี่ยว', { n: plot.daysToHarvest })}</span>
                       ) : (
-                        <span className="text-emerald-300">🎉 พร้อมเก็บเกี่ยวแล้ว!</span>
+                        <span className="text-emerald-300 inline-flex items-center gap-1"><Icon name="check-circle" size={12} />{t('farm.page.ready', 'พร้อมเก็บเกี่ยวแล้ว!')}</span>
                       )}
                     </div>
                   )}
 
-                  {plot.soil_notes && <div className="text-xs text-gray-500">🧪 {plot.soil_notes}</div>}
+                  {plot.soil_notes && <div className="text-xs text-gray-500">{plot.soil_notes}</div>}
                   {plot.notes && <div className="text-xs text-gray-500 italic">{plot.notes}</div>}
 
                   {/* ── วิเคราะห์ดิน + NPK/ความชื้น ── */}
@@ -368,20 +386,20 @@ export default function FarmPage() {
                     <div className="flex gap-2 pt-1 border-t border-gray-800">
                       {(plot.status !== 'harvested') && (
                         <button onClick={() => updateStatus(plot, 'harvested')} className="text-xs bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-600/40 rounded px-3 py-1">
-                          🌾 เก็บเกี่ยว
+                          {t('farm.page.harvestBtn', 'เก็บเกี่ยว')}
                         </button>
                       )}
                       {plot.status !== 'fallow' && (
                         <button onClick={() => updateStatus(plot, 'fallow')} className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-3 py-1">
-                          🪧 พักแปลง
+                          {t('farm.page.fallowBtn', 'พักแปลง')}
                         </button>
                       )}
                       {plot.status !== 'growing' && plot.status !== 'active' && (
                         <button onClick={() => updateStatus(plot, 'growing')} className="text-xs bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-600/40 rounded px-3 py-1">
-                          🌱 ปลูกต่อ
+                          {t('farm.page.growBtn', 'ปลูกต่อ')}
                         </button>
                       )}
-                      <button onClick={() => remove(plot)} className="ml-auto text-red-400 hover:text-red-300 text-xs">🗑️</button>
+                      <button onClick={() => remove(plot)} className="ml-auto text-red-400 hover:text-red-300 text-xs"><Icon name="trash" size={14} /></button>
                     </div>
                   )}
                 </div>

@@ -3,10 +3,12 @@ import { useAuthStore } from '../stores/useAuthStore';
 import LoginForm from '../components/auth/LoginForm';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 export default function Home() {
   const { isAuthenticated, isHydrated, mustChangePassword } = useAuthStore();
   const router = useRouter();
+  const t = useLanguageStore((s) => s.t);
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
@@ -19,7 +21,7 @@ export default function Home() {
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-green-400 text-lg animate-pulse">⏳ Loading...</div>
+        <div className="text-emerald-400 text-sm tracking-wide glow-text">{t('common.loading', 'กำลังโหลด...')}</div>
       </div>
     );
   }

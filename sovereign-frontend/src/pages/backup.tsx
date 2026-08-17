@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 
 interface BackupEntry {
   file: string;
@@ -32,6 +35,7 @@ export default function BackupPage() {
   const [error, setError] = useState('');
 
   const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const t = useLanguageStore((s) => s.t);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,11 +48,11 @@ export default function BackupPage() {
       setSchedule(data.schedule || { enabled: false, time: '02:00' });
     } catch (err) {
       console.error(err);
-      setError('โหลดข้อมูล backup ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+      setError(t('backup.loadingFail', 'โหลดข้อมูล backup ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -65,11 +69,11 @@ export default function BackupPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage('✅ สร้าง backup สำเร็จ');
+      setMessage(t('backup.created', 'สร้าง backup สำเร็จ'));
       await load();
     } catch (err) {
       console.error(err);
-      setError('สร้าง backup ไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('backup.createFailed', 'สร้าง backup ไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     } finally {
       setBusy(false);
     }
@@ -85,17 +89,17 @@ export default function BackupPage() {
         body: JSON.stringify(schedule),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMessage('✅ บันทึกตารางเวลา backup แล้ว');
+      setMessage(t('backup.scheduleSaved', 'บันทึกตารางเวลา backup แล้ว'));
     } catch (err) {
       console.error(err);
-      setError('บันทึกตารางเวลาไม่สำเร็จ');
+      setError(t('backup.scheduleSaveFailed', 'บันทึกตารางเวลาไม่สำเร็จ'));
     } finally {
       setBusy(false);
     }
   };
 
   const restore = async (file: string) => {
-    if (!window.confirm(`⚠️ ต้องการกู้คืนฐานข้อมูลจาก "${file}" หรือไม่?\nข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลในไฟล์ backup นี้`)) return;
+    if (!window.confirm(t('backup.restoreConfirm', 'ต้องการกู้คืนฐานข้อมูลจาก "{file}" หรือไม่?\nข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลในไฟล์ backup นี้', { file }))) return;
     setBusy(true);
     setError('');
     try {
@@ -108,17 +112,17 @@ export default function BackupPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage('♻️ กู้คืนสำเร็จ — backend อาจรีสตาร์ทเพื่อให้ระบบทำงานปกติ');
+      setMessage(t('backup.restored', 'กู้คืนสำเร็จ — backend อาจรีสตาร์ทเพื่อให้ระบบทำงานปกติ'));
     } catch (err) {
       console.error(err);
-      setError('กู้คืนไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('backup.restoreFailed', 'กู้คืนไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (file: string) => {
-    if (!window.confirm(`ลบไฟล์ backup "${file}"?`)) return;
+    if (!window.confirm(t('backup.deleteConfirm', 'ลบไฟล์ backup "{file}"?', { file }))) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup/${encodeURIComponent(file)}`, {
         method: 'DELETE',
@@ -127,53 +131,53 @@ export default function BackupPage() {
       await load();
     } catch (err) {
       console.error(err);
-      setError('ลบไม่สำเร็จ');
+      setError(t('backup.deleteFailed', 'ลบไม่สำเร็จ'));
     }
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('backup.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="ระบบ"
-          title="💾 Backup &amp; Restore" actions={<a href="/dashboard" className="text-sm text-blue-400 hover:underline">← กลับ Dashboard</a>}
+          eyebrow={t('backup.page.eyebrow', 'ระบบ')}
+          title="Backup &amp; Restore" icon={<Icon name="backup" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('backup.page.backDashboard', '← กลับ Dashboard')}</a>}
         />
       </header>
       <main className="max-w-4xl mx-auto p-6 space-y-6">
         {!isSuperAdmin && (
-          <div className="text-sm text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded-lg px-4 py-3">
-            🔒 หน้า Backup ใช้งานได้เฉพาะ SUPERADMIN
+          <div className="card px-4 py-3 text-sm text-amber-400">
+            {t('backup.adminOnly', 'หน้า Backup ใช้งานได้เฉพาะ SUPERADMIN')}
           </div>
         )}
 
-        {message && <div className="text-sm text-green-400 bg-green-900/30 border border-green-700 rounded-lg px-4 py-3">{message}</div>}
-        {error && <div className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3">{error}</div>}
+        {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
+        {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Backup ตอนนี้ */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
-            <h2 className="font-bold text-gray-200">🛡️ สร้าง Backup ตอนนี้</h2>
-            <p className="text-xs text-gray-500">Dump ฐานข้อมูล TimescaleDB + บีบอัดเก็บไว้ในโฟลเดอร์ backups</p>
+          <div className="panel panel-glow p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('backup.createNow', 'สร้าง Backup ตอนนี้')}</h2>
+            <p className="text-xs text-gray-500">{t('backup.createHint', 'Dump ฐานข้อมูล TimescaleDB + บีบอัดเก็บไว้ในโฟลเดอร์ backups')}</p>
             <button
               onClick={createBackup}
               disabled={busy || !isSuperAdmin}
-              className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary w-full"
             >
-              {busy ? '⏳ กำลังทำงาน…' : '💾 Backup ตอนนี้'}
+              {busy ? t('backup.working', 'กำลังทำงาน…') : <><Icon name="backup" size={14} /> {t('backup.nowBtn', 'Backup ตอนนี้')}</>}
             </button>
           </div>
 
           {/* ตารางเวลาอัตโนมัติ */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
-            <h2 className="font-bold text-gray-200">⏰ Backup อัตโนมัติ</h2>
+          <div className="panel panel-glow p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('backup.autoTitle', 'Backup อัตโนมัติ')}</h2>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
@@ -182,7 +186,7 @@ export default function BackupPage() {
                   onChange={(e) => setSchedule({ ...schedule, enabled: e.target.checked })}
                   className="w-4 h-4 accent-green-500"
                 />
-                เปิดใช้งาน
+                {t('common.enabled', 'เปิดใช้งาน')}
               </label>
               <input
                 type="time"
@@ -194,40 +198,40 @@ export default function BackupPage() {
             <button
               onClick={saveSchedule}
               disabled={busy || !isSuperAdmin}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary w-full"
             >
-              บันทึกตารางเวลา
+              {t('backup.scheduleLabel', 'บันทึกตารางเวลา')}
             </button>
           </div>
         </div>
 
         {/* รายการไฟล์ */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
+        <div className="panel panel-cyan p-5">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-gray-200">📦 ไฟล์ Backup ({backups.length})</h2>
+            <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('backup.filesTitle', 'ไฟล์ Backup ({n})', { n: backups.length })}</h2>
             <button
               onClick={load}
               disabled={loading}
-              className="text-xs px-3 py-1.5 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded disabled:opacity-50"
+              className="btn-secondary"
             >
-              🔄 รีเฟรช
+              <Icon name="refresh" size={14} /> {t('common.refresh', 'รีเฟรช')}
             </button>
           </div>
 
-          {loading && backups.length === 0 && <div className="text-gray-500 text-sm">⏳ กำลังโหลด…</div>}
+          {loading && backups.length === 0 && <div className="text-gray-500 text-sm">{t('common.loading', 'กำลังโหลด…')}</div>}
 
           {!loading && backups.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-6">ยังไม่มีไฟล์ backup — กดปุ่ม "Backup ตอนนี้"</div>
+            <div className="text-gray-500 text-sm text-center py-6">{t('backup.empty', 'ยังไม่มีไฟล์ backup — กดปุ่ม "Backup ตอนนี้"')}</div>
           )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-500 border-b border-gray-700">
-                  <th className="py-2 pr-4">ไฟล์</th>
-                  <th className="py-2 pr-4">ขนาด</th>
-                  <th className="py-2 pr-4">วันที่</th>
-                  <th className="py-2">การจัดการ</th>
+                  <th className="py-2 pr-4">{t('backup.thFile', 'ไฟล์')}</th>
+                  <th className="py-2 pr-4">{t('backup.thSize', 'ขนาด')}</th>
+                  <th className="py-2 pr-4">{t('common.date', 'วันที่')}</th>
+                  <th className="py-2">{t('common.actions', 'การจัดการ')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -235,21 +239,21 @@ export default function BackupPage() {
                   <tr key={b.file} className="border-b border-gray-800">
                     <td className="py-2 pr-4 font-mono text-xs text-gray-300">{b.file}</td>
                     <td className="py-2 pr-4 text-gray-400">{formatSize(b.size)}</td>
-                    <td className="py-2 pr-4 text-gray-400">{new Date(b.date).toLocaleString('th-TH')}</td>
+                    <td className="py-2 pr-4 text-gray-400">{new Date(b.date).toLocaleString(fmtLocale())}</td>
                     <td className="py-2 space-x-2">
                       <button
                         onClick={() => restore(b.file)}
                         disabled={busy || !isSuperAdmin}
                         className="text-xs px-2.5 py-1 bg-yellow-700/50 hover:bg-yellow-700 border border-yellow-600 rounded disabled:opacity-40"
                       >
-                        ♻️ กู้คืน
+                        {t('backup.restore', 'กู้คืน')}
                       </button>
                       <button
                         onClick={() => remove(b.file)}
                         disabled={busy || !isSuperAdmin}
                         className="text-xs px-2.5 py-1 bg-red-900/50 hover:bg-red-900 border border-red-700 rounded disabled:opacity-40"
                       >
-                        🗑️ ลบ
+                        <Icon name="trash" size={14} /> {t('common.delete', 'ลบ')}
                       </button>
                     </td>
                   </tr>

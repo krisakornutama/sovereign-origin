@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 import { ALL_PAGES } from '../lib/navigation';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import Icon from './ui/Icon';
 
 const PALETTE_EVENT = 'sovereign:palette';
 
@@ -39,7 +41,7 @@ export function useCommandPaletteOpen() {
   return { open, setOpen };
 }
 
-type Result = { href: string; label: string; icon: string; group: string; score: number };
+type Result = { href: string; label: string; labelKey: string; icon: string; group: string; groupKey: string; score: number };
 
 function scoreItem(q: string, item: { label: string; href: string; keywords?: string }): number {
   const s = q.toLowerCase();
@@ -57,6 +59,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
   const user = useAuthStore((s) => s.user);
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
+  const t = useLanguageStore((s) => s.t);
   const isSuperadmin = user?.role === 'SUPERADMIN';
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -125,21 +128,21 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
       onMouseDown={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="ค้นหาหน้า"
+      aria-label={t('common.searchPage', 'ค้นหาหน้า...')}
     >
       <div
-        className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden"
+        className="w-full max-w-lg bg-gray-900 border border-gray-800 rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* ช่องค้นหา */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
-          <span className="text-gray-500 text-lg">🔍</span>
+          <Icon name="search" size={15} className="text-gray-500" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="ค้นหาหน้า... (เช่น ความปลอดภัย, ฟาร์ม, wealth)"
+            placeholder={t('common.searchPage')}
             className="flex-1 bg-transparent outline-none text-gray-100 placeholder-gray-500 text-sm"
           />
           <kbd className="text-[10px] text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">Esc</kbd>
@@ -149,7 +152,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
           {results.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-gray-500">
-              ไม่พบหน้า "{query}" — ลองคำอื่น เช่น 'ai', 'ไฟ', 'เงิน'
+              {t('common.noResults', 'ไม่พบหน้าที่ค้นหา')} "{query}"
             </div>
           ) : (
             results.map((r, i) => (
@@ -161,22 +164,22 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
                   i === active ? 'bg-emerald-500/10 text-emerald-300' : 'text-gray-300'
                 }`}
               >
-                <span className="text-base">{r.icon}</span>
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate">{r.label}</span>
-                  <span className="block text-[10px] text-gray-500">{r.group}</span>
-                </span>
-                {i === active && <span className="text-[10px] text-emerald-400">↵ เปิด</span>}
+                <Icon name={r.icon} size={15} className={i === active ? 'text-emerald-300' : 'text-gray-500'} />
+              <span className="flex-1 min-w-0">
+                <span className="block truncate">{t(r.labelKey, r.label)}</span>
+                <span className="block text-[10px] text-gray-500">{t(r.groupKey, r.group)}</span>
+              </span>
+              {i === active && <span className="text-[10px] text-emerald-400">↵ {t('common.open', 'เปิด')}</span>}
               </button>
             ))
           )}
         </div>
 
         <div className="px-4 py-2 border-t border-gray-800 text-[10px] text-gray-500 flex gap-3">
-          <span>↑↓ เลือก</span>
-          <span>↵ เปิด</span>
-          <span>Esc ปิด</span>
-          <span className="ml-auto">{results.length} หน้า</span>
+          <span>↑↓ {t('common.select', 'เลือก')}</span>
+          <span>↵ {t('common.open', 'เปิด')}</span>
+          <span>Esc {t('common.close', 'ปิด')}</span>
+          <span className="ml-auto">{results.length} {t('common.pages', 'หน้า')}</span>
         </div>
       </div>
     </div>

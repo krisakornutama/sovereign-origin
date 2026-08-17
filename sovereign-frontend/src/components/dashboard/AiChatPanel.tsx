@@ -2,7 +2,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { authFetch } from '../../lib/apiFetch';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 import VoiceInput from './VoiceInput';
+import Icon from '../ui/Icon';
 
 interface ChatMessage {
   id?: string;
@@ -17,6 +19,7 @@ function isApprovalReply(text: string): boolean {
 
 export default function AiChatPanel() {
   const { user } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const isSuperadmin = user?.role === 'SUPERADMIN';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,7 +61,7 @@ export default function AiChatPanel() {
   }, []);
 
   const clearHistory = async () => {
-    if (!window.confirm('ล้างประวัติการสนทนาทั้งหมด? AI จะจำไม่ได้ว่าคุยอะไรไว้')) return;
+    if (!window.confirm(t('dashboard.aiChat.clearHistoryConfirm', 'ล้างประวัติการสนทนาทั้งหมด? AI จะจำไม่ได้ว่าคุยอะไรไว้'))) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history`, { method: 'DELETE' });
       if (!res.ok) return;
@@ -139,7 +142,7 @@ export default function AiChatPanel() {
       if (!res.ok) throw new Error('API error');
 
       const data = await res.json();
-      const reply = data.reply || '🤖 ไม่สามารถประมวลผลได้';
+      const reply = data.reply || t('dashboard.aiChat.processError', 'ไม่สามารถประมวลผลได้');
 
       setMessages((prev) => [...prev, { role: 'ai', content: reply }]);
 
@@ -151,7 +154,7 @@ export default function AiChatPanel() {
         setTimeout(() => speakText(reply), 300);
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'ai', content: '⚠️ AI Offline หรือเกิดข้อผิดพลาด' }]);
+      setMessages((prev) => [...prev, { role: 'ai', content: t('dashboard.aiChat.offlineError', 'AI Offline หรือเกิดข้อผิดพลาด') }]);
     } finally {
       setIsLoading(false);
     }
@@ -163,48 +166,50 @@ export default function AiChatPanel() {
   };
 
   const quickQuestions = [
-    { label: '🔍 เช็คดินเค็ม', query: 'เช็คดินเค็ม' },
-    { label: '🔋 สถานะแบตเตอรี่', query: 'สถานะแบตเตอรี่' },
-    { label: '🚨 Emergency', query: 'Emergency Protocol' },
-    { label: '📅 Phase 2', query: 'แผน Phase 2' },
+    { label: 'เช็คดินเค็ม', query: 'เช็คดินเค็ม' },
+    { label: 'สถานะแบตเตอรี่', query: 'สถานะแบตเตอรี่' },
+    { label: 'Emergency', query: 'Emergency Protocol' },
+    { label: 'Phase 2', query: 'แผน Phase 2' },
   ];
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-xl flex flex-col h-[600px] lg:h-[700px]">
+    <div className="panel panel-glow flex flex-col h-[600px] lg:h-[700px]">
       {/* Header */}
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-blue-400">🧠 Sovereign AI</h3>
+        <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5 glow-text">
+          <Icon name="ai" size={14} /> Sovereign AI
+        </h3>
         <div className="flex items-center gap-2">
           {isSuperadmin && (
             <a
               href="/ai-agent"
-              title="เปิดหน้าจัดการคำขออนุมัติของ AI agent"
+              title={t('dashboard.aiChat.approvalsTitle', 'เปิดหน้าจัดการคำขออนุมัติของ AI agent')}
               className={`text-xs px-2.5 py-1 rounded-full border transition flex items-center gap-1 ${
                 pendingCount > 0
                   ? 'bg-amber-600/20 border-amber-500 text-amber-300 animate-pulse'
                   : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              🛡️ {pendingCount} รออนุมัติ
+              <Icon name="shield" size={11} /> {t('dashboard.aiChat.pendingApprovals', '{n} รออนุมัติ', { n: pendingCount })}
             </a>
           )}
           <button
             onClick={() => setAutoSpeak(!autoSpeak)}
             className={`text-xs px-2 py-1 rounded-full border transition ${
               autoSpeak
-                ? 'bg-green-600/20 border-green-500 text-green-400'
+                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400'
                 : 'bg-gray-800 border-gray-600 text-gray-500'
             }`}
-            title={autoSpeak ? 'ปิดเสียง' : 'เปิดเสียง'}
+            title={autoSpeak ? t('dashboard.aiChat.muteSound', 'ปิดเสียง') : t('dashboard.aiChat.unmuteSound', 'เปิดเสียง')}
           >
-            🔊 {autoSpeak ? 'ON' : 'OFF'}
+            {autoSpeak ? t('common.on', 'ON') : t('common.off', 'OFF')}
           </button>
           <button
             onClick={clearHistory}
-            title="ล้างประวัติการสนทนา"
-            className="text-xs px-2 py-1 rounded-full border bg-gray-800 border-gray-600 text-gray-500 hover:bg-red-900/30 hover:text-red-300 transition"
+            title={t('dashboard.aiChat.clearHistoryTitle', 'ล้างประวัติการสนทนา')}
+            className="text-xs px-2 py-1 rounded-full border bg-gray-800 border-gray-600 text-gray-500 hover:bg-red-900/30 hover:text-red-300 transition flex items-center"
           >
-            🗑️
+            <Icon name="trash" size={12} />
           </button>
         </div>
       </div>
@@ -213,7 +218,7 @@ export default function AiChatPanel() {
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-gray-500 text-sm text-center py-8">
-            ถามอะไรเกี่ยวกับ Sovereign Hub ได้เลย...
+            {t('dashboard.aiChat.emptyHint', 'ถามอะไรเกี่ยวกับ Sovereign Hub ได้เลย...')}
           </div>
         )}
         {messages.map((msg, idx) => (
@@ -225,11 +230,15 @@ export default function AiChatPanel() {
               className={`max-w-[85%] p-3 rounded-xl ${
                 msg.role === 'user'
                   ? 'bg-blue-600/20 text-blue-300 rounded-br-sm'
-                  : 'bg-gray-800/80 text-green-400 rounded-bl-sm border border-green-900/30'
+                  : 'bg-gray-800/80 text-emerald-400 rounded-bl-sm border border-gray-700'
               }`}
             >
-              <div className="text-xs opacity-75 mb-1">
-                {msg.role === 'user' ? '🧑 คุณ' : '🤖 AI'}
+              <div className="text-xs opacity-75 mb-1 flex items-center gap-1">
+                {msg.role === 'user' ? (
+                  <><Icon name="users" size={11} /> {t('dashboard.aiChat.you', 'คุณ')}</>
+                ) : (
+                  <><Icon name="ai" size={11} /> AI</>
+                )}
               </div>
               <div className="text-sm whitespace-pre-line">{msg.content}</div>
               {msg.role === 'ai' && (
@@ -238,14 +247,14 @@ export default function AiChatPanel() {
                     onClick={() => speakText(msg.content)}
                     className="text-xs text-gray-500 hover:text-gray-300 transition"
                   >
-                    🔊 อ่านซ้ำ
+                    {t('dashboard.aiChat.replay', 'อ่านซ้ำ')}
                   </button>
                   {isApprovalReply(msg.content) && (
                     <a
                       href="/ai-agent"
-                      className="text-xs px-2.5 py-1 bg-amber-600/20 border border-amber-500 text-amber-300 rounded-lg hover:bg-amber-600/30 transition"
+                      className="text-xs px-2.5 py-1 bg-amber-600/20 border border-amber-500 text-amber-300 rounded-lg hover:bg-amber-600/30 transition flex items-center gap-1"
                     >
-                      🛡️ ไปจัดการที่หน้า AI Agent →
+                      <Icon name="shield" size={11} /> {t('dashboard.aiChat.goToAgent', 'ไปจัดการที่หน้า AI Agent →')}
                     </a>
                   )}
                 </div>
@@ -255,11 +264,11 @@ export default function AiChatPanel() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-800/80 text-green-400 rounded-bl-sm border border-green-900/30 p-3 rounded-xl max-w-[85%]">
+            <div className="bg-gray-800/80 text-emerald-400 rounded-bl-sm border border-gray-700 p-3 rounded-xl max-w-[85%]">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-100" />
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce delay-200" />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce delay-200" />
               </div>
             </div>
           </div>
@@ -276,7 +285,7 @@ export default function AiChatPanel() {
             disabled={isLoading}
             className="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-full transition disabled:opacity-50"
           >
-            {q.label}
+            {t(`dashboard.aiChat.quickQuestions.${q.query}`, q.label)}
           </button>
         ))}
       </div>
@@ -292,16 +301,16 @@ export default function AiChatPanel() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             className="flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
-            placeholder={isVoiceActive ? 'กำลังฟังเสียง...' : 'พิมพ์หรือกดไมค์เพื่อพูด...'}
+            placeholder={isVoiceActive ? t('dashboard.aiChat.listening', 'กำลังฟังเสียง...') : t('dashboard.aiChat.placeholder', 'พิมพ์หรือกดไมค์เพื่อพูด...')}
             disabled={isLoading}
           />
 
           <button
             onClick={() => sendMessage()}
             disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ▶
+            <Icon name="send" size={14} />
           </button>
         </div>
       </div>

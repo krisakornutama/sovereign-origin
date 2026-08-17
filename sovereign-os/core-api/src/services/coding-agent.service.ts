@@ -4,12 +4,72 @@
 // → ตรวจงาน (lint/review) → เสนอทางต่อ 2-4 ตัวเลือก — รันแบบเบื้องหลัง (poll ได้)
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const prisma = new PrismaClient();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const CODING_MODEL = process.env.CODING_MODEL || process.env.OLLAMA_MODEL || 'qwen3:8b';
+const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
+const CODING_PROJECT_PATH = process.env.CODING_PROJECT_PATH || 'E:/My work/Project Sovereign Origin';
+
+// ── Workspace: ตำแหน่งโปรเจ็กที่ coding agent จัดการได้ ──
+
+/** path ที่ปลอดภัย: resolve แล้วต้องอยู่ใต้ project root (กัน path traversal) */
+export function safeProjectPath(relOrAbs: string, projectPath = CODING_PROJECT_PATH): string {
+  const root = path.resolve(projectPath);
+  const target = path.resolve(root, String(relOrAbs || ''));
+  const normRoot = root.toLowerCase();
+  const normTarget = target.toLowerCase();
+  if (normTarget !== normRoot && !normTarget.startsWith(normRoot + path.sep)) {
+    throw new Error(`❌ path อยู่นอกโปรเจ็กที่อนุญาต: ${target}`);
+  }
+  if (/\.env$/i.test(target)) throw new Error('❌ ห้ามแก้ไขไฟล์ .env');
+  return target;
+}
+
+export interface CodingJobOptions {
+  model?: string;
+  reasoningEffort?: string; // low | medium | high | full
+  autonomy?: string; // manual | semi | auto
+  imageBase64?: string;
+}
+
+/** ระดับเหตุผล → options/think ที่ Ollama เข้าใจ (โมเดลที่ไม่รองรับจะ ignore) */
+export function buildReasoningOptions(effort?: string): { think?: boolean; reasoning_effort?: string } {
+  const e = String(effort || '').toLowerCase();
+  if (e === 'low') return { think: false };
+  if (e === 'medium') return { think: true, reasoning_effort: 'medium' };
+  if (e === 'high') return { think: true, reasoning_effort: 'high' };
+  return { think: true }; // full = ไม่จำกัด
+}
+
+export function buildOllamaPayload(
+  model: string,
+  prompt: string,
+  system: string,
+  opts: { effort?: string; images?: string[]; extraOptions?: Record<string, unknown> } = {}
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    model,
+    system,
+    prompt,
+    stream: false,
+    keep_alive: OLLAMA_KEEP_ALIVE,
+    options: { temperature: 0.1, ...buildReasoningOptions(opts.effort), ...(opts.extraOptions || {}) },
+  };
+  if (opts.images?.length) payload.images = opts.images;
+  return payload;
+}
+
+export function autonomySuffix(autonomy?: string): string {
+  const a = String(autonomy || '').toLowerCase();
+  if (a === 'semi') return '\n\nระดับอัตโนมัติ: กึ่งอัตโนมัติ — ทำงานประจำได้เอง แต่การตัดสินใจเสี่ยงต้องระบุให้ผู้ใช้เห็นก่อน';
+  if (a === 'auto') return '\n\nระดับอัตโนมัติ: เต็มพิกัด — คิดเอง ตัดสินใจเอง ทำเองให้เสร็จ ตรวจสอบความถูกต้องเอง';
+  return '\n\nระดับอัตโนมัติ: ทำตามคำสั่งที่ระบุเท่านั้น ห้ามคาดเดาหรือเพิ่มงานเอง';
+}
 
 // ── Pure: ตัวแยก JSON จากคำตอบของ AI ──
 
@@ -98,16 +158,18 @@ export function validatePlan(plan: CodePlan): string | null {
 }
 
 /** ขั้น 1: วางแผนจากภาพรวม (AI) — fallback เป็นแผนไฟล์เดียวถ้า AI ตอบไม่เป็น JSON */
-export async function planTask(task: string, context?: string): Promise<CodePlan> {
+export async function planTask(
+  task: string,
+  context?: string,
+  opts: { model?: string; effort?: string; images?: string[]; autonomy?: string } = {}
+): Promise<CodePlan> {
+  const model = opts.model || CODING_MODEL;
   const resp = await axios.post(
     `${OLLAMA_URL}/api/generate`,
-    {
-      model: CODING_MODEL,
-      system: 'คุณเป็นสถาปนิกโค้ด ตอบเป็นภาษาไทย ให้ JSON ตามรูปแบบที่ขอ',
-      prompt: buildPlanPrompt(task, context),
-      stream: false,
-      keep_alive: OLLAMA_KEEP_ALIVE,
-    },
+    buildOllamaPayload(model, buildPlanPrompt(task, context) + autonomySuffix(opts.autonomy), 'คุณเป็นสถาปนิกโค้ด ตอบเป็นภาษาไทย ให้ JSON ตามรูปแบบที่ขอ', {
+      effort: opts.effort,
+      images: opts.images,
+    }),
     { timeout: 300000 }
   );
   const plan = parsePlanJson(resp.data?.response ?? '');
@@ -122,16 +184,21 @@ export async function planTask(task: string, context?: string): Promise<CodePlan
 }
 
 /** ขั้น 2: เขียนโค้ดจริงสำหรับแต่ละไฟล์ในแผน */
-export async function generateFile(file: PlanFile, task: string, existingCode?: string): Promise<string> {
+export async function generateFile(
+  file: PlanFile,
+  task: string,
+  existingCode?: string,
+  opts: { model?: string; effort?: string; images?: string[]; autonomy?: string } = {}
+): Promise<string> {
+  const model = opts.model || CODING_MODEL;
   const resp = await axios.post(
     `${OLLAMA_URL}/api/generate`,
-    {
-      model: CODING_MODEL,
-      system: 'คุณเป็นวิศวกรซอฟต์แวร์ เขียนโค้ดภาษา TypeScript/Python/Shell ที่รันได้จริง ตอบเฉพาะโค้ด',
-      prompt: buildCodePrompt(file, task, existingCode),
-      stream: false,
-      keep_alive: OLLAMA_KEEP_ALIVE,
-    },
+    buildOllamaPayload(
+      model,
+      buildCodePrompt(file, task, existingCode) + autonomySuffix(opts.autonomy),
+      'คุณเป็นวิศวกรซอฟต์แวร์ เขียนโค้ดภาษา TypeScript/Python/Shell ที่รันได้จริง ตอบเฉพาะโค้ด',
+      { effort: opts.effort, images: opts.images }
+    ),
     { timeout: 300000 }
   );
   let code = String(resp.data?.response ?? '').trim();
@@ -201,23 +268,89 @@ export async function deleteCodingJob(id: string): Promise<void> {
 }
 
 /** สั่งงานเขียนโค้ด → สร้าง job (queued) แล้วปล่อย runner — API ไม่รอ */
-export async function createCodingJob(task: string): Promise<{ id: string }> {
+export async function createCodingJob(task: string, opts: CodingJobOptions = {}): Promise<{ id: string }> {
   const text = String(task ?? '').trim().slice(0, 3000);
   if (!text) throw new Error('task is required');
   const job = await prisma.codingJob.create({
-    data: { title: text.slice(0, 120), task: text, status: 'queued', progress: 0 },
+    data: {
+      title: text.slice(0, 120),
+      task: text,
+      status: 'queued',
+      progress: 0,
+      model: String(opts.model || '').trim() || null,
+      reasoning_effort: String(opts.reasoningEffort || '').trim() || null,
+      autonomy: String(opts.autonomy || '').trim() || null,
+      image_base64: String(opts.imageBase64 || '').trim().slice(0, 2000000) || null,
+    },
   });
   return { id: job.id };
 }
 
+/** บันทึกไฟล์ที่ AI สร้างลง sandbox ในโปรเจ็ก: <project>/generated/<title-slug>/ */
+export function writeFilesToSandbox(job: any, files: Array<{ path: string; content: string }>): string {
+  const slug = String(job.title || 'job')
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0E00-\u0E7F]+/gi, '-')
+    .slice(0, 40);
+  const dir = safeProjectPath(`generated/${slug}`, CODING_PROJECT_PATH);
+  fs.mkdirSync(dir, { recursive: true });
+  let written = 0;
+  for (const f of files) {
+    const rel = String(f.path || '').replace(/^[\\/]+/, '');
+    if (!rel || rel.includes('..')) continue;
+    const target = path.join(dir, rel);
+    if (!target.toLowerCase().startsWith(dir.toLowerCase())) continue;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, String(f.content ?? ''), 'utf8');
+    written += 1;
+  }
+  return dir;
+}
+
+/** นำโค้ดจากงานที่เสร็จไปเขียนจริงที่ path ในแผน (ตรวจความปลอดภัยแล้ว) */
+export async function applyFilesToProject(jobId: string): Promise<{ applied: string[]; skipped: string[] }> {
+  const job = await prisma.codingJob.findUnique({ where: { id: jobId } });
+  if (!job) throw new Error('ไม่พบงานนี้');
+  if (job.status !== 'done') throw new Error('งานยังไม่เสร็จ — รอให้สถานะเป็น done ก่อน');
+  let files: Array<{ path: string; content: string }> = [];
+  try {
+    const parsed = typeof job.files_json === 'string' ? JSON.parse(job.files_json) : job.files_json;
+    if (Array.isArray(parsed)) files = parsed;
+  } catch {
+    /* ignore */
+  }
+  const applied: string[] = [];
+  const skipped: string[] = [];
+  for (const f of files) {
+    const rel = String(f?.path || '').replace(/^[\\/]+/, '');
+    if (!rel || rel.includes('..') || /\.env$/i.test(rel)) {
+      skipped.push(f?.path || '(empty)');
+      continue;
+    }
+    try {
+      const target = safeProjectPath(rel, CODING_PROJECT_PATH);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, String(f?.content ?? ''), 'utf8');
+      applied.push(rel);
+    } catch (err: any) {
+      skipped.push(`${rel} (${err?.message || 'denied'})`);
+    }
+  }
+  return { applied, skipped };
+}
+
 /** ประมวลผลงานเดียว: วางแผน → เขียนโค้ดทุกไฟล์ → ตรวจ → บันทึกผล */
-async function executeCodingJob(job: any): Promise<string | null> {
+export async function executeCodingJob(job: any): Promise<string | null> {
   try {
     await prisma.codingJob.update({
       where: { id: job.id },
       data: { status: 'running', started_at: new Date(), progress: 10 },
     });
-    const plan = await planTask(job.task);
+    const images = job.image_base64 ? [job.image_base64] : undefined;
+    const model = job.model || CODING_MODEL;
+    const effort = job.reasoning_effort || undefined;
+    const autonomy = job.autonomy || undefined;
+    const plan = await planTask(job.task, undefined, { model, effort, images, autonomy });
     const planErr = validatePlan(plan);
     if (planErr) throw new Error(planErr);
     await prisma.codingJob.update({
@@ -227,7 +360,7 @@ async function executeCodingJob(job: any): Promise<string | null> {
     const files: Array<{ path: string; content: string }> = [];
     let i = 0;
     for (const pf of plan.files.slice(0, 6)) {
-      const content = await generateFile(pf, job.task);
+      const content = await generateFile(pf, job.task, undefined, { model, effort, images, autonomy });
       files.push({ path: pf.path, content });
       i += 1;
       await prisma.codingJob.update({
@@ -236,10 +369,12 @@ async function executeCodingJob(job: any): Promise<string | null> {
       });
     }
     const review = autoReview(files);
+    const sandboxDir = writeFilesToSandbox(job, files);
     const result = {
       plan,
       files,
       review,
+      sandbox_dir: sandboxDir,
       summary: `สร้าง ${files.length} ไฟล์${review.some((r) => r.severity === 'error') ? ' — มีข้อผิดพลาดให้แก้' : ''}`,
     };
     await prisma.codingJob.update({

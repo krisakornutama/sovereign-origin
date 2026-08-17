@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 
 interface Firmware {
   file: string;
@@ -31,11 +34,11 @@ interface OtaEvent {
 }
 
 const statusBadges: Record<string, { label: string; cls: string }> = {
-  sent: { label: '📤 ส่งคำสั่ง', cls: 'bg-blue-900/50 text-blue-300 border-blue-700' },
-  success: { label: '✅ อัปเดตสำเร็จ', cls: 'bg-green-900/50 text-green-300 border-green-700' },
-  failed: { label: '❌ ล้มเหลว', cls: 'bg-red-900/50 text-red-300 border-red-700' },
-  rebooted: { label: '🔄 รีบูตแล้ว (เวอร์ชันใหม่)', cls: 'bg-purple-900/50 text-purple-300 border-purple-700' },
-  unknown: { label: '⚠️ ไม่รู้จัก', cls: 'bg-gray-800 text-gray-400 border-gray-600' },
+  sent: { label: 'ส่งคำสั่ง', cls: 'bg-blue-900/50 text-blue-300 border-blue-700' },
+  success: { label: 'อัปเดตสำเร็จ', cls: 'bg-emerald-900/50 text-emerald-300 border-emerald-700' },
+  failed: { label: 'ล้มเหลว', cls: 'bg-rose-900/50 text-rose-300 border-rose-700' },
+  rebooted: { label: 'รีบูตแล้ว (เวอร์ชันใหม่)', cls: 'bg-purple-900/50 text-purple-300 border-purple-700' },
+  unknown: { label: 'ไม่รู้จัก', cls: 'bg-gray-800 text-gray-400 border-gray-600' },
 };
 
 function formatSize(bytes: number): string {
@@ -59,6 +62,7 @@ export default function OtaPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const t = useLanguageStore((s) => s.t);
 
   const load = useCallback(async () => {
     try {
@@ -72,9 +76,9 @@ export default function OtaPage() {
       setEvents(await evRes.json());
     } catch (err) {
       console.error(err);
-      setError('โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+      setError(t('ota.loadingFail', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -93,7 +97,7 @@ export default function OtaPage() {
     if (!selectedFile) return;
     const name = customName.trim() || selectedFile.name;
     if (!name.endsWith('.bin')) {
-      setError('ชื่อไฟล์ต้องลงท้ายด้วย .bin');
+      setError(t('ota.fileExtError', 'ชื่อไฟล์ต้องลงท้ายด้วย .bin'));
       return;
     }
     setBusy(true);
@@ -109,21 +113,21 @@ export default function OtaPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage(`✅ อัปโหลด ${name} สำเร็จ`);
+      setMessage(t('ota.uploadSuccess', 'อัปโหลด {name} สำเร็จ', { name }));
       setSelectedFile(null);
       setCustomName('');
       if (fileRef.current) fileRef.current.value = '';
       await load();
     } catch (err) {
       console.error(err);
-      setError('อัปโหลดไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('ota.uploadFailed', 'อัปโหลดไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (file: string) => {
-    if (!window.confirm(`ลบ firmware "${file}"?`)) return;
+    if (!window.confirm(t('ota.deleteConfirm', 'ลบ firmware "{file}"?', { file }))) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ota/firmwares/${encodeURIComponent(file)}`, {
         method: 'DELETE',
@@ -132,16 +136,16 @@ export default function OtaPage() {
       await load();
     } catch (err) {
       console.error(err);
-      setError('ลบไม่สำเร็จ');
+      setError(t('ota.deleteFailed', 'ลบไม่สำเร็จ'));
     }
   };
 
   const deploy = async () => {
     if (!targetDevice || !targetFirmware) {
-      setError('เลือกอุปกรณ์และ firmware ก่อน');
+      setError(t('ota.pickFirst', 'เลือกอุปกรณ์และ firmware ก่อน'));
       return;
     }
-    if (!window.confirm(`⚠️ ส่งคำสั่ง OTA ไปยังอุปกรณ์ "${targetDevice}"\nFirmware: ${targetFirmware}\nอุปกรณ์จะดาวน์โหลด + อัปเดต + รีบูตอัตโนมัติ`)) return;
+    if (!window.confirm(t('ota.deployConfirm', 'ส่งคำสั่ง OTA ไปยังอุปกรณ์ "{device}"\nFirmware: {firmware}\nอุปกรณ์จะดาวน์โหลด + อัปเดต + รีบูตอัตโนมัติ', { device: targetDevice, firmware: targetFirmware }))) return;
     setBusy(true);
     setMessage('');
     setError('');
@@ -155,45 +159,45 @@ export default function OtaPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      setMessage('🚀 ส่งคำสั่ง OTA แล้ว — รออุปกรณ์ดาวน์โหลดและรีบูต');
+      setMessage(t('ota.deploySent', 'ส่งคำสั่ง OTA แล้ว — รออุปกรณ์ดาวน์โหลดและรีบูต'));
       await load();
     } catch (err) {
       console.error(err);
-      setError('สั่ง OTA ไม่สำเร็จ: ' + ((err as Error).message || 'unknown'));
+      setError(t('ota.deployFailed', 'สั่ง OTA ไม่สำเร็จ: {msg}', { msg: (err as Error).message || 'unknown' }));
     } finally {
       setBusy(false);
     }
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('ota.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="อุปกรณ์ &amp; พลังงาน"
-          title="🚀 ESP OTA Updates" actions={<a href="/dashboard" className="text-sm text-blue-400 hover:underline">← กลับ Dashboard</a>}
+          eyebrow={t('ota.page.eyebrow', 'อุปกรณ์ & พลังงาน')}
+          title={t('ota.page.title', 'ESP OTA Updates')} icon={<Icon name="ota" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('ota.page.backDashboard', '← กลับ Dashboard')}</a>}
         />
       </header>
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         {!isSuperAdmin && (
-          <div className="text-sm text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded-lg px-4 py-3">
-            🔒 อัปโหลด/Deploy ใช้งานได้เฉพาะ SUPERADMIN (ดูรายการได้ทุก role)
+          <div className="card px-4 py-3 text-sm text-amber-400">
+            {t('ota.adminOnly', 'อัปโหลด/Deploy ใช้งานได้เฉพาะ SUPERADMIN (ดูรายการได้ทุก role)')}
           </div>
         )}
 
-        {message && <div className="text-sm text-green-400 bg-green-900/30 border border-green-700 rounded-lg px-4 py-3">{message}</div>}
-        {error && <div className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3">{error}</div>}
+        {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
+        {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 
         {/* อัปโหลด */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
-          <h2 className="font-bold text-gray-200">📤 อัปโหลด Firmware (.bin)</h2>
+        <div className="panel panel-glow p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('ota.uploadTitle', 'อัปโหลด Firmware (.bin)')}</h2>
           <div className="flex flex-wrap gap-3 items-center">
             <input
               ref={fileRef}
@@ -204,7 +208,7 @@ export default function OtaPage() {
             />
             <input
               type="text"
-              placeholder="ชื่อไฟล์ (เช่น esp32_v1.2.0.bin)"
+              placeholder={t('ota.fileNamePlaceholder', 'ชื่อไฟล์ (เช่น esp32_v1.2.0.bin)')}
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
               className="flex-1 min-w-48 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
@@ -212,32 +216,32 @@ export default function OtaPage() {
             <button
               onClick={upload}
               disabled={!selectedFile || busy || !isSuperAdmin}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary"
             >
-              {busy ? '⏳ อัปโหลด…' : '📤 อัปโหลด'}
+              {busy ? t('ota.uploading', 'อัปโหลด…') : <><Icon name="upload" size={14} /> {t('ota.upload', 'อัปโหลด')}</>}
             </button>
           </div>
-          <p className="text-xs text-gray-600">ใช้วิธี build ผ่าน Arduino IDE: Sketch → Export Compiled Binary แล้วอัปโหลดไฟล์จากโฟลเดอร์ build</p>
+          <p className="text-xs text-gray-600">{t('ota.buildHint', 'ใช้วิธี build ผ่าน Arduino IDE: Sketch → Export Compiled Binary แล้วอัปโหลดไฟล์จากโฟลเดอร์ build')}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* รายการ firmware */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
+          <div className="panel panel-cyan p-5">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-gray-200">📦 Firmware ({firmwares.length})</h2>
-              <button onClick={load} className="text-xs px-3 py-1.5 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded">
-                🔄 รีเฟรช
+              <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('ota.firmwareList', 'Firmware ({n})', { n: firmwares.length })}</h2>
+              <button onClick={load} className="btn-secondary">
+                <Icon name="refresh" size={14} /> {t('common.refresh', 'รีเฟรช')}
               </button>
             </div>
             {firmwares.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-6">ยังไม่มี firmware — อัปโหลดก่อน</div>
+              <div className="text-gray-500 text-sm text-center py-6">{t('ota.noFirmware', 'ยังไม่มี firmware — อัปโหลดก่อน')}</div>
             ) : (
               <div className="space-y-2">
                 {firmwares.map((fw) => (
-                  <div key={fw.file} className="flex items-center justify-between gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2">
+                  <div key={fw.file} className="flex items-center justify-between gap-2 inset px-3 py-2">
                     <div className="min-w-0">
-                      <div className="text-sm text-green-400 font-mono truncate">{fw.file}</div>
-                      <div className="text-xs text-gray-500">{formatSize(fw.size)} · {new Date(fw.date).toLocaleString('th-TH')}</div>
+                      <div className="text-sm text-emerald-400 font-mono truncate glow-text">{fw.file}</div>
+                      <div className="text-xs text-gray-500">{formatSize(fw.size)} · {new Date(fw.date).toLocaleString(fmtLocale())}</div>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <a
@@ -246,21 +250,21 @@ export default function OtaPage() {
                         rel="noreferrer"
                         className="text-xs px-2.5 py-1 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded"
                       >
-                        ⬇️
+                        <Icon name="download" size={14} />
                       </a>
                       <button
                         onClick={() => setTargetFirmware(fw.file)}
                         className={`text-xs px-2.5 py-1 rounded border ${
                           targetFirmware === fw.file
-                            ? 'bg-green-600 border-green-600 text-white'
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
                             : 'bg-gray-800 border-gray-600 hover:bg-gray-700'
                         }`}
                       >
-                        เลือก
+                        {t('common.select', 'เลือก')}
                       </button>
                       {isSuperAdmin && (
                         <button onClick={() => remove(fw.file)} className="text-xs px-2.5 py-1 bg-red-900/50 border border-red-700 hover:bg-red-900 rounded">
-                          🗑️
+                          <Icon name="trash" size={14} />
                         </button>
                       )}
                     </div>
@@ -271,27 +275,27 @@ export default function OtaPage() {
           </div>
 
           {/* Deploy */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
-            <h2 className="font-bold text-gray-200">📡 สั่ง OTA ไปยังอุปกรณ์</h2>
+          <div className="panel panel-glow p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('ota.deployTitle', 'สั่ง OTA ไปยังอุปกรณ์')}</h2>
             <div>
-              <div className="text-xs text-gray-500 mb-1">เลือกอุปกรณ์ (nodeId):</div>
+              <div className="text-xs text-gray-500 mb-1">{t('ota.pickDeviceLabel', 'เลือกอุปกรณ์ (nodeId):')}</div>
               <select
                 value={targetDevice}
                 onChange={(e) => setTargetDevice(e.target.value)}
                 className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
               >
-                <option value="">— เลือกอุปกรณ์ —</option>
+                <option value="">{t('ota.pickDevicePlaceholder', '— เลือกอุปกรณ์ —')}</option>
                 {devices.map((d) => (
                   <option key={d.id} value={d.node_id}>
-                    {d.type} · {d.node_id} {d.is_active ? '' : '(ปิดใช้งาน)'}
+                    {d.type} · {d.node_id} {d.is_active ? '' : t('ota.inactive', '(ปิดใช้งาน)')}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-1">Firmware ที่เลือก:</div>
-              <div className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-green-400 font-mono">
-                {targetFirmware || '— ยังไม่ได้เลือก —'}
+              <div className="text-xs text-gray-500 mb-1">{t('ota.selectedFirmwareLabel', 'Firmware ที่เลือก:')}</div>
+              <div className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-emerald-400 font-mono glow-text">
+                {targetFirmware || t('ota.notSelected', '— ยังไม่ได้เลือก —')}
               </div>
             </div>
             <button
@@ -299,34 +303,34 @@ export default function OtaPage() {
               disabled={busy || !isSuperAdmin || !targetDevice || !targetFirmware}
               className="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {busy ? '⏳ กำลังส่ง…' : '🚀 DEPLOY (ผ่าน MQTT)'}
+              {busy ? t('ota.sending', 'กำลังส่ง…') : t('ota.deployBtn', 'DEPLOY (ผ่าน MQTT)')}
             </button>
             <p className="text-xs text-gray-600">
-              ส่ง JSON {'{ url, file, version }'} ไปที่ topic <code className="text-gray-400">sovereign/{"{nodeId}"}/ota/command</code> — อุปกรณ์ต้องรันโค้ด OTA (ดูตัวอย่างใน repo: firmware/esp32_ota_example.ino)
+              {t('ota.deployHintStart', 'ส่ง JSON {payload} ไปที่ topic ', { payload: '{ url, file, version }' })}<code className="text-gray-400">sovereign/{"{nodeId}"}/ota/command</code>{t('ota.deployHintEnd', ' — อุปกรณ์ต้องรันโค้ด OTA (ดูตัวอย่างใน repo: firmware/esp32_ota_example.ino)')}
             </p>
           </div>
         </div>
 
         {/* ประวัติ OTA */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
+        <div className="panel panel-cyan p-5">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-gray-200">🕐 เหตุการณ์ OTA ({events.length}) <span className="text-xs text-gray-500 font-normal">— อัปเดตอัตโนมัติทุก 5 วิ</span></h2>
-            <button onClick={load} className="text-xs px-3 py-1.5 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded">
-              🔄 รีเฟรช
+            <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('ota.eventsTitle', 'เหตุการณ์ OTA ({n}) ', { n: events.length })}<span className="text-xs text-gray-500 font-normal">{t('ota.autoUpdateHint', '— อัปเดตอัตโนมัติทุก 5 วิ')}</span></h2>
+            <button onClick={load} className="btn-secondary">
+              <Icon name="refresh" size={14} /> {t('common.refresh', 'รีเฟรช')}
             </button>
           </div>
           {events.length === 0 ? (
-            <div className="text-gray-500 text-sm text-center py-4">ยังไม่มีเหตุการณ์ — สั่ง deploy แล้วผลจากอุปกรณ์จะโผล่ตรงนี้</div>
+            <div className="text-gray-500 text-sm text-center py-4">{t('ota.noEvents', 'ยังไม่มีเหตุการณ์ — สั่ง deploy แล้วผลจากอุปกรณ์จะโผล่ตรงนี้')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-gray-500 border-b border-gray-700">
-                    <th className="py-2 pr-4">เวลา</th>
+                    <th className="py-2 pr-4">{t('common.time', 'เวลา')}</th>
                     <th className="py-2 pr-4">Node</th>
-                    <th className="py-2 pr-4">Firmware / Version</th>
-                    <th className="py-2 pr-4">ประเภท</th>
-                    <th className="py-2">สถานะ</th>
+                    <th className="py-2 pr-4">{t('ota.thFirmware', 'Firmware / Version')}</th>
+                    <th className="py-2 pr-4">{t('ota.thType', 'ประเภท')}</th>
+                    <th className="py-2">{t('common.status', 'สถานะ')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -334,16 +338,16 @@ export default function OtaPage() {
                     const badge = statusBadges[e.status] || statusBadges.unknown;
                     return (
                       <tr key={e.id} className="border-b border-gray-800">
-                        <td className="py-2 pr-4 text-gray-400 whitespace-nowrap">{new Date(e.created_at).toLocaleString('th-TH')}</td>
+                        <td className="py-2 pr-4 text-gray-400 whitespace-nowrap">{new Date(e.created_at).toLocaleString(fmtLocale())}</td>
                         <td className="py-2 pr-4 font-mono text-xs text-gray-300">{e.node_id}</td>
-                        <td className="py-2 pr-4 font-mono text-xs text-green-400">
+                        <td className="py-2 pr-4 font-mono text-xs text-emerald-400">
                           {e.firmware || e.version || '—'}
                           {e.error && <div className="text-red-400">{e.error}</div>}
                         </td>
-                        <td className="py-2 pr-4 text-xs text-gray-500">{e.type === 'deploy' ? '📤 คำสั่ง' : '📡 รายงาน'}</td>
+                        <td className="py-2 pr-4 text-xs text-gray-500">{e.type === 'deploy' ? t('ota.typeDeploy', 'คำสั่ง') : t('ota.typeReport', 'รายงาน')}</td>
                         <td className="py-2">
                           <span className={`text-[10px] px-2 py-0.5 rounded-full border ${badge.cls}`}>
-                            {badge.label}
+                            {t('ota.status.' + e.status, badge.label)}
                           </span>
                         </td>
                       </tr>

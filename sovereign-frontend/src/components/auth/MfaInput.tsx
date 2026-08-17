@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 import { useRouter } from 'next/navigation';
+import Icon from '../ui/Icon';
+import LanguageToggle from '../ui/LanguageToggle';
 
 const DIGIT_COUNT = 6;
 
@@ -17,6 +20,7 @@ export default function MfaInput() {
   const [submitting, setSubmitting] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const { token, login } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const router = useRouter();
 
   // นับถอยหลัง Retry-After; ปิดการกรอกระหว่างรอ
@@ -83,7 +87,7 @@ export default function MfaInput() {
           const retryAfter = Number(res.headers.get('Retry-After') || 0);
           if (retryAfter > 0) setCooldown(retryAfter);
         }
-        throw new Error(data.error || 'รหัส OTP ไม่ถูกต้อง');
+        throw new Error(data.error || t('login.otpInvalid', 'รหัส OTP ไม่ถูกต้อง'));
       }
 
       // token เต็ม (mfa_verified=true)
@@ -107,6 +111,10 @@ export default function MfaInput() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center relative overflow-hidden">
+      {/* สลับภาษาไทย/อังกฤษ */}
+      <div className="absolute top-4 right-4 z-10">
+        <LanguageToggle compact />
+      </div>
       {/* พื้นหลัง: grid + glow เล็ก ๆ แบบ command center */}
       <div
         className="absolute inset-0 opacity-[0.07] pointer-events-none"
@@ -119,13 +127,17 @@ export default function MfaInput() {
       <div className="absolute top-[-140px] left-1/2 -translate-x-1/2 w-[520px] h-[300px] rounded-full bg-green-500/10 blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-md px-6">
-        <div className="bg-gray-900/90 border border-gray-700 rounded-2xl p-8 shadow-2xl shadow-black/60 backdrop-blur">
+        <div className="card panel-glow p-8">
           <div className="text-center">
-            <div className="text-3xl">🏰</div>
-            <h1 className="mt-2 text-xl font-bold text-green-400 tracking-wide">SOVEREIGN OS</h1>
-            <p className="text-gray-400 text-sm mt-1">🔐 ยืนยันตัวตน 2FA — ขั้นตอนที่ 2</p>
+            <div className="flex justify-center text-emerald-400">
+              <Icon name="crown" size={28} />
+            </div>
+            <h1 className="mt-2 text-sm font-semibold text-gray-200 tracking-wide glow-text">SOVEREIGN OS</h1>
+            <p className="text-gray-400 text-sm mt-1 flex items-center justify-center gap-1.5">
+              <Icon name="lock" size={13} />{t('login.mfaTitle')}
+            </p>
             <p className="text-gray-500 text-xs mt-1">
-              กรอกรหัส 6 หลักจากแอป Authenticator (Google / Microsoft)
+              {t('login.mfaHint')}
             </p>
           </div>
 
@@ -134,7 +146,7 @@ export default function MfaInput() {
               className="mt-6 p-3 rounded-lg bg-amber-900/30 border border-amber-700/50 text-amber-300 text-sm text-center font-mono"
               role="status"
             >
-              ⏳ ระบบจำกัดจำนวนครั้ง — ลองอีกครั้งใน {formatCountdown(cooldown)}
+              {t('login.rateLimited', 'ระบบจำกัดจำนวนครั้ง — ลองอีกครั้งใน {time}', { time: formatCountdown(cooldown) })}
             </div>
           ) : (
             error && (
@@ -160,10 +172,10 @@ export default function MfaInput() {
                 onPaste={handlePaste}
                 disabled={locked}
                 autoFocus={i === 0}
-                aria-label={`หลักที่ ${i + 1}`}
+                aria-label={t('login.mfaDigitLabel', 'หลักที่ {n}', { n: i + 1 })}
                 className={`w-11 h-14 sm:w-12 rounded-lg border bg-gray-800 text-center text-2xl font-mono text-white
                   focus:outline-none focus:ring-2 transition
-                  ${error ? 'border-red-700' : 'border-gray-600 focus:ring-green-500'}
+                  ${error ? 'border-red-700' : 'border-gray-600 focus:ring-emerald-500'}
                   ${d ? 'border-green-600/70' : ''}
                   disabled:opacity-50 disabled:cursor-not-allowed`}
               />
@@ -174,14 +186,13 @@ export default function MfaInput() {
             type="button"
             onClick={submit}
             disabled={locked || submitting || code.length !== DIGIT_COUNT}
-            className="mt-6 w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg text-white font-semibold tracking-wide transition
-              disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-6 w-full btn-primary"
           >
-            {locked ? `รอ ${formatCountdown(cooldown)}` : submitting ? 'กำลังยืนยัน…' : 'ยืนยัน'}
+            {locked ? t('login.wait', 'รอ {time}', { time: formatCountdown(cooldown) }) : submitting ? t('login.verifying') : t('login.confirm')}
           </button>
 
           <p className="mt-4 text-center text-[11px] text-gray-500 font-mono">
-            SESSION GATE · TOTP (SHA-1) · 30 วินาทีต่อรหัส · พยายามจำกัด 10 ครั้ง/15 นาที
+            {t('login.mfaGate', 'SESSION GATE · TOTP (SHA-1) · 30 วินาทีต่อรหัส · พยายามจำกัด 10 ครั้ง/15 นาที')}
           </p>
         </div>
       </div>

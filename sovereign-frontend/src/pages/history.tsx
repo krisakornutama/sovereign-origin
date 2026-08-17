@@ -1,9 +1,12 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
 
 interface DataPoint {
   time: number; // Unix ms
@@ -35,6 +38,7 @@ const PADDING = { top: 20, right: 30, bottom: 40, left: 60 };
 
 export default function HistoryPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   const [range, setRange] = useState<Range>(() => {
@@ -107,7 +111,7 @@ export default function HistoryPage() {
       setSeries(results);
     } catch (err) {
       console.error(err);
-      setError('โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB');
+      setError(t('history.loadError', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB'));
       setSeries([]);
     } finally {
       setLoading(false);
@@ -144,7 +148,7 @@ export default function HistoryPage() {
       ctx.fillStyle = '#6b7280';
       ctx.font = '14px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('กำลังโหลดข้อมูล…', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.fillText(t('history.loadingChart', 'กำลังโหลดข้อมูล…'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
       return;
     }
 
@@ -153,7 +157,7 @@ export default function HistoryPage() {
       ctx.fillStyle = '#6b7280';
       ctx.font = '14px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(error || 'ยังไม่มีข้อมูลเซ็นเซอร์ในช่วงเวลานี้', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.fillText(error || t('history.noDataInRange', 'ยังไม่มีข้อมูลเซ็นเซอร์ในช่วงเวลานี้'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
       return;
     }
 
@@ -240,8 +244,8 @@ export default function HistoryPage() {
     const spanMs = xMax - xMin;
     const fmt = (t: number) =>
       spanMs > 2 * 86400000
-        ? new Date(t).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' })
-        : new Date(t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        ? new Date(t).toLocaleDateString(fmtLocale(), { day: '2-digit', month: '2-digit' })
+        : new Date(t).toLocaleTimeString(fmtLocale(), { hour: '2-digit', minute: '2-digit' });
     const timeLabels = 6;
     ctx.fillStyle = '#6b7280';
     ctx.font = '10px monospace';
@@ -251,21 +255,21 @@ export default function HistoryPage() {
       const x = scaleX(t);
       ctx.fillText(fmt(t), x, CANVAS_HEIGHT - PADDING.bottom + 15);
     }
-  }, [series, loading, error]);
+  }, [series, loading, error, t]);
 
   useEffect(() => {
     drawChart();
   }, [drawChart]);
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('history.unauthorized', 'Unauthorized')}</div>;
 
   const allPoints = series.flatMap((s) => s.points);
   const spanText = allPoints.length > 0
-    ? `${new Date(Math.min(...allPoints.map((p) => p.time))).toLocaleString('th-TH')} → ${new Date(Math.max(...allPoints.map((p) => p.time))).toLocaleString('th-TH')}`
+    ? `${new Date(Math.min(...allPoints.map((p) => p.time))).toLocaleString(fmtLocale())} → ${new Date(Math.max(...allPoints.map((p) => p.time))).toLocaleString(fmtLocale())}`
     : '—';
 
   const fileBase = `${(selectedMetrics.join('_') || 'metric').slice(0, 40)}_${range}_${new Date().toISOString().slice(0, 10)}`;
@@ -306,13 +310,13 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="ข้อมูล &amp; รายงาน"
-          title="📈 Sensor History" actions={<a href="/dashboard" className="text-sm text-blue-400 hover:underline">← กลับ Dashboard</a>}
+          eyebrow={t('history.eyebrow', 'ข้อมูล & รายงาน')}
+          title="Sensor History" icon={<Icon name="history" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('history.backDashboard', '← กลับ Dashboard')}</a>}
         />
       </header>
       <main className="max-w-6xl mx-auto p-6 space-y-6">
@@ -323,11 +327,11 @@ export default function HistoryPage() {
               onClick={() => setRange(r.key)}
               className={
                 range === r.key
-                  ? 'px-3 py-1.5 rounded text-sm font-bold bg-green-600 text-white'
-                  : 'px-3 py-1.5 rounded text-sm bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700'
+                  ? 'btn-primary px-3 py-1.5 text-sm'
+                  : 'btn-ghost px-3 py-1.5 text-sm'
               }
             >
-              {r.label}
+              {t(`history.range.${r.key}`, r.label)}
             </button>
           ))}
           {range === 'custom' && (
@@ -349,40 +353,40 @@ export default function HistoryPage() {
           <button
             onClick={fetchHistory}
             disabled={loading}
-            className="px-3 py-1.5 rounded text-sm bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
+            className="btn-primary px-3 py-1.5 text-sm"
           >
-            {loading ? 'โหลด…' : '🔄 โหลดใหม่'}
+            {loading ? t('history.reloading', 'กำลังโหลด…') : <><Icon name="refresh" size={14} /> {t('history.reload', 'โหลดใหม่')}</>}
           </button>
           <span className="mx-1 text-gray-600">|</span>
           <button
             onClick={downloadCSV}
             disabled={series.length === 0}
-            className="px-3 py-1.5 rounded text-sm bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-secondary px-3 py-1.5 text-sm"
           >
-            📄 CSV
+            <Icon name="download" size={14} /> CSV
           </button>
           <button
             onClick={downloadPNG}
             disabled={allPoints.length === 0}
-            className="px-3 py-1.5 rounded text-sm bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-secondary px-3 py-1.5 text-sm"
           >
-            🖼️ PNG
+            <Icon name="image" size={14} /> PNG
           </button>
         </div>
 
         {/* เลือก metric: กดเพื่อเปิด/ปิด เปรียบเทียบได้หลายตัวพร้อมกัน */}
         <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-xs text-gray-400">Metric:</span>
+          <span className="text-xs text-gray-400">{t('history.metricLabel', 'Metric:')}</span>
           {metrics.map((m) => {
             const active = selectedMetrics.includes(m);
             return (
               <button
                 key={m}
                 onClick={() => toggleMetric(m)}
-                title={active ? 'กดเพื่อเอากราฟออก' : 'กดเพื่อเพิ่มกราฟ'}
+                title={active ? t('history.toggleRemove', 'กดเพื่อเอากราฟออก') : t('history.toggleAdd', 'กดเพื่อเพิ่มกราฟ')}
                 className={
                   active
-                    ? 'px-3 py-1 rounded text-sm font-bold text-white'
+                    ? 'px-3 py-1 rounded text-sm font-bold text-white shadow-neon-green'
                     : 'px-3 py-1 rounded text-sm bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700'
                 }
                 style={active ? { backgroundColor: colorOf(m) } : undefined}
@@ -394,15 +398,16 @@ export default function HistoryPage() {
         </div>
 
         {metrics.length === 0 && (
-          <div className="text-sm text-yellow-400 bg-gray-900 border border-yellow-700 rounded-lg px-4 py-3">
-            ⚠️ ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล — รอข้อมูลจาก MQTT หรือเพิ่มข้อมูลด้วยมือที่หน้า Sensors
+          <div className="flex items-start gap-2 text-sm text-amber-400 bg-gray-900 border border-amber-700/60 rounded-lg px-4 py-3">
+            <Icon name="alert-triangle" size={15} className="shrink-0 mt-0.5" />
+            <span>{t('history.noDataHint', 'ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล — รอข้อมูลจาก MQTT หรือเพิ่มข้อมูลด้วยมือที่หน้า Sensors')}</span>
           </div>
         )}
 
         <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
-          <span>📦 series: <b className="text-green-400">{series.length}</b></span>
-          <span>จุดข้อมูล: <b className="text-green-400">{allPoints.length}</b></span>
-          <span>ช่วงเวลา: {spanText}</span>
+          <span>{t('history.seriesCount', 'series: ')}<b className="text-emerald-400 glow-text">{series.length}</b></span>
+          <span>{t('history.pointsCount', 'จุดข้อมูล: ')}<b className="text-emerald-400 glow-text">{allPoints.length}</b></span>
+          <span>{t('history.rangeLabel', 'ช่วงเวลา: ')}{spanText}</span>
           <span className="ml-auto flex gap-3 flex-wrap">
             {series.map((s, i) => (
               <span key={s.metric} className="inline-flex items-center gap-1.5">
@@ -410,11 +415,11 @@ export default function HistoryPage() {
                 {s.metric} <span className="text-gray-500">({s.points.length})</span>
               </span>
             ))}
-            <span className="text-gray-600">| เส้น = ค่าเฉลี่ย | แถบจาง = min–max</span>
+            <span className="text-gray-600">{t('history.legend', '| เส้น = ค่าเฉลี่ย | แถบจาง = min–max')}</span>
           </span>
         </div>
 
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-2">
+        <div className="card panel-cyan p-2">
           <canvas
             ref={canvasRef}
             width={CANVAS_WIDTH}

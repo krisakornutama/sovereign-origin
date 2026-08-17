@@ -3,8 +3,10 @@
 // Signature: กองแท่งทอง — ความสูง = มูลค่ารวม, เส้นประ = ยอดเดือนก่อน (ทองนิ่ง ไม่ริบหรี่ — ต่างจากเทียนของห้องเยียวยา)
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
+import Icon from '../components/ui/Icon';
 
 // ── จานสีห้องคลัง (เหล็กกล้า + ทองแท่ง — เย็น ไม่ใช่เทียนอุ่นของห้องเยียวยา): พื้น #0D0F0E · เหล็ก #141718 · ทอง #D4AF37 · หมึกสมุด #E8E2D5 · กำไร #7FB069 · ขาดทุน #C2574A ──
 const PANEL = 'bg-[#141718] border border-[#262B2C] rounded-xl';
@@ -52,6 +54,7 @@ interface AssetRow {
 
 // ── กองแท่งทอง — 1 แท่ง = $25,000, สูงสุด 10 แท่ง, เส้นประ = ยอดเดือนก่อน ──
 function IngotStack({ value, baseline }: { value: number; baseline: number | null }) {
+  const t = useLanguageStore((s) => s.t);
   const INGOT = 25000;
   const slots = 10;
   const pct = Math.min(1, value / (INGOT * slots));
@@ -65,7 +68,7 @@ function IngotStack({ value, baseline }: { value: number; baseline: number | nul
   const yOf = (i: number) => base - i * step - slotH;
 
   return (
-    <svg viewBox="0 0 200 290" className="w-36 sm:w-44 drop-shadow-[0_0_20px_rgba(212,175,55,0.14)]" role="img" aria-label={value >= 1 ? `กองแท่งทอง ${full} แท่งเต็ม` : 'ตู้นิรภัยว่างเปล่า'}>
+    <svg viewBox="0 0 200 290" className="w-36 sm:w-44 drop-shadow-[0_0_20px_rgba(212,175,55,0.14)]" role="img" aria-label={value >= 1 ? t('portfolio.ingot.ariaFull', 'กองแท่งทอง {n} แท่งเต็ม', { n: full }) : t('portfolio.ingot.ariaEmpty', 'ตู้นิรภัยว่างเปล่า')}>
       <defs>
         <radialGradient id="vaultLight" cx="50%" cy="0%" r="80%">
           <stop offset="0%" stopColor="#D4AF37" stopOpacity="0.20" />
@@ -86,7 +89,7 @@ function IngotStack({ value, baseline }: { value: number; baseline: number | nul
       {bpct !== null && (
         <g>
           <line x1="34" y1={yOf(bpct * slots) + slotH / 2} x2="166" y2={yOf(bpct * slots) + slotH / 2} stroke="#8C9188" strokeWidth="1.4" strokeDasharray="5 4" />
-          <text x="168" y={yOf(bpct * slots) + slotH / 2 - 4} fontSize="8" fill="#8C9188" textAnchor="end">เดือนก่อน</text>
+          <text x="168" y={yOf(bpct * slots) + slotH / 2 - 4} fontSize="8" fill="#8C9188" textAnchor="end">{t('portfolio.ingot.prevMonth', 'เดือนก่อน')}</text>
         </g>
       )}
       {/* ช่องแท่ง */}
@@ -105,7 +108,7 @@ function IngotStack({ value, baseline }: { value: number; baseline: number | nul
         );
       })}
       {full === 0 && partial <= 0.04 && (
-        <text x="100" y="150" fontSize="11" fill="#6E7368" textAnchor="middle" className="font-ledger">ตู้นิรภัยว่าง</text>
+        <text x="100" y="150" fontSize="11" fill="#6E7368" textAnchor="middle" className="font-ledger">{t('portfolio.ingot.empty', 'ตู้นิรภัยว่าง')}</text>
       )}
       {/* พื้นห้องนิรภัย */}
       <rect x="28" y={base + 6} width="144" height="5" rx="2" fill="#262B2C" />
@@ -122,6 +125,7 @@ interface Member {
 
 export default function PortfolioPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const isSuperadmin = user?.role === 'SUPERADMIN';
   const [members, setMembers] = useState<Member[]>([]);
   // พอร์ตที่กำลังดู: default = ตัวเอง; SUPERADMIN เปลี่ยนดูพอร์ตสมาชิกคนอื่นได้
@@ -146,7 +150,7 @@ export default function PortfolioPage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/risk${ownerQuery}`);
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'คำนวณความเสี่ยงไม่สำเร็จ');
+      if (!res.ok) throw new Error(d.error || t('portfolio.riskError', 'คำนวณความเสี่ยงไม่สำเร็จ'));
       setRisk(d);
     } catch (e: any) {
       setRiskError(e.message);
@@ -189,7 +193,7 @@ export default function PortfolioPage() {
     load()
       .catch((err) => {
         console.error(err);
-        setError('โหลดข้อมูลพอร์ตไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+        setError(t('portfolio.loadError', 'โหลดข้อมูลพอร์ตไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, user, viewOwnerId]);
@@ -200,13 +204,13 @@ export default function PortfolioPage() {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/refresh`, { method: 'POST' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data?.error || 'รีเฟรชราคาไม่สำเร็จ');
+        setError(data?.error || t('portfolio.refreshError', 'รีเฟรชราคาไม่สำเร็จ'));
       } else {
         await load();
       }
     } catch (err) {
       console.error(err);
-      setError('รีเฟรชราคาไม่สำเร็จ — ตรวจการเชื่อมต่ออินเทอร์เน็ต');
+      setError(t('portfolio.refreshErrorNet', 'รีเฟรชราคาไม่สำเร็จ — ตรวจการเชื่อมต่ออินเทอร์เน็ต'));
     } finally {
       setRefreshing(false);
     }
@@ -221,7 +225,7 @@ export default function PortfolioPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data?.error || 'เพิ่ม asset ไม่สำเร็จ');
+        setError(data?.error || t('portfolio.addAssetError', 'เพิ่ม asset ไม่สำเร็จ'));
         return;
       }
       setError('');
@@ -229,13 +233,13 @@ export default function PortfolioPage() {
       await load();
     } catch (err) {
       console.error(err);
-      setError('เพิ่ม asset ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+      setError(t('portfolio.addAssetErrorNet', 'เพิ่ม asset ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     }
   };
 
   const deleteAsset = async (id: string) => {
     if (!id) return;
-    if (!confirm('ลบ asset นี้? (กระทบพอร์ตทันที)')) return;
+    if (!confirm(t('portfolio.deleteAssetConfirm', 'ลบ asset นี้? (กระทบพอร์ตทันที)'))) return;
     await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/assets/${id}${ownerQuery}`, { method: 'DELETE' });
     await load();
   };
@@ -245,7 +249,7 @@ export default function PortfolioPage() {
     const quantity = Number(invForm.quantity);
     const unit_price_usd = Number(invForm.unit_price_usd);
     if (!invForm.name.trim() || !(quantity >= 0) || !(unit_price_usd >= 0)) {
-      setError('กรอกชื่อ จำนวน และราคาต่อหน่วยให้ครบ');
+      setError(t('portfolio.invFormError', 'กรอกชื่อ จำนวน และราคาต่อหน่วยให้ครบ'));
       return;
     }
     setInvSaving(true);
@@ -264,7 +268,7 @@ export default function PortfolioPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data?.error || 'เพิ่มเสบียงไม่สำเร็จ');
+        setError(data?.error || t('portfolio.addInvError', 'เพิ่มเสบียงไม่สำเร็จ'));
         return;
       }
       setError('');
@@ -272,7 +276,7 @@ export default function PortfolioPage() {
       await load();
     } catch (err) {
       console.error(err);
-      setError('เพิ่มเสบียงไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+      setError(t('portfolio.addInvErrorNet', 'เพิ่มเสบียงไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     } finally {
       setInvSaving(false);
     }
@@ -280,25 +284,25 @@ export default function PortfolioPage() {
 
   const deleteInventory = async (id: string) => {
     if (!id) return;
-    if (!confirm('ลบรายการเสบียงนี้? (ห้ามกู้คืน)')) return;
+    if (!confirm(t('portfolio.deleteInvConfirm', 'ลบรายการเสบียงนี้? (ห้ามกู้คืน)'))) return;
     try {
       await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portfolio/inventory/${id}${ownerQuery}`, { method: 'DELETE' });
       setError('');
       await load();
     } catch (err) {
       console.error(err);
-      setError('ลบเสบียงไม่สำเร็จ — ตรวจว่า backend เปิดอยู่');
+      setError(t('portfolio.deleteInvError', 'ลบเสบียงไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     }
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('portfolio.unauthorized', 'Unauthorized')}</div>;
 
   const categoryIcons: Record<string, string> = {
-    FUEL: '⛽', FOOD: '🍚', MATERIAL: '🧱', PRECIOUS_METAL: '🥇', OTHER: '📦',
+    FUEL: 'zap', FOOD: 'package', MATERIAL: 'layers', PRECIOUS_METAL: 'coin', OTHER: 'package',
   };
 
   // ── กองทอง: มูลค่ารวม + เส้นประเดือนก่อน (จาก history จุดเก่าสุดของ 30 จุด) ──
@@ -310,18 +314,18 @@ export default function PortfolioPage() {
   const ingotFull = Math.floor(value / 25000);
   // กองทองสูงสุดที่วาดได้ 10 แท่ง — เกินกว่านั้น caption ต้องไม่บอกจำนวนเกินจริง
   const ingotLabel = ingotFull > 10 ? '10+' : String(ingotFull);
-  const growthTail = growthPct != null ? ` — ${growthPct >= 0 ? '📈 สูงขึ้น' : '📉 ลดลง'} ${Math.abs(growthPct).toFixed(1)}% เทียบเดือนก่อน` : '';
+  const growthTail = growthPct != null ? t('portfolio.stack.growthTail', ' — {dir} {pct}% เทียบเดือนก่อน', { dir: growthPct >= 0 ? t('portfolio.stack.up', 'สูงขึ้น') : t('portfolio.stack.down', 'ลดลง'), pct: Math.abs(growthPct).toFixed(1) }) : '';
   const stackCaption = value < 1
-    ? 'ตู้นิรภัยว่างเปล่า — เริ่มสะสมทรัพย์สิน'
+    ? t('portfolio.stack.empty', 'ตู้นิรภัยว่างเปล่า — เริ่มสะสมทรัพย์สิน')
     : ingotFull === 0
-      ? `กองทองเริ่มก่อ — ${fmtUsd(value)}${growthTail}`
-      : `กองทอง ${ingotLabel} แท่ง · ${fmtUsd(value)}${growthTail}`;
+      ? t('portfolio.stack.starting', 'กองทองเริ่มก่อ — {amount}{tail}', { amount: fmtUsd(value), tail: growthTail })
+      : t('portfolio.stack.full', 'กองทอง {bars} แท่ง · {amount}{tail}', { bars: ingotLabel, amount: fmtUsd(value), tail: growthTail });
 
   const ledgerRows: Array<{ label: string; value: string; tone?: 'gold' | 'plain' }> = [
-    { label: '📈 พอร์ตการลงทุน', value: fmtUsd(summary?.portfolioUsd ?? 0) },
-    { label: '⛽ เสบียงกายภาพ', value: fmtUsd(summary?.inventoryUsd ?? 0) },
-    { label: '💵 เงินสด', value: fmtUsd(summary?.cashUsd ?? 0) },
-    { label: 'รวมสุทธิ', value: fmtUsd(summary?.grandTotalUsd ?? 0), tone: 'gold' },
+    { label: t('portfolio.ledger.portfolio', 'พอร์ตการลงทุน'), value: fmtUsd(summary?.portfolioUsd ?? 0) },
+    { label: t('portfolio.ledger.inventory', 'เสบียงกายภาพ'), value: fmtUsd(summary?.inventoryUsd ?? 0) },
+    { label: t('portfolio.ledger.cash', 'เงินสด'), value: fmtUsd(summary?.cashUsd ?? 0) },
+    { label: t('portfolio.ledger.total', 'รวมสุทธิ'), value: fmtUsd(summary?.grandTotalUsd ?? 0), tone: 'gold' },
   ];
 
   return (
@@ -331,84 +335,85 @@ export default function PortfolioPage() {
         <header className="border-b border-[#262B2C] px-6 py-3 flex justify-between items-center" style={{ background: '#0D0F0E' }}>
           <div>
             <p className="mono text-[9px] tracking-[0.3em] text-[#9A7B26] uppercase">Sovereign Wealth</p>
-            <h1 className="font-ledger text-xl font-bold text-[#D4AF37]">ห้องคลัง</h1>
+            <h1 className="font-ledger text-xl font-bold text-[#D4AF37]">{t('portfolio.title', 'ห้องคลัง')}</h1>
           </div>
           <div className="flex items-center gap-3">
             {isSuperadmin && members.length > 0 && (
               <select
                 value={viewOwnerId}
                 onChange={(e) => setViewOwnerId(e.target.value)}
-                title="สลับดูพอร์ตของสมาชิกในครอบครัว"
+                title={t('portfolio.switchPortfolioTitle', 'สลับดูพอร์ตของสมาชิกในครอบครัว')}
                 className={`${INPUT} max-w-[220px]`}
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.id === user?.id ? '👑 ' : ''}{m.username}{m.id === user?.id ? ' (คุณ)' : ''}
+                    {m.username}{m.id === user?.id ? t('portfolio.me', ' (คุณ)') : ''}
                   </option>
                 ))}
               </select>
             )}
             <button onClick={refresh} disabled={refreshing} className={`${BTN} bg-[#262B2C] text-[#E8E2D5] hover:bg-[#33383A]`}>
-              {refreshing ? '⏳ กำลังดึงราคา…' : '🔄 ดึงราคาล่าสุด'}
+              {refreshing ? t('portfolio.fetchingPrices', 'กำลังดึงราคา…') : <><Icon name="refresh" size={14} /> {t('portfolio.fetchPrices', 'ดึงราคาล่าสุด')}</>}
             </button>
-            <a href="/dashboard" className="text-sm text-[#8C9188] hover:text-[#D4AF37]">← กลับ Dashboard</a>
+            <a href="/dashboard" className="text-sm text-[#8C9188] hover:text-[#D4AF37]">{t('portfolio.backDashboard', '← กลับ Dashboard')}</a>
           </div>
         </header>
         <main className="max-w-6xl mx-auto p-6 space-y-6 w-full">
           {error && <div className="text-sm text-[#D98F85] bg-[#3A1D19]/60 border border-[#6E3026] rounded-lg px-4 py-3">{error}</div>}
           {loading ? (
-            <div className="text-[#6E7368]">⏳ กำลังเปิดตู้นิรภัย…</div>
+            <div className="text-[#6E7368]">{t('portfolio.openingVault', 'กำลังเปิดตู้นิรภัย…')}</div>
           ) : (
             <>
               {/* ── กองแท่งทอง — signature ── */}
               <section className="flex flex-col items-center gap-2 pt-1">
                 <IngotStack value={value} baseline={baseline} />
-                <p className={`text-sm font-medium ${value >= 1 ? 'text-[#D4AF37]' : 'text-[#6E7368]'}`}>{stackCaption}</p>
-                <p className="text-[10px] text-[#6E7368]">แท่งละ $25,000 · เส้นประ = ยอดเมื่อเดือนก่อน</p>
+                <p className={`text-sm font-medium ${value >= 1 ? 'text-[#D4AF37] glow-text' : 'text-[#6E7368]'}`}>{stackCaption}</p>
+                <p className="text-[10px] text-[#6E7368]">{t('portfolio.ingotCaption', 'แท่งละ $25,000 · เส้นประ = ยอดเมื่อเดือนก่อน')}</p>
               </section>
 
               {/* ── สมุดบัญชีรวม (แทนการ์ดตัวเลขใหญ่) ── */}
-              <div className={`${PANEL} overflow-hidden`}>
+              <div className={`${PANEL} overflow-hidden panel-glow`}>
                 <div className="flex items-center justify-between px-5 py-2.5 border-b border-[#262B2C]">
-                  <h2 className="font-ledger font-semibold text-[#E8E2D5]"><span className="text-[#D4AF37]">▍</span> สมุดบัญชีรวม</h2>
+                  <h2 className="font-ledger font-semibold text-[#E8E2D5] glow-text"><span className="text-[#D4AF37]">▍</span> {t('portfolio.ledger.title', 'สมุดบัญชีรวม')}</h2>
                   {summary?.runway?.months != null && (
-                    <span className="mono text-xs text-[#8C9188]">🏕️ Runway <span className="text-[#D4AF37]">{summary.runway.months.toFixed(1)} เดือน</span> · ค่าใช้จ่าย {fmtUsd(summary.runway.monthlyBurnUsd)}/เดือน (ไฟ {fmtUsd(summary.runway.energyCostUsd)})</span>
+                    <span className="mono text-xs text-[#8C9188]">{t('portfolio.ledger.runwayLabel', 'Runway ')}<span className="text-[#D4AF37]">{summary.runway.months.toFixed(1)} {t('portfolio.ledger.runwayMonths', '{n} เดือน', { n: summary.runway.months.toFixed(1) })}</span>{t('portfolio.ledger.runwayBurn', ' · ค่าใช้จ่าย {burn}/เดือน (ไฟ {energy})', { burn: fmtUsd(summary.runway.monthlyBurnUsd), energy: fmtUsd(summary.runway.energyCostUsd) })}</span>
                   )}
                 </div>
                 <div className="divide-y divide-[#1D2122]">
                   {ledgerRows.map((r) => (
                     <div key={r.label} className={`flex items-center justify-between px-5 py-2.5 ${r.tone === 'gold' ? 'bg-[#0D0F0E]' : ''}`}>
                       <span className={`text-sm ${r.tone === 'gold' ? 'font-semibold text-[#E8E2D5]' : 'text-[#8C9188]'}`}>{r.label}</span>
-                      <span className={`mono text-lg font-bold ${r.tone === 'gold' ? 'text-[#D4AF37] border-t-2 border-[#9A7B26]/50 pt-0.5' : 'text-[#E8E2D5]'}`}>{r.value}</span>
+                      <span className={`mono text-lg font-bold ${r.tone === 'gold' ? 'text-[#D4AF37] glow-text border-t-2 border-[#9A7B26]/50 pt-0.5' : 'text-[#E8E2D5]'}`}>{r.value}</span>
                     </div>
                   ))}
                 </div>
                 {summary && summary.missingPrices.length > 0 && (
-                  <div className="px-5 py-2 text-xs text-[#C9A227] bg-[#3A2F0D]/40 border-t border-[#262B2C]">
-                    ⚠️ ยังไม่มีราคาสำหรับ: {summary.missingPrices.join(', ')} — กด "ดึงราคาล่าสุด" หรือรอ cron job
+                  <div className="px-5 py-2 text-xs text-[#C9A227] bg-[#3A2F0D]/40 border-t border-[#262B2C] flex items-center gap-1.5">
+                    <Icon name="alert-triangle" size={13} className="shrink-0" />
+                    <span>{t('portfolio.ledger.missingPrices', 'ยังไม่มีราคาสำหรับ: {prices} — กด "ดึงราคาล่าสุด" หรือรอ cron job', { prices: summary.missingPrices.join(', ') })}</span>
                   </div>
                 )}
               </div>
 
               {/* ── หอคอยวิเคราะห์ Aladdin ── */}
-              <div className={`${PANEL} p-5`}>
+              <div className={`${PANEL} p-5 panel-cyan`}>
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="font-ledger font-semibold text-[#E8E2D5]"><span className="text-[#D4AF37]">▍</span> หอคอยวิเคราะห์ · Aladdin Risk Engine <span className="text-[10px] text-[#6E7368] font-normal">— จำลองแนวคิด BlackRock Aladdin: ใช้ข้อมูลอดีตทำนายอนาคต + บอกสิ่งที่ต้องทำ</span></h2>
+                  <h2 className="font-ledger font-semibold text-[#E8E2D5] glow-text-cyan"><span className="text-[#D4AF37]">▍</span> {t('portfolio.aladdin.title', 'หอคอยวิเคราะห์ · Aladdin Risk Engine')} <span className="text-[10px] text-[#6E7368] font-normal">{t('portfolio.aladdin.subtitle', '— จำลองแนวคิด BlackRock Aladdin: ใช้ข้อมูลอดีตทำนายอนาคต + บอกสิ่งที่ต้องทำ')}</span></h2>
                   <button onClick={loadRisk} disabled={riskLoading} className={`${BTN} bg-[#262B2C] text-[#D4AF37] hover:bg-[#33383A]`}>
-                    {riskLoading ? '⏳ กำลังวิเคราะห์...' : '🔮 วิเคราะห์ความเสี่ยง'}
+                    {riskLoading ? t('portfolio.risk.analyzing', 'กำลังวิเคราะห์...') : t('portfolio.risk.analyze', 'วิเคราะห์ความเสี่ยง')}
                   </button>
                 </div>
                 {riskError && <div className="text-xs text-[#D98F85] mt-2">{riskError}</div>}
                 {!risk && !riskLoading && (
                   <div className="text-xs text-[#6E7368] mt-2">
-                    กด "วิเคราะห์ความเสี่ยง" เพื่อให้ระบบคำนวณแนวโน้ม/โมเมนตัม/RSI จากราคาอดีต + จำลอง Monte Carlo 30 วัน + VaR95
+                    {t('portfolio.risk.hint', 'กด "วิเคราะห์ความเสี่ยง" เพื่อให้ระบบคำนวณแนวโน้ม/โมเมนตัม/RSI จากราคาอดีต + จำลอง Monte Carlo 30 วัน + VaR95')}
                   </div>
                 )}
                 {risk && (
                   <div className="mt-4 space-y-4">
                     {risk.actions && risk.actions.length > 0 && (
                       <div className={`${TILE} p-3 border-[#3A3A2E]`}>
-                        <div className="text-xs font-bold text-[#D4AF37] mb-2">✅ สิ่งที่ต้องทำ (ทำตามลำดับ)</div>
+                        <div className="text-xs font-bold text-[#D4AF37] mb-2">{t('portfolio.risk.actionsTitle', 'สิ่งที่ต้องทำ (ทำตามลำดับ)')}</div>
                         <ul className="space-y-1">
                           {risk.actions.map((a: string, i: number) => (
                             <li key={i} className="text-xs text-[#C9C4B6] flex gap-2"><span className="text-[#D4AF37] shrink-0">{i + 1}.</span>{a}</li>
@@ -419,23 +424,23 @@ export default function PortfolioPage() {
                     {risk.portfolio && (
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className={`${TILE} p-3`}>
-                          <div className="text-[10px] text-[#6E7368]">🎯 VaR 95% (30 วัน)</div>
-                          <div className="mono text-lg font-bold text-[#D98F85]">-{fmtUsd(risk.portfolio.var95)}</div>
-                          <div className="text-[10px] text-[#6E7368]">เสี่ยงขาดทุนสูงสุด {risk.portfolio.var95Pct}% ของพอร์ต</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.var95', 'VaR 95% (30 วัน)')}</div>
+                          <div className="mono text-lg font-bold text-[#D98F85] glow-text-red">-{fmtUsd(risk.portfolio.var95)}</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.var95Desc', 'เสี่ยงขาดทุนสูงสุด {pct}% ของพอร์ต', { pct: risk.portfolio.var95Pct })}</div>
                         </div>
                         <div className={`${TILE} p-3`}>
-                          <div className="text-[10px] text-[#6E7368]">📉 Drawdown สูงสุด</div>
-                          <div className="mono text-lg font-bold text-[#D4AF37]">{(risk.portfolio.maxDrawdown * 100).toFixed(1)}%</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.maxDrawdown', 'Drawdown สูงสุด')}</div>
+                          <div className="mono text-lg font-bold text-[#D4AF37] glow-text">{(risk.portfolio.maxDrawdown * 100).toFixed(1)}%</div>
                         </div>
                         <div className={`${TILE} p-3`}>
-                          <div className="text-[10px] text-[#6E7368]">🧩 ความเข้มข้น (HHI)</div>
-                          <div className="mono text-lg font-bold text-[#8FB3D9]">{risk.portfolio.concentration.toFixed(2)}</div>
-                          <div className="text-[10px] text-[#6E7368]">{risk.portfolio.diversificationGrade} · ตัวใหญ่สุด {risk.portfolio.topHolding}</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.concentration', 'ความเข้มข้น (HHI)')}</div>
+                          <div className="mono text-lg font-bold text-[#8FB3D9] glow-text-cyan">{risk.portfolio.concentration.toFixed(2)}</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.concentrationDesc', '{grade} · ตัวใหญ่สุด {top}', { grade: risk.portfolio.diversificationGrade, top: risk.portfolio.topHolding })}</div>
                         </div>
                         <div className={`${TILE} p-3`}>
-                          <div className="text-[10px] text-[#6E7368]">🎲 Monte Carlo 30 วัน (P50)</div>
-                          <div className="mono text-lg font-bold text-[#7FB069]">{fmtUsd(Math.round(risk.simulation?.p50 ?? 0))}</div>
-                          <div className="text-[10px] text-[#6E7368]">P10 {fmtUsd(Math.round(risk.simulation?.p10 ?? 0))} · P90 {fmtUsd(Math.round(risk.simulation?.p90 ?? 0))} · โอกาสขาดทุน {(risk.simulation?.probLoss * 100).toFixed(0)}%</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.monteCarlo', 'Monte Carlo 30 วัน (P50)')}</div>
+                          <div className="mono text-lg font-bold text-[#7FB069] glow-text">{fmtUsd(Math.round(risk.simulation?.p50 ?? 0))}</div>
+                          <div className="text-[10px] text-[#6E7368]">{t('portfolio.risk.monteCarloDesc', 'P10 {p10} · P90 {p90} · โอกาสขาดทุน {p}%', { p10: fmtUsd(Math.round(risk.simulation?.p10 ?? 0)), p90: fmtUsd(Math.round(risk.simulation?.p90 ?? 0)), p: (risk.simulation?.probLoss * 100).toFixed(0) })}</div>
                         </div>
                       </div>
                     )}
@@ -452,18 +457,18 @@ export default function PortfolioPage() {
                               a.signal === 'SELL' ? 'bg-[#4A211A]/70 text-[#D98F85]' :
                               a.signal === 'REDUCE' ? 'bg-[#3A2F0D]/70 text-[#D4AF37]' : 'bg-[#262B2C] text-[#8C9188]'
                             }`}>
-                              {a.signal === 'BUY' ? '🟢 ซื้อ' : a.signal === 'SELL' ? '🔴 ขาย' : a.signal === 'REDUCE' ? '🟠 ลด' : '⚪ ถือ'}
+                              {a.signal === 'BUY' ? t('portfolio.signal.buy', 'ซื้อ') : a.signal === 'SELL' ? t('portfolio.signal.sell', 'ขาย') : a.signal === 'REDUCE' ? t('portfolio.signal.reduce', 'ลด') : t('portfolio.signal.hold', 'ถือ')}
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-[#8C9188]">
-                            <span>แนวโน้ม: <b className={a.trend === 'rising' ? 'text-[#7FB069]' : a.trend === 'falling' ? 'text-[#D98F85]' : 'text-[#C9C4B6]'}>{a.trend === 'rising' ? '↑ ขึ้น' : a.trend === 'falling' ? '↓ ลง' : '→ นิ่ง'}</b></span>
-                            <span>โมเมนตัม: {a.momentum === 'strong' ? '💪 แรง' : a.momentum === 'weak' ? '🥀 อ่อน' : 'ปกติ'}</span>
+                            <span>{t('portfolio.asset.trend', 'แนวโน้ม: ')}<b className={a.trend === 'rising' ? 'text-[#7FB069]' : a.trend === 'falling' ? 'text-[#D98F85]' : 'text-[#C9C4B6]'}>{a.trend === 'rising' ? t('portfolio.asset.trendUp', '↑ ขึ้น') : a.trend === 'falling' ? t('portfolio.asset.trendDown', '↓ ลง') : t('portfolio.asset.trendFlat', '→ นิ่ง')}</b></span>
+                            <span>{t('portfolio.asset.momentum', 'โมเมนตัม: ')}{a.momentum === 'strong' ? t('portfolio.asset.momentumStrong', 'แรง') : a.momentum === 'weak' ? t('portfolio.asset.momentumWeak', 'อ่อน') : t('portfolio.asset.momentumNormal', 'ปกติ')}</span>
                             <span>RSI: {a.rsi}</span>
-                            <span>แนวรับ: <b className="text-[#8FB3D9]">{a.support.toFixed(2)}</b></span>
-                            <span>แนวต้าน: <b className="text-[#D4AF37]">{a.resistance.toFixed(2)}</b></span>
-                            <span>Volatility: {(a.volatility * 100).toFixed(0)}%/ปี</span>
+                            <span>{t('portfolio.asset.support', 'แนวรับ: ')}<b className="text-[#8FB3D9]">{a.support.toFixed(2)}</b></span>
+                            <span>{t('portfolio.asset.resistance', 'แนวต้าน: ')}<b className="text-[#D4AF37]">{a.resistance.toFixed(2)}</b></span>
+                            <span>{t('portfolio.asset.volatility', 'Volatility: {v}%/ปี', { v: (a.volatility * 100).toFixed(0) })}</span>
                           </div>
-                          <div className="text-[11px] text-[#6E7368] mt-1">💡 {a.reasoning}</div>
+                          <div className="text-[11px] text-[#6E7368] mt-1">{a.reasoning}</div>
                           <ul className="text-[11px] text-[#C9C4B6] mt-1 space-y-0.5">
                             {a.actions.map((x: string, i: number) => <li key={i}>• {x}</li>)}
                           </ul>
@@ -475,13 +480,13 @@ export default function PortfolioPage() {
               </div>
 
               {/* ── ตู้เซฟหลักทรัพย์ ── */}
-              <div className={`${PANEL} p-5`}>
-                <h2 className="font-ledger font-semibold text-[#E8E2D5] mb-3"><span className="text-[#D4AF37]">▍</span> ตู้เซฟหลักทรัพย์ (หุ้น / คริปโต / ทองคำ)</h2>
+              <div className={`${PANEL} p-5 panel-cyan`}>
+                <h2 className="font-ledger font-semibold text-[#E8E2D5] mb-3 glow-text-cyan"><span className="text-[#D4AF37]">▍</span> {t('portfolio.vault.title', 'ตู้เซฟหลักทรัพย์ (หุ้น / คริปโต / ทองคำ)')}</h2>
                 <div className="flex gap-2 mb-4">
                   <input
                     value={form.symbol}
                     onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                    placeholder="Symbol เช่น BTC, AAPL, XAUUSD"
+                    placeholder={t('portfolio.vault.symbolPh', 'Symbol เช่น BTC, AAPL, XAUUSD')}
                     className={`flex-1 ${INPUT}`}
                   />
                   <select
@@ -489,26 +494,26 @@ export default function PortfolioPage() {
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                     className={INPUT}
                   >
-                    <option value="CRYPTO">🪙 คริปโต</option>
-                    <option value="STOCK">📈 หุ้น</option>
-                    <option value="COMMODITY">🥇 สินค้าโภคภัณฑ์</option>
+                    <option value="CRYPTO">{t('portfolio.type.crypto', 'คริปโต')}</option>
+                    <option value="STOCK">{t('portfolio.type.stock', 'หุ้น')}</option>
+                    <option value="COMMODITY">{t('portfolio.type.commodity', 'สินค้าโภคภัณฑ์')}</option>
                   </select>
                   <input
                     value={form.quantity}
                     onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                    placeholder="จำนวน"
+                    placeholder={t('portfolio.vault.qtyPh', 'จำนวน')}
                     className={`w-24 ${INPUT}`}
                   />
-                  <button onClick={addAsset} className={BTN}>➕ เพิ่ม</button>
+                  <button onClick={addAsset} className={BTN}>{t('common.add', 'เพิ่ม')}</button>
                 </div>
                 <div className="text-[11px] text-[#6E7368] mb-3 leading-relaxed">
-                  ℹ️ <b>จำนวน</b> = หน่วยที่ถือ — หุ้น (STOCK): จำนวนหุ้น เช่น <code className="text-[#C9C4B6]">AAPL 10</code> = 10 หุ้น · คริปโต: จำนวนเหรียญ เช่น <code className="text-[#C9C4B6]">BTC 0.5</code> = 0.5 เหรียญ · ทอง/สินค้า: น้ำหนัก เช่น <code className="text-[#C9C4B6]">XAUUSD 1</code> = 1 ออนซ์
+                  <b>{t('portfolio.vault.qtyHintBold', 'จำนวน')}</b>{t('portfolio.vault.qtyHintA', '= หน่วยที่ถือ — หุ้น (STOCK): จำนวนหุ้น เช่น ')}<code className="text-[#C9C4B6]">AAPL 10</code>{t('portfolio.vault.qtyHintB', ' = 10 หุ้น · คริปโต: จำนวนเหรียญ เช่น ')}<code className="text-[#C9C4B6]">BTC 0.5</code>{t('portfolio.vault.qtyHintC', ' = 0.5 เหรียญ · ทอง/สินค้า: น้ำหนัก เช่น ')}<code className="text-[#C9C4B6]">XAUUSD 1</code>{t('portfolio.vault.qtyHintD', ' = 1 ออนซ์')}
                 </div>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[#9A7B26] text-xs">
-                      <th className="pb-2">Symbol</th><th className="pb-2">ประเภท</th><th className="pb-2">จำนวน</th>
-                      <th className="pb-2">ราคา</th><th className="pb-2">มูลค่า</th><th className="pb-2"></th>
+                      <th className="pb-2">Symbol</th><th className="pb-2">{t('portfolio.vault.colType', 'ประเภท')}</th><th className="pb-2">{t('portfolio.vault.colQty', 'จำนวน')}</th>
+                      <th className="pb-2">{t('portfolio.vault.colPrice', 'ราคา')}</th><th className="pb-2">{t('portfolio.vault.colValue', 'มูลค่า')}</th><th className="pb-2"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -520,29 +525,29 @@ export default function PortfolioPage() {
                         <td className="py-2 mono">{a.priceUsd != null ? fmtUsd(a.priceUsd) : '—'}</td>
                         <td className="py-2 mono text-[#7FB069]">{fmtUsd(a.valueUsd)}</td>
                         <td className="py-2 text-right">
-                          <button onClick={() => deleteAsset(a.id)} className="text-xs text-[#D98F85] hover:underline">ลบ</button>
+                          <button onClick={() => deleteAsset(a.id)} className="text-xs text-[#D98F85] hover:underline">{t('common.delete', 'ลบ')}</button>
                         </td>
                       </tr>
                     ))}
                     {assets.length === 0 && (
-                      <tr><td colSpan={6} className="py-4 text-[#6E7368] text-center">ยังไม่มี asset — เพิ่มด้านบน</td></tr>
+                      <tr><td colSpan={6} className="py-4 text-[#6E7368] text-center">{t('portfolio.vault.noAssets', 'ยังไม่มี asset — เพิ่มด้านบน')}</td></tr>
                     )}
                   </tbody>
                 </table>
                 <div className="text-xs text-[#6E7368] mt-3">
-                  ℹ️ ราคา: คริปโตจาก Binance, หุ้น/ทองคำจาก Yahoo Finance (ฟรี ไม่ต้อง API key) — cron job ดึงทุก 4 ชม. + cache กัน rate limit
+                  {t('portfolio.vault.priceNote', 'ราคา: คริปโตจาก Binance, หุ้น/ทองคำจาก Yahoo Finance (ฟรี ไม่ต้อง API key) — cron job ดึงทุก 4 ชม. + cache กัน rate limit')}
                 </div>
               </div>
 
               {/* ── โกดังเสบียง ── */}
-              <div className={`${PANEL} p-5`}>
-                <h2 className="font-ledger font-semibold text-[#E8E2D5] mb-3"><span className="text-[#D4AF37]">▍</span> โกดังเสบียง (ดีเซล / วัตถุดิบฟาร์ม / ทองคำแท่ง)</h2>
+              <div className={`${PANEL} p-5 panel-cyan`}>
+                <h2 className="font-ledger font-semibold text-[#E8E2D5] mb-3 glow-text-cyan"><span className="text-[#D4AF37]">▍</span> {t('portfolio.inventory.title', 'โกดังเสบียง (ดีเซล / วัตถุดิบฟาร์ม / ทองคำแท่ง)')}</h2>
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   <input
                     value={invForm.name}
                     onChange={(e) => setInvForm({ ...invForm, name: e.target.value })}
-                    placeholder="ชื่อ เช่น ดีเซล B7, ข้าวสาร 5%"
+                    placeholder={t('portfolio.inventory.namePh', 'ชื่อ เช่น ดีเซล B7, ข้าวสาร 5%')}
                     className={`flex-1 min-w-[180px] ${INPUT}`}
                   />
                   <select
@@ -550,28 +555,28 @@ export default function PortfolioPage() {
                     onChange={(e) => setInvForm({ ...invForm, category: e.target.value })}
                     className={INPUT}
                   >
-                    <option value="FUEL">⛽ เชื้อเพลิง</option>
-                    <option value="FOOD">🍚 อาหาร/วัตถุดิบ</option>
-                    <option value="MATERIAL">🧱 วัสดุ</option>
-                    <option value="PRECIOUS_METAL">🥇 ทองคำแท่ง</option>
-                    <option value="OTHER">📦 อื่น ๆ</option>
+                    <option value="FUEL">{t('portfolio.inventory.cat.fuel', 'เชื้อเพลิง')}</option>
+                    <option value="FOOD">{t('portfolio.inventory.cat.food', 'อาหาร/วัตถุดิบ')}</option>
+                    <option value="MATERIAL">{t('portfolio.inventory.cat.material', 'วัสดุ')}</option>
+                    <option value="PRECIOUS_METAL">{t('portfolio.inventory.cat.precious', 'ทองคำแท่ง')}</option>
+                    <option value="OTHER">{t('portfolio.inventory.cat.other', 'อื่น ๆ')}</option>
                   </select>
                   <input
                     value={invForm.quantity}
                     onChange={(e) => setInvForm({ ...invForm, quantity: e.target.value })}
-                    placeholder="จำนวน"
+                    placeholder={t('portfolio.inventory.qtyPh', 'จำนวน')}
                     className={`w-24 ${INPUT}`}
                   />
                   <input
                     value={invForm.unit}
                     onChange={(e) => setInvForm({ ...invForm, unit: e.target.value })}
-                    placeholder="หน่วย (ลิตร/กก.)"
+                    placeholder={t('portfolio.inventory.unitPh', 'หน่วย (ลิตร/กก.)')}
                     className={`w-32 ${INPUT}`}
                   />
                   <input
                     value={invForm.unit_price_usd}
                     onChange={(e) => setInvForm({ ...invForm, unit_price_usd: e.target.value })}
-                    placeholder="ราคา/หน่วย USD"
+                    placeholder={t('portfolio.inventory.pricePh', 'ราคา/หน่วย USD')}
                     className={`w-32 ${INPUT}`}
                   />
                   <button
@@ -579,7 +584,7 @@ export default function PortfolioPage() {
                     disabled={invSaving}
                     className={BTN}
                   >
-                    {invSaving ? '⏳…' : '➕ เพิ่มเสบียง'}
+                    {invSaving ? t('portfolio.inventory.saving', 'กำลังบันทึก…') : t('portfolio.inventory.add', 'เพิ่มเสบียง')}
                   </button>
                 </div>
 
@@ -587,13 +592,13 @@ export default function PortfolioPage() {
                   {inventory.map((item) => (
                     <div key={item.id} className={`${TILE} p-3 flex flex-col`}>
                       <div className="flex items-start justify-between gap-2">
-                        <div className="font-bold text-sm text-[#E8E2D5]">{categoryIcons[item.category] || '📦'} {item.name}</div>
+                        <div className="font-bold text-sm text-[#E8E2D5] flex items-center gap-1.5"><Icon name={categoryIcons[item.category] ?? 'package'} size={14} className="text-[#8C9188]" />{item.name}</div>
                         <button
                           onClick={() => deleteInventory(item.id)}
-                          title="ลบรายการนี้"
-                          className="text-xs text-[#D98F85] hover:text-[#E8A79D] hover:underline shrink-0"
+                          title={t('portfolio.inventory.deleteTitle', 'ลบรายการนี้')}
+                          className="text-xs text-[#D98F85] hover:text-[#E8A79D] hover:underline shrink-0 inline-flex items-center gap-1"
                         >
-                          🗑️ ลบ
+                          <Icon name="trash" size={12} />{t('common.delete', 'ลบ')}
                         </button>
                       </div>
                       <div className="text-xs text-[#8C9188] mt-1">
@@ -606,7 +611,7 @@ export default function PortfolioPage() {
                     </div>
                   ))}
                   {inventory.length === 0 && (
-                    <div className="text-[#6E7368] text-sm col-span-full">ยังไม่มีรายการเสบียง — ใช้ฟอร์มด้านบนเพิ่ม (ดีเซล / ข้าวสาร / ทองคำแท่ง ฯลฯ)</div>
+                    <div className="text-[#6E7368] text-sm col-span-full">{t('portfolio.inventory.empty', 'ยังไม่มีรายการเสบียง — ใช้ฟอร์มด้านบนเพิ่ม (ดีเซล / ข้าวสาร / ทองคำแท่ง ฯลฯ)')}</div>
                   )}
                 </div>
               </div>

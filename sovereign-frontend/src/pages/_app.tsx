@@ -9,6 +9,7 @@ import AgentBackgroundBadge from '../components/AgentBackgroundBadge';
 import CommandPaletteHost from '../components/CommandPaletteHost';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFeatureStore } from '../stores/useFeatureStore';
+import { useLanguageStore } from '../stores/useLanguageStore';
 import '../styles/globals.css';
 
 // หน้าเฉพาะ SUPERADMIN — ซ่อน/ปิดให้สมาชิกเสมอ (กันเดา URL เข้า)
@@ -65,6 +66,15 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     Promise.resolve(useAuthStore.persist.rehydrate()).catch(() => {
       /* ไม่มี state ให้ hydrate — ไม่เป็นไร */
     });
+
+    // ภาษา: หลัง mount เสร็จเท่านั้นถึงให้ใช้ภาษาใน localStorage ได้
+    // (ก่อนหน้านี้ t() เรนเดอร์ไทยเสมอ = ตรงกับ HTML จาก server กัน hydration error)
+    Promise.resolve(useLanguageStore.persist.rehydrate()).catch(() => {
+      /* ไม่มี state ให้ hydrate — ไม่เป็นไร */
+    });
+    document.documentElement.dataset.langReady = '1';
+    document.documentElement.lang =
+      useLanguageStore.getState().lang === 'th' ? 'th' : 'en';
 
     // self-heal: ถ้า hydration ยังไม่จบ (dev HMR เปลี่ยน page chunk แต่ store chunk ค้าง
     // → module ผสมกันทำให้ rehydrate ไม่จบ) ลองใหม่ทุก 500ms — idempotent ปลอดภัย
@@ -126,19 +136,25 @@ export default function MyApp({ Component, pageProps }: AppProps) {
 
 // หน้าบอก "ไม่มีสิทธิ์" — กันสมาชิกเดา URL เปิดหน้าที่พ่อไม่เปิดให้
 function NoAccessScreen() {
+  const t = useLanguageStore((s) => s.t);
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex items-center justify-center p-8">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-8">
       <div className="text-center max-w-md">
-        <div className="text-5xl mb-4">🔒</div>
-        <h1 className="text-xl font-bold mb-2">หน้านี้ยังไม่ได้เปิดให้คุณดู</h1>
-        <p className="text-sm text-gray-400 mb-6">
-          ถ้าคิดว่าควรเห็นหน้านี้ ให้ผู้ดูแล (superadmin) เปิดสิทธิ์ให้ที่หน้า Users
+        <div className="w-12 h-12 mx-auto mb-4 rounded-xl border border-gray-800 bg-gray-900 flex items-center justify-center text-gray-500">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+        </div>
+        <h1 className="text-lg font-semibold mb-2">{t('app.noAccessTitle', 'หน้านี้ยังไม่ได้เปิดให้คุณดู')}</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          {t('app.noAccessHint', 'ถ้าคิดว่าควรเห็นหน้านี้ ให้ผู้ดูแล (superadmin) เปิดสิทธิ์ให้ที่หน้า Users')}
         </p>
         <a
           href="/dashboard"
           className="inline-block px-5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-colors"
         >
-          ← กลับ Dashboard
+          {t('app.backDashboard', 'กลับ Dashboard')}
         </a>
       </div>
     </div>

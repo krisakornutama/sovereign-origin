@@ -1,5 +1,7 @@
 "use client";
 import { useState } from 'react';
+import { useLanguageStore } from '../../stores/useLanguageStore';
+import { fmtLocale } from '../../lib/formatDate';
 
 export interface RealityCorrection {
   id: string;
@@ -22,8 +24,8 @@ export interface RealityStats {
 }
 
 const CALIB: Record<RealityStats['calibration'], { label: string; cls: string }> = {
-  calibrated: { label: 'Calibrated — AI ยังเชื่อถือได้', cls: 'text-green-400 border-green-600 bg-green-950/40' },
-  watch: { label: 'Watch — AI เตือนผิดบ่อยขึ้น ควรสังเกต', cls: 'text-yellow-400 border-yellow-600 bg-yellow-950/40' },
+  calibrated: { label: 'Calibrated — AI ยังเชื่อถือได้', cls: 'text-emerald-400 border-emerald-600 bg-emerald-950/40' },
+  watch: { label: 'Watch — AI เตือนผิดบ่อยขึ้น ควรสังเกต', cls: 'text-amber-400 border-amber-600 bg-amber-950/40' },
   unstable: { label: 'UNSTABLE — AI เตือนผิดเกินเกณฑ์ ลด sensitivity', cls: 'text-red-400 border-red-600 bg-red-950/40' },
 };
 
@@ -44,50 +46,51 @@ export default function RealityCard({
 }) {
   const [kind, setKind] = useState<RealityCorrection['kind']>('false_positive');
   const [note, setNote] = useState('');
+  const t = useLanguageStore((s) => s.t);
 
   if (!stats) return null;
   const c = CALIB[stats.calibration];
 
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 space-y-3">
+    <div className="panel panel-cyan p-4 space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-bold">🧠 Reality-Check · Paranoia Index</h2>
-        <span className={`text-[10px] px-2 py-1 rounded border ${c.cls}`}>{c.label}</span>
+        <h2 className="text-sm font-semibold text-gray-200 glow-text">Reality-Check · Paranoia Index</h2>
+        <span className={`text-[10px] px-2 py-1 rounded border ${c.cls}`}>{t(`securityComponents.reality.calib.${stats.calibration}`, c.label)}</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
         <div className="rounded bg-gray-800 p-2">
-          <div className="text-xl font-bold text-yellow-400">{stats.paranoiaIndex.toFixed(3)}</div>
-          <div className="text-[10px] text-gray-500">Paranoia Index (เตือนผิด/alert)</div>
+          <div className="text-xl font-bold text-amber-400 glow-text">{stats.paranoiaIndex.toFixed(3)}</div>
+          <div className="text-[10px] text-gray-500">{t('securityComponents.reality.paranoiaIndexLabel', 'Paranoia Index (เตือนผิด/alert)')}</div>
         </div>
         <div className="rounded bg-gray-800 p-2">
-          <div className="text-xl font-bold text-red-400">{stats.falsePositives30d}</div>
-          <div className="text-[10px] text-gray-500">เตือนผิด 30 วัน</div>
+          <div className="text-xl font-bold text-red-400 glow-text-red">{stats.falsePositives30d}</div>
+          <div className="text-[10px] text-gray-500">{t('securityComponents.reality.falsePositives30d', 'เตือนผิด 30 วัน')}</div>
         </div>
         <div className="rounded bg-gray-800 p-2">
-          <div className="text-xl font-bold text-blue-400">{stats.alerts30d}</div>
-          <div className="text-[10px] text-gray-500">Alert ทั้งหมด 30 วัน</div>
+          <div className="text-xl font-bold text-blue-400 glow-text-cyan">{stats.alerts30d}</div>
+          <div className="text-[10px] text-gray-500">{t('securityComponents.reality.alerts30d', 'Alert ทั้งหมด 30 วัน')}</div>
         </div>
         <div className="rounded bg-gray-800 p-2">
-          <div className="text-xl font-bold text-gray-200">{stats.corrections30d}</div>
-          <div className="text-[10px] text-gray-500">คำยืนยันจากครอบครัว</div>
+          <div className="text-xl font-bold text-gray-200 glow-text">{stats.corrections30d}</div>
+          <div className="text-[10px] text-gray-500">{t('securityComponents.reality.corrections30d', 'คำยืนยันจากครอบครัว')}</div>
         </div>
       </div>
       <p className="text-[10px] text-gray-500">
-        Paranoia Index = สัดส่วนที่ AI เตือนผิดเมื่อเทียบกับ alert ทั้งหมดใน 30 วัน
+        {t('securityComponents.reality.explain', 'Paranoia Index = สัดส่วนที่ AI เตือนผิดเมื่อเทียบกับ alert ทั้งหมดใน 30 วัน')}
         {stats.paranoiaIndex > 0.4 && (
-          <span className="text-red-400"> — เกิน 0.4 แล้ว! แนะนำให้ SUPERADMIN ลดความไวของระบบ (เช่น raise confidence_min ใน Vision/Firewall rules)</span>
+          <span className="text-red-400">{t('securityComponents.reality.overThreshold', ' — เกิน 0.4 แล้ว! แนะนำให้ SUPERADMIN ลดความไวของระบบ (เช่น raise confidence_min ใน Vision/Firewall rules)')}</span>
         )}
-        ข้อมูลนี้ยังถูกส่งให้ AI อ่านก่อนตอบคำถามทุกครั้ง (reality anchor) เพื่อกันไม่ให้ AI ติดหลงเชื่อการเตือนที่ผิดซ้ำ ๆ
+        {t('securityComponents.reality.anchorNote', 'ข้อมูลนี้ยังถูกส่งให้ AI อ่านก่อนตอบคำถามทุกครั้ง (reality anchor) เพื่อกันไม่ให้ AI ติดหลงเชื่อการเตือนที่ผิดซ้ำ ๆ')}
       </p>
-      <div className="rounded bg-gray-800/60 p-2 space-y-1.5 max-h-32 overflow-y-auto">
-        {stats.latest.length === 0 && <p className="text-[10px] text-gray-600">ยังไม่มีการยืนยัน — เมื่อเห็น alert ที่ "AI เข้าใจผิด" ให้กดปุ่มในตารางเหตุการณ์ หรือแจ้งที่นี่</p>}
+      <div className="log-stream space-y-1.5 max-h-32 overflow-y-auto">
+        {stats.latest.length === 0 && <p className="text-[10px] text-gray-600">{t('securityComponents.reality.empty', 'ยังไม่มีการยืนยัน — เมื่อเห็น alert ที่ "AI เข้าใจผิด" ให้กดปุ่มในตารางเหตุการณ์ หรือแจ้งที่นี่')}</p>}
         {stats.latest.map((l) => (
           <div key={l.id} className="flex items-start gap-2 text-[11px]">
             <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] ${l.kind === 'false_positive' ? 'bg-red-900/60 text-red-300' : l.kind === 'false_negative' ? 'bg-blue-900/60 text-blue-300' : 'bg-gray-700 text-gray-300'}`}>
-              {KIND_LABEL[l.kind]}
+              {t(`securityComponents.reality.kind.${l.kind}`, KIND_LABEL[l.kind])}
             </span>
             <span className="text-gray-300 break-all">{l.note}</span>
-            <span className="shrink-0 text-gray-600 ml-auto">{(l.by || 'system').slice(0, 8)} · {new Date(l.ts).toLocaleTimeString('th-TH')}</span>
+            <span className="shrink-0 text-gray-600 ml-auto">{(l.by || 'system').slice(0, 8)} · {new Date(l.ts).toLocaleTimeString(fmtLocale())}</span>
           </div>
         ))}
       </div>
@@ -98,25 +101,25 @@ export default function RealityCard({
           className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs"
         >
           {Object.entries(KIND_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+            <option key={k} value={k}>{t(`securityComponents.reality.kind.${k}`, v)}</option>
           ))}
         </select>
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="เช่น นี่คือช่างที่เราจ้างมาซ่อมกล้อง ไม่ใช่ผู้บุกรุก"
+          placeholder={t('securityComponents.reality.placeholder', 'เช่น นี่คือช่างที่เราจ้างมาซ่อมกล้อง ไม่ใช่ผู้บุกรุก')}
           className="flex-1 min-w-52 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs"
         />
         <button
           onClick={async () => {
-            if (!note.trim()) return alert('ใส่รายละเอียดก่อน');
+            if (!note.trim()) return alert(t('securityComponents.reality.alertNote', 'ใส่รายละเอียดก่อน'));
             await onCorrect(kind, note.trim());
             setNote('');
           }}
           disabled={busy}
-          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-40 transition"
+          className="btn-secondary text-xs px-3 py-1.5"
         >
-          {busy ? '⏳...' : 'ยืนยัน (reality anchor)'}
+          {busy ? t('common.loading', 'กำลังโหลด...') : t('securityComponents.reality.confirm', 'ยืนยัน (reality anchor)')}
         </button>
       </div>
     </div>

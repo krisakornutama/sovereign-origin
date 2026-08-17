@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 interface Zone {
   id: string; name: string; type: string;
@@ -24,6 +26,7 @@ const POINT_TYPES = ['กล้อง', 'เซ็นเซอร์ตรวจ
 
 export default function PropertyPage() {
   const { isAuthenticated, user, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [zones, setZones] = useState<Zone[]>([]);
   const [points, setPoints] = useState<Point[]>([]);
   const [scored, setScored] = useState<ScoredPoint[]>([]);
@@ -78,8 +81,8 @@ export default function PropertyPage() {
         body: JSON.stringify({ x, y }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'ย้ายจุดไม่สำเร็จ');
-      setMessage(`✅ ย้ายจุดไปที่ x=${x}, y=${y} แล้ว`);
+      if (!r.ok) throw new Error(d.error || t('property.errMovePoint', 'ย้ายจุดไม่สำเร็จ'));
+      setMessage(t('property.movedPoint', 'ย้ายจุดไปที่ x={x}, y={y} แล้ว', { x, y }));
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -107,7 +110,7 @@ export default function PropertyPage() {
       if (z.land) setLand(z.land);
       if (mr.ok) setMapSvg(await mr.text());
     } catch {
-      setError('โหลดแผนที่ไม่สำเร็จ — ตรวจว่า Core API เปิดอยู่');
+      setError(t('property.errLoadMap', 'โหลดแผนที่ไม่สำเร็จ — ตรวจว่า Core API เปิดอยู่'));
     } finally {
       setLoading(false);
     }
@@ -124,7 +127,7 @@ export default function PropertyPage() {
 
   const addZone = async () => {
     setError(''); setMessage('');
-    if (!zoneForm.name.trim()) return setError('ระบุชื่อโซน');
+    if (!zoneForm.name.trim()) return setError(t('property.errZoneName', 'ระบุชื่อโซน'));
     setBusy(true);
     try {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/property/zones`, {
@@ -137,8 +140,8 @@ export default function PropertyPage() {
         }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'เพิ่มโซนไม่สำเร็จ');
-      setMessage(`✅ เพิ่มโซน "${zoneForm.name}" แล้ว`);
+      if (!r.ok) throw new Error(d.error || t('property.errAddZone', 'เพิ่มโซนไม่สำเร็จ'));
+      setMessage(t('property.zoneAdded', 'เพิ่มโซน "{name}" แล้ว', { name: zoneForm.name }));
       setZoneForm({ ...zoneForm, name: '', x: '5', y: '5' });
       await load();
     } catch (e: any) {
@@ -149,9 +152,9 @@ export default function PropertyPage() {
   };
 
   const deleteZone = async (id: string, name: string) => {
-    if (!window.confirm(`ลบโซน "${name}"?`)) return;
+    if (!window.confirm(t('property.confirmDeleteZone', 'ลบโซน "{name}"?', { name }))) return;
     const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/property/zones/${id}`, { method: 'DELETE' });
-    if (r.ok) { setMessage('🗑️ ลบโซนแล้ว'); load(); }
+    if (r.ok) { setMessage(t('property.zoneDeleted', 'ลบโซนแล้ว')); load(); }
   };
 
   const addPoint = async (p?: Suggestion) => {
@@ -162,7 +165,7 @@ export default function PropertyPage() {
     const z = (p?.z != null ? p.z : Number(pointForm.z) || 0);
     const type = p?.type || pointForm.type;
     const reason = p?.reason || pointForm.reason;
-    if (!name.trim()) return setError('ระบุชื่อจุด');
+    if (!name.trim()) return setError(t('property.errPointName', 'ระบุชื่อจุด'));
     setBusy(true);
     try {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/property/points`, {
@@ -170,8 +173,8 @@ export default function PropertyPage() {
         body: JSON.stringify({ name, type, x, y, z, radius_m: Number(pointForm.radius_m) || 4, reason }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'เพิ่มจุดไม่สำเร็จ');
-      setMessage(`✅ เพิ่ม "${name}" (${type}) ที่ x=${x} y=${y}`);
+      if (!r.ok) throw new Error(d.error || t('property.errAddPoint', 'เพิ่มจุดไม่สำเร็จ'));
+      setMessage(t('property.pointAdded', 'เพิ่ม "{name}" ({type}) ที่ x={x} y={y}', { name, type, x, y }));
       setPointForm({ ...pointForm, name: '', reason: '' });
       await load();
     } catch (e: any) {
@@ -190,13 +193,13 @@ export default function PropertyPage() {
   };
 
   const deletePoint = async (id: string, name: string) => {
-    if (!window.confirm(`ลบจุด "${name}"?`)) return;
+    if (!window.confirm(t('property.confirmDeletePoint', 'ลบจุด "{name}"?', { name }))) return;
     const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/property/points/${id}`, { method: 'DELETE' });
-    if (r.ok) { setMessage('🗑️ ลบจุดแล้ว'); load(); }
+    if (r.ok) { setMessage(t('property.pointDeleted', 'ลบจุดแล้ว')); load(); }
   };
 
   const triggerPoint = async (pt: Point) => {
-    const subject = window.prompt('อะไรผ่านจุดนี้? (เช่น "คนแปลกหน้า", "สุนัข")', 'บุคคล');
+    const subject = window.prompt(t('property.triggerPrompt', 'อะไรผ่านจุดนี้? (เช่น "คนแปลกหน้า", "สุนัข")'), t('property.triggerDefault', 'บุคคล'));
     if (subject === null) return;
     setMessage(''); setError('');
     try {
@@ -205,8 +208,8 @@ export default function PropertyPage() {
         body: JSON.stringify({ subject: subject || 'บุคคล/สัตว์' }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'trigger ไม่สำเร็จ');
-      setMessage(`🚨 ${d.message}`);
+      if (!r.ok) throw new Error(d.error || t('property.errTrigger', 'trigger ไม่สำเร็จ'));
+      setMessage(d.message);
       load();
     } catch (e: any) {
       setError(e.message);
@@ -214,47 +217,47 @@ export default function PropertyPage() {
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('property.unauthorized', 'Unauthorized')}</div>;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">🗺️ แผนที่บ้าน & จุดยุทธศาสตร์</h1>
+          <h1 className="text-2xl font-bold glow-text">{t('property.title', 'แผนที่บ้าน & จุดยุทธศาสตร์')}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            จำลองที่ดิน {land.width}×{land.length} ม. (3 มิติ) + วิเคราะห์จุดวางกับดัก/กล้อง/เซ็นเซอร์ตรวจจับคน-สัตว์
+            {t('property.subtitle', 'จำลองที่ดิน {w}×{l} ม. (3 มิติ) + วิเคราะห์จุดวางกับดัก/กล้อง/เซ็นเซอร์ตรวจจับคน-สัตว์', { w: land.width, l: land.length })}
           </p>
         </div>
-        <a href="/dashboard" className="text-sm text-gray-400 hover:text-gray-200">← กลับ Dashboard</a>
+        <a href="/dashboard" className="text-sm text-gray-400 hover:text-gray-200">{t('property.backDashboard', '← กลับ Dashboard')}</a>
       </div>
 
       {message && <div className="mb-3 bg-emerald-900/40 border border-emerald-700 rounded-lg px-4 py-2 text-sm text-emerald-300">{message}</div>}
       {error && <div className="mb-3 bg-red-900/40 border border-red-700 rounded-lg px-4 py-2 text-sm text-red-300">{error}</div>}
 
       {/* ── แผนที่ 3 มิติ ── */}
-      <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4 mb-6">
+      <div className="card panel-glow p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold">🧊 แผนที่จำลอง (2D + ไอโซเมตริก 3D)</h2>
-          <button onClick={reloadMap} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">🔄 รีเฟรชแผนที่</button>
+          <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('property.mapTitle', 'แผนที่จำลอง (2D + ไอโซเมตริก 3D)')}</h2>
+          <button onClick={reloadMap} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs inline-flex items-center gap-1"><Icon name="refresh" size={12} /> {t('property.refreshMap', 'รีเฟรชแผนที่')}</button>
         </div>
         {loading ? (
-          <div className="text-gray-500 text-sm py-8 text-center">⏳ กำลังสร้างแผนที่...</div>
+          <div className="text-gray-500 text-sm py-8 text-center">{t('property.mapping', 'กำลังสร้างแผนที่...')}</div>
         ) : mapSvg ? (
-          <div className="overflow-auto rounded-lg bg-gray-950 border border-gray-800 max-h-[70vh]">
+          <div className="overflow-auto rounded-lg bg-gray-950 border border-cyan-800/50 max-h-[70vh]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(mapSvg)))}`} alt="แผนที่ที่ดิน" className="max-w-none" />
+            <img src={`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(mapSvg)))}`} alt={t('property.mapAlt', 'แผนที่ที่ดิน')} className="max-w-none" />
           </div>
         ) : (
-          <div className="text-gray-500 text-sm">ยังไม่มีโซน — เพิ่มโซนแรกด้านล่างเพื่อสร้างแผนที่</div>
+          <div className="text-gray-500 text-sm">{t('property.noZonesMap', 'ยังไม่มีโซน — เพิ่มโซนแรกด้านล่างเพื่อสร้างแผนที่')}</div>
         )}
 
         {/* ── ลากจุดยุทธศาสตร์ด้วยเมาส์ ── */}
         <div className="mt-4">
-          <h3 className="font-bold mb-1">🖱️ ลากจุดยุทธศาสตร์ (คลิกค้างแล้วลาก — บันทึกอัตโนมัติเมื่อปล่อย)</h3>
-          <p className="text-xs text-gray-500 mb-3">มุมมอง 2 มิติ: พื้นที่ {land.width}×{land.length} ม. · สีจัตุรัส = โซน · จุด = กล้อง/เซ็นเซอร์/กับดัก/ไฟ</p>
+          <h3 className="font-bold mb-1">{t('property.dragTitle', 'ลากจุดยุทธศาสตร์ (คลิกค้างแล้วลาก — บันทึกอัตโนมัติเมื่อปล่อย)')}</h3>
+          <p className="text-xs text-gray-500 mb-3">{t('property.boardHint', 'มุมมอง 2 มิติ: พื้นที่ {w}×{l} ม. · สีจัตุรัส = โซน · จุด = กล้อง/เซ็นเซอร์/กับดัก/ไฟ', { w: land.width, l: land.length })}</p>
           <div
             ref={boardRef}
             onPointerMove={moveDrag}
@@ -294,14 +297,14 @@ export default function PropertyPage() {
                 <div
                   key={p.id}
                   onPointerDown={startDrag(p)}
-                  title={`${p.name} (${p.x},${p.y}) — ลากเพื่อย้าย`}
+                  title={t('property.dragTitleAttr', '{name} ({x},{y}) — ลากเพื่อย้าย', { name: p.name, x: p.x, y: p.y })}
                   className={`absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 ${color} shadow-lg cursor-grab active:cursor-grabbing ${preview ? 'ring-2 ring-white/70 scale-110' : ''} ${p.enabled ? '' : 'opacity-40'}`}
                   style={{ left: `${px}%`, top: `${py}%`, touchAction: 'none' }}
                 />
               );
             })}
             {points.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">ยังไม่มีจุด — เพิ่มจุดด้านล่างแล้วลากมาวางได้เลย</div>
+              <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">{t('property.noPointsBoard', 'ยังไม่มีจุด — เพิ่มจุดด้านล่างแล้วลากมาวางได้เลย')}</div>
             )}
           </div>
         </div>
@@ -309,93 +312,99 @@ export default function PropertyPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* ── โซน ── */}
-        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
-          <h3 className="font-bold mb-3">🏠 โซนในที่ดิน ({zones.length})</h3>
+        <div className="card panel-cyan p-4">
+          <h3 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-3">{t('property.zonesTitle', 'โซนในที่ดิน ({n})', { n: zones.length })}</h3>
           <div className="space-y-2">
-            {zones.length === 0 && <div className="text-gray-500 text-xs">ยังไม่มีโซน — เช่น บ้าน, สวนทุเรียน, ประตูหน้า, โรงเก็บ</div>}
+            {zones.length === 0 && <div className="text-gray-500 text-xs">{t('property.noZones', 'ยังไม่มีโซน — เช่น บ้าน, สวนทุเรียน, ประตูหน้า, โรงเก็บ')}</div>}
             {zones.map((z) => (
-              <div key={z.id} className="flex items-center justify-between bg-gray-950/60 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+              <div key={z.id} className="flex items-center justify-between inset px-3 py-2 text-sm">
                 <div>
                   <span className="font-bold">{z.name}</span>{' '}
                   <span className="text-gray-500 text-xs">{z.type} · {z.width_m}×{z.length_m}×{z.height_m} ม. @({z.x},{z.y})</span>
                 </div>
-                <button onClick={() => deleteZone(z.id, z.name)} className="text-red-400 hover:text-red-300 text-xs">🗑️</button>
+                <button onClick={() => deleteZone(z.id, z.name)} className="text-red-400 hover:text-red-300 text-xs"><Icon name="trash" size={12} /></button>
               </div>
             ))}
           </div>
           <div className="mt-4 space-y-2">
-            <input value={zoneForm.name} onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })} placeholder="ชื่อโซน เช่น สวนทุเรียน" className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <input value={zoneForm.name} onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })} placeholder={t('property.zoneNamePlaceholder', 'ชื่อโซน เช่น สวนทุเรียน')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
             <div className="grid grid-cols-3 gap-2 text-xs">
               <select value={zoneForm.type} onChange={(e) => setZoneForm({ ...zoneForm, type: e.target.value })} className="bg-gray-800 border border-gray-700 rounded px-2 py-2">
-                {ZONE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                {ZONE_TYPES.map((zt) => <option key={zt} value={zt}>{t(`property.zoneType.${zt}`, zt)}</option>)}
               </select>
-              <input value={zoneForm.x} onChange={(e) => setZoneForm({ ...zoneForm, x: e.target.value })} placeholder="X (ม.)" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.y} onChange={(e) => setZoneForm({ ...zoneForm, y: e.target.value })} placeholder="Y (ม.)" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.width_m} onChange={(e) => setZoneForm({ ...zoneForm, width_m: e.target.value })} placeholder="กว้าง" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.length_m} onChange={(e) => setZoneForm({ ...zoneForm, length_m: e.target.value })} placeholder="ยาว" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.height_m} onChange={(e) => setZoneForm({ ...zoneForm, height_m: e.target.value })} placeholder="สูง" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.x} onChange={(e) => setZoneForm({ ...zoneForm, x: e.target.value })} placeholder={t('property.xM', 'X (ม.)')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.y} onChange={(e) => setZoneForm({ ...zoneForm, y: e.target.value })} placeholder={t('property.yM', 'Y (ม.)')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.width_m} onChange={(e) => setZoneForm({ ...zoneForm, width_m: e.target.value })} placeholder={t('property.width', 'กว้าง')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.length_m} onChange={(e) => setZoneForm({ ...zoneForm, length_m: e.target.value })} placeholder={t('property.length', 'ยาว')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.height_m} onChange={(e) => setZoneForm({ ...zoneForm, height_m: e.target.value })} placeholder={t('property.height', 'สูง')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
             </div>
-            <button onClick={addZone} disabled={busy} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold disabled:opacity-50">➕ เพิ่มโซน</button>
+            <button onClick={addZone} disabled={busy} className="btn-primary w-full">{t('property.addZone', 'เพิ่มโซน')}</button>
           </div>
         </div>
 
         {/* ── จุดยุทธศาสตร์ ── */}
-        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
-          <h3 className="font-bold mb-3">🎯 จุดยุทธศาสตร์ ({points.length})</h3>
+        <div className="card panel-cyan p-4">
+          <h3 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-3">{t('property.pointsTitle', 'จุดยุทธศาสตร์ ({n})', { n: points.length })}</h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {points.length === 0 && <div className="text-gray-500 text-xs">ยังไม่มีจุด — ใช้คำแนะนำด้านล่างหรือเพิ่มเอง</div>}
+            {points.length === 0 && <div className="text-gray-500 text-xs">{t('property.noPoints', 'ยังไม่มีจุด — ใช้คำแนะนำด้านล่างหรือเพิ่มเอง')}</div>}
             {points.map((p) => {
               const s = scored.find((x) => x.point.id === p.id);
               return (
-                <div key={p.id} className={`bg-gray-950/60 border rounded-lg px-3 py-2 text-xs ${p.enabled ? 'border-gray-800' : 'border-gray-800 opacity-50'}`}>
+                <div key={p.id} className={`inset px-3 py-2 text-xs ${p.enabled ? '' : 'opacity-50'}`}>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm">{p.type === 'กับดัก' ? '🔴' : p.type === 'กล้อง' ? '🔵' : p.type === 'ไฟ' ? '🟡' : '🩵'} {p.name}</span>
+                    <span className="font-bold text-sm inline-flex items-center gap-1.5">
+                      <span className={`inline-block w-2 h-2 rounded-full ${p.type === 'กับดัก' ? 'bg-red-500' : p.type === 'กล้อง' ? 'bg-blue-500' : p.type === 'ไฟ' ? 'bg-yellow-500' : 'bg-cyan-400'}`} />
+                      {p.name}
+                    </span>
                     <div className="flex gap-1">
-                      <button onClick={() => togglePoint(p)} className="text-gray-400 hover:text-gray-200">{p.enabled ? '🟢' : '⚪'}</button>
-                      <button onClick={() => deletePoint(p.id, p.name)} className="text-red-400 hover:text-red-300">🗑️</button>
+                      <button onClick={() => togglePoint(p)} className="text-gray-400 hover:text-gray-200">{p.enabled ? <Icon name="eye" size={12} className="text-emerald-400" /> : <Icon name="eye-off" size={12} />}</button>
+                      <button onClick={() => deletePoint(p.id, p.name)} className="text-red-400 hover:text-red-300"><Icon name="trash" size={12} /></button>
                     </div>
                   </div>
-                  <div className="text-gray-400 mt-1">@{p.x},{p.y},{p.z} · รัศมี {p.radius_m} ม.</div>
-                  {p.reason && <div className="text-gray-500 mt-0.5">💬 {p.reason}</div>}
+                  <div className="text-gray-400 mt-1">{t('property.pointPos', '@{x},{y},{z} · รัศมี {r} ม.', { x: p.x, y: p.y, z: p.z, r: p.radius_m })}</div>
+                  {p.reason && <div className="text-gray-500 mt-0.5">{p.reason}</div>}
                   {s && (
                     <div className="mt-1">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${s.score >= 70 ? 'bg-red-900/60 text-red-300' : s.score >= 40 ? 'bg-amber-900/60 text-amber-300' : 'bg-gray-800 text-gray-300'}`}>คะแนน {s.score}/100</span>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${s.score >= 70 ? 'bg-red-900/60 text-red-300' : s.score >= 40 ? 'bg-amber-900/60 text-amber-300' : 'bg-gray-800 text-gray-300'}`}>{t('property.score', 'คะแนน {score}/100', { score: s.score })}</span>
                       <span className="text-gray-500 ml-1">{s.reasons.join(' · ')}</span>
                     </div>
                   )}
-                  <button onClick={() => triggerPoint(p)} className="mt-1.5 w-full py-1 bg-rose-900/50 hover:bg-rose-800/60 border border-rose-800 rounded text-[11px] font-bold">🚨 ทดสอบตรวจจับ</button>
+                  <button onClick={() => triggerPoint(p)} className="mt-1.5 w-full py-1 bg-rose-900/50 hover:bg-rose-800/60 border border-rose-800 rounded text-[11px] font-bold inline-flex items-center justify-center gap-1"><Icon name="alerts" size={11} /> {t('property.testDetect', 'ทดสอบตรวจจับ')}</button>
                 </div>
               );
             })}
           </div>
           <div className="mt-4 space-y-2">
-            <input value={pointForm.name} onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })} placeholder="ชื่อจุด เช่น กล้องมุมรั้ว" className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <input value={pointForm.name} onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })} placeholder={t('property.pointNamePlaceholder', 'ชื่อจุด เช่น กล้องมุมรั้ว')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
             <div className="grid grid-cols-4 gap-2 text-xs">
               <select value={pointForm.type} onChange={(e) => setPointForm({ ...pointForm, type: e.target.value })} className="bg-gray-800 border border-gray-700 rounded px-1 py-2">
-                {POINT_TYPES.map((t) => <option key={t}>{t}</option>)}
+                {POINT_TYPES.map((pt) => <option key={pt} value={pt}>{t(`property.pointType.${pt}`, pt)}</option>)}
               </select>
-              <input value={pointForm.x} onChange={(e) => setPointForm({ ...pointForm, x: e.target.value })} placeholder="X" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={pointForm.y} onChange={(e) => setPointForm({ ...pointForm, y: e.target.value })} placeholder="Y" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={pointForm.radius_m} onChange={(e) => setPointForm({ ...pointForm, radius_m: e.target.value })} placeholder="รัศมี" className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={pointForm.x} onChange={(e) => setPointForm({ ...pointForm, x: e.target.value })} placeholder={t('property.x', 'X')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={pointForm.y} onChange={(e) => setPointForm({ ...pointForm, y: e.target.value })} placeholder={t('property.y', 'Y')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={pointForm.radius_m} onChange={(e) => setPointForm({ ...pointForm, radius_m: e.target.value })} placeholder={t('property.radius', 'รัศมี')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
             </div>
-            <input value={pointForm.reason} onChange={(e) => setPointForm({ ...pointForm, reason: e.target.value })} placeholder="เหตุผลที่วาง (เช่น คนต้องผ่านทางนี้)" className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
-            <button onClick={() => addPoint()} disabled={busy} className="w-full py-2 bg-cyan-700 hover:bg-cyan-600 rounded-lg text-sm font-bold disabled:opacity-50">➕ เพิ่มจุด</button>
+            <input value={pointForm.reason} onChange={(e) => setPointForm({ ...pointForm, reason: e.target.value })} placeholder={t('property.reasonPlaceholder', 'เหตุผลที่วาง (เช่น คนต้องผ่านทางนี้)')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <button onClick={() => addPoint()} disabled={busy} className="btn-primary w-full">{t('property.addPoint', 'เพิ่มจุด')}</button>
           </div>
         </div>
 
         {/* ── คำแนะนำอัตโนมัติ ── */}
-        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
-          <h3 className="font-bold mb-3">🧠 วิเคราะห์จุดยุทธศาสตร์</h3>
+        <div className="card panel-glow p-4">
+          <h3 className="text-sm font-semibold text-gray-200 glow-text mb-3">{t('property.analyzeTitle', 'วิเคราะห์จุดยุทธศาสตร์')}</h3>
           <p className="text-xs text-gray-500 mb-3">
-            ระบบวิเคราะห์จากตำแหน่งโซน: จุดที่คน/สัตว์ต้องผ่าน (ขอบรั้ว, ประตู, ระหว่างบ้าน↔สวน) ได้คะแนนสูงสุด
+            {t('property.analyzeDesc', 'ระบบวิเคราะห์จากตำแหน่งโซน: จุดที่คน/สัตว์ต้องผ่าน (ขอบรั้ว, ประตู, ระหว่างบ้าน↔สวน) ได้คะแนนสูงสุด')}
           </p>
-          <div className="text-xs font-bold text-amber-300 mb-2">📍 ตำแหน่งแนะนำให้วางจุดตรวจจับ ({suggestions.length})</div>
+          <div className="text-xs font-bold text-amber-300 mb-2 flex items-center gap-1"><Icon name="map-pin" size={12} /> {t('property.suggestedTitle', 'ตำแหน่งแนะนำให้วางจุดตรวจจับ ({n})', { n: suggestions.length })}</div>
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {suggestions.map((s, i) => (
               <div key={i} className="bg-gray-950/60 border border-gray-800 rounded-lg px-3 py-2 text-xs">
-                <div className="font-bold">{s.type === 'กับดัก' ? '🔴' : s.type === 'กล้อง' ? '🔵' : s.type === 'ไฟ' ? '🟡' : '🩵'} {s.name} @({s.x},{s.y})</div>
+                <div className="font-bold inline-flex items-center gap-1.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${s.type === 'กับดัก' ? 'bg-red-500' : s.type === 'กล้อง' ? 'bg-blue-500' : s.type === 'ไฟ' ? 'bg-yellow-500' : 'bg-cyan-400'}`} />
+                  {s.name} @({s.x},{s.y})
+                </div>
                 <div className="text-gray-500 mt-0.5">{s.reason}</div>
-                <button onClick={() => addPoint(s)} className="mt-1.5 w-full py-1 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-bold">➕ เพิ่มจุดนี้</button>
+                <button onClick={() => addPoint(s)} className="mt-1.5 w-full py-1 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-bold">{t('property.addThisPoint', 'เพิ่มจุดนี้')}</button>
               </div>
             ))}
           </div>

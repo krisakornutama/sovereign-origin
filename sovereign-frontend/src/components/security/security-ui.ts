@@ -1,3 +1,5 @@
+import { fmtLocale } from '../../lib/formatDate';
+
 export type ActionMsgType = 'success' | 'info' | 'error';
 
 export interface ActionMsg {
@@ -16,14 +18,14 @@ export function extractIp(addr: string): string {
 }
 
 export const ACTION_STYLES: Record<ActionMsgType, string> = {
-  success: 'bg-green-900/30 text-green-400 border-green-800',
+  success: 'bg-emerald-900/30 text-emerald-400 border-emerald-800 shadow-neon-green',
   info: 'bg-amber-900/30 text-amber-300 border-amber-700',
-  error: 'bg-red-900/30 text-red-400 border-red-800',
+  error: 'bg-red-900/30 text-red-400 border-red-800 shadow-neon-red',
 };
 
 export function fmtTime(ts?: number): string {
   if (!ts) return '-';
-  return new Date(ts).toLocaleString('th-TH');
+  return new Date(ts).toLocaleString(fmtLocale());
 }
 
 export function fmtArgs(args: any): string {

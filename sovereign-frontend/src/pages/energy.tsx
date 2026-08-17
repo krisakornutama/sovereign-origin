@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 
 interface EnergySummary {
   battery_soc: number | null;
@@ -20,14 +23,15 @@ const CANVAS_HEIGHT = 300;
 const PADDING = { top: 20, right: 30, bottom: 40, left: 60 };
 
 const statusLabels: Record<EnergySummary['status'], string> = {
-  discharging: '🔴 ใช้แบตเตอรี่ (discharge)',
-  charging: '🟢 กำลังชาร์จ / ผลิตไฟเกิน',
-  balanced: '⚪ สมดุล',
-  no_data: '⚪ ไม่มีข้อมูล',
+  discharging: 'ใช้แบตเตอรี่ (discharge)',
+  charging: 'กำลังชาร์จ / ผลิตไฟเกิน',
+  balanced: 'สมดุล',
+  no_data: 'ไม่มีข้อมูล',
 };
 
 export default function EnergyPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [summary, setSummary] = useState<EnergySummary | null>(null);
   const [points, setPoints] = useState<{ time: number; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +58,7 @@ export default function EnergyPage() {
         );
       } catch (err) {
         console.error(err);
-        setError('โหลดข้อมูลพลังงานไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลเซ็นเซอร์');
+        setError(t('energy.loadFailed', 'โหลดข้อมูลพลังงานไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลเซ็นเซอร์'));
       } finally {
         setLoading(false);
       }
@@ -73,7 +77,7 @@ export default function EnergyPage() {
       ctx.fillStyle = '#6b7280';
       ctx.font = '14px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('ยังไม่มีข้อมูล power_kw', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.fillText(t('energy.chartNoData', 'ยังไม่มีข้อมูล power_kw'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
       return;
     }
 
@@ -133,89 +137,90 @@ export default function EnergyPage() {
     for (let i = 0; i <= 5; i++) {
       const t = xMin + (i / 5) * (xMax - xMin);
       const x = scaleX(t);
-      ctx.fillText(new Date(t).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' }), x, CANVAS_HEIGHT - PADDING.bottom + 15);
+      ctx.fillText(new Date(t).toLocaleDateString(fmtLocale(), { day: '2-digit', month: '2-digit' }), x, CANVAS_HEIGHT - PADDING.bottom + 15);
     }
-  }, [points]);
+  }, [points, t]);
 
   useEffect(() => {
     drawChart();
   }, [drawChart]);
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
-  if (!isAuthenticated || !user) return <div className="text-white p-8">Unauthorized</div>;
+  if (!isAuthenticated || !user) return <div className="text-white p-8">{t('energy.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="อุปกรณ์ &amp; พลังงาน"
-          title="⚡ Energy Management" actions={<a href="/dashboard" className="text-sm text-blue-400 hover:underline">← กลับ Dashboard</a>}
+          eyebrow={t('energy.eyebrow', 'อุปกรณ์ & พลังงาน')}
+          title={t('energy.title', 'Energy Management')} icon={<Icon name="energy" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</a>}
         />
       </header>
       <main className="max-w-5xl mx-auto p-6 space-y-6">
-        {error && <div className="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3">{error}</div>}
+        {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
 
         {loading ? (
-          <div className="text-gray-500">⏳ กำลังโหลด…</div>
+          <div className="text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
-                <div className="text-xs text-gray-400 mb-1">🔋 แบตเตอรี่</div>
-                <div className="text-3xl font-bold text-green-400">
+              <div className="card panel-glow p-5">
+                <div className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><Icon name="battery" size={13} /> {t('energy.battery', 'แบตเตอรี่')}</div>
+                <div className="text-3xl font-bold text-emerald-400 glow-text">
                   {summary?.battery_soc != null ? summary.battery_soc + '%' : 'N/A'}
                 </div>
                 <div className="w-full bg-gray-700 h-2 rounded-full mt-3 overflow-hidden">
                   <div
-                    className="h-2 rounded-full bg-gradient-to-r from-green-400 to-emerald-600"
+                    className="h-2 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
                     style={{ width: `${Math.min(100, summary?.battery_soc ?? 0)}%` }}
                   />
                 </div>
               </div>
 
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
-                <div className="text-xs text-gray-400 mb-1">⚡ กำลังไฟเฉลี่ย 24 ชม.</div>
-                <div className="text-3xl font-bold text-amber-400">
+              <div className="card panel-glow p-5">
+                <div className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><Icon name="zap" size={13} /> {t('energy.avgPower', 'กำลังไฟเฉลี่ย 24 ชม.')}</div>
+                <div className="text-3xl font-bold text-amber-400 glow-text">
                   {summary?.power_kw_avg_24h != null ? summary.power_kw_avg_24h + ' kW' : 'N/A'}
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  ล่าสุด: {summary?.power_kw_latest != null ? summary.power_kw_latest + ' kW' : 'N/A'}
-                  {' '}(− = ใช้ไฟ, + = ชาร์จ)
+                  {t('energy.latest', 'ล่าสุด: ')}{summary?.power_kw_latest != null ? summary.power_kw_latest + ' kW' : 'N/A'}
+                  {' '}{t('energy.signHint', '(− = ใช้ไฟ, + = ชาร์จ)')}
                 </div>
               </div>
 
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
-                <div className="text-xs text-gray-400 mb-1">🔌 ใช้ไป 24 ชม. (สุทธิ)</div>
-                <div className="text-3xl font-bold text-blue-400">
+              <div className="card panel-glow p-5">
+                <div className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><Icon name="zap" size={13} /> {t('energy.netUsage', 'ใช้ไป 24 ชม. (สุทธิ)')}</div>
+                <div className="text-3xl font-bold text-blue-400 glow-text">
                   {summary?.kwh_net_24h != null ? Math.abs(summary.kwh_net_24h) + ' kWh' : 'N/A'}
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  {summary?.kwh_net_24h != null && summary.kwh_net_24h < 0 ? 'ใช้จากแบตเตอรี่' : 'ผลิต/ชาร์จเข้าสะสม'}
+                  {summary?.kwh_net_24h != null && summary.kwh_net_24h < 0 ? t('energy.fromBattery', 'ใช้จากแบตเตอรี่') : t('energy.chargingInto', 'ผลิต/ชาร์จเข้าสะสม')}
                 </div>
               </div>
 
-              <div className="bg-gray-900 border border-gray-700 rounded-xl p-5">
-                <div className="text-xs text-gray-400 mb-1">⏱️ ประมาณเวลาที่เหลือ</div>
-                <div className="text-3xl font-bold text-purple-400">
-                  {summary?.hours_remaining != null ? summary.hours_remaining + ' ชม.' : '—'}
+              <div className="card panel-glow p-5">
+                <div className="text-xs text-gray-400 mb-1 flex items-center gap-1.5"><Icon name="clock" size={13} /> {t('energy.timeRemaining', 'ประมาณเวลาที่เหลือ')}</div>
+                <div className="text-3xl font-bold text-purple-400 glow-text">
+                  {summary?.hours_remaining != null ? t('energy.hoursShort', '{n} ชม.', { n: summary.hours_remaining }) : '—'}
                 </div>
-                <div className="text-xs text-gray-500 mt-2">{summary ? statusLabels[summary.status] : ''}</div>
+                <div className="text-xs text-gray-500 mt-2">{summary ? t(`energy.status.${summary.status}`, statusLabels[summary.status]) : ''}</div>
               </div>
             </div>
 
-            <div className="text-xs text-gray-600">
-              ℹ️ คำนวณจากความจุแบตเตอรี่ {summary?.capacity_kwh ?? 5} kWh (ตั้งได้ผ่าน env ENERGY_CAPACITY_KWH) และค่า power_kw เฉลี่ย 24 ชม. — ตัวเลขเป็นค่าประมาณ
+            <div className="text-xs text-gray-600 flex items-start gap-1.5">
+              <Icon name="info" size={13} className="mt-0.5 shrink-0" />
+              <span>{t('energy.calcNote', 'คำนวณจากความจุแบตเตอรี่ {capacity} kWh (ตั้งได้ผ่าน env ENERGY_CAPACITY_KWH) และค่า power_kw เฉลี่ย 24 ชม. — ตัวเลขเป็นค่าประมาณ', { capacity: summary?.capacity_kwh ?? 5 })}</span>
             </div>
 
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+            <div className="card panel-cyan p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-gray-200">📈 กำลังไฟ 7 วัน (kW)</h2>
-                <span className="text-xs text-gray-500">🟠 เส้น = power_kw | เส้นกลาง = ศูนย์</span>
+                <h2 className="font-bold text-gray-200 glow-text-cyan">{t('energy.chartTitle', 'กำลังไฟ 7 วัน (kW)')}</h2>
+                <span className="text-xs text-gray-500">{t('energy.chartLegend', 'เส้น = power_kw | เส้นกลาง = ศูนย์')}</span>
               </div>
               <canvas
                 ref={canvasRef}

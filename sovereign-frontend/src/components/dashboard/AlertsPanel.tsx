@@ -1,6 +1,8 @@
 "use client";
+import { fmtLocale } from '../../lib/formatDate';
 import { useState, useEffect } from 'react';
 import { authFetch } from '../../lib/apiFetch';
+import Icon from '../ui/Icon';
 
 interface Alert {
   ruleId: string;
@@ -38,7 +40,7 @@ export default function AlertsPanel() {
               checkData.alerts.forEach((msg: string, i: number) => {
                 // Show notification
                 if (Notification.permission === 'granted') {
-                  new Notification('🚨 Sovereign Alert', { body: msg });
+                  new Notification('Sovereign Alert', { body: msg });
                 }
               });
               return [...newAlerts.slice(-4), ...checkData.alerts.map((m: string) => ({
@@ -72,26 +74,28 @@ export default function AlertsPanel() {
   if (alerts.length === 0) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="log-stream space-y-2">
       {alerts.map((alert, i) => (
         <div
           key={i}
           className={`p-3 rounded-lg border text-sm animate-slide-in ${
             alert.severity === 'critical'
-              ? 'bg-red-900/40 border-red-500/50 text-red-300'
+              ? 'bg-rose-950/40 border-rose-800/60 text-rose-300'
               : alert.severity === 'warning'
-              ? 'bg-amber-900/40 border-amber-500/50 text-amber-300'
-              : 'bg-blue-900/40 border-blue-500/50 text-blue-300'
+              ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+              : 'bg-sky-950/40 border-sky-800/60 text-sky-300 panel-cyan'
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️'}
-            </span>
+            <Icon
+              name={alert.severity === 'info' ? 'info' : 'alert-triangle'}
+              size={16}
+              className="shrink-0"
+            />
             <div>
               <p className="font-semibold">{alert.message}</p>
               <p className="text-xs opacity-75 mt-0.5">
-                {new Date(alert.timestamp).toLocaleTimeString('th-TH')}
+                {new Date(alert.timestamp).toLocaleTimeString(fmtLocale())}
               </p>
             </div>
           </div>

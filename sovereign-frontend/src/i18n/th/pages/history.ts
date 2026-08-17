@@ -1,0 +1,25 @@
+// หน้า History (history.tsx) — ภาษาไทย
+export default {
+  unauthorized: 'Unauthorized',
+  eyebrow: 'ข้อมูล & รายงาน',
+  backDashboard: '← กลับ Dashboard',
+  range: {
+    '24h': '24 ชม',
+    '7d': '7 วัน',
+    '30d': '30 วัน',
+    custom: 'กำหนดเอง',
+  },
+  reloading: 'กำลังโหลด…',
+  reload: 'โหลดใหม่',
+  metricLabel: 'Metric:',
+  toggleRemove: 'กดเพื่อเอากราฟออก',
+  toggleAdd: 'กดเพื่อเพิ่มกราฟ',
+  noDataHint: 'ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล — รอข้อมูลจาก MQTT หรือเพิ่มข้อมูลด้วยมือที่หน้า Sensors',
+  seriesCount: 'series: ',
+  pointsCount: 'จุดข้อมูล: ',
+  rangeLabel: 'ช่วงเวลา: ',
+  legend: '| เส้น = ค่าเฉลี่ย | แถบจาง = min–max',
+  loadingChart: 'กำลังโหลดข้อมูล…',
+  noDataInRange: 'ยังไม่มีข้อมูลเซ็นเซอร์ในช่วงเวลานี้',
+  loadError: 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB',
+} as const;
