@@ -2,25 +2,27 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useRiskStore } from '../../stores/useRiskStore';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 import { authFetch } from '../../lib/apiFetch';
+import Icon from '../ui/Icon';
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
-  war: { label: 'สงคราม', icon: '💥' },
-  banking: { label: 'วิกฤตธนาคาร', icon: '🏦' },
-  energy: { label: 'พลังงาน', icon: '⚡' },
-  inflation: { label: 'เงินเฟ้อ', icon: '📈' },
+  war: { label: 'สงคราม', icon: '' },
+  banking: { label: 'วิกฤตธนาคาร', icon: '' },
+  energy: { label: 'พลังงาน', icon: '' },
+  inflation: { label: 'เงินเฟ้อ', icon: '' },
 };
 
 function defconInfo(level: number): { label: string; color: string; ring: string } {
   switch (level) {
     case 1:
-      return { label: 'DEFCON 1 · CRITICAL', color: 'text-red-400', ring: 'border-red-500 bg-red-900/30' };
+      return { label: 'DEFCON 1 · CRITICAL', color: 'text-rose-400', ring: 'border-rose-800/60 bg-rose-950/40' };
     case 2:
-      return { label: 'DEFCON 2 · SEVERE', color: 'text-orange-400', ring: 'border-orange-500 bg-orange-900/30' };
+      return { label: 'DEFCON 2 · SEVERE', color: 'text-orange-400', ring: 'border-orange-800/60 bg-orange-950/40' };
     case 3:
-      return { label: 'DEFCON 3 · ELEVATED', color: 'text-yellow-400', ring: 'border-yellow-500 bg-yellow-900/30' };
+      return { label: 'DEFCON 3 · ELEVATED', color: 'text-amber-400', ring: 'border-amber-800/60 bg-amber-950/40' };
     default:
-      return { label: 'DEFCON 5 · NORMAL', color: 'text-green-400', ring: 'border-green-700 bg-green-900/20' };
+      return { label: 'DEFCON 5 · NORMAL', color: 'text-emerald-400', ring: 'border-emerald-800/60 bg-emerald-950/40' };
   }
 }
 
@@ -33,6 +35,7 @@ function threatColor(overall: number | null): string {
 
 export default function DefconWidget() {
   const { token, isAuthenticated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const threat = useRiskStore((s) => s.threat);
   const defconLevel = useRiskStore((s) => s.defconLevel);
   const seed = useRiskStore((s) => s.seed);
@@ -68,23 +71,25 @@ export default function DefconWidget() {
   const color = threatColor(overall);
 
   return (
-    <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-4 backdrop-blur-sm">
+    <div className="card panel-glow p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-gray-200">🛡️ DEFCON / Threat Index</h3>
-        <a href="/risk-monitor" className="text-xs text-blue-400 hover:underline">รายละเอียด →</a>
+        <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5 glow-text">
+          <Icon name="shield" size={14} /> DEFCON / Threat Index
+        </h3>
+        <a href="/risk-monitor" className="text-xs text-sky-400 hover:underline">{t('dashboard.defcon.detailsLink', 'รายละเอียด →')}</a>
       </div>
 
       <div className={`rounded-lg border px-3 py-2 mb-3 ${info.ring}`}>
-        <span className={`text-sm font-bold ${info.color}`}>{info.label}</span>
+        <span className={`text-sm font-bold ${info.color} glow-text`}>{t(`dashboard.defcon.level${defconLevel === 1 || defconLevel === 2 || defconLevel === 3 ? defconLevel : 5}`, info.label)}</span>
         {overall != null && (
-          <span className="text-xs text-gray-400 ml-2">Threat Index {overall}/100</span>
+          <span className="text-xs text-gray-400 ml-2 glow-text">Threat Index {overall}/100</span>
         )}
       </div>
 
       {overall != null ? (
         <>
           {/* Gauge แนวนอน */}
-          <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
+          <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden mb-2 panel-cyan">
             <div
               className="h-2 rounded-full transition-all duration-700"
               style={{ width: `${Math.min(100, overall)}%`, background: color }}
@@ -100,11 +105,11 @@ export default function DefconWidget() {
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(CATEGORY_LABELS).map(([key, meta]) => {
               const v = categories[key] ?? 0;
-              const c = v > 75 ? 'text-red-400' : v > 50 ? 'text-yellow-400' : 'text-gray-300';
+              const c = v > 75 ? 'text-rose-400' : v > 50 ? 'text-amber-400' : 'text-gray-300';
               return (
-                <div key={key} className="bg-gray-800/60 border border-gray-700 rounded-lg px-2 py-1.5">
+                <div key={key} className="inset panel-cyan px-2 py-1.5">
                   <div className="flex justify-between text-[10px]">
-                    <span className="text-gray-400">{meta.icon} {meta.label}</span>
+                    <span className="text-gray-400">{t(`dashboard.defcon.category.${key}`, meta.label)}</span>
                     <span className={c}>{v}</span>
                   </div>
                   <div className="bg-gray-700 h-1 rounded-full overflow-hidden mt-1">
@@ -124,8 +129,8 @@ export default function DefconWidget() {
         </>
       ) : (
         <div className="text-xs text-gray-500">
-          ยังไม่มีข้อมูล — เปิด <code className="text-gray-400">RISK_MONITOR_ENABLED=true</code> + Ollama ใน .env แล้วกด
-          <a href="/risk-monitor" className="text-blue-400 hover:underline"> 🔄 ดึงข่าว + วิเคราะห์</a>
+          {t('dashboard.defcon.emptyBefore', 'ยังไม่มีข้อมูล — เปิด ')}<code className="text-gray-400">RISK_MONITOR_ENABLED=true</code>{t('dashboard.defcon.emptyAfter', ' + Ollama ใน .env แล้วกด')}
+          <a href="/risk-monitor" className="text-sky-400 hover:underline">{t('dashboard.defcon.fetchNews', ' ดึงข่าว + วิเคราะห์')}</a>
         </div>
       )}
     </div>

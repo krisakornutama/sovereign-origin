@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
+import Icon from '../ui/Icon';
+import { useLanguageStore } from '../../stores/useLanguageStore';
+import { fmtLocale } from '../../lib/formatDate';
 import type { KillSwitchState } from './KillSwitchCard';
 
 export interface StreamEvent {
@@ -16,65 +19,86 @@ const EVENT_TYPES = [
 ] as const;
 
 const TYPE_ICON: Record<string, string> = {
-  THREAT: '🚨', IDS_ALERT: '🛰️', KILL_SWITCH: '⛔', INTEL_UPDATE: '🧬',
-  APP_CONTROL: '📱', DNS_BLOCK: '🚫', DNS_ALLOW: '✅', AI_ANALYSIS: '🤖',
-  FIRST_RESPONDER: '🚑', REALITY: '🧠', DRILL: '🧯',
-  LIVING_MODE: '🌿', MANUAL_DAY: '🤚',
-  TIME_DESYNC: '⏰', RELAY_CHATTER: '⚡', BIT_ROT: '💾', INJECTION: '🧪', GOVSIM: '🏛️',
+  THREAT: 'alert-triangle', IDS_ALERT: 'alerts', KILL_SWITCH: 'x-circle', INTEL_UPDATE: 'database',
+  APP_CONTROL: 'grid', DNS_BLOCK: 'shield', DNS_ALLOW: 'check-circle', AI_ANALYSIS: 'ai',
+  FIRST_RESPONDER: 'heart-pulse', REALITY: 'eye', DRILL: 'target',
+  LIVING_MODE: 'farm',
+  TIME_DESYNC: 'clock', RELAY_CHATTER: 'zap', BIT_ROT: 'save', GOVSIM: 'governance',
 };
 
-function summarize(type: string, data: any): string {
+type TFunc = (path: string, fallback?: string, vars?: Record<string, string | number>) => string;
+
+function summarize(type: string, data: any, t: TFunc): string {
   switch (type) {
     case 'THREAT':
-      return `[${data.severity}] ${data.description || 'anomaly'}${data.blocked ? ' — 🚫 auto-blocked' : ''}`;
+      return `[${data.severity}] ${data.description || 'anomaly'}${data.blocked ? ' — auto-blocked' : ''}`;
     case 'IDS_ALERT':
-      return `[Suricata] ${data.signature || ''} จาก ${data.sourceIp || '-'}${data.category ? ` (${data.category})` : ''}`;
+      return `[Suricata] ${data.signature || ''} ${t('securityComponents.stream.idsFrom', 'จาก')} ${data.sourceIp || '-'}${data.category ? ` (${data.category})` : ''}`;
     case 'KILL_SWITCH':
       return data.active
-        ? `เปิดโดย ${data.by || 'unknown'} — ${data.reason || ''}`
-        : `ปลดล็อกโดย ${data.by || 'unknown'}`;
+        ? t('securityComponents.stream.killEnabled', 'เปิดโดย {by} — {reason}', { by: data.by || 'unknown', reason: data.reason || '' })
+        : t('securityComponents.stream.killReleased', 'ปลดล็อกโดย {by}', { by: data.by || 'unknown' });
     case 'INTEL_UPDATE':
       return data.action === 'add'
-        ? `เพิ่ม IOC ${data.item?.type} ${data.item?.value}${data.item?.category ? ` (${data.item.category})` : ''}`
-        : 'อัปเดตฐาน IOC';
+        ? t('securityComponents.stream.intelAdd', 'เพิ่ม IOC {type} {value}{cat}', { type: data.item?.type, value: data.item?.value, cat: data.item?.category ? ` (${data.item.category})` : '' })
+        : t('securityComponents.stream.intelUpdate', 'อัปเดตฐาน IOC');
     case 'APP_CONTROL':
-      return `${data.action === 'toggle' ? 'สลับ' : 'เปลี่ยน'} App ${data.appId} → ${data.blocked ? 'block' : 'unblock'}`;
+      return `${t(data.action === 'toggle' ? 'securityComponents.stream.appToggle' : 'securityComponents.stream.appChange', data.action === 'toggle' ? 'สลับ' : 'เปลี่ยน')} App ${data.appId} → ${data.blocked ? 'block' : 'unblock'}`;
     case 'DNS_BLOCK':
-      return `Block โดเมน ${data.domain} ผ่าน Pi-hole + Threat DB`;
+      return t('securityComponents.stream.dnsBlock', 'Block โดเมน {domain} ผ่าน Pi-hole + Threat DB', { domain: data.domain });
     case 'DNS_ALLOW':
-      return `ปลดบล็อกโดเมน ${data.domain}`;
+      return t('securityComponents.stream.dnsAllow', 'ปลดบล็อกโดเมน {domain}', { domain: data.domain });
     case 'AI_ANALYSIS':
-      return `AI Analyst สรุป: ${data.stats ? `ตรวจ ${data.stats.events24h} เหตุการณ์` : '—'}`;
+      return t('securityComponents.stream.aiSummary', 'AI Analyst สรุป: {stats}', {
+        stats: data.stats ? t('securityComponents.stream.aiChecked', 'ตรวจ {n} เหตุการณ์', { n: data.stats.events24h }) : '—',
+      });
     case 'FIRST_RESPONDER':
       return data.active
-        ? `โหมดฉุกเฉินเปิด โดย ${data.by || 'unknown'}${data.note ? ` — ${data.note}` : ''} (หมดอายุ ${data.expiresAt ? new Date(data.expiresAt).toLocaleString('th-TH') : '-'})`
-        : `โหมดฉุกเฉินปิด โดย ${data.by || 'unknown'}`;
+        ? t('securityComponents.stream.frEnabled', 'โหมดฉุกเฉินเปิด โดย {by}{note} (หมดอายุ {expires})', {
+            by: data.by || 'unknown',
+            note: data.note ? ` — ${data.note}` : '',
+            expires: data.expiresAt ? new Date(data.expiresAt).toLocaleString(fmtLocale()) : '-',
+          })
+        : t('securityComponents.stream.frDisabled', 'โหมดฉุกเฉินปิด โดย {by}', { by: data.by || 'unknown' });
     case 'REALITY':
       return data.action === 'correct'
-        ? `ครอบครัวยืนยัน [${data.kind}] โดย ${data.by || 'unknown'} — ${data.note || ''}`
-        : 'อัปเดต Paranoia Index';
+        ? t('securityComponents.stream.realityCorrect', 'ครอบครัวยืนยัน [{kind}] โดย {by} — {note}', { kind: data.kind, by: data.by || 'unknown', note: data.note || '' })
+        : t('securityComponents.stream.realityUpdate', 'อัปเดต Paranoia Index');
     case 'DRILL':
       return `Chaos Drill: ${data.verdict} (${data.passed}/${data.total} checks)`;
     case 'LIVING_MODE':
       return data.active
-        ? `Living Mode เปิด โดย ${data.by || 'unknown'} — ระบบไม่เตือนรบกวนการใช้ชีวิต`
-        : `Living Mode ปิด (โดย ${data.by || 'unknown'})`;
+        ? t('securityComponents.stream.livingOn', 'Living Mode เปิด โดย {by} — ระบบไม่เตือนรบกวนการใช้ชีวิต', { by: data.by || 'unknown' })
+        : t('securityComponents.stream.livingOff', 'Living Mode ปิด (โดย {by})', { by: data.by || 'unknown' });
     case 'MANUAL_DAY':
       return data.active
-        ? `Manual Day เริ่ม โดย ${data.by || 'unknown'} — automation พัก ${data.endsAt ? Math.max(0, Math.round((data.endsAt - data.ts) / 3600000)) : ''} ชม.`
-        : `Manual Day จบ — ระบบอัตโนมัติกลับมา`;
+        ? t('securityComponents.stream.manualOn', 'Manual Day เริ่ม โดย {by} — automation พัก {hours} ชม.', {
+            by: data.by || 'unknown',
+            hours: data.endsAt ? Math.max(0, Math.round((data.endsAt - data.ts) / 3600000)) : '',
+          })
+        : t('securityComponents.stream.manualOff', 'Manual Day จบ — ระบบอัตโนมัติกลับมา');
     case 'TIME_DESYNC':
-      return `⏰ เวลาไม่เสถียร [${data.type || '?'}] ${data.detail || ''}`;
+      return t('securityComponents.stream.timeDesync', 'เวลาไม่เสถียร [{type}] {detail}', { type: data.type || '?', detail: data.detail || '' });
     case 'RELAY_CHATTER':
-      return `⚡ Relay ${data.relayId || '?'} ${data.type === 'device_chatter' ? 'ชิปสับถี่ (Hardware Chatter!)' : 'สั่งถี่เกิน'} — ${data.detail || ''}`;
+      return `Relay ${data.relayId || '?'} ${data.type === 'device_chatter' ? t('securityComponents.stream.relayChatter', 'ชิปสับถี่ (Hardware Chatter!)') : t('securityComponents.stream.relayTooFrequent', 'สั่งถี่เกิน')} — ${data.detail || ''}`;
     case 'BIT_ROT':
-      return `💾 Bit Rot: checksum ไม่ตรง ${data.file || '?'}${data.quarantinedTo ? ' → สำรองไว้แล้ว' : ''}`;
+      return t('securityComponents.stream.bitRot', 'Bit Rot: checksum ไม่ตรง {file}{quarantine}', {
+        file: data.file || '?',
+        quarantine: data.quarantinedTo ? t('securityComponents.stream.bitRotQuarantined', ' → สำรองไว้แล้ว') : '',
+      });
     case 'INJECTION':
-      return `🧪 Prompt-Injection ถูกบล็อก (${(data.patterns || []).join(', ')}) actor=${data.actor || 'unknown'}`;
+      return t('securityComponents.stream.injectionBlocked', 'Prompt-Injection ถูกบล็อก ({patterns}) actor={actor}', {
+        patterns: (data.patterns || []).join(', '),
+        actor: data.actor || 'unknown',
+      });
     case 'GOVSIM':
       return data.action === 'status'
-        ? `🏛️ GovSim [${data.scenario}] เปลี่ยนสถานะ → ${data.status} — ${data.text || ''}`
-        : `🏛️ GovSim [${data.scenario}] tick ${data.tick}${data.events?.length ? ': ' + data.events.join(' | ') : ''}`;
+        ? t('securityComponents.stream.govsimStatus', 'GovSim [{scenario}] เปลี่ยนสถานะ → {status} — {text}', { scenario: data.scenario, status: data.status, text: data.text || '' })
+        : t('securityComponents.stream.govsimTick', 'GovSim [{scenario}] tick {tick}{events}', {
+            scenario: data.scenario,
+            tick: data.tick,
+            events: data.events?.length ? ': ' + data.events.join(' | ') : '',
+          });
     default:
       return JSON.stringify(data).slice(0, 120);
   }
@@ -109,6 +133,7 @@ export default function LiveEventStreamPanel({
 }) {
   const [conn, setConn] = useState<ConnState>('off');
   const [events, setEvents] = useState<StreamEvent[]>([]);
+  const t = useLanguageStore((s) => s.t);
 
   const prepend = useCallback((evt: StreamEvent) => {
     setEvents((prev) => {
@@ -169,33 +194,33 @@ export default function LiveEventStreamPanel({
     conn === 'offline' ? 'bg-red-500' : 'bg-gray-600';
 
   const label =
-    conn === 'live' ? 'เชื่อมต่อสด' :
-    conn === 'connecting' ? 'กำลังเชื่อมต่อ...' :
-    conn === 'offline' ? 'ขาดการเชื่อมต่อ (กำลังพยายามใหม่)' : 'ปิดอยู่';
+    conn === 'live' ? t('securityComponents.stream.connLive', 'เชื่อมต่อสด') :
+    conn === 'connecting' ? t('securityComponents.stream.connConnecting', 'กำลังเชื่อมต่อ...') :
+    conn === 'offline' ? t('securityComponents.stream.connOffline', 'ขาดการเชื่อมต่อ (กำลังพยายามใหม่)') : t('securityComponents.stream.connOff', 'ปิดอยู่');
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
+    <div className="panel panel-cyan p-4 space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-bold">
-          📡 เหตุการณ์สด (Real-time Stream)
-          <span className="ml-2 text-[10px] text-gray-500 font-normal">— anomaly / IDS / kill-switch / intel เกิดเมื่อไหร่โผล่ทันที</span>
+        <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">
+          {t('securityComponents.stream.title', 'เหตุการณ์สด (Real-time Stream)')}
+          <span className="ml-2 text-[10px] text-gray-500 font-normal">{t('securityComponents.stream.titleSub', '— anomaly / IDS / kill-switch / intel เกิดเมื่อไหร่โผล่ทันที')}</span>
         </h2>
         <span className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded border border-gray-700 ${conn === 'live' ? 'text-emerald-300' : 'text-gray-500'}`}>
           <span className={`w-2 h-2 rounded-full ${dot}`} /> {label}
         </span>
       </div>
-      <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
+      <div className="log-stream space-y-1 max-h-72 overflow-y-auto pr-1">
         {events.length === 0 && (
           <div className="text-xs text-gray-600 py-4 text-center">
-            ยังไม่มีเหตุการณ์สด — เหตุการณ์ใหม่ (anomaly, IDS alert, kill-switch, ...) จะแสดงที่นี่ทันที
+            {t('securityComponents.stream.empty', 'ยังไม่มีเหตุการณ์สด — เหตุการณ์ใหม่ (anomaly, IDS alert, kill-switch, ...) จะแสดงที่นี่ทันที')}
           </div>
         )}
         {events.map((e, i) => (
           <div key={`${e.ts}-${i}`} className={`flex items-start gap-2 text-[11px] rounded px-2 py-1.5 border ${colorOf(e.type, e.data)}`}>
-            <span className="font-mono whitespace-nowrap text-[10px] opacity-70">{new Date(e.ts).toLocaleTimeString('th-TH')}</span>
-            <span>{TYPE_ICON[e.type] || '▪️'}</span>
+            <span className="font-mono whitespace-nowrap text-[10px] opacity-70 glow-text-cyan">{new Date(e.ts).toLocaleTimeString(fmtLocale())}</span>
+            <span className="shrink-0 w-4 text-center pt-px">{TYPE_ICON[e.type] ? <Icon name={TYPE_ICON[e.type]} size={12} /> : null}</span>
             <span className="font-bold">{e.type}</span>
-            <span className="flex-1 truncate">{summarize(e.type, e.data)}</span>
+            <span className="flex-1 truncate">{summarize(e.type, e.data, t)}</span>
           </div>
         ))}
       </div>

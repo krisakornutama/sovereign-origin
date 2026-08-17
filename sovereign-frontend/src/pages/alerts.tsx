@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
+import { fmtLocale } from '../lib/formatDate';
 
 interface Alert {
   ruleId: string;
@@ -17,6 +20,7 @@ interface Alert {
 
 export default function AlertsPage() {
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
@@ -37,39 +41,39 @@ export default function AlertsPage() {
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">⏳ Loading...</div>;
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   if (!isAuthenticated || !user) {
-    return <div className="text-white p-8">Unauthorized</div>;
+    return <div className="text-white p-8">{t('alerts.unauthorized', 'Unauthorized')}</div>;
   }
 
   const severityColor = (s: string) =>
-    s === 'critical' ? 'text-red-400 bg-red-900/20' :
+    s === 'critical' ? 'text-rose-400 bg-rose-900/20' :
     s === 'warning' ? 'text-amber-400 bg-amber-900/20' : 'text-blue-400 bg-blue-900/20';
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="ความปลอดภัย"
-          title="🚨 SOVEREIGN OS"
-          subtitle="Alert History" actions={<a href="/dashboard" className="text-sm text-blue-400 hover:underline">← กลับ Dashboard</a>}
+          eyebrow={t('alerts.eyebrow', 'ความปลอดภัย')}
+          title="SOVEREIGN OS" icon={<Icon name="alerts" size={18} />}
+          subtitle={t('alerts.subtitle', 'Alert History')} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('alerts.backDashboard', '← กลับ Dashboard')}</a>}
         />
       </header>
       <main className="max-w-4xl mx-auto p-6 space-y-4">
-        <h2 className="text-xl font-bold">ประวัติการแจ้งเตือน</h2>
+        <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('alerts.title', 'ประวัติการแจ้งเตือน')}</h2>
         {alerts.length === 0 ? (
-          <div className="text-gray-500 text-center py-8">ไม่มีประวัติการแจ้งเตือน</div>
+          <div className="text-gray-500 text-center py-8">{t('alerts.empty', 'ไม่มีประวัติการแจ้งเตือน')}</div>
         ) : (
           alerts.map((alert, i) => (
             <div
               key={i}
-              className={`p-4 rounded-xl border ${
-                alert.severity === 'critical' ? 'border-red-500/50 bg-red-900/10' :
-                alert.severity === 'warning' ? 'border-amber-500/50 bg-amber-900/10' : 'border-blue-500/50 bg-blue-900/10'
+              className={`card p-4 ${
+                alert.severity === 'critical' ? 'border-rose-800/60' :
+                alert.severity === 'warning' ? 'border-amber-800/60' : 'border-blue-800/60 panel-cyan'
               }`}
             >
               <div className="flex justify-between items-start">
@@ -79,10 +83,10 @@ export default function AlertsPage() {
                   </span>
                   <span className="ml-2 text-sm">{alert.message}</span>
                 </div>
-                <span className="text-xs text-gray-500">{new Date(alert.timestamp).toLocaleString('th-TH')}</span>
+                <span className="text-xs text-gray-500">{new Date(alert.timestamp).toLocaleString(fmtLocale())}</span>
               </div>
               <div className="text-xs text-gray-500 mt-2">
-                {alert.metric} {alert.value} → threshold: {alert.threshold}
+                {alert.metric} {alert.value} {t('alerts.threshold', ' → threshold: ')}{alert.threshold}
               </div>
             </div>
           ))

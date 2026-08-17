@@ -91,6 +91,9 @@ import { runDefconAction } from './services/defcon-actions.service';
 import portfolioRoutes from './modules/portfolio/portfolio.routes';
 import healingRoutes from './modules/healing/healing.routes';
 import codingRoutes from './modules/coding/coding.routes';
+import workspaceRoutes from './modules/coding/workspace.routes';
+import skillsRoutes from './modules/coding/skills.routes';
+import notesRoutes from './modules/notes/notes.routes';
 import cloneRoutes from './modules/clone/clone.routes';
 import riskRoutes from './modules/risk/risk.routes';
 import healthRoutes from './modules/health/health.routes';
@@ -98,11 +101,13 @@ import infrastructureRoutes from './modules/infrastructure/infrastructure.routes
 import { lifestyleRoutes } from './modules/lifestyle/lifestyle.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import farmRoutes from './modules/farm/farm.routes';
+import livestockRoutes from './modules/livestock/livestock.routes';
 import propertyRoutes from './modules/property/property.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
 import featureRoutes from './modules/features/feature.routes';
 import { featureGuard } from './services/feature-grant.service';
 import { predictiveWorker } from './services/predictive.service';
+import './services/livestock-cron.service'; // ปลดล็อก withdrawal + เตือนวัคซีน รายวัน
 import mqtt from 'mqtt';
 
 const execAsync = promisify(exec);
@@ -171,6 +176,9 @@ app.use('/api/vision', featureGuard('/vision'), visionRuleRoutes); // Vision AI 
 app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes); // Phase 4: Wealth & Asset Tracker
 app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
 app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
+app.use('/api/coding', featureGuard('/ai-agent'), workspaceRoutes); // Coding Agent — workspace (ตำแหน่งโปรเจ็ก/ไฟล์/เทอร์มินัล)
+app.use('/api/coding', featureGuard('/ai-agent'), skillsRoutes); // Coding Agent — skill queue (คิวทักษะ + ระดับอัตโนมัติ)
+app.use('/api/notes', featureGuard('/ai-agent'), notesRoutes); // Note — ปุ่มโน้ต
 app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
 app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);
 app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON
@@ -189,6 +197,7 @@ if (config.modules.isEnabled('documents')) {
 }
 if (config.modules.isEnabled('farm')) {
   app.use('/api/farm/plots', featureGuard('/farm'), farmRoutes); // Farm Plot Manager
+app.use('/api/livestock', featureGuard('/livestock'), livestockRoutes); // Sovereign Livestock Engine
 }
 app.use('/api/property', featureGuard('/property'), propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์
 app.use('/api/govsim', govsimRoutes); // Governance & Socio-Political Simulation (War Room)
@@ -309,17 +318,18 @@ app.delete('/api/sensors/:metric/all', authenticate, async (req, res) => {
   }
 });
 
-// AI Chat (P1: บันทึกประวัติสนทนา — Conversational Memory)
+// AI Chat (P1: บันทึกประวัติสนทนา — Conversational Memory) — รองรับแนบรูปภาพ (base64 → vision model)
 app.post('/api/ai/chat', authenticate, async (req, res) => {
   const { message } = req.body;
+  const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64 : undefined;
   try {
     const reply = await aiAgent.processMessage(message, {
       actor: req.user?.id,
       source: 'chat',
       ip: req.ip,
-    });
+    }, { imageBase64 });
     if (req.user?.id && typeof message === 'string') {
-      await appendExchange(req.user.id, message, reply);
+      await appendExchange(req.user.id, imageBase64 ? `[รูปภาพ] ${message}` : message, reply);
     }
     res.json({ reply });
   } catch (err) {

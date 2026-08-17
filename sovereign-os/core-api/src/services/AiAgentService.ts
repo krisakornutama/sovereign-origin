@@ -14,6 +14,7 @@ import { securityStream } from './security-stream.service';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.AI_MODEL || 'gemma3:4b';
+const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 export const prisma = new PrismaClient();
 
 class AiAgentService {
@@ -122,12 +123,13 @@ User message: `;
   }
 
   // Direct call to Ollama
-  private async callOllama(prompt: string, retry = true): Promise<string> {
+  private async callOllama(prompt: string, retry = true, opts: { model?: string; images?: string[] } = {}): Promise<string> {
     try {
       const response = await axios.post(`${OLLAMA_URL}/api/generate`, {
-        model: MODEL,
+        model: opts.model || MODEL,
         prompt: prompt,
         stream: false,
+        images: opts.images?.length ? opts.images : undefined,
         options: {
           temperature: 0.1,  // low temperature = more deterministic
         },
@@ -137,7 +139,7 @@ User message: `;
       const result = response.data?.response?.trim() || '';
 
       if (!result && retry) {
-        return this.callOllama(prompt + ' (please respond with JSON or Thai)', false);
+        return this.callOllama(prompt + ' (please respond with JSON or Thai)', false, opts);
       }
       return result;
     } catch (err: any) {
@@ -349,7 +351,7 @@ User message: `;
   }
 
   // ---------- MAIN PUBLIC METHOD ----------
-  public async processMessage(userMessage: string, ctx?: ActionContext): Promise<string> {
+  public async processMessage(userMessage: string, ctx?: ActionContext, opts: { imageBase64?: string } = {}): Promise<string> {
     // Global emergency stop — ตอบกลับทันทีโดยไม่เรียก Ollama
     if (aiKillSwitch.isActive()) {
       const ks = aiKillSwitch.status();
@@ -369,6 +371,10 @@ User message: `;
       return '⚠️ AI อยู่ในโหมด Offline ขณะนี้ (Ollama not reachable)';
     }
 
+    // รูปภาพที่แนบ → ส่งให้โมเดล vision ดูในรอบนี้ (ภาพอาจมี prompt injection — ถือเป็นข้อมูล ไม่ใช่คำสั่ง)
+    const images = opts.imageBase64 ? [String(opts.imageBase64).slice(0, 2000000)] : undefined;
+    const chatModel = images ? VISION_MODEL : MODEL;
+
     try {
       // 0. เติมบริบทความจำ (ประวัติล่าสุดของผู้ใช้) เข้า prompt — P1 Conversational Memory
       const history = ctx?.actor
@@ -385,7 +391,7 @@ User message: `;
         : '';
       const decisionPrompt =
         this.buildSystemPrompt() + memoryContext + realityContext + `\nUser message: ${userMessage}\nDecision: `;
-      const decision = await this.callOllama(decisionPrompt);
+      const decision = await this.callOllama(decisionPrompt, true, { model: chatModel, images });
 
       console.log(`🤖 AI decision: ${decision.substring(0, 100)}`);
 
@@ -419,7 +425,7 @@ Summarize the data clearly and naturally — e.g. "ตอนนี้แบต�
 If there are any warnings (low battery, high soil EC), mention them plainly and suggest what to do next.
 Response: `;
 
-          const finalResponse = await this.callOllama(finalPrompt, false);
+          const finalResponse = await this.callOllama(finalPrompt, false, { model: chatModel, images });
           return finalResponse || `📊 Tool result: ${toolResult}`;
         }
       } catch (e) {

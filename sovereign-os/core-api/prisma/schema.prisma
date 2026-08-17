@@ -16,40 +16,40 @@ enum Role {
 }
 
 model User {
-  id               String   @id @default(uuid()) @db.Uuid
-  username         String   @unique
-  password_hash    String
-  role             Role     @default(OPERATOR)
-  mfa_secret       String?
+  id                   String  @id @default(uuid()) @db.Uuid
+  username             String  @unique
+  password_hash        String
+  role                 Role    @default(OPERATOR)
+  mfa_secret           String?
   // MFA ใหม่ที่รอ confirm (ตั้งค่าแล้วยังไม่ activate — ต้องกรอกรหัสจากแอปยืนยันก่อน)
-  pending_mfa_secret String?
+  pending_mfa_secret   String?
   // true = ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน (บังคับหลัง login ครั้งแรก / admin ตั้งให้)
   must_change_password Boolean @default(false)
-  assigned_node_id String?  @db.Uuid
+  assigned_node_id     String? @db.Uuid
 
-  assigned_node    Node?    @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
-  audit_logs       AuditLog[]
+  assigned_node Node?      @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
+  audit_logs    AuditLog[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
-  assets           Asset[]
-  inventory_items  InventoryItem[]
-  wealth_history   WealthHistory[]
-  feature_grants   UserFeatureGrant[]
+  assets          Asset[]
+  inventory_items InventoryItem[]
+  wealth_history  WealthHistory[]
+  feature_grants  UserFeatureGrant[]
 
   @@map("users")
 }
 
 model Node {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String
-  gis_location    String?
-  status          String    @default("active")
-  last_sync_time  DateTime? @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String
+  gis_location   String?
+  status         String    @default("active")
+  last_sync_time DateTime? @db.Timestamptz
 
-  admins          User[]    @relation("NodeAdmins")
-  devices         Device[]
-  relays          Relay[]
-  telemetry       SensorTelemetry[] @ignore
+  admins    User[]            @relation("NodeAdmins")
+  devices   Device[]
+  relays    Relay[]
+  telemetry SensorTelemetry[] @ignore
 
   @@map("nodes")
 }
@@ -61,10 +61,10 @@ model Device {
   mqtt_topic     String
   is_active      Boolean   @default(true)
   last_heartbeat DateTime? @db.Timestamptz
-  latitude       Float?    // พิกัด GPS (Global Map)
+  latitude       Float? // พิกัด GPS (Global Map)
   longitude      Float?
 
-  node           Node      @relation(fields: [node_id], references: [id])
+  node Node @relation(fields: [node_id], references: [id])
 
   @@map("devices")
 }
@@ -76,7 +76,7 @@ model Relay {
   label   String
   state   Int    @default(0)
 
-  node      Node             @relation(fields: [node_id], references: [id])
+  node      Node            @relation(fields: [node_id], references: [id])
   schedules RelaySchedule[]
 
   @@map("relays")
@@ -93,19 +93,19 @@ model RelaySchedule {
   last_fired String? // วันที่ล่าสุดที่ยิง (YYYY-MM-DD) – ป้องกันยิงซ้ำในวันเดียวกัน
   created_at DateTime @default(now()) @db.Timestamptz
 
-  relay      Relay    @relation(fields: [relay_id], references: [id])
+  relay Relay @relation(fields: [relay_id], references: [id])
 
   @@map("relay_schedules")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  timestamp DateTime @default(now()) @db.Timestamptz
-  user_id   String   @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  timestamp   DateTime @default(now()) @db.Timestamptz
+  user_id     String   @db.Uuid
   action_type String
-  payload   Json
+  payload     Json
 
-  user      User     @relation(fields: [user_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
 
   @@map("audit_logs")
 }
@@ -117,7 +117,7 @@ model SensorTelemetry {
   metric    String
   value     Float
 
-  node      Node     @relation(fields: [node_id], references: [id])
+  node Node @relation(fields: [node_id], references: [id])
 
   @@map("sensor_telemetry")
   @@ignore
@@ -138,20 +138,20 @@ model Asset {
   wallet_address String?
   notes          String?
 
-  user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@map("assets")
 }
 
 model WealthHistory {
-  id             String   @id @default(uuid()) @db.Uuid
-  user_id        String   @db.Uuid // เจ้าของพอร์ต — ประวัติมูลค่าแยกต่อคน
-  timestamp      DateTime @default(now()) @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid // เจ้าของพอร์ต — ประวัติมูลค่าแยกต่อคน
+  timestamp       DateTime @default(now()) @db.Timestamptz
   total_usd_value Float
-  payload        Json
+  payload         Json
 
-  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, timestamp])
   @@map("wealth_history")
@@ -161,7 +161,7 @@ model WealthHistory {
 model SecurityEvent {
   id          String   @id @default(uuid()) @db.Uuid
   timestamp   DateTime @default(now()) @db.Timestamptz
-  event_type  String   // CONNECTION, INTRUSION, FIREWALL, ANOMALY
+  event_type  String // CONNECTION, INTRUSION, FIREWALL, ANOMALY
   severity    String   @default("info") // info, warning, critical
   source_ip   String?
   dest_ip     String?
@@ -255,22 +255,22 @@ model AssetPrice {
 // เสบียงกายภาพ / สินค้าคงคลังที่จับต้องได้ (น้ำ อาหาร ดีเซล วัตถุดิบฟาร์ม ทองคำแท่ง)
 // category: WATER | FOOD | FUEL | MATERIAL | PRECIOUS_METAL | OTHER
 model InventoryItem {
-  id             String   @id @default(uuid()) @db.Uuid
-  user_id        String   @db.Uuid // เจ้าของ — เสบียงแยกต่อคน
-  name           String // "น้ำดื่มขวด 1.5L"
-  category       String // WATER | FOOD | FUEL | MATERIAL | PRECIOUS_METAL | OTHER
-  quantity       Float
-  unit           String // "L" | "kg" | "baht" | "piece" | "bottle"
-  unit_price_usd Float // ราคาตลาดต่อหน่วย (อัปเดตด้วยมือหรือดึงอัตโนมัติ)
-  location       String? // ที่เก็บ เช่น "ครัว", "ห้องเก็บใต้ดิน", "โรงนา"
-  expiry_date    DateTime? @db.Timestamptz // วันหมดอายุ (Food Shelf-Life Tracker)
-  shelf_life_days Int?    // อายุการเก็บ (วัน) ใช้คำนวณวันหมดอายุอัตโนมัติเมื่อรับของเข้า
-  minimum_stock  Float?   // ระดับขั้นต่ำ — เตือนเมื่อเหลือน้อย (หมุนเวียนเสบียง)
-  notes          String?
-  created_at     DateTime @default(now()) @db.Timestamptz
-  updated_at     DateTime @updatedAt @db.Timestamptz
+  id              String    @id @default(uuid()) @db.Uuid
+  user_id         String    @db.Uuid // เจ้าของ — เสบียงแยกต่อคน
+  name            String // "น้ำดื่มขวด 1.5L"
+  category        String // WATER | FOOD | FUEL | MATERIAL | PRECIOUS_METAL | OTHER
+  quantity        Float
+  unit            String // "L" | "kg" | "baht" | "piece" | "bottle"
+  unit_price_usd  Float // ราคาตลาดต่อหน่วย (อัปเดตด้วยมือหรือดึงอัตโนมัติ)
+  location        String? // ที่เก็บ เช่น "ครัว", "ห้องเก็บใต้ดิน", "โรงนา"
+  expiry_date     DateTime? @db.Timestamptz // วันหมดอายุ (Food Shelf-Life Tracker)
+  shelf_life_days Int? // อายุการเก็บ (วัน) ใช้คำนวณวันหมดอายุอัตโนมัติเมื่อรับของเข้า
+  minimum_stock   Float? // ระดับขั้นต่ำ — เตือนเมื่อเหลือน้อย (หมุนเวียนเสบียง)
+  notes           String?
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
 
-  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@map("inventory_items")
@@ -284,11 +284,11 @@ model InventoryItem {
 model UserFeatureGrant {
   id         String   @id @default(uuid()) @db.Uuid
   user_id    String   @db.Uuid
-  feature    String   // key ของหน้า (ตรงกับ href ใน navigation)
+  feature    String // key ของหน้า (ตรงกับ href ใน navigation)
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @updatedAt @db.Timestamptz
 
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, feature])
   @@index([user_id])
@@ -303,9 +303,9 @@ model FarmPlot {
   name                String // "แปลงผักหลังบ้าน"
   location            String? // ตำแหน่งในฟาร์ม เช่น "โซน A", "ใต้ร่มไม้"
   crop                String? // พืชที่ปลูก เช่น "มะเขือเทศ"
-  area_sqm            Float?  // ขนาดแปลง (ตร.ม.)
-  width_m             Float?  // ความกว้างแปลง (ม.) — สำหรับแผนผัง
-  length_m            Float?  // ความยาวแปลง (ม.)
+  area_sqm            Float? // ขนาดแปลง (ตร.ม.)
+  width_m             Float? // ความกว้างแปลง (ม.) — สำหรับแผนผัง
+  length_m            Float? // ความยาวแปลง (ม.)
   layout_image_url    String? // ภาพถ่ายแปลง (จากกล้อง/มือถือ)
   boundary            Json? // ขอบเขตแปลงในแผนผัง (polygon พิกัดเมตร)
   soil_notes          String? // สภาพดิน / ค่า pH / ปุ๋ยที่ใช้
@@ -337,7 +337,8 @@ model FarmSoilReading {
   note         String?
   recorded_at  DateTime @default(now()) @db.Timestamptz
 
-  plot         FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+  plot FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+
   @@index([plot_id, recorded_at])
   @@map("farm_soil_readings")
 }
@@ -366,7 +367,7 @@ enum HealthFlagStatus {
 model HealthObservation {
   id          String         @id @default(uuid()) @db.Uuid
   category    HealthCategory
-  detail      String?        // เช่น "เข้าห้องน้ำ 3 ครั้งกลางดึก"
+  detail      String? // เช่น "เข้าห้องน้ำ 3 ครั้งกลางดึก"
   source      String         @default("conversation") // manual | sensor | conversation
   severity    Int            @default(1) // 1-5
   observed_at DateTime       @default(now()) @db.Timestamptz
@@ -379,7 +380,7 @@ model HealthObservation {
 // Flag ข้อสงสัยทางสุขภาพ — ล้างได้เมื่อผู้ใช้ชี้แจง / ตอบรับแล้ว
 model HealthFlag {
   id         String           @id @default(uuid()) @db.Uuid
-  flag_type  String           // CHECK_URINATION, CHECK_SLEEP, ...
+  flag_type  String // CHECK_URINATION, CHECK_SLEEP, ...
   category   HealthCategory
   status     HealthFlagStatus @default(PENDING)
   note       String?
@@ -440,29 +441,31 @@ model HealthReading {
 // Phase 5: AI Computer Vision & Perimeter Defense
 // ─────────────────────────────────────────────────────────────
 model Camera {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String
-  rtsp_url     String?  // กล้อง IP (local-only)
-  location     String?  // เช่น "หน้าบ้าน", "รั้วหลัง"
-  enabled      Boolean  @default(true)
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  rtsp_url      String? // กล้อง IP (local-only)
+  location      String? // เช่น "หน้าบ้าน", "รั้วหลัง"
+  enabled       Boolean   @default(true)
   last_event_at DateTime? @db.Timestamptz
-  created_at   DateTime @default(now()) @db.Timestamptz
+  created_at    DateTime  @default(now()) @db.Timestamptz
 
-  events       DetectionEvent[]
+  events DetectionEvent[]
+
   @@map("cameras")
 }
 
 // เหตุการณ์ตรวจจับ (จาก Frigate/YOLO ท้องถิ่น) — ผูกกับ Automation Rule ได้
 model DetectionEvent {
-  id          String   @id @default(uuid()) @db.Uuid
-  camera_id   String   @db.Uuid
-  object_type String   // person | vehicle | animal | venomous | other
-  confidence  Float?
-  image_path  String?  // ภาพนิ่งในเครื่อง (ไม่ส่ง cloud)
+  id               String   @id @default(uuid()) @db.Uuid
+  camera_id        String   @db.Uuid
+  object_type      String // person | vehicle | animal | venomous | other
+  confidence       Float?
+  image_path       String? // ภาพนิ่งในเครื่อง (ไม่ส่ง cloud)
   triggered_action String? // relay/floodlight ที่สั่งไป เช่น "relay1:ON"
-  detected_at DateTime @default(now()) @db.Timestamptz
+  detected_at      DateTime @default(now()) @db.Timestamptz
 
-  camera      Camera   @relation(fields: [camera_id], references: [id])
+  camera Camera @relation(fields: [camera_id], references: [id])
+
   @@index([detected_at])
   @@map("detection_events")
 }
@@ -472,10 +475,10 @@ model DetectionEvent {
 // ─────────────────────────────────────────────────────────────
 model WaterQualityReading {
   id          String   @id @default(uuid()) @db.Uuid
-  tank_name   String   // "ถังฝน", "ถังกรอง"
-  tds         Float?   // ppm
+  tank_name   String // "ถังฝน", "ถังกรอง"
+  tds         Float? // ppm
   ph          Float?
-  turbidity   Float?   // NTU
+  turbidity   Float? // NTU
   source      String   @default("manual") // sensor | manual
   measured_at DateTime @default(now()) @db.Timestamptz
 
@@ -487,13 +490,13 @@ model WaterQualityReading {
 // Phase 5: Offline Emergency Radio & Mesh Comms
 // ─────────────────────────────────────────────────────────────
 model RadioMessage {
-  id          String   @id @default(uuid()) @db.Uuid
-  direction   String   // in | out
-  channel     String   // sdr | meshtastic | lora | fm
-  text        String
-  remote_id   String?  // ต้นทาง (node id / callsign)
-  is_emergency Boolean @default(false)
-  received_at DateTime @default(now()) @db.Timestamptz
+  id           String   @id @default(uuid()) @db.Uuid
+  direction    String // in | out
+  channel      String // sdr | meshtastic | lora | fm
+  text         String
+  remote_id    String? // ต้นทาง (node id / callsign)
+  is_emergency Boolean  @default(false)
+  received_at  DateTime @default(now()) @db.Timestamptz
 
   @@index([received_at])
   @@map("radio_messages")
@@ -503,16 +506,17 @@ model RadioMessage {
 // Phase 5: Predictive Equipment & Generator Maintenance
 // ─────────────────────────────────────────────────────────────
 model Equipment {
-  id                   String   @id @default(uuid()) @db.Uuid
-  name                 String   // "เครื่องปั่นไฟเบนซิน", "ปั๊มน้ำ"
-  type                 String   // generator | pump | winch | solar | other
-  run_hours            Float    @default(0)
+  id                     String    @id @default(uuid()) @db.Uuid
+  name                   String // "เครื่องปั่นไฟเบนซิน", "ปั๊มน้ำ"
+  type                   String // generator | pump | winch | solar | other
+  run_hours              Float     @default(0)
   service_interval_hours Float? // เตือนถ่ายน้ำมันเครื่องเมื่อครบชั่วโมง
-  last_service_at      DateTime? @db.Timestamptz
-  notes                String?
-  created_at           DateTime @default(now()) @db.Timestamptz
+  last_service_at        DateTime? @db.Timestamptz
+  notes                  String?
+  created_at             DateTime  @default(now()) @db.Timestamptz
 
-  run_hours_logs       RunHoursLog[]
+  run_hours_logs RunHoursLog[]
+
   @@map("equipment")
 }
 
@@ -524,7 +528,8 @@ model RunHoursLog {
   note         String?
   logged_at    DateTime @default(now()) @db.Timestamptz
 
-  equipment    Equipment @relation(fields: [equipment_id], references: [id])
+  equipment Equipment @relation(fields: [equipment_id], references: [id])
+
   @@map("run_hours_logs")
 }
 
@@ -594,32 +599,32 @@ model KnowledgeItem {
 // AI สอนลูก — โปรไฟล์เด็ก + บันทึกบทเรียน/คะแนนแบบทดสอบที่เรียนจบ
 // ─────────────────────────────────────────────
 model KidProfile {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String // ชื่อเล่นของเด็ก เช่น "น้องน้ำ"
-  age        Int? // อายุ (ปี) — ใช้ตั้งค่าเริ่มต้นระดับอายุได้
-  emoji      String? // อวตาร เช่น 🧒 👧
-  color      String? // สีเน้นใน UI
+  id                  String    @id @default(uuid()) @db.Uuid
+  name                String // ชื่อเล่นของเด็ก เช่น "น้องน้ำ"
+  age                 Int? // อายุ (ปี) — ใช้ตั้งค่าเริ่มต้นระดับอายุได้
+  emoji               String? // อวตาร เช่น 🧒 👧
+  color               String? // สีเน้นใน UI
   // ค่าขนมรายสัปดาห์อัตโนมัติ: day = 0 (อาทิตย์)…6 (เสาร์), amount = บาท, last_paid = กันจ่ายซ้ำ
-  allowance_day        Int?      @db.Integer
-  allowance_amount     Int?      @db.Integer
-  allowance_last_paid  DateTime? @db.Timestamptz
+  allowance_day       Int?      @db.Integer
+  allowance_amount    Int?      @db.Integer
+  allowance_last_paid DateTime? @db.Timestamptz
   // PIN ส่วนตัวของลูก (bcrypt hash) — บังคับก่อนทำงานเสร็จ/แลกคูปอง ให้เด็กทำเองได้
-  pin_hash             String?
+  pin_hash            String?
   // เป้าหมายออมรายเดือน (บาท) — เทียบกับยอดฝากเข้ากระปุกในเดือนนั้น
-  savings_goal         Int?      @db.Integer
+  savings_goal        Int?      @db.Integer
   // เป้าหมายระยะยาวของถังสะสมแต้ม เช่น "ซื้อจักรยาน 500฿" + ETA
-  piggy_target_title   String?
-  piggy_target_amount  Int?      @db.Integer
+  piggy_target_title  String?
+  piggy_target_amount Int?      @db.Integer
   // ระดับ/ดาว — XP สะสมจากการเรียน (คะแนน*10) + ทำงานบ้าน (รางวัล) → เลื่อนระดับ + เกียรติบัตรอัตโนมัติ
-  xp                   Int       @default(0) @db.Integer
+  xp                  Int       @default(0) @db.Integer
   // โหมดเงิน: play = เงินจำลอง (หัดเล่น) | real = เงินจริงที่พ่อแม่มอบหมายให้ลูกบริหาร
-  money_mode           String    @default("play")
+  money_mode          String    @default("play")
   // นโยบายการลงทุนของพ่อแม่ เช่น "ลูกต้องเก็บ 20% ของรายได้เข้าถังและลงทุนเสมอ"
-  invest_policy        String?
+  invest_policy       String?
   // เป้าหมายผลตอบแทนรายเดือนของพอร์ตเงินจริง (%)
-  invest_target_pct    Float     @default(0)
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @updatedAt @db.Timestamptz
+  invest_target_pct   Float     @default(0)
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
 
   progress            KidLessonProgress[]
   chores              KidChore[]
@@ -646,7 +651,7 @@ model KidLessonProgress {
   total          Int // จำนวนข้อทั้งหมด
   completed_at   DateTime @default(now()) @db.Timestamptz
 
-  kid            KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, completed_at])
   @@map("kid_lesson_progress")
@@ -665,25 +670,25 @@ model KidChore {
   archived_at  DateTime? @db.Timestamptz // เก็บถาวรอัตโนมัติเมื่อจบแล้วเกิน 30 วัน
   created_at   DateTime  @default(now()) @db.Timestamptz
 
-  kid          KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id])
   @@map("kid_chores")
 }
 
 model KidBill {
-  id         String    @id @default(uuid()) @db.Uuid
-  kid_id     String    @db.Uuid
-  title      String // "ค่าไฟ" | "ค่าน้ำ" | "ค่าห้อง" | ...
-  amount     Int // บาทที่ต้องจ่าย
-  emoji      String?
-  period     String    @default("one-time") // one-time | monthly
-  status     String    @default("unpaid") // unpaid | paid
-  paid_at    DateTime? @db.Timestamptz
+  id          String    @id @default(uuid()) @db.Uuid
+  kid_id      String    @db.Uuid
+  title       String // "ค่าไฟ" | "ค่าน้ำ" | "ค่าห้อง" | ...
+  amount      Int // บาทที่ต้องจ่าย
+  emoji       String?
+  period      String    @default("one-time") // one-time | monthly
+  status      String    @default("unpaid") // unpaid | paid
+  paid_at     DateTime? @db.Timestamptz
   archived_at DateTime? @db.Timestamptz // เก็บถาวรอัตโนมัติเมื่อจ่ายแล้วเกิน 30 วัน
-  created_at DateTime  @default(now()) @db.Timestamptz
+  created_at  DateTime  @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id])
   @@map("kid_bills")
@@ -698,7 +703,7 @@ model KidWalletTx {
   category   String // chore | bill | manual | allowance | coupon
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_wallet_txs")
@@ -712,7 +717,7 @@ model KidPiggyTx {
   note       String
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_piggy_txs")
@@ -728,7 +733,7 @@ model KidInvestment {
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @updatedAt @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@unique([kid_id, symbol])
   @@map("kid_investments")
@@ -743,7 +748,7 @@ model KidAuditLog {
   actor      String   @default("parent") // parent | kid
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_audit_logs")
@@ -760,7 +765,7 @@ model KidCoupon {
   redeemed_at DateTime? @db.Timestamptz
   created_at  DateTime  @default(now()) @db.Timestamptz
 
-  kid         KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id])
   @@map("kid_coupons")
@@ -780,7 +785,7 @@ model KidCertificate {
   detail     String?
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_certificates")
@@ -794,7 +799,7 @@ model KidPortfolioDeposit {
   note       String
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_portfolio_deposits")
@@ -807,7 +812,7 @@ model KidPortfolioSnapshot {
   value      Float // มูลค่าพอร์ตรวม (บาท)
   created_at DateTime @default(now()) @db.Timestamptz
 
-  kid        KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
 
   @@index([kid_id, created_at])
   @@map("kid_portfolio_snapshots")
@@ -831,9 +836,9 @@ model AgentRole {
   jobs AgentJob[]
 
   // สรุปรายวันส่ง Telegram: เปิด/ปิด + เวลาที่จะส่ง (ชั่วโมง 0-23) + กันซ้ำด้วยวันที่ล่าสุด
-  daily_report      Boolean @default(true)
-  report_hour       Int     @default(7)
-  last_report_date  String? // YYYY-MM-DD — กันส่งซ้ำวันเดียวกัน
+  daily_report     Boolean @default(true)
+  report_hour      Int     @default(7)
+  last_report_date String? // YYYY-MM-DD — กันส่งซ้ำวันเดียวกัน
 
   @@map("agent_roles")
 }
@@ -862,15 +867,15 @@ model AgentJob {
 // Vision AI คนแปลกหน้า — ใบหน้าที่คุ้นเคย + กฎการตรวจ + ประวัติแจ้งเตือน
 // ─────────────────────────────────────────────
 model KnownFace {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String // "พ่อ", "แม่", "ลุงสมชาย"
-  photo_url   String? // รูปอ้างอิง (http(s) หรือ data:image) — ให้ VL model เทียบใบหน้า
-  photo_data  String? // ภาพจริงที่พ่อแม่อัปโหลด/ถ่ายจากกล้อง (data URI, จำกัดขนาด)
-  dhash       String? // perceptual hash (คำนวณฝั่งเบราว์เซอร์) — เปรียบเทียบเชิงตัวเลข
-  embedding   Json? // เวกเตอร์ลายเซ็นใบหน้า (cosine similarity) — สร้างตอนลงทะเบียนครั้งเดียว
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String // "พ่อ", "แม่", "ลุงสมชาย"
+  photo_url    String? // รูปอ้างอิง (http(s) หรือ data:image) — ให้ VL model เทียบใบหน้า
+  photo_data   String? // ภาพจริงที่พ่อแม่อัปโหลด/ถ่ายจากกล้อง (data URI, จำกัดขนาด)
+  dhash        String? // perceptual hash (คำนวณฝั่งเบราว์เซอร์) — เปรียบเทียบเชิงตัวเลข
+  embedding    Json? // เวกเตอร์ลายเซ็นใบหน้า (cosine similarity) — สร้างตอนลงทะเบียนครั้งเดียว
   embed_method String? // image-embed | describe-nomic | none
-  note        String?
-  created_at  DateTime @default(now()) @db.Timestamptz
+  note         String?
+  created_at   DateTime @default(now()) @db.Timestamptz
 
   @@map("known_faces")
 }
@@ -891,13 +896,13 @@ model VisionRule {
 
 // ประวัติแจ้งเตือนภาพน่าสงสัย
 model VisionAlert {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String   @id @default(uuid()) @db.Uuid
   image_url  String?
   message    String
-  kind       String    @default("stranger") // stranger | person | other
-  confidence Float     @default(0)
-  cleared    Boolean   @default(false)
-  created_at DateTime  @default(now()) @db.Timestamptz
+  kind       String   @default("stranger") // stranger | person | other
+  confidence Float    @default(0)
+  cleared    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz
 
   @@index([created_at])
   @@map("vision_alerts")
@@ -910,7 +915,7 @@ model VisionAlert {
 // ─────────────────────────────────────────────
 model ScenarioForecast {
   id          String   @id @default(uuid()) @db.Uuid
-  focus       String   // general | politics | governance | economy | energy | security | climate
+  focus       String // general | politics | governance | economy | energy | security | climate
   horizonDays Int      @default(90)
   model       String
   base        Json // { threatOverall, categories, defcon, headlineCount, headlines: [...] }
@@ -927,8 +932,8 @@ model ScenarioForecast {
 // ─────────────────────────────────────────────────────────────
 model ChatMessage {
   id         String   @id @default(uuid()) @db.Uuid
-  actor      String   // ผู้พูด (username/id) — แยกผู้ใช้แต่ละคนได้
-  role       String   // user | assistant
+  actor      String // ผู้พูด (username/id) — แยกผู้ใช้แต่ละคนได้
+  role       String // user | assistant
   content    String
   created_at DateTime @default(now()) @db.Timestamptz
 
@@ -940,18 +945,18 @@ model ChatMessage {
 // Property Map — แผนที่จำลองที่ดิน (3 มิติ) + จุดยุทธศาสตร์สำหรับกับดัก/ตรวจจับ
 // ─────────────────────────────────────────────────────────────
 model PropertyZone {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  type        String   @default("อื่น") // บ้าน | สวน | รั้ว | ประตู | ที่จอดรถ | โรงเก็บ | ที่โล่ง | ทางเข้า | อื่น
-  x           Float    @default(0) // พิกัดกริด (เมตร) จากมุมบน-ซ้าย
-  y           Float    @default(0)
-  z           Float    @default(0) // ความสูงจากพื้น
-  width_m     Float    @default(2)
-  length_m    Float    @default(2)
-  height_m    Float    @default(2)
-  color       String?
-  note        String?
-  created_at  DateTime @default(now()) @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  type       String   @default("อื่น") // บ้าน | สวน | รั้ว | ประตู | ที่จอดรถ | โรงเก็บ | ที่โล่ง | ทางเข้า | อื่น
+  x          Float    @default(0) // พิกัดกริด (เมตร) จากมุมบน-ซ้าย
+  y          Float    @default(0)
+  z          Float    @default(0) // ความสูงจากพื้น
+  width_m    Float    @default(2)
+  length_m   Float    @default(2)
+  height_m   Float    @default(2)
+  color      String?
+  note       String?
+  created_at DateTime @default(now()) @db.Timestamptz
 
   @@map("property_zones")
 }
@@ -997,8 +1002,8 @@ model FirewallRule {
 
 // นโยบายเริ่มต้นไฟร์วอลล์ (singleton id=1)
 model FirewallConfig {
-  id             Int     @id
-  default_policy String  @default("ALLOW") // ALLOW | DENY
+  id             Int      @id
+  default_policy String   @default("ALLOW") // ALLOW | DENY
   updated_at     DateTime @updatedAt @db.Timestamptz
 
   @@map("firewall_config")
@@ -1040,20 +1045,53 @@ model HealingLog {
 
 // ── Coding Agent — เขียนโค้ดจากภาพรวม + ตรวจงาน + เสนอทางต่อ ──
 model CodingJob {
-  id           String    @id @default(uuid()) @db.Uuid
-  title        String
-  task         String
-  status       String    @default("queued") // queued | running | done | error
-  progress     Int       @default(0)
-  plan_json    Json?
-  files_json   Json?
-  result       Json?
-  error        String?
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  started_at   DateTime? @db.Timestamptz
-  completed_at DateTime? @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  title            String
+  task             String
+  status           String    @default("queued") // queued | running | done | error
+  progress         Int       @default(0)
+  plan_json        Json?
+  files_json       Json?
+  result           Json?
+  error            String?
+  model            String? // โมเดลที่ใช้เขียน (nullable = ใช้ค่าเริ่มต้นจาก env)
+  reasoning_effort String? // low | medium | high | full
+  autonomy         String? // manual | semi | auto
+  image_base64     String? // รูปภาพที่แนบมากับงาน (ถ้ามี)
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  started_at       DateTime? @db.Timestamptz
+  completed_at     DateTime? @db.Timestamptz
 
   @@map("coding_jobs")
+}
+
+// ── Skill Queue — คิวทักษะ/งานที่ผู้ใช้เพิ่มเอง + ระดับอัตโนมัติ ──
+model SkillQueueItem {
+  id               String    @id @default(uuid()) @db.Uuid
+  title            String
+  content          String // คำสั่ง/ทักษะเต็ม (ส่งเป็น task ให้ coding agent)
+  status           String    @default("queued") // queued | running | done | error
+  autonomy         String    @default("manual") // manual | semi | auto
+  model            String?
+  reasoning_effort String?
+  job_id           String?   @db.Uuid // coding job ที่รันให้ skill นี้
+  result           String?
+  error            String?
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  started_at       DateTime? @db.Timestamptz
+  completed_at     DateTime? @db.Timestamptz
+
+  @@map("skill_queue_items")
+}
+
+// ── Note — ปุ่มโน้ตส่วนตัวในหน้า Coding Agent ──
+model Note {
+  id         String   @id @default(uuid()) @db.Uuid
+  content    String
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @default(now()) @db.Timestamptz
+
+  @@map("notes")
 }
 
 // ── Next-Gen Security: Threat Intelligence database ──
@@ -1077,4 +1115,184 @@ model ThreatIntelItem {
   @@unique([type, value])
   @@index([active])
   @@map("threat_intel_items")
+}
+
+// ═════════════════════════════════════════════════════════════
+// Sovereign Livestock Engine — ปศุสัตว์ 6 เสาหลัก (Event-Driven)
+// 1) Medical & Biosecurity Gate  2) Microclimate & ATS Fail-Safe
+// 3) Precision Feed & Production 4) Reproductive & Breeding
+// 5) Biosecurity Access Control  6) Batch Financial Engine
+// API อยู่ที่ src/modules/livestock/livestock.routes.ts
+// Vet AI / Event Engine อยู่ที่ src/services/livestock-vet-ai.service.ts
+// ═════════════════════════════════════════════════════════════
+
+// 1. ข้อมูลสัตว์ / เล้า / คอก — สถานะ QUARANTINE/LOCKED_WITHDRAWAL = สั่งโดย Vet AI อัตโนมัติ
+model LivestockGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String   @unique // เช่น BROILER-FLOCK-01, SWINE-PEN-04
+  name       String? // ชื่อเล่นกลุ่ม เช่น "เล้าไก่หลังโรงนา"
+  species    String // POULTRY_BROILER | POULTRY_LAYER | DUCK | SWINE | CATTLE
+  quantity   Int // จำนวนสัตว์คงเหลือ
+  birthDate  DateTime @db.Timestamptz // วันฟัก/วันเข้าเล้า
+  houseCode  String? // เล้า/โรงเรือน เช่น HOUSE-01 (ผูกกับ UtilityAlertLog)
+  status     String   @default("ACTIVE") // ACTIVE | QUARANTINE | HARVESTED | LOCKED_WITHDRAWAL
+  notes      String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  records   MedicalRecord[]
+  schedules VaccineSchedule[]
+  dailyLogs DailyProductionLog[]
+  breedings BreedingRecord[]
+  batches   BatchFinancialLog[]
+
+  @@index([species])
+  @@index([status])
+  @@map("livestock_groups")
+}
+
+// 2. ประวัติการรักษาและระยะหยุดยา — safeHarvestDate = บังคับสกัดการขาย
+model MedicalRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  livestockGroupId String         @db.Uuid
+  livestockGroup   LivestockGroup @relation(fields: [livestockGroupId], references: [id], onDelete: Cascade)
+  drugName         String
+  dosageMgKg       Float
+  administeredAt   DateTime       @default(now()) @db.Timestamptz
+  withdrawalDays   Int // ระยะเวลาหยุดยา (วัน)
+  safeHarvestDate  DateTime // วันที่พ้นระยะหยุดยา = administeredAt + withdrawalDays
+
+  @@index([livestockGroupId, safeHarvestDate])
+  @@index([safeHarvestDate]) // สแกนรายกลุ่มที่ยังติดหยุดยา
+  @@map("livestock_medical_records")
+}
+
+// 3. ตารางวัคซีนบังคับ — เตือนเมื่อถึงอายุ/เกินกำหนด
+model VaccineSchedule {
+  id               String         @id @default(uuid()) @db.Uuid
+  livestockGroupId String         @db.Uuid
+  livestockGroup   LivestockGroup @relation(fields: [livestockGroupId], references: [id], onDelete: Cascade)
+  vaccineName      String
+  targetAgeDays    Int // อายุเป้าหมาย (วัน) นับจาก birthDate
+  isCompleted      Boolean        @default(false)
+  completedAt      DateTime?      @db.Timestamptz
+
+  @@index([livestockGroupId, isCompleted])
+  @@map("livestock_vaccine_schedules")
+}
+
+// 4. บันทึกผลผลิตและการตายรายวัน — ใช้คำนวณ FCR / HD% / Mortality Spike
+model DailyProductionLog {
+  id               String         @id @default(uuid()) @db.Uuid
+  livestockGroupId String         @db.Uuid
+  livestockGroup   LivestockGroup @relation(fields: [livestockGroupId], references: [id], onDelete: Cascade)
+  logDate          DateTime       @db.Timestamptz // วันของข้อมูล
+  mortalityCount   Int            @default(0)
+  culledCount      Int            @default(0)
+  feedConsumedKg   Float          @default(0)
+  waterConsumedL   Float? // ยอดน้ำกิน (ลิตร) — ลดลง = ธงโรคระบาด
+  eggCount         Int? // ไข่ที่เก็บได้ (ไก่ไข่/เป็ด)
+  avgWeightGram    Float? // น้ำหนักเฉลี่ยต่อตัว (กรัม)
+
+  @@unique([livestockGroupId, logDate])
+  @@index([livestockGroupId, logDate])
+  @@map("livestock_daily_logs")
+}
+
+// 5. ตรวจสอบระดับอาหารในไซโล — Ultrasonic / Load cell
+model FeedSilo {
+  id           String   @id @default(uuid()) @db.Uuid
+  siloCode     String   @unique // เช่น SILO-A
+  capacityKg   Float
+  currentKg    Float
+  lastRefillAt DateTime @db.Timestamptz
+
+  @@map("livestock_feed_silos")
+}
+
+// 6. ความปลอดภัยชีวอนามัยหน้าฟาร์ม — บังคับฉีดพ่น >= 180 วินาที
+model BiosecurityLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  visitorName  String
+  vehiclePlate String?
+  sanitizedSec Int // ระยะเวลาฉีดพ่นจริง (ต้อง >= 180s)
+  passedGate   Boolean  @default(false)
+  entryTime    DateTime @default(now()) @db.Timestamptz
+
+  @@index([passedGate, entryTime])
+  @@map("livestock_biosecurity_logs")
+}
+
+// 7. ระบบขยายพันธุ์และวงจรคลอด
+model BreedingRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  livestockGroupId String         @db.Uuid
+  livestockGroup   LivestockGroup @relation(fields: [livestockGroupId], references: [id], onDelete: Cascade)
+  inseminatedAt    DateTime       @db.Timestamptz // วันผสมเทียม/กกไข่
+  expectedBirthAt  DateTime       @db.Timestamptz // วันคลอดถอยหลัง (gestation period)
+  actualBirthAt    DateTime?      @db.Timestamptz
+  litterSize       Int? // ลูกต่อครอก / ไข่ฟัก
+  eggSetCount      Int? // จำนวนไข่ที่กก (เป็ด/ไก่) — คำนวณ % Hatchability
+  hatchedCount     Int? // ลูกที่ฟักออกสำเร็จ
+  status           String         @default("PREGNANT") // PREGNANT | LITTERED | FAILED | ABORTED
+
+  @@index([livestockGroupId, status])
+  @@map("livestock_breeding_records")
+}
+
+// 8. บัญชีและกำไรสุทธิรายรุ่น (Margin/Batch)
+model BatchFinancialLog {
+  id                String          @id @default(uuid()) @db.Uuid
+  livestockGroupId  String?         @db.Uuid
+  livestockGroup    LivestockGroup? @relation(fields: [livestockGroupId], references: [id], onDelete: SetNull)
+  batchCode         String          @unique // เช่น BROILER-BATCH-2026-01
+  initialAnimalCost Float           @default(0) // ค่าพันธุ์สัตว์
+  totalFeedCost     Float           @default(0)
+  totalMedCost      Float           @default(0)
+  totalUtilityCost  Float           @default(0) // ค่าไฟ/น้ำ
+  totalRevenue      Float           @default(0)
+  netProfit         Float           @default(0)
+  closedAt          DateTime?       @db.Timestamptz // เวลาปิดรุ่น
+  created_at        DateTime        @default(now()) @db.Timestamptz
+
+  @@index([livestockGroupId])
+  @@map("livestock_batch_financials")
+}
+
+// 9. เฝ้าระวังระบบไฟฟ้าโรงเรือนปิด (Evap Fail-Safe) — ATS: ตัดไฟเมือง → เจนฯ
+model UtilityAlertLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  houseCode      String // HOUSE-01 (ผูกกับ LivestockGroup.houseCode)
+  gridPowerState String // NORMAL | BLACKOUT
+  generatorState String // OFF | RUNNING | FAIL
+  atsTrippedAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([houseCode])
+  @@map("livestock_utility_alerts")
+}
+
+// Climate telemetry ของปศุสัตว์ → hypertable (TimescaleDB)
+// ใช้คำสั่ง SQL ใน migration สร้าง hypertable โดยตรง (Prisma สร้างได้แค่ตารางธรรมดา)
+// และอ่าน/เขียนผ่าน prisma.$queryRaw ($queryRawUnsafe) ใน routes
+model LivestockClimateLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  houseCode String?
+  tempC     Float
+  rhPct     Float
+  thi       Float
+  status    String // COMFORT | HEAT_WARNING | CRITICAL
+  at        DateTime @db.Timestamptz
+
+  @@map("livestock_climate_logs")
+  @@ignore
+}
+
+// ── การตั้งค่าระบบแบบ key-value (เช่น Telegram bot token/chat_id ที่ตั้งผ่าน UI) ──
+// ภาค UI (Settings → Telegram) เขียนทับค่าใน .env ได้โดยไม่ต้องแก้ไฟล์บนเครื่อง
+model SystemSetting {
+  key        String   @id // เช่น "telegram.botToken", "telegram.chatId"
+  value      String
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  @@map("system_settings")
 }

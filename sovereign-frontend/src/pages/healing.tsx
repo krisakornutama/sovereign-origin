@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 interface Teaching {
   id: string; title: string; category: string; category_tags?: string[] | null;
@@ -24,9 +26,9 @@ const INPUT = 'bg-[#120D07] border border-[#3A2C1B] rounded-lg px-2 py-2 text-sm
 const BTN = 'px-4 py-2 bg-[#E3B04B] text-[#1A1209] hover:bg-[#F0C069] disabled:opacity-50 rounded-lg text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E3B04B]';
 
 const METRIC_LABELS: Record<string, string> = {
-  stress: '😰 ความเครียด', pain: '🤕 ความเจ็บปวด', anxiety: '😟 วิตกกังวล',
-  meditation_min: '🧘 สมาธิ (นาที/วัน)', sleep_hours: '💤 การนอนหลับ (ชม.)',
-  hrv: '❤️ HRV', wbc: '💪 ภูมิคุ้มกัน (WBC)', heart_rate: '💓 ชีพจร',
+  stress: 'ความเครียด', pain: 'ความเจ็บปวด', anxiety: 'วิตกกังวล',
+  meditation_min: 'สมาธิ (นาที/วัน)', sleep_hours: 'การนอนหลับ (ชม.)',
+  hrv: 'HRV', wbc: 'ภูมิคุ้มกัน (WBC)', heart_rate: 'ชีพจร',
 };
 
 // ── เทียนแห่งสติ — ไฟลุกตามสมาธิ 24 ชม. ล่าสุด เทียบเป้า 30 นาที ──
@@ -45,8 +47,9 @@ function flamePath(h: number): string {
 }
 
 function Candle({ lit, pct }: { lit: boolean; pct: number }) {
+  const t = useLanguageStore((s) => s.t);
   return (
-    <svg viewBox="0 0 140 200" className="w-32 sm:w-36 drop-shadow-[0_0_18px_rgba(227,176,75,0.25)]" role="img" aria-label={lit ? `เทียนแห่งสติลุก ${Math.round(pct * 100)} เปอร์เซ็นต์` : 'เทียนแห่งสติยังไม่ได้จุด'}>
+    <svg viewBox="0 0 140 200" className="w-32 sm:w-36 drop-shadow-[0_0_18px_rgba(227,176,75,0.25)]" role="img" aria-label={lit ? t('healing.candle.ariaLit', 'เทียนแห่งสติลุก {pct} เปอร์เซ็นต์', { pct: Math.round(pct * 100) }) : t('healing.candle.ariaUnlit', 'เทียนแห่งสติยังไม่ได้จุด')}>
       <defs>
         <radialGradient id="candleGlow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor={GOLD} stopOpacity="0.9" />
@@ -90,6 +93,7 @@ function Candle({ lit, pct }: { lit: boolean; pct: number }) {
 
 export default function HealingPage() {
   const { isAuthenticated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
   const [tab, setTab] = useState<'ธรรมะ' | 'สมาธิ' | 'สมุนไพร' | 'ติดตาม'>('ธรรมะ');
   const [teachings, setTeachings] = useState<Teaching[]>([]);
   const [herbs, setHerbs] = useState<Herb[]>([]);
@@ -117,17 +121,17 @@ export default function HealingPage() {
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/healing/progress?days=90`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/healing/progress?days=1`),
       ]);
-      const t = await tr.json();
+      const trJson = await tr.json();
       const h = await hr.json();
       const p = await pr.json();
       const pd = await prDay.json();
-      setTeachings(t.teachings ?? []);
+      setTeachings(trJson.teachings ?? []);
       setHerbs(h.herbs ?? []);
       setProgress(p.progress ?? []);
       setMeditation(p.meditation ?? { total_min: 0, sessions: 0 });
       setTodayMin(pd.meditation?.total_min ?? 0);
     } catch {
-      setError('โหลดข้อมูลไม่สำเร็จ — ตรวจสอบเซิร์ฟเวอร์');
+      setError(t('healing.loadFailed', 'โหลดข้อมูลไม่สำเร็จ — ตรวจสอบเซิร์ฟเวอร์'));
     }
   }, []);
 
@@ -146,10 +150,10 @@ export default function HealingPage() {
         body: JSON.stringify({ message: chatMsg }),
       });
       const j = await r.json();
-      setChatReply(j.reply ?? (j.error ?? 'ไม่มีการตอบกลับ'));
+      setChatReply(j.reply ?? (j.error ?? t('healing.companion.noReply', 'ไม่มีการตอบกลับ')));
     } catch {
       setChatReply('');
-      setError('AI ปลอบโยนไม่สำเร็จ — ตรวจสอบ Ollama');
+      setError(t('healing.companion.failed', 'AI ปลอบโยนไม่สำเร็จ — ตรวจสอบ Ollama'));
     } finally {
       setChatBusy(false);
     }
@@ -164,11 +168,11 @@ export default function HealingPage() {
       });
       const j = await r.json();
       if (j.success) {
-        setMessage(`✅ บันทึกสมาธิแล้ว ${medForm.duration_min} นาที`);
+        setMessage(t('healing.meditate.saved', 'บันทึกสมาธิแล้ว {n} นาที', { n: medForm.duration_min }));
         setMedForm({ ...medForm, note: '' });
         load();
-      } else setError(j.error ?? 'บันทึกไม่สำเร็จ');
-    } catch { setError('บันทึกสมาธิไม่สำเร็จ'); }
+      } else setError(j.error ?? t('healing.meditate.saveFailed2', 'บันทึกไม่สำเร็จ'));
+    } catch { setError(t('healing.meditate.saveFailed', 'บันทึกสมาธิไม่สำเร็จ')); }
   };
 
   const checkHerb = async () => {
@@ -179,7 +183,7 @@ export default function HealingPage() {
         body: JSON.stringify({ herb: herbCheck.herb, meds: herbCheck.meds.split(',').map((s) => s.trim()).filter(Boolean) }),
       });
       setHerbResult(await r.json());
-    } catch { setError('ตรวจสมุนไพรไม่สำเร็จ'); }
+    } catch { setError(t('healing.herbTab.checkFailed', 'ตรวจสมุนไพรไม่สำเร็จ')); }
   };
 
   const logMetric = async () => {
@@ -191,32 +195,32 @@ export default function HealingPage() {
       });
       const j = await r.json();
       if (j.success) {
-        setMessage(`✅ บันทึก ${METRIC_LABELS[metricForm.metric] ?? metricForm.metric} = ${metricForm.value}`);
+        setMessage(t('healing.trackTab.saved', 'บันทึก {label} = {value}', { label: t('healing.metric.' + metricForm.metric, METRIC_LABELS[metricForm.metric] ?? metricForm.metric), value: metricForm.value }));
         setMetricForm({ ...metricForm, value: '' });
         load();
-      } else setError(j.error ?? 'บันทึกไม่สำเร็จ');
-    } catch { setError('บันทึกตัววัดไม่สำเร็จ'); }
+      } else setError(j.error ?? t('healing.meditate.saveFailed2', 'บันทึกไม่สำเร็จ'));
+    } catch { setError(t('healing.trackTab.saveFailed', 'บันทึกตัววัดไม่สำเร็จ')); }
   };
 
-  const cats = Array.from(new Set(teachings.map((t) => t.category)));
-  const filtered = teachingFilter ? teachings.filter((t) => t.category === teachingFilter) : teachings;
+  const cats = Array.from(new Set(teachings.map((item) => item.category)));
+  const filtered = teachingFilter ? teachings.filter((item) => item.category === teachingFilter) : teachings;
 
   // ── เทียน: lit ตามนาทีสมาธิ 24 ชม. ล่าสุด (เป้า 30 นาที) ──
   const pct = Math.min(1, todayMin / 30);
   const lit = pct >= 0.03;
   const candleCaption = !lit
-    ? 'เทียนยังไม่ได้จุด — บันทึกสมาธิวันนี้ เพื่อจุดไฟแห่งสติ'
+    ? t('healing.candle.captionUnlit', 'เทียนยังไม่ได้จุด — บันทึกสมาธิวันนี้ เพื่อจุดไฟแห่งสติ')
     : pct < 1 / 3
-      ? `ไฟเริ่มลุก — ${todayMin} นาทีใน 24 ชม. สู่เป้า 30`
+      ? t('healing.candle.captionStart', 'ไฟเริ่มลุก — {min} นาทีใน 24 ชม. สู่เป้า 30', { min: todayMin })
       : pct < 2 / 3
-        ? `ไฟกำลังลุกโชน — ${todayMin}/30 นาที`
-        : `ไฟแห่งสติเต็มเปี่ยม — ${todayMin} นาทีใน 24 ชม. 🎉`;
+        ? t('healing.candle.captionRising', 'ไฟกำลังลุกโชน — {min}/30 นาที', { min: todayMin })
+        : t('healing.candle.captionFull', 'ไฟแห่งสติเต็มเปี่ยม — {min} นาทีใน 24 ชม.', { min: todayMin });
 
   const TABS: Array<{ key: typeof tab; label: string }> = [
-    { key: 'ธรรมะ', label: '📿 ธรรมะบำบัดใจ' },
-    { key: 'สมาธิ', label: '🧘 สมาธิบำบัดกาย' },
-    { key: 'สมุนไพร', label: '🌿 สมุนไพรคู่ยา' },
-    { key: 'ติดตาม', label: '📊 ติดตามผล' },
+    { key: 'ธรรมะ', label: t('healing.tabs.dhamma', 'ธรรมะบำบัดใจ') },
+    { key: 'สมาธิ', label: t('healing.tabs.meditation', 'สมาธิบำบัดกาย') },
+    { key: 'สมุนไพร', label: t('healing.tabs.herbs', 'สมุนไพรคู่ยา') },
+    { key: 'ติดตาม', label: t('healing.tabs.track', 'ติดตามผล') },
   ];
 
   return (
@@ -233,29 +237,29 @@ export default function HealingPage() {
           {/* ── ส่วนหัว: เงียบ แต่เป็นเอกลักษณ์ — ตีกรอบคำสอนด้วยเส้นทอง ── */}
           <header className="text-center space-y-2">
             <p className="mono text-[10px] tracking-[0.35em] text-[#B8873A] uppercase">Sovereign Buddhist Healing</p>
-            <h1 className="font-script text-4xl font-semibold text-[#EDE3CC]">ห้องเยียวยา</h1>
-            <p className="text-sm text-[#B99F70]">สมุนไพร/แพทย์รักษากาย — สติปัฏฐานรักษาใจ · อริยสัจเข้าใจเหตุ · อนัตตาปล่อยวาง</p>
+            <h1 className="font-script text-4xl font-semibold text-[#EDE3CC]">{t('healing.page.title', 'ห้องเยียวยา')}</h1>
+            <p className="text-sm text-[#B99F70]">{t('healing.page.subtitle', 'สมุนไพร/แพทย์รักษากาย — สติปัฏฐานรักษาใจ · อริยสัจเข้าใจเหตุ · อนัตตาปล่อยวาง')}</p>
             <p className="font-script italic text-[#E3B04B] text-sm leading-relaxed max-w-xl mx-auto border-y border-[#332616] py-2 px-4">
               “จิตที่ตั้งมั่น ย่อมไม่หวั่นไหวต่อทุกขเวทนา” <span className="text-[#8A7A58] not-italic">— หลวงปู่ชา สุภัทโท</span>
             </p>
           </header>
 
           {/* ── เทียนแห่งสติ — signature: ไฟลุกตามสมาธิจริง ── */}
-          <section className="flex flex-col items-center gap-1 py-2" aria-label="เทียนแห่งสติ">
+          <section className="flex flex-col items-center gap-1 py-2" aria-label={t('healing.candle.sectionLabel', 'เทียนแห่งสติ')}>
             <Candle lit={lit} pct={pct} />
             <p className={`text-xs font-medium ${lit ? 'text-[#E3B04B]' : 'text-[#8A7A58]'}`}>{candleCaption}</p>
-            <p className="text-[10px] text-[#6E6248]">🎯 เป้าหมาย: สมาธิ 30 นาที/วัน</p>
+            <p className="text-[10px] text-[#6E6248] flex items-center justify-center gap-1"><Icon name="target" size={11} /> {t('healing.page.target', 'เป้าหมาย: สมาธิ 30 นาที/วัน')}</p>
           </section>
 
           {/* ── แท็บ: เส้นใต้ทองเงียบ ๆ (ไม่ใช่ปุ่มเม็ดยา) ── */}
           <nav className="flex flex-wrap gap-1 justify-center border-b border-[#332616]">
-            {TABS.map((t) => (
+            {TABS.map((tItem) => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E3B04B] ${tab === t.key ? 'border-[#E3B04B] text-[#E3B04B] font-semibold' : 'border-transparent text-[#8A7A58] hover:text-[#B99F70]'}`}
+                key={tItem.key}
+                onClick={() => setTab(tItem.key)}
+                className={`px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E3B04B] ${tab === tItem.key ? 'border-[#E3B04B] text-[#E3B04B] font-semibold' : 'border-transparent text-[#8A7A58] hover:text-[#B99F70]'}`}
               >
-                {t.label}
+                {tItem.label}
               </button>
             ))}
           </nav>
@@ -266,18 +270,18 @@ export default function HealingPage() {
           {/* ── 📿 ธรรมะบำบัดใจ ── */}
           {tab === 'ธรรมะ' && (
             <div className="grid md:grid-cols-2 gap-4">
-              <div className={`${CARD} p-4 space-y-3`}>
+              <div className={`${CARD} p-4 space-y-3 panel-glow`}>
                 <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> AI Dhamma Companion</h2>
-                <p className="text-xs text-[#8A7A58]">เล่าให้หลวงพี่ AI ฟัง — ระบบค้นพุทธวจนะที่ตรง แล้วปลอบโยนพร้อมคำแนะนำการปฏิบัติ</p>
+                <p className="text-xs text-[#8A7A58]">{t('healing.companion.desc', 'เล่าให้หลวงพี่ AI ฟัง — ระบบค้นพุทธวจนะที่ตรง แล้วปลอบโยนพร้อมคำแนะนำการปฏิบัติ')}</p>
                 <textarea
                   value={chatMsg}
                   onChange={(e) => setChatMsg(e.target.value)}
-                  placeholder="เช่น กลัวความตาย อยากฝึกใจให้สงบ..."
+                  placeholder={t('healing.companion.placeholder', 'เช่น กลัวความตาย อยากฝึกใจให้สงบ...')}
                   rows={3}
                   className={`w-full ${INPUT}`}
                 />
                 <button onClick={askCompanion} disabled={chatBusy} className={`w-full ${BTN}`}>
-                  {chatBusy ? '⏳ หลวงพี่กำลังพิจารณา... (อาจใช้เวลานานในเครื่อง CPU)' : '🙏 ถามหลวงพี่'}
+                  {chatBusy ? t('healing.companion.busy', 'หลวงพี่กำลังพิจารณา... (อาจใช้เวลานานในเครื่อง CPU)') : <><Icon name="send" size={14} /> {t('healing.companion.ask', 'ถามหลวงพี่')}</>}
                 </button>
                 {chatReply && (
                   <div className="bg-[#120D07]/80 border-l-2 border-l-[#E3B04B] rounded-r-lg p-3 text-sm leading-relaxed whitespace-pre-wrap text-[#D9CEB2]">
@@ -285,27 +289,27 @@ export default function HealingPage() {
                   </div>
                 )}
               </div>
-              <div className={`${CARD} p-4 space-y-3`}>
+              <div className={`${CARD} p-4 space-y-3 panel-cyan`}>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> ฐานข้อมูลพุทธวจนะ</h2>
+                  <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> {t('healing.teachings.title', 'ฐานข้อมูลพุทธวจนะ')}</h2>
                   <select value={teachingFilter} onChange={(e) => setTeachingFilter(e.target.value)} className={`${INPUT} text-xs px-2 py-1.5`}>
-                    <option value="">ทุกหมวด</option>
+                    <option value="">{t('healing.teachings.all', 'ทุกหมวด')}</option>
                     {cats.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                  {filtered.map((t) => (
-                    <div key={t.id} className="border border-[#332616] rounded-lg p-3 space-y-1 bg-[#151009]/60">
+                  {filtered.map((item) => (
+                    <div key={item.id} className="border border-[#332616] rounded-lg p-3 space-y-1 bg-[#151009]/60">
                       <div className="flex items-center justify-between">
-                        <span className="font-script font-semibold text-[#E3B04B]">{t.title}</span>
-                        <span className="text-[10px] border border-[#3A2C1B] px-2 py-0.5 rounded-full text-[#B99F70]">{t.category}</span>
+                        <span className="font-script font-semibold text-[#E3B04B]">{item.title}</span>
+                        <span className="text-[10px] border border-[#3A2C1B] px-2 py-0.5 rounded-full text-[#B99F70]">{item.category}</span>
                       </div>
-                      <p className="text-xs text-[#C9BCA4] leading-relaxed">{t.content}</p>
-                      {t.application && <p className="text-[11px] text-[#93A97E]/90">💡 ใช้สำหรับ: {t.application}</p>}
-                      {t.source && <p className="text-[10px] text-[#6E6248]">📖 {t.source}</p>}
+                      <p className="text-xs text-[#C9BCA4] leading-relaxed">{item.content}</p>
+                      {item.application && <p className="text-[11px] text-[#93A97E]/90">{t('healing.teachings.application', 'ใช้สำหรับ: {text}', { text: item.application })}</p>}
+                      {item.source && <p className="text-[10px] text-[#6E6248] flex items-center gap-1"><Icon name="book" size={11} /> {item.source}</p>}
                     </div>
                   ))}
-                  {filtered.length === 0 && <p className="text-xs text-[#6E6248]">ยังไม่มีหลักธรรมในหมวดนี้</p>}
+                  {filtered.length === 0 && <p className="text-xs text-[#6E6248]">{t('healing.teachings.empty', 'ยังไม่มีหลักธรรมในหมวดนี้')}</p>}
                 </div>
               </div>
             </div>
@@ -314,36 +318,36 @@ export default function HealingPage() {
           {/* ── 🧘 สมาธิ ── */}
           {tab === 'สมาธิ' && (
             <div className="grid md:grid-cols-2 gap-4">
-              <div className={`${CARD} p-4 space-y-3`}>
-                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> บันทึกการเจริญสมาธิ</h2>
+              <div className={`${CARD} p-4 space-y-3 panel-glow`}>
+                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> {t('healing.meditate.title', 'บันทึกการเจริญสมาธิ')}</h2>
                 <div className="grid grid-cols-2 gap-2">
                   <select value={medForm.type} onChange={(e) => setMedForm({ ...medForm, type: e.target.value })} className={INPUT}>
-                    <option>หายใจ</option><option>เดินจงกรม</option><option>แผ่เมตตา</option><option>กราบพระ</option><option>สวดมนต์</option><option>นั่งสมาธิ</option>
+                    <option value="หายใจ">{t('healing.meditate.type.breathing', 'หายใจ')}</option><option value="เดินจงกรม">{t('healing.meditate.type.walking', 'เดินจงกรม')}</option><option value="แผ่เมตตา">{t('healing.meditate.type.lovingKindness', 'แผ่เมตตา')}</option><option value="กราบพระ">{t('healing.meditate.type.bowing', 'กราบพระ')}</option><option value="สวดมนต์">{t('healing.meditate.type.chanting', 'สวดมนต์')}</option><option value="นั่งสมาธิ">{t('healing.meditate.type.sitting', 'นั่งสมาธิ')}</option>
                   </select>
-                  <input value={medForm.duration_min} onChange={(e) => setMedForm({ ...medForm, duration_min: e.target.value })} type="number" min="1" placeholder="นาที" className={INPUT} />
+                  <input value={medForm.duration_min} onChange={(e) => setMedForm({ ...medForm, duration_min: e.target.value })} type="number" min="1" placeholder={t('healing.meditate.minutesPlaceholder', 'นาที')} className={INPUT} />
                 </div>
-                <input value={medForm.note} onChange={(e) => setMedForm({ ...medForm, note: e.target.value })} placeholder="หมายเหตุ (เช่น รู้สึกสงบขึ้น)" className={`w-full ${INPUT}`} />
-                <button onClick={logMeditation} className={`w-full ${BTN}`}>✅ บันทึกสมาธิ</button>
+                <input value={medForm.note} onChange={(e) => setMedForm({ ...medForm, note: e.target.value })} placeholder={t('healing.meditate.notePlaceholder', 'หมายเหตุ (เช่น รู้สึกสงบขึ้น)')} className={`w-full ${INPUT}`} />
+                <button onClick={logMeditation} className={`w-full ${BTN}`}><Icon name="check" size={14} /> {t('healing.meditate.save', 'บันทึกสมาธิ')}</button>
                 <p className="text-[11px] text-[#6E6248] leading-relaxed">
-                  💡 การหายใจเข้าออกรู้ชัด — ฝึกสติปัฏฐานตามมหาสติปัฏฐานสูตร<br />
-                  💡 คลื่นสมอง: Alpha (8-13Hz) = สงบตื่นรู้ · Theta (4-7Hz) = สมาธิลึก ลดปวด · Delta = หลับลึกซ่อมแซมร่างกาย
+                  {t('healing.meditate.info1', 'การหายใจเข้าออกรู้ชัด — ฝึกสติปัฏฐานตามมหาสติปัฏฐานสูตร')}<br />
+                  {t('healing.meditate.info2', 'คลื่นสมอง: Alpha (8-13Hz) = สงบตื่นรู้ · Theta (4-7Hz) = สมาธิลึก ลดปวด · Delta = หลับลึกซ่อมแซมร่างกาย')}
                 </p>
               </div>
-              <div className={`${CARD} p-4 space-y-3`}>
-                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> สถิติสมาธิ (90 วัน)</h2>
+              <div className={`${CARD} p-4 space-y-3 panel-cyan`}>
+                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> {t('healing.meditate.statsTitle', 'สถิติสมาธิ (90 วัน)')}</h2>
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="bg-[#151009]/80 rounded-xl p-4 border border-[#332616]">
-                    <div className="mono text-3xl font-bold text-[#E3B04B]">{meditation.total_min}</div>
-                    <div className="text-xs text-[#8A7A58]">นาทีรวม</div>
+                    <div className="mono text-3xl font-bold text-[#E3B04B] glow-text">{meditation.total_min}</div>
+                    <div className="text-xs text-[#8A7A58]">{t('healing.meditate.totalMin', 'นาทีรวม')}</div>
                   </div>
                   <div className="bg-[#151009]/80 rounded-xl p-4 border border-[#332616]">
-                    <div className="mono text-3xl font-bold text-[#E3B04B]">{meditation.sessions}</div>
-                    <div className="text-xs text-[#8A7A58]">ครั้งที่ทำ</div>
+                    <div className="mono text-3xl font-bold text-[#E3B04B] glow-text">{meditation.sessions}</div>
+                    <div className="text-xs text-[#8A7A58]">{t('healing.meditate.sessions', 'ครั้งที่ทำ')}</div>
                   </div>
                 </div>
                 <div className="bg-[#151009]/60 border border-[#332616] rounded-lg p-3 text-xs text-[#8A7A58] space-y-1">
-                  <p>🎯 เป้าหมายแนะนำ: 30-45 นาที/วัน เพื่อให้ได้ประโยชน์ทางกายและใจ</p>
-                  <p>🧠 สมาธิลึก (Theta) ช่วยลดความเจ็บปวด — เห็นเวทนาเป็นแค่คลื่นที่มาแล้วไป</p>
+                  <p>{t('healing.meditate.goal', 'เป้าหมายแนะนำ: 30-45 นาที/วัน เพื่อให้ได้ประโยชน์ทางกายและใจ')}</p>
+                  <p>{t('healing.meditate.theta', 'สมาธิลึก (Theta) ช่วยลดความเจ็บปวด — เห็นเวทนาเป็นแค่คลื่นที่มาแล้วไป')}</p>
                 </div>
               </div>
             </div>
@@ -353,20 +357,20 @@ export default function HealingPage() {
           {tab === 'สมุนไพร' && (
             <div className="space-y-4">
               <div className={`${CARD} p-4 space-y-3`}>
-                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> ตรวจสมุนไพรกับยาที่ทาน</h2>
+                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> {t('healing.herbTab.title', 'ตรวจสมุนไพรกับยาที่ทาน')}</h2>
                 <div className="grid md:grid-cols-2 gap-2">
                   <select value={herbCheck.herb} onChange={(e) => setHerbCheck({ ...herbCheck, herb: e.target.value })} className={INPUT}>
-                    <option value="">เลือกสมุนไพร</option>
+                    <option value="">{t('healing.herbTab.select', 'เลือกสมุนไพร')}</option>
                     {herbs.map((h) => <option key={h.name} value={h.name}>{h.name}</option>)}
                   </select>
-                  <input value={herbCheck.meds} onChange={(e) => setHerbCheck({ ...herbCheck, meds: e.target.value })} placeholder="ยาที่ทาน (คั่นด้วย , เช่น Warfarin, Paracetamol)" className={INPUT} />
+                  <input value={herbCheck.meds} onChange={(e) => setHerbCheck({ ...herbCheck, meds: e.target.value })} placeholder={t('healing.herbTab.medsPlaceholder', 'ยาที่ทาน (คั่นด้วย , เช่น Warfarin, Paracetamol)')} className={INPUT} />
                 </div>
-                <button onClick={checkHerb} className={BTN}>🔍 ตรวจ</button>
+                <button onClick={checkHerb} className={BTN}><Icon name="search" size={14} /> {t('healing.herbTab.check', 'ตรวจ')}</button>
                 {herbResult && (
                   <div className={`rounded-lg p-3 text-sm border ${herbResult.safe ? 'bg-[#2A3A22]/70 border-[#3D5232] text-[#A8C193]' : 'bg-[#4A211A]/70 border-[#6E3026] text-[#D9A69A]'}`}>
                     <p className="font-semibold">{herbResult.note}</p>
                     {herbResult.conflicts?.map((c: any, i: number) => (
-                      <p key={i} className="text-xs mt-1">🚨 {c.med} ({c.severity}): {c.note}</p>
+                      <p key={i} className="text-xs mt-1"><Icon name="alert-triangle" size={12} className="inline-block mr-1 align-[-2px]" /> {c.med} ({c.severity}): {c.note}</p>
                     ))}
                   </div>
                 )}
@@ -374,16 +378,16 @@ export default function HealingPage() {
               <div className="grid md:grid-cols-2 gap-3">
                 {herbs.map((h) => (
                   <div key={h.name} className={`${CARD} p-4 space-y-2`}>
-                    <h3 className="font-script font-semibold text-[#93A97E]">🌿 {h.name}</h3>
+                    <h3 className="font-script font-semibold text-[#93A97E] flex items-center gap-1.5"><Icon name="farm" size={14} /> {h.name}</h3>
                     <div className="flex flex-wrap gap-1">
                       {h.uses.map((u) => <span key={u} className="text-[10px] border border-[#3A2C1B] px-2 py-0.5 rounded-full text-[#B99F70]">{u}</span>)}
                     </div>
                     <ul className="text-[11px] text-[#E3B04B]/90 space-y-0.5">
-                      {h.warnings.map((w) => <li key={w}>⚠️ {w}</li>)}
+                      {h.warnings.map((w) => <li key={w} className="flex items-start gap-1"><Icon name="alert-triangle" size={11} className="mt-0.5 shrink-0" /> {w}</li>)}
                     </ul>
                     {h.interactions.length > 0 && (
                       <div className="text-[11px] text-[#8A7A58] space-y-0.5">
-                        <p className="text-[#B99F70] font-semibold">ข้อควรระวังกับยา:</p>
+                        <p className="text-[#B99F70] font-semibold">{t('healing.herbTab.caution', 'ข้อควรระวังกับยา:')}</p>
                         {h.interactions.map((i) => (
                           <p key={i.med}>• {i.med} [{i.severity}]: {i.note}</p>
                         ))}
@@ -392,7 +396,7 @@ export default function HealingPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-[11px] text-[#6E6248] text-center">⚠️ สมุนไพรเป็นยาเสริม — ไม่ใช่ยารักษาหลัก ต้องปรึกษาแพทย์ก่อนใช้ร่วมกับคีโม/ยาละลายลิ่มเลือด</p>
+              <p className="text-[11px] text-[#6E6248] text-center"><Icon name="alert-triangle" size={11} className="inline-block mr-1 align-[-2px]" /> {t('healing.herbTab.footer', 'สมุนไพรเป็นยาเสริม — ไม่ใช่ยารักษาหลัก ต้องปรึกษาแพทย์ก่อนใช้ร่วมกับคีโม/ยาละลายลิ่มเลือด')}</p>
             </div>
           )}
 
@@ -400,43 +404,43 @@ export default function HealingPage() {
           {tab === 'ติดตาม' && (
             <div className="space-y-4">
               <div className={`${CARD} p-4 space-y-3`}>
-                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> บันทึกตัววัดรายสัปดาห์</h2>
+                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> {t('healing.trackTab.title', 'บันทึกตัววัดรายสัปดาห์')}</h2>
                 <div className="grid md:grid-cols-3 gap-2">
                   <select value={metricForm.metric} onChange={(e) => setMetricForm({ ...metricForm, metric: e.target.value })} className={INPUT}>
-                    {Object.entries(METRIC_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {Object.entries(METRIC_LABELS).map(([k, v]) => <option key={k} value={k}>{t('healing.metric.' + k, v)}</option>)}
                   </select>
-                  <input value={metricForm.value} onChange={(e) => setMetricForm({ ...metricForm, value: e.target.value })} type="number" step="any" placeholder="ค่า" className={INPUT} />
-                  <button onClick={logMetric} className={BTN}>✅ บันทึก</button>
+                  <input value={metricForm.value} onChange={(e) => setMetricForm({ ...metricForm, value: e.target.value })} type="number" step="any" placeholder={t('healing.trackTab.valuePlaceholder', 'ค่า')} className={INPUT} />
+                  <button onClick={logMetric} className={BTN}><Icon name="check" size={14} /> {t('healing.trackTab.save', 'บันทึก')}</button>
                 </div>
               </div>
               <div className="grid md:grid-cols-2 gap-3">
                 {progress.length === 0 && (
                   <div className={`md:col-span-2 ${CARD} p-6 text-center text-sm text-[#8A7A58]`}>
-                    ยังไม่มีข้อมูล — บันทึกตัววัดสัปดาห์ละครั้ง แล้วระบบจะแสดงความคืบหน้า (ก่อน vs หลัง) ที่นี่
+                    {t('healing.trackTab.empty', 'ยังไม่มีข้อมูล — บันทึกตัววัดสัปดาห์ละครั้ง แล้วระบบจะแสดงความคืบหน้า (ก่อน vs หลัง) ที่นี่')}
                   </div>
                 )}
                 {progress.map((m) => {
-                  const label = METRIC_LABELS[m.metric] ?? m.metric;
+                  const label = t('healing.metric.' + m.metric, METRIC_LABELS[m.metric] ?? m.metric);
                   return (
                     <div key={m.metric} className={`${CARD} p-4 space-y-2`}>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-[#D9CEB2]">{label}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full border ${m.improving ? 'bg-[#2A3A22]/70 border-[#3D5232] text-[#93A97E]' : 'bg-[#4A211A]/70 border-[#6E3026] text-[#D9A69A]'}`}>
-                          {m.improving ? '✅ ดีขึ้น' : '⚠️ ต้องดูแล'}
+                        <span className={`text-xs px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${m.improving ? 'bg-[#2A3A22]/70 border-[#3D5232] text-[#93A97E]' : 'bg-[#4A211A]/70 border-[#6E3026] text-[#D9A69A]'}`}>
+                          {m.improving ? <><Icon name="check" size={11} /> {t('healing.trackTab.better', 'ดีขึ้น')}</> : <><Icon name="alert-triangle" size={11} /> {t('healing.trackTab.needsCare', 'ต้องดูแล')}</>}
                         </span>
                       </div>
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="mono text-2xl font-bold text-[#C9BCA4]">{m.before}</div>
-                          <div className="text-[10px] text-[#6E6248]">ก่อน ({m.samples} ครั้ง)</div>
+                          <div className="text-[10px] text-[#6E6248]">{t('healing.trackTab.before', 'ก่อน ({n} ครั้ง)', { n: m.samples })}</div>
                         </div>
                         <div className="text-xl text-[#6E6248]">→</div>
                         <div className="text-right">
                           <div className="mono text-2xl font-bold text-[#E3B04B]">{m.after}</div>
-                          <div className="text-[10px] text-[#6E6248]">ล่าสุด</div>
+                          <div className="text-[10px] text-[#6E6248]">{t('healing.trackTab.latest', 'ล่าสุด')}</div>
                         </div>
                       </div>
-                      <div className={`text-xs ${m.improving ? 'text-[#93A97E]' : 'text-[#D9A69A]'}`}>Δ {m.delta > 0 ? '+' : ''}{m.delta} {m.improving ? '🎉' : '💪'}</div>
+                      <div className={`text-xs ${m.improving ? 'text-[#93A97E]' : 'text-[#D9A69A]'}`}>Δ {m.delta > 0 ? '+' : ''}{m.delta}</div>
                     </div>
                   );
                 })}

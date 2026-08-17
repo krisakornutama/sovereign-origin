@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import HoverCard from '../components/ui/HoverCard';
 import Sparkline from '../components/ui/Sparkline';
+import Icon from '../components/ui/Icon';
 
 // Simulated live data for demo
 const generateTrend = (base: number, variance: number, points: number): number[] => {
@@ -91,7 +92,7 @@ export default function HoverCardsDemo() {
 
         {/* ── Flip Cards ── */}
         <HoverCard
-          icon="⚡"
+          icon={<Icon name="battery" size={20} />}
           title="Battery SOC"
           metric={`${liveData.battery.soc.toFixed(0)}%`}
           accent="emerald"
@@ -125,7 +126,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="💧"
+          icon={<Icon name="droplet" size={20} />}
           title="Water Level"
           metric={`${liveData.water.level.toFixed(0)}%`}
           accent="cyan"
@@ -159,7 +160,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="🌡️"
+          icon={<Icon name="thermometer" size={20} />}
           title="Temperature"
           metric={`${liveData.temperature.value.toFixed(1)}°C`}
           accent="amber"
@@ -189,7 +190,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="🛡️"
+          icon={<Icon name="shield" size={20} />}
           title="Security Status"
           metric={liveData.security.pir ? 'Motion Detected' : 'All Clear'}
           accent={liveData.security.pir ? 'red' : 'emerald'}
@@ -229,7 +230,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="🛡️"
+          icon={<Icon name="shield" size={20} />}
           title="DEFCON Level"
           metric={`DEFCON ${liveData.defcon.level}`}
           accent={liveData.defcon.level <= 2 ? 'red' : liveData.defcon.level === 3 ? 'amber' : 'emerald'}
@@ -264,7 +265,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="💰"
+          icon={<Icon name="portfolio" size={20} />}
           title="Portfolio Value"
           metric={formatCurrency(liveData.wealth.portfolio)}
           accent="violet"
@@ -295,7 +296,7 @@ export default function HoverCardsDemo() {
 
         {/* ── Expand Cards ── */}
         <HoverCard
-          icon="📡"
+          icon={<Icon name="wifi" size={20} />}
           title="Device Status"
           metric="12 Online"
           accent="blue"
@@ -326,7 +327,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="🌍"
+          icon={<Icon name="globe" size={20} />}
           title="Global Map"
           metric="4 Nodes"
           accent="cyan"
@@ -369,7 +370,7 @@ export default function HoverCardsDemo() {
         />
 
         <HoverCard
-          icon="🤖"
+          icon={<Icon name="ai-agent" size={20} />}
           title="AI Agent"
           metric="Active"
           accent="violet"

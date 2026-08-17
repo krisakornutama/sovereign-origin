@@ -1,0 +1,25 @@
+// History page (history.tsx) — English
+export default {
+  unauthorized: 'Unauthorized',
+  eyebrow: 'Data & Reports',
+  backDashboard: '← Back to Dashboard',
+  range: {
+    '24h': '24h',
+    '7d': '7 days',
+    '30d': '30 days',
+    custom: 'Custom',
+  },
+  reloading: 'Loading…',
+  reload: 'Reload',
+  metricLabel: 'Metric:',
+  toggleRemove: 'Click to remove the chart',
+  toggleAdd: 'Click to add the chart',
+  noDataHint: 'No sensor data in the database yet — wait for MQTT data or add data manually on the Sensors page',
+  seriesCount: 'series: ',
+  pointsCount: 'data points: ',
+  rangeLabel: 'time range: ',
+  legend: '| line = average | faint band = min–max',
+  loadingChart: 'Loading data…',
+  noDataInRange: 'No sensor data in this time range',
+  loadError: 'Failed to load data — make sure the backend is running and TimescaleDB has data',
+} as const;

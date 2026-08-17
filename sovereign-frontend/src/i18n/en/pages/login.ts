@@ -1,0 +1,19 @@
+// Login / MFA page — English
+export default {
+  username: 'Username',
+  password: 'Password',
+  signIn: 'Sign in',
+  subtitle: 'Off-Grid Command Center · Sign in',
+  rateLimited: 'Too many attempts — try again in {time}',
+  wait: 'Wait {time}',
+  loading: 'Loading...',
+  mfaTitle: '2FA verification — Step 2',
+  mfaHint: 'Enter the 6-digit code from your Authenticator app (Google / Microsoft)',
+  mfaDigitLabel: 'Digit {n}',
+  verifying: 'Verifying…',
+  confirm: 'Confirm',
+  mfaGate: 'SESSION GATE · TOTP (SHA-1) · 30s per code · 10 attempts / 15 min',
+  loginFailed: 'Sign in failed',
+  otpInvalid: 'Invalid OTP code',
+  genericError: 'Something went wrong',
+} as const;

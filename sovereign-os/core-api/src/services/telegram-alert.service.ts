@@ -5,6 +5,7 @@
 // - soft-fail: ไม่มี token / เน็ตตัด = log เงียบ ไม่ทำให้ request หลักชะงัก
 import axios from 'axios';
 import { config } from '../config';
+import { getTelegramCredentials } from './telegram-credentials.service';
 
 export type AlertSeverity = 'critical' | 'warn' | 'info';
 
@@ -148,18 +149,19 @@ export class TelegramAlertDispatcher {
   }
 }
 
-// ── Singleton สำหรับ wiring ใน app (อ่าน env ตอนสร้าง) ──
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+// ── Singleton สำหรับ wiring ใน app ──
+// credential อ่านแบบ dynamic (DB override จากหน้า Settings → env fallback)
+// เพื่อให้ตั้งค่า/แก้ token ผ่าน UI ได้โดยไม่ต้อง restart ตัว service
 
-function defaultSender(html: string): Promise<boolean> {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+async function defaultSender(html: string): Promise<boolean> {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken || !creds.chatId) {
     console.warn('Telegram credentials not set — alert suppressed silently');
     return Promise.resolve(false);
   }
   return axios
-    .post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      chat_id: TELEGRAM_CHAT_ID,
+    .post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
+      chat_id: creds.chatId,
       text: html,
       parse_mode: 'HTML',
     })

@@ -3,16 +3,17 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════
-   SOVEREIGN OS — Design System
-   ฟอนต์ไทยหัวกลม (Prompt) + โทน command-center สมัยใหม่
+   SOVEREIGN OS — Design System v2 (Cyber-Tech Command Center)
+   พื้นผิว Gunmetal ดำลึก + นีออนเขียว/ไซอัน, ไลเยอร์โปร่งแสงซ้อนชั้น,
+   เส้นขอบเรืองแสงบาง, ข้อมูลแน่นเหมือนคอนโซลควบคุม
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
   --font-thai: 'Prompt', 'Noto Sans Thai Looped', 'IBM Plex Sans Thai', 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace;
+  --neon-green: #34d399;
+  --neon-cyan: #22d3ee;
   --accent: #10b981;
-  --accent-2: #22d3ee;
-  --radius: 1rem;
 }
 
 /* ── หน้าเยียวยา: เสียงพระคัมภีร์ (Sarabun — ฟอนต์จารีตไทย) ── */
@@ -29,16 +30,15 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ── ระบบ polish ทั่วแอป (ทุกหน้าได้อานิสงส์) ── */
 ::selection {
-  background: rgba(16, 185, 129, 0.35);
+  background: rgba(52, 211, 153, 0.35);
   color: #ecfdf5;
 }
 
-/* scrollbar เล็ก กลมกลืนกับโทนเข้ม */
+/* scrollbar เล็ก กลมกลืน (โทนนีออนอ่อนๆ) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(75, 85, 99, 0.6) transparent;
+  scrollbar-color: rgba(52, 211, 153, 0.25) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -48,21 +48,20 @@ html {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(75, 85, 99, 0.6);
+  background: rgba(52, 211, 153, 0.22);
   border-radius: 8px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.8);
+  background: rgba(34, 211, 238, 0.35);
 }
 
 /* focus ต้องเห็นชัด (คีย์บอร์ด/ผู้พิการทางสายตา) */
 :focus-visible {
-  outline: 2px solid rgba(16, 185, 129, 0.7);
+  outline: 2px solid rgba(52, 211, 153, 0.7);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-/* ลิงก์/ปุ่มทั่วไป — hover สื่น ไม่กระตุก */
 a,
 button {
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
@@ -86,7 +85,7 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* ── พื้นหลัง aurora (เฉพาะ dark theme) — ให้ความรู้สึกลึกขึ้นกว่าสีดำแบน ── */
+/* ── พื้นหลังคอนโซล: ออร่านีออน + กริดเส้นสแกน ── */
 body::before {
   content: '';
   position: fixed;
@@ -94,9 +93,23 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(900px 500px at 12% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
-    radial-gradient(800px 500px at 88% 0%, rgba(34, 211, 238, 0.08), transparent 60%),
-    radial-gradient(1000px 600px at 50% 110%, rgba(139, 92, 246, 0.08), transparent 60%);
+    radial-gradient(1000px 560px at 12% -10%, rgba(52, 211, 153, 0.10), transparent 60%),
+    radial-gradient(900px 560px at 88% 0%, rgba(34, 211, 238, 0.09), transparent 60%),
+    radial-gradient(1100px 600px at 50% 110%, rgba(52, 211, 153, 0.05), transparent 60%);
+}
+
+/* กริดเส้นสแกนแผ่ว (พื้นผิว gunmetal ลายเครื่องจักร) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.015) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(1200px 700px at 50% 40%, #000 30%, transparent 100%);
 }
 
 /* ── หน้า app ใช้คลาส font-mono บน root div (สไตล์ terminal เดิม) ──
@@ -121,7 +134,6 @@ pre,
   main {
     padding-bottom: 5rem;
   }
-  /* ซ่อน scrollbar ของแถบนำทางแนวนอน (ยังเลื่อนได้ด้วยนิ้ว) */
   .scrollbar-none {
     scrollbar-width: none;
   }
@@ -130,99 +142,179 @@ pre,
   }
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-/* ── Selection ── */
-::selection {
-  background: rgba(16, 185, 129, 0.35);
-  color: #fff;
-}
-
-/* ── Focus ring ที่มองเห็นชัด ── */
-:focus-visible {
-  outline: 2px solid rgba(16, 185, 129, 0.7);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
-/* ── Component classes (ใช้ซ้ำได้ทุกหน้า) ── */
+/* ═══════════ Component classes (ใช้ซ้ำได้ทุกหน้า) ═══════════ */
 @layer components {
+  /* การ์ดมาตรฐาน — พื้นผิวโปร่งแสงซ้อนชั้น + เส้นขอบบาง + ความลึก */
   .card {
-    @apply bg-gray-900/60 border border-gray-700/60 rounded-2xl backdrop-blur-sm;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    @apply bg-gray-900/60 border border-gray-800 rounded-xl;
+    background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 45%);
+    backdrop-filter: blur(6px);
+  }
+  /* แผงมาตรฐาน (พื้นทึบกว่า) */
+  .panel {
+    @apply bg-gray-900 border border-gray-800 rounded-xl;
+    background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0) 45%);
+  }
+  /* พื้นที่ฝังใน (inset) — จอ HUD ย่อย */
+  .inset {
+    @apply bg-gray-800/60 border border-gray-700/70 rounded-lg;
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
   }
   .card-hover {
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
   .card-hover:hover {
-    transform: translateY(-2px);
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 8px 32px rgba(16, 185, 129, 0.12);
+    border-color: rgba(52, 211, 153, 0.45);
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.12);
   }
+
+  /* ── แผงนีออนเขียว (เนื้อหาหลัก/การกระทำ) ── */
+  .panel-glow {
+    border-color: rgba(52, 211, 153, 0.28);
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.06),
+      0 0 20px rgba(52, 211, 153, 0.10),
+      inset 0 0 26px rgba(52, 211, 153, 0.03);
+  }
+  .panel-glow:hover {
+    border-color: rgba(52, 211, 153, 0.42);
+  }
+  /* ── แผงนีออนไซอัน (ข้อมูล/สตรีม/กราฟ/log) ── */
+  .panel-cyan {
+    border-color: rgba(34, 211, 238, 0.26);
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.06),
+      0 0 20px rgba(34, 211, 238, 0.10),
+      inset 0 0 26px rgba(34, 211, 238, 0.03);
+  }
+  .panel-cyan:hover {
+    border-color: rgba(34, 211, 238, 0.4);
+  }
+
+  /* ── ตัวอักษรเรืองแสง ── */
+  .glow-text {
+    text-shadow: 0 0 10px rgba(52, 211, 153, 0.45);
+  }
+  .glow-text-cyan {
+    text-shadow: 0 0 10px rgba(34, 211, 238, 0.45);
+  }
+  .glow-text-red {
+    text-shadow: 0 0 10px rgba(251, 113, 133, 0.5);
+  }
+
+  /* ── จุดสถานะนีออน ── */
+  .glow-dot {
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.9);
+  }
+  .glow-dot-cyan {
+    box-shadow: 0 0 6px rgba(34, 211, 238, 0.9);
+  }
+  .glow-dot-red {
+    box-shadow: 0 0 6px rgba(251, 113, 133, 0.9);
+  }
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40;
+    @apply btn bg-emerald-600 hover:bg-emerald-500 text-white;
+    box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35), 0 0 16px rgba(52, 211, 153, 0.22);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.5), 0 0 22px rgba(52, 211, 153, 0.3);
   }
   .btn-secondary {
-    @apply btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-200;
+    @apply btn bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-gray-800/60 border border-transparent text-gray-400 hover:text-gray-200;
+  }
+  .btn-danger {
+    @apply btn bg-red-950/50 hover:bg-red-900/60 border border-red-800/70 text-red-300;
+    box-shadow: 0 0 12px rgba(251, 113, 133, 0.15);
   }
   .input {
-    @apply bg-gray-800/70 border border-gray-600/70 rounded-xl px-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-colors;
+    @apply bg-gray-800/70 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-colors placeholder-gray-500;
+  }
+  .input:focus {
+    box-shadow: 0 0 12px rgba(52, 211, 153, 0.12);
   }
   .label {
-    @apply text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5 block;
+    @apply text-xs font-medium text-gray-500 mb-1.5 block;
+  }
+  .eyebrow {
+    @apply text-[10px] uppercase tracking-[0.18em] text-emerald-400/80 font-semibold;
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.35);
+  }
+  .eyebrow-cyan {
+    @apply text-[10px] uppercase tracking-[0.18em] text-cyan-400/80 font-semibold;
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
+  /* ตารางมาตรฐาน (HUD) */
+  .table {
+    @apply w-full text-sm;
+  }
+  .table thead th {
+    @apply text-left text-[11px] uppercase tracking-wider text-emerald-400/70 font-semibold px-3 py-2 border-b border-gray-800 whitespace-nowrap;
+  }
+  .table tbody td {
+    @apply px-3 py-2.5 border-b border-gray-800/70 text-gray-300 align-middle;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr:hover td {
+    @apply bg-gray-800/40;
+  }
+  /* สตรีม log เหตุการณ์ — เรียงบรรทัดแบบ terminal */
+  .log-stream {
+    @apply inset px-3 py-2 font-mono text-[11px] leading-relaxed;
+    background-color: rgba(6, 10, 16, 0.7);
+  }
 }
 
 /* ═══════════ ธีมสว่าง (Light theme) ═══════════
-   หน้าเว็บใช้คลาสเข้มฮาร์ดโค้ด (bg-gray-950 ฯลฯ) จึง override ด้วย CSS
+   หน้าเว็บใช้คลาสเข้มฮาร์ดโค้ด จึง override ด้วย CSS
    ตามคลาสที่ใช้งานบ่อย – เปิด/ปิดผ่าน html[data-theme='light']
    (ตั้งได้ที่หน้า /settings) */
 
 html[data-theme='light'] body {
-  background-color: #f1f5f9;
+  background-color: #f4f6f9;
   color: #1e293b;
 }
 
 html[data-theme='light'] body::before {
   background:
-    radial-gradient(900px 500px at 12% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
-    radial-gradient(800px 500px at 88% 0%, rgba(34, 211, 238, 0.08), transparent 60%);
+    radial-gradient(900px 500px at 12% -10%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(800px 500px at 88% 0%, rgba(34, 211, 238, 0.06), transparent 60%);
 }
 
-html[data-theme='light'] .bg-gray-950 { background-color: #f1f5f9; }
+html[data-theme='light'] body::after {
+  display: none;
+}
+
+html[data-theme='light'] .bg-gray-950 { background-color: #f4f6f9; }
+html[data-theme='light'] .bg-gray-950\/50 { background-color: #f4f6f9; }
+html[data-theme='light'] .bg-gray-950\/60 { background-color: #f4f6f9; }
+html[data-theme='light'] .bg-gray-950\/70 { background-color: #f4f6f9; }
+html[data-theme='light'] .bg-gray-950\/90 { background-color: #eef2f7; }
 html[data-theme='light'] .bg-gray-900 { background-color: #ffffff; }
+html[data-theme='light'] .bg-gray-900\/60 { background-color: #ffffff; }
+html[data-theme='light'] .bg-gray-900\/70 { background-color: #ffffff; }
 html[data-theme='light'] .bg-gray-900\/80 { background-color: #ffffff; }
 html[data-theme='light'] .bg-gray-900\/90 { background-color: #ffffff; }
 html[data-theme='light'] .bg-gray-800 { background-color: #eef2f7; }
+html[data-theme='light'] .bg-gray-800\/40 { background-color: #eef2f7; }
 html[data-theme='light'] .bg-gray-800\/50 { background-color: #eef2f7; }
+html[data-theme='light'] .bg-gray-800\/60 { background-color: #eef2f7; }
 html[data-theme='light'] .bg-gray-800\/70 { background-color: #eef2f7; }
 html[data-theme='light'] .bg-gray-700 { background-color: #e2e8f0; }
 
 html[data-theme='light'] .text-white { color: #0f172a; }
+html[data-theme='light'] .text-gray-50 { color: #0f172a; }
 html[data-theme='light'] .text-gray-100 { color: #1e293b; }
 html[data-theme='light'] .text-gray-200 { color: #334155; }
 html[data-theme='light'] .text-gray-300 { color: #475569; }
@@ -233,44 +325,25 @@ html[data-theme='light'] .text-blue-400 { color: #2563eb; }
 html[data-theme='light'] .text-red-400 { color: #dc2626; }
 html[data-theme='light'] .text-amber-400 { color: #d97706; }
 html[data-theme='light'] .text-cyan-400 { color: #0891b2; }
+html[data-theme='light'] .text-violet-400 { color: #7c3aed; }
+html[data-theme='light'] .text-rose-400 { color: #e11d48; }
+html[data-theme='light'] .text-emerald-300 { color: #047857; }
+html[data-theme='light'] .text-emerald-400 { color: #059669; }
+html[data-theme='light'] .text-emerald-600 { color: #047857; }
 
 html[data-theme='light'] .border-gray-700 { border-color: #e2e8f0; }
+html[data-theme='light'] .border-gray-700\/60 { border-color: #e2e8f0; }
+html[data-theme='light'] .border-gray-700\/70 { border-color: #e2e8f0; }
 html[data-theme='light'] .border-gray-800 { border-color: #e2e8f0; }
+html[data-theme='light'] .border-gray-800\/70 { border-color: #e2e8f0; }
 html[data-theme='light'] .border-gray-600 { border-color: #cbd5e1; }
 
 html[data-theme='light'] ::selection {
-  background: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.25);
   color: #0f172a;
 }
 
-/* ═══════════ Hover Card Animations ═══════════ */
-
-/* 3D flip utilities */
-.rotate-y-180 {
-  transform: rotateY(180deg);
-}
-
-/* Hover card glow pulse on the border */
-.hover-card-glow {
-  position: relative;
-}
-.hover-card-glow::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(34,211,238,0.3), rgba(139,92,246,0.3));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.hover-card-glow:hover::before {
-  opacity: 1;
-}
+/* ═══════════ Effects ═══════════ */
 
 /* Sparkline mini chart animation */
 @keyframes sparkle-draw {
@@ -294,31 +367,11 @@ html[data-theme='light'] ::selection {
   animation: shimmer 2s infinite;
 }
 
-/* Card lift with shadow bloom */
-@keyframes shadow-bloom {
-  from { box-shadow: 0 4px 24px rgba(0,0,0,0.25); }
-  to { box-shadow: 0 12px 40px rgba(16,185,129,0.15), 0 4px 24px rgba(0,0,0,0.3); }
+/* จุดสถานะหายใจช้าๆ (live indicator) */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
-.hover-card-lift:hover {
-  animation: shadow-bloom 0.4s ease-out forwards;
-}
-
-/* Ripple on click */
-@keyframes ripple {
-  to {
-    transform: scale(4);
-    opacity: 0;
-  }
-}
-.ripple-container {
-  position: relative;
-  overflow: hidden;
-}
-.ripple {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-  transform: scale(0);
-  animation: ripple 0.6s linear;
-  pointer-events: none;
+.pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
 }

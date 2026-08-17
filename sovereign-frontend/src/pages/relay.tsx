@@ -4,6 +4,8 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import Icon from '../components/ui/Icon';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 interface Relay {
   relayId: string;
@@ -23,16 +25,18 @@ interface RelaySchedule {
 
 const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา']; // index 0 = จันทร์ (วัน 1)
 
-function daysToLabel(days: string): string {
-  if (days === '*') return 'ทุกวัน';
-  return days
-    .split(',')
-    .map((d) => DAY_NAMES[parseInt(d, 10) - 1] || d)
-    .join(' ');
-}
-
 export default function RelayPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
+
+  const daysToLabel = (days: string): string => {
+    if (days === '*') return t('relay.everyDay', 'ทุกวัน');
+    return days
+      .split(',')
+      .map((d) => t(`relay.days.${d}`, DAY_NAMES[parseInt(d, 10) - 1] || d))
+      .join(' ');
+  };
+
   const [relays, setRelays] = useState<Relay[]>([]);
   const [schedules, setSchedules] = useState<RelaySchedule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,11 +58,11 @@ export default function RelayPage() {
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/relay/status`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/relay/schedules`),
       ]);
-      if (!statusRes.ok || !schedRes.ok) throw new Error('โหลดข้อมูลไม่สำเร็จ');
+      if (!statusRes.ok || !schedRes.ok) throw new Error(t('relay.errLoad', 'โหลดข้อมูลไม่สำเร็จ'));
       setRelays(await statusRes.json());
       setSchedules(await schedRes.json());
     } catch (err: any) {
-      setError(`❌ ${err.message || 'ไม่สามารถโหลดข้อมูลได้'}`);
+      setError(`${err.message || t('relay.errLoadData', 'ไม่สามารถโหลดข้อมูลได้')}`);
       setRelays([]);
       setSchedules([]);
     } finally {
@@ -93,12 +97,12 @@ export default function RelayPage() {
         setRelays((prev) =>
           prev.map((r) => (r.relayId === relay.relayId ? { ...r, state: newState } : r))
         );
-        setMessage(`✅ ${relay.label}: ${newState === 1 ? 'เปิด' : 'ปิด'}แล้ว`);
+        setMessage(t('relay.toggled', '{label}: {state}แล้ว', { label: relay.label, state: newState === 1 ? t('common.on', 'เปิด') : t('common.off', 'ปิด') }));
       } else {
-        setError(`❌ ${data.error || 'คำสั่งล้มเหลว'}`);
+        setError(`${data.error || t('relay.errCommand', 'คำสั่งล้มเหลว')}`);
       }
     } catch {
-      setError('❌ ไม่สามารถส่งคำสั่งได้ (ตรวจสอบ MQTT Broker / Core API)');
+      setError(t('relay.errSend', 'ไม่สามารถส่งคำสั่งได้ (ตรวจสอบ MQTT Broker / Core API)'));
     } finally {
       setSendingId(null);
     }
@@ -112,11 +116,11 @@ export default function RelayPage() {
 
   const addSchedule = async () => {
     if (!formRelay) {
-      setError('❌ เลือก relay ก่อน');
+      setError(t('relay.errSelectRelay', 'เลือก relay ก่อน'));
       return;
     }
     if (formDays.length === 0) {
-      setError('❌ เลือกอย่างน้อย 1 วัน');
+      setError(t('relay.errSelectDay', 'เลือกอย่างน้อย 1 วัน'));
       return;
     }
     setMessage('');
@@ -130,13 +134,13 @@ export default function RelayPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage('✅ เพิ่มตารางเวลาแล้ว');
+        setMessage(t('relay.scheduleAdded', 'เพิ่มตารางเวลาแล้ว'));
         loadData();
       } else {
-        setError(`❌ ${data.error || 'เพิ่มตารางไม่สำเร็จ'}`);
+        setError(`${data.error || t('relay.errAddSchedule', 'เพิ่มตารางไม่สำเร็จ')}`);
       }
     } catch {
-      setError('❌ ไม่สามารถเพิ่มตารางได้');
+      setError(t('relay.errAddScheduleFailed', 'ไม่สามารถเพิ่มตารางได้'));
     }
   };
 
@@ -153,46 +157,46 @@ export default function RelayPage() {
         setSchedules((prev) =>
           prev.map((s) => (s.id === sched.id ? { ...s, enabled: !sched.enabled } : s))
         );
-        setMessage(sched.enabled ? '⏸️ ปิดตารางแล้ว' : '▶️ เปิดตารางแล้ว');
+        setMessage(sched.enabled ? t('relay.scheduleDisabled', 'ปิดตารางแล้ว') : t('relay.scheduleEnabled', 'เปิดตารางแล้ว'));
       }
     } catch {
-      setError('❌ เปลี่ยนสถานะตารางไม่สำเร็จ');
+      setError(t('relay.errToggleSchedule', 'เปลี่ยนสถานะตารางไม่สำเร็จ'));
     }
   };
 
   const deleteSchedule = async (sched: RelaySchedule) => {
-    if (!confirm(`ลบตาราง ${sched.relayLabel} เวลา ${sched.time}?`)) return;
+    if (!confirm(t('relay.confirmDelete', 'ลบตาราง {label} เวลา {time}?', { label: sched.relayLabel, time: sched.time }))) return;
     setMessage('');
     setError('');
     try {
       await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/relay/schedules/${sched.id}`, {
         method: 'DELETE',
       });
-      setMessage('🗑️ ลบตารางแล้ว');
+      setMessage(t('relay.scheduleDeleted', 'ลบตารางแล้ว'));
       loadData();
     } catch {
-      setError('❌ ลบตารางไม่สำเร็จ');
+      setError(t('relay.errDeleteSchedule', 'ลบตารางไม่สำเร็จ'));
     }
   };
 
   if (!isHydrated) {
-    return <div className="text-white p-8">⏳ Loading...</div>;
+    return <div className="text-white p-8">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   if (!isAuthenticated || !user) {
-    return <div className="text-white p-8">Unauthorized</div>;
+    return <div className="text-white p-8">{t('relay.unauthorized', 'Unauthorized')}</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-mono flex">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
-          eyebrow="อุปกรณ์ &amp; พลังงาน"
-          title="🏰 SOVEREIGN OS"
-          subtitle="Relay Control" actions={<div className="flex gap-3 items-center">
-          <a href="/dashboard" className="text-sm text-blue-400 hover:underline">📊 Dashboard</a>
+          eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
+          title="SOVEREIGN OS" icon={<Icon name="relay" size={18} />}
+          subtitle={t('relay.subtitle', 'Relay Control')} actions={<div className="flex gap-3 items-center">
+          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</a>
         </div>}
         />
       </header>
@@ -200,18 +204,19 @@ export default function RelayPage() {
       <main className="max-w-4xl mx-auto p-6 space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold">🎛️ ควบคุมอุปกรณ์ไฟฟ้า</h2>
+            <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('relay.controlTitle', 'ควบคุมอุปกรณ์ไฟฟ้า')}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              ส่งคำสั่งผ่าน MQTT ไปยัง relay (ต้องมีอุปกรณ์รับคำสั่งจริงในเครือข่าย)
+              {t('relay.controlDesc', 'ส่งคำสั่งผ่าน MQTT ไปยัง relay (ต้องมีอุปกรณ์รับคำสั่งจริงในเครือข่าย)')}
             </p>
           </div>
-          <button onClick={loadData} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm">
-            🔄 รีเฟรช
+          <button onClick={loadData} className="btn-secondary">
+            <Icon name="refresh" size={14} />
+            {t('common.refresh', 'รีเฟรช')}
           </button>
         </div>
 
-        {message && <div className="p-3 rounded text-sm bg-green-900/30 text-green-400">{message}</div>}
-        {error && <div className="p-3 rounded text-sm bg-red-900/30 text-red-400">{error}</div>}
+        {message && <div className="inset p-3 rounded text-sm text-emerald-400">{message}</div>}
+        {error && <div className="inset p-3 rounded text-sm text-red-400">{error}</div>}
 
         {/* Relay cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -221,21 +226,21 @@ export default function RelayPage() {
             return (
               <div
                 key={relay.relayId}
-                className={`bg-gray-900 border rounded-xl p-5 flex flex-col gap-4 transition ${
-                  isOn ? 'border-green-600/50 bg-green-900/10' : 'border-gray-700'
+                className={`card panel-cyan p-5 flex flex-col gap-4 transition ${
+                  isOn ? 'border-emerald-600/50' : ''
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-lg font-bold text-white">{relay.label}</div>
+                    <div className="text-lg font-bold text-white glow-text">{relay.label}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{relay.relayId}</div>
                   </div>
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                      isOn ? 'bg-green-600/20 text-green-400' : 'bg-gray-700 text-gray-400'
+                      isOn ? 'bg-emerald-600/20 text-emerald-400' : 'bg-gray-700 text-gray-400'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${isOn ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+                    <span className={`w-2 h-2 rounded-full ${isOn ? 'bg-emerald-500 animate-pulse glow-dot' : 'bg-gray-500'}`} />
                     {isOn ? 'ON' : 'OFF'}
                   </span>
                 </div>
@@ -243,11 +248,9 @@ export default function RelayPage() {
                 <button
                   onClick={() => toggleRelay(relay, isOn ? 0 : 1)}
                   disabled={isSending}
-                  className={`w-full py-2.5 rounded-lg text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
-                    isOn ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-green-600 hover:bg-green-500 text-white'
-                  }`}
+                  className={`w-full ${isOn ? 'btn-danger' : 'btn-primary'}`}
                 >
-                  {isSending ? '⏳ ส่งคำสั่ง...' : isOn ? '⏻ ปิด' : '⏻ เปิด'}
+                  {isSending ? t('relay.sending', 'ส่งคำสั่ง...') : isOn ? t('common.off', 'ปิด') : t('common.on', 'เปิด')}
                 </button>
               </div>
             );
@@ -255,23 +258,23 @@ export default function RelayPage() {
         </div>
 
         {relays.length === 0 && !loading && (
-          <div className="text-gray-500 text-center py-8">ไม่มี relay ในระบบ</div>
+          <div className="text-gray-500 text-center py-8">{t('relay.noRelays', 'ไม่มี relay ในระบบ')}</div>
         )}
-        {loading && <div className="text-gray-400 text-center py-8">⏳ กำลังโหลดสถานะ...</div>}
+        {loading && <div className="text-gray-400 text-center py-8">{t('relay.loadingStatus', 'กำลังโหลดสถานะ...')}</div>}
 
         {/* ⏰ Scheduled Relay */}
         <section className="space-y-4">
-          <h2 className="text-xl font-bold">⏰ ตารางเวลาอัตโนมัติ</h2>
+          <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('relay.scheduleTitle', 'ตารางเวลาอัตโนมัติ')}</h2>
 
           {/* ฟอร์มเพิ่มตาราง */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-4">
+          <div className="card panel-glow p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Relay</label>
+                <label className="label">{t('relay.relay', 'Relay')}</label>
                 <select
                   value={formRelay}
                   onChange={(e) => setFormRelay(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                  className="input w-full"
                 >
                   {relays.map((r) => (
                     <option key={r.relayId} value={r.relayId}>{r.label}</option>
@@ -279,29 +282,29 @@ export default function RelayPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">เวลา (HH:mm)</label>
+                <label className="label">{t('relay.timeLabel', 'เวลา (HH:mm)')}</label>
                 <input
                   type="time"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                  className="input w-full"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">คำสั่ง</label>
+                <label className="label">{t('relay.command', 'คำสั่ง')}</label>
                 <select
                   value={formState}
                   onChange={(e) => setFormState(Number(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                  className="input w-full"
                 >
-                  <option value={1}>เปิด (ON)</option>
-                  <option value={0}>ปิด (OFF)</option>
+                  <option value={1}>{t('relay.optionOn', 'เปิด (ON)')}</option>
+                  <option value={0}>{t('relay.optionOff', 'ปิด (OFF)')}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 block mb-2">วันในสัปดาห์</label>
+              <label className="label">{t('relay.daysOfWeek', 'วันในสัปดาห์')}</label>
               <div className="flex flex-wrap gap-2">
                 {DAY_NAMES.map((name, idx) => {
                   const day = idx + 1;
@@ -313,11 +316,11 @@ export default function RelayPage() {
                       onClick={() => toggleDay(day)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
                         selected
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-emerald-600 text-white'
                           : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                       }`}
                     >
-                      {name}
+                      {t(`relay.days.${day}`, name)}
                     </button>
                   );
                 })}
@@ -326,7 +329,7 @@ export default function RelayPage() {
                   onClick={() => setFormDays([1, 2, 3, 4, 5, 6, 7])}
                   className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition"
                 >
-                  ทุกวัน
+                  {t('relay.everyDay', 'ทุกวัน')}
                 </button>
               </div>
             </div>
@@ -334,42 +337,43 @@ export default function RelayPage() {
             <button
               onClick={addSchedule}
               disabled={!formRelay || formDays.length === 0}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-semibold disabled:opacity-50"
+              className="btn-primary"
             >
-              ➕ เพิ่มตารางเวลา
+              <Icon name="plus" size={14} />
+              {t('relay.addSchedule', 'เพิ่มตารางเวลา')}
             </button>
           </div>
 
           {/* รายการตาราง */}
-          <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-x-auto">
+          <div className="card panel-cyan overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
                 <tr>
-                  <th className="px-4 py-3">Relay</th>
-                  <th className="px-4 py-3">เวลา</th>
-                  <th className="px-4 py-3">วัน</th>
-                  <th className="px-4 py-3">คำสั่ง</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3">จัดการ</th>
+                  <th className="px-4 py-3">{t('relay.relay', 'Relay')}</th>
+                  <th className="px-4 py-3">{t('common.time', 'เวลา')}</th>
+                  <th className="px-4 py-3">{t('relay.colDays', 'วัน')}</th>
+                  <th className="px-4 py-3">{t('relay.command', 'คำสั่ง')}</th>
+                  <th className="px-4 py-3">{t('common.status', 'สถานะ')}</th>
+                  <th className="px-4 py-3">{t('common.actions', 'จัดการ')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-cyan-800/50">
                 {schedules.map((sched) => (
                   <tr key={sched.id} className={`hover:bg-gray-800/50 ${sched.enabled ? '' : 'opacity-50'}`}>
                     <td className="px-4 py-2 text-gray-200">{sched.relayLabel}</td>
                     <td className="px-4 py-2 font-bold text-white">{sched.time}</td>
                     <td className="px-4 py-2 text-xs text-gray-400">{daysToLabel(sched.days)}</td>
-                    <td className="px-4 py-2">{sched.state === 1 ? 'เปิด' : 'ปิด'}</td>
+                    <td className="px-4 py-2">{sched.state === 1 ? t('common.on', 'เปิด') : t('common.off', 'ปิด')}</td>
                     <td className="px-4 py-2">
                       <button
                         onClick={() => toggleSchedule(sched)}
                         className={`px-3 py-1 rounded-full text-xs font-bold transition ${
                           sched.enabled
-                            ? 'bg-green-600/20 text-green-400 hover:bg-green-600/40'
+                            ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40'
                             : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                         }`}
                       >
-                        {sched.enabled ? '🟢 เปิด' : '⚪ ปิด'}
+                        {sched.enabled ? t('common.on', 'เปิด') : t('common.off', 'ปิด')}
                       </button>
                     </td>
                     <td className="px-4 py-2">
@@ -377,7 +381,7 @@ export default function RelayPage() {
                         onClick={() => deleteSchedule(sched)}
                         className="text-red-400 hover:text-red-300 text-xs"
                       >
-                        🗑️
+                        <Icon name="trash" size={14} />
                       </button>
                     </td>
                   </tr>
@@ -385,7 +389,7 @@ export default function RelayPage() {
                 {schedules.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                      ยังไม่มีตารางเวลา — เพิ่มตารางแรกของคุณ
+                      {t('relay.noSchedules', 'ยังไม่มีตารางเวลา — เพิ่มตารางแรกของคุณ')}
                     </td>
                   </tr>
                 )}

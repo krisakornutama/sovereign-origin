@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 /**
  * ป้ายแจ้งเตือนทั่วทั้งแอป: เมื่อมีงาน AI ทำงานเบื้องหลัง จะแสดง badge มุมขวาล่าง
@@ -13,6 +14,7 @@ export default function AgentBackgroundBadge() {
   const [show, setShow] = useState(false);
   const prevActive = useRef(0);
   const notifiedIds = useRef<Set<string>>(new Set());
+  const t = useLanguageStore((s) => s.t);
 
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
@@ -34,8 +36,8 @@ export default function AgentBackgroundBadge() {
           // เริ่มทำงานใหม่ → แจ้งเตือน
           try {
             if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('🤖 AI ทำงานเบื้องหลัง', {
-                body: `${activeIds.length} งานกำลังรัน — ไปหน้าอื่นต่อได้เลย`,
+              new Notification(t('app.badge.notifStartedTitle', '🤖 AI ทำงานเบื้องหลัง'), {
+                body: t('app.badge.notifStartedBody', '{n} งานกำลังรัน — ไปหน้าอื่นต่อได้เลย', { n: activeIds.length }),
               });
             }
           } catch {
@@ -45,8 +47,8 @@ export default function AgentBackgroundBadge() {
           // เสร็จหมด → แจ้งเตือน
           try {
             if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('✅ AI ทำงานเบื้องหลังเสร็จ', {
-                body: `เสร็จ ${finishedIds.length} งาน — ดูผลได้ที่หน้า AI Agent`,
+              new Notification(t('app.badge.notifDoneTitle', '✅ AI ทำงานเบื้องหลังเสร็จ'), {
+                body: t('app.badge.notifDoneBody', 'เสร็จ {n} งาน — ดูผลได้ที่หน้า AI Agent', { n: finishedIds.length }),
               });
             }
           } catch {
@@ -107,11 +109,11 @@ export default function AgentBackgroundBadge() {
       onClick={() => {
         window.location.href = '/ai-agent';
       }}
-      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-900/40 border border-emerald-400/50 animate-pulse"
-      title="AI กำลังทำงานเบื้องหลัง — คลิกเพื่อดูสถานะ"
+      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold border border-emerald-400/40"
+      title={t('app.badge.tooltip', 'AI กำลังทำงานเบื้องหลัง — คลิกเพื่อดูสถานะ')}
     >
-      <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-      🤖 AI ทำงานเบื้องหลัง ({activeCount})
+      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+      {t('app.badge.label', 'AI ทำงานเบื้องหลัง ({n})', { n: activeCount })}
     </button>
   );
 }

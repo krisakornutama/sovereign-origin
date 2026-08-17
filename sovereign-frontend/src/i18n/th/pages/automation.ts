@@ -1,0 +1,33 @@
+// Automation Rules page — Thai
+export default {
+  unauthorized: 'Unauthorized',
+  eyebrow: 'อุปกรณ์ & พลังงาน',
+  sensorsLink: 'เซ็นเซอร์',
+  rulesTitle: 'กฎอัตโนมัติ',
+  rulesDesc: 'เมื่อเซ็นเซอร์ถึงเงื่อนไขที่กำหนด ระบบจะส่งการแจ้งเตือนอัตโนมัติ',
+  newRule: 'สร้างกฎใหม่',
+  newRuleIfThen: 'สร้างกฎใหม่ (IF-THEN)',
+  saveRule: 'บันทึกกฎ',
+  metricPlaceholder: 'metric เช่น temperature',
+  thresholdPlaceholder: 'ค่า threshold',
+  messagePlaceholder: 'ข้อความแจ้งเตือน เช่น แบตเตอรี่ต่ำ!',
+  isDefault: 'ค่าเริ่มต้น',
+  noRules: 'ไม่มีกฎอัตโนมัติ — กด "สร้างกฎใหม่" เพื่อเพิ่ม',
+  fillRequired: 'กรอก metric และข้อความแจ้งเตือนก่อน',
+  ruleCreated: 'สร้างกฎใหม่แล้ว',
+  createFailed: 'สร้างกฎไม่สำเร็จ: {msg}',
+  editSaved: 'บันทึกการแก้ไขแล้ว',
+  editFailed: 'แก้ไขไม่สำเร็จ: {msg}',
+  deleteConfirm: 'ลบกฎนี้? (กฎสำเร็จรูปลบไม่ได้)',
+  deleteFailed: 'ลบกฎไม่สำเร็จ: {msg}',
+  condition: {
+    gt: '> (มากกว่า)',
+    lt: '< (น้อยกว่า)',
+    eq: '= (เท่ากับ)',
+  },
+  conditionOption: {
+    gt: '> มากกว่า',
+    lt: '< น้อยกว่า',
+    eq: '= เท่ากับ',
+  },
+} as const;

@@ -1,0 +1,27 @@
+// Energy page (energy.tsx) — English
+export default {
+  unauthorized: 'Unauthorized',
+  loadFailed: 'Failed to load energy data — check that the backend is running and has sensor data',
+  eyebrow: 'Devices & Energy',
+  title: 'Energy Management',
+  backDashboard: '← Back to Dashboard',
+  chartNoData: 'No power_kw data yet',
+  battery: 'Battery',
+  avgPower: 'Avg power (24h)',
+  latest: 'Latest: ',
+  signHint: '(− = using, + = charging)',
+  netUsage: 'Net usage (24h)',
+  fromBattery: 'Using from battery',
+  chargingInto: 'Producing / charging storage',
+  timeRemaining: 'Est. time remaining',
+  hoursShort: '{n} h',
+  calcNote: 'Calculated from battery capacity {capacity} kWh (set via env ENERGY_CAPACITY_KWH) and 24h avg power_kw — approximate figures',
+  chartTitle: 'Power (7 days, kW)',
+  chartLegend: 'Line = power_kw | Center line = zero',
+  status: {
+    discharging: 'Discharging',
+    charging: 'Charging / overproducing',
+    balanced: 'Balanced',
+    no_data: 'No data',
+  },
+} as const;

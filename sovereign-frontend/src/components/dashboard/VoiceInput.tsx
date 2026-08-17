@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useCallback } from 'react';
 import { authFetch } from '../../lib/apiFetch';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 
 interface VoiceInputProps {
   onResult: (text: string) => void;
@@ -16,6 +17,7 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const t = useLanguageStore((s) => s.t);
 
   const hasWebSpeech =
     typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
@@ -41,7 +43,7 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
       if (text) {
         onResult(text);
       } else {
-        setError('ไม่ได้ยินเสียง กรุณาลองใหม่');
+        setError(t('dashboard.voiceInput.noHear', 'ไม่ได้ยินเสียง กรุณาลองใหม่'));
       }
     };
 
@@ -49,10 +51,10 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
       // not-allowed → ผู้ใช้กดปฏิเสธไมค์; no-speech → เงียบเกินไป
       setError(
         event.error === 'not-allowed' || event.error === 'service-not-allowed'
-          ? 'กรุณาอนุญาตการเข้าถึงไมโครโฟน'
+          ? t('dashboard.voiceInput.micPermission', 'กรุณาอนุญาตการเข้าถึงไมโครโฟน')
           : event.error === 'no-speech'
-          ? 'ไม่ได้ยินเสียง กรุณาลองใหม่'
-          : 'ฟังเสียงไม่สำเร็จ กรุณาลองใหม่'
+          ? t('dashboard.voiceInput.noHear', 'ไม่ได้ยินเสียง กรุณาลองใหม่')
+          : t('dashboard.voiceInput.listenFailed', 'ฟังเสียงไม่สำเร็จ กรุณาลองใหม่')
       );
       setIsListening(false);
       onListeningChange?.(false);
@@ -66,7 +68,7 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
     try {
       recognition.start();
     } catch {
-      setError('ฟังเสียงไม่สำเร็จ กรุณาลองใหม่');
+      setError(t('dashboard.voiceInput.listenFailed', 'ฟังเสียงไม่สำเร็จ กรุณาลองใหม่'));
       setIsListening(false);
       onListeningChange?.(false);
     }
@@ -104,10 +106,10 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
           if (data.text?.trim()) {
             onResult(data.text.trim());
           } else {
-            setError('ไม่ได้ยินเสียง กรุณาลองใหม่');
+            setError(t('dashboard.voiceInput.noHear', 'ไม่ได้ยินเสียง กรุณาลองใหม่'));
           }
         } catch {
-          setError('ส่งข้อมูลไม่สำเร็จ');
+          setError(t('dashboard.voiceInput.sendFailed', 'ส่งข้อมูลไม่สำเร็จ'));
         }
 
         stream.getTracks().forEach((t) => t.stop());
@@ -123,7 +125,7 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
         if (mediaRecorder.state === 'recording') mediaRecorder.stop();
       }, 5000);
     } catch {
-      setError('กรุณาอนุญาตการเข้าถึงไมโครโฟน');
+      setError(t('dashboard.voiceInput.micPermission', 'กรุณาอนุญาตการเข้าถึงไมโครโฟน'));
     }
   }, [onResult, onListeningChange]);
 
@@ -149,10 +151,10 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
         onClick={isListening ? stopListening : startListening}
         className={`p-2.5 rounded-full transition-all duration-300 ${
           isListening
-            ? 'bg-red-600 animate-pulse shadow-lg shadow-red-500/50 scale-110'
-            : 'bg-gray-700 hover:bg-gray-600 hover:scale-105'
+            ? 'bg-rose-600 animate-pulse'
+            : 'bg-gray-700 hover:bg-gray-600'
         }`}
-        title={isListening ? 'กำลังฟัง... คลิกเพื่อหยุด' : 'กดเพื่อพูด'}
+        title={isListening ? t('dashboard.voiceInput.titleListening', 'กำลังฟัง... คลิกเพื่อหยุด') : t('dashboard.voiceInput.titleSpeak', 'กดเพื่อพูด')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -169,13 +171,13 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
       </button>
 
       {isListening && (
-        <span className="ml-2 text-xs text-red-400 animate-pulse hidden sm:inline">
-          กำลังฟัง...
+        <span className="ml-2 text-xs text-rose-400 animate-pulse hidden sm:inline">
+          {t('dashboard.voiceInput.listening', 'กำลังฟัง...')}
         </span>
       )}
 
       {error && (
-        <div className="absolute top-full mt-2 left-0 bg-red-900/90 text-red-300 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap z-50">
+        <div className="absolute top-full mt-2 left-0 bg-rose-950/90 text-rose-300 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap z-50">
           {error}
         </div>
       )}

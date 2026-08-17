@@ -42,6 +42,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: '/health', label: 'Health Screening', group: 'ชีวิต & การเงิน' },
   { key: '/inventory', label: 'Inventory & Supplies', group: 'ชีวิต & การเงิน' },
   { key: '/farm', label: 'Farm Plots', group: 'ชีวิต & การเงิน' },
+  { key: '/livestock', label: 'Sovereign Livestock', group: 'ชีวิต & การเงิน' },
   { key: '/portfolio', label: 'Wealth & Assets', group: 'ชีวิต & การเงิน' },
   { key: '/knowledge', label: 'Knowledge Base', group: 'ชีวิต & การเงิน' },
   { key: '/healing', label: 'Buddhist Healing', group: 'ชีวิต & การเงิน' },

@@ -5,16 +5,16 @@
  * variant: ok (เขียว) / warn (เหลือง) / err (แดง) / off (เทา)
  */
 const VARIANTS = {
-  ok: 'text-emerald-400 border-emerald-700/50 bg-emerald-900/30',
-  warn: 'text-amber-400 border-amber-700/50 bg-amber-900/30',
-  err: 'text-rose-400 border-rose-700/50 bg-rose-900/30',
-  off: 'text-gray-400 border-gray-700/50 bg-gray-900/40',
+  ok: 'text-emerald-400 border-emerald-700/40 bg-emerald-950/40',
+  warn: 'text-amber-400 border-amber-700/40 bg-amber-950/40',
+  err: 'text-rose-400 border-rose-700/40 bg-rose-950/40',
+  off: 'text-gray-400 border-gray-700/40 bg-gray-900/40',
 } as const;
 
 const DOTS = {
-  ok: 'bg-emerald-400',
-  warn: 'bg-amber-400',
-  err: 'bg-rose-400',
+  ok: 'bg-emerald-400 glow-dot',
+  warn: 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]',
+  err: 'bg-rose-400 glow-dot-red',
   off: 'bg-gray-500',
 } as const;
 

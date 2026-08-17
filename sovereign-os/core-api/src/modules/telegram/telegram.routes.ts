@@ -1,13 +1,17 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import axios from 'axios';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import {
+  getTelegramCredentials,
+  setTelegramCredentials,
+  clearTelegramCredentials,
+  maskBotToken,
+} from '../../services/telegram-credentials.service';
 
 const router = Router();
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
 // ไฟล์ที่ให้ส่งผ่าน Telegram ได้ — จำกัดอยู่ในโฟลเดอร์ที่ระบบสร้างเองเท่านั้น
 // (กัน path traversal: เดิมอ่านไฟล์ใดก็ได้บนเครื่องแล้ว exfil ผ่าน Telegram)
@@ -39,13 +43,14 @@ async function sendTelegramMessage(
   message: string,
   buttons?: { text: string; data: string }[]
 ): Promise<boolean> {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken || !creds.chatId) {
     console.warn('Telegram credentials not set');
     return false;
   }
   try {
     const body: any = {
-      chat_id: TELEGRAM_CHAT_ID,
+      chat_id: creds.chatId,
       text: message,
       parse_mode: 'HTML',
     };
@@ -54,7 +59,7 @@ async function sendTelegramMessage(
         inline_keyboard: [buttons.map((b) => ({ text: b.text, callback_data: b.data }))],
       };
     }
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, body);
+    await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, body);
     return true;
   } catch (err) {
     console.error('Telegram send failed:', err);
@@ -72,13 +77,14 @@ async function sendTelegram(message: string): Promise<boolean> {
  * - caption: ข้อความประกอบ (รองรับ HTML)
  */
 async function sendTelegramPhoto(photo: string | Buffer, caption = ''): Promise<boolean> {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken || !creds.chatId) {
     console.warn('Telegram credentials not set');
     return false;
   }
   try {
     const form = new FormData();
-    form.append('chat_id', TELEGRAM_CHAT_ID);
+    form.append('chat_id', creds.chatId);
     if (caption) form.append('caption', caption);
     if (typeof photo === 'string') {
       // URL หรือ file_id
@@ -92,13 +98,83 @@ async function sendTelegramPhoto(photo: string | Buffer, caption = ''): Promise<
       const contentType = isPng ? 'image/png' : 'image/jpeg';
       form.append('photo', new Blob([photo], { type: contentType }), filename);
     }
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, form);
+    await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendPhoto`, form);
     return true;
   } catch (err) {
     console.error('Telegram sendPhoto failed:', err);
     return false;
   }
 }
+
+// ── Telegram credential management (ตั้ง/แก้ผ่าน UI โดยไม่ต้องแตะ .env) ──
+
+const BOT_TOKEN_RE = /^\d{5,16}:[A-Za-z0-9_-]{20,}$/;
+
+// GET /api/telegram/config — สถานะการตั้งค่า (ไม่คืน token เต็ม — mask ไว้)
+router.get('/config', authenticate, async (_req, res) => {
+  const creds = await getTelegramCredentials();
+  res.json({
+    configured: Boolean(creds.botToken && creds.chatId),
+    source: creds.source,
+    botTokenMasked: maskBotToken(creds.botToken),
+    chatId: creds.chatId,
+  });
+});
+
+// PUT /api/telegram/config { botToken?, chatId? } — บันทึก override ลง DB (SUPERADMIN)
+// ส่งเฉพาะฟิลด์ที่ต้องการเปลี่ยน; ฟิลด์ที่ไม่ได้ส่งคงค่าเดิมไว้
+router.put('/config', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const { botToken, chatId } = req.body || {};
+  const nextToken = typeof botToken === 'string' ? botToken.trim() : undefined;
+  const nextChatId = typeof chatId === 'string' ? chatId.trim() : undefined;
+
+  if (nextToken !== undefined) {
+    if (!BOT_TOKEN_RE.test(nextToken)) {
+      return res.status(400).json({ error: 'Bot token format invalid' });
+    }
+  }
+  if (nextChatId !== undefined && (nextChatId.length < 2 || nextChatId.length > 64)) {
+    return res.status(400).json({ error: 'Chat ID length invalid' });
+  }
+
+  // merge กับค่าเดิม: ฟิลด์ที่ไม่ส่ง = คงเดิม
+  const current = await getTelegramCredentials();
+  const mergedToken = nextToken !== undefined ? nextToken : current.botToken;
+  const mergedChatId = nextChatId !== undefined ? nextChatId : current.chatId;
+  if (!mergedToken || !mergedChatId) {
+    return res.status(400).json({ error: 'Both bot token and chat ID are required' });
+  }
+
+  await setTelegramCredentials(mergedToken, mergedChatId);
+  res.json({
+    configured: true,
+    source: 'db',
+    botTokenMasked: maskBotToken(mergedToken),
+    chatId: mergedChatId,
+  });
+});
+
+// DELETE /api/telegram/config — ลบ override กลับไปใช้ .env (SUPERADMIN)
+router.delete('/config', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  await clearTelegramCredentials();
+  const creds = await getTelegramCredentials();
+  res.json({
+    configured: Boolean(creds.botToken && creds.chatId),
+    source: creds.source,
+    botTokenMasked: maskBotToken(creds.botToken),
+    chatId: creds.chatId,
+  });
+});
+
+// POST /api/telegram/test — ส่งข้อความทดสอบด้วย credential ปัจจุบัน (SUPERADMIN)
+router.post('/test', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken || !creds.chatId) {
+    return res.status(400).json({ success: false, error: 'Telegram not configured' });
+  }
+  const ok = await sendTelegram('✅ Sovereign Alert — test message');
+  res.json({ success: ok });
+});
 
 // Manual send (for testing)
 router.post('/notify', authenticate, async (req, res) => {

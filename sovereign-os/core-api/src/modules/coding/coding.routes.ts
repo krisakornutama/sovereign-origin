@@ -8,14 +8,20 @@ import {
   deleteCodingJob,
   processCodingQueue,
   suggestNext,
+  applyFilesToProject,
 } from '../../services/coding-agent.service';
 
 const router = Router();
 
-// POST /api/coding/jobs { task } — สั่งงานเขียนโค้ด (ตอบกลับทันที, รันเบื้องหลัง)
+// POST /api/coding/jobs { task, model?, reasoningEffort?, autonomy?, imageBase64? } — สั่งงานเขียนโค้ด
 router.post('/jobs', authenticate, async (req, res) => {
   try {
-    const { id } = await createCodingJob(String(req.body?.task ?? ''));
+    const { id } = await createCodingJob(String(req.body?.task ?? ''), {
+      model: String(req.body?.model || ''),
+      reasoningEffort: String(req.body?.reasoningEffort || ''),
+      autonomy: String(req.body?.autonomy || ''),
+      imageBase64: String(req.body?.imageBase64 || ''),
+    });
     // kick runner แบบไม่บล็อก (route ไม่รอผล)
     void processCodingQueue().catch((err) => console.error('coding queue kick error:', err));
     res.status(202).json({ success: true, id });
@@ -41,6 +47,16 @@ router.delete('/jobs/:id', authenticate, async (req, res) => {
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: String(err?.message || 'ลบงานไม่สำเร็จ') });
+  }
+});
+
+// POST /api/coding/jobs/:id/apply — เขียนไฟล์จากงานที่เสร็จ ลงโปรเจ็กจริง (path ในแผน)
+router.post('/jobs/:id/apply', authenticate, async (req, res) => {
+  try {
+    const result = await applyFilesToProject(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: String(err?.message || 'เขียนไฟล์ลงโปรเจ็กไม่สำเร็จ') });
   }
 });
 

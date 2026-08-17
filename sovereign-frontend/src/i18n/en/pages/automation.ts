@@ -1,0 +1,33 @@
+// Automation Rules page — English
+export default {
+  unauthorized: 'Unauthorized',
+  eyebrow: 'Devices & Energy',
+  sensorsLink: 'Sensors',
+  rulesTitle: 'Automation Rules',
+  rulesDesc: 'When a sensor reaches a defined condition, the system automatically sends a notification',
+  newRule: 'Create new rule',
+  newRuleIfThen: 'Create new rule (IF-THEN)',
+  saveRule: 'Save rule',
+  metricPlaceholder: 'metric, e.g. temperature',
+  thresholdPlaceholder: 'Threshold value',
+  messagePlaceholder: 'Alert message, e.g. battery low!',
+  isDefault: 'Default',
+  noRules: 'No automation rules — press "Create new rule" to add one',
+  fillRequired: 'Fill in the metric and alert message first',
+  ruleCreated: 'Rule created',
+  createFailed: 'Failed to create rule: {msg}',
+  editSaved: 'Changes saved',
+  editFailed: 'Failed to save changes: {msg}',
+  deleteConfirm: 'Delete this rule? (default rules cannot be deleted)',
+  deleteFailed: 'Failed to delete rule: {msg}',
+  condition: {
+    gt: '> (greater than)',
+    lt: '< (less than)',
+    eq: '= (equal to)',
+  },
+  conditionOption: {
+    gt: '> Greater than',
+    lt: '< Less than',
+    eq: '= Equal to',
+  },
+} as const;
