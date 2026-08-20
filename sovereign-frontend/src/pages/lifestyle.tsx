@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -126,7 +127,7 @@ export default function LifestylePage() {
             title={t('lifestyle.page.title', 'วิถีชีวิต')}
             icon={<Icon name="lifestyle" size={18} />}
             subtitle={t('lifestyle.page.subtitle', 'ออกแบบช่องว่างแห่งความไม่ควบคุมโดยตั้งใจ — ระบบเกิดมาเพื่อรับใช้ชีวิต ไม่ใช่ชีวิตเพื่อรับใช้กราฟ')}
-            actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('lifestyle.page.backDashboard', '← กลับ Dashboard')}</a>}
+            actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('lifestyle.page.backDashboard', '← กลับ Dashboard')}</Link>}
           />
         </header>
 

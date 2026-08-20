@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -403,7 +404,7 @@ export default function SettingsPage() {
           title="Settings"
           icon={<Icon name="settings" size={18} />}
           subtitle={t('settings.subtitle', 'ตั้งค่าระบบ · ธีม · clone/export')}
-          actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>}
+          actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>}
         />
       </header>
 

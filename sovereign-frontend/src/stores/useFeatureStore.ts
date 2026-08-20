@@ -10,6 +10,18 @@ import { authFetch } from '../lib/apiFetch';
 // หน้าแรก (landing) — ทุกคนเห็นได้เสมอ (widget ในหน้าแสดงตามสิทธิ์อีกที)
 const ALWAYS_VISIBLE = ['/dashboard', '/change-password'];
 
+// ฟีเจอร์ทดแทน (alias) — เมนูย้ายที่แล้วแต่สิทธิ์กลุ่มเดิมยังใช้ได้
+// เช่น /treasury ย้ายมาจาก /portfolio — คนที่ได้สิทธิ์ /portfolio เก่าต้องเข้าได้ทั้งคู่
+const FEATURE_ALIASES: Record<string, string[]> = {
+  '/treasury': ['/portfolio'],
+};
+
+// สิทธิ์ผ่านไหม — ตรงเป๊ะ หรือผ่าน alias ของฟีเจอร์นั้น
+function grantedFor(granted: string[], feature: string): boolean {
+  if (granted.includes(feature)) return true;
+  return (FEATURE_ALIASES[feature] || []).some((alias) => granted.includes(alias));
+}
+
 interface FeatureState {
   // key ของหน้าที่เห็น เช่น "/portfolio" | "/health" (null = ยังโหลดไม่เสร็จ)
   granted: string[] | null;
@@ -47,7 +59,7 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
     if (ALWAYS_VISIBLE.includes(feature)) return true;
     // หน้าลูก (เช่น /health-export) — ถือว่ามีสิทธิ์เมื่อพ่อเปิดหน้าแม่ให้ (/health)
     if (granted.some((g) => feature.startsWith(g + '/'))) return true;
-    return granted.includes(feature);
+    return grantedFor(granted, feature);
   },
 
   /** หน้าไหนถูกบล็อก (สำหรับ route guard ใน _app) */
@@ -57,6 +69,6 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
     if (ALWAYS_VISIBLE.includes(pathname)) return false;
     if (granted.includes(pathname)) return false;
     if (granted.some((g) => pathname.startsWith(g + '/'))) return false;
-    return true;
+    return !grantedFor(granted, pathname);
   },
 }));

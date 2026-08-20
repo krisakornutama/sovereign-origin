@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -309,7 +310,7 @@ export default function SecurityPage() {
           title={t('security.title', 'Cyber Security')}
           icon={<Icon name="shield" size={18} />}
           subtitle={t('security.subtitle', 'Firewall + ระบบตรวจจับภัยคุกคาม')}
-          actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('security.backDashboard', '← กลับ Dashboard')}</a>}
+          actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('security.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
 

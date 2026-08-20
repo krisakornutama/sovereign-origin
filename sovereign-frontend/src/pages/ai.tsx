@@ -1,6 +1,7 @@
 "use client";
 // P2 — Decision Support AI: ถาม "ควรทำอะไรดี" + สถานการณ์จำลอง (what-if)
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -164,7 +165,7 @@ export default function AiPage() {
         <PageHeader
           eyebrow={t('ai.eyebrow', 'ความปลอดภัย')}
           title="AI Command Center" icon={<Icon name="ai" size={18} />}
-          subtitle={t('ai.subtitle', 'Decision Support — วิเคราะห์จากข้อมูลจริงในบ้าน')} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('ai.backDashboard', '← กลับ Dashboard')}</a>}
+          subtitle={t('ai.subtitle', 'Decision Support — วิเคราะห์จากข้อมูลจริงในบ้าน')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('ai.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
 
@@ -294,7 +295,7 @@ export default function AiPage() {
           <section className="card panel-cyan p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">
               {t('ai.forecastTitle', 'การคาดการณ์สถานการณ์ (Scenario Forecast)')}
-              <a href="/risk-monitor" className="ml-2 text-xs text-sky-400 hover:underline">{t('ai.viewRiskMonitor', '→ ดูที่ Risk Monitor')}</a>
+              <Link href="/risk-monitor" scroll={false} className="ml-2 text-xs text-sky-400 hover:underline">{t('ai.viewRiskMonitor', '→ ดูที่ Risk Monitor')}</Link>
             </h2>
             <p className="text-xs text-gray-500">
               {t('ai.forecastDesc', 'สร้างสถานการณ์ที่เป็นไปได้จากข้อมูลอดีต (ข่าวเก่า + คำพยากรณ์ครั้งก่อน) และปัจจุบัน (ข่าวล่าสุด + Threat Index + DEFCON) แล้วประเมินเทียบกับสถานการณ์โลกปัจจุบัน — ออกมาเป็นข้อ ๆ พร้อมโอกาสเกิด %')}

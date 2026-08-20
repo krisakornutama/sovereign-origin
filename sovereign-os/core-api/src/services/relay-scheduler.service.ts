@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import mqtt from 'mqtt';
 import { PrismaClient } from '@prisma/client';
+import { interlockStatus } from './actuation.service';
 
 const prisma = new PrismaClient();
 
@@ -30,6 +31,12 @@ export class RelaySchedulerService {
   }
 
   private async checkSchedules(): Promise<void> {
+    // Fail-Safe Interlock: kill-switch / ปุ่มฉุกเฉิน → งดสั่ง relay ตามตารางทั้งหมด
+    const interlock = interlockStatus();
+    if (interlock.emergency || interlock.killSwitch) {
+      console.log(`⏰ Relay scheduler paused (emergency=${interlock.emergency}, killSwitch=${interlock.killSwitch})`);
+      return;
+    }
     const now = new Date();
     const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1 = จันทร์ … 7 = อาทิตย์

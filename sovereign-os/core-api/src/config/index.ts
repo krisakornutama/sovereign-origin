@@ -240,4 +240,27 @@ export const config = {
     // ภัย 5 (Generational): วันไร้ระบบอัตโนมัติเริ่มต้น 24 ชม.
     manualDayHours: parseInt(process.env.MANUAL_DAY_HOURS || '24', 10),
   },
+  // ── Series 🔴 — External Dead-Man Switch (DMS) ──
+  // ตัวดักคอยแยกวงจร: รับ heartbeat จากอุปกรณ์ DMS (4G OOB) ด้วย HMAC-SHA256 rolling key
+  // (DMS_ENABLED=true แต่ไม่มี DMS_MASTER_SECRET = ไม่เปิด — blueprint §7.2)
+  // ดูสเปกเต็ม: docs/SERIES_RED_DMS_BLUEPRINT.md
+  dms: {
+    enabled: (process.env.DMS_ENABLED || 'false') === 'true' && !!process.env.DMS_MASTER_SECRET,
+    masterSecret: process.env.DMS_MASTER_SECRET || '',
+    // บันไดวิกฤต: >MISSED_MS = "สงสัยตาย" (ระดับ 1) → >FAILOVER_MS = "ยืนยัน SPOF" (ระดับ 2)
+    missedMs: parseInt(process.env.DMS_MISSED_MS || '90000', 10), // 90s = 3 missed
+    failoverMs: parseInt(process.env.DMS_FAILOVER_MS || '180000', 10), // 180s = 6 missed
+    autoFailover: (process.env.DMS_AUTO_FAILOVER || 'false') === 'true', // false = แจ้งเตือนอย่างเดียว
+    wolMac: process.env.DMS_WOL_MAC || '', // MAC Cold Standby (ว่าง = ไม่ปลุก)
+    wolBroadcast: process.env.DMS_WOL_BROADCAST || '192.168.1.255',
+    failoverCooldownMs: parseInt(process.env.DMS_FAILOVER_COOLDOWN_MS || '300000', 10), // กันยิงซ้ำ
+    // device_id ที่ยอมรับ (`,` คั่น) — default ตาม blueprint: dms-esp32s3-01
+    allowedDevices: splitList(process.env.DMS_ALLOWED_DEVICES).length
+      ? splitList(process.env.DMS_ALLOWED_DEVICES)
+      : ['dms-esp32s3-01'],
+    dryRun: (process.env.DMS_DRY_RUN || 'false') === 'true', // จำลองลาดเดอร์ ไม่ยิงจริง (เหมือน UPS_DRY_RUN)
+    checkIntervalMs: parseInt(process.env.DMS_CHECK_INTERVAL_MS || '10000', 10),
+    // ความคลาดเคลื่อนนาฬิกาที่ยอมรับ (blueprint §8: tolerance 60s + accept ±1 key window)
+    clockToleranceMs: parseInt(process.env.DMS_CLOCK_TOLERANCE_MS || '60000', 10),
+  },
 };

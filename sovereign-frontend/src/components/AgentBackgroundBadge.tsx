@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -15,6 +16,7 @@ export default function AgentBackgroundBadge() {
   const prevActive = useRef(0);
   const notifiedIds = useRef<Set<string>>(new Set());
   const t = useLanguageStore((s) => s.t);
+  const router = useRouter();
 
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
@@ -106,9 +108,7 @@ export default function AgentBackgroundBadge() {
 
   return (
     <button
-      onClick={() => {
-        window.location.href = '/ai-agent';
-      }}
+      onClick={() => router.push('/ai-agent', undefined, { scroll: false })}
       className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold border border-emerald-400/40"
       title={t('app.badge.tooltip', 'AI กำลังทำงานเบื้องหลัง — คลิกเพื่อดูสถานะ')}
     >

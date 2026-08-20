@@ -1,6 +1,7 @@
 "use client";
 // P3 — Vision AI: วิเคราะห์ภาพจากกล้อง/อัปโหลด ด้วย qwen3-vl (Ollama ท้องถิ่น)
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import Sidebar from '../components/layout/Sidebar';
@@ -329,7 +330,7 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
           eyebrow={t('vision.eyebrow', 'ความปลอดภัย')}
           title={t('vision.title', 'Vision AI')}
           icon={<Icon name="vision" size={18} />}
-          subtitle={t('vision.subtitle', 'Computer Vision — qwen3-vl ท้องถิ่น (ภาพไม่ขึ้น cloud)')} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('vision.backDashboard', '← กลับ Dashboard')}</a>}
+          subtitle={t('vision.subtitle', 'Computer Vision — qwen3-vl ท้องถิ่น (ภาพไม่ขึ้น cloud)')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('vision.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
 

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -114,8 +115,8 @@ export default function SystemHealthPage() {
           eyebrow={t('system.page.eyebrow', 'ระบบ')}
           title="SOVEREIGN OS"
           subtitle={t('system.page.subtitle', 'System Health')} icon={<Icon name="system" size={18} />} actions={<div className="flex items-center gap-3">
-          <a href="/ai-agent" className="text-sm text-sky-400 hover:underline">{t('system.page.aiAgent', 'AI Agent')}</a>
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('system.page.backDashboard', '← กลับ Dashboard')}</a>
+          <Link href="/ai-agent" scroll={false} className="text-sm text-sky-400 hover:underline">{t('system.page.aiAgent', 'AI Agent')}</Link>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('system.page.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
       </header>
@@ -124,9 +125,9 @@ export default function SystemHealthPage() {
           <div className={`card p-3 text-sm ${ACTION_STYLES[actionMsg.type]}`}>
             {actionMsg.text}
             {actionMsg.approvalId && (
-              <a href="/ai-agent" className="block mt-1 text-xs underline hover:opacity-80">
+              <Link href="/ai-agent" scroll={false} className="block mt-1 text-xs underline hover:opacity-80">
                 {t('system.approveLink', '→ ไปอนุมัติที่หน้า AI Agent (รหัสคำขอ: {id}…)', { id: actionMsg.approvalId.slice(0, 8) })}
-              </a>
+              </Link>
             )}
           </div>
         )}

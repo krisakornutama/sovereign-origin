@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -266,8 +267,8 @@ export default function HealthPage() {
         <PageHeader
           eyebrow={t('health.page.eyebrow', 'ชีวิต & การเงิน')}
           title={t('health.page.title', 'Health Screening (Ambient)')} icon={<Icon name="health" size={18} />} actions={<div className="flex items-center gap-3">
-          <a href="/health-export" className="btn-secondary"><Icon name="reports" size={13} /> {t('health.page.report30d', 'รายงาน 30 วัน (PDF/CSV)')}</a>
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('health.page.backDashboard', '← กลับ Dashboard')}</a>
+          <Link href="/health-export" scroll={false} className="btn-secondary"><Icon name="reports" size={13} /> {t('health.page.report30d', 'รายงาน 30 วัน (PDF/CSV)')}</Link>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('health.page.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
       </header>

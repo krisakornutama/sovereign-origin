@@ -43,7 +43,8 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: '/inventory', label: 'Inventory & Supplies', group: 'ชีวิต & การเงิน' },
   { key: '/farm', label: 'Farm Plots', group: 'ชีวิต & การเงิน' },
   { key: '/livestock', label: 'Sovereign Livestock', group: 'ชีวิต & การเงิน' },
-  { key: '/portfolio', label: 'Wealth & Assets', group: 'ชีวิต & การเงิน' },
+  { key: '/portfolio', label: 'Wealth & Assets (legacy)', group: 'ชีวิต & การเงิน' },
+  { key: '/treasury', label: 'Treasury & Invest', group: 'ชีวิต & การเงิน' },
   { key: '/knowledge', label: 'Knowledge Base', group: 'ชีวิต & การเงิน' },
   { key: '/healing', label: 'Buddhist Healing', group: 'ชีวิต & การเงิน' },
   { key: '/lifestyle', label: 'วิถีชีวิต (Embracing Chaos)', group: 'ชีวิต & การเงิน' },
@@ -106,19 +107,21 @@ export async function setFeatureGrants(
 // (router ข้างในเรียก authenticate อีกที — ทำงานซ้ำได้ปลอดภัย)
 import type { Request, Response, NextFunction } from 'express';
 
-export function requireFeature(feature: string) {
+export function requireFeature(feature: string | string[]) {
+  const features = Array.isArray(feature) ? feature : [feature];
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
     if (req.user.role === 'SUPERADMIN') return next();
-    const ok = await hasFeatureGrant(req.user.id, req.user.role, feature);
-    if (!ok) return res.status(403).json({ error: 'You do not have access to this feature' });
-    next();
+    for (const f of features) {
+      if (await hasFeatureGrant(req.user.id, req.user.role, f)) return next();
+    }
+    return res.status(403).json({ error: 'You do not have access to this feature' });
   };
 }
 
 // รูปแบบที่ใช้กับ mount: app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes)
 // (authenticate ถูกเรียกก่อน requireFeature เพื่อให้ req.user พร้อม)
 import { authenticate as authMiddleware } from '../middleware/auth.middleware';
-export function featureGuard(feature: string) {
+export function featureGuard(feature: string | string[]) {
   return [authMiddleware, requireFeature(feature)];
 }

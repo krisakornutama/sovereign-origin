@@ -236,7 +236,7 @@ export function createWealthWorker(cfg: WealthWorkerConfig): WealthWorker {
   return new WealthWorker(
     {
       listAssets: async () =>
-        prisma.asset.findMany().then((rows) =>
+        prisma.assetPosition.findMany().then((rows) =>
           rows.map((r) => ({ userId: r.user_id, symbol: r.symbol, type: r.type, quantity: r.quantity }))
         ),
       listInventory: async () =>

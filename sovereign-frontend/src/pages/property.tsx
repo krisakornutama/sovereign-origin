@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
@@ -231,7 +232,7 @@ export default function PropertyPage() {
             {t('property.subtitle', 'จำลองที่ดิน {w}×{l} ม. (3 มิติ) + วิเคราะห์จุดวางกับดัก/กล้อง/เซ็นเซอร์ตรวจจับคน-สัตว์', { w: land.width, l: land.length })}
           </p>
         </div>
-        <a href="/dashboard" className="text-sm text-gray-400 hover:text-gray-200">{t('property.backDashboard', '← กลับ Dashboard')}</a>
+        <Link href="/dashboard" scroll={false} className="text-sm text-gray-400 hover:text-gray-200">{t('property.backDashboard', '← กลับ Dashboard')}</Link>
       </div>
 
       {message && <div className="mb-3 bg-emerald-900/40 border border-emerald-700 rounded-lg px-4 py-2 text-sm text-emerald-300">{message}</div>}

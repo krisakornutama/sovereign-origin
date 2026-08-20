@@ -15,6 +15,12 @@ const prisma = new PrismaClient();
 
 const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
 
+// ── กันค่าเกินจริง/ติดลบ (ตารางเดียวกันกับ treasury — ต้องตรวจเท่ากัน) ──
+function nonNegativeFinite(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 // ── พอร์ตแยกต่อคน: ใครเป็นเจ้าของพอร์ตที่กำลังดู/แก้ ──
 // - สมาชิกทั่วไป → เห็นได้เฉพาะพอร์ตของตัวเองเท่านั้น (backend บังคับ ไม่เชื่อฝั่ง UI)
 // - SUPERADMIN → ดูได้ทุกคน โดยส่ง ?userId=<uuid> (ถ้าไม่ส่ง = พอร์ตของตัวเอง)
@@ -33,7 +39,7 @@ export function resolveOwnerId(req: Request): string {
 router.get('/assets', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
-    const rows = await prisma.asset.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
+    const rows = await prisma.assetPosition.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
     const assets: AssetHolding[] = rows.map((r) => ({ symbol: r.symbol, type: r.type, quantity: r.quantity }));
     const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
       `SELECT DISTINCT ON (symbol) symbol, price_usd
@@ -64,12 +70,18 @@ router.post('/assets', authenticate, async (req, res) => {
     if (!symbol || !VALID_ASSET_TYPES.includes(type)) {
       return res.status(400).json({ error: 'symbol and type (CRYPTO|STOCK|COMMODITY) are required' });
     }
-    const asset = await prisma.asset.create({
+    const symbolStr = String(symbol).trim().toUpperCase();
+    if (!symbolStr || symbolStr.length > 32) {
+      return res.status(400).json({ error: 'symbol must be 1-32 characters' });
+    }
+    const qty = nonNegativeFinite(quantity);
+    if (qty === null) return res.status(400).json({ error: 'quantity must be a non-negative number' });
+    const asset = await prisma.assetPosition.create({
       data: {
         user_id: resolveOwnerId(req),
-        symbol: String(symbol).toUpperCase(),
+        symbol: symbolStr,
         type,
-        quantity: Number(quantity) || 0,
+        quantity: qty,
         wallet_address: wallet_address || null,
         notes: notes || null,
       },
@@ -85,9 +97,9 @@ router.post('/assets', authenticate, async (req, res) => {
 router.delete('/assets/:id', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
-    const owned = await prisma.asset.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    const owned = await prisma.assetPosition.findFirst({ where: { id: req.params.id, user_id: ownerId } });
     if (!owned) return res.status(404).json({ error: 'Asset not found in this portfolio' });
-    await prisma.asset.delete({ where: { id: req.params.id } });
+    await prisma.assetPosition.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete asset' });
@@ -99,12 +111,16 @@ router.put('/assets/:id', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
     const { quantity, notes } = req.body || {};
-    const owned = await prisma.asset.findFirst({ where: { id: req.params.id, user_id: ownerId } });
+    const owned = await prisma.assetPosition.findFirst({ where: { id: req.params.id, user_id: ownerId } });
     if (!owned) return res.status(404).json({ error: 'Asset not found in this portfolio' });
     const data: Record<string, unknown> = {};
-    if (quantity !== undefined) data.quantity = Number(quantity);
+    if (quantity !== undefined) {
+      const qty = nonNegativeFinite(quantity);
+      if (qty === null) return res.status(400).json({ error: 'quantity must be a non-negative number' });
+      data.quantity = qty;
+    }
     if (notes !== undefined) data.notes = notes;
-    await prisma.asset.update({ where: { id: req.params.id }, data });
+    await prisma.assetPosition.update({ where: { id: req.params.id }, data });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update asset' });
@@ -136,17 +152,19 @@ router.get('/inventory', authenticate, async (req, res) => {
 router.post('/inventory', authenticate, async (req, res) => {
   try {
     const { name, category, quantity, unit, unit_price_usd, notes } = req.body || {};
-    if (!name || !(Number(quantity) >= 0) || !(Number(unit_price_usd) >= 0)) {
-      return res.status(400).json({ error: 'name, quantity and unit_price_usd are required' });
+    const qty = nonNegativeFinite(quantity);
+    const price = nonNegativeFinite(unit_price_usd);
+    if (!name || qty === null || price === null) {
+      return res.status(400).json({ error: 'name, quantity and unit_price_usd are required (non-negative numbers)' });
     }
     const item = await prisma.inventoryItem.create({
       data: {
         user_id: resolveOwnerId(req),
         name: String(name),
         category: String(category || 'OTHER'),
-        quantity: Number(quantity),
+        quantity: qty,
         unit: String(unit || 'piece'),
-        unit_price_usd: Number(unit_price_usd),
+        unit_price_usd: price,
         notes: notes || null,
       },
     });
@@ -165,8 +183,16 @@ router.put('/inventory/:id', authenticate, async (req, res) => {
     const owned = await prisma.inventoryItem.findFirst({ where: { id: req.params.id, user_id: ownerId } });
     if (!owned) return res.status(404).json({ error: 'Inventory item not found in this portfolio' });
     const data: Record<string, unknown> = {};
-    if (quantity !== undefined) data.quantity = Number(quantity);
-    if (unit_price_usd !== undefined) data.unit_price_usd = Number(unit_price_usd);
+    if (quantity !== undefined) {
+      const qty = nonNegativeFinite(quantity);
+      if (qty === null) return res.status(400).json({ error: 'quantity must be a non-negative number' });
+      data.quantity = qty;
+    }
+    if (unit_price_usd !== undefined) {
+      const price = nonNegativeFinite(unit_price_usd);
+      if (price === null) return res.status(400).json({ error: 'unit_price_usd must be a non-negative number' });
+      data.unit_price_usd = price;
+    }
     if (notes !== undefined) data.notes = notes;
     if (name !== undefined) data.name = name;
     await prisma.inventoryItem.update({ where: { id: req.params.id }, data });
@@ -197,7 +223,7 @@ router.get('/summary', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
     const [assetRows, inventoryRows, avgRow, latestHistory] = await Promise.all([
-      prisma.asset.findMany({ where: { user_id: ownerId } }),
+      prisma.assetPosition.findMany({ where: { user_id: ownerId } }),
       prisma.inventoryItem.findMany({ where: { user_id: ownerId } }),
       prisma.$queryRawUnsafe<Array<{ avg_power: number | null }>>(
         `SELECT AVG(value) AS avg_power FROM sensor_telemetry
@@ -256,7 +282,7 @@ router.get('/summary', authenticate, async (req, res) => {
 router.get('/history', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
-    const limit = Math.min(parseInt(req.query.limit as string) || 60, 500);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 60, 1), 500); // clamp — ค่าไม่ถูกต้อง/ติดลบ → อย่างน้อย 1
     const rows = await prisma.wealthHistory.findMany({ where: { user_id: ownerId }, orderBy: { timestamp: 'desc' }, take: limit });
     res.json(rows.map((r) => ({ timestamp: r.timestamp, totalUsd: r.total_usd_value, payload: r.payload })));
   } catch (err) {
@@ -284,7 +310,7 @@ router.get('/risk', authenticate, async (req, res) => {
   try {
     const ownerId = resolveOwnerId(req);
     const { analyzeAssetRisk, simulatePortfolio, portfolioRisk, buildRiskActions } = await import('../../services/aladdin-risk.service');
-    const assets = await prisma.asset.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
+    const assets = await prisma.assetPosition.findMany({ where: { user_id: ownerId }, orderBy: { symbol: 'asc' } });
     const latest = await prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(
       `SELECT DISTINCT ON (symbol) symbol, price_usd FROM asset_prices ORDER BY symbol, time DESC`
     );

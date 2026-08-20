@@ -26,7 +26,7 @@ function assetRow(overrides: Record<string, any> = {}) {
 }
 
 before(async () => {
-  db = mockModel(prisma, 'asset', {
+  db = mockModel(prisma, 'assetPosition', {
     findMany: async ({ where }: any) => [assetRow({ user_id: where?.user_id })],
     findFirst: async ({ where }: any) => (where?.id === '11111111-1111-1111-1111-111111111111' && where?.user_id === OWNER_A ? assetRow() : null),
     create: async ({ data }: any) => assetRow(data),
@@ -35,7 +35,7 @@ before(async () => {
   });
   mockModel(prisma, 'inventoryItem', {
     findMany: async ({ where }: any) => [{ id: '22222222-2222-2222-2222-222222222222', user_id: where?.user_id, name: 'ข้าวสาร', category: 'FOOD', quantity: 10, unit: 'kg', unit_price_usd: 2 }],
-    findFirst: async () => null,
+    findFirst: async ({ where }: any) => (where?.id === '22222222-2222-2222-2222-222222222222' && where?.user_id === OWNER_A ? { id: '22222222-2222-2222-2222-222222222222', user_id: OWNER_A, name: 'ข้าวสาร', category: 'FOOD', quantity: 10, unit: 'kg', unit_price_usd: 2 } : null),
     create: async ({ data }: any) => ({ id: '22222222-2222-2222-2222-222222222222', ...data }),
     delete: async () => ({}),
   });
@@ -132,6 +132,49 @@ test('DELETE /assets/:id — ลบ asset ของคนอื่นไม่�
     headers: auth(memberToken),
   });
   assert.strictEqual(res.status, 404);
+});
+
+// ── Validation — ตารางเดียวกันกับ treasury → กัน bypass ──
+
+test('POST /assets — quantity ติดลบ → 400 (กัน bypass validation treasury)', async () => {
+  const res = await fetch(server.baseUrl + '/api/portfolio/assets', {
+    method: 'POST',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'BTC', type: 'CRYPTO', quantity: -3 }),
+  });
+  assert.strictEqual(res.status, 400);
+});
+
+test('POST /assets — quantity Infinity → 400', async () => {
+  const res = await fetch(server.baseUrl + '/api/portfolio/assets', {
+    method: 'POST',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'BTC', type: 'CRYPTO', quantity: '1e999' }),
+  });
+  assert.strictEqual(res.status, 400);
+});
+
+test('PUT /assets/:id — quantity ติดลบ → 400', async () => {
+  const res = await fetch(server.baseUrl + '/api/portfolio/assets/11111111-1111-1111-1111-111111111111', {
+    method: 'PUT',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quantity: -1 }),
+  });
+  assert.strictEqual(res.status, 400);
+});
+
+test('PUT /inventory/:id — unit_price_usd ติดลบ → 400', async () => {
+  const res = await fetch(server.baseUrl + '/api/portfolio/inventory/22222222-2222-2222-2222-222222222222', {
+    method: 'PUT',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ unit_price_usd: -5 }),
+  });
+  assert.strictEqual(res.status, 400);
+});
+
+test('GET /history?limit=-5 → 200 (clamp ไม่ 500)', async () => {
+  const res = await fetch(server.baseUrl + '/api/portfolio/history?limit=-5', { headers: auth(adminToken) });
+  assert.strictEqual(res.status, 200);
 });
 
 test('ต้อง login ก่อน — 401 ทุก endpoint', async () => {

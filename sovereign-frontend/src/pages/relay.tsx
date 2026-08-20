@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -196,7 +197,7 @@ export default function RelayPage() {
           eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title="SOVEREIGN OS" icon={<Icon name="relay" size={18} />}
           subtitle={t('relay.subtitle', 'Relay Control')} actions={<div className="flex gap-3 items-center">
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</Link>
         </div>}
         />
       </header>

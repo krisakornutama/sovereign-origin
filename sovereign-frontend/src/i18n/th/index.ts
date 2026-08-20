@@ -38,6 +38,7 @@ import securityComponents from './pages/securityComponents';
 import sensorsHub from './pages/sensorsHub';
 import settings from './pages/settings';
 import system from './pages/system';
+import { treasury } from './pages/treasury';
 import users from './pages/users';
 import vision from './pages/vision';
 
@@ -76,8 +77,9 @@ export default {
   security,
   securityComponents,
   sensorsHub,
-  settings,
+settings,
   system,
+  treasury,
   users,
   vision,
 } as const;

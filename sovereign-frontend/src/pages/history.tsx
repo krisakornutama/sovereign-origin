@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -316,7 +317,7 @@ export default function HistoryPage() {
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
           eyebrow={t('history.eyebrow', 'ข้อมูล & รายงาน')}
-          title="Sensor History" icon={<Icon name="history" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('history.backDashboard', '← กลับ Dashboard')}</a>}
+          title="Sensor History" icon={<Icon name="history" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('history.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
       <main className="max-w-6xl mx-auto p-6 space-y-6">

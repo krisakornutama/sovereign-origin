@@ -65,6 +65,7 @@ function auth(token: string) {
 
 test('FEATURE_CATALOG ครอบคลุมหน้า member ทั้งหมดและแยกหน้า admin', () => {
   assert.ok(FEATURE_CATALOG.some((f) => f.key === '/portfolio'));
+  assert.ok(FEATURE_CATALOG.some((f) => f.key === '/treasury')); // LIFE & FINANCE ใหม่
   assert.ok(FEATURE_CATALOG.some((f) => f.key === '/users' && f.adminOnly));
   // ทุก key ไม่ซ้ำ
   const keys = FEATURE_CATALOG.map((f) => f.key);
@@ -78,8 +79,8 @@ test('MEMBER_GRANTABLE_FEATURES ไม่รวมหน้า admin', () => {
 });
 
 test('setFeatureGrants กรอง feature ที่ไม่รู้จัก / หน้า admin ออก', async () => {
-  const saved = await setFeatureGrants(OWNER_B, ['/portfolio', '/hack-me', '/users', '/health']);
-  assert.deepStrictEqual(saved, ['/portfolio', '/health']);
+  const saved = await setFeatureGrants(OWNER_B, ['/portfolio', '/treasury', '/hack-me', '/users', '/health']);
+  assert.deepStrictEqual(saved, ['/portfolio', '/treasury', '/health']);
 });
 
 test('hasFeatureGrant: สมาชิกมีสิทธิ์เฉพาะที่ grant', async () => {
@@ -112,6 +113,24 @@ test('requireFeature middleware: สมาชิกมีสิทธิ์ → 
   const next = () => { called = true; };
   await requireFeature('/portfolio')(req, {} as any, next);
   assert.strictEqual(called, true);
+});
+
+test('requireFeature (array): มีสิทธิ์กลุ่มใดกลุ่มหนึ่ง → next() — /treasury ผ่านสิทธิ์ /portfolio เดิม', async () => {
+  const req: any = { user: { id: OWNER_B, role: 'OPERATOR' } };
+  let called = false;
+  const next = () => { called = true; };
+  await requireFeature(['/treasury', '/portfolio'])(req, {} as any, next);
+  assert.strictEqual(called, true);
+});
+
+test('requireFeature (array): ไม่มีสิทธิ์ทั้งสอง → 403', async () => {
+  const req: any = { user: { id: OWNER_B, role: 'OPERATOR' } };
+  const res: any = { status: (code: number) => ({ json: (body: any) => ({ code, body }) }) };
+  let called = false;
+  const next = () => { called = true; };
+  const out = await requireFeature(['/farm', '/xyz'])(req, res, next);
+  assert.strictEqual(out.code, 403);
+  assert.strictEqual(called, false);
 });
 
 test('requireFeature middleware: SUPERADMIN → next() เสมอ', async () => {

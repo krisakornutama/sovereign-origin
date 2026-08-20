@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -60,7 +61,7 @@ export default function AlertsPage() {
         <PageHeader
           eyebrow={t('alerts.eyebrow', 'ความปลอดภัย')}
           title="SOVEREIGN OS" icon={<Icon name="alerts" size={18} />}
-          subtitle={t('alerts.subtitle', 'Alert History')} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('alerts.backDashboard', '← กลับ Dashboard')}</a>}
+          subtitle={t('alerts.subtitle', 'Alert History')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('alerts.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
       <main className="max-w-4xl mx-auto p-6 space-y-4">

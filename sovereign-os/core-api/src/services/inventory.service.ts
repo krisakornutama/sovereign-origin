@@ -83,3 +83,47 @@ export function computeExpiryDate(
 export function isCategoryValid(category: string): boolean {
   return (INVENTORY_CATEGORIES as readonly string[]).includes(category);
 }
+
+// ─────────────────────────────────────────────────────────────
+// Stock adjustment (Prisma) — หัก/เติมยอดคงเหลืออัตโนมัติ
+// ใช้จาก livestock (เบิกอาหาร/ฉีดวัคซีน/บันทึกยา) เพื่อให้คลังตรงกับของจริง
+// ─────────────────────────────────────────────────────────────
+
+export interface StockAdjustResult {
+  ok: boolean;
+  name?: string;
+  remaining: number;
+  shortfall: number; // จำนวนที่หักไม่ได้ (เกินยอดคงเหลือ)
+  reason?: string;
+}
+
+/** หักยอดคงเหลือ — หักเกิน = หักได้เท่าที่เหลือ + รายงาน shortfall (ไม่มีติดลบ) */
+export async function deductStock(
+  prisma: { inventoryItem: { findUnique: (a: any) => Promise<any>; update: (a: any) => Promise<any> } },
+  itemId: string,
+  qty: number
+): Promise<StockAdjustResult> {
+  const amount = Math.max(0, Number(qty) || 0);
+  const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+  if (!item) return { ok: false, remaining: 0, shortfall: amount, reason: 'inventory item not found' };
+  const remaining = Math.max(0, Number(item.quantity) - amount);
+  const shortfall = Math.max(0, amount - Number(item.quantity));
+  if (amount === 0) return { ok: true, name: item.name, remaining: Number(item.quantity), shortfall: 0 };
+  await prisma.inventoryItem.update({ where: { id: itemId }, data: { quantity: remaining } });
+  return { ok: shortfall === 0, name: item.name, remaining, shortfall, reason: shortfall > 0 ? `หักได้ ${remaining}/${Number(item.quantity)} — ขาด ${shortfall}` : undefined };
+}
+
+/** เติมยอดคงเหลือ (กลับเข้าคลัง — เช่น เติมถังอาหาร) */
+export async function addStock(
+  prisma: { inventoryItem: { findUnique: (a: any) => Promise<any>; update: (a: any) => Promise<any> } },
+  itemId: string,
+  qty: number
+): Promise<StockAdjustResult> {
+  const amount = Math.max(0, Number(qty) || 0);
+  const item = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+  if (!item) return { ok: false, remaining: 0, shortfall: 0, reason: 'inventory item not found' };
+  if (amount === 0) return { ok: true, name: item.name, remaining: Number(item.quantity), shortfall: 0 };
+  const remaining = Number(item.quantity) + amount;
+  await prisma.inventoryItem.update({ where: { id: itemId }, data: { quantity: remaining } });
+  return { ok: true, name: item.name, remaining, shortfall: 0 };
+}

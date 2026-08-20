@@ -1,6 +1,7 @@
 "use client";
 // P4 — Predictive AI: คาดการณ์แบตเตอรี่ + จุดผิดปกติของเซ็นเซอร์ (z-score)
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import Sidebar from '../components/layout/Sidebar';
@@ -121,7 +122,7 @@ export default function PredictivePage() {
         <PageHeader
           eyebrow={t('predictive.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title={t('predictive.title', 'Predictive AI')} icon={<Icon name="predictive" size={18} />}
-          subtitle={t('predictive.subtitle', 'พยากรณ์แบตเตอรี่ + ตรวจจับความผิดปกติ (z-score)')} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('predictive.backDashboard', '← กลับ Dashboard')}</a>}
+          subtitle={t('predictive.subtitle', 'พยากรณ์แบตเตอรี่ + ตรวจจับความผิดปกติ (z-score)')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('predictive.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
 
@@ -160,7 +161,7 @@ export default function PredictivePage() {
           <section className="card p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">
               {t('predictive.societyTitle', 'คาดการณ์สังคม & การเมือง (จากสถานการณ์ปัจจุบัน)')}
-              <a href="/risk-monitor" className="ml-2 text-xs text-sky-400 hover:underline">{t('predictive.riskLink', '→ ดูข้อมูลความเสี่ยงที่ Risk Monitor')}</a>
+              <Link href="/risk-monitor" scroll={false} className="ml-2 text-xs text-sky-400 hover:underline">{t('predictive.riskLink', '→ ดูข้อมูลความเสี่ยงที่ Risk Monitor')}</Link>
             </h2>
             <p className="text-xs text-gray-500">
               {t('predictive.scopeDesc', 'Predictive AI ไม่ได้ดูแค่แบตเตอรี่กับเซ็นเซอร์ — ยังพยากรณ์การเมือง การปกครอง เศรษฐกิจ และสถานการณ์ปัจจุบัน จากข่าวอดีต + ปัจจุบัน + Threat Index ออกมาเป็นข้อ ๆ พร้อมโอกาสเกิด %')}

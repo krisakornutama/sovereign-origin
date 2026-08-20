@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -52,7 +53,7 @@ export default function HealthExportPage() {
           title={t('healthExport.page.title', 'รายงานสุขภาพ 30 วัน (ส่งแพทย์)')} icon={<Icon name="reports" size={18} />} actions={<div className="flex items-center gap-3">
           <button onClick={() => (window.frames[0] as any)?.print?.() ?? window.print()} disabled={!html} className="btn-primary"><Icon name="file" size={13} /> {t('healthExport.printPdf', 'พิมพ์ / บันทึก PDF')}</button>
           <button onClick={downloadCsv} className="btn-secondary"><Icon name="download" size={13} /> {t('healthExport.downloadCsv', 'ดาวน์โหลด CSV')}</button>
-          <a href="/health" className="text-sm text-sky-400 hover:underline">{t('healthExport.back', '← กลับ')}</a>
+          <Link href="/health" scroll={false} className="text-sm text-sky-400 hover:underline">{t('healthExport.back', '← กลับ')}</Link>
         </div>}
         />
       </header>

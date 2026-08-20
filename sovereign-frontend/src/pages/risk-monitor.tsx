@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -150,7 +151,7 @@ export default function RiskMonitorPage() {
           >
             {refreshing ? t('riskMonitor.analyzing', 'กำลังวิเคราะห์…') : (<><Icon name="refresh" size={14} /> {t('riskMonitor.fetchAnalyze', 'ดึงข่าว + วิเคราะห์')}</>)}
           </button>
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('riskMonitor.backDashboard', '← กลับ Dashboard')}</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('riskMonitor.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
       </header>
@@ -273,7 +274,7 @@ export default function RiskMonitorPage() {
             <div className="card panel-cyan p-5">
               <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-2">
                 {t('riskMonitor.scenarioForecast', 'การคาดการณ์สถานการณ์ (Scenario Forecast)')}
-                <a href="/ai" className="ml-2 text-xs text-sky-400 hover:underline">{t('riskMonitor.goAi', '→ ไป AI Command Center')}</a>
+                <Link href="/ai" scroll={false} className="ml-2 text-xs text-sky-400 hover:underline">{t('riskMonitor.goAi', '→ ไป AI Command Center')}</Link>
               </h2>
               <p className="text-xs text-gray-500 mb-3">
                 {t('riskMonitor.forecastDesc', 'ใช้ Threat Index + DEFCON + ข่าว (อดีตและปัจจุบัน) ที่หน้านี้วิเคราะห์ไว้ มาสร้างสถานการณ์ที่เป็นไปได้พร้อมโอกาสเกิด % — ประวัติทุกครั้งเก็บไว้ให้เทียบแนวโน้มได้')}

@@ -4,6 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import { securityStream } from './security-stream.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { sendTelegramAlert } from './telegram-alert.service';
+import { aiKillSwitch } from './ai-kill-switch.service';
+import { firstResponder } from './first-responder.service';
 
 const prisma = new PrismaClient();
 
@@ -84,6 +86,11 @@ export interface CommandResult {
 export interface ActuationDeps {
   loadSnapshot: () => Promise<PhysicalSnapshot>;
   publishReal?: (actuatorId: string, state: string) => void | Promise<void>;
+}
+
+/** Fail-safe interlock status — kill-switch + ปุ่มฉุกเฉินทางกายภาพ */
+export function interlockStatus(): { killSwitch: boolean; emergency: boolean } {
+  return { killSwitch: aiKillSwitch.isActive(), emergency: firstResponder.isActive() };
 }
 
 // ── Config (env — เปลี่ยนได้ แต่ AI เขียนทับไม่ได้) ──
@@ -338,6 +345,24 @@ export class ActuationService {
     const actuator = state.actuators.find((a) => a.id === cmd.actuatorId);
     if (!actuator) return { ok: false, actuatorId: cmd.actuatorId, action: 'denied', reason: `ไม่รู้จัก actuator ${cmd.actuatorId}` };
     const desiredState = actuator.kind === 'relay' ? (cmd.desiredState === 'on' ? 'on' : 'off') : String(cmd.desiredState);
+
+    // ── MANUAL OVERRIDE / FAIL-SAFE INTERLOCK (Safety Layer 0 — ตรวจก่อนทุกอย่าง) ──
+    // ปุ่มตัดการทำงานสั่งมือ (UI kill-switch + ปุ่มกลไก physical) = ยับยั้ง automation
+    // ทุกตัว (governor/system/THI fan) ได้ทันที — เหลือแต่มนุษย์ (human) กับงาน
+    // ที่ติดธง [SAFE] (fail-safe เช่น เซนเซอร์ดับ → พัดลม safe state) เท่านั้น
+    const isEmergency = cmd.actor !== 'human' && !cmd.reason.startsWith('[SAFE]');
+    if (isEmergency && interlockStatus().emergency) {
+      this.record(state, { actuatorId: cmd.actuatorId, action: 'denied', actor: cmd.actor, reason: `EMERGENCY_OVERRIDE: ปุ่มฉุกเฉินเปิดอยู่ — ${cmd.actor} สั่งไม่ได้` });
+      this.saveState(state);
+      this.raise('deny', { actuatorId: cmd.actuatorId, desired: desiredState, actor: cmd.actor, rule: 'EMERGENCY_OVERRIDE', text: `⛔ EMERGENCY_OVERRIDE — ปุ่มฉุกเฉินเปิดอยู่: ${cmd.reason}` });
+      return { ok: false, actuatorId: cmd.actuatorId, action: 'denied', rule: 'EMERGENCY_OVERRIDE', reason: 'ปุ่มฉุกเฉิน (physical/UI) เปิดอยู่ — automation ถูกระงับ' };
+    }
+    if (isEmergency && interlockStatus().killSwitch) {
+      this.record(state, { actuatorId: cmd.actuatorId, action: 'denied', actor: cmd.actor, reason: `KILL_SWITCH: AI kill-switch เปิดอยู่ — ${cmd.actor} สั่งไม่ได้` });
+      this.saveState(state);
+      this.raise('deny', { actuatorId: cmd.actuatorId, desired: desiredState, actor: cmd.actor, rule: 'KILL_SWITCH', text: `⛔ KILL_SWITCH — ${cmd.reason}` });
+      return { ok: false, actuatorId: cmd.actuatorId, action: 'denied', rule: 'KILL_SWITCH', reason: 'AI kill-switch เปิดอยู่ — automation ถูกระงับ' };
+    }
 
     const snap = await this.loadSnapshot();
     const verdict = evaluateEnvelope(actuator, desiredState, cmd.actor, snap, cfg, this.lastCommandAt[cmd.actuatorId] || 0);

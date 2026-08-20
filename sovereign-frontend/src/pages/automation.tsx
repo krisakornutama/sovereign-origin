@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
@@ -221,8 +222,8 @@ export default function AutomationPage() {
           eyebrow={t('automation.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title="SOVEREIGN OS" icon={<Icon name="automation" size={18} />}
           subtitle="Automation Rules" actions={<div className="flex gap-3">
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>
-          <a href="/sensors" className="text-sm text-sky-400 hover:underline">{t('automation.sensorsLink', 'เซ็นเซอร์')}</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
+          <Link href="/sensors" scroll={false} className="text-sm text-sky-400 hover:underline">{t('automation.sensorsLink', 'เซ็นเซอร์')}</Link>
         </div>}
         />
       </header>

@@ -87,7 +87,7 @@ function fakeDs(overrides: Partial<AdvisorDataSources> = {}): AdvisorDataSources
 before(async () => {
   mockModel(prisma, 'farmPlot', { findMany: async () => [] });
   mockModel(prisma, 'inventoryItem', { findMany: async () => [] });
-  mockModel(prisma, 'asset', { findMany: async () => [] });
+  mockModel(prisma, 'assetPosition', { findMany: async () => [] });
   mockModel(prisma, 'wealthHistory', { findFirst: async () => null });
   mockModel(prisma, 'threatIndex', { findFirst: async () => null });
   try {

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -158,7 +159,7 @@ export default function EnergyPage() {
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
           eyebrow={t('energy.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title={t('energy.title', 'Energy Management')} icon={<Icon name="energy" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</a>}
+          title={t('energy.title', 'Energy Management')} icon={<Icon name="energy" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
       <main className="max-w-5xl mx-auto p-6 space-y-6">

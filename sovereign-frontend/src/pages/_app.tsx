@@ -1,7 +1,9 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { applyAppearance } from '../lib/config';
 import ApiConnectionBanner from '../components/layout/ApiConnectionBanner';
 import MobileNav from '../components/layout/MobileNav';
@@ -28,13 +30,34 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const isSuperadmin = user?.role === 'SUPERADMIN';
   const [blocked, setBlocked] = useState(false);
 
-  // กันเปิดสิทธิ์: ยังไม่ได้เปลี่ยนรหัสผ่าน (บังคับหลัง login ครั้งแรก)
+  // กันหน้าเปิดสิทธิ์: ยังไม่ได้เปลี่ยนรหัสผ่าน (บังคับหลัง login ครั้งแรก)
   // → ทุกหน้าถูกส่งไป /change-password จนกว่าจะเปลี่ยนสำเร็จ
   useEffect(() => {
     if (isHydrated && isAuthenticated && mustChangePassword && pathname !== '/change-password') {
       router.replace('/change-password');
     }
   }, [isHydrated, isAuthenticated, mustChangePassword, pathname, router]);
+
+  // SPA navigation ระดับสากล: <a> ภายใน (href ขึ้นต้นด้วย /) ที่ไม่ได้มาผ่าน next/link
+  // จะถูกแปลงเป็น router.push แทนการ reload หน้า — คลิกปกติเปลี่ยนหน้าแบบ SPA
+  // (Ctrl/Cmd/Shift/Alt/มิดเดิลคลิก หรือ target=_blank ยังเปิดแท็บใหม่ตามปกติ)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      const anchor = el?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      if (!href.startsWith('/') || href.startsWith('//') || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      e.preventDefault();
+      if (href === pathname + window.location.search + window.location.hash) return;
+      // scroll:false = กัน Next เลื่อนหน้าขึ้นบนสุดเองตอนสลับหน้า (อ้างอิงโฟลว์ options.scroll
+      // ใน pages router: scroll ขึ้นบนทุกครั้งที่นับได้ถ้าไม่สั่งปิด)
+      router.push(href, undefined, { scroll: false });
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [router, pathname]);
 
   // โหลดสิทธิ์เมื่อ login แล้ว (สมาชิก) — SUPERADMIN เห็นหมดอยู่แล้ว
   useEffect(() => {
@@ -150,12 +173,12 @@ function NoAccessScreen() {
         <p className="text-sm text-gray-500 mb-6">
           {t('app.noAccessHint', 'ถ้าคิดว่าควรเห็นหน้านี้ ให้ผู้ดูแล (superadmin) เปิดสิทธิ์ให้ที่หน้า Users')}
         </p>
-        <a
-          href="/dashboard"
+        <Link
+          href="/dashboard" scroll={false}
           className="inline-block px-5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition-colors"
         >
           {t('app.backDashboard', 'กลับ Dashboard')}
-        </a>
+        </Link>
       </div>
     </div>
   );

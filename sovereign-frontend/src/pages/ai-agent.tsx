@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -7,8 +8,7 @@ import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
-import SkillQueuePanel from '../components/coding/SkillQueuePanel';
-import WorkspacePanel from '../components/coding/WorkspacePanel';
+import CodingIde from '../components/coding/CodingIde';
 
 type AutonomyLevel = 'view' | 'suggest' | 'autonomous';
 type ToolKind = 'read-only' | 'action';
@@ -116,9 +116,9 @@ export default function AiAgentPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
   const [chatLoaded, setChatLoaded] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // แท็บ: policy (เดิม) | team (ทีม Agent) | jobs (งานเบื้องหลัง) | coding (Coding Agent + เครื่องมือ: คิวทักษะ/ไฟล์/เทอร์มินัล/โน้ต)
+  // แท็บ: policy (เดิม) | team (ทีม Agent) | jobs (งานเบื้องหลัง) | coding (Coding Agent แบบ IDE — อยู่ใน CodingIde)
   const [tab, setTab] = useState<'policy' | 'team' | 'jobs' | 'coding'>('policy');
 
   // ── ทีม Agent + งานเบื้องหลัง ──
@@ -129,35 +129,7 @@ export default function AiAgentPage() {
   const [teamBusy, setTeamBusy] = useState<string | null>(null);
   const [jobsLoading, setJobsLoading] = useState(false);
 
-  // ── Coding Agent: เขียนโค้ดจากภาพรวม ──
-  const [codingJobs, setCodingJobs] = useState<any[]>([]);
-  const [codingTask, setCodingTask] = useState('');
-  const [codingBusy, setCodingBusy] = useState(false);
-  const [codingSuggestions, setCodingSuggestions] = useState<string[]>([]);
-  const [codingDoneTask, setCodingDoneTask] = useState('');
-
-  // ── Coding Agent 2.0: เลือกโมเดล + ระดับเหตุผล + ระดับอัตโนมัติ + ส่งรูปภาพ ──
-  const [codingModel, setCodingModel] = useState(''); // '' = ค่าเริ่มต้นจาก env
-  const [codingEffort, setCodingEffort] = useState(''); // low | medium | high | full
-  const [codingAutonomy, setCodingAutonomy] = useState(''); // manual | semi | auto
-  const [codingImage, setCodingImage] = useState<string | null>(null); // base64 รูปที่แนบ (ถ้ามี)
   const [chatImage, setChatImage] = useState<string | null>(null); // base64 รูปในแชท (ถ้ามี)
-  const [previewFile, setPreviewFile] = useState<{ path: string; content: string } | null>(null); // preview ไฟล์จากงาน
-  const [applyBusy, setApplyBusy] = useState<string | null>(null); // job id ที่กำลัง apply ลงโปรเจ็ก
-
-  const EFFORT_LEVELS = [
-    { key: '', label: 'อัตโนมัติ' },
-    { key: 'low', label: 'น้อย' },
-    { key: 'medium', label: 'ปานกลาง' },
-    { key: 'high', label: 'มาก' },
-    { key: 'full', label: 'เต็ม' },
-  ];
-  const AUTONOMY_LEVELS = [
-    { key: '', label: 'ตามค่าเริ่มต้น' },
-    { key: 'manual', label: 'ทำตามสั่ง' },
-    { key: 'semi', label: 'กึ่งอัตโนมัติ' },
-    { key: 'auto', label: 'คิดเอง/ทำเอง' },
-  ];
 
   const fileToBase64 = (file: File, cb: (b64: string) => void) => {
     const reader = new FileReader();
@@ -313,117 +285,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
     }
   };
 
-  // ── Coding Agent ──
-  const loadCodingJobs = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coding/jobs`);
-      if (res.ok) {
-        const data = await res.json();
-        setCodingJobs(data.jobs || []);
-      }
-    } catch {
-      // เงียบ
-    }
-  }, []);
-
-  const startCoding = async () => {
-    if (!isSuperadmin) return;
-    const task = codingTask.trim();
-    if (!task) {
-      setError(t('aiAgent.coding.taskRequired', 'พิมพ์ภาพรวมที่อยากให้ AI เขียนโค้ดก่อน'));
-      return;
-    }
-    setError('');
-    setMessage('');
-    setCodingBusy(true);
-    setCodingSuggestions([]);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coding/jobs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task,
-          model: codingModel,
-          reasoningEffort: codingEffort,
-          autonomy: codingAutonomy,
-          imageBase64: codingImage || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMessage(t('aiAgent.coding.sent', 'ส่งงานเขียนโค้ดให้ AI แล้ว — รันเบื้องหลัง ไปดูหน้าอื่นได้เลย (อาจใช้เวลาหลายนาทีในเครื่อง CPU)'));
-        setCodingTask('');
-        setCodingImage(null);
-        setTab('coding');
-        await loadCodingJobs();
-      } else {
-        setError(data?.error || t('aiAgent.coding.sendFailed', 'สั่งงานเขียนโค้ดไม่สำเร็จ'));
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setCodingBusy(false);
-    }
-  };
-
-  const applyCodingJob = async (id: string) => {
-    if (!isSuperadmin) return;
-    setApplyBusy(id);
-    setError('');
-    setMessage('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coding/jobs/${id}/apply`, { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMessage(t('aiAgent.coding.applyDone', 'เขียนไฟล์ลงโปรเจ็กแล้ว: {count} ไฟล์', { count: data.applied?.length ?? 0 }) + (data.skipped?.length ? t('aiAgent.coding.applySkipped', ' (ข้าม {n} — {names})', { n: data.skipped.length, names: data.skipped.join(', ') }) : ''));
-      } else {
-        setError(data?.error || t('aiAgent.coding.applyFailed', 'เขียนไฟล์ลงโปรเจ็กไม่สำเร็จ'));
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setApplyBusy(null);
-    }
-  };
-
-  const deleteCodingJob = async (id: string) => {
-    if (!isSuperadmin) return;
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coding/jobs/${id}`, { method: 'DELETE' });
-      if (res.ok) await loadCodingJobs();
-    } catch {
-      // เงียบ
-    }
-  };
-
-  const fetchSuggestions = async (job: any) => {
-    if (!job?.task) return;
-    setCodingBusy(true);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coding/suggest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: job.task, summary: job.result || '' }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setCodingSuggestions(data.suggestions || []);
-        setCodingDoneTask(job.id);
-      }
-    } catch {
-      setError(t('aiAgent.coding.suggestFailed', 'สร้างข้อเสนอไม่สำเร็จ'));
-    } finally {
-      setCodingBusy(false);
-    }
-  };
-
-  // Poll งานเขียนโค้ด (เฉพาะแท็บ coding)
-  useEffect(() => {
-    if (tab !== 'coding') return;
-    loadCodingJobs();
-    const interval = setInterval(loadCodingJobs, 4000);
-    return () => clearInterval(interval);
-  }, [tab, loadCodingJobs]);
+// ── Coding Agent: state + แฮนเดลทั้งหมดย้ายไปอยู่ใน CodingIde.tsx ──
 
   // Poll งานเบื้องหลังทุก 3 วิ (เฉพาะหน้า jobs — ป้าย global ดูแลใน _app)
   useEffect(() => {
@@ -605,7 +467,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
         <PageHeader
           eyebrow={t('aiAgent.eyebrow', 'ความปลอดภัย')}
           title="SOVEREIGN OS" icon={<Icon name="ai-agent" size={18} />}
-          subtitle="AI Agent Control" actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('aiAgent.backDashboard', '← กลับ Dashboard')}</a>}
+          subtitle="AI Agent Control" actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('aiAgent.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
 
@@ -1117,260 +979,10 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
           </section>
         )}
 
-        {/* ── แท็บ: Coding Agent — เฟรมเดียว: สั่งงาน + งาน + คิวทักษะ + ไฟล์ + เทอร์มินัล + โน้ต ── */}
+{/* ── แท็บ: Coding Agent — IDE layout เต็ม (toolbar + กลาง 70% + ขวา 30% + เทอร์มินัลล่าง) ── */}
         {tab === 'coding' && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 h-[calc(100vh-190px)] min-h-[560px]">
-            {/* คอลัมน์ 1: สั่งงาน + คิวทักษะ */}
-            <div className="flex flex-col gap-4 min-h-0">
-              <section className="card panel-glow p-4 space-y-3 flex-none">
-                <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('aiAgent.coding.title', 'สั่งงานเขียนโค้ด')}</h2>
-                <p className="text-[11px] text-gray-500">{t('aiAgent.coding.desc', 'ภาพรวมครั้งเดียว — AI วางแผน → เขียนโค้ดทุกไฟล์ → ตรวจงาน → เสนอทางต่อ (ทำงานเบื้องหลัง)')}</p>
-                <div className="inset p-3 space-y-2">
-              {/* ── เลือกโมเดล + ระดับเหตุผล + ระดับอัตโนมัติ + ส่งรูปภาพ ── */}
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <label className="text-gray-400">{t('aiAgent.coding.modelLabel', 'โมเดล')}</label>
-                <select
-                  value={codingModel}
-                  onChange={(e) => setCodingModel(e.target.value)}
-                  className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"
-                >
-                  <option value="">{t('aiAgent.coding.defaultEnv', 'ค่าเริ่มต้น (env)')}</option>
-                  {(status?.models || []).map((m: any) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
-                <label className="text-gray-400 ml-2">{t('aiAgent.coding.effortLabel', 'เหตุผล')}</label>
-                <div className="flex gap-1">
-                  {EFFORT_LEVELS.map((e) => (
-                    <button
-                      key={e.key}
-                      onClick={() => setCodingEffort(e.key)}
-                      title={e.key ? t('aiAgent.coding.effortTitle', 'ระดับการให้เหตุผล: {label}', { label: t(`aiAgent.effort.${e.key}`, e.label) }) : t('aiAgent.coding.defaultEffortTitle', 'ใช้ค่าของโมเดลเอง')}
-                      className={`px-2.5 py-1.5 rounded text-xs font-bold transition ${
-                        codingEffort === e.key ? 'bg-emerald-600 text-white' : 'bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300'
-                      }`}
-                    >
-                      {e.key ? t(`aiAgent.effort.${e.key}`, e.label) : t('aiAgent.effort.auto', e.label)}
-                    </button>
-                  ))}
-                </div>
-                <label className="text-gray-400 ml-2">{t('aiAgent.coding.autonomyLabel', 'อัตโนมัติ')}</label>
-                <select
-                  value={codingAutonomy}
-                  onChange={(e) => setCodingAutonomy(e.target.value)}
-                  className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"
-                >
-                  {AUTONOMY_LEVELS.map((a) => (
-                    <option key={a.key} value={a.key}>{t(a.key ? `aiAgent.autonomyLevel.${a.key}` : 'aiAgent.autonomyLevel.default', a.label)}</option>
-                  ))}
-                </select>
-                <label className="text-gray-400 ml-2">{t('aiAgent.coding.imageLabel', 'รูปภาพ')}</label>
-                <button
-                  onClick={() => document.getElementById('coding-image-input')?.click()}
-                  className={`px-2.5 py-1.5 rounded text-xs font-bold transition ${
-                    codingImage ? 'bg-emerald-600 text-white' : 'bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300'
-                  }`}
-                >
-                  {codingImage ? t('aiAgent.coding.hasImage', 'มีรูปแล้ว') : t('aiAgent.coding.attachImage', 'แนบรูป')}
-                </button>
-                <input
-                  id="coding-image-input"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) fileToBase64(f, (b64) => setCodingImage(b64));
-                    e.target.value = '';
-                  }}
-                />
-                {codingImage && (
-                  <button onClick={() => setCodingImage(null)} className="text-[10px] px-2 py-1 rounded bg-red-900/40 border border-red-800 text-red-300">{t('aiAgent.chat.removeImage', 'ลบรูป')}</button>
-                )}
-              </div>
-              {codingImage && (
-                <div className="flex items-center gap-2">
-                  <img src={codingImage} alt={t('aiAgent.chat.imageAlt', 'แนบ')} className="h-16 w-16 object-cover rounded border border-gray-700" />
-                  <span className="text-[10px] text-gray-500">{t('aiAgent.coding.imagePlanNote', 'รูปนี้จะส่งให้ AI ดูตอนวางแผน (ต้องใช้โมเดลที่รองรับภาพ)')}</span>
-                </div>
-              )}
-              <textarea
-                value={codingTask}
-                onChange={(e) => setCodingTask(e.target.value)}
-                rows={3}
-                placeholder={t('aiAgent.coding.phTask', 'เช่น สร้าง REST API จัดการงานบ้านของลูกเป็นภาษา TypeScript พร้อม auth และทดสอบครบ ใช้ Express + Prisma')}
-                className="input w-full"
-              />
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-[11px] text-gray-500">{t('aiAgent.coding.specHint', 'ระบุภาษา/เฟรมเวิร์ก/ไฟล์ที่ต้องการ')}</p>
-                <button
-                  onClick={startCoding}
-                  disabled={codingBusy || !isSuperadmin}
-                  className="btn-primary"
-                >
-                  {codingBusy ? t('aiAgent.coding.working', 'กำลังทำงาน...') : t('aiAgent.coding.writeCode', 'ให้ AI เขียนโค้ดเลย')}
-                </button>
-              </div>
-            </div>
-              </section>
-
-              {codingSuggestions.length > 0 && (
-                <div className="card panel-glow p-3 space-y-2 flex-none border-emerald-800/60">
-                  <p className="text-sm font-semibold text-emerald-300 glow-text">{t('aiAgent.coding.suggestionsTitle', 'อยากทำอะไรต่อ? (AI คิดให้แล้ว)')}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {codingSuggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setCodingTask(s); setCodingSuggestions([]); }}
-                        className="px-3 py-1.5 bg-gray-900 border border-emerald-700 text-emerald-200 hover:bg-emerald-900/40 rounded-lg text-xs transition-all"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <section className="card panel-cyan p-4 flex-1 min-h-0 overflow-y-auto">
-                <SkillQueuePanel models={(status?.models || []).map((m: any) => m.name)} compact />
-              </section>
-            </div>
-
-            {/* คอลัมน์ 2: งานเขียนโค้ด */}
-            <section className="card panel-cyan p-4 flex flex-col min-h-0">
-              <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-2 flex-none">{t('aiAgent.coding.jobsTitle', 'งานเขียนโค้ด')}</h2>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-            {codingJobs.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-8 border border-dashed border-gray-700 rounded-lg">
-                {t('aiAgent.coding.noJobs', 'ยังไม่มีงานเขียนโค้ด — พิมพ์ภาพรวมด้านบนแล้วกด "ให้ AI เขียนโค้ดเลย"')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {codingJobs.map((j) => {
-                  const active = j.status === 'queued' || j.status === 'running';
-                  let plan: any = null;
-                  let files: Array<{ path: string; content: string }> = [];
-                  let review: Array<{ severity: string; message: string }> = [];
-                  try { plan = typeof j.plan_json === 'string' ? JSON.parse(j.plan_json) : j.plan_json; } catch { /* noop */ }
-                  try {
-                    const parsed = typeof j.files_json === 'string' ? JSON.parse(j.files_json) : j.files_json;
-                    if (Array.isArray(parsed)) files = parsed;
-                  } catch { /* noop */ }
-                  try {
-                    const res = typeof j.result === 'string' ? JSON.parse(j.result) : j.result;
-                    if (res?.review) review = res.review;
-                  } catch { /* noop */ }
-                  return (
-                    <div key={j.id} className={`card p-4 space-y-2 ${active ? 'border-emerald-800/60' : j.status === 'error' ? 'border-rose-800/60' : ''}`}>
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon name="code" size={16} className="text-gray-500 shrink-0" />
-                          <span className="font-bold text-sm truncate max-w-[240px]">{j.title}</span>
-                          <span className="text-[10px] text-gray-500">{new Date(j.created_at).toLocaleString(fmtLocale())}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                            j.status === 'done' ? 'bg-emerald-900/50 text-emerald-300' :
-                            j.status === 'error' ? 'bg-rose-900/50 text-rose-300' :
-                            'bg-emerald-900/60 text-emerald-300 animate-pulse'
-                          }`}>
-                            {j.status === 'queued' ? t('aiAgent.coding.statusQueued', 'วางแผน...') : j.status === 'running' ? t('aiAgent.coding.statusRunning', 'กำลังเขียนโค้ด ({n}%)', { n: j.progress }) : j.status === 'done' ? t('aiAgent.coding.statusDone', 'เสร็จ') : t('aiAgent.coding.statusFailed', 'พลาด')}
-                          </span>
-                          {isSuperadmin && !active && (
-                            <button onClick={() => deleteCodingJob(j.id)} className="text-[10px] px-2 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-500"><Icon name="trash" size={12} /></button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-400 bg-gray-950/40 border border-gray-800 rounded px-2 py-1.5">{j.task}</div>
-                      {(j.model || j.reasoning_effort || j.autonomy) && (
-                        <div className="text-[10px] text-gray-500">
-                          {j.model || t('aiAgent.coding.defaultLabel', 'ค่าเริ่มต้น')} · {j.reasoning_effort ? t(`aiAgent.effort.${j.reasoning_effort}`, j.reasoning_effort) : t('aiAgent.coding.defaultLabel', 'ค่าเริ่มต้น')} · {j.autonomy ? t(`aiAgent.autonomyLevel.${j.autonomy}`, j.autonomy) : t('aiAgent.coding.defaultLabel', 'ค่าเริ่มต้น')}
-                        </div>
-                      )}
-                      {(j.status === 'queued' || j.status === 'running') && (
-                        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.max(5, j.progress)}%` }} />
-                        </div>
-                      )}
-                      {j.status === 'done' && plan && (
-                        <div className="text-xs text-gray-300 bg-gray-950/60 border border-gray-800 rounded px-2 py-1.5">
-                          <span className="font-bold">{plan.title}</span>{t('aiAgent.coding.planFiles', ' — {n} ไฟล์', { n: plan.files?.length ?? 0 })}
-                        </div>
-                      )}
-                      {j.status === 'done' && files.length > 0 && (
-                        <div className="space-y-2">
-                          <details className="bg-gray-950/60 border border-gray-800 rounded-lg">
-                            <summary className="px-3 py-2 text-xs font-bold cursor-pointer hover:bg-gray-800/40">{t('aiAgent.coding.filesSummary', 'โค้ดที่สร้าง ({n} ไฟล์)', { n: files.length })}</summary>
-                            <div className="px-3 pb-3 space-y-2">
-                              {files.map((f) => (
-                                <div key={f.path}>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-[10px] text-green-400 font-mono">{f.path}</p>
-                                    <button onClick={() => setPreviewFile({ path: f.path, content: f.content })} className="text-[10px] px-2 py-0.5 rounded bg-gray-800 border border-gray-600 text-emerald-300">{t('aiAgent.coding.openFull', 'เปิดดูเต็ม')}</button>
-                                  </div>
-                                  <pre className="text-[10px] text-gray-300 bg-gray-950 rounded p-2 overflow-x-auto max-h-40">{f.content.slice(0, 2000)}</pre>
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-gray-950/60 border border-gray-800 rounded-lg">
-                            <summary className="px-3 py-2 text-xs font-bold cursor-pointer hover:bg-gray-800/40">{t('aiAgent.coding.reviewSummary', 'ผลตรวจงาน ({n} รายการ)', { n: review.length })}</summary>
-                            <div className="px-3 pb-3 space-y-1">
-                              {review.map((r, i) => (
-                                <p key={i} className={`text-[10px] ${r.severity === 'error' ? 'text-red-400' : r.severity === 'warning' ? 'text-amber-300' : 'text-gray-400'}`}>
-                                  {r.message}
-                                </p>
-                              ))}
-                            </div>
-                          </details>
-                        </div>
-                      )}
-                      {j.status === 'done' && (
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <button
-                            onClick={() => fetchSuggestions(j)}
-                            disabled={codingBusy}
-                            className="px-3 py-1.5 bg-emerald-800/60 hover:bg-emerald-700/60 border border-emerald-700 rounded-lg text-xs font-semibold transition-all"
-                          >
-                            {codingBusy && codingDoneTask === j.id ? t('aiAgent.coding.thinking', 'กำลังคิดอยู่...') : t('aiAgent.coding.aiSuggest', 'AI คิดต่อให้ (2-4 ตัวเลือก)')}
-                          </button>
-                          <button
-                            onClick={() => applyCodingJob(j.id)}
-                            disabled={applyBusy === j.id}
-                            className="px-3 py-1.5 bg-green-700/60 hover:bg-green-600/60 border border-green-700 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-                          >
-                            {applyBusy === j.id ? t('aiAgent.coding.applying', 'กำลังเขียนลงโปรเจ็ก...') : t('aiAgent.coding.applyToProject', 'เขียนลงโปรเจ็ก')}
-                          </button>
-                        </div>
-                      )}
-                      {j.status === 'error' && (
-                        <div className="text-xs text-red-300 bg-red-950/40 border border-red-800 rounded px-2 py-1.5">{j.error}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-              </div>
-            </section>
-
-            {/* คอลัมน์ 3: ไฟล์โปรเจ็ก + เทอร์มินัล + โน้ต */}
-            <WorkspacePanel compact />
-          </div>
-        )}
-
-        {/* ── Preview modal: ไฟล์จากงานเขียนโค้ด ── */}
-        {previewFile && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-            <div className="card w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-700">
-                <span className="text-sm font-mono text-emerald-300 truncate">{previewFile.path}</span>
-                <button onClick={() => setPreviewFile(null)} className="px-3 py-1 text-xs rounded bg-gray-800 border border-gray-600 text-gray-300">{t('common.close', 'ปิด')}</button>
-              </div>
-              <div className="p-4 overflow-auto flex-1">
-                <pre className="text-xs text-gray-200 font-mono whitespace-pre-wrap break-all">{previewFile.content}</pre>
-              </div>
-            </div>
+          <div className="h-[calc(100vh-190px)] min-h-[560px]">
+            <CodingIde />
           </div>
         )}
 
