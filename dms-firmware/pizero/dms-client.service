@@ -1,0 +1,22 @@
+# dms-client.service — ตัวอย่าง systemd unit สำหรับ Pi Zero 2 W
+# ติดตั้ง: sudo cp dms-client.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#         sudo systemctl enable --now dms-client
+[Unit]
+Description=Sovereign DMS Client (Dead-Man Switch, 4G OOB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/dms-firmware/pizero
+ExecStart=/usr/bin/python3 /home/pi/dms-firmware/pizero/dms_client.py
+Restart=always
+RestartSec=10
+# กัน cron/เน็ตบ้านแก้ secret — จำกัดสิทธิ์อ่าน
+ProtectSystem=strict
+ReadOnlyPaths=/home/pi/dms-firmware
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
