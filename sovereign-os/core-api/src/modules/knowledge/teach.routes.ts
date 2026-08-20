@@ -59,6 +59,9 @@ import {
   portfolioDeposits,
   portfolioPerformance,
   setInvestTargetPct,
+  curriculumOverview,
+  recordCurriculumProgress,
+  subjectCertificates,
 } from '../../services/teach-kids.service';
 import { prisma } from '../../services/teach-kids.service';
 
@@ -623,6 +626,49 @@ router.post('/teach/kids/:id/progress', authenticate, async (req, res) => {
     if (/kid not found/i.test(msg)) return res.status(404).json({ error: 'ไม่พบโปรไฟล์เด็ก' });
     if (/total|lessonTitle/i.test(msg)) return res.status(400).json({ error: 'ข้อมูลคะแนนไม่ถูกต้อง' });
     res.status(500).json({ error: 'บันทึกความคืบหน้าไม่สำเร็จ' });
+  }
+});
+
+// ────────────────────────────────────────────────
+// Sovereign Curriculum — หลักสูตรสร้างยอดคน (โฮมสคูล)
+// ────────────────────────────────────────────────
+
+// GET /api/knowledge/teach/curriculum — หลักสูตรทั้งหมด + ความคืบหน้าทุกคน
+router.get('/teach/curriculum', authenticate, async (_req, res) => {
+  try {
+    res.json(await curriculumOverview());
+  } catch (err) {
+    console.error('Curriculum load error:', err);
+    res.status(500).json({ error: 'โหลดหลักสูตรไม่สำเร็จ' });
+  }
+});
+
+// GET /api/knowledge/teach/curriculum/certificates?kidId= — เกียรติบัตรจบสาขา
+router.get('/teach/curriculum/certificates', authenticate, async (req, res) => {
+  try {
+    const kidId = req.query.kidId ? String(req.query.kidId) : undefined;
+    res.json({ certificates: await subjectCertificates(kidId) });
+  } catch (err) {
+    console.error('Curriculum certificates error:', err);
+    res.status(500).json({ error: 'โหลดเกียรติบัตรไม่สำเร็จ' });
+  }
+});
+
+// POST /api/knowledge/teach/curriculum/items/:itemId/progress { kidId, score, total }
+// บันทึกเรียนจบบทเรียนในหลักสูตร → XP + เช็คจบสาขา → เกียรติบัตรอัตโนมัติ
+router.post('/teach/curriculum/items/:itemId/progress', authenticate, async (req, res) => {
+  try {
+    const kidId = String(req.body?.kidId || '');
+    if (!kidId) return res.status(400).json({ error: 'kidId ต้องระบุ' });
+    const result = await recordCurriculumProgress(kidId, req.params.itemId, {
+      score: Number(req.body?.score ?? 0),
+      total: Number(req.body?.total ?? 0),
+    });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    const msg = String(err?.message || '');
+    const notFound = /kid not found|curriculum item not found/i.test(msg);
+    res.status(notFound ? 404 : 400).json({ error: notFound ? (msg.includes('kid not found') ? 'ไม่พบโปรไฟล์เด็ก' : 'ไม่พบบทเรียนในหลักสูตร') : msg });
   }
 });
 

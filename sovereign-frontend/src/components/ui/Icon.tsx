@@ -562,6 +562,13 @@ const ICONS: Record<string, React.ReactNode> = {
       <path d="M3 18h18" />
     </>
   ),
+  'graduation-cap': (
+    <>
+      <path d="M22 10L12 5 2 10l10 5 10-5z" />
+      <path d="M6 12.5V16c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-3.5" />
+      <path d="M22 10v6" />
+    </>
+  ),
   'heart-pulse': (
     <>
       <path d="M12 20s-7-4.5-7-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 21 10c0 5.5-7 10-7 10z" />
