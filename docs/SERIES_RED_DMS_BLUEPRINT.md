@@ -193,14 +193,14 @@ T+แก้   ── Recovery: ระบบหลักกลับมา ping �
 
 ## 7. API Contract & Environment Variables (สำหรับเมื่อเริ่ม implement)
 
-### 7.1 ไฟล์ที่จะสร้าง (ยังไม่ต้องแตะใน Soak)
+### 7.1 ไฟล์ที่จะสร้าง
 
 ```
-sovereign-os/core-api/src/modules/dms/dms.routes.ts     # POST /api/v1/dms/ping, GET /api/v1/dms/status
-sovereign-os/core-api/src/services/dms.service.ts       # rolling-key verify, missed/failover logic, WoL
-sovereign-os/core-api/tests/dms.test.ts                 # HMAC, replay, thresholds, state machine
-dms-firmware/                                            # (โฟลเดอร์ใหม่) firmware DMS: ESP32 (MicroPython/C) หรือ Pi
-infra/docker-compose(.prod).yml                          # env DMS_* เพิ่ม
+sovereign-os/core-api/src/modules/dms/dms.routes.ts     # ✅ สร้างแล้ว — POST /api/v1/dms/ping, GET /api/v1/dms/status
+sovereign-os/core-api/src/services/dms.service.ts       # ✅ สร้างแล้ว — rolling-key verify, missed/failover logic, WoL
+sovereign-os/core-api/tests/dms.test.ts                 # ✅ สร้างแล้ว — HMAC, replay, thresholds, state machine (24 tests)
+dms-firmware/                                            # ✅ สร้างแล้ว — ESP32 (MicroPython), Pi client, simulator
+infra/docker-compose(.prod).yml                          # ✅ เพิ่ม env DMS_* แล้ว
 ```
 
 ### 7.2 Env (ฝั่ง server)
@@ -248,11 +248,11 @@ verifyDmsPing({ deviceId, ts, seq, sig }, secret, now, allowedDevices)
 
 | Phase | ขอบเขต | ตรวจรับ |
 |---|---|---|
-| **M0** | Firmware skeleton: heartbeat timer 30s + HTTP POST (JSON) | ส่ง ping เข้า server ได้จริง |
-| **M1** | Server: `/api/v1/dms/ping` + HMAC verify + audit events + `GET /api/v1/dms/status` (lastSeen map) | `tests/dms.test.ts` ผ่าน (HMAC/replay/threshold) |
-| **M2** | DMS: Escalation Ladder (90s/180s) + 4G alert (Telegram/SMS) — ยังไม่มี action | ทดสอบตัดไฟบ้านจำลอง: alert มาถึงใน ~2 นาที |
-| **M3** | WoL → Cold Standby (server trigger หรือ DMS direct) | Cold Standby boot ภายใน 3–5 นาทีหลังไฟดับ |
-| **M4** | Hardening: flash encryption, dual-channel check (LAN+4G), cooldown, dry-run mode (`DMS_DRY_RUN=true` จำลองลาดเดอร์โดยไม่ยิงจริง — เหมือน `UPS_DRY_RUN`) | Drill แบบ dry-run ผ่าน |
+| **M0** | ✅ Firmware skeleton: heartbeat timer 30s + HTTP POST (JSON) | `dms-firmware/` (micropython + pizero + simulator) |
+| **M1** | ✅ Server: `/api/v1/dms/ping` + HMAC verify + audit events + `GET /api/v1/dms/status` | `tests/dms.test.ts` ผ่าน (24/24 — HMAC/replay/threshold) |
+| **M2** | ✅ DMS: Escalation Ladder (90s/180s) + 4G alert (Telegram/SMS) — ยังไม่มี action | code พร้อม — ⏳ รอ hardware drill: ตัดไฟบ้านจำลอง → alert มาถึงใน ~2 นาที |
+| **M3** | ✅ WoL → Cold Standby (server trigger, `DMS_AUTO_FAILOVER` + `DMS_WOL_MAC`) | code พร้อม — ⏳ รอตั้ง BIOS Wake-on-LAN บน Cold Standby |
+| **M4** | ✅ Hardening: dual-channel check (firmware LAN TCP), cooldown, dry-run (`DMS_DRY_RUN`) | drill แบบ dry-run ผ่าน (simulator + `DMS_DRY_RUN=true`) — ⏳ flash encryption ตามความพร้อมฮาร์ดแวร์ |
 
 ### Acceptance Criteria (สุดท้าย)
 1. ตัดไฟบ้านจริงตอน 23:00 → DMS แจ้ง Telegram ผ่าน 4G ≤ 2 นาที
@@ -269,5 +269,4 @@ verifyDmsPing({ deviceId, ts, seq, sig }, secret, now, allowedDevices)
 
 ---
 
-*Blueprint จัดทำ: 16 ส.ค. 2026 · สถานะ: DRAFT (รอ Soak Phase ผ่าน 3–7 วัน → เริ่ม M0)*
-*หลักการ: เอกสารเท่านั้น ไม่มีการแก้โค้ดที่กำลังรัน — ระบบหลักยังคงรัน dist/ เวอร์ชันที่ผ่าน 649/649 tests*
+*Blueprint จัดทำ: 16 ส.ค. 2026 · สถานะ: SERVER + FIRMWARE CODE COMPLETE (18 ส.ค. 2026) — M0–M4 code พร้อม, tests 774/774 ผ่าน, build ผ่าน · รอ hardware acceptance (M2: ตัดไฟจริง, M3: Cold Standby BIOS/WoL, M4: flash encryption)*
