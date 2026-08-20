@@ -10,6 +10,8 @@ declare module 'pdf-parse' {
   interface PdfParseOptions {
     pagerender?: (pageData: unknown) => Promise<string>;
     max?: number;
+    /** รหัสเปิด PDF ที่เข้ารหัส (ถ้าสเตตเมนต์ล็อก) */
+    password?: string;
   }
   function pdfParse(
     dataBuffer: Buffer,
