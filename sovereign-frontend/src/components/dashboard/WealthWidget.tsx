@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useWealthStore } from '../../stores/useWealthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
@@ -48,7 +49,7 @@ export default function WealthWidget() {
         <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5 glow-text">
           <Icon name="coin" size={14} /> {t('dashboard.wealth.title', 'พอร์ต + Survival Runway')}
         </h3>
-        <a href="/portfolio" className="text-xs text-sky-400 hover:underline">{t('dashboard.wealth.detailsLink', 'รายละเอียด →')}</a>
+        <Link href="/treasury" scroll={false} className="text-xs text-sky-400 hover:underline">{t('dashboard.wealth.detailsLink', 'รายละเอียด →')}</Link>
       </div>
 
       {summary ? (
@@ -90,7 +91,7 @@ export default function WealthWidget() {
       ) : (
         <div className="text-xs text-gray-500">
           {t('dashboard.wealth.emptyBefore', 'ยังไม่มีข้อมูล — เปิด ')}<code className="text-gray-400">PORTFOLIO_ENABLED=true</code>{t('dashboard.wealth.emptyAfter', ' ใน .env แล้วกด')}
-          <a href="/portfolio" className="text-sky-400 hover:underline">{t('dashboard.wealth.fetchPrices', ' ดึงราคา')}</a>
+          <Link href="/treasury" scroll={false} className="text-sky-400 hover:underline">{t('dashboard.wealth.fetchPrices', ' ดึงราคา')}</Link>
         </div>
       )}
     </div>

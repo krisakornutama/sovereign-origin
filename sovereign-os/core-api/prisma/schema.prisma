@@ -31,10 +31,15 @@ model User {
   audit_logs    AuditLog[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
-  assets          Asset[]
-  inventory_items InventoryItem[]
-  wealth_history  WealthHistory[]
-  feature_grants  UserFeatureGrant[]
+  asset_positions  AssetPosition[]
+  inventory_items  InventoryItem[]
+  wealth_history   WealthHistory[]
+  feature_grants   UserFeatureGrant[]
+  balance_sheet    PersonalBalanceSheet?
+  survival_runways SurvivalRunway[]
+  treasury_events  TreasuryEvent[]
+  transfer_orders  TransferOrder[]
+  dime_statements  DimeStatement[]
 
   @@map("users")
 }
@@ -129,19 +134,160 @@ enum AssetType {
   COMMODITY
 }
 
-model Asset {
-  id             String    @id @default(uuid()) @db.Uuid
-  user_id        String    @db.Uuid // เจ้าของพอร์ต — สมาชิกแต่ละคนมีพอร์ตแยก
-  symbol         String
-  type           AssetType
-  quantity       Float     @default(0)
-  wallet_address String?
-  notes          String?
+model AssetPosition {
+  id                          String    @id @default(uuid()) @db.Uuid
+  user_id                     String    @db.Uuid // เจ้าของพอร์ต — สมาชิกแต่ละคนมีพอร์ตแยก
+  symbol                      String
+  type                        AssetType // CRYPTO | STOCK | COMMODITY
+  quantity                    Float     @default(0)
+  wallet_address              String?
+  notes                       String?
+  // ── Treasury & Wealth Engine (link กับ PersonalBalanceSheet + SurvivalRunway) ──
+  strategy_family             String    @default("FUNDAMENTAL") // FUNDAMENTAL | ASYMMETRIC | MACRO | QUANT | PASSIVE_INCOME
+  avg_cost_usd                Float? // ต้นทุนเฉลี่ยต่อหน่วย — ใช้คิด realized gain ตอนขาย
+  // ── คอลัมน์จากสเตตเมนต์ Dime! (อัปเดตทุกเดือนที่ import) ──
+  company_name                String? // ชื่อบริษัทจากสเตตเมนต์
+  allocation_pct              Float? // สัดส่วนในพอร์ต (%) ตามสเตตเมนต์
+  total_return_pct            Float? // ผลตอบแทนรวม (%) ตามสเตตเมนต์ (ลบ = ขาดทุน)
+  total_return_usd            Float? // ผลตอบแทนรวม ($) ตามสเตตเมนต์
+  expected_dividend_yield_pct Float     @default(0) // อัตราปันผลคาดหวัง %/ปี → คำนวณกระแสรายได้พาสซีฟ
+  catalyst_note               String? // Asymmetric Catalyst — เหตุการณ์ที่รอจุดเปลี่ยน (watchlist)
+  last_dividend_usd           Float?
+  last_dividend_at            DateTime? @db.Timestamptz
+  realized_gain_usd           Float     @default(0) // กำไรที่รับรู้สะสมจากการขาย (ลบ = ขาดทุนสะสม)
+  sold_qty                    Float     @default(0) // จำนวนที่ขายสะสม (สำหรับ audit)
+  created_at                  DateTime  @default(now()) @db.Timestamptz
+  updated_at                  DateTime  @updatedAt @db.Timestamptz
+
+  user   User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  events TreasuryEvent[]
+
+  @@index([user_id])
+  @@index([strategy_family])
+  @@map("asset_positions")
+}
+
+// ── Personal Balance Sheet — ฐานข้อมูลการเงินส่วนตัว (เงินสดหนุน survival runway) ──
+model PersonalBalanceSheet {
+  id                 String   @id @default(uuid()) @db.Uuid
+  user_id            String   @db.Uuid
+  liquid_cash_usd    Float    @default(0) // เงินสด/บัญชีสภาพคล่องสูง
+  liabilities_usd    Float    @default(0) // หนี้สินรวม (ยอดคงค้าง)
+  monthly_burn_usd   Float    @default(0) // ค่าใช้จ่ายประจำต่อเดือน (Core Burn)
+  monthly_income_usd Float    @default(0) // รายได้ประจำต่อเดือน (เงินเดือน ฯลฯ)
+  updated_at         DateTime @updatedAt @db.Timestamptz
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id])
-  @@map("assets")
+  @@unique([user_id])
+  @@map("personal_balance_sheets")
+}
+
+// ── Survival Runway — สแนปชอตเดือนที่อยู่รอด (คำนวณแบบไดนามิกทุกครั้ง + เก็บประวัติ) ──
+// months = (Total Liquid Cash + Annualized Dividend Income) / Monthly Burn Rate
+model SurvivalRunway {
+  id                      String   @id @default(uuid()) @db.Uuid
+  user_id                 String   @db.Uuid
+  months                  Float
+  liquid_cash_usd         Float
+  annualized_dividend_usd Float
+  monthly_burn_usd        Float
+  snapshot_at             DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, snapshot_at])
+  @@map("survival_runways")
+}
+
+// ── Treasury Event — ฟีดรายได้/กำไรรับรู้ (ปันผล, ขายทำกำไร, ปรับเงินสด) ──
+// ทุก event เกิดคู่กับการอัปเดตยอดเงินสดใน PersonalBalanceSheet อัตโนมัติ
+model TreasuryEvent {
+  id                String   @id @default(uuid()) @db.Uuid
+  user_id           String   @db.Uuid
+  type              String // REALIZED_GAIN | DIVIDEND | CASH_ADJUST
+  symbol            String?
+  asset_position_id String?  @db.Uuid // ผูกกับ AssetPosition (ถ้าเกิดจากการขาย/ปันผล)
+  amount_usd        Float
+  note              String?
+  created_at        DateTime @default(now()) @db.Timestamptz
+
+  user     User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  position AssetPosition? @relation(fields: [asset_position_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, created_at])
+  @@map("treasury_events")
+}
+
+// ── Transfer Order — คำสั่งโอน/รับเงินจริง (บันชี ledger + ยืนยันด้วย txid) ──
+// วงจร: PENDING (สั่ง + QR PromptPay) → โอนจริงผ่านแอปธนาคาร → VERIFIED (กรอก txid)
+//  - VERIFIED แล้ว ledger (PersonalBalanceSheet) อัปเดตอัตโนมัติ
+//  - OUT: หักเงินสด / IN: เครดิตเงินสด — เหมือนขาย/ปันผล cross-link เดิม
+model TransferOrder {
+  id             String    @id @default(uuid()) @db.Uuid
+  user_id        String    @db.Uuid // เจ้าของ ledger ที่คำสั่งนี้กระทบ
+  direction      String // IN (รับเงิน) | OUT (โอน/จ่าย) — พิสูจน์ฝั่ง backend, กัน UI เขียนเอง
+  category       String    @default("OTHER") // BILL | FOOD | UTILITY | SALARY | INVESTMENT | LOAN | OTHER
+  amount_usd     Float // ยอดใน ledger (โอนจริงอาจหักได้น้อยกว่าถ้าเงินสดไม่พอ — ดู actual_debited_usd)
+  amount_thb     Float? // ยอดบาทสำหรับ QR PromptPay (ถ้าไม่ระบุ ใช้ rate คงที่)
+  payee          String? // ผู้รับ (OUT) / ผู้จ่าย (IN)
+  bank           String?
+  account_number String?
+  note           String?
+  ref_code       String    @unique // คำสั่งอ้างอิง เช่น XFR-XXXXXX — ใช้หมายถึงสลิป/QR
+  qr_payload     String? // EMVCo PromptPay payload — null ถ้ายังไม่ตั้ง PROMPTPAY_TARGET
+  status         String    @default("PENDING") // PENDING | VERIFIED | CANCELLED
+  txid           String? // เลขอ้างอิงจากแอปธนาคาร หลังโอนจริง
+  evidence_url   String? // ลิงก์สลิป/ภาพหลักฐาน (optional)
+  requested_by   String    @db.Uuid // ใครเป็นคนสั่ง
+  verified_by    String?   @db.Uuid // ใครยืนยันว่าธนาคารโอนเรียบร้อย
+  verified_at    DateTime? @db.Timestamptz
+  cancelled_at   DateTime? @db.Timestamptz
+  created_at     DateTime  @default(now()) @db.Timestamptz
+  updated_at     DateTime  @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([status])
+  @@map("transfer_orders")
+}
+
+// ── Dime! Statement — สเตตเมนต์รายเดือนจากโบรกเกอร์ Dime ส่งทางอีเมล ──
+// วงจร: IMAP ดึงอีเมล unread → ดาวน์โหลด PDF → parse ยอดถือครองหุ้น US →
+//       upsert AssetPosition (STOCK) + AssetPrice → เก็บ raw ไว้เป็น history
+// dedupe 2 ชั้น: message_id (จากอีเมล) / raw_text_hash (จาก PDF) — ป้องกัน import ซ้ำ
+model DimeStatement {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String?  @db.Uuid // เจ้าของพอร์ตที่ statement ผูก (null = ยัง mapping ไม่ได้)
+  statement_period String // "YYYY-MM" — เดือนของสเตตเมนต์
+  message_id       String?  @unique // Message-ID จากอีเมลต้นทาง
+  raw_text_hash    String?  @unique // sha1 ของข้อความ PDF ที่ extract — กันไฟล์ซ้ำ
+  source           String   @default("EMAIL") // EMAIL | UPLOAD
+  subject          String? // subject ของอีเมล / ชื่อไฟล์ที่อัปโหลด
+  assets           Json // [{ statement_period, ticker, company_name, shares, avg_cost, current_price, total_value, currency, allocation_pct?, total_return_pct?, total_return_usd? }]
+  skipped          Json? // แถวที่ validate ไม่ผ่าน [{ line, ticker?, reason }]
+  // ── สรุปหน้าแรกของสเตตเมนต์ ──
+  account_no            String? // เช่น "47170"
+  investment_account_no String? // เช่น "1478800017601"
+  tax_id                String? // เช่น "0105564162055"
+  tax_invoice_no        String? // เช่น "80000395380"
+  branch_no             String? // เช่น "00000"
+  fx_rate               Float? // 1 USD = ? THB
+  total_balance_usd     Float?
+  total_balance_thb     Float?
+  cash_balance_usd      Float?
+  cash_balance_thb      Float?
+  total_return_pct      Float? // เช่น -20.25
+  total_return_usd      Float? // เช่น -599.56
+  sectors               Json? // [{ name, value_usd, pct }] — Allocation Group by Sector
+  parsed_at             DateTime @default(now()) @db.Timestamptz
+  created_at            DateTime @default(now()) @db.Timestamptz
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, parsed_at])
+  @@map("dime_statements")
 }
 
 model WealthHistory {
@@ -643,17 +789,20 @@ model KidProfile {
 
 // ผลแบบทดสอบ / บทเรียนที่เรียนจบของเด็กแต่ละคน
 model KidLessonProgress {
-  id             String   @id @default(uuid()) @db.Uuid
-  kid_id         String   @db.Uuid
-  lesson_item_id String?  @db.Uuid // knowledge item id ของบทเรียนที่เก็บไว้ (ถ้ามี)
-  lesson_title   String
-  score          Int // จำนวนข้อที่ตอบถูก
-  total          Int // จำนวนข้อทั้งหมด
-  completed_at   DateTime @default(now()) @db.Timestamptz
+  id                 String           @id @default(uuid()) @db.Uuid
+  kid_id             String           @db.Uuid
+  lesson_item_id     String?          @db.Uuid // knowledge item id ของบทเรียนที่เก็บไว้ (ถ้ามี)
+  lesson_title       String
+  score              Int // จำนวนข้อที่ตอบถูก
+  total              Int // จำนวนข้อทั้งหมด
+  curriculum_item_id String?          @db.Uuid // บทเรียนจากหลักสูตรสาขา (curriculum_items) — ถ้าบันทึกผ่านหลักสูตรสร้างยอดคน
+  completed_at       DateTime         @default(now()) @db.Timestamptz
 
-  kid KidProfile @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  kid              KidProfile      @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  curriculum_item  CurriculumItem? @relation(fields: [curriculum_item_id], references: [id])
 
   @@index([kid_id, completed_at])
+  @@index([curriculum_item_id])
   @@map("kid_lesson_progress")
 }
 
@@ -780,8 +929,9 @@ model KidCoupon {
 model KidCertificate {
   id         String   @id @default(uuid()) @db.Uuid
   kid_id     String   @db.Uuid
-  level      Int      @db.Integer // ระดับที่ได้รับ
-  title      String // เช่น "เกียรติบัตรระดับ 2 — นักเรียนเก่งแห่งบ้าน"
+  level      Int      @db.Integer // ระดับที่ได้รับ (subject = 0)
+  kind       String   @default("level") // level = เลื่อนระดับจาก XP | subject = จบสาขาหลักสูตร
+  title      String // เช่น "เกียรติบัตรระดับ 2 — นักเรียนเก่งแห่งบ้าน" / "เกียรติบัตรจบสาขา ..."
   detail     String?
   created_at DateTime @default(now()) @db.Timestamptz
 
@@ -816,6 +966,44 @@ model KidPortfolioSnapshot {
 
   @@index([kid_id, created_at])
   @@map("kid_portfolio_snapshots")
+}
+
+// ─────────────────────────────────────────────
+// Sovereign Curriculum — หลักสูตรสร้างยอดคน (โฮมสคูล)
+// สาขาวิชา (track: Inner OS / เงิน / วิศวกรรม / สุขภาพ / ป้องกัน / สังคม / วิชาการ)
+// + หลักสูตรรายบท (item) ที่เรียนได้จริงที่บ้าน — เชื่อมกับบันทึกเรียนจบ (kid_lesson_progress)
+// ─────────────────────────────────────────────
+model CurriculumTrack {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique // เช่น INNER_OS | MICRO_ECONOMY | ENGINEERING | ...
+  title       String // ชื่อสาขา เช่น "Inner OS — จัดการใจและตัวเอง"
+  description String?
+  emoji       String           @default("🎓")
+  color       String           @default("#10b981")
+  sort_order  Int              @default(0) @db.Integer
+  created_at  DateTime         @default(now()) @db.Timestamptz
+
+  items CurriculumItem[]
+
+  @@map("curriculum_tracks")
+}
+
+// บทเรียนในแต่ละสาขา — ระดับ 1-4 (เริ่มต้น/พื้นฐาน/ประยุกต์/เชี่ยวชาญ)
+model CurriculumItem {
+  id          String               @id @default(uuid()) @db.Uuid
+  track_id    String               @db.Uuid
+  title       String // ชื่อบทเรียน เช่น "ตั้งเป้าหมายออมเดือนนี้"
+  description String?
+  stage       Int                  @default(1) @db.Integer // 1 เริ่มต้น · 2 พื้นฐาน · 3 ประยุกต์ · 4 เชี่ยวชาญ
+  sequence    Int                  @default(1) @db.Integer // ลำดับในสาขา
+  created_at  DateTime             @default(now()) @db.Timestamptz
+
+  track    CurriculumTrack     @relation(fields: [track_id], references: [id], onDelete: Cascade)
+  progress KidLessonProgress[]
+
+  @@unique([track_id, sequence])
+  @@index([track_id])
+  @@map("curriculum_items")
 }
 
 // ─────────────────────────────────────────────
@@ -1128,26 +1316,29 @@ model ThreatIntelItem {
 
 // 1. ข้อมูลสัตว์ / เล้า / คอก — สถานะ QUARANTINE/LOCKED_WITHDRAWAL = สั่งโดย Vet AI อัตโนมัติ
 model LivestockGroup {
-  id         String   @id @default(uuid()) @db.Uuid
-  code       String   @unique // เช่น BROILER-FLOCK-01, SWINE-PEN-04
-  name       String? // ชื่อเล่นกลุ่ม เช่น "เล้าไก่หลังโรงนา"
-  species    String // POULTRY_BROILER | POULTRY_LAYER | DUCK | SWINE | CATTLE
-  quantity   Int // จำนวนสัตว์คงเหลือ
-  birthDate  DateTime @db.Timestamptz // วันฟัก/วันเข้าเล้า
-  houseCode  String? // เล้า/โรงเรือน เช่น HOUSE-01 (ผูกกับ UtilityAlertLog)
-  status     String   @default("ACTIVE") // ACTIVE | QUARANTINE | HARVESTED | LOCKED_WITHDRAWAL
-  notes      String?
-  created_at DateTime @default(now()) @db.Timestamptz
-  updated_at DateTime @updatedAt @db.Timestamptz
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @unique // เช่น BROILER-FLOCK-01, SWINE-PEN-04
+  name            String? // ชื่อเล่นกลุ่ม เช่น "เล้าไก่หลังโรงนา"
+  species         String // POULTRY_BROILER | POULTRY_LAYER | DUCK | SWINE | CATTLE
+  quantity        Int // จำนวนสัตว์คงเหลือ
+  birthDate       DateTime  @db.Timestamptz // วันฟัก/วันเข้าเล้า
+  houseCode       String? // เล้า/โรงเรือน เช่น HOUSE-01 (ผูกกับ UtilityAlertLog)
+  status          String    @default("ACTIVE") // ACTIVE | QUARANTINE | HARVESTED | LOCKED_WITHDRAWAL
+  notes           String?
+  quarantineEndAt DateTime? @db.Timestamptz // เวลาปลดล็อกกักกันอัตโนมัติ (ตั้งเมื่อเข้า QUARANTINE)
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
 
   records   MedicalRecord[]
   schedules VaccineSchedule[]
   dailyLogs DailyProductionLog[]
   breedings BreedingRecord[]
   batches   BatchFinancialLog[]
+  visions   LivestockVisionReport[]
 
   @@index([species])
   @@index([status])
+  @@index([quarantineEndAt]) // cron ปลดล็อกกักกัน
   @@map("livestock_groups")
 }
 
@@ -1161,6 +1352,7 @@ model MedicalRecord {
   administeredAt   DateTime       @default(now()) @db.Timestamptz
   withdrawalDays   Int // ระยะเวลาหยุดยา (วัน)
   safeHarvestDate  DateTime // วันที่พ้นระยะหยุดยา = administeredAt + withdrawalDays
+  inventoryItemId  String?        @db.Uuid // ผูกกับยอดคงเหลือในคลัง (หักอัตโนมัติ 1 โดสเมื่อบันทึกยา)
 
   @@index([livestockGroupId, safeHarvestDate])
   @@index([safeHarvestDate]) // สแกนรายกลุ่มที่ยังติดหยุดยา
@@ -1176,6 +1368,7 @@ model VaccineSchedule {
   targetAgeDays    Int // อายุเป้าหมาย (วัน) นับจาก birthDate
   isCompleted      Boolean        @default(false)
   completedAt      DateTime?      @db.Timestamptz
+  inventoryItemId  String?        @db.Uuid // ผูกกับยอดคงเหลือในคลัง (หัก 1 โดสเมื่อฉีดจริง)
 
   @@index([livestockGroupId, isCompleted])
   @@map("livestock_vaccine_schedules")
@@ -1201,23 +1394,25 @@ model DailyProductionLog {
 
 // 5. ตรวจสอบระดับอาหารในไซโล — Ultrasonic / Load cell
 model FeedSilo {
-  id           String   @id @default(uuid()) @db.Uuid
-  siloCode     String   @unique // เช่น SILO-A
-  capacityKg   Float
-  currentKg    Float
-  lastRefillAt DateTime @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  siloCode        String   @unique // เช่น SILO-A
+  capacityKg      Float
+  currentKg       Float
+  lastRefillAt    DateTime @db.Timestamptz
+  inventoryItemId String?  @db.Uuid // ผูกกับยอดคงเหลือในคลัง — เบิก/เติมอาหาร = หัก/เพิ่ม stock อัตโนมัติ
 
   @@map("livestock_feed_silos")
 }
 
 // 6. ความปลอดภัยชีวอนามัยหน้าฟาร์ม — บังคับฉีดพ่น >= 180 วินาที
 model BiosecurityLog {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
   visitorName  String
   vehiclePlate String?
   sanitizedSec Int // ระยะเวลาฉีดพ่นจริง (ต้อง >= 180s)
-  passedGate   Boolean  @default(false)
-  entryTime    DateTime @default(now()) @db.Timestamptz
+  passedGate   Boolean   @default(false)
+  entryTime    DateTime  @default(now()) @db.Timestamptz
+  exitTime     DateTime? @db.Timestamptz // เวลาออกฟาร์ม (บันทึกผ่าน POST /biosecurity/:id/exit)
 
   @@index([passedGate, entryTime])
   @@map("livestock_biosecurity_logs")
@@ -1295,4 +1490,21 @@ model SystemSetting {
   updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
 
   @@map("system_settings")
+}
+
+// ── Multimodal Vision Ingestion (ปศุสัตว์) — รูปอาการป่วย → Qwen2-VL → JSON สรุป ──
+// รับภาพ base64 (ผื่นผิวหนัง/อุจจาระ/รอยโรค) สกัดสรุปอาการประกอบการวินิจฉัยของ Vet AI
+// (เก็บเฉพาะผลวิเคราะห์ JSON — ไม่เก็บภาพต้นฉบับ กันแบตข้อมูล)
+model LivestockVisionReport {
+  id               String         @id @default(uuid()) @db.Uuid
+  livestockGroupId String         @db.Uuid
+  livestockGroup   LivestockGroup @relation(fields: [livestockGroupId], references: [id], onDelete: Cascade)
+  model            String // โมเดลที่ใช้ (qwen2-vl ฯลฯ)
+  severity         String // info | warn | critical
+  summary          String // สรุปอาการ (ภาษาไทย จากโมเดล)
+  symptomsJson     String // JSON รายละเอียดอาการ/อวัยวะ/ความน่าจะเป็น
+  created_at       DateTime       @default(now()) @db.Timestamptz
+
+  @@index([livestockGroupId, created_at])
+  @@map("livestock_vision_reports")
 }

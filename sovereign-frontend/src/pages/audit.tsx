@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -89,7 +90,7 @@ export default function AuditPage() {
           title="SOVEREIGN OS"
           icon={<Icon name="audit" size={18} />}
           subtitle="Audit Log" actions={<div className="flex gap-3 items-center">
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
         </div>}
         />
       </header>

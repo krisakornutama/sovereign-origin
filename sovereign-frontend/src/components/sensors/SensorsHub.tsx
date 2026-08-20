@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import Sidebar from '../layout/Sidebar';
@@ -255,7 +256,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
           <h1 className="text-sm font-semibold text-gray-200">
             SOVEREIGN OS <span className="text-xs text-gray-500 ml-2">{t('sensorsHub.headerSub', 'Sensors & Devices')}</span>
           </h1>
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
         </header>
 
         {/* Tabs */}

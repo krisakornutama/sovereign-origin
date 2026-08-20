@@ -204,6 +204,16 @@ export default {
     readFileFailed: 'อ่านไฟล์ไม่สำเร็จ',
     termFailed: 'รันคำสั่งไม่สำเร็จ',
     deleteNoteConfirm: 'ลบโน้ตนี้?',
+    ide: {
+      tabFiles: 'ไฟล์',
+      tabJobs: 'งาน & คิว',
+      tabNotes: 'โน้ต',
+      viewHint: 'ยังไม่มีงานเขียนโค้ด — พิมพ์ภาพรวมด้านบนเพื่อให้ AI เขียนโค้ด, หรือเลือกงานจากแท็บ ⚡ ด้านขวา',
+      discardJob: 'Discard',
+      discardConfirm: 'Discard งานนี้? (ลบออกจากรายการ)',
+      terminalBar: 'เทอร์มินัล',
+      jobCount: '{n} งานในรายการ',
+    },
   },
 
   jobs: {

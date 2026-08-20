@@ -27,7 +27,8 @@ export type SecurityStreamType =
   | 'GOVERNOR'
   | 'SYSTEM'
   | 'ACTUATION'
-  | 'MESH';
+  | 'MESH'
+  | 'DMS';
 
 export interface SecurityStreamEvent {
   type: SecurityStreamType;

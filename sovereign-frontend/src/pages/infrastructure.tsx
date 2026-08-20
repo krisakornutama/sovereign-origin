@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -125,7 +126,7 @@ export default function InfrastructurePage() {
           eyebrow={t('infrastructure.eyebrow', 'ความปลอดภัย')}
           title={t('infrastructure.title', 'Off-Grid Infrastructure Hub')} icon={<Icon name="infrastructure" size={18} />} actions={<div className="flex items-center gap-3">
           {pendingAlerts > 0 && <span className="text-xs bg-red-900/40 text-red-300 border border-red-700 rounded-lg px-3 py-1 flex items-center gap-1"><Icon name="alert-triangle" size={12} /> {t('infrastructure.pendingAlerts', '{n} รายการต้องดูแล', { n: pendingAlerts })}</span>}
-          <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('infrastructure.backDashboard', '← กลับ Dashboard')}</a>
+          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('infrastructure.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
       </header>

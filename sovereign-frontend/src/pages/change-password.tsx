@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -57,7 +58,7 @@ export default function ChangePasswordPage() {
             title={t('changePassword.title', 'เปลี่ยนรหัสผ่าน')}
             icon={<Icon name="password" size={18} />}
             subtitle={t('changePassword.subtitle', 'ตั้งรหัสผ่านใหม่ด้วยตัวเอง')}
-            actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">Dashboard</a>}
+            actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>}
           />
         </header>
         <main className="flex-1 w-full max-w-md mx-auto p-6 panel-glow">

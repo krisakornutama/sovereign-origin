@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -299,7 +300,7 @@ export default function UsersPage() {
         <PageHeader
           eyebrow={t('users.page.eyebrow', 'ระบบ')}
           title="SOVEREIGN OS"
-          subtitle={t('users.page.subtitle', 'User Management')} icon={<Icon name="users" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('users.page.dashboardLink', 'Dashboard')}</a>}
+          subtitle={t('users.page.subtitle', 'User Management')} icon={<Icon name="users" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('users.page.dashboardLink', 'Dashboard')}</Link>}
         />
       </header>
 
@@ -467,7 +468,7 @@ export default function UsersPage() {
                             {t('users.presetLearn', 'เรียนอย่างเดียว')}
                           </button>
                           <button
-                            onClick={() => applyPreset(u, ['/knowledge', '/portfolio'])}
+                            onClick={() => applyPreset(u, ['/knowledge', '/treasury'])}
                             className="px-2.5 py-1 rounded text-[11px] inline-flex items-center gap-1 bg-emerald-900/40 border border-emerald-700/60 text-emerald-300 hover:bg-emerald-800/40"
                           >
                             <Icon name="coin" size={11} /> {t('users.presetLearnMoney', 'เรียน + เงิน')}

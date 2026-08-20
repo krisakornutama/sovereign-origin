@@ -204,6 +204,16 @@ export default {
     readFileFailed: 'Could not read file',
     termFailed: 'Failed to run command',
     deleteNoteConfirm: 'Delete this note?',
+    ide: {
+      tabFiles: 'Files',
+      tabJobs: 'Jobs & Queue',
+      tabNotes: 'Notes',
+      viewHint: 'No coding jobs yet — write a brief above to have AI write code, or pick a job from the ⚡ tab on the right',
+      discardJob: 'Discard',
+      discardConfirm: 'Discard this job? (remove from list)',
+      terminalBar: 'Terminal',
+      jobCount: '{n} jobs in list',
+    },
   },
 
   jobs: {

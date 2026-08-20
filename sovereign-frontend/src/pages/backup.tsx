@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -148,7 +149,7 @@ export default function BackupPage() {
       <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
           eyebrow={t('backup.page.eyebrow', 'ระบบ')}
-          title="Backup &amp; Restore" icon={<Icon name="backup" size={18} />} actions={<a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('backup.page.backDashboard', '← กลับ Dashboard')}</a>}
+          title="Backup &amp; Restore" icon={<Icon name="backup" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('backup.page.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       </header>
       <main className="max-w-4xl mx-auto p-6 space-y-6">

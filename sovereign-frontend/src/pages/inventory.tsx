@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -250,7 +251,7 @@ export default function InventoryPage() {
             title={t('inventory.page.title', 'SOVEREIGN OS')}
             icon={<Icon name="inventory" size={18} />}
             subtitle={t('inventory.page.subtitle', 'Inventory & Supplies')} actions={<div className="flex gap-3 items-center">
-              <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('inventory.page.dashboardLink', 'Dashboard')}</a>
+              <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('inventory.page.dashboardLink', 'Dashboard')}</Link>
             </div>}
           />
         </header>

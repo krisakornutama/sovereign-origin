@@ -1,4 +1,5 @@
 ﻿"use client";
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { openCommandPalette } from '../CommandPalette';
@@ -24,7 +25,7 @@ const ITEMS: Array<{ href: string; label: string; labelKey: string; icon: string
   { href: '/inventory', label: 'เสบียง', labelKey: 'common.nav.inventory', icon: 'inventory' },
   { href: '/farm', label: 'ฟาร์ม', labelKey: 'common.nav.farm', icon: 'farm' },
   { href: '/livestock', label: 'ปศุสัตว์', labelKey: 'common.nav.livestock', icon: 'farm' },
-  { href: '/portfolio', label: 'การเงิน', labelKey: 'common.nav.portfolio', icon: 'portfolio' },
+  { href: '/treasury', label: 'การเงิน', labelKey: 'common.nav.treasury', icon: 'portfolio' },
   { href: '/health', label: 'สุขภาพ', labelKey: 'common.nav.health', icon: 'health' },
   { href: '/healing', label: 'ธรรมะบำบัด', labelKey: 'common.nav.healing', icon: 'healing' },
   { href: '/system', label: 'ระบบ', labelKey: 'common.nav.system', icon: 'system' },
@@ -69,9 +70,9 @@ export default function MobileNav() {
               <span className="text-[10px] font-medium">{t(item.labelKey, item.label)}</span>
             </button>
           ) : (
-          <a
+          <Link
             key={item.href}
-            href={item.href}
+            href={item.href} scroll={false}
             className={`flex flex-col items-center justify-center gap-1 px-3 py-2 border-t-2 transition ${
               active(item.href)
                 ? 'border-emerald-400 text-emerald-300 bg-emerald-500/10 shadow-[0_-2px_12px_rgba(52,211,153,0.2)]'
@@ -80,7 +81,7 @@ export default function MobileNav() {
           >
             <Icon name={item.icon} size={17} />
             <span className="text-[10px] font-medium">{t(item.labelKey, item.label)}</span>
-          </a>
+          </Link>
           )
         )}
       </div>

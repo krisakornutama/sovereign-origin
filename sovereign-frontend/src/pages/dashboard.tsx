@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { useOfflineSync } from '../hooks/useOfflineSync';
@@ -338,7 +339,7 @@ export default function Dashboard() {
       case 'actions':
         return (
           <div className="flex flex-wrap gap-3">
-            <a href="/sensors" className="btn-primary">{t('dashboard.actions.manageSensors', 'จัดการอุปกรณ์และเซ็นเซอร์')}</a>
+            <Link href="/sensors" scroll={false} className="btn-primary">{t('dashboard.actions.manageSensors', 'จัดการอุปกรณ์และเซ็นเซอร์')}</Link>
             <button onClick={() => window.location.reload()} className="btn-secondary">{t('dashboard.actions.refreshData', 'รีเฟรชข้อมูล')}</button>
           </div>
         );
@@ -351,7 +352,7 @@ export default function Dashboard() {
           <section className="card p-4">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-sm font-semibold text-gray-200">{t('dashboard.inventory.title', 'เสบียง & สต็อก')}</h2>
-              <a href="/inventory" className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.inventory.openPage', 'เปิดหน้า Inventory')} <Icon name="arrow-right" size={11} /></a>
+              <Link href="/inventory" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.inventory.openPage', 'เปิดหน้า Inventory')} <Icon name="arrow-right" size={11} /></Link>
             </div>
             {inventoryStatus ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -390,7 +391,7 @@ export default function Dashboard() {
           <section className="card p-4">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-sm font-semibold text-gray-200">{t('dashboard.kids.title', 'ลูกๆ — การเรียนรู้')}</h2>
-              <a href="/knowledge" className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.kids.openKnowledge', 'เปิดคลังความรู้')} <Icon name="arrow-right" size={11} /></a>
+              <Link href="/knowledge" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.kids.openKnowledge', 'เปิดคลังความรู้')} <Icon name="arrow-right" size={11} /></Link>
             </div>
             {kidsSummary === null ? (
               <div className="text-gray-500 text-sm py-4">{t('dashboard.kids.moduleDisabled', 'โมดูล AI สอนลูกปิดอยู่ หรือยังไม่มีโปรไฟล์เด็ก')}</div>
@@ -405,7 +406,7 @@ export default function Dashboard() {
                     {kidsSummary.filter((k) => k.pendingChores > 0).map((k) => t('dashboard.kids.choresCount', '{name} งานค้าง {n}', { name: `${k.emoji || ''}${k.name}`, n: k.pendingChores })).join(' · ')}
                     {kidsSummary.some((k) => k.pendingChores > 0) && kidsSummary.some((k) => k.unpaidBills > 0) ? ' · ' : ''}
                     {kidsSummary.filter((k) => k.unpaidBills > 0).map((k) => t('dashboard.kids.billsCount', '{name} บิลค้าง {n} ใบ', { name: `${k.emoji || ''}${k.name}`, n: k.unpaidBills })).join(' · ')}
-                    <a href="/knowledge" className="text-sky-400 hover:underline ml-1">{t('dashboard.kids.viewHome', '→ ดูหน้าบ้าน')}</a>
+                    <Link href="/knowledge" scroll={false} className="text-sky-400 hover:underline ml-1">{t('dashboard.kids.viewHome', '→ ดูหน้าบ้าน')}</Link>
                   </div>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -466,7 +467,7 @@ export default function Dashboard() {
           <section className="card p-4">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-sm font-semibold text-gray-200">{t('dashboard.farm.title', 'แปลงเกษตร')}</h2>
-              <a href="/farm" className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.farm.openPage', 'เปิดหน้า Farm')} <Icon name="arrow-right" size={11} /></a>
+              <Link href="/farm" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.farm.openPage', 'เปิดหน้า Farm')} <Icon name="arrow-right" size={11} /></Link>
             </div>
             {farmOverview ? (
               <>
@@ -554,7 +555,7 @@ export default function Dashboard() {
   const FEATURE_BY_WIDGET: Partial<Record<WidgetKey, string>> = {
     alerts: '/automation',
     defcon: '/risk-monitor',
-    wealth: '/portfolio',
+    wealth: '/treasury',
     inventory: '/inventory',
     farm: '/farm',
     kids: '/knowledge',
@@ -651,7 +652,7 @@ function SensorCategory({ title, sensors, trendRange }: { title: string; sensors
     <div className="card p-5">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-sm font-semibold text-gray-200">{title}</h3>
-        <a href={`/sensors?tab=data&filter=${encodeURIComponent(sensors[0]?.[0] ?? '')}`} className="text-xs text-sky-400 hover:underline">{t('dashboard.sensors.manage', 'จัดการ')}</a>
+        <Link href={`/sensors?tab=data&filter=${encodeURIComponent(sensors[0]?.[0] ?? '')}`} scroll={false} className="text-xs text-sky-400 hover:underline">{t('dashboard.sensors.manage', 'จัดการ')}</Link>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {sensors.map(([metric, value]) => (
@@ -721,14 +722,14 @@ function SensorCard({ label, value, metric, trendRange }: { label: string; value
         </div>
       )}
       {/* mini trend 24 ชม. — คลิกไปดูกราฟเต็มใน History */}
-      <a
-        href={`/history?metric=${encodeURIComponent(metric)}&range=${trendRange}`}
+      <Link 
+        href={`/history?metric=${encodeURIComponent(metric)}&range=${trendRange}`} scroll={false}
         className="block mt-2 group"
         title={trendRange === '24h' ? t('dashboard.sensors.fullChart24h', 'ดูกราฟเต็ม 24 ชม. ในหน้า History') : trendRange === '7d' ? t('dashboard.sensors.fullChart7d', 'ดูกราฟเต็ม 7 วัน ในหน้า History') : t('dashboard.sensors.fullChart30d', 'ดูกราฟเต็ม 30 วัน ในหน้า History')}
       >
         <TrendSparkline points={trend} color={trendColor(metric)} />
         <div className="text-[10px] text-gray-600 group-hover:text-gray-400 mt-0.5">{t('dashboard.sensors.trendHint', '24h trend →')}</div>
-      </a>
+      </Link>
     </div>
   );
 }

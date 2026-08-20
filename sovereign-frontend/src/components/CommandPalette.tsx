@@ -6,7 +6,7 @@
 //  ใช้: ↑↓ เลือก · Enter เปิด · Esc ปิด
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { ALL_PAGES } from '../lib/navigation';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -70,7 +70,8 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
   const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
   const visiblePages = useMemo(() => {
     if (isSuperadmin) return ALL_PAGES;
-    return ALL_PAGES.filter((p) => !ADMIN_PAGES.has(p.href) && hasFeature(p.href));
+    // sub-view (href มี #hash) ใช้สิทธิ์เดียวกันกับหน้าแม่ — เช็คจาก href ฐาน
+    return ALL_PAGES.filter((p) => !ADMIN_PAGES.has(p.href) && hasFeature(p.href.split('#')[0]));
   }, [isSuperadmin, hasFeature]);
 
   // โหลดสิทธิ์เมื่อเปิด palette (เผื่อ store ยังไม่โหลด)
@@ -111,7 +112,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
 
   const go = (href: string) => {
     setOpen(false);
-    router.push(href);
+    router.push(href, undefined, { scroll: false });
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

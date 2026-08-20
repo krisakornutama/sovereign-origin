@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useRiskStore } from '../../stores/useRiskStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
@@ -76,7 +77,7 @@ export default function DefconWidget() {
         <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5 glow-text">
           <Icon name="shield" size={14} /> DEFCON / Threat Index
         </h3>
-        <a href="/risk-monitor" className="text-xs text-sky-400 hover:underline">{t('dashboard.defcon.detailsLink', 'รายละเอียด →')}</a>
+        <Link href="/risk-monitor" scroll={false} className="text-xs text-sky-400 hover:underline">{t('dashboard.defcon.detailsLink', 'รายละเอียด →')}</Link>
       </div>
 
       <div className={`rounded-lg border px-3 py-2 mb-3 ${info.ring}`}>
@@ -130,7 +131,7 @@ export default function DefconWidget() {
       ) : (
         <div className="text-xs text-gray-500">
           {t('dashboard.defcon.emptyBefore', 'ยังไม่มีข้อมูล — เปิด ')}<code className="text-gray-400">RISK_MONITOR_ENABLED=true</code>{t('dashboard.defcon.emptyAfter', ' + Ollama ใน .env แล้วกด')}
-          <a href="/risk-monitor" className="text-sky-400 hover:underline">{t('dashboard.defcon.fetchNews', ' ดึงข่าว + วิเคราะห์')}</a>
+          <Link href="/risk-monitor" scroll={false} className="text-sky-400 hover:underline">{t('dashboard.defcon.fetchNews', ' ดึงข่าว + วิเคราะห์')}</Link>
         </div>
       )}
     </div>

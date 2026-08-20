@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../../lib/apiFetch';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
@@ -181,8 +182,7 @@ export default function AiChatPanel() {
         </h3>
         <div className="flex items-center gap-2">
           {isSuperadmin && (
-            <a
-              href="/ai-agent"
+            <Link               href="/ai-agent" scroll={false}
               title={t('dashboard.aiChat.approvalsTitle', 'เปิดหน้าจัดการคำขออนุมัติของ AI agent')}
               className={`text-xs px-2.5 py-1 rounded-full border transition flex items-center gap-1 ${
                 pendingCount > 0
@@ -191,7 +191,7 @@ export default function AiChatPanel() {
               }`}
             >
               <Icon name="shield" size={11} /> {t('dashboard.aiChat.pendingApprovals', '{n} รออนุมัติ', { n: pendingCount })}
-            </a>
+            </Link>
           )}
           <button
             onClick={() => setAutoSpeak(!autoSpeak)}
@@ -250,12 +250,11 @@ export default function AiChatPanel() {
                     {t('dashboard.aiChat.replay', 'อ่านซ้ำ')}
                   </button>
                   {isApprovalReply(msg.content) && (
-                    <a
-                      href="/ai-agent"
+                    <Link                       href="/ai-agent" scroll={false}
                       className="text-xs px-2.5 py-1 bg-amber-600/20 border border-amber-500 text-amber-300 rounded-lg hover:bg-amber-600/30 transition flex items-center gap-1"
                     >
                       <Icon name="shield" size={11} /> {t('dashboard.aiChat.goToAgent', 'ไปจัดการที่หน้า AI Agent →')}
-                    </a>
+                    </Link>
                   )}
                 </div>
               )}

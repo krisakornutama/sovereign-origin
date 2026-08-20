@@ -153,7 +153,7 @@ export const defaultDataSources: AdvisorDataSources = {
     });
   },
   async assets() {
-    return prisma.asset.findMany({ select: { symbol: true, type: true, quantity: true } });
+    return prisma.assetPosition.findMany({ select: { symbol: true, type: true, quantity: true } });
   },
   async latestPrices() {
     return prisma.$queryRawUnsafe<Array<{ symbol: string; price_usd: number }>>(

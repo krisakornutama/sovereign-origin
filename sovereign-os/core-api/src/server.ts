@@ -89,6 +89,7 @@ import { createRiskWorker, riskEmitter } from './services/risk-monitor.service';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from './services/defcon-engine.service';
 import { runDefconAction } from './services/defcon-actions.service';
 import portfolioRoutes from './modules/portfolio/portfolio.routes';
+import treasuryRoutes from './modules/treasury/treasury.routes';
 import healingRoutes from './modules/healing/healing.routes';
 import codingRoutes from './modules/coding/coding.routes';
 import workspaceRoutes from './modules/coding/workspace.routes';
@@ -106,7 +107,11 @@ import propertyRoutes from './modules/property/property.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
 import featureRoutes from './modules/features/feature.routes';
 import { featureGuard } from './services/feature-grant.service';
+import dmsRoutes from './modules/dms/dms.routes';
+import { dmsService } from './services/dms.service';
 import { predictiveWorker } from './services/predictive.service';
+import dimeRoutes from './modules/dime/dime.routes';
+import { startDimeScheduler } from './services/dime.service';
 import './services/livestock-cron.service'; // ปลดล็อก withdrawal + เตือนวัคซีน รายวัน
 import mqtt from 'mqtt';
 
@@ -174,6 +179,8 @@ app.use('/api/knowledge', featureGuard('/knowledge'), teachRoutes); // AI สอ
 app.use('/api/agent', featureGuard('/ai-agent'), agentTeamRoutes); // Agentic AI team — บทบาท + งานเบื้องหลัง
 app.use('/api/vision', featureGuard('/vision'), visionRuleRoutes); // Vision AI คนแปลกหน้า
 app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes); // Phase 4: Wealth & Asset Tracker
+app.use('/api/treasury', featureGuard(['/treasury', '/portfolio']), treasuryRoutes); // LIFE & FINANCE: Treasury & Wealth Engine (Net Worth / Runway / 5 Families)
+  app.use('/api/dime', featureGuard(['/treasury', '/portfolio']), dimeRoutes); // Dime! Statement — IMAP + PDF → อัปเดตพอร์ตอัตโนมัติ
 app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
 app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
 app.use('/api/coding', featureGuard('/ai-agent'), workspaceRoutes); // Coding Agent — workspace (ตำแหน่งโปรเจ็ก/ไฟล์/เทอร์มินัล)
@@ -204,6 +211,7 @@ app.use('/api/govsim', govsimRoutes); // Governance & Socio-Political Simulation
 app.use('/api/governor', governorRoutes); // Governor AI — คุมเมืองอัตโนมัติ + มนุษย์ approve เรื่องใหญ่
 app.use('/api/war-room', warRoomRoutes); // War Room Activity Gate — ข้อ 3: simulation หลับ-ตื่น
 app.use('/api/actuation', actuationRoutes); // Phase 7: Closed-Loop Actuation Sandbox — Safety Envelope + Mapper + Verifier
+app.use('/api/v1/dms', dmsRoutes); // Series 🔴: External Dead-Man Switch — ping (HMAC-only, ไม่มี featureGuard) + status
 
 // ── สิทธิ์ฟังก์ชั่นต่อคน: API ตั้งสิทธิ์ (catalog / me / users/:id) ──
 app.use('/api/features', featureRoutes);
@@ -567,6 +575,19 @@ automationEmitter.on('alert', async (alert) => {
 // Start services
 new MqttIngestionWorker();
 relayScheduler.start();
+startDimeScheduler(); // Dime! Statement — cron ตาม DIME_ENABLED/DIME_FETCH_CRON (default ปิด)
+
+// ── Series 🔴: Dead-Man Switch (DMS) — ตรวจบันไดวิกฤต 90s/180s + WoL (ถ้าตั้ง) ──
+// DMS_ENABLED=true + DMS_MASTER_SECRET ต้องตั้งพร้อมกัน (config.dms.enabled) — ปิดไว้โดย default
+if (config.dms.enabled) {
+  dmsService.init();
+  dmsService.start(config.dms.checkIntervalMs);
+  console.log(
+    `🛡️ DMS monitor started (devices: ${config.dms.allowedDevices.join(', ')}, missed>${config.dms.missedMs}ms, failover>${config.dms.failoverMs}ms, autoFailover=${config.dms.autoFailover}, dry-run=${config.dms.dryRun})`
+  );
+} else {
+  console.log('🛡️ DMS monitor disabled (set DMS_ENABLED=true + DMS_MASTER_SECRET to enable)');
+}
 
 // ── AI สอนลูก: จ่ายค่าขนมรายสัปดาห์อัตโนมัติ ── ตรวจทุก 30 นาที + ตอนเริ่มระบบ
 // จ่ายเฉพาะคนที่ถึงกำหนด (กันจ่ายซ้ำด้วย allowance_last_paid) — บันทึกเป็น wallet tx

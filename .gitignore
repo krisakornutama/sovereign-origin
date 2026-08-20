@@ -112,3 +112,6 @@ coverage/
 # Runtime data (offsite encrypted backups, knowledge uploads) — ไม่ควรเข้าสู่ git
 **/infra/offsite/
 **/knowledge/uploads/
+
+# DMS firmware config (secret — อย่า commit)
+dms-firmware/config.py

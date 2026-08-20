@@ -6,7 +6,7 @@
 //  label = ข้อความไทย (default) / labelKey = key สำหรับสลับภาษาอังกฤษ
 // ─────────────────────────────────────────────────────────────
 
-export type NavItem = { href: string; label: string; labelKey: string; icon: string; keywords?: string };
+export type NavItem = { href: string; label: string; labelKey: string; icon: string; keywords?: string; children?: NavItem[] };
 export type NavGroup = { title: string; titleKey: string; items: NavItem[] };
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -52,7 +52,18 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/inventory', label: 'เสบียงและของใช้', labelKey: 'common.nav.inventory', icon: 'inventory', keywords: 'เสบียง คลัง สต็อก ของใช้' },
       { href: '/farm', label: 'แปลงเกษตร', labelKey: 'common.nav.farm', icon: 'farm', keywords: 'ฟาร์ม แปลง ดิน พืช เกษตร' },
       { href: '/livestock', label: 'ปศุสัตว์', labelKey: 'common.nav.livestock', icon: 'farm', keywords: 'ปศุสัตว์ เล้า คอก ไก่ สุกร โค เป็ด ฟาร์มปศุสัตว์ เกษตร' },
-      { href: '/portfolio', label: 'ทรัพย์สินและการเงิน', labelKey: 'common.nav.portfolio', icon: 'portfolio', keywords: 'เงิน การเงิน หุ้น พอร์ต ทรัพย์สิน ลงทุน' },
+      {
+        href: '/treasury',
+        label: 'คลัง & ลงทุน',
+        labelKey: 'common.nav.treasury',
+        icon: 'portfolio',
+        keywords: 'เงิน การเงิน หุ้น พอร์ต ทรัพย์สิน ลงทุน คลัง คลังทรัพย์สิน กระแสเงินสด runway survival net worth ครอบครัว',
+        children: [
+          { href: '/treasury#net-worth', label: 'ทรัพย์สิน & เงินสด', labelKey: 'common.nav.treasuryNetWorth', icon: 'portfolio', keywords: 'ทรัพย์สิน เงินสด net worth กระแสเงินสด cashflow หนี้สิน' },
+          { href: '/treasury#runway', label: 'Survival Runway', labelKey: 'common.nav.treasuryRunway', icon: 'gauge', keywords: 'runway อยู่รอด เดือน ค่าใช้จ่าย เผาผลาญ เงินสดปันผล' },
+          { href: '/treasury#strategies', label: 'กลยุทธ์ลงทุน', labelKey: 'common.nav.treasuryStrategies', icon: 'target', keywords: 'กลยุทธ์ ลงทุน 5 ตระกูล fundamental asymmetric macro quant passive income catalyst ปันผล' },
+        ],
+      },
       { href: '/knowledge', label: 'คลังความรู้', labelKey: 'common.nav.knowledge', icon: 'knowledge', keywords: 'ความรู้ บทเรียน เรียน เด็ก สอน' },
       { href: '/healing', label: 'ธรรมะบำบัด', labelKey: 'common.nav.healing', icon: 'healing', keywords: 'ธรรมะ สมาธิ สมุนไพร เยียวยา วัด' },
       { href: '/lifestyle', label: 'วิถีชีวิต', labelKey: 'common.nav.lifestyle', icon: 'lifestyle', keywords: 'วิถี ชีวิต ธรรมชาติ จังหวะ หน้าต่าง อากาศ แสง circadian manual day ไร้ระบบ' },
@@ -86,7 +97,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** รายการหน้าทั้งหมดแบบแบน (สำหรับ CommandPalette) */
+/** รายการหน้าทั้งหมดแบบแบน (สำหรับ CommandPalette) — รวม sub-view (#hash) ด้วย */
 export const ALL_PAGES: Array<NavItem & { group: string; groupKey: string }> = NAV_GROUPS.flatMap((g) =>
-  g.items.map((i) => ({ ...i, group: g.title, groupKey: g.titleKey }))
+  g.items.flatMap((i) => [
+    { ...i, group: g.title, groupKey: g.titleKey },
+    ...(i.children ?? []).map((c) => ({ ...c, group: g.title, groupKey: g.titleKey })),
+  ])
 );
