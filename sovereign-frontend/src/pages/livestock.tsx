@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { authFetch } from '../lib/apiFetch';
@@ -95,7 +96,7 @@ export default function LivestockPage() {
             subtitle={t('livestock.page.subtitle', 'Livestock Engine')}
             actions={
               <div className="flex gap-3 items-center">
-                <a href="/dashboard" className="text-sm text-sky-400 hover:underline">{t('livestock.page.dashboardLink', 'Dashboard')}</a>
+                <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('livestock.page.dashboardLink', 'Dashboard')}</Link>
               </div>
             }
           />

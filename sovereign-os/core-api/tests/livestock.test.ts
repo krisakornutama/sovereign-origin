@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import livestockRoutes, { prisma as livestockPrisma } from '../src/modules/livestock/livestock.routes';
 import { actuationService } from '../src/services/actuation.service';
 import { getTelegramAlertDispatcher } from '../src/services/telegram-alert.service';
+import axios from 'axios';
 import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
 
 let server: TestServer;
@@ -23,6 +24,8 @@ const bio = new Map<string, any[]>();
 const breedings = new Map<string, any[]>();
 const batches = new Map<string, any[]>();
 const utilities: any[] = [];
+const items = new Map<string, any>();
+const visions = new Map<string, any[]>();
 let seq = 0;
 
 const GROUP = {
@@ -42,6 +45,7 @@ function resetStores() {
   groups.clear(); medical.clear(); schedules.clear(); logs.clear();
   silos.clear(); bio.clear(); breedings.clear(); batches.clear();
   utilities.length = 0; seq = 0;
+  items.clear(); visions.clear();
 }
 
 function newId(p: string) { return `${p}-${++seq}`; }
@@ -159,6 +163,13 @@ function mockDelegates() {
       return { ...e };
     },
     findMany: async () => [...bio.get('all')!].reverse().slice(0, 100),
+    findUnique: async ({ where }: any) => bio.get('all')!.find((b) => b.id === where.id) || null,
+    update: async ({ where, data }: any) => {
+      const b = bio.get('all')!.find((x) => x.id === where.id);
+      if (!b) throw new Error('not found');
+      Object.assign(b, data);
+      return { ...b };
+    },
   });
 
   mockModel(livestockPrisma, 'breedingRecord', {
@@ -204,6 +215,31 @@ function mockDelegates() {
       utilities.push(u);
       return { ...u };
     },
+  });
+
+  mockModel(livestockPrisma, 'inventoryItem', {
+    findUnique: async ({ where }: any) => items.get(where.id) || null,
+    update: async ({ where, data }: any) => {
+      const it = items.get(where.id);
+      if (!it) throw new Error('not found');
+      Object.assign(it, data);
+      return { ...it };
+    },
+  });
+
+  mockModel(livestockPrisma, 'livestockVisionReport', {
+    create: async ({ data }: any) => {
+      const arr = visions.get(data.livestockGroupId) || [];
+      const r = { id: newId('vis'), created_at: new Date(), ...data };
+      arr.push(r);
+      visions.set(data.livestockGroupId, arr);
+      return { ...r };
+    },
+    findMany: async ({ where = {} }: any = {}) =>
+      (visions.get(where.livestockGroupId) || [])
+        .slice()
+        .sort((a, b) => +b.created_at - +a.created_at)
+        .slice(0, where.take || 50),
   });
 }
 
@@ -611,5 +647,147 @@ describe('dashboard', () => {
     assert.equal(r.json.summary.netProfit, 22000);
     assert.ok(r.json.summary.latestThi > 80);
     assert.equal(r.json.regimes.length, 5);
+  });
+});
+
+// ═══════════════ Automated Inventory Depletion (ยา/วัคซีน/ถังผูกคลัง) ═══════════════
+describe('stock sync (ยา/วัคซีน/ถังผูกคลังอัตโนมัติ)', () => {
+  test('บันทึกยา + inventoryItemId → หักคลัง 1 โดสอัตโนมัติ', async () => {
+    items.set('item-med', { id: 'item-med', name: 'Amoxicillin 50%', quantity: 10, minimumStock: 2 });
+    groups.set('g-medinv', { ...GROUP, id: 'g-medinv', code: 'MED-INV' });
+    const r = await api('/groups/g-medinv/medical', 'POST', {
+      drugName: 'Amoxicillin', dosageMgKg: 5, withdrawalDays: 7, inventoryItemId: 'item-med',
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.stock.ok, true);
+    assert.equal(items.get('item-med').quantity, 9);
+    assert.equal(r.json.groupLocked, true);
+  });
+
+  test('ฉีดวัคซีนจริง → หักคลัง 1 โดส + หมดคลัง → แจ้งเตือน', async () => {
+    items.set('item-vax', { id: 'item-vax', name: 'วัคซีน ND', quantity: 1, minimumStock: 5 });
+    groups.set('g-vaxinv', { ...GROUP, id: 'g-vaxinv', code: 'VAX-INV' });
+    const v = await api('/groups/g-vaxinv/vaccines', 'POST', { vaccineName: 'ND', targetAgeDays: 21, inventoryItemId: 'item-vax' });
+    const done = await api(`/vaccines/${v.json.schedule.id}`, 'PATCH', { isCompleted: true });
+    assert.equal(done.status, 200);
+    assert.equal(done.json.stock.ok, true); // เหลือ 1 หัก 1 → พอดี
+    assert.equal(done.json.stock.remaining, 0);
+    assert.equal(items.get('item-vax').quantity, 0);
+
+    // วัคซีนอีกตัวที่คลังเหลือ 0 → หักไม่ได้ (shortfall) → แจ้งเตือน warn
+    items.set('item-vax2', { id: 'item-vax2', name: 'วัคซีน IB', quantity: 0, minimumStock: 5 });
+    const v2 = await api('/groups/g-vaxinv/vaccines', 'POST', { vaccineName: 'IB', targetAgeDays: 42, inventoryItemId: 'item-vax2' });
+    const done2 = await api(`/vaccines/${v2.json.schedule.id}`, 'PATCH', { isCompleted: true });
+    assert.equal(done2.json.stock.ok, false);
+    assert.equal(sentAlerts.filter((a) => a.eventKey?.startsWith('stock-vaccine-')).length, 1);
+  });
+
+  test('ถังผูกคลัง: เบิก → หักคลัง, เติม → กลับเข้าคลัง, ต่ำ 15% → FEED LOW', async () => {
+    items.set('item-feed', { id: 'item-feed', name: 'อาหารไก่', quantity: 100 });
+    const c = await api('/silos', 'POST', { siloCode: 'SILO-INV', capacityKg: 500, currentKg: 500, inventoryItemId: 'item-feed' });
+    const sid = c.json.silo.id;
+
+    const withdraw = await api(`/silos/${sid}/refill`, 'PATCH', { deltaKg: -20 });
+    assert.equal(withdraw.json.silo.currentKg, 480);
+    assert.equal(withdraw.json.stock.ok, true);
+    assert.equal(items.get('item-feed').quantity, 80);
+
+    const add = await api(`/silos/${sid}/refill`, 'PATCH', { deltaKg: 30 });
+    assert.equal(add.json.silo.currentKg, 500);
+    assert.equal(add.json.stock.remaining, 110);
+
+    const low = await api(`/silos/${sid}/refill`, 'PATCH', { deltaKg: -430 });
+    assert.equal(low.json.silo.currentKg, 70); // 14% < 15%
+    assert.equal(sentAlerts.filter((a) => a.eventKey === `silo-${sid}-low`).length, 1);
+    assert.equal(low.json.stock.ok, false); // 110 - 430 → shortfall 320
+    assert.equal(sentAlerts.filter((a) => a.eventKey?.startsWith('stock-silo-')).length, 1);
+  });
+
+  test('ถังไม่มี inventoryItemId → refill ไม่แตะคลัง (stock null)', async () => {
+    const c = await api('/silos', 'POST', { siloCode: 'SILO-JUST', capacityKg: 100, currentKg: 100 });
+    const ref = await api(`/silos/${c.json.silo.id}/refill`, 'PATCH', { deltaKg: -50 });
+    assert.equal(ref.json.silo.currentKg, 50);
+    assert.equal(ref.json.stock, null);
+  });
+});
+
+// ═══════════════ Quarantine Cooldown (ปลดอัตโนมัติ 14 วัน) ═══════════════
+describe('quarantine cooldown', () => {
+  test('สร้างกลุ่มสถานะ QUARANTINE → ตั้ง quarantineEndAt ไว้ล่วงหน้า', async () => {
+    const c = await api('/groups', 'POST', { code: 'Q-NEW', species: 'DUCK', quantity: 10, status: 'QUARANTINE' });
+    assert.equal(c.status, 200);
+    const end = new Date(c.json.group.quarantineEndAt).getTime();
+    const days = (end - Date.now()) / 86_400_000;
+    assert.ok(days > 13.5 && days <= 14.2, `days=${days}`);
+  });
+
+  test('PATCH กลุ่ม → QUARANTINE ตั้งวันปลด / ออกกักกัน → ล้าง', async () => {
+    const gid = 'g-qc';
+    groups.set(gid, { ...GROUP, id: gid, code: 'QC-01' });
+    const up = await api(`/groups/${gid}`, 'PATCH', { status: 'QUARANTINE' });
+    const days = (new Date(up.json.group.quarantineEndAt).getTime() - Date.now()) / 86_400_000;
+    assert.ok(days > 13.5 && days <= 14.2);
+
+    const back = await api(`/groups/${gid}`, 'PATCH', { status: 'ACTIVE' });
+    assert.equal(back.json.group.quarantineEndAt, null);
+
+    assert.equal((await api(`/groups/${gid}`, 'PATCH', { status: 'ALIEN' })).status, 400);
+  });
+
+  test('daily-log ปลุกกักกัน → ตั้งวันปลด + แจ้งกำหนดในข้อความ', async () => {
+    const gid = 'g-qlog';
+    groups.set(gid, { ...GROUP, id: gid, code: 'QL-01' });
+    const r = await api(`/groups/${gid}/daily-logs`, 'POST', { logDate: '2026-08-16T00:00:00.000Z', mortalityCount: 6, feedConsumedKg: 20 });
+    assert.equal(r.json.statusChanged, 'QUARANTINE');
+    const end = new Date(groups.get(gid).quarantineEndAt).getTime();
+    assert.ok((end - Date.now()) / 86_400_000 > 13.5);
+    const alert = sentAlerts.find((a) => a.eventKey === `quarantine-${gid}`);
+    assert.ok(alert?.text.includes('ปลดอัตโนมัติ'), alert?.text);
+  });
+});
+
+// ═══════════════ Biosecurity Exit (เข้า-ออกครบรอบ) ═══════════════
+describe('biosecurity exit', () => {
+  test('POST exit → บันทึก exitTime + durationMs + summary.inside ลดลง', async () => {
+    const before = (await api('/biosecurity')).json.summary.inside;
+    const entry = await api('/biosecurity', 'POST', { visitorName: 'ExitMan', sanitizedSec: 200 });
+    assert.equal(entry.json.gate.passed, true);
+    const eid = entry.json.entry.id;
+
+    const ex = await api(`/biosecurity/${eid}/exit`, 'POST');
+    assert.equal(ex.status, 200);
+    assert.ok(ex.json.entry.exitTime);
+    assert.ok(ex.json.durationMs >= 0);
+    assert.equal(ex.json.entry.id, eid);
+
+    const after = (await api('/biosecurity')).json.summary.inside;
+    assert.ok(after <= before);
+    assert.equal((await api(`/biosecurity/${eid}/exit`, 'POST')).status, 400); // ออกซ้ำไม่ได้
+    assert.equal((await api('/biosecurity/nope/exit', 'POST')).status, 404);
+  });
+});
+
+// ═══════════════ Multimodal Vision Ingestion (ภาพอาการ → รายงาน) ═══════════════
+describe('livestock vision ingestion', () => {
+  test('POST vision → วิเคราะห์ผ่านโมเดล + บันทึกรายงาน + แจ้งเตือนอัตโนมัติ', async () => {
+    // mock axios.post เลียบ Ollama (vision.service เรียก axios.post ตรงๆ) — คืน JSON อาการ
+    // (mock จะถูกคืนสภาพใน after() → mock.restoreAll ของไฟล์นี้)
+    mock.method(axios, 'post', async (_url: string) => ({
+      data: { response: JSON.stringify({ summary: 'พบผื่นผิวหนังอักเสบที่หลัง — สงสัยแบคทีเรีย', symptoms: ['ผื่นแดง', 'ขนร่วง'], severity: 'warn', recommendation: 'พาไปพบสัตวแพทย์โดยเร็ว' }) },
+    }));
+    const gid = 'g-vision';
+    groups.set(gid, { ...GROUP, id: gid, code: 'VIS-01' });
+    const base64 = `data:image/jpeg;base64,${'A'.repeat(240)}`;
+    const r = await api(`/groups/${gid}/vision`, 'POST', { imageBase64: base64 });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.analysis.severity, 'warn');
+    assert.ok(r.json.report.id.startsWith('vis-'));
+    assert.equal(sentAlerts.filter((a) => a.eventKey?.startsWith('vision-')).length, 1);
+
+    const hist = await api(`/groups/${gid}/vision`);
+    assert.equal(hist.json.reports.length, 1);
+    assert.ok(hist.json.reports[0].summary.includes('ผื่นผิวหนัง'));
+
+    assert.equal((await api(`/groups/${gid}/vision`, 'POST', { imageBase64: 'short' })).status, 400);
   });
 });

@@ -25,14 +25,24 @@ import {
   gateCheck,
   evaluateDailyLog,
   GATE_SANITIZE_MIN_SEC,
+  shouldRunFan,
+  validateDosage,
+  computeMortalityImpact,
+  quarantineStatus,
+  parseLivestockVisionResponse,
+  LIVESTOCK_VISION_PROMPT,
   type VetAction,
 } from '../../services/livestock-vet-ai.service';
+import { deductStock, addStock } from '../../services/inventory.service';
+import { callVision, VISION_ENABLED, VISION_MODEL } from '../../services/vision.service';
 
 const router = Router();
 export const prisma = new PrismaClient();
 
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const DAY_MS = 86_400_000;
+// ระยะกักกันอัตโนมัติ (วัน) — นับจากวันที่เข้ากักกัน → cron ปลดเอง
+const QUARANTINE_DAYS = parseInt(process.env.LIVESTOCK_QUARANTINE_DAYS || '14', 10);
 const SPECIES = ['POULTRY_BROILER', 'POULTRY_LAYER', 'DUCK', 'SWINE', 'CATTLE'];
 const GROUP_STATUSES = ['ACTIVE', 'QUARANTINE', 'HARVESTED', 'LOCKED_WITHDRAWAL'];
 const BREED_STATUSES = ['PREGNANT', 'LITTERED', 'FAILED', 'ABORTED'];
@@ -57,6 +67,10 @@ interface ClimateSample {
 // ในหน่วยความจำใช้เป็น cache เล็กๆ เฉพาะ session นี้เท่านั้น
 const climateHistory: ClimateSample[] = [];
 const MAX_CLIMATE_HISTORY = 500;
+
+// สถานะพัดลมต่อเล้า (Hysteresis & Anti-Flapping) — จำ on/off + เวลาสั่งครั้งสุดท้าย
+// เพื่อกัน "ตัด-ต่อ" ถี่ๆ ตอน THI ก้ำกึ่ง threshold (เปิด 74 / ปิด 70 + cooldown 5 นาที)
+const fanStates = new Map<string, { on: boolean; lastToggleAt: number }>();
 
 const notify = (text: string, severity: 'info' | 'warn' | 'critical', eventKey?: string) =>
   sendTelegramAlert({ text, severity, eventKey });
@@ -114,6 +128,7 @@ router.post('/groups', authenticate, requireRole(...WRITE_ROLES), async (req, re
         birthDate: born ?? new Date(),
         houseCode: houseCode || null,
         status: groupStatus,
+        quarantineEndAt: groupStatus === 'QUARANTINE' ? new Date(Date.now() + QUARANTINE_DAYS * DAY_MS) : null,
         notes: notes || null,
       },
     });
@@ -137,6 +152,12 @@ router.patch('/groups/:id', authenticate, requireRole(...WRITE_ROLES), async (re
       if (!GROUP_STATUSES.includes(String(status)))
         return res.status(400).json({ error: `Invalid status — ใช้ได้: ${GROUP_STATUSES.join(', ')}` });
       data.status = String(status);
+      // เข้ากักกัน → ตั้งเวลาปลดอัตโนมัติ / ออกจากกักกัน → ล้างเวลา (Quarantine Cooldown)
+      if (String(status) === 'QUARANTINE') {
+        data.quarantineEndAt = new Date(Date.now() + QUARANTINE_DAYS * DAY_MS);
+      } else {
+        data.quarantineEndAt = null;
+      }
     }
     if (notes !== undefined) data.notes = notes || null;
     const group = await prisma.livestockGroup.update({ where: { id }, data });
@@ -169,6 +190,7 @@ router.get('/groups/:id', authenticate, async (req, res) => {
         dailyLogs: { orderBy: { logDate: 'asc' } },
         breedings: { orderBy: { inseminatedAt: 'desc' } },
         batches: true,
+        visions: { orderBy: { created_at: 'desc' }, take: 10 },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -180,7 +202,8 @@ router.get('/groups/:id', authenticate, async (req, res) => {
           }, 0)
         : 0;
     const lock = withdrawalStatus(new Date(latestSafe || Date.now()));
-    res.json({ group, withdrawalLock: lock });
+    const quarantine = quarantineStatus(group.quarantineEndAt);
+    res.json({ group, withdrawalLock: lock, quarantine });
   } catch (err) {
     console.error('Livestock group detail error:', err);
     res.status(500).json({ error: 'Failed to load livestock group' });
@@ -192,13 +215,21 @@ router.get('/groups/:id', authenticate, async (req, res) => {
 // POST /api/livestock/groups/:id/medical — บันทึกยา → safeHarvestDate = วันนี้ + withdrawalDays
 router.post('/groups/:id/medical', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
-    const { drugName, dosageMgKg, withdrawalDays, administeredAt } = req.body || {};
+    const { drugName, dosageMgKg, withdrawalDays, administeredAt, inventoryItemId } = req.body || {};
     if (!drugName || String(drugName).trim().length === 0)
       return res.status(400).json({ error: 'drugName is required' });
     const dose = Number(dosageMgKg);
     if (!Number.isFinite(dose) || dose < 0) return res.status(400).json({ error: 'dosageMgKg must be >= 0' });
     const days = Number(withdrawalDays);
     if (!Number.isFinite(days) || days < 0) return res.status(400).json({ error: 'withdrawalDays must be >= 0' });
+
+    // ── Dosage Sanity Checker (Guardrail กันยาเกินขนาด) ──
+    // ยาเกิน hard-cap → ปฏิเสธทันที (AI hallucination กันไม่ได้ให้เข้า DB)
+    const dosageVerdict = validateDosage({ drugName: String(drugName), doseMgPerKg: dose, withdrawalDays: days });
+    if (!dosageVerdict.ok) {
+      return res.status(400).json({ error: dosageVerdict.reason, cap: dosageVerdict });
+    }
+
     const givenAt = parseDate(administeredAt);
     if (givenAt === 'invalid') return res.status(400).json({ error: 'administeredAt must be a valid date' });
     const base = (givenAt ?? new Date()).getTime();
@@ -213,8 +244,18 @@ router.post('/groups/:id/medical', authenticate, requireRole(...WRITE_ROLES), as
         administeredAt: new Date(base),
         withdrawalDays: days,
         safeHarvestDate,
+        inventoryItemId: inventoryItemId ? String(inventoryItemId) : null,
       },
     });
+
+    // ── Automated Inventory Depletion: บันทึกยา = หักยอดคงเหลือในคลัง 1 โดส ──
+    let stock = null;
+    if (inventoryItemId) {
+      stock = await deductStock(prisma, String(inventoryItemId), 1);
+      if (!stock.ok) {
+        await notify(`⚠️ คลัง: หักสต็อกยา ${stock.reason} — ยา "${String(drugName)}" บันทึกแล้วแต่คลังไม่พอ`, 'warn', `stock-medical-${record.id}`);
+      }
+    }
 
     // ยาบางตัวทำให้ขายไม่ได้: LOCKED_WITHDRAWAL อัตโนมัติจนพ้นระยะ
     let group = await prisma.livestockGroup.findUnique({ where: { id: req.params.id } });
@@ -239,7 +280,7 @@ router.post('/groups/:id/medical', authenticate, requireRole(...WRITE_ROLES), as
             Number(req.body.drugConcentrationMgPerL)
           )
         : null;
-    res.json({ record, groupLocked: days > 0, drugTotalL });
+    res.json({ record, groupLocked: days > 0, drugTotalL, stock, dosageChecked: { ok: true, known: dosageVerdict.known, maxMgPerKg: dosageVerdict.maxMgPerKg } });
   } catch (err) {
     console.error('Livestock medical create error:', err);
     res.status(500).json({ error: 'Failed to create medical record' });
@@ -249,7 +290,7 @@ router.post('/groups/:id/medical', authenticate, requireRole(...WRITE_ROLES), as
 // POST /api/livestock/groups/:id/vaccines — เพิ่มแผนวัคซีน (targetAgeDays นับจาก birthDate)
 router.post('/groups/:id/vaccines', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
-    const { vaccineName, targetAgeDays } = req.body || {};
+    const { vaccineName, targetAgeDays, inventoryItemId } = req.body || {};
     if (!vaccineName || String(vaccineName).trim().length === 0)
       return res.status(400).json({ error: 'vaccineName is required' });
     const age = Number(targetAgeDays);
@@ -259,6 +300,7 @@ router.post('/groups/:id/vaccines', authenticate, requireRole(...WRITE_ROLES), a
         livestockGroupId: req.params.id,
         vaccineName: String(vaccineName),
         targetAgeDays: age,
+        inventoryItemId: inventoryItemId ? String(inventoryItemId) : null,
       },
     });
     res.json({ schedule });
@@ -268,7 +310,7 @@ router.post('/groups/:id/vaccines', authenticate, requireRole(...WRITE_ROLES), a
   }
 });
 
-// PATCH /api/livestock/vaccines/:id — ฉีดแล้ว (isCompleted + completedAt)
+// PATCH /api/livestock/vaccines/:id — ฉีดแล้ว (isCompleted + completedAt) → หักสต็อกวัคซีนอัตโนมัติ
 router.patch('/vaccines/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const { isCompleted } = req.body || {};
@@ -279,7 +321,14 @@ router.patch('/vaccines/:id', authenticate, requireRole(...WRITE_ROLES), async (
         completedAt: isCompleted ? new Date() : null,
       },
     });
-    res.json({ schedule });
+    let stock = null;
+    if (isCompleted && schedule.inventoryItemId) {
+      stock = await deductStock(prisma, schedule.inventoryItemId, 1);
+      if (!stock.ok) {
+        await notify(`⚠️ คลัง: หักสต็อกวัคซีน ${stock.reason} — ฉีดแล้วแต่คลังไม่พอ`, 'warn', `stock-vaccine-${schedule.id}`);
+      }
+    }
+    res.json({ schedule, stock });
   } catch (err) {
     console.error('Livestock vaccine update error:', err);
     res.status(500).json({ error: 'Failed to update vaccine schedule' });
@@ -309,15 +358,24 @@ router.post('/climate', authenticate, async (req, res) => {
     climateHistory.push(sample);
     if (climateHistory.length > MAX_CLIMATE_HISTORY) climateHistory.shift();
 
-    // Fail-safe จริง: THI > 74 → สั่งเปิดโหลดพัดลม/ระบบระบายอากาศ (sandbox = บันทึก state, real = MQTT)
+    // Fail-safe จริง: เปิดที่ THI ≥ 74 / ปิดที่ THI ≤ 70 (dead-band + cooldown 5 นาที กัน anti-flapping)
+    // sandbox = บันทึก state, real = MQTT — ผ่าน interlock (kill-switch/ปุ่มฉุกเฉินระงับ automation)
+    const fanKey = sample.houseCode || 'default';
+    const fan = fanStates.get(fanKey) || { on: false, lastToggleAt: 0 };
+    const decision = shouldRunFan(thi, fan.on, fan.lastToggleAt);
     let failSafe: { ok: boolean; action: string; reason?: string } | null = null;
-    if (level === 'warn' || level === 'critical') {
+    if (decision.turnOn || decision.turnOff) {
       failSafe = await actuationService.executeCommand({
         actuatorId: 'load-1',
-        desiredState: 'on',
+        desiredState: decision.turnOn ? 'on' : 'off',
         actor: 'system',
-        reason: `LIVESTOCK THI=${thi.toFixed(1)} (${level.toUpperCase()}) — เปิดพัดลม/ระบบระบายอากาศ`,
+        reason: `LIVESTOCK THI=${thi.toFixed(1)} — ${decision.reason}`,
       });
+      if (failSafe.ok) {
+        fan.on = decision.turnOn;
+        fan.lastToggleAt = Date.now();
+        fanStates.set(fanKey, fan);
+      }
     }
 
     // เก็บประวัติลง hypertable (Timescale) — พ้นความตายเมื่อ restart server
@@ -336,10 +394,14 @@ router.post('/climate', authenticate, async (req, res) => {
       console.error('Livestock climate persist error:', dbErr);
     }
 
+    // วิกฤตแล้วแต่พัดลมเปิดอยู่แล้ว → แจ้งสถานะ fail-safe ว่าปกป้องอยู่ (ไม่ต้องสั่งซ้ำ)
+    if (level === 'critical' && !decision.turnOn && fan.on) {
+      failSafe = { ok: true, action: 'on', reason: 'CRITICAL THI — พัดลมเปิดอยู่แล้ว (fail-safe คุ้มครองต่อ)' };
+    }
     if (level === 'critical') {
       await notify(`🚨 LIVESTOCK CRITICAL: THI=${thi.toFixed(1)} (>84) — เปิดน้ำ/พัดลมทุกทางด่วน!`, 'critical', `thi-${houseCode || ''}`);
     }
-    res.json({ thi, level, label, actions: actions.map((a) => a.action), failSafe, sample });
+    res.json({ thi, level, label, actions: actions.map((a) => a.action), failSafe, fanState: { on: fan.on, lastToggleAt: fan.lastToggleAt, decision }, sample });
   } catch (err) {
     console.error('Livestock climate error:', err);
     res.status(500).json({ error: 'Failed to record climate' });
@@ -422,10 +484,10 @@ router.get('/silos', authenticate, async (_req, res) => {
   }
 });
 
-// POST /api/livestock/silos — ลงทะเบียนถัง
+// POST /api/livestock/silos — ลงทะเบียนถัง (ผูก inventoryItemId ได้ → เบิก/เติม = หัก/เพิ่มคลัง)
 router.post('/silos', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
-    const { siloCode, capacityKg, currentKg, lastRefillAt } = req.body || {};
+    const { siloCode, capacityKg, currentKg, lastRefillAt, inventoryItemId } = req.body || {};
     if (!siloCode || String(siloCode).trim().length === 0)
       return res.status(400).json({ error: 'siloCode is required' });
     const cap = Number(capacityKg);
@@ -436,6 +498,7 @@ router.post('/silos', authenticate, requireRole(...WRITE_ROLES), async (req, res
         capacityKg: cap,
         currentKg: currentKg === undefined || currentKg === null ? cap : Number(currentKg),
         lastRefillAt: parseDate(lastRefillAt) === 'invalid' ? new Date() : (parseDate(lastRefillAt) ?? new Date()),
+        inventoryItemId: inventoryItemId ? String(inventoryItemId) : null,
       },
     });
     res.json({ silo });
@@ -445,7 +508,7 @@ router.post('/silos', authenticate, requireRole(...WRITE_ROLES), async (req, res
   }
 });
 
-// PATCH /api/livestock/silos/:id/refill — เติม/เบิกอาหาร
+// PATCH /api/livestock/silos/:id/refill — เติม/เบิกอาหาร → ซิงก์ยอดคงเหลือในคลังอัตโนมัติ
 router.patch('/silos/:id/refill', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const { deltaKg } = req.body || {};
@@ -458,10 +521,20 @@ router.patch('/silos/:id/refill', authenticate, requireRole(...WRITE_ROLES), asy
       where: { id: silo.id },
       data: { currentKg: next, lastRefillAt: delta > 0 ? new Date() : silo.lastRefillAt },
     });
+    // Automated Inventory Depletion: เบิกอาหาร (delta < 0) = หักคลัง, เติม (delta > 0) = กลับเข้าคลัง
+    let stock = null;
+    if (silo.inventoryItemId) {
+      stock = delta < 0
+        ? await deductStock(prisma, silo.inventoryItemId, Math.abs(delta))
+        : await addStock(prisma, silo.inventoryItemId, delta);
+      if (delta < 0 && !stock.ok) {
+        await notify(`⚠️ คลัง: เบิกอาหาร ${stock.reason} — ตรวจยอดคงเหลือ`, 'warn', `stock-silo-${silo.id}`);
+      }
+    }
     if (next / silo.capacityKg < 0.15) {
       await notify(`🥣 FEED LOW: ${silo.siloCode} เหลือ ${(next / silo.capacityKg * 100).toFixed(0)}% — เติมอาหาร`, 'warn', `silo-${silo.id}-low`);
     }
-    res.json({ silo: updated });
+    res.json({ silo: updated, stock });
   } catch (err) {
     console.error('Livestock silo refill error:', err);
     res.status(500).json({ error: 'Failed to refill feed silo' });
@@ -570,12 +643,17 @@ router.post('/groups/:id/daily-logs', authenticate, requireRole(...WRITE_ROLES),
     let statusChanged: string | null = null;
     for (const action of actions) {
       if (action.action === 'QUARANTINE' && group.status !== 'QUARANTINE') {
+        const endAt = new Date(Date.now() + QUARANTINE_DAYS * DAY_MS);
         await prisma.livestockGroup.update({
           where: { id: group.id },
-          data: { status: 'QUARANTINE' },
+          data: { status: 'QUARANTINE', quarantineEndAt: endAt },
         });
         statusChanged = 'QUARANTINE';
-        await notify(`🚨 ${action.message} — กลุ่ม ${group.code} (${group.species})`, 'critical', `quarantine-${group.id}`);
+        await notify(
+          `🚨 ${action.message} — กลุ่ม ${group.code} (${group.species}) กักกัน ${QUARANTINE_DAYS} วัน ปลดอัตโนมัติ ${endAt.toISOString().slice(0, 10)}`,
+          'critical',
+          `quarantine-${group.id}`
+        );
       } else if (action.action === 'WATER_DROP') {
         await notify(`⚠️ ${action.message} — กลุ่ม ${group.code}`, 'warn', `waterdrop-${group.id}`);
       }
@@ -616,6 +694,7 @@ router.get('/groups/:id/metrics', authenticate, async (req, res) => {
         dailyLogs: { orderBy: { logDate: 'asc' } },
         records: { orderBy: { safeHarvestDate: 'desc' }, take: 1 },
         schedules: { where: { isCompleted: false }, orderBy: { targetAgeDays: 'asc' } },
+        batches: { orderBy: { created_at: 'desc' }, take: 1 },
       },
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -642,6 +721,18 @@ router.get('/groups/:id/metrics', authenticate, async (req, res) => {
     const totalFeed = logs.reduce((s, l) => s + l.feedConsumedKg, 0);
     const totalMortality = logs.reduce((s, l) => s + l.mortalityCount, 0);
 
+    // ── Mortality Financial Impact: สัตว์ที่ตาย × ต้นทุนต่อตัว (เทียบงบชุดเลี้ยง) ──
+    const latestBatch = group.batches[0] || null;
+    const batchCost = latestBatch
+      ? latestBatch.initialAnimalCost + latestBatch.totalFeedCost + latestBatch.totalMedCost + latestBatch.totalUtilityCost
+      : 0;
+    const unitCostPerAnimal = batchCost > 0 ? batchCost / group.quantity : 0;
+    const mortalityFinancial = computeMortalityImpact({
+      totalMortality,
+      unitCostPerAnimal,
+      batchCost: latestBatch ? batchCost : 0,
+    });
+
     res.json({
       metrics: {
         fcr: fcr.fcr,
@@ -656,6 +747,8 @@ router.get('/groups/:id/metrics', authenticate, async (req, res) => {
         waterDropPct: water.pct,
         withdrawalLock: lock,
         pendingVaccines: group.schedules.length,
+        mortalityFinancial,
+        quarantine: quarantineStatus(group.quarantineEndAt),
       },
     });
   } catch (err) {
@@ -746,7 +839,7 @@ router.post('/biosecurity', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/livestock/biosecurity — ประวัติเข้า-ออก
+// GET /api/livestock/biosecurity — ประวัติเข้า-ออก (รวมคนที่ยังอยู่ในฟาร์ม)
 router.get('/biosecurity', authenticate, async (_req, res) => {
   try {
     const logs = await prisma.biosecurityLog.findMany({
@@ -754,10 +847,28 @@ router.get('/biosecurity', authenticate, async (_req, res) => {
       take: 100,
     });
     const denied = logs.filter((l) => !l.passedGate).length;
-    res.json({ logs, summary: { total: logs.length, denied } });
+    const inside = logs.filter((l) => l.passedGate && !l.exitTime).length;
+    res.json({ logs, summary: { total: logs.length, denied, inside } });
   } catch (err) {
     console.error('Livestock biosecurity list error:', err);
     res.status(500).json({ error: 'Failed to load biosecurity logs' });
+  }
+});
+
+// POST /api/livestock/biosecurity/:id/exit — ลงเวลาออกฟาร์ม (ครบรอบเข้า-ออก)
+router.post('/biosecurity/:id/exit', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const entry = await prisma.biosecurityLog.findUnique({ where: { id: req.params.id } });
+    if (!entry) return res.status(404).json({ error: 'Biosecurity log not found' });
+    if (entry.exitTime) return res.status(400).json({ error: 'บันทึกเวลาออกแล้ว' });
+    const exited = await prisma.biosecurityLog.update({
+      where: { id: entry.id },
+      data: { exitTime: new Date() },
+    });
+    res.json({ entry: exited, durationMs: new Date(exited.exitTime!).getTime() - new Date(entry.entryTime).getTime() });
+  } catch (err) {
+    console.error('Livestock biosecurity exit error:', err);
+    res.status(500).json({ error: 'Failed to record biosecurity exit' });
   }
 });
 
@@ -834,6 +945,63 @@ router.get('/batches', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Livestock batches list error:', err);
     res.status(500).json({ error: 'Failed to load financial batches' });
+  }
+});
+
+// ═══════════ Multimodal Vision Ingestion — ภาพอาการป่วย → Qwen2-VL → JSON สรุป ═══════════
+
+// POST /api/livestock/groups/:id/vision — ส่งภาพ (ผื่นผิวหนัง/อุจจาระ/รอยโรค) → VL model → สรุปอาการ
+router.post('/groups/:id/vision', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const { imageBase64, prompt } = req.body || {};
+    if (!imageBase64 || String(imageBase64).length < 100)
+      return res.status(400).json({ error: 'imageBase64 is required (data URL หรือ base64 ของภาพ)' });
+    if (!VISION_ENABLED)
+      return res.status(400).json({ error: 'Vision AI disabled (VISION_ENABLED=false)' });
+    const group = await prisma.livestockGroup.findUnique({ where: { id: req.params.id } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const b64 = String(imageBase64).replace(/^data:image\/[^;]+;base64,/, '').trim();
+    const text = await callVision(b64, prompt || LIVESTOCK_VISION_PROMPT);
+    const parsed = parseLivestockVisionResponse(text);
+
+    const report = await prisma.livestockVisionReport.create({
+      data: {
+        livestockGroupId: group.id,
+        model: VISION_MODEL,
+        severity: parsed.severity,
+        summary: parsed.summary || 'ไม่สามารถสกัดอาการได้',
+        symptomsJson: JSON.stringify({ symptoms: parsed.symptoms, recommendation: parsed.recommendation }),
+      },
+    });
+
+    // อาการผิดปกติ → แจ้งสัตวบาลผ่าน Telegram ทันที (dedup ต่อรายงาน)
+    if (parsed.severity !== 'info') {
+      await notify(
+        `🐄 VISION(${group.code}): ${(parsed.summary || 'พบความผิดปกติ').slice(0, 220)}`,
+        parsed.severity === 'critical' ? 'critical' : 'warn',
+        `vision-${group.id}-${report.id}`
+      );
+    }
+    res.json({ report, analysis: parsed });
+  } catch (err) {
+    console.error('Livestock vision ingestion error:', err);
+    res.status(500).json({ error: 'Failed to analyze livestock image' });
+  }
+});
+
+// GET /api/livestock/groups/:id/vision — ประวัติวิเคราะห์ภาพ
+router.get('/groups/:id/vision', authenticate, async (req, res) => {
+  try {
+    const reports = await prisma.livestockVisionReport.findMany({
+      where: { livestockGroupId: req.params.id },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    res.json({ reports });
+  } catch (err) {
+    console.error('Livestock vision history error:', err);
+    res.status(500).json({ error: 'Failed to load vision reports' });
   }
 });
 
