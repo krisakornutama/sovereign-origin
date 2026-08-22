@@ -209,6 +209,35 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Kitchen IOT — HX711 weight + DS18B20 fridge_temp ──
+router.post('/iot/weight', authenticate, async (req, res) => {
+  try {
+    const { inventoryItemId, weightKg, deviceId } = req.body || {};
+    if (!inventoryItemId || weightKg == null) return res.status(400).json({ error: 'inventoryItemId and weightKg required' });
+    const w = Number(weightKg);
+    if (isNaN(w) || w < 0 || w > 10000) return res.status(400).json({ error: 'weightKg invalid' });
+    const item = await prisma.inventoryItem.update({ where: { id: String(inventoryItemId) }, data: { quantity: w } });
+    // บันทึก telemetry ด้วย (ให้ dashboard เห็น)
+    try {
+      await prisma.$queryRawUnsafe(`INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '11111111-1111-1111-1111-111111111111'::uuid, $1, 'kitchen_weight', $2)`, String(deviceId||'hx711-kitchen'), w);
+    } catch {}
+    res.json({ success: true, item });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/kitchen-sensors', authenticate, async (_req, res) => {
+  try {
+    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT DISTINCT ON (metric) metric, value, time FROM sensor_telemetry WHERE metric IN ('kitchen_weight','fridge_temp','kitchen_temp','kitchen_humidity','pantry_door') ORDER BY metric, time DESC`);
+    const map: Record<string, any> = {};
+    for (const r of rows) map[r.metric] = { value: Number(r.value), time: r.time };
+    // เช็คตู้เย็น >8°C แจ้งเตือน
+    const alerts: string[] = [];
+    if (map.fridge_temp && map.fridge_temp.value > 8) alerts.push(`ตู้เย็นร้อน ${map.fridge_temp.value}°C (>8°C) — เสี่ยงของเสีย`);
+    if (map.kitchen_weight && map.kitchen_weight.value < 1) alerts.push(`วัตถุดิบใกล้หมด (น้ำหนัก ${map.kitchen_weight.value}kg)`);
+    res.json({ sensors: map, alerts });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ── Reports — superadmin เห็นหมด, owner เห็นร้านตัวเอง ──
 router.get('/reports/summary', authenticate, async (req, res) => {
   try {
