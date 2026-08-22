@@ -6,7 +6,7 @@
 // Mount: /api/livestock (featureGuard('/livestock'))
 // ═════════════════════════════════════════════════════════════
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { sendTelegramAlert } from '../../services/telegram-alert.service';
 import { actuationService } from '../../services/actuation.service';
@@ -37,7 +37,7 @@ import { deductStock, addStock } from '../../services/inventory.service';
 import { callVision, VISION_ENABLED, VISION_MODEL } from '../../services/vision.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const DAY_MS = 86_400_000;

@@ -1,10 +1,10 @@
 import cron from 'node-cron';
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { sendTelegram, sendTelegramPhoto } from '../modules/telegram/telegram.routes';
 import { buildReportPng } from './chart-snapshot.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

@@ -1,12 +1,11 @@
 import mqtt from 'mqtt';
 import { Pool } from 'pg';
 import EventEmitter from 'events';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { firstResponder } from '../services/first-responder.service';
 import { relayGuard } from '../services/relay-guard.service';
 import { telemetryBuffer, TELEMETRY_FLUSH_MS } from '../services/telemetry-buffer.service';
 
-const prisma = new PrismaClient();
 const telemetryPool = new Pool({
   host: process.env.TIMESCALE_HOST || 'localhost',
   port: Number(process.env.TIMESCALE_PORT) || 5432,

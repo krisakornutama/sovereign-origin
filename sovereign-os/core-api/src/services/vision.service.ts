@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

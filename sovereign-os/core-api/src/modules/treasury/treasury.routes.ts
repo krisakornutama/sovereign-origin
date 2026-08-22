@@ -6,7 +6,7 @@
 // Cross-link: ขายทำกำไร/ปันผล → อัปเดตเงินสดใน PersonalBalanceSheet อัตโนมัติ
 // ═════════════════════════════════════════════════════════════
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import multer from 'multer';
 import { authenticate } from '../../middleware/auth.middleware';
 import { resolveOwnerId } from '../portfolio/portfolio.routes';
@@ -28,7 +28,7 @@ import { computePortfolioValue, computeInventoryValue, type AssetHolding, type I
 import { createTransferOrder, confirmTransfer, cancelTransfer } from '../../services/transfer.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
 

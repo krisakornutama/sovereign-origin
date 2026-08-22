@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   buildPropertyMapSvg,
@@ -9,7 +9,6 @@ import {
 } from '../../services/property-strategy.service';
 
 const router = Router();
-const prisma = new PrismaClient();
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 const ZONE_TYPES = ['บ้าน', 'สวน', 'รั้ว', 'ประตู', 'ที่จอดรถ', 'โรงเก็บ', 'ที่โล่ง', 'ทางเข้า', 'อื่น'];

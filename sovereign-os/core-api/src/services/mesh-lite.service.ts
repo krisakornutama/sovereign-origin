@@ -10,10 +10,9 @@ import { BACKUP_DIR } from './backup.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { securityStream } from './security-stream.service';
 import { sendTelegramAlert } from './telegram-alert.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 const execFile = promisify(execFileCb);
-const prisma = new PrismaClient();
 
 // ── Sovereign Mesh Lite: สำรองข้อมูลนอกสถานที่แบบเข้ารหัส (AES-256-GCM) ──
 // หลักการ: ทุกครั้งที่มี backup ใหม่ (DB dump + state bundle) → เข้ารหัสด้วย key เฉพาะเครื่อง

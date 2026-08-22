@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // ─────────────────────────────────────────────────────────────
 // Phase 5: Off-Grid Infrastructure Hub

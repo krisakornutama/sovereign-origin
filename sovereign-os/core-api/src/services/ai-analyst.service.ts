@@ -1,7 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { piHole } from './pihole.service';
 import { threatIntel } from './threat-intel.service';
@@ -10,7 +10,7 @@ import { threatIntel } from './threat-intel.service';
 // รวมสถานะ (security events + IDS alerts + threat intel + Pi-hole) → ส่ง Ollama
 // วิเคราะห์เป็นภาษาไทย → เก็บผลล่าสุด + แจ้งเตือนผ่าน Telegram (ไม่บังคับ)
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const LAST_REPORT_FILE = path.resolve(process.cwd(), 'data', 'ai-analyst-last.json');
 

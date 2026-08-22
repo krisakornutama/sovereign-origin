@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { EventEmitter } from 'events';
 import { livingMode } from './living-mode.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 export const automationEmitter = new EventEmitter();
 
 // Anti-Goodhart Shield (ภัย 2): metrics ที่เป็น "ร่องรอยการมีชีวิต" — ระบบห้ามลงโทษ/เตือนรบกวน

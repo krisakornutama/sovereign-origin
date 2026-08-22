@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { threatIntel } from './threat-intel.service';
 import { securityStream } from './security-stream.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // ── IDS reader (Suricata eve.json) ──
 // อ่านท้ายไฟล์ eve.json แล้วแปลง alert เป็น securityEvent (event_type = IDS_ALERT)

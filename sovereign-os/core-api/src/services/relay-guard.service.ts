@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 
 // ── Relay Anti-Chatter Guard (Phase 6 — ภัยที่ 4: Hardware Chatter) ──
@@ -17,7 +17,7 @@ export const RELAY_LOCK_DURATION_MS = 10 * 60_000;
 export const MQTT_CHATTER_THRESHOLD = 8;
 export const MQTT_CHATTER_WINDOW_MS = 3000;
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 class RelayGuardService {
   private lastCommandAt = new Map<string, number>();

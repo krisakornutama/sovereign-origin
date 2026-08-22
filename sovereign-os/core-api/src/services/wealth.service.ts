@@ -1,4 +1,5 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import EventEmitter from 'events';
 import cron from 'node-cron';
 import { fetchPrice, PriceCache, type PriceQuote } from './price-feed.service';
@@ -230,7 +231,6 @@ export class WealthWorker {
 }
 
 // ── Instance สำหรับ wiring ใน server.ts ──
-const prisma = new PrismaClient();
 
 export function createWealthWorker(cfg: WealthWorkerConfig): WealthWorker {
   return new WealthWorker(

@@ -11,11 +11,10 @@
 // Transport: long polling (getUpdates) — the hub is a private appliance with
 // no public URL, so a webhook is not required.
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 
-const prisma = new PrismaClient();
 
 export interface ApprovalRequestInfo {
   tool: string;

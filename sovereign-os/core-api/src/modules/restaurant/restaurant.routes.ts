@@ -1,10 +1,23 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { config } from '../../config';
 
 const router = Router();
-const prisma = new PrismaClient();
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
+
+// ตรวจสิทธิ์ระดับร้าน: SUPERADMIN ผ่านเสมอ, เจ้าของร้านผ่านร้านตัวเอง
+function isOwnerOrSuper(user: any, restaurant: { ownerId: string | null } | null): boolean {
+  if (!restaurant) return false;
+  return user?.role === 'SUPERADMIN' || restaurant.ownerId === user?.id;
+}
+
+// ตรวจตัวเลขในช่วงที่กำหนด (กัน NaN/ติดลบ/พุ่งสูงผิดปกติจากภายนอก)
+function numInRange(v: unknown, min: number, max: number): number | null {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < min || n > max) return null;
+  return n;
+}
 
 // ── Restaurant ──
 router.post('/', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
@@ -23,7 +36,11 @@ router.get('/', authenticate, async (_req, res) => {
 
 router.put('/:id/camera', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
-    const cameraId = req.body?.cameraId ? String(req.body.cameraId) : null;
+    // ผูกกล้องเป็นงาน admin — อนุญาตเฉพาะเจ้าของร้านหรือ SUPERADMIN
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id } });
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
+    if (!isOwnerOrSuper((req as any).user, restaurant)) return res.status(403).json({ error: 'Only the restaurant owner or SUPERADMIN can manage cameras' });
+    const cameraId = req.body?.cameraId ? String(req.body.cameraId).slice(0, 100) : null;
     const r = await prisma.restaurant.update({ where: { id: req.params.id }, data: { cameraId } });
     res.json(r);
   } catch (err: any) { res.status(400).json({ error: err.message }); }
@@ -70,8 +87,10 @@ router.post('/menus', authenticate, requireRole(...WRITE_ROLES), async (req, res
   try {
     const { restaurantId, name, priceTHB, category } = req.body || {};
     if (!restaurantId || !name || priceTHB == null) return res.status(400).json({ error: 'restaurantId, name, priceTHB required' });
+    const price = numInRange(priceTHB, 0, 1_000_000);
+    if (price == null) return res.status(400).json({ error: 'priceTHB must be a number between 0 and 1000000' });
     const m = await prisma.menuItem.create({
-      data: { restaurantId: String(restaurantId), name: String(name).slice(0, 80), priceTHB: Number(priceTHB), category: category ? String(category).slice(0, 30) : 'FOOD' },
+      data: { restaurantId: String(restaurantId), name: String(name).slice(0, 80), priceTHB: price, category: category ? String(category).slice(0, 30) : 'FOOD' },
     });
     res.status(201).json(m);
   } catch (err: any) { res.status(400).json({ error: err.message }); }
@@ -87,6 +106,13 @@ router.get('/menus', authenticate, async (req, res) => {
 router.put('/menus/:id/recipe', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+    if (lines.length > 200) return res.status(400).json({ error: 'too many recipe lines (max 200)' });
+    for (const l of lines) {
+      if (!l || typeof l !== 'object') return res.status(400).json({ error: 'each line must be an object' });
+      const qty = numInRange(l.qtyGram, 0, 100_000);
+      if (qty == null) return res.status(400).json({ error: 'qtyGram must be a number between 0 and 100000' });
+      l.qtyGram = qty;
+    }
     // ลบสูตรเก่าแล้วสร้างใหม่
     await prisma.recipeLine.deleteMany({ where: { menuId: req.params.id } });
     for (const l of lines) {
@@ -141,11 +167,21 @@ router.post('/orders', authenticate, async (req, res) => {
   try {
     const { restaurantId, items, tableNo, type, customerId } = req.body || {};
     if (!restaurantId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'restaurantId and items required' });
+    if (items.length > 100) return res.status(400).json({ error: 'too many items (max 100)' });
+    // ตรวจรูปร่าง items ก่อนแตะฐานข้อมูล — กัน qty ติดลบ/ทศนิยม/NaN ที่จะบิดยอดorder
+    for (const it of items) {
+      if (!it || typeof it !== 'object' || !it.menuId || typeof it.menuId !== 'string') {
+        return res.status(400).json({ error: 'each item needs menuId (string)' });
+      }
+      const qty = numInRange(it.qty ?? 1, 1, 999);
+      if (qty == null || !Number.isInteger(qty)) return res.status(400).json({ error: 'item qty must be an integer between 1 and 999' });
+      it.qty = qty;
+    }
     let total = 0;
     for (const it of items) {
       const menu = await prisma.menuItem.findUnique({ where: { id: it.menuId } });
       if (!menu) return res.status(400).json({ error: `menu ${it.menuId} not found` });
-      total += Number(menu.priceTHB) * Number(it.qty || 1);
+      total += Number(menu.priceTHB) * it.qty;
     }
     const order = await prisma.restaurantOrder.create({
       data: {
@@ -201,7 +237,7 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
         await tx.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { increment: pointsEarned } } });
       }
       if (actorId) {
-        await tx.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: order.totalTHB / 35, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}` } as any });
+        await tx.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: order.totalTHB / config.restaurant.thbPerUsd, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}` } as any });
       }
       return upd;
     });
@@ -214,12 +250,15 @@ router.post('/iot/weight', authenticate, async (req, res) => {
   try {
     const { inventoryItemId, weightKg, deviceId } = req.body || {};
     if (!inventoryItemId || weightKg == null) return res.status(400).json({ error: 'inventoryItemId and weightKg required' });
-    const w = Number(weightKg);
-    if (isNaN(w) || w < 0 || w > 10000) return res.status(400).json({ error: 'weightKg invalid' });
+    const w = numInRange(weightKg, 0, 10000);
+    if (w == null) return res.status(400).json({ error: 'weightKg invalid' });
     const item = await prisma.inventoryItem.update({ where: { id: String(inventoryItemId) }, data: { quantity: w } });
-    // บันทึก telemetry ด้วย (ให้ dashboard เห็น)
+    // บันทึก telemetry ด้วย (ให้ dashboard เห็น) — node ผ่าน config ไม่ฝังตายตัว
     try {
-      await prisma.$queryRawUnsafe(`INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '11111111-1111-1111-1111-111111111111'::uuid, $1, 'kitchen_weight', $2)`, String(deviceId||'hx711-kitchen'), w);
+      await prisma.$queryRawUnsafe(
+        `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), $3::uuid, $1, 'kitchen_weight', $2)`,
+        String(deviceId || 'hx711-kitchen').slice(0, 60), w, config.defaults.telemetryNodeId
+      );
     } catch {}
     res.json({ success: true, item });
   } catch (err: any) { res.status(500).json({ error: err.message }); }

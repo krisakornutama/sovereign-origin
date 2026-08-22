@@ -1,7 +1,7 @@
 import zlib from 'zlib';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // ─────────────────────────────────────────────
 // Minimal PNG encoder (RGB, 8-bit) — ไม่พึ่ง library ภายนอก

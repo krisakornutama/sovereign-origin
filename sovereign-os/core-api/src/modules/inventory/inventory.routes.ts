@@ -1,5 +1,5 @@
 import { Router, Request } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   computeExpiryStatus,
@@ -10,7 +10,7 @@ import {
 } from '../../services/inventory.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { buildFarmMapSvg } from '../../services/farm-map.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const VALID_STATUSES = ['active', 'growing', 'harvested', 'fallow'];

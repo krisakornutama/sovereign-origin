@@ -1,6 +1,6 @@
 import { Router, Request } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { wealthEmitter } from '../../services/wealth.service';
 import {
   computePortfolioValue,
@@ -11,7 +11,6 @@ import {
 } from '../../services/wealth.service';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
 

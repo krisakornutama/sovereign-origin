@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient, HealthReadingType } from '@prisma/client';
+import { HealthReadingType } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
 import {
   analyzeReadings,
@@ -9,7 +10,7 @@ import {
 } from '../../services/health-readings.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 function asType(value: unknown): ReadingType | null {
   const s = String(value ?? '').toUpperCase();

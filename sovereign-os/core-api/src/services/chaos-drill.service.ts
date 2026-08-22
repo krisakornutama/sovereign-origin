@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import net from 'net';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { securityStream } from './security-stream.service';
 import { idsReader } from './ids-reader.service';
@@ -12,7 +12,6 @@ import { timeConsensus } from './time-consensus.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { BACKUP_DIR } from './backup.service';
 
-const prisma = new PrismaClient();
 
 // ── Chaos Drill (Antifragility Paradox) ──
 // ซ้อมวิกฤตตามกำหนด: ตรวจ self-check ว่าโครงสร้างพื้นฐานสำคัญพร้อมรับแรงกระแทก

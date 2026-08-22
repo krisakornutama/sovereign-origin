@@ -4,8 +4,9 @@
 // → ส่งออกเป็นแพ็กเกจ JSON (ข้อมูลทั้งหมดของโมดูลที่เลือก + รายการไฟล์ที่เกี่ยวข้อง)
 // → นำแพ็กเกจไปติดตั้งที่เครื่องอื่น (import) ระบบจะสร้างข้อมูลให้เหมือนต้นฉบับ
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // ── รายการโมดูลที่ถอดแบบได้ — แต่ละตัว = กลุ่มตารางที่เกี่ยวข้อง ──
 export interface ManifestModule {

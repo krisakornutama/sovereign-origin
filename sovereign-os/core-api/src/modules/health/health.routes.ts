@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
-import { PrismaClient, HealthCategory, HealthFlagStatus } from '@prisma/client';
+import { HealthCategory, HealthFlagStatus } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // ─────────────────────────────────────────────────────────────
 // Module 5: Herbal Safety & Action Engine

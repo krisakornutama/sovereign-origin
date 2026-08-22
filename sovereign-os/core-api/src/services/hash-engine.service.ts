@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 
 // ── Lite AV: SHA-256 Checksum Engine (แทน ClamAV daemon) ──
@@ -12,7 +12,7 @@ import { securityStream } from './security-stream.service';
 // 3) SHA-256 checksum → เทียบฐาน Threat Intel (type=FILE) + EICAR self-test
 // 4) สงสัย → Quarantine ไป data/quarantine + securityEvent MALWARE_DETECTED + SSE
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export const EICAR = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
 export const MAX_SCAN_BYTES = 25 * 1024 * 1024; // 25 MB

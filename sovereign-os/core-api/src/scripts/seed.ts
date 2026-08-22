@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import speakeasy from 'speakeasy';
 
-const prisma = new PrismaClient();
 
 // No hardcoded default password: use SEED_ADMIN_PASSWORD when provided,
 // otherwise generate a strong random one and print it once on the console.

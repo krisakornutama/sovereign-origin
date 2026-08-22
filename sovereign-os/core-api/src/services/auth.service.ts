@@ -2,10 +2,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export class AuthService {
   static async createUser(username: string, password: string, role: string = 'OPERATOR', nodeId?: string) {
