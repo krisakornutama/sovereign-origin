@@ -7,29 +7,14 @@ import { useFeatureStore } from '../../stores/useFeatureStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import Icon from '../ui/Icon';
+import { NAV_GROUPS } from '../../lib/navigation';
 
 // เมนูหลักบนมือถือ/แท็บเล็ต — Sidebar จะหายไปบนจอเล็ก เลยต้องมีทางนำทางนี้
-// (เลื่อนแนวนอนได้ — มีครบทุกหน้า ไม่ต้องไปหาเมนู)
+// (flex-wrap แสดงครบทุกเมนู ไม่ต้องไปหาเมนู)
+// รายการมาจาก NAV_GROUPS ใน lib/navigation.ts โดยตรง — หน้าใหม่ที่เพิ่มที่นั่น
+// จะไปโผล่บนมือถืออัตโนมัติ (เดิม hardcode ซ้ำแล้วตกขบวนหน้าใหม่ เช่น /restaurant)
 const ITEMS: Array<{ href: string; label: string; labelKey: string; icon: string }> = [
-  { href: '/dashboard', label: 'หน้าหลัก', labelKey: 'common.nav.dashboard', icon: 'dashboard' },
-  { href: '/change-password', label: 'รหัสผ่าน', labelKey: 'common.nav.changePassword', icon: 'key' },
-  { href: '/sensors', label: 'อุปกรณ์และเซ็นเซอร์', labelKey: 'common.nav.sensors', icon: 'sensors' },
-  { href: '/energy', label: 'พลังงาน', labelKey: 'common.nav.energy', icon: 'energy' },
-  { href: '/predictive', label: 'พยากรณ์', labelKey: 'common.nav.predictive', icon: 'predictive' },
-  { href: '/ai', label: 'AI Command', labelKey: 'common.nav.ai', icon: 'ai' },
-  { href: '/ai-agent', label: 'AI Agent', labelKey: 'common.nav.aiAgent', icon: 'ai-agent' },
-  { href: '/security', label: 'ความปลอดภัย', labelKey: 'common.nav.security', icon: 'security' },
-  { href: '/property', label: 'แผนที่บ้าน', labelKey: 'common.nav.property', icon: 'property' },
-  { href: '/risk-monitor', label: 'ความเสี่ยง', labelKey: 'common.nav.riskMonitor', icon: 'risk' },
-  { href: '/knowledge', label: 'คลังความรู้', labelKey: 'common.nav.knowledge', icon: 'knowledge' },
-  { href: '/inventory', label: 'เสบียง', labelKey: 'common.nav.inventory', icon: 'inventory' },
-  { href: '/farm', label: 'ฟาร์ม', labelKey: 'common.nav.farm', icon: 'farm' },
-  { href: '/livestock', label: 'ปศุสัตว์', labelKey: 'common.nav.livestock', icon: 'farm' },
-  { href: '/treasury', label: 'การเงิน', labelKey: 'common.nav.treasury', icon: 'portfolio' },
-  { href: '/health', label: 'สุขภาพ', labelKey: 'common.nav.health', icon: 'health' },
-  { href: '/healing', label: 'ธรรมะบำบัด', labelKey: 'common.nav.healing', icon: 'healing' },
-  { href: '/system', label: 'ระบบ', labelKey: 'common.nav.system', icon: 'system' },
-  { href: '/settings', label: 'ตั้งค่า', labelKey: 'common.nav.settings', icon: 'settings' },
+  ...NAV_GROUPS.flatMap((g) => g.items),
   { href: 'palette', label: 'ค้นหา', labelKey: 'common.search', icon: 'search' },
 ];
 
