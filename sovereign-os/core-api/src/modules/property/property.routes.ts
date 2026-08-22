@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   buildPropertyMapSvg,
+  generateBaguaMasterplan,
   scoreStrategicPoints,
   suggestStrategicPoints,
 } from '../../services/property-strategy.service';
@@ -203,6 +204,66 @@ router.get('/map.svg', authenticate, async (_req, res) => {
     res.send(buildPropertyMapSvg(zones, points, LAND_WIDTH, LAND_LENGTH));
   } catch (err: any) {
     res.status(500).json({ error: String(err?.message || 'สร้างแผนที่ไม่สำเร็จ') });
+  }
+});
+
+// GET /api/property/bagua-masterplan — พิมพ์เขียวค่ายกล ปรับตามขนาดที่ดินจริง
+//  query: width=80&length=60 (ค่าเริ่มต้น 3 ไร่ = 80×60 ม.), regenerate=1 เพื่อทับตำแหน่งเดิม
+router.get('/bagua-masterplan', authenticate, async (req, res) => {
+  try {
+    const width = Math.min(2000, Math.max(10, Number(req.query.width) || Number(process.env.BAGUA_WIDTH) || 80));
+    const length = Math.min(2000, Math.max(10, Number(req.query.length) || Number(process.env.BAGUA_LENGTH) || 60));
+    const regenerate = req.query.regenerate === '1' || req.query.regenerate === 'true';
+    const plan = generateBaguaMasterplan(width, length);
+    const created = { zones: 0, points: 0 };
+    const updated = { zones: 0, points: 0 };
+
+    for (const z of plan.zones) {
+      const data = {
+        type: z.type,
+        x: z.x, y: z.y, z: z.z,
+        width_m: z.width_m, length_m: z.length_m, height_m: z.height_m,
+        color: z.color,
+        note: z.note,
+      };
+      const existing = await prisma.propertyZone.findFirst({ where: { name: z.name } });
+      if (existing) {
+        if (regenerate) await prisma.propertyZone.update({ where: { id: existing.id }, data });
+        updated.zones++;
+      } else {
+        await prisma.propertyZone.create({ data: { name: z.name, ...data } });
+        created.zones++;
+      }
+    }
+
+    for (const p of plan.points) {
+      const zone = await prisma.propertyZone.findFirst({ where: { name: p.zoneName } });
+      const data = {
+        type: p.type,
+        x: p.x, y: p.y, z: p.z,
+        radius_m: p.radius_m,
+        reason: p.reason,
+        zone_id: zone?.id ?? null,
+        enabled: true,
+      };
+      const existing = await prisma.strategicPoint.findFirst({ where: { name: p.name } });
+      if (existing) {
+        if (regenerate) await prisma.strategicPoint.update({ where: { id: existing.id }, data });
+        updated.points++;
+      } else {
+        await prisma.strategicPoint.create({ data: { name: p.name, ...data } });
+        created.points++;
+      }
+    }
+
+    const [zones, points] = await Promise.all([
+      prisma.propertyZone.findMany({ orderBy: { created_at: 'asc' } }),
+      prisma.strategicPoint.findMany({ orderBy: { created_at: 'asc' } }),
+    ]);
+    const svg = buildPropertyMapSvg(zones, points, plan.land.width, plan.land.length);
+    res.json({ success: true, plan, created, updated, land: plan.land, zones, points, svg });
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message || 'สร้างพิมพ์เขียวค่ายกลไม่สำเร็จ') });
   }
 });
 

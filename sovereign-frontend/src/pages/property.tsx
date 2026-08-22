@@ -1,10 +1,12 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
+import dynamic from "next/dynamic";
+const TerrainViewer = dynamic(() => import("../components/terrain-viewer/TerrainViewer"), { ssr: false });
 
 interface Zone {
   id: string; name: string; type: string;
@@ -38,6 +40,7 @@ export default function PropertyPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [show3D, setShow3D] = useState(false);
 
   const [zoneForm, setZoneForm] = useState({ name: '', type: 'บ้าน', x: '5', y: '5', width_m: '6', length_m: '4', height_m: '2.5' });
   const [pointForm, setPointForm] = useState({ name: '', type: 'กล้อง', x: '1', y: '1', z: '2', radius_m: '6', reason: '' });
@@ -116,6 +119,34 @@ export default function PropertyPage() {
       setLoading(false);
     }
   }, []);
+
+  const terrainHeightData = useMemo(() => {
+    const res = 5;
+    const gw = Math.min(Math.ceil(land.width / res), 256);
+    const gh = Math.min(Math.ceil(land.length / res), 256);
+    const data: number[] = [];
+    for (let y = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++) {
+        const nx = x / gw;
+        const ny = y / gh;
+        const v = Math.sin(nx * Math.PI * 2) * 3 + Math.cos(ny * Math.PI * 1.5) * 2 + 5;
+        data.push(Math.max(0, v));
+      }
+    }
+    return data;
+  }, [land.width, land.length]);
+
+  const terrainZones = useMemo(() => {
+    return zones.map((z) => ({
+      name: z.name,
+      x: z.x,
+      y: z.y,
+      width: z.width_m,
+      length: z.length_m,
+      elevationMean: z.z || 0,
+      color: z.color || '#8adc85',
+    }));
+  }, [zones]);
 
   useEffect(() => {
     if (isAuthenticated && user) load();
@@ -254,6 +285,35 @@ export default function PropertyPage() {
         ) : (
           <div className="text-gray-500 text-sm">{t('property.noZonesMap', 'ยังไม่มีโซน — เพิ่มโซนแรกด้านล่างเพื่อสร้างแผนที่')}</div>
         )}
+
+      {/* ── ภาพ 3 มิติ (3D Terrain) ── */}
+      <div className="card panel-glow p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('property.terrain3d.title', 'ภาพTerrain 3 มิติ')}</h2>
+          <button
+            onClick={() => setShow3D((v) => !v)}
+            className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs inline-flex items-center gap-1"
+          >
+            <Icon name={show3D ? 'eye-off' : 'eye'} size={12} />
+            {show3D ? t('property.terrain3d.hide', 'ซ่อน') : t('property.terrain3d.show', 'แสดง 3D')}
+          </button>
+        </div>
+        {show3D ? (
+          <div style={{ height: '60vh', minHeight: 400 }} className="rounded-lg overflow-hidden border border-gray-700">
+            <TerrainViewer
+              landWidth={land.width}
+              landLength={land.length}
+              resolution={5}
+              heightData={terrainHeightData}
+              zones={terrainZones}
+            />
+          </div>
+        ) : (
+          <div className="text-gray-500 text-sm py-8 text-center">
+            {t('property.terrain3d.hint', 'กด "แสดง 3D" เพื่อดูภาพterrain 3 มิติของที่ดิน')}
+          </div>
+        )}
+      </div>
 
         {/* ── ลากจุดยุทธศาสตร์ด้วยเมาส์ ── */}
         <div className="mt-4">

@@ -289,3 +289,160 @@ export function buildPropertyMapSvg(
   <text x="${margin / 2}" y="${topH + margin / 2 + isoH + 55}" font-size="11" fill="#9ca3af">สเกล: 1 ช่อง = 1 ม. · 🔴 กับดัก · 🔵 กล้อง · 🩵 เซ็นเซอร์ตรวจจับ · 🟡 ไฟ</text>
 </svg>`;
 }
+
+// ────────────────────────────────────────────────
+// พิมพ์เขียวค่ายกล 3 ไร่ (Bagua Masterplan)
+// ที่ดิน 4800 ตร.ม. แบ่งเป็นวงแหวนซ้อนกัน:
+//   วงนอก 40% (1920) = แนวป้องกัน/ป่ากั้น   Zone 1
+//   วงกลาง 50% (2400) = สระน้ำ/นา/เล้า+สมุนไพร   Zone 2-4
+//   แกนกลาง 10% (480) = ศูนย์บัญชาการหยินหยาง  Zone 5
+// ────────────────────────────────────────────────
+
+export interface BaguaRing {
+  id: string;
+  nameTh: string;
+  nameEn: string;
+  area_m2: number;
+  pct: number;
+}
+
+export interface BaguaZoneSpec {
+  name: string;
+  type: string; // PERIMETER_DEFENSE | WATER_BODY | AGRICULTURE | LIVESTOCK_GARDEN | CORE_LIVING
+  color: string;
+  note: string;
+  x: number;
+  y: number;
+  z: number;
+  width_m: number;
+  length_m: number;
+  height_m: number;
+  area_m2: number;
+}
+
+export interface BaguaPointSpec {
+  name: string;
+  type: string;
+  x: number;
+  y: number;
+  z: number;
+  radius_m: number;
+  reason: string;
+  zoneName: string;
+}
+
+export interface BaguaMasterplan {
+  totalAreaSqM: number;
+  philosophy: string;
+  land: { width: number; length: number };
+  rings: BaguaRing[];
+  zones: BaguaZoneSpec[];
+  points: BaguaPointSpec[];
+}
+
+const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+/**
+ * คำนวณพิมพ์เขียวค่ายกล (pure — ไม่แตะ DB)
+ * ปรับให้เข้ากับที่ดินกว้าง×ยาว ใดก็ได้:
+ *   - วงนอก 40% = 4 แถบขอบ (แนวป้องกัน)
+ *   - วงกลาง 60% = 4 แถบ (สระ/นา/สวนสมุนไพร) ปิดบริเวณเต็มพื้นที่
+ *   - แกนกลาง 10% = ศูนย์บัญชาการหยินหยาง (อัตราส่วนเดียวกับที่ดิน)
+ * ไม่มีช่องว่าง/ทับซ้อน — ผลรวมโซน = ขนาดที่ดินเสมอ
+ */
+export function generateBaguaMasterplan(width = 80, length = 60): BaguaMasterplan {
+  if (width <= 0 || length <= 0) throw new Error('width/length must be > 0');
+  const total = width * length;
+
+  // วงแหวนซ้อนบนรูปสี่เหลี่ยมผืนผ้า: แกนกลาง = √0.1 ของด้าน, ขอบวงกลาง = √0.6 → พื้นที่ 10% / 60% / 40%
+  const mw = width * Math.sqrt(0.6);   // ความกว้างขอบวงกลาง (จตุภาค 60%)
+  const ml = length * Math.sqrt(0.6);  // ความยาวขอบวงกลาง
+  const cw = width * Math.sqrt(0.1);   // ความกว้างแกนกลาง (10%)
+  const cl = length * Math.sqrt(0.1);  // ความยาวแกนกลาง
+
+  // ระยะความหนาของแต่ละแถบ
+  const t = (length - ml) / 2;         // ความหนาแถบวงนอก (บน/ล่าง)
+  const s = (width - mw) / 2;          // ความหนาแถบวงนอก (ซ้าย/ขวา)
+  const hm = (ml - cl) / 2;            // ความสูงแถบวงกลาง (บน/ล่าง)
+  const sm = (mw - cw) / 2;            // ความกว้างแถบวงกลาง (ซ้าย/ขวา)
+
+  const mkZone = (
+    name: string, type: string, color: string, note: string,
+    x: number, y: number, w: number, l: number, h: number
+  ): BaguaZoneSpec => ({
+    name, type, color, note,
+    x: round2(x), y: round2(y), z: 0,
+    width_m: round2(w), length_m: round2(l), height_m: h,
+    area_m2: round2(w * l),
+  });
+
+  const zones: BaguaZoneSpec[] = [
+    // Zone 1 — แนวป้องกัน (วงนอก 40%: 4 แถบขอบ, ไม่ทับซ้อน)
+    mkZone('ป่าแนวป้องกัน เหนือ', 'PERIMETER_DEFENSE', '#64748b',
+      'Zone 1 · Perimeter Guard & Barrier Forest — รั้วไผ่ + โหนดเซ็นเซอร์ IoT คุ้มกันรอบด้าน', 0, 0, width, t, 3),
+    mkZone('ป่าแนวป้องกัน ใต้', 'PERIMETER_DEFENSE', '#64748b',
+      'Zone 1 · Perimeter Guard & Barrier Forest — ด้านใต้ (ทางเข้าหลักรูปตัว S)', 0, length - t, width, t, 3),
+    mkZone('ป่าแนวป้องกัน ตะวันตก', 'PERIMETER_DEFENSE', '#64748b',
+      'Zone 1 · Perimeter Guard & Barrier Forest — ด้านตะวันตก', 0, t, s, length - 2 * t, 3),
+    mkZone('ป่าแนวป้องกัน ตะวันออก', 'PERIMETER_DEFENSE', '#64748b',
+      'Zone 1 · Perimeter Guard & Barrier Forest — ด้านตะวันออก', width - s, t, s, length - 2 * t, 3),
+    // Zone 2 — สระน้ำ (แถบบนวงกลาง)
+    mkZone('สระน้ำสำรอง (Aqua Reserve)', 'WATER_BODY', '#0ea5e9',
+      'Zone 2 · Resource Retention Pond — เลี้ยงปลา + กักน้ำสำรองดับไฟ', s, t, mw, hm, 2),
+    // Zone 3 — นาแปลงหลัก (แถบซ้าย+ขวาของวงกลาง: 2 แถบรวมเป็นโซนเดียว)
+    mkZone('นาแปลงหลัก + ไม้ผล (ฝั่งตะวันตก)', 'AGRICULTURE', '#84cc16',
+      'Zone 3 · Sovereign Paddy & Staples — ข้าวอินทรีย์ SRI + กล้วย/มันสำปะหลัง', s, t + hm, sm, cl, 2),
+    mkZone('นาแปลงหลัก + ไม้ผล (ฝั่งตะวันออก)', 'AGRICULTURE', '#84cc16',
+      'Zone 3 · Sovereign Paddy & Staples — ข้าวอินทรีย์ SRI + กล้วย/มันสำปะหลัง', s + sm + cw, t + hm, sm, cl, 2),
+    // Zone 4 — เล้าไก่ + สวนสมุนไพร (แถบล่างวงกลาง)
+    mkZone('เล้าไก่ + สวนสมุนไพร', 'LIVESTOCK_GARDEN', '#10b981',
+      'Zone 4 · Nutrition & Healing Garden — ไก่ไข่ + ยาสมุนไพร 10-20 ชนิด', s, t + ml - hm, mw, hm, 3),
+    // Zone 5 — แกนกลาง 10% (อัตราส่วนเดียวกับที่ดิน)
+    mkZone('ศูนย์บัญชาการหยินหยาง', 'CORE_LIVING', '#f59e0b',
+      'Zone 5 · Yin-Yang Command Hub — Solar Off-Grid + Server Room + พื้นที่พักหลัก', (width - cw) / 2, (length - cl) / 2, cw, cl, 4),
+  ];
+
+  const points: BaguaPointSpec[] = [
+    {
+      name: 'ประตู S-Curve — PIR เซ็นเซอร์', type: 'เซ็นเซอร์ตรวจจับ',
+      x: round2(width / 2), y: round2(length - 1.5), z: 2, radius_m: 4,
+      reason: 'Zone 1 · S-Curve Entrance — ตรวจจับคน/สัตว์ผ่านประตูรูปตัว S (ESP8266 + PIR)',
+      zoneName: 'ป่าแนวป้องกัน ใต้',
+    },
+    {
+      name: 'ประตู S-Curve — กล้อง CCTV', type: 'กล้อง',
+      x: round2(width / 2), y: round2(length - t - 1), z: 3, radius_m: 6,
+      reason: 'บันทึกภาพทางเข้าหลัก — เห็นรั้วประตู + สองข้างถนน',
+      zoneName: 'ป่าแนวป้องกัน ใต้',
+    },
+    {
+      name: 'สระน้ำ — Telemetry ระดับน้ำ/pH', type: 'เซ็นเซอร์ตรวจจับ',
+      x: round2(width / 2), y: round2(t + hm / 2), z: 1, radius_m: 4,
+      reason: 'มอนิเตอร์น้ำจริง (ระดับ + pH) — IoT คาดการณ์ภัยแล้ง/น้ำท่วมล่วงหน้า',
+      zoneName: 'สระน้ำสำรอง (Aqua Reserve)',
+    },
+    {
+      name: 'Server Vault — UPS + DEFCON', type: 'เซ็นเซอร์ตรวจจับ',
+      x: round2(width / 2), y: round2(length / 2), z: 2, radius_m: 4,
+      reason: 'แบตเตอรี + เซิร์ฟเวอร์กลาง — ตรวจจับไฟดับ/อุณหภูมิเกิน → ยกระดับ DEFCON อัตโนมัติ',
+      zoneName: 'ศูนย์บัญชาการหยินหยาง',
+    },
+  ];
+
+  const middleArea = mw * ml - cw * cl;   // วงกลางจริง = 60%
+  const coreArea = cw * cl;               // แกนกลาง = 10%
+  const outerArea = total - mw * ml;      // วงนอกจริง = 40%
+
+  return {
+    totalAreaSqM: total,
+    philosophy: 'วงแหวนซ้อน 3 ชั้น (ยิน-หยาง) ปรับตามขนาดที่ดินจริง: 40% แนวป้องกัน · 50% อาหารและน้ำ · 10% ศูนย์บัญชาการ — ผลรวมโซนปิดที่ดินทั้งแปลงโดยไม่มีช่องว่าง',
+    land: { width: round2(width), length: round2(length) },
+    rings: [
+      { id: 'outer', nameTh: 'วงนอก — แนวป้องกัน', nameEn: 'Outer — Perimeter Defense', area_m2: round2(outerArea), pct: 40 },
+      { id: 'middle', nameTh: 'วงกลาง — น้ำ/อาหาร', nameEn: 'Middle — Water & Food', area_m2: round2(middleArea), pct: 50 },
+      { id: 'core', nameTh: 'แกนกลาง — ศูนย์บัญชาการ', nameEn: 'Core — Command Hub', area_m2: round2(coreArea), pct: 10 },
+    ],
+    zones,
+    points,
+  };
+}

@@ -267,6 +267,7 @@ export default function HealthPage() {
         <PageHeader
           eyebrow={t('health.page.eyebrow', 'ชีวิต & การเงิน')}
           title={t('health.page.title', 'Health Screening (Ambient)')} icon={<Icon name="health" size={18} />} actions={<div className="flex items-center gap-3">
+          <Link href="/health/self-check" scroll={false} className="btn-primary"><Icon name="healing" size={13} /> {t('health.page.selfCheck', 'Self-Check 32 ข้อ (พูด/พิมพ์)')}</Link>
           <Link href="/health-export" scroll={false} className="btn-secondary"><Icon name="reports" size={13} /> {t('health.page.report30d', 'รายงาน 30 วัน (PDF/CSV)')}</Link>
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('health.page.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}

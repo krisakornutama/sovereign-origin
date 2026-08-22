@@ -189,6 +189,9 @@ app.use('/api/notes', featureGuard('/ai-agent'), notesRoutes); // Note — ป�
 app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
 app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);
 app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON
+// Health check — Public (ไม่ต้อง auth) — frontend hook ใช้ poll endpoint นี้
+// (ต้องอยู่ก่อน mount health module: featureGuard+authenticate จะ 401 ทุก request ที่ไม่มี token)
+app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 app.use('/api/health', featureGuard('/health'), healthRoutes); // Phase 5: Health Screening
 app.use('/api/health/readings', featureGuard('/health'), healthReadingsRoutes); // P6: Health Reading Tracker + AI trend
 app.use('/api/infrastructure', featureGuard('/infrastructure'), infrastructureRoutes); // Phase 5: Off-Grid Infrastructure Hub
@@ -223,9 +226,6 @@ app.get('/api/modules', (_, res) => {
     enabled: config.modules.available.filter((m) => config.modules.isEnabled(m)),
   });
 });
-
-// Health check
-app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 // Dashboard stats
 app.get('/api/dashboard/stats', authenticate, async (req, res) => {
