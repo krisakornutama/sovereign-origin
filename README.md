@@ -1,7 +1,7 @@
 # Sovereign OS
 
 ระบบบ้านอัจฉริยะ Sovereign ที่ดูแลตัวเองได้ (Self-Sovereign Home OS) — Security, Resilience, AI และ Telemetry ในชุดเดียว
-ทดสอบ 649/649 tests ผ่าน 100% · core-api รันบน RAM ~220MiB, CPU <0.5%
+ทดสอบ 994/994 tests ผ่าน 100% · core-api รันบน RAM ~220MiB, CPU <0.5%
 
 ## 🚀 ติดตั้งภายในคลิกเดียว (One-Click Install)
 
@@ -61,7 +61,7 @@ tools/install/  ← ตัวติดตั้งคลิกเดียว
 
 ```bash
 cd sovereign-os/core-api
-npm test   # 649 tests (tsx --test, serial)
+npm test   # 994 tests (tsx --test, serial)
 npm run build  # tsc ตรวจ type + build dist/
 ```
 
