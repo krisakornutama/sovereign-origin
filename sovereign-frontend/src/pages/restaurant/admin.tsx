@@ -1,0 +1,144 @@
+"use client";
+import { useState, useEffect } from "react";
+import Sidebar from "../../components/layout/Sidebar";
+import PageHeader from "../../components/ui/PageHeader";
+import Icon from "../../components/ui/Icon";
+import { authFetch } from "../../lib/apiFetch";
+import { useAuthStore } from "../../stores/useAuthStore";
+import { useLanguageStore } from "../../stores/useLanguageStore";
+import Link from "next/link";
+
+export default function RestaurantAdminPage() {
+  const { isAuthenticated, isHydrated } = useAuthStore();
+  const t = useLanguageStore((s) => s.t);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [selected, setSelected] = useState("");
+  const [menus, setMenus] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("FOOD");
+  const [editing, setEditing] = useState<string|null>(null);
+  const [recipeLines, setRecipeLines] = useState<any[]>([{ farmCrop: "", qtyGram: 100, isSelfProduced: true }]);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [cameraId, setCameraId] = useState("");
+  const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+
+  const load = async () => {
+    const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant`);
+    if(r.ok){ const d=await r.json(); setRestaurants(d); if(d[0]&&!selected) setSelected(d[0].id); }
+    const inv = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory?limit=100`);
+    if(inv.ok){ const d=await inv.json(); setInventory(d.items||d||[]); }
+  };
+  const loadMenus = async (rid:string) => {
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus?restaurantId=${rid}`);
+    if(res.ok) setMenus(await res.json());
+  };
+  useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated]);
+  useEffect(()=>{ if(selected) loadMenus(selected); },[selected]);
+
+  const createMenu = async () => {
+    if(!selected||!name||!price) return setErr("ใส่ชื่อและราคา");
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({restaurantId:selected,name,priceTHB:Number(price),category})});
+    const d=await res.json();
+    if(res.ok){ setMsg("สร้างเมนูแล้ว"); setName(""); setPrice(""); loadMenus(selected); } else setErr(d.error);
+  };
+  const saveRecipe = async (menuId:string) => {
+    const lines = recipeLines.filter(l=>l.qtyGram>0 && (l.farmCrop||l.inventoryItemId)).map(l=>({ farmCrop: l.farmCrop||null, inventoryItemId: l.inventoryItemId||null, qtyGram: Number(l.qtyGram), isSelfProduced: !!l.isSelfProduced }));
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus/${menuId}/recipe`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})});
+    if(res.ok){ setMsg("บันทึกสูตรแล้ว — ใช้ของผลิตเองจะเช็คสต็อกก่อนขาย"); loadMenus(selected); setEditing(null); } else setErr("บันทึกสูตรไม่สำเร็จ");
+  };
+  const bindCamera = async () => {
+    if(!selected) return;
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/${selected}/camera`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({cameraId: cameraId||null})});
+    if(res.ok) setMsg("ผูกกล้องแล้ว"); else setErr("ผูกกล้องไม่สำเร็จ");
+  };
+
+  if(!isHydrated) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">กำลังโหลด...</div>;
+  if(!isAuthenticated) return <div className="text-white p-8">Unauthorized</div>;
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
+          <PageHeader eyebrow="จักรวรรดิ" title="จัดการร้าน — เมนู & สูตร" icon={<Icon name="inventory" size={18} />} subtitle="เมนูเพิ่มได้ไม่จำกัด • สูตรดึงจาก Farm โดยตรง + สแกนบิลตลาด (เน้นผลิตเอง)" actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">← POS</Link>} />
+        </header>
+        <main className="max-w-6xl mx-auto p-6 space-y-4 w-full">
+          {msg && <div className="inset p-3 text-sm text-emerald-300">{msg}</div>}
+          {err && <div className="inset p-3 text-sm text-red-400">{err}</div>}
+
+          <div className="card p-4 flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="text-xs text-gray-400">ร้าน</label>
+              <select value={selected} onChange={e=>setSelected(e.target.value)} className="mt-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <option value="">— เลือกร้าน —</option>
+                {restaurants.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-400">ผูกกล้องหน้าร้าน (cameraId)</label>
+                <input value={cameraId} onChange={e=>setCameraId(e.target.value)} placeholder="เช่น Camera.id จาก /sensors" className="mt-1 w-64 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <button onClick={bindCamera} className="px-3 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm">ผูกกล้อง</button>
+            </div>
+            <div className="ml-auto text-xs text-gray-500">เจ้าของร้านเพิ่มได้ / superadmin เห็นรายจ่ายทั้งหมด</div>
+          </div>
+
+          {!selected ? <div className="text-sm text-gray-500 py-8 text-center">เลือกร้านก่อน</div> : (
+            <>
+              <div className="card p-4">
+                <h3 className="font-bold mb-2">เพิ่มเมนู</h3>
+                <div className="flex flex-wrap gap-2">
+                  <input value={name} onChange={e=>setName(e.target.value)} placeholder="ชื่อเมนู เช่น ข้าวผัดกระเพรา" className="flex-1 min-w-60 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                  <input value={price} onChange={e=>setPrice(e.target.value)} placeholder="ราคา บาท" type="number" className="w-32 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                  <select value={category} onChange={e=>setCategory(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                    <option value="FOOD">FOOD</option><option value="DRINK">DRINK</option><option value="DESSERT">DESSERT</option>
+                  </select>
+                  <button onClick={createMenu} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold">+ เพิ่ม</button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">เมนูเพิ่มได้ไม่จำกัด — สูตรจะดึงวัตถุดิบจาก Inventory/Farm</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {menus.map(m=>(
+                  <div key={m.id} className="card p-4 space-y-2">
+                    <div className="flex justify-between"><span className="font-bold">{m.name}</span><span className="text-sm text-emerald-400">{m.priceTHB} บาท</span></div>
+                    <div className="text-xs text-gray-500">{m.recipes?.length||0} วัตถุดิบ {m.recipes?.some((r:any)=>r.isSelfProduced)?"• เน้นผลิตเอง":""}</div>
+                    {editing===m.id ? (
+                      <div className="space-y-2">
+                        {recipeLines.map((l,i)=>(
+                          <div key={i} className="flex gap-2">
+                            <input value={l.farmCrop} onChange={e=>{ const a=[...recipeLines]; a[i].farmCrop=e.target.value; setRecipeLines(a); }} placeholder="ชื่อพืช/วัตถุดิบ (เช่น ข้าวหอม)" className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
+                            <select value={l.inventoryItemId||""} onChange={e=>{ const a=[...recipeLines]; a[i].inventoryItemId=e.target.value; setRecipeLines(a); }} className="w-40 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs">
+                              <option value="">— เลือกจากสต็อก —</option>
+                              {inventory.map((it:any)=><option key={it.id} value={it.id}>{it.name} ({it.quantity}{it.unit})</option>)}
+                            </select>
+                            <input value={l.qtyGram} onChange={e=>{ const a=[...recipeLines]; a[i].qtyGram=e.target.value; setRecipeLines(a); }} type="number" placeholder="กรัม" className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
+                            <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={l.isSelfProduced} onChange={e=>{ const a=[...recipeLines]; a[i].isSelfProduced=e.target.checked; setRecipeLines(a); }} />ผลิตเอง</label>
+                            <button onClick={()=>setRecipeLines(recipeLines.filter((_,j)=>j!==i))} className="text-red-400 text-xs">ลบ</button>
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <button onClick={()=>setRecipeLines([...recipeLines,{farmCrop:"",qtyGram:50,isSelfProduced:true}])} className="text-xs px-2 py-1 bg-gray-800 rounded">+ แถว</button>
+                          <button onClick={()=>saveRecipe(m.id)} className="text-xs px-3 py-1 bg-emerald-600 rounded font-bold">บันทึกสูตร</button>
+                          <button onClick={()=>setEditing(null)} className="text-xs px-3 py-1 bg-gray-700 rounded">ยกเลิก</button>
+                        </div>
+                        <p className="text-[11px] text-gray-500">ถ้าติ๊กผลิตเอง ระบบจะเช็คสต็อก Farm ก่อนขาย — ถ้าไม่พอจะบล็อกเมนู (เนื้อหมูให้เอาติ๊กออก ซื้อตลาดได้)</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {m.recipes?.length? <ul className="text-xs text-gray-400 list-disc ml-4">{m.recipes.map((r:any,i:number)=><li key={i}>{r.farmCrop||r.inventoryItemId} {r.qtyGram}g {r.isSelfProduced?"(ผลิตเอง)":"(ซื้อได้)"}</li>)}</ul> : <div className="text-xs text-gray-600">ยังไม่มีสูตร</div>}
+                        <button onClick={()=>{ setEditing(m.id); setRecipeLines(m.recipes?.length?m.recipes.map((r:any)=>({farmCrop:r.farmCrop||"",inventoryItemId:r.inventoryItemId||"",qtyGram:r.qtyGram,isSelfProduced:r.isSelfProduced})): [{farmCrop:"",qtyGram:100,isSelfProduced:true}]); }} className="mt-2 text-xs px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded">แก้ไขสูตร</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}

@@ -1492,6 +1492,108 @@ model SystemSetting {
   @@map("system_settings")
 }
 
+// ── Restaurant Empire — ร้านอาหารจักรวรรดิ (Farm→Inventory→Menu→Order→Treasury) ──
+model Restaurant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  cameraId  String?  @db.Uuid // ผูก Camera.id หน้าร้าน (superadmin/owner ผูกได้)
+  ownerId   String?  @db.Uuid // User ที่เป็นเจ้าของร้าน
+  status    String   @default("OPEN") // OPEN | CLOSED
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  menus  MenuItem[]
+  orders RestaurantOrder[]
+
+  @@map("restaurants")
+}
+
+model RestaurantCustomer {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  phone        String?
+  knownFaceId  String?  @db.Uuid
+  points       Int      @default(0)
+  tier         String   @default("BRONZE")
+  consentFace  Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+
+  orders RestaurantOrder[]
+
+  @@index([phone])
+  @@map("restaurant_customers")
+}
+
+model MenuItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @db.Uuid
+  name         String
+  priceTHB     Float
+  category     String   @default("FOOD")
+  isActive     Boolean  @default(true)
+  imageUrl     String?
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  recipes    RecipeLine[]
+
+  @@index([restaurantId])
+  @@map("menu_items")
+}
+
+model RecipeLine {
+  id              String  @id @default(uuid()) @db.Uuid
+  menuId          String  @db.Uuid
+  inventoryItemId String? @db.Uuid // ผูก InventoryItem (วัตถุดิบ)
+  farmCrop        String? // ชื่อพืชจาก Farm (fallback ถ้ายังไม่มี inventory)
+  qtyGram         Float
+  isSelfProduced  Boolean @default(true) // true = ต้องมาจาก Farm เท่านั้น
+  isOptional      Boolean @default(false)
+
+  menu MenuItem @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@index([menuId])
+  @@map("recipe_lines")
+}
+
+model RestaurantOrder {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderNo      String   @unique // ORD-YYYYMMDD-XXXX
+  restaurantId String   @db.Uuid
+  customerId   String?  @db.Uuid
+  tableNo      String?
+  type         String   @default("DINE_IN") // DINE_IN | TAKEAWAY
+  status       String   @default("PENDING") // PENDING | PAID | CANCELLED
+  totalTHB     Float
+  payment      String? // CASH | PROMPTPAY
+  pointsEarned Int      @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id])
+  customer   RestaurantCustomer? @relation(fields: [customerId], references: [id])
+  lines      RestaurantOrderLine[]
+
+  @@index([restaurantId, createdAt])
+  @@index([customerId])
+  @@map("restaurant_orders")
+}
+
+model RestaurantOrderLine {
+  id           String @id @default(uuid()) @db.Uuid
+  orderId      String @db.Uuid
+  menuId       String @db.Uuid
+  qty          Int
+  priceAtOrder Float
+
+  order RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("restaurant_order_lines")
+}
+
 // ── Multimodal Vision Ingestion (ปศุสัตว์) — รูปอาการป่วย → Qwen2-VL → JSON สรุป ──
 // รับภาพ base64 (ผื่นผิวหนัง/อุจจาระ/รอยโรค) สกัดสรุปอาการประกอบการวินิจฉัยของ Vet AI
 // (เก็บเฉพาะผลวิเคราะห์ JSON — ไม่เก็บภาพต้นฉบับ กันแบตข้อมูล)
