@@ -49,7 +49,7 @@ function splitList(value: string | undefined): string[] {
 // ── Feature Modules (ENABLED_MODULES) ──
 // แต่ละโมดูล = กลุ่ม API / หน้าเว็บที่เปิด-ปิดได้อิสระผ่าน infra/.env
 // ค่าว่าง = เปิดทุกโมดูล (เข้ากันได้กับ config เก่า) — ระบุแค่โมดูลที่อยากเปิดถ้าต้องการปิดตัวอื่น
-export const AVAILABLE_MODULES = ['inventory', 'farm', 'vision', 'documents'] as const;
+export const AVAILABLE_MODULES = ['inventory', 'farm', 'vision', 'documents', 'restaurant'] as const;
 export type ModuleName = (typeof AVAILABLE_MODULES)[number];
 
 function parseEnabledModules(): Set<ModuleName> {

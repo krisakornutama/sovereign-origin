@@ -181,30 +181,30 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.status === 'PAID') return res.json(order);
     const payment = req.body?.payment === 'PROMPTPAY' ? 'PROMPTPAY' : 'CASH';
-    // หักสต็อกตามสูตร + คำนวณ food_cost
-    for (const line of order.lines) {
-      const menu = await prisma.menuItem.findUnique({ where: { id: line.menuId }, include: { recipes: true } });
-      for (const r of menu?.recipes || []) {
-        if (r.inventoryItemId) {
-          const inv = await prisma.inventoryItem.findUnique({ where: { id: r.inventoryItemId } });
-          if (inv) {
-            const needKg = (r.qtyGram * line.qty) / 1000;
-            await prisma.inventoryItem.update({ where: { id: inv.id }, data: { quantity: Math.max(0, inv.quantity - needKg) } });
+    const pointsEarned = Math.floor(order.totalTHB / 20);
+    const actorId = (req as any).user?.id;
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const line of order.lines) {
+        const menu = await tx.menuItem.findUnique({ where: { id: line.menuId }, include: { recipes: true } });
+        for (const r of menu?.recipes || []) {
+          if (r.inventoryItemId) {
+            const inv = await tx.inventoryItem.findUnique({ where: { id: r.inventoryItemId } });
+            if (inv) {
+              const needKg = (r.qtyGram * line.qty) / 1000;
+              await tx.inventoryItem.update({ where: { id: inv.id }, data: { quantity: Math.max(0, inv.quantity - needKg) } });
+            }
           }
         }
       }
-    }
-    // บันทึกรายรับร้าน (แยกกระเป๋า restaurant) — ใช้ TreasuryEvent + TransferOrder ถ้ามี tableNo ไม่ต้อง
-    const pointsEarned = Math.floor(order.totalTHB / 20); // 20 บาท = 1 แต้ม
-    const updated = await prisma.restaurantOrder.update({ where: { id: order.id }, data: { status: 'PAID', payment, pointsEarned } });
-    if (order.customerId && pointsEarned > 0) {
-      await prisma.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { increment: pointsEarned } } });
-    }
-    // สร้าง TreasuryEvent ให้ superadmin เห็น (userId = restaurant owner หรือผู้จ่าย)
-    const actorId = (req as any).user?.id;
-    if (actorId) {
-      await prisma.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: order.totalTHB / 35, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}` } as any });
-    }
+      const upd = await tx.restaurantOrder.update({ where: { id: order.id }, data: { status: 'PAID', payment, pointsEarned } });
+      if (order.customerId && pointsEarned > 0) {
+        await tx.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { increment: pointsEarned } } });
+      }
+      if (actorId) {
+        await tx.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: order.totalTHB / 35, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}` } as any });
+      }
+      return upd;
+    });
     res.json(updated);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
