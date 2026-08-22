@@ -8,8 +8,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createCanvas } from 'canvas';
-import { execSync } from 'child_process';
 
 // ============================================================
 // ค่าคงที่การตั้งค่า (Configurable)
@@ -204,7 +202,7 @@ function computeStats(zones: ZoneResult[], totalWidth: number, totalLength: numb
   // คำนวณ median ประมาณ (เรียงค่าทั้งหมด – ข้ามไปเพื่อความเร็ว – ใช้ mean แทนในที่นี้)
   // ในการใช้งานจริงควรรวบรวมค่าทั้งหมดแล้วเรียง
 
-  return { elevationMin: min, elevationMax: max, elevationMean, elevationMedian: elevationMean, totalPointCount };
+  return { elevationMin: min, elevationMax: max, elevationMean, elevationMedian: elevationMean, totalPointCount: totalPoints };
 }
 
 // ============================================================
@@ -386,4 +384,4 @@ if (require.main === module) {
   });
 }
 
-export { processDEM, processDEMAsync, generateTestDEM, main };
+export { generateTestDEM, main };

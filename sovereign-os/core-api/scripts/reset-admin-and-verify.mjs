@@ -24,8 +24,8 @@ const axios = require('axios');
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:3001';
 const USERNAME = 'admin';
-// mfa_secret ที่อยู่ใน DB ก่อน seed ถูก re-run (จาก backup 2026-08-11 23:20)
-const OLD_BACKUP_SECRET = 'KMQTU5BBIVPEYKKSK53XIODUGRESY3KWEEYTYVTUFRZCKNDGEZZA';
+// mfa_secret ที่อยู่ใน DB ก่อน seed ถูก re-run — ต้องตั้งผ่าน env OLD_BACKUP_SECRET (ห้าม hardcode)
+const OLD_BACKUP_SECRET = process.env.OLD_BACKUP_SECRET || '';
 
 function db(sql) {
   const tmp = mkdtempSync(join(tmpdir(), 'sovq-'));
@@ -83,17 +83,21 @@ async function main() {
   console.log('   ✅ รหัสผิดถูก reject ถูกต้อง');
 
   console.log(`\n== 4) รหัสจาก OLD secret (แอป Authenticator ของ user) ==`);
-  const oldCode = speakeasy.totp({ secret: OLD_BACKUP_SECRET, encoding: 'base32' });
-  const old = await post('/api/auth/verify-mfa', { code: oldCode }, { Authorization: `Bearer ${preToken}` });
-  console.log(`   code ที่คำนวณจาก secret เก่า: ${oldCode}`);
-  console.log(`   HTTP ${old.status} → ${old.data?.token ? '✅ ผ่าน (full token ได้)' : JSON.stringify(old.data)}`);
-  if (restored) {
-    if (old.status !== 200 || !old.data?.token) { console.error('   ❌ ควรผ่านเพราะกู้ secret เก่ากลับมาแล้ว'); process.exit(1); }
-    console.log('   ✅ แอป Authenticator เดิมใช้ได้อีกครั้ง');
-  } else if (old.status !== 400) {
-    console.error('   ❌ ควรได้ 400 (secret ยังไม่ตรงกับแอป)'); process.exit(1);
+  if (!OLD_BACKUP_SECRET) {
+    console.log('   ⏭️  ข้าม — ไม่ได้ตั้ง OLD_BACKUP_SECRET env');
   } else {
-    console.log('   ✅ โดน reject → แอป user ยังไม่ sync (ยืนยันว่าตัวตน 2FA เก่าไม่ถูกต้อง)');
+    const oldCode = speakeasy.totp({ secret: OLD_BACKUP_SECRET, encoding: 'base32' });
+    const old = await post('/api/auth/verify-mfa', { code: oldCode }, { Authorization: `Bearer ${preToken}` });
+    console.log(`   code ที่คำนวณจาก secret เก่า: ${oldCode}`);
+    console.log(`   HTTP ${old.status} → ${old.data?.token ? '✅ ผ่าน (full token ได้)' : JSON.stringify(old.data)}`);
+    if (restored) {
+      if (old.status !== 200 || !old.data?.token) { console.error('   ❌ ควรผ่านเพราะกู้ secret เก่ากลับมาแล้ว'); process.exit(1); }
+      console.log('   ✅ แอป Authenticator เดิมใช้ได้อีกครั้ง');
+    } else if (old.status !== 400) {
+      console.error('   ❌ ควรได้ 400 (secret ยังไม่ตรงกับแอป)'); process.exit(1);
+    } else {
+      console.log('   ✅ โดน reject → แอป user ยังไม่ sync (ยืนยันว่าตัวตน 2FA เก่าไม่ถูกต้อง)');
+    }
   }
 
   console.log(`\n== 5) POSITIVE: รหัสจาก secret ปัจจุบันใน DB (ควรผ่าน) ==`);
