@@ -118,7 +118,7 @@ export const config = {
     keyPath: process.env.TLS_KEY || '',
   },
   // จำกัด origin ที่เชื่อม API ได้ (production ควรตั้งเป็นโดเมนหน้าเว็บ ไม่ใช่ *)
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+  corsOrigin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? 'http://localhost:3000' : 'http://localhost:3000,http://127.0.0.1:3000'),
   // AI agent policy — autonomy level + protected targets for action tools
   agent: {
     autonomy: getAgentAutonomy(),
