@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
+import { config } from '../../config';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/sensors/devices
 router.get('/devices', authenticate, async (req, res) => {
@@ -38,7 +38,7 @@ router.post('/devices', authenticate, async (req, res) => {
     const { name, type, mqtt_topic, node_id } = req.body;
     const device = await prisma.device.create({
       data: {
-        node_id: node_id || '11111111-1111-1111-1111-111111111111',
+        node_id: node_id || config.defaults.telemetryNodeId,
         type,
         mqtt_topic: mqtt_topic || `sovereign/${name}/sensor/+`,
         is_active: true,
@@ -64,7 +64,7 @@ router.delete('/devices/:id', authenticate, async (req, res) => {
 router.post('/generate-code', authenticate, async (req, res) => {
   const { type, sensors, wifiSSID, wifiPass, mqttServer, deviceId } = req.body;
   const mqttHost = mqttServer || '10.12.55.234';
-  const nodeId = '11111111-1111-1111-1111-111111111111';
+  const nodeId = config.defaults.telemetryNodeId;
   const deviceName = deviceId || `Sovereign-${Date.now()}`;
 
   let code = '';

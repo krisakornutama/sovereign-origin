@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // ความจุแบตเตอรี่ (kWh) — ตั้งได้ผ่าน env ENERGY_CAPACITY_KWH (ค่าเริ่มต้น 5 kWh)
 const CAPACITY_KWH = parseFloat(process.env.ENERGY_CAPACITY_KWH || '5');

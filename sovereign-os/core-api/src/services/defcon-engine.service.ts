@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import EventEmitter from 'events';
 
 export const defconEmitter = new EventEmitter();
@@ -111,7 +111,6 @@ export class DefconEngine {
 }
 
 // ── Instance สำหรับ wiring ใน server.ts ──
-const prisma = new PrismaClient();
 
 export interface DefconRuntimeConfig {
   hysteresis: number;

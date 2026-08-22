@@ -1,9 +1,8 @@
 import cron from 'node-cron';
 import mqtt from 'mqtt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { interlockStatus } from './actuation.service';
 
-const prisma = new PrismaClient();
 
 const mqttClient = mqtt.connect({
   host: process.env.MQTT_HOST || 'localhost',

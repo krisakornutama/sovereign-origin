@@ -4,14 +4,14 @@
 //   - ลงทะเบียนใบหน้าที่คุ้นเคย (ชื่อ + รูป) → โมเดลจำภาพ (qwen3-vl) เทียบเมื่อเจอคน
 //   - ตั้งกฎ: เปิด/ปิด, ความถี่ตรวจ, ความมั่นใจขั้นต่ำ, เฉพาะคนแปลกหน้า, แจ้ง Telegram
 //   - เมื่อเจอคนที่เข้าเงื่อนไข → จับภาพ → แจ้งเตือน (Telegram) + เก็บประวัติแจ้งเตือน
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { embedFace, matchFaceInImage } from './face-embed.service';
 import { firstResponder } from './first-responder.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

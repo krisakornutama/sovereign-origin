@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import mqtt from 'mqtt';
 import { relayGuard } from '../../services/relay-guard.service';
+import { config } from '../../config';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const mqttClient = mqtt.connect({
   host: process.env.MQTT_HOST || 'localhost',
@@ -15,7 +15,7 @@ const mqttClient = mqtt.connect({
 
 mqttClient.on('connect', () => console.log('Relay MQTT connected'));
 
-const DEFAULT_NODE_ID = '11111111-1111-1111-1111-111111111111';
+const DEFAULT_NODE_ID = config.defaults.telemetryNodeId;
 
 const DEFAULT_RELAYS = [
   { id: 'relay1', label: 'ปั๊มน้ำ' },

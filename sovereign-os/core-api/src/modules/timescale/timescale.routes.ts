@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Only allow safe time_bucket intervals – never interpolate user input into SQL.
 const INTERVAL_PATTERN = /^\d+\s+(second|minute|hour|day|week|month)s?$/i;

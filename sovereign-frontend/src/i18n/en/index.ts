@@ -31,6 +31,7 @@ import predictive from './pages/predictive';
 import property from './pages/property';
 import relay from './pages/relay';
 import reports from './pages/reports';
+import restaurant from './pages/restaurant';
 import riskMonitor from './pages/riskMonitor';
 import scenarioForecast from './pages/scenarioForecast';
 import security from './pages/security';
@@ -72,6 +73,7 @@ export default {
   property,
   relay,
   reports,
+  restaurant,
   riskMonitor,
   scenarioForecast,
   security,

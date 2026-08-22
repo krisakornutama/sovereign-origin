@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { riskEmitter } from '../../services/risk-monitor.service';
 import { classifyDefcon, type DefconLevel } from '../../services/defcon-engine.service';
 import {
@@ -11,7 +11,6 @@ import {
 } from '../../services/scenario-forecast.service';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const VALID_CATEGORIES = ['war', 'banking', 'energy', 'inflation'];
 

@@ -238,38 +238,18 @@ describe('App Control (catalog + state file)', () => {
   });
 });
 
-describe('Threat Intel service (DB จริง — ลบข้อมูลหลังทดสอบ)', () => {
-  test('add + matchDomains + hits เพิ่ม + remove', async () => {
-    const { threatIntel } = await import('../src/services/threat-intel.service');
-    const value = `unittest-${Date.now()}.example.com`;
-    const item = await threatIntel.add({ type: 'DOMAIN', value, category: 'malware', note: 'test' });
-    try {
-      const matched1 = await threatIntel.matchDomains([value]);
-      assert.equal(matched1.length, 1);
-      assert.equal(matched1[0].category, 'malware');
-      const matched2 = await threatIntel.matchDomains([value]);
-      assert.equal(matched2.length, 1, 'match ซ้ำต้องเจออีก');
-      const list = await threatIntel.list({ q: value });
-      assert.ok(list.items.some((i: any) => i.value === value), 'list ค้นหาควรเจอ');
-    } finally {
-      await threatIntel.remove(item.id);
-    }
-    const after = await threatIntel.matchDomains([value]);
-    assert.equal(after.length, 0, 'ลบแล้วต้องไม่เจอ');
-  });
-
+describe('Threat Intel service (unit)', () => {
   test('add IP ต้อง validate IPv4', async () => {
     const { threatIntel } = await import('../src/services/threat-intel.service');
     await assert.rejects(() => threatIntel.add({ type: 'IP', value: '999.1.1.1' }), /IP/);
     await assert.rejects(() => threatIntel.add({ type: 'IP', value: 'not-an-ip' }), /IP/);
   });
-
-  test('seedIfEmpty ไม่ทำอะไรถ้าฐานมีข้อมูลแล้ว', async () => {
-    const { threatIntel } = await import('../src/services/threat-intel.service');
-    const n = await threatIntel.seedIfEmpty();
-    assert.equal(n, 0, 'มีข้อมูลอยู่แล้ว seed ควรคืน 0');
-  });
 });
+
+// หมายเหตุ: เทสต์ add/match/remove และ seedIfEmpty ที่ต้องใช้ DB จริง
+// ย้ายไปอยู่ที่ tests/integration/threat-intel.integration.test.ts แล้ว
+// (รันด้วย RUN_INTEGRATION=1 npm run test:integration — เดิมอยู่ใน unit suite
+//  ทำให้ npm test แดงทุกครั้งบนเครื่องที่ไม่ได้เปิด Postgres)
 
 describe('AI Analyst helpers', () => {
   test('extractRecommendations: ดึงบรรทัดที่ขึ้นต้น - * • เลข', async () => {

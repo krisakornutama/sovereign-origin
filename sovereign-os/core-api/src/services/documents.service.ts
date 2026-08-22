@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { callVision, VISION_MODEL, type CallVisionDeps } from './vision.service';
 import { computeExpiryDate, isCategoryValid } from './inventory.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 

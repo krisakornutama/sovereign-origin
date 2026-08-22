@@ -263,4 +263,16 @@ export const config = {
     // ความคลาดเคลื่อนนาฬิกาที่ยอมรับ (blueprint §8: tolerance 60s + accept ±1 key window)
     clockToleranceMs: parseInt(process.env.DMS_CLOCK_TOLERANCE_MS || '60000', 10),
   },
+  // ── ค่า default กลาง (เดิมฝังตายตัวอยู่ในโค้ดหลายไฟล์) ──
+  defaults: {
+    // node_id เครื่องหลัก — ใช้เมื่อ telemetry/request ไม่ระบุ node มาเอง
+    // (ตรงกับ node ที่ scripts/seed.ts สร้างไว้ตอนติดตั้ง)
+    telemetryNodeId: process.env.TELEMETRY_NODE_ID || '11111111-1111-1111-1111-111111111111',
+  },
+  // ── Restaurant Empire — POS + Kitchen IoT ──
+  restaurant: {
+    // อัตราแลกเปลี่ยน THB→USD ตอนบันทึก TreasuryEvent ประเภท SALE
+    // (เดิมฝัง /35 ตายตัว — ปรับได้ผ่าน env ไม่ต้องแก้โค้ด)
+    thbPerUsd: parseFloat(process.env.THB_PER_USD || '35'),
+  },
 };

@@ -1,10 +1,9 @@
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { securityStream } from './security-stream.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 
-const prisma = new PrismaClient();
 
 // ── First-Responder Mode (SOS) — รับมือเหตุฉุกเฉินกับหน่วยกู้ภัย ──
 // เมื่อเปิดโหมดนี้:

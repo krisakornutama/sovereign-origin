@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/telemetry/latest?node_id=xxx
 router.get('/latest', authenticate, async (req, res) => {

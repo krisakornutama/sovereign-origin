@@ -1,11 +1,11 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import EventEmitter from 'events';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { threatIntel } from './threat-intel.service';
 import { securityStream } from './security-stream.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 export const threatEmitter = new EventEmitter();
 
 const execAsync = promisify(exec);

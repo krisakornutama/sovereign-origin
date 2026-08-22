@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // เก็บประวัติได้สูงสุดกี่ข้อความ (กันโตไม่มีที่สิ้นสุด)
 export const MAX_HISTORY = 500;
