@@ -248,6 +248,39 @@ router.get('/:id/soil-readings', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/farm/plots/:id/harvest {yieldKg, grade?, note?} — เก็บเกี่ยว -> InventoryItem + harvested
+router.post('/:id/harvest', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const plot = await prisma.farmPlot.findUnique({ where: { id: req.params.id } });
+    if (!plot) return res.status(404).json({ error: 'Plot not found' });
+    const yieldKg = Number(req.body?.yieldKg);
+    if (!yieldKg || yieldKg <= 0) return res.status(400).json({ error: 'yieldKg must be > 0' });
+    if (yieldKg > 100000) return res.status(400).json({ error: 'yieldKg too large (max 100000)' });
+    const grade = req.body?.grade ? String(req.body.grade).slice(0, 20) : null;
+    const note = req.body?.note ? String(req.body.note).slice(0, 300) : null;
+    const userId = (req as any).user?.id as string;
+    const cropName = plot.crop || plot.name;
+    // สร้างวัตถุดิบใน Inventory (FOOD) ผูกกับผู้เก็บเกี่ยว
+    const item = await prisma.inventoryItem.create({
+      data: {
+        user_id: userId,
+        name: `${cropName}${grade ? ` (${grade})` : ''}`,
+        category: 'FOOD',
+        quantity: yieldKg,
+        unit: 'kg',
+        unit_price_usd: 0,
+        location: plot.name,
+        notes: note ? `จากแปลง ${plot.name} — ${note}` : `จากแปลง ${plot.name}`,
+      },
+    });
+    await prisma.farmPlot.update({ where: { id: plot.id }, data: { status: 'harvested' } });
+    res.status(201).json({ success: true, inventoryId: item.id, plotId: plot.id, yieldKg });
+  } catch (err) {
+    console.error('Harvest error:', err);
+    res.status(500).json({ error: 'Failed to harvest' });
+  }
+});
+
 // GET /api/farm/plots/:id/analysis?crop=ทุเรียน — วิเคราะห์ดินเทียบกับพืชที่ต้องการปลูก
 router.get('/:id/analysis', authenticate, async (req, res) => {
   try {
