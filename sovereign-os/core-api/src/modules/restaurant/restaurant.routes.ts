@@ -3,11 +3,11 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 
 const router = Router();
-const prisma: any = new PrismaClient();
+const prisma = new PrismaClient();
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 // ── Restaurant ──
-router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name is required' });
