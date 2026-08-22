@@ -4,6 +4,7 @@ import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
 import { authFetch } from "../../lib/apiFetch";
+import { asArray } from "../../lib/fetchJson";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useLanguageStore } from "../../stores/useLanguageStore";
 import Link from "next/link";
@@ -47,10 +48,10 @@ export default function RestaurantPage() {
   const loadMenus = async (rid: string) => {
     if (!rid) return;
     const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus/available?restaurantId=${rid}`);
-    if (res.ok) setMenus(await res.json());
+    if (res.ok) setMenus(asArray(await res.json()));
     else {
       const r2 = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus?restaurantId=${rid}`);
-      if (r2.ok) setMenus(await r2.json());
+      if (r2.ok) setMenus(asArray(await r2.json()));
     }
   };
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated]);

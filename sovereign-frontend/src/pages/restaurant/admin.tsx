@@ -4,6 +4,7 @@ import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
 import { authFetch } from "../../lib/apiFetch";
+import { asArray } from "../../lib/fetchJson";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useLanguageStore } from "../../stores/useLanguageStore";
 import Link from "next/link";
@@ -31,7 +32,7 @@ export default function RestaurantAdminPage() {
   };
   const loadMenus = async (rid:string) => {
     const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/restaurant/menus?restaurantId=${rid}`);
-    if(res.ok) setMenus(await res.json());
+    if(res.ok) setMenus(asArray(await res.json()));
   };
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated]);
   useEffect(()=>{ if(selected) loadMenus(selected); },[selected]);
