@@ -104,6 +104,7 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import farmRoutes from './modules/farm/farm.routes';
 import livestockRoutes from './modules/livestock/livestock.routes';
 import propertyRoutes from './modules/property/property.routes';
+import restaurantRoutes from './modules/restaurant/restaurant.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
 import featureRoutes from './modules/features/feature.routes';
 import { featureGuard } from './services/feature-grant.service';
@@ -210,6 +211,7 @@ if (config.modules.isEnabled('farm')) {
 app.use('/api/livestock', featureGuard('/livestock'), livestockRoutes); // Sovereign Livestock Engine
 }
 app.use('/api/property', featureGuard('/property'), propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์
+app.use('/api/restaurant', restaurantRoutes); // จักรวรรดิร้านอาหาร — Farm→Inventory→Menu→Order
 app.use('/api/govsim', govsimRoutes); // Governance & Socio-Political Simulation (War Room)
 app.use('/api/governor', governorRoutes); // Governor AI — คุมเมืองอัตโนมัติ + มนุษย์ approve เรื่องใหญ่
 app.use('/api/war-room', warRoomRoutes); // War Room Activity Gate — ข้อ 3: simulation หลับ-ตื่น
