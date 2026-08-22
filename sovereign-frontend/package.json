@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "@types/three": "^0.185.4",
-    "lightweight-charts": "^5.2.0",
     "next": "^16.3.0",
-    "next-pwa": "^2.0.2",
     "react": "^18",
     "react-dom": "^18",
     "socket.io-client": "^4.7.5",
