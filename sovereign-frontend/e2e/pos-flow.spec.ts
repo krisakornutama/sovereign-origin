@@ -1,5 +1,15 @@
 import { test, expect, request } from '@playwright/test';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+
+/** รัน SQL ใน container ผ่าน stdin — เลี่ยงปัญหา quoting อักขระไทย/quotes บน Windows shell */
+function psql(sql: string): boolean {
+  const r = spawnSync(
+    'docker',
+    ['exec', '-i', 'sovereign-db', 'psql', '-U', 'sovereign', '-d', 'sovereign_v2'],
+    { input: sql, encoding: 'utf8' }
+  );
+  return r.status === 0;
+}
 
 // ── POS flow เต็มวงจรผ่าน UI จริง ──
 // beforeAll: สร้างร้าน+เมนูผ่าน API (e2e-bot) → เทสต์เลือกร้าน เพิ่มตะกร้า จ่ายเงิน
@@ -15,22 +25,22 @@ let menuId = '';
 /** ลบร้าน/เมนู/ออเดอร์ทดสอบที่ค้างอยู่ (ใช้ทั้งก่อนสร้างและหลังจบ) — ถ้า docker ไม่อยู่ = ข้าม */
 function cleanupDb() {
   if (!restaurantId) return;
-  const sql = `delete from restaurant_order_lines where "orderId" in (select id from restaurant_orders where "restaurantId"='${restaurantId}'); delete from restaurant_orders where "restaurantId"='${restaurantId}'; delete from recipe_lines where "menuId"='${menuId}'; delete from menu_items where "restaurantId"='${restaurantId}'; delete from restaurants where id='${restaurantId}';`;
-  try {
-    execSync(`docker exec sovereign-db psql -U sovereign -d sovereign_v2 -c "${sql}"`, { stdio: 'pipe' });
-  } catch (err) {
-    console.error('[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จ (docker/psql อาจไม่พร้อม):', err instanceof Error ? err.message : err);
-  }
+  const sql = `delete from restaurant_order_lines where "orderId" in (select id from restaurant_orders where "restaurantId"='${restaurantId}');
+delete from restaurant_orders where "restaurantId"='${restaurantId}';
+delete from recipe_lines where "menuId"='${menuId}';
+delete from menu_items where "restaurantId"='${restaurantId}';
+delete from restaurants where id='${restaurantId}';`;
+  if (!psql(sql)) console.error('[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จ (docker/psql อาจไม่พร้อม)');
 }
 
 /** ลบร้านชื่อซ้ำจากรอบก่อน (ทำให้ suite รันซ้ำกี่รอบก็สะอาด) */
 function cleanupByName() {
-  const sql = `delete from restaurant_order_lines where "orderId" in (select id from restaurant_orders o join restaurants r on r.id=o."restaurantId" where r.name='${REST_NAME}'); delete from restaurant_orders where "restaurantId" in (select id from restaurants where name='${REST_NAME}'); delete from recipe_lines where "menuId" in (select id from menu_items m join restaurants r on r.id=m."restaurantId" where r.name='${REST_NAME}'); delete from menu_items where "restaurantId" in (select id from restaurants where name='${REST_NAME}'); delete from restaurants where name='${REST_NAME}';`;
-  try {
-    execSync(`docker exec sovereign-db psql -U sovereign -d sovereign_v2 -c "${sql}"`, { stdio: 'pipe' });
-  } catch {
-    // docker ไม่อยู่ — ไปต่อ (ร้านซ้ำจะไม่เกิดเพราะชื่อ unique ต่อรอบไม่ได้บังคับ)
-  }
+  const sql = `delete from restaurant_order_lines where "orderId" in (select o.id from restaurant_orders o join restaurants r on r.id=o."restaurantId" where r.name='${REST_NAME}');
+delete from restaurant_orders where "restaurantId" in (select id from restaurants where name='${REST_NAME}');
+delete from recipe_lines where "menuId" in (select m.id from menu_items m join restaurants r on r.id=m."restaurantId" where r.name='${REST_NAME}');
+delete from menu_items where "restaurantId" in (select id from restaurants where name='${REST_NAME}');
+delete from restaurants where name='${REST_NAME}';`;
+  psql(sql);
 }
 
 test.beforeAll(async () => {
