@@ -10,7 +10,9 @@ export { prisma };
 const router = Router();
 
 // โฟลเดอร์เก็บ firmware .bin — ตั้งผ่าน env OTA_DIR
-const OTA_DIR = process.env.OTA_DIR || path.join(__dirname, '..', '..', 'ota_firmwares');
+// (ใช้ process.cwd() แทน __dirname เพราะ dev mode รันผ่าน tsx/ESM ที่ __dirname เป็น
+//  undefined → path.join โยน exception ทำให้ GET /firmwares ตาย 500 ตลอดใน container)
+const OTA_DIR = process.env.OTA_DIR || path.join(process.cwd(), 'ota_firmwares');
 // URL ฐานที่ ESP ใช้ดาวน์โหลดไฟล์ — ตั้งเป็น IP/โดเมนของเครื่องนี้ที่ ESP เข้าถึงได้
 const OTA_BASE_URL = process.env.OTA_BASE_URL || 'http://localhost:3001';
 // ถ้าตั้ง OTA_TOKEN → endpoint download ต้องส่ง ?token= มาตรงกัน (กันคนนอกดาวน์โหลด)
