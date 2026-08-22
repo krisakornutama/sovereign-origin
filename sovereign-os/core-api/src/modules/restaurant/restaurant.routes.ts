@@ -209,4 +209,36 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Reports — superadmin เห็นหมด, owner เห็นร้านตัวเอง ──
+router.get('/reports/summary', authenticate, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const isSuper = user?.role === 'SUPERADMIN';
+    const where: any = { status: 'PAID' };
+    if (req.query.restaurantId) where.restaurantId = String(req.query.restaurantId);
+    else if (!isSuper) {
+      const own = await prisma.restaurant.findMany({ where: { ownerId: user.id }, select: { id: true } });
+      where.restaurantId = { in: own.map(o=>o.id) };
+      if (own.length===0) return res.json({ totalRevenue:0, totalOrders:0, byRestaurant:[], daily:[] });
+    }
+    const days = Math.min(Math.max(parseInt(String(req.query.days||'30')),1),90);
+    const since = new Date(Date.now() - days*86400000);
+    where.createdAt = { gte: since };
+    const orders = await prisma.restaurantOrder.findMany({ where, include: { lines: true } });
+    const totalRevenue = orders.reduce((s,o)=>s+o.totalTHB,0);
+    const byRestaurant: Record<string, { revenue:number; count:number }> = {};
+    const daily: Record<string, number> = {};
+    for (const o of orders) {
+      byRestaurant[o.restaurantId] = byRestaurant[o.restaurantId] || { revenue:0, count:0 };
+      byRestaurant[o.restaurantId].revenue += o.totalTHB;
+      byRestaurant[o.restaurantId].count += 1;
+      const k = o.createdAt.toISOString().slice(0,10);
+      daily[k] = (daily[k]||0)+o.totalTHB;
+    }
+    const restaurants = await prisma.restaurant.findMany({ where: isSuper ? {} : { ownerId: user.id } });
+    const byRestaurantArr = Object.entries(byRestaurant).map(([id, v])=>({ restaurantId: id, name: restaurants.find(r=>r.id===id)?.name||id, ...v }));
+    res.json({ totalRevenue, totalOrders: orders.length, avgPerOrder: orders.length? totalRevenue/orders.length:0, byRestaurant: byRestaurantArr, daily, since, days });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;
