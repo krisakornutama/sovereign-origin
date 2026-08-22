@@ -15,9 +15,8 @@ import { securityStream } from './security-stream.service';
 import { sendTelegramAlert } from './telegram-alert.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import type { AlertSeverity } from './telegram-alert.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 // ── Rolling-key HMAC (blueprint §3) ──
 // KEY(t) = SHA256(DMS_MASTER_SECRET || FLOOR(t / 300))   ← หมุนทุก 5 นาที

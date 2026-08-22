@@ -7,9 +7,9 @@
 // - feature key = href ของหน้า เช่น "/portfolio" | "/health" | "/farm"
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // ── รายชื่อหน้าทั้งหมด (ตรงกับ NAV_GROUPS ใน frontend/src/lib/navigation.ts) ──
 // key = href ของหน้า — ใช้เป็น feature key ในตาราง grant

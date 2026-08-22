@@ -3,12 +3,11 @@ import { promisify } from 'util';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 import { sendTelegram } from '../modules/telegram/telegram.routes';
 
 const execFileAsync = promisify(execFile);
-const prisma = new PrismaClient();
 
 // ── System Monitor (Survival Pillar) ──
 // เฝ้าดิสก์/เมม/CPU — แจ้งเตือนก่อนที่ระบบจะตายเงียบ ๆ (ดิสก์เต็ม หน่วยความจำหมด)

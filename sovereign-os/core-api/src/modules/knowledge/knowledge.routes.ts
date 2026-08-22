@@ -12,12 +12,11 @@ import path from 'path';
 import multer from 'multer';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { hashEngine } from '../../services/hash-engine.service';
 import { knowledgeDir, uploadsDir } from '../../services/knowledge-dir.service';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const KNOWLEDGE_DIR = knowledgeDir();
 const UPLOAD_DIR = uploadsDir();

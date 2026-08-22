@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import fs from 'fs';
 import path from 'path';
 import { agentPolicy } from './agent-policy.service';
@@ -15,7 +15,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.AI_MODEL || 'gemma3:4b';
 const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
-export const prisma = new PrismaClient();
+export { prisma };
 
 class AiAgentService {
   // ระบบ prompt ถูกสร้างแบบ dynamic เพื่อให้สะท้อนระดับ autonomy ปัจจุบัน

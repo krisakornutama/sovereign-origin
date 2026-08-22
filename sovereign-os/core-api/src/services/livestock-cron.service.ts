@@ -7,10 +7,10 @@
 //   4) ปลดล็อกกักกันอัตโนมัติเมื่อพ้น QUARANTINE_DAYS
 // ═════════════════════════════════════════════════════════════
 import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { sendTelegramAlert } from './telegram-alert.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 const DAY_MS = 86_400_000;
 
 // ล่วงหน้าที่จะแจ้งเตือน (วัน) — ตั้งผ่าน env ได้

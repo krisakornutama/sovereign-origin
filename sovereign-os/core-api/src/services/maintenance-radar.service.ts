@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 
-const prisma = new PrismaClient();
 
 // ── Maintenance Radar (Sovereignty Tax — ภัย 4) ──
 // ระบบ 40 modules = 780 จุดเชื่อมต่อ = ภาษีอธิปไตย: เวลาชีวิตที่ต้องจ่ายค่าซ่อมบำรุงตลอดไป

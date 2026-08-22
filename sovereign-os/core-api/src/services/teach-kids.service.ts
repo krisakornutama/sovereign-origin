@@ -9,7 +9,7 @@
 
 import axios from 'axios';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { search, type SearchResult } from './semantic-search.service';
 import { sendTelegram } from '../modules/telegram/telegram.routes';
 
@@ -36,7 +36,7 @@ async function notifyParent(message: string): Promise<void> {
   }
 }
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

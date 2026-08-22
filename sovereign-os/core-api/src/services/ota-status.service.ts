@@ -1,7 +1,6 @@
 import mqtt from 'mqtt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 /**
  * ฟังผล OTA จากอุปกรณ์ผ่าน MQTT topic: sovereign/{nodeId}/ota/status

@@ -2,12 +2,11 @@ import { Router } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
 
 const router = Router();
-const prisma = new PrismaClient();
 const execAsync = promisify(exec);
 
 // GET /api/security/connections - ดึงการเชื่อมต่อปัจจุบัน (netstat)

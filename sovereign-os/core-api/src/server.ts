@@ -18,7 +18,8 @@ import { relayScheduler } from './services/relay-scheduler.service';
 import { reportService } from './services/report.service';
 import { backupService } from './services/backup.service';
 import { authenticate, requireRole, auditStateChange } from './middleware/auth.middleware';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from './lib/prisma';
 
 import authRoutes from './modules/auth/auth.routes';
 import nodeRoutes from './modules/nodes/node.routes';
@@ -120,7 +121,6 @@ const execAsync = promisify(exec);
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, { cors: { origin: '*' } });
-const prisma = new PrismaClient();
 const KNOWLEDGE_DIR = knowledgeDir();
 
 // Resolve a requested file name to an absolute path and ensure it stays
@@ -234,7 +234,7 @@ app.get('/api/modules', (_, res) => {
 // Dashboard stats
 app.get('/api/dashboard/stats', authenticate, async (req, res) => {
   try {
-    const nodeId = req.user?.assigned_node_id || '11111111-1111-1111-1111-111111111111';
+    const nodeId = req.user?.assigned_node_id || config.defaults.telemetryNodeId;
     const result = await prisma.$queryRawUnsafe<Array<any>>(
       `SELECT DISTINCT ON (metric) metric, value
        FROM sensor_telemetry
@@ -259,14 +259,22 @@ app.get('/api/dashboard/stats', authenticate, async (req, res) => {
 app.post('/api/sensors/data', authenticate, async (req, res) => {
   try {
     const { node_id, device_id, metric, value } = req.body;
-    const nodeId = node_id || req.user?.assigned_node_id || '11111111-1111-1111-1111-111111111111';
+    // ตรวจค่าก่อนแตะ TimescaleDB — metric เป็นชื่อ และ value ต้องเป็นตัวเลขจริง
+    if (!metric || typeof metric !== 'string' || metric.length > 60) {
+      return res.status(400).json({ error: 'metric ต้องเป็น string ยาว 1-60 ตัวอักษร' });
+    }
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return res.status(400).json({ error: 'value ต้องเป็นตัวเลข' });
+    }
+    const nodeId = node_id || req.user?.assigned_node_id || config.defaults.telemetryNodeId;
     const deviceId = device_id || 'manual-input';
     await prisma.$queryRawUnsafe(
       `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value)
        VALUES (NOW(), $1::uuid, $2, $3, $4)`,
-      nodeId, deviceId, metric, value
+      nodeId, deviceId, metric, numericValue
     );
-    res.status(201).json({ success: true, message: `เพิ่ม ${metric} = ${value} สำเร็จ` });
+    res.status(201).json({ success: true, message: `เพิ่ม ${metric} = ${numericValue} สำเร็จ` });
   } catch (err) {
     console.error('Add sensor error:', err);
     res.status(500).json({ error: 'เพิ่มข้อมูลไม่สำเร็จ' });
@@ -774,7 +782,7 @@ const defconMqtt = mqtt.connect({
   port: Number(process.env.MQTT_PORT) || 1883,
   protocol: 'mqtt',
 });
-const DEFAULT_NODE_ID = '11111111-1111-1111-1111-111111111111';
+const DEFAULT_NODE_ID = config.defaults.telemetryNodeId;
 
 // ── Phase 7: Closed-Loop Actuation Sandbox — ใส่ตัวอ่าน snapshot จริง (TimescaleDB) ──
 actuationService.setDeps({

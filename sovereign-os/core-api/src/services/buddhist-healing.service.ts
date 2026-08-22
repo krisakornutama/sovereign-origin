@@ -2,10 +2,10 @@
 //
 // Sovereign Buddhist Healing Module — ธรรมะบำบัดใจ + สมุนไพรคู่ยา + ติดตามผลการเยียวยา
 // หลักการ: สมุนไพร/แพทย์ดูแลกาย, สติปัฏฐานดูแลใจ, อริยสัจเข้าใจเหตุ, อนัตตาปล่อยวาง
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

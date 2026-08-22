@@ -10,10 +10,10 @@
 // Pure logic แยกจาก data sources เพื่อเทสต์ง่าย (pattern เดียวกับ power-guard)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { automationEmitter } from './automation.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 /** metrics ที่ worker ตรวจหาความผิดปกติประจำ */
 export const KEY_METRICS = ['battery_soc', 'water_level_cm', 'power_kw', 'temperature', 'humidity'] as const;

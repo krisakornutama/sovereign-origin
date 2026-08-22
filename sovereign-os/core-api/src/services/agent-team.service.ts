@@ -4,10 +4,10 @@
 // แต่ละบทบาทมี system prompt + capability (แหล่งข้อมูลที่อ่านได้) ของตัวเอง
 // งานที่สั่ง ("run job") รันแบบเบื้องหลังใน process เดียวกัน — API ตอบกลับทันที
 // และหน้าเว็บ poll สถานะได้ ระหว่างที่ผู้ใช้เปิดหน้าอื่นได้ตามปกติ
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

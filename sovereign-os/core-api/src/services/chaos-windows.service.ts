@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 
-const prisma = new PrismaClient();
 
 // ── Chaos Windows Engine (ภัย 1 + 3 — "Embrace Natural Chaos") ──
 // ระบบนี้เกิดมาเพื่อคุมสภาพแวดล้อมให้ "นิ่งปลอดภัย" — แต่ธรรมชาติของมนุษย์ต้องการความ

@@ -8,7 +8,7 @@ test('ENABLED_MODULES เปิดเฉพาะโมดูลที่ระ�
   process.env.ENABLED_MODULES = 'inventory,not-a-module';
   const { config, AVAILABLE_MODULES } = await import('../src/config');
 
-  assert.deepStrictEqual([...AVAILABLE_MODULES], ['inventory', 'farm', 'vision', 'documents']);
+  assert.deepStrictEqual([...AVAILABLE_MODULES], ['inventory', 'farm', 'vision', 'documents', 'restaurant']);
   assert.strictEqual(config.modules.isEnabled('inventory'), true);
   assert.strictEqual(config.modules.isEnabled('farm'), false);
   assert.deepStrictEqual([...config.modules.enabled], ['inventory']);
