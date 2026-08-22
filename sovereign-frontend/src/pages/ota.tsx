@@ -72,9 +72,12 @@ export default function OtaPage() {
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ota/events`),
       ]);
-      setFirmwares(await fwRes.json());
-      setDevices(await devRes.json());
-      setEvents(await evRes.json());
+      // กัน .map พัง: backend ตอบ 500/403 กลับมาเป็น {error:...} — ยัดเข้า state ตรงๆ
+      // แล้วหน้าจอระเบิดตอน render (firmwares.map is not a function)
+      const [fw, dev, ev] = await Promise.all([fwRes.json(), devRes.json(), evRes.json()]);
+      setFirmwares(Array.isArray(fw) ? fw : []);
+      setDevices(Array.isArray(dev) ? dev : []);
+      setEvents(Array.isArray(ev) ? ev : []);
     } catch (err) {
       console.error(err);
       setError(t('ota.loadingFail', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
