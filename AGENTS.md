@@ -9,10 +9,11 @@
 - ถ้าแก้แล้วพัง → `git diff` ดูว่าแก้อะไรไป แล้ว `git checkout -- <ไฟล์>` คืนเฉพาะส่วนที่พัง
 - **ห้าม force push** 除非ได้รับอนุญาตจากผู้ใช้
 
-### 2. BUILD BEFORE COMMIT — ต้อง build ผ่านก่อน commit
-- หลังแก้โค้ดทุกครั้ง ต้องรัน `npx next build` (frontend) หรือ build command ของ backend
-- ถ้า build ไม่ผ่าน **ห้าม commit** ต้องแก้ให้ผ่านก่อน
-- ถ้า build error จำนวนมาก ให้ย้อนกลับไป backup แล้วแก้ทีละจุด
+### 2. BUILD BEFORE COMMIT — ต้องผ่าน quality gate ก่อน commit
+- หลังแก้โค้ดทุกครั้ง รัน `npm run verify` ที่ **root ของ repo** (สคริปต์เดียวครบ: backend build+test, frontend typecheck+build)
+- ถ้า verify ไม่ผ่าน **ห้าม commit** ต้องแก้ให้ผ่านก่อน
+- แก้อะไรที่กระทบหน้าเว็บ/UI ให้รัน `npm run verify:full` (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
+- ถ้า error จำนวนมาก ให้ย้อนกลับไป backup แล้วแก้ทีละจุด
 
 ### 3. BRANCH WORKFLOW — ทำงานบน branch แยก
 - สร้าง branch ใหม่สำหรับแต่ละ feature: `git checkout -b ai/<feature-name>`
@@ -66,7 +67,7 @@
 1. git add -A && git commit -m "backup: before <task>"
 2. git checkout -b ai/<task-name>
 3. แก้โค้ด
-4. npx next build (frontend) หรือ build ของ backend
+4. npm run verify (ที่ root — ครอบ build+test ทั้งสองฝั่ง)
 5. ถ้า build ไม่ผ่าน → แก้ หรือ git checkout -- ไฟล์ที่พัง
 6. ถ้า build ผ่าน → git add -A && git commit -m "<task description>"
 7. git checkout main && git merge ai/<task-name>

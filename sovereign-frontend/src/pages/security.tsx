@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -77,7 +78,7 @@ export default function SecurityPage() {
     if (!isSuperadmin) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/approvals`);
-      if (res.ok) setApprovals(await res.json());
+      if (res.ok) setApprovals(asArray(await res.json()));
     } catch (err) {
       // เงียบ ๆ — หน้า firewall ยังใช้งานได้
     }

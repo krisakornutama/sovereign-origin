@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
+import { asArray } from '../../lib/fetchJson';
 import Icon from '../ui/Icon';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { fmtLocale } from '../../lib/formatDate';
@@ -351,8 +352,8 @@ export default function NextGenPanel() {
         authFetch(`${API}/dns/queries?limit=20`),
       ]);
       if (s.ok) setSummary(await s.json());
-      if (t.ok) setTopBlocked(await t.json());
-      if (q.ok) setQueries(await q.json());
+      if (t.ok) setTopBlocked(asArray(await t.json()));
+      if (q.ok) setQueries(asArray(await q.json()));
     }, []);
 
     useEffect(() => { load(); }, [load]);
