@@ -7,13 +7,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import multer from 'multer';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { dimeProcessor } from '../../services/dime.service';
 import { isDimeConfigured, loadDimeImapConfig } from '../../services/dime-imap.service';
 
 const router = Router();
-export const prisma = new PrismaClient();
+export { prisma };
 
 const pdfUpload = multer({
   storage: multer.memoryStorage(),

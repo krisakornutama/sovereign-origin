@@ -1,13 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { sendTelegramAlert } from './telegram-alert.service';
 import { aiKillSwitch } from './ai-kill-switch.service';
 import { firstResponder } from './first-responder.service';
 
-const prisma = new PrismaClient();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 7: Closed-Loop Actuation Sandbox (Safety Engineering)

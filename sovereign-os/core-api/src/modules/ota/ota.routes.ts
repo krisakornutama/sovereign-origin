@@ -2,10 +2,10 @@ import { Router, raw } from 'express';
 import fs from 'fs';
 import path from 'path';
 import mqtt from 'mqtt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const router = Router();
 

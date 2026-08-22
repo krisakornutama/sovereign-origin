@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { createHash } from 'node:crypto';
 import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { parseDimeStatementText, type DimeParsedAsset } from './dime-parser.service';
 import {
   fetchDimeStatementPdf,
@@ -273,7 +273,7 @@ export type DimeProcessor = ReturnType<typeof createDimeProcessor>;
 
 // ── Singleton (ใช้งานจริง) ──
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export const dimeProcessor: DimeProcessor = createDimeProcessor(
   {

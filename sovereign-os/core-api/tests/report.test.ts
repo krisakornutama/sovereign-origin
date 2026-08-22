@@ -7,8 +7,25 @@ import { prisma as chartPrisma } from '../src/services/chart-snapshot.service';
 import { mockModel } from './helpers';
 
 before(() => {
-  // ── data layer (report service) ──
+  // ── data layer ──
+  // หมายเหตุ: หลังรวม PrismaClient เป็น singleton (src/lib/prisma.ts)
+  // prisma ของ report.service กับ chart-snapshot.service เป็น instance เดียวกัน
+  // จึงต้อง mock $queryRawUnsafe ครั้งเดียวที่ตอบทุก query pattern (mock ซ้อน mock
+  // บน object เดียวกันจะทับกัน — ตัวหลังชนะ ตัวหน้าเงียบหาย)
   mock.method(prisma, '$queryRawUnsafe', async (query: string) => {
+    // chart snapshot — ให้ทุก metric มีข้อมูล
+    if (query.includes('time_bucket')) {
+      const now = Date.now();
+      const metrics = ['temperature', 'humidity', 'battery_soc', 'power_kw', 'water_level_cm', 'rainfall'];
+      const rows: any[] = [];
+      for (const m of metrics) {
+        for (let i = 0; i < 10; i++) {
+          rows.push({ metric: m, bucket: new Date(now - (9 - i) * 600000).toISOString(), avg_value: 20 + i });
+        }
+      }
+      return rows;
+    }
+    // report stats
     if (query.includes('DISTINCT ON')) return [{ metric: 'temperature', value: 30 }];
     if (query.includes('GROUP BY metric'))
       return [{ metric: 'temperature', min_value: 20, avg_value: 25, max_value: 30 }];
@@ -24,20 +41,8 @@ before(() => {
       created_at: new Date(),
     }),
   });
-
-  // ── data layer (chart snapshot) — ให้ทุก metric มีข้อมูล ──
-  mock.method(chartPrisma, '$queryRawUnsafe', async (query: string) => {
-    if (!query.includes('time_bucket')) return [];
-    const now = Date.now();
-    const metrics = ['temperature', 'humidity', 'battery_soc', 'power_kw', 'water_level_cm', 'rainfall'];
-    const rows: any[] = [];
-    for (const m of metrics) {
-      for (let i = 0; i < 10; i++) {
-        rows.push({ metric: m, bucket: new Date(now - (9 - i) * 600000).toISOString(), avg_value: 20 + i });
-      }
-    }
-    return rows;
-  });
+  // chartPrisma === prisma (singleton) — mock ข้างบนครอบคลุมทั้งสอง call site แล้ว
+  void chartPrisma;
 });
 
 after(() => {
@@ -95,14 +100,21 @@ test('weekly report uses weekly period text in photo caption', async () => {
 
 test('skips chart photos for metrics without data, but still sends message', async () => {
   // ให้ทุก time_bucket query คืนค่าว่าง → ไม่มี metric ไหนวาดกราฟได้
-  mock.method(chartPrisma, '$queryRawUnsafe', async () => []);
+  // หมายเหตุ: หลังรวม PrismaClient เป็น singleton override นี้ทับ mock กลาง
+  // (กระทบ gatherStats ด้วย) และต้อง restore เมื่อจบเทสต์ ไม่งั้นเทสต์ถัดไป
+  // เห็น query ว่างทุกอัน
+  const emptyChart = mock.method(prisma, '$queryRawUnsafe', async () => []);
   const postMock = mockAxios();
 
-  await reportService.generateNow('daily');
+  try {
+    await reportService.generateNow('daily');
 
-  const { sendMessage, sendPhoto } = splitCalls(postMock);
-  assert.strictEqual(sendMessage.length, 1);
-  assert.strictEqual(sendPhoto.length, 0, 'ไม่มีข้อมูล → ไม่ส่งรูป');
+    const { sendMessage, sendPhoto } = splitCalls(postMock);
+    assert.strictEqual(sendMessage.length, 1);
+    assert.strictEqual(sendPhoto.length, 0, 'ไม่มีข้อมูล → ไม่ส่งรูป');
+  } finally {
+    emptyChart.mock.restore();
+  }
 });
 
 test('falls back to text summary when Ollama is offline (report still generated + sent)', async () => {

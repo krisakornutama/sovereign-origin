@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 export type IntelType = 'IP' | 'DOMAIN';
 export type IntelCategory =

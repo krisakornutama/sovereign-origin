@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 // ── Time-Consensus Engine (Phase 6 — ภัยที่ 2: Byzantine Time Drift & NTP Poisoning) ──
 // ระบบ local-first ผูกกับ System Clock ทั้งหมด (TLS, tokens, SSE replay, cron, solar calc)

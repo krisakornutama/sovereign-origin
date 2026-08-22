@@ -1,10 +1,9 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 
-const prisma = new PrismaClient();
 
 // ── Data Integrity Guard (Bit Rot — ภัยที่ 3: NAND Flash Exhaustion & Silent Bit Rot) ──
 // ไฟล์ state ทั้งหมดของระบบเขียนด้วย checksum sidecar (.sha256)

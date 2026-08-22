@@ -2,12 +2,12 @@
 //
 // Coding Agent — ผู้ใช้พิมพ์ภาพรวมครั้งเดียว → AI วางแผน → เขียนโค้ดทุกไฟล์
 // → ตรวจงาน (lint/review) → เสนอทางต่อ 2-4 ตัวเลือก — รันแบบเบื้องหลัง (poll ได้)
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export const prisma = new PrismaClient();
+export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';

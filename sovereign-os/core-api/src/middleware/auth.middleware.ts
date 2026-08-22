@@ -1,12 +1,11 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AuditService } from '../services/audit.service';
 import { config } from '../config';
 import { warRoomPulse } from '../services/war-room.service';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = config.jwtSecret;
 
 // Extend Express Request to include authenticated user

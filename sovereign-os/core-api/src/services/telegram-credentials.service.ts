@@ -1,10 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 // ── Telegram credential resolver: DB (ตั้งผ่าน UI) → env (.env) ──
 // ให้ผู้ใช้กรอก bot token / chat ID ในหน้า Settings โดยไม่ต้องแก้ .env บนเครื่อง
 // กฎความสำคัญ: ค่าที่ตั้งใน DB (system_settings) ชนะ env — เหมือน override
 
-const prisma = new PrismaClient();
 
 const TELEGRAM_TOKEN_KEY = 'telegram.botToken';
 const TELEGRAM_CHAT_ID_KEY = 'telegram.chatId';

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import EventEmitter from 'events';
 import cron from 'node-cron';
 
@@ -220,7 +220,6 @@ export class RiskWorker {
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
-const prisma = new PrismaClient();
 
 /** ตรวจว่ามีตัวอักษรภาษาไทย (ก-ฮ / เ-ไ / ฯ ๆ ุ ู ึ ื ั ้ ๊ ๋ ็ ์ ํ) อย่างน้อย 2 ตัวหรือไม่ */
 function containsThai(text: string): boolean {

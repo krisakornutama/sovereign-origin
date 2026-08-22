@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { securityStream } from './security-stream.service';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 
-const prisma = new PrismaClient();
 
 // ── Reality-Check & Paranoia Index (ป้องกัน Synthetic Insanity) ──
 // สมาชิกบ้านสามารถยืนยัน/ปฏิเสธการแจ้งเตือนของระบบ:
