@@ -25,6 +25,7 @@ export const common = {
     inventory: 'Inventory & Supplies',
     farm: 'Farm Plots',
     livestock: 'Livestock',
+    restaurant: 'Restaurant',
     portfolio: 'Wealth & Assets',
     treasury: 'Treasury & Invest',
     treasuryNetWorth: 'Net Worth & Cash',
