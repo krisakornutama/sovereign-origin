@@ -11,6 +11,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
+import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 
 // ── โทเค็นห้องคลัง (เหล็กกล้า + หมึกสมุด + ไฟสีของตระกูล) ──
@@ -530,30 +531,30 @@ export default function TreasuryPage() {
   const pendingCount = transfers.filter((x) => x.status === 'PENDING').length;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 flex" style={{ background: 'radial-gradient(1000px 380px at 50% -6%, rgba(52,211,153,0.05), transparent 60%), #030712' }}>
+    <div className="min-h-screen bg-gray-950 text-gray-200 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="border-b border-gray-800 px-6 py-3 flex flex-wrap justify-between items-center gap-3 bg-gray-950">
-          <div>
-            <p className="mono text-[9px] tracking-[0.3em] text-emerald-500/80 uppercase">{t('treasury.page.eyebrow', 'ชีวิต & การเงิน')}</p>
-            <h1 className="font-semibold text-xl text-gray-100 glow-text">{t('treasury.page.title', 'SOVEREIGN TREASURY')}</h1>
-            <p className="text-[11px] text-gray-500">{t('treasury.page.subtitle', 'คลัง & ลงทุน — ทรัพย์สิน / Survival Runway / กลยุทธ์ 5 ตระกูล')}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSuperadmin && members.length > 0 && (
-              <select value={viewOwnerId} onChange={(e) => setViewOwnerId(e.target.value)} className={INPUT}>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>{m.username}{m.id === user?.id ? ' (คุณ)' : ''}</option>
-                ))}
-              </select>
-            )}
-            <button onClick={() => run(load)} disabled={loading} className={BTN}>
-              <Icon name="refresh" size={14} /> {t('treasury.page.refresh', 'รีเฟรช')}
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-6xl mx-auto p-6 space-y-5 w-full">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('treasury.page.eyebrow', 'ชีวิต & การเงิน')}
+            title={t('treasury.page.title', 'SOVEREIGN TREASURY')}
+            subtitle={t('treasury.page.subtitle', 'คลัง & ลงทุน — ทรัพย์สิน / Survival Runway / กลยุทธ์ 5 ตระกูล')}
+            icon={<Icon name="portfolio" size={18} />}
+            actions={
+              <>
+                {isSuperadmin && members.length > 0 && (
+                  <select value={viewOwnerId} onChange={(e) => setViewOwnerId(e.target.value)} className={INPUT}>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>{m.username}{m.id === user?.id ? ' (คุณ)' : ''}</option>
+                    ))}
+                  </select>
+                )}
+                <button onClick={() => run(load)} disabled={loading} className={BTN}>
+                  <Icon name="refresh" size={14} /> {t('treasury.page.refresh', 'รีเฟรช')}
+                </button>
+              </>
+            }
+          />
           {error && (
             <div className="text-sm text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded-lg px-4 py-3 flex items-center gap-2">
               <Icon name="alert-triangle" size={14} className="shrink-0" />{error}
