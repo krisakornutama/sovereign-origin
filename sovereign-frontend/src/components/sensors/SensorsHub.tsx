@@ -6,6 +6,8 @@ import { authFetch } from '../../lib/apiFetch';
 import Sidebar from '../layout/Sidebar';
 import Icon from '../ui/Icon';
 import PageHeader from '../ui/PageHeader';
+import StatCard from '../ui/StatCard';
+import EmptyState from '../ui/EmptyState';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { fmtLocale } from '../../lib/formatDate';
 
@@ -391,23 +393,11 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
           {tab === 'data' && (
             <>
               {/* สถิติรวม */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="panel panel-cyan p-3">
-                  <div className="text-xs text-gray-400 flex items-center gap-1"><Icon name="database" size={11} /> {t('sensorsHub.statShowing', 'ข้อมูลที่แสดง')}</div>
-                  <div className="text-2xl font-bold glow-text">{records.length}</div>
-                </div>
-                <div className="panel panel-cyan p-3">
-                  <div className="text-xs text-gray-400 flex items-center gap-1"><Icon name="battery" size={11} /> {t('sensorsHub.statBattery', 'แบตเตอรี่ล่าสุด')}</div>
-                  <div className="text-2xl font-bold glow-text">{latestBattery ?? 'N/A'}%</div>
-                </div>
-                <div className="panel panel-cyan p-3">
-                  <div className="text-xs text-gray-400 flex items-center gap-1"><Icon name="thermometer" size={11} /> {t('sensorsHub.statTemp', 'อุณหภูมิ')}</div>
-                  <div className="text-2xl font-bold glow-text">{latestTemp ?? 'N/A'}°C</div>
-                </div>
-                <div className="panel panel-cyan p-3">
-                  <div className="text-xs text-gray-400 flex items-center gap-1"><Icon name="droplet" size={11} /> {t('sensorsHub.statRain', 'ฝนตก')}</div>
-                  <div className="text-2xl font-bold glow-text">{latestRain === 1 ? t('sensorsHub.raining', 'ตก') : latestRain === 0 ? t('sensorsHub.notRaining', 'ไม่ตก') : 'N/A'}</div>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <StatCard label={t('sensorsHub.statShowing', 'ข้อมูลที่แสดง')} value={records.length} icon={<Icon name="database" size={14} />} />
+                <StatCard label={t('sensorsHub.statBattery', 'แบตเตอรี่ล่าสุด')} value={latestBattery != null ? `${latestBattery}%` : 'N/A'} icon={<Icon name="battery" size={14} />} />
+                <StatCard label={t('sensorsHub.statTemp', 'อุณหภูมิ')} value={latestTemp != null ? `${latestTemp}°C` : 'N/A'} icon={<Icon name="thermometer" size={14} />} />
+                <StatCard label={t('sensorsHub.statRain', 'ฝนตก')} value={latestRain === 1 ? t('sensorsHub.raining', 'ตก') : latestRain === 0 ? t('sensorsHub.notRaining', 'ไม่ตก') : 'N/A'} icon={<Icon name="droplet" size={14} />} />
               </div>
 
               {/* Controls */}
