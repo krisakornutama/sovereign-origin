@@ -670,12 +670,12 @@ function SensorCard({ label, value, metric, trendRange }: { label: string; value
   }, [metric, trendRange]);
 
   return (
-    <div className="card p-4 hover:border-gray-700 transition-all">
-      <div className="text-xs text-gray-500 mb-1">{t(`dashboard.metric.${metric}`, label)}</div>
-      <div className={`mono text-2xl font-semibold ${color}`}>{value != null ? value.toFixed(1) + unit : t('dashboard.na', 'N/A')}</div>
+    <div className="card p-4 hover:border-emerald-800/50 hover:shadow-[0_0_12px_rgba(52,211,153,0.08)] transition-all duration-200 group">
+      <div className="text-xs text-gray-500 mb-1 flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-emerald-500/60 group-hover:bg-emerald-400 transition-colors" />{t(`dashboard.metric.${metric}`, label)}</div>
+      <div className={`mono text-2xl font-semibold ${color} tracking-tight`}>{value != null ? value.toFixed(1) + unit : t('dashboard.na', 'N/A')}</div>
       {isPercentage && (
-        <div className="w-full bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
-          <div className="h-1.5 rounded-full bg-gradient-to-r from-green-400 to-green-600" style={{ width: `${Math.min(100, value)}%` }} />
+        <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700" style={{ width: `${Math.min(100, value)}%` }} />
         </div>
       )}
       {/* mini trend 24 ชม. — คลิกไปดูกราฟเต็มใน History */}
