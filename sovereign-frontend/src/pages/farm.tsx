@@ -338,17 +338,17 @@ export default function FarmPage() {
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {plots.map((plot) => (
-                <div key={plot.id} className="card p-4 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-bold text-white">{plot.name}</div>
-                      <div className="text-xs text-gray-400 flex items-center gap-1">
+                <div key={plot.id} className="card p-4 space-y-2.5 card-hover group">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-white truncate group-hover:text-emerald-300 transition-colors">{plot.name}</div>
+                      <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                         <Icon name="map-pin" size={12} className="text-gray-500 shrink-0" />
-                        {plot.location ? plot.location : t('farm.page.unknownLocation', 'ไม่ระบุตำแหน่ง')}
-                        {plot.area_sqm ? t('farm.page.areaSuffix', ' · {n} ตร.ม.', { n: plot.area_sqm }) : ''}
+                        <span className="truncate">{plot.location ? plot.location : t('farm.page.unknownLocation', 'ไม่ระบุตำแหน่ง')}</span>
+                        {plot.area_sqm ? <span className="text-gray-500">{t('farm.page.areaSuffix', ' · {n} ตร.ม.', { n: plot.area_sqm })}</span> : null}
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs border whitespace-nowrap ${STATUS_COLOR[plot.status] ?? STATUS_COLOR.fallow}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs border whitespace-nowrap shrink-0 ${STATUS_COLOR[plot.status] ?? STATUS_COLOR.fallow}`}>
                       {t('farm.status.' + plot.status, STATUS_LABEL[plot.status] ?? plot.status)}
                     </span>
                   </div>
