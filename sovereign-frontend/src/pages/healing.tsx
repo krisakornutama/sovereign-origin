@@ -6,6 +6,8 @@ import { authFetch } from '../lib/apiFetch';
 import { asObject } from '../lib/fetchJson';
 import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
+import Sidebar from '../components/layout/Sidebar';
+import PageHeader from '../components/ui/PageHeader';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
 interface Teaching {
@@ -233,17 +235,27 @@ export default function HealingPage() {
         .candle-glow { animation: candle-glow 2.6s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) { .candle-flame, .candle-glow { animation: none; } }
       `}</style>
-      <div className="min-h-screen text-[#EDE3CC] p-4 md:p-6" style={{ background: 'radial-gradient(1100px 420px at 50% -8%, rgba(227,176,75,0.10), transparent 65%), #151009' }}>
-        <div className="max-w-5xl mx-auto space-y-5">
-          {/* ── ส่วนหัว: เงียบ แต่เป็นเอกลักษณ์ — ตีกรอบคำสอนด้วยเส้นทอง ── */}
-          <header className="text-center space-y-2">
-            <p className="mono text-[10px] tracking-[0.35em] text-[#B8873A] uppercase">Sovereign Buddhist Healing</p>
-            <h1 className="font-script text-4xl font-semibold text-[#EDE3CC]">{t('healing.page.title', 'ห้องเยียวยา')}</h1>
-            <p className="text-sm text-[#B99F70]">{t('healing.page.subtitle', 'สมุนไพร/แพทย์รักษากาย — สติปัฏฐานรักษาใจ · อริยสัจเข้าใจเหตุ · อนัตตาปล่อยวาง')}</p>
-            <p className="font-script italic text-[#E3B04B] text-sm leading-relaxed max-w-xl mx-auto border-y border-[#332616] py-2 px-4">
-              “จิตที่ตั้งมั่น ย่อมไม่หวั่นไหวต่อทุกขเวทนา” <span className="text-[#8A7A58] not-italic">— หลวงปู่ชา สุภัทโท</span>
-            </p>
-          </header>
+      <div className="min-h-screen bg-gray-950 flex">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 p-4 lg:p-6">
+            <PageHeader
+              eyebrow={t('healing.eyebrow', 'ชีวิต & การเงิน')}
+              title={t('healing.page.title', 'ห้องเยียวยา')}
+              subtitle={t('healing.page.subtitle', 'สมุนไพร/แพทย์รักษากาย — สติปัฏฐานรักษาใจ · อริยสัจเข้าใจเหตุ · อนัตตาปล่อยวาง')}
+              icon={<Icon name="healing" size={18} />}
+            />
+            <div className="rounded-xl p-4 md:p-6 text-[#EDE3CC]" style={{ background: 'radial-gradient(1100px 420px at 50% -8%, rgba(227,176,75,0.10), transparent 65%), #151009' }}>
+              <div className="max-w-5xl mx-auto space-y-5">
+                {/* ── ส่วนหัว: เงียบ แต่เป็นเอกลักษณ์ — ตีกรอบคำสอนด้วยเส้นทอง ── */}
+                <header className="text-center space-y-2">
+                  <p className="mono text-[10px] tracking-[0.35em] text-[#B8873A] uppercase">Sovereign Buddhist Healing</p>
+                  <h1 className="font-script text-4xl font-semibold text-[#EDE3CC]">{t('healing.page.title', 'ห้องเยียวยา')}</h1>
+                  <p className="text-sm text-[#B99F70]">{t('healing.page.subtitle', 'สมุนไพร/แพทย์รักษากาย — สติปัฏฐานรักษาใจ · อริยสัจเข้าใจเหตุ · อนัตตาปล่อยวาง')}</p>
+                  <p className="font-script italic text-[#E3B04B] text-sm leading-relaxed max-w-xl mx-auto border-y border-[#332616] py-2 px-4">
+                    “จิตที่ตั้งมั่น ย่อมไม่หวั่นไหวต่อทุกขเวทนา” <span className="text-[#8A7A58] not-italic">— หลวงปู่ชา สุภัทโท</span>
+                  </p>
+                </header>
 
           {/* ── เทียนแห่งสติ — signature: ไฟลุกตามสมาธิจริง ── */}
           <section className="flex flex-col items-center gap-1 py-2" aria-label={t('healing.candle.sectionLabel', 'เทียนแห่งสติ')}>
@@ -448,6 +460,9 @@ export default function HealingPage() {
               </div>
             </div>
           )}
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     </>

@@ -2,6 +2,9 @@
 
 import { useState, useMemo } from "react";
 import TerrainViewer from "../../components/terrain-viewer/TerrainViewer";
+import Sidebar from "../../components/layout/Sidebar";
+import PageHeader from "../../components/ui/PageHeader";
+import Icon from "../../components/ui/Icon";
 import { useLanguageStore } from "../../stores/useLanguageStore";
 
 function generateDemoHeightData(w: number, h: number): number[] {
@@ -60,10 +63,16 @@ export default function TerrainDemoPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-4 md:p-6">
-      <h1 className="text-xl md:text-2xl font-bold text-center text-white mb-6">
-        {t("terrain.title", "3D Terrain Viewer")}
-      </h1>
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          <PageHeader
+            eyebrow="Design System"
+            title={t("terrain.title", "3D Terrain Viewer")}
+            subtitle={t("terrain.subtitle", "Demo ภาพ terrain 3 มิติ — ปรับขนาดที่ดินและความละเอียด")}
+            icon={<Icon name="dashboard" size={18} />}
+          />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Controls */}
@@ -124,18 +133,20 @@ export default function TerrainDemoPage() {
           </div>
         </div>
 
-        {/* 3D Viewer */}
-        <div className="lg:col-span-3 bg-gray-900/60 border border-gray-700 rounded-lg overflow-hidden"
-          style={{ height: "70vh", minHeight: "500px" }}
-        >
-          <TerrainViewer
-            landWidth={landWidth}
-            landLength={landLength}
-            resolution={resolution}
-            heightData={heightData}
-            zones={zones}
-          />
+          {/* 3D Viewer */}
+          <div className="lg:col-span-3 bg-gray-900/60 border border-gray-700 rounded-lg overflow-hidden"
+            style={{ height: "70vh", minHeight: "500px" }}
+          >
+            <TerrainViewer
+              landWidth={landWidth}
+              landLength={landLength}
+              resolution={resolution}
+              heightData={heightData}
+              zones={zones}
+            />
+          </div>
         </div>
+        </main>
       </div>
     </div>
   );
