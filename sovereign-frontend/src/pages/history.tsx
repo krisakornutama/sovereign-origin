@@ -382,13 +382,13 @@ export default function HistoryPage() {
                 type="datetime-local"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white"
+                className="input"
               />
               <input
                 type="datetime-local"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white"
+                className="input"
               />
             </>
           )}
@@ -429,7 +429,7 @@ export default function HistoryPage() {
                 className={
                   active
                     ? 'px-3 py-1 rounded text-sm font-bold text-white shadow-neon-green'
-                    : 'px-3 py-1 rounded text-sm bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700'
+                    : 'btn-secondary px-3 py-1 text-sm'
                 }
                 style={active ? { backgroundColor: colorOf(m) } : undefined}
               >

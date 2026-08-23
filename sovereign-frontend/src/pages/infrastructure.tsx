@@ -179,7 +179,7 @@ export default function InfrastructurePage() {
 
         <div className="flex gap-2 flex-wrap">
           {tabs.map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 rounded-lg text-sm ${tab === key ? 'bg-sky-600 text-white shadow-neon-green' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{label}</button>
+            <button key={key} onClick={() => setTab(key)} className={tab === key ? 'btn-primary' : 'btn-ghost'}>{label}</button>
           ))}
         </div>
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}

@@ -213,7 +213,7 @@ export default function OtaPage() {
               placeholder={t('ota.fileNamePlaceholder', 'ชื่อไฟล์ (เช่น esp32_v1.2.0.bin)')}
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              className="flex-1 min-w-48 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+              className="input flex-1 min-w-48 text-sm"
             />
             <button
               onClick={upload}
@@ -250,7 +250,7 @@ export default function OtaPage() {
                         href={`${process.env.NEXT_PUBLIC_API_URL}/api/ota/firmwares/${encodeURIComponent(fw.file)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs px-2.5 py-1 bg-gray-800 border border-gray-600 hover:bg-gray-700 rounded"
+                        className="btn-secondary text-xs px-2.5 py-1"
                       >
                         <Icon name="download" size={14} />
                       </a>
@@ -284,7 +284,7 @@ export default function OtaPage() {
               <select
                 value={targetDevice}
                 onChange={(e) => setTargetDevice(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                className="input w-full text-sm"
               >
                 <option value="">{t('ota.pickDevicePlaceholder', '— เลือกอุปกรณ์ —')}</option>
                 {devices.map((d) => (
@@ -296,7 +296,7 @@ export default function OtaPage() {
             </div>
             <div>
               <div className="text-xs text-gray-500 mb-1">{t('ota.selectedFirmwareLabel', 'Firmware ที่เลือก:')}</div>
-              <div className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-emerald-400 font-mono glow-text">
+              <div className="input text-sm">
                 {targetFirmware || t('ota.notSelected', '— ยังไม่ได้เลือก —')}
               </div>
             </div>
@@ -335,7 +335,7 @@ export default function OtaPage() {
                     <th className="py-2">{t('common.status', 'สถานะ')}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-800/50">
                   {events.map((e) => {
                     const badge = statusBadges[e.status] || statusBadges.unknown;
                     return (

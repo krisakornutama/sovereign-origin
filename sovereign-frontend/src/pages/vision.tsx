@@ -358,14 +358,14 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="http://192.168.1.50/snapshot.jpg"
-                  className="w-full bg-gray-800 border border-gray-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+                  className="input w-full"
                 />
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-400 block">{t('vision.cameraLabel', 'กล้อง (ไม่บังคับ — บันทึกเหตุการณ์ได้)')}</label>
+                  <label className="label">{t('vision.cameraLabel', 'กล้อง (ไม่บังคับ — บันทึกเหตุการณ์ได้)')}</label>
                   <select
                     value={cameraId}
                     onChange={(e) => setCameraId(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm"
+                    className="input w-full"
                   >
                     <option value="">{t('vision.noRecord', '— ไม่บันทึก —')}</option>
                     {cameras.map((c) => (
@@ -425,16 +425,16 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-700">
-                    <th className="py-2 pr-3">{t('common.time', 'เวลา')}</th>
-                    <th className="py-2 pr-3">{t('vision.colCamera', 'กล้อง')}</th>
-                    <th className="py-2 pr-3">{t('vision.colType', 'ประเภท')}</th>
-                    <th className="py-2">{t('vision.colConfidence', 'ความเชื่อมั่น')}</th>
+                  <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                    <th className="py-2 pr-3 font-semibold">{t('common.time', 'เวลา')}</th>
+                    <th className="py-2 pr-3 font-semibold">{t('vision.colCamera', 'กล้อง')}</th>
+                    <th className="py-2 pr-3 font-semibold">{t('vision.colType', 'ประเภท')}</th>
+                    <th className="py-2 font-semibold">{t('vision.colConfidence', 'ความเชื่อมั่น')}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-800/50">
                   {history.map((h) => (
-                    <tr key={h.id} className="border-b border-gray-800">
+                    <tr key={h.id} className="hover:bg-gray-800/50 transition-colors">
                       <td className="py-2 pr-3 text-gray-400">{new Date(h.detected_at).toLocaleString(fmtLocale())}</td>
                       <td className="py-2 pr-3">{h.camera?.name ?? '—'}</td>
                       <td className="py-2 pr-3">{t(`vision.obj.${h.object_type}`, OBJECT_LABEL[h.object_type] || h.object_type)}</td>
@@ -494,14 +494,14 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                   })}
                 </div>
                 <div className="space-y-1.5">
-                  <input value={faceForm.name} onChange={(e) => setFaceForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('vision.namePlaceholder', 'ชื่อ เช่น พ่อ, แม่, ลุงสมชาย')} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs" />
+                  <input value={faceForm.name} onChange={(e) => setFaceForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('vision.namePlaceholder', 'ชื่อ เช่น พ่อ, แม่, ลุงสมชาย')} className="input w-full text-xs" />
                   <div className="flex items-center gap-2">
-                    <label className="flex-1 cursor-pointer bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-center hover:bg-gray-700 inline-flex items-center justify-center gap-1">
+                    <label className="flex-1 cursor-pointer btn-secondary text-xs text-center inline-flex items-center justify-center gap-1">
                       <Icon name="upload" size={12} />
                       {t('vision.uploadPhoto', 'อัปโหลดรูป')}
                       <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => onFaceFile(e.target.files?.[0] ?? null)} />
                     </label>
-                    <button onClick={captureFaceFromCamera} className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-center hover:bg-gray-700 inline-flex items-center justify-center gap-1"><Icon name="camera" size={12} /> {t('vision.captureFromCamera', 'ถ่ายจากกล้อง')}</button>
+                    <button onClick={captureFaceFromCamera} className="flex-1 btn-secondary text-xs text-center inline-flex items-center justify-center gap-1"><Icon name="camera" size={12} /> {t('vision.captureFromCamera', 'ถ่ายจากกล้อง')}</button>
                   </div>
                   {faceForm.photoPreview && (
                     <div className="flex items-center gap-2">
@@ -512,7 +512,7 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                       </span>
                     </div>
                   )}
-                  <input value={faceForm.note} onChange={(e) => setFaceForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('vision.notePlaceholder', 'หมายเหตุ (ไม่บังคับ)')} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs" />
+                  <input value={faceForm.note} onChange={(e) => setFaceForm((p) => ({ ...p, note: e.target.value }))} placeholder={t('vision.notePlaceholder', 'หมายเหตุ (ไม่บังคับ)')} className="input w-full text-xs" />
                   <button onClick={addFace} disabled={faceEmbedding === 'loading'} className="btn-primary">
                     {faceEmbedding === 'loading' ? t('vision.creatingEmbedding', 'กำลังสร้าง embedding...') : t('vision.addFamiliar', 'เพิ่มคนคุ้นเคย')}
                   </button>
@@ -530,7 +530,7 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                     </label>
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <span className="shrink-0">{t('vision.every', 'ตรวจทุก')}</span>
-                      <select value={rule.interval_min} onChange={(e) => saveRule({ interval_min: Number(e.target.value) })} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-xs">
+                      <select value={rule.interval_min} onChange={(e) => saveRule({ interval_min: Number(e.target.value) })} className="input text-xs py-0.5 px-1.5">
                         {[5, 10, 15, 30, 60].map((m) => <option key={m} value={m}>{t('vision.minutes', '{n} นาที', { n: m })}</option>)}
                       </select>
                     </div>
@@ -566,7 +566,7 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                       {!a.cleared && (
                         <button
                           onClick={async () => { await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vision/alerts/${a.id}/clear`, { method: 'POST' }); loadAlerts(); }}
-                          className="shrink-0 px-2 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-300 text-[10px]"
+                          className="shrink-0 btn-secondary text-[10px] px-2 py-0.5"
                         >
 {t('vision.handled', 'จัดการแล้ว')}
                         </button>

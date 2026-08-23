@@ -187,7 +187,7 @@ export default function AiPage() {
                     sendAdvisor(qq.q);
                   }}
                   disabled={advisorLoading}
-                  className="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-full transition disabled:opacity-50"
+                  className="btn-secondary text-xs px-2.5 py-1 rounded-full"
                 >
                   {t('ai.quick.' + qq.key, qq.label)}
                 </button>

@@ -815,7 +815,7 @@ export default function TreasuryPage() {
                         <th className="pb-2 text-right">{t('common.actions', 'จัดการ')}</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-800/50">
                       {data.positions.map((p) => (
                         <tr key={p.id} className="border-t border-gray-800/60">
                           <td className="py-2 font-bold mono text-gray-100">
@@ -906,7 +906,7 @@ export default function TreasuryPage() {
                           <th className="pb-2 text-right">{t('common.actions', 'จัดการ')}</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-gray-800/50">
                         {transfers.map((tr) => (
                           <tr key={tr.id} className="border-t border-gray-800/60">
                             <td className="py-2">

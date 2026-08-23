@@ -68,11 +68,11 @@ export default function KitchenIOTPage() {
             <h3 className="font-bold text-sm mb-2">{t('restaurant.kitchen.syncTitle', 'ซิงค์น้ำหนัก HX711 → Inventory')}</h3>
             <p className="text-xs text-gray-500 mb-3">{t('restaurant.kitchen.syncDesc', 'วางวัตถุดิบบนตาชั่ง HX711 → mqtt `sovereign/+/sensor/kitchen_weight` → หรือกรอกมือที่นี่ (จะอัปเดต `InventoryItem.quantity` ทันที)')}</p>
             <div className="flex flex-wrap gap-2">
-              <select value={selectedInv} onChange={e=>setSelectedInv(e.target.value)} className="flex-1 min-w-60 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+              <select value={selectedInv} onChange={e=>setSelectedInv(e.target.value)} className="input text-sm flex-1">
                 <option value="">{t('restaurant.kitchen.selectInvPlaceholder', '— เลือกวัตถุดิบ —')}</option>
                 {inventory.map((it:any)=><option key={it.id} value={it.id}>{it.name} ({it.quantity}{it.unit})</option>)}
               </select>
-              <input value={weight} onChange={e=>setWeight(e.target.value)} placeholder={t('restaurant.kitchen.weightPlaceholder', 'น้ำหนัก kg (เช่น 2.5)')} type="number" step="0.01" className="w-40 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+              <input value={weight} onChange={e=>setWeight(e.target.value)} placeholder={t('restaurant.kitchen.weightPlaceholder', 'น้ำหนัก kg (เช่น 2.5)')} type="number" step="0.01" className="input text-sm" />
               <button onClick={syncWeight} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold">{t('restaurant.kitchen.syncButton', 'ซิงค์')}</button>
             </div>
             <p className="text-xs text-gray-500 mt-2">{t('restaurant.kitchen.iotNote', 'IOT จริง: ESP32 + HX711 ส่ง `sovereign/kitchen/sensor/kitchen_weight` ทุก 5s → `mqttIngest` → `sensor_telemetry` → หน้านี้ poll ทุก 10s')}</p>

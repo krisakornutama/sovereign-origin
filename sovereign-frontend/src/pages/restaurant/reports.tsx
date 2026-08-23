@@ -34,7 +34,7 @@ export default function RestaurantReportsPage() {
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full space-y-4 w-full">
           <div className="flex gap-2 items-center">
             <span className="text-xs text-gray-400">{t('restaurant.reports.range', 'ช่วง')}</span>
-            <select value={days} onChange={e=>setDays(Number(e.target.value))} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm">
+            <select value={days} onChange={e=>setDays(Number(e.target.value))} className="input text-sm">
               <option value={7}>{t('restaurant.reports.days7', '7 วัน')}</option><option value={30}>{t('restaurant.reports.days30', '30 วัน')}</option><option value={90}>{t('restaurant.reports.days90', '90 วัน')}</option>
             </select>
             <button onClick={load} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm">{t('restaurant.refresh', 'รีเฟรช')}</button>

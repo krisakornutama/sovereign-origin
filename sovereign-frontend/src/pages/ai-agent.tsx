@@ -9,6 +9,7 @@ import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 import CodingIde from '../components/coding/CodingIde';
 
 type AutonomyLevel = 'view' | 'suggest' | 'autonomous';
@@ -574,7 +575,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
               <button
                 key={qq.q}
                 onClick={() => { setChatInput(qq.q); }}
-                className="text-[11px] px-2 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full transition"
+                className="btn-secondary text-[11px] px-2 py-1 rounded-full"
               >
                 {t('aiAgent.chat.quick.' + qq.key, qq.q)}
               </button>
@@ -597,7 +598,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
             />
             <button
               onClick={() => document.getElementById('chat-image-input')?.click()}
-              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded text-sm"
+              className="btn-secondary text-sm"
               title={t('aiAgent.chat.attachImage', 'แนบรูปภาพ')}
             >
               <Icon name="image" size={15} />
@@ -628,7 +629,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('aiAgent.autonomy.title', 'ระดับ Autonomy')}</h2>
             {!isSuperadmin && (
-              <span className="text-xs px-2 py-1 rounded bg-gray-800 border border-gray-600 text-gray-400">
+              <span className="text-xs px-2 py-1 rounded bg-gray-800 border border-gray-700 text-gray-400">
                 {t('aiAgent.autonomy.superadminOnly', 'เปลี่ยนได้เฉพาะ SUPERADMIN')}
               </span>
             )}
@@ -699,15 +700,15 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
           <section className="card panel-cyan overflow-x-auto">
             <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-700">{t('aiAgent.tools.title', 'สิทธิ์ของ Tool')}</h2>
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-3">{t('aiAgent.tools.colTool', 'Tool')}</th>
-                  <th className="px-4 py-3">{t('aiAgent.tools.colType', 'ประเภท')}</th>
-                  <th className="px-4 py-3">{t('aiAgent.tools.colDescription', 'คำอธิบาย')}</th>
-                  <th className="px-4 py-3">{t('common.status', 'สถานะ')}</th>
+              <thead className="bg-gray-950/40 backdrop-blur-sm">
+                <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                  <th className="px-4 py-3 font-semibold">{t('aiAgent.tools.colTool', 'Tool')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('aiAgent.tools.colType', 'ประเภท')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('aiAgent.tools.colDescription', 'คำอธิบาย')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('common.status', 'สถานะ')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-gray-800/50">
                 {policy.tools.map((item) => (
                   <tr key={item.name} className="hover:bg-gray-800/50">
                     <td className="px-4 py-2 font-bold text-emerald-300">{item.name}</td>
@@ -788,16 +789,16 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
                 <h3 className="text-sm font-semibold text-gray-200 mb-2">{t('aiAgent.approvals.historyTitle', 'ประวัติการตัดสินใจ ({n})', { n: history.length })}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead className="text-gray-500 uppercase">
-                      <tr>
-                        <th className="py-2 pr-3">{t('common.time', 'เวลา')}</th>
-                        <th className="py-2 pr-3">{t('aiAgent.tools.colTool', 'Tool')}</th>
-                        <th className="py-2 pr-3">{t('aiAgent.approvals.colArgs', 'Args')}</th>
-                        <th className="py-2 pr-3">{t('aiAgent.approvals.colResult', 'ผล')}</th>
-                        <th className="py-2">{t('common.details', 'รายละเอียด')}</th>
+                    <thead className="bg-gray-950/40 backdrop-blur-sm">
+                      <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                        <th className="px-3 py-2 font-semibold">{t('common.time', 'เวลา')}</th>
+                        <th className="px-3 py-2 font-semibold">{t('aiAgent.tools.colTool', 'Tool')}</th>
+                        <th className="px-3 py-2 font-semibold">{t('aiAgent.approvals.colArgs', 'Args')}</th>
+                        <th className="px-3 py-2 font-semibold">{t('aiAgent.approvals.colResult', 'ผล')}</th>
+                        <th className="px-3 py-2 font-semibold">{t('common.details', 'รายละเอียด')}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-800">
+                    <tbody className="divide-y divide-gray-800/50">
                       {history.slice(0, 20).map((a) => (
                         <tr key={a.id} className="text-gray-400">
                           <td className="py-2 pr-3 whitespace-nowrap">{fmtTime(a.decidedAt)}</td>
@@ -866,26 +867,24 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
               <div className="inset p-3 space-y-2">
                 <div className="text-xs font-semibold text-gray-200">{t('aiAgent.team.addRoleTitle', 'เพิ่มบทบาทใหม่')}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <input value={roleForm.name || ''} onChange={(e) => setRoleForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('aiAgent.team.phRoleName', 'ชื่อบทบาท เช่น ผู้ดูแลระบบน้ำ')} className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm" />
-                  <input value={roleForm.emoji || ''} onChange={(e) => setRoleForm((p) => ({ ...p, emoji: e.target.value }))} placeholder={t('aiAgent.team.phRoleEmoji', 'อีโมจิของบทบาท')} className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm" />
-                  <input value={roleForm.description || ''} onChange={(e) => setRoleForm((p) => ({ ...p, description: e.target.value }))} placeholder={t('aiAgent.team.phRoleDesc', 'ทำงานอะไร เช่น เฝ้าระวังคุณภาพน้ำ')} className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm md:col-span-2" />
-                  <select value={roleForm.capability || 'general'} onChange={(e) => setRoleForm((p) => ({ ...p, capability: e.target.value }))} className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm">
+                  <input value={roleForm.name || ''} onChange={(e) => setRoleForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('aiAgent.team.phRoleName', 'ชื่อบทบาท เช่น ผู้ดูแลระบบน้ำ')} className="input text-sm" />
+                  <input value={roleForm.emoji || ''} onChange={(e) => setRoleForm((p) => ({ ...p, emoji: e.target.value }))} placeholder={t('aiAgent.team.phRoleEmoji', 'อีโมจิของบทบาท')} className="input text-sm" />
+                  <input value={roleForm.description || ''} onChange={(e) => setRoleForm((p) => ({ ...p, description: e.target.value }))} placeholder={t('aiAgent.team.phRoleDesc', 'ทำงานอะไร เช่น เฝ้าระวังคุณภาพน้ำ')} className="input text-sm md:col-span-2" />
+                  <select value={roleForm.capability || 'general'} onChange={(e) => setRoleForm((p) => ({ ...p, capability: e.target.value }))} className="input text-sm">
                     {[['inventory', 'เสบียง'], ['farm', 'ฟาร์ม'], ['risk', 'ความเสี่ยง'], ['health', 'สุขภาพ'], ['water', 'ระบบน้ำ'], ['knowledge', 'คลังความรู้'], ['kids', 'สอนลูก'], ['general', 'ทั่วไป']].map(([v, l]) => (
                       <option key={v} value={v}>{t('aiAgent.team.capability.' + v, l)}</option>
                     ))}
                   </select>
-                  <input value={roleForm.count || ''} onChange={(e) => setRoleForm((p) => ({ ...p, count: e.target.value }))} type="number" min={1} placeholder={t('aiAgent.team.phRoleCount', 'จำนวน agent')} className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm" />
+                  <input value={roleForm.count || ''} onChange={(e) => setRoleForm((p) => ({ ...p, count: e.target.value }))} type="number" min={1} placeholder={t('aiAgent.team.phRoleCount', 'จำนวน agent')} className="input text-sm" />
                 </div>
-                <textarea value={roleForm.system_prompt || ''} onChange={(e) => setRoleForm((p) => ({ ...p, system_prompt: e.target.value }))} placeholder={t('aiAgent.team.phSystemPrompt', 'บุคลิก/วิธีทำงาน (system prompt) เช่น คุณคือผู้ดูแลระบบน้ำ อ่านข้อมูลแล้วสรุปความเสี่ยง')} rows={2} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm" />
+                <textarea value={roleForm.system_prompt || ''} onChange={(e) => setRoleForm((p) => ({ ...p, system_prompt: e.target.value }))} placeholder={t('aiAgent.team.phSystemPrompt', 'บุคลิก/วิธีทำงาน (system prompt) เช่น คุณคือผู้ดูแลระบบน้ำ อ่านข้อมูลแล้วสรุปความเสี่ยง')} rows={2} className="input w-full text-sm" />
                 <button onClick={createRole} className="btn-primary px-3 py-1.5">{t('common.add', 'เพิ่ม')}</button>
               </div>
             )}
 
             {/* รายการบทบาท */}
             {roles.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-8 border border-dashed border-gray-700 rounded-lg">
-                {t('aiAgent.team.noRoles', 'ยังไม่มีบทบาท — กด "คืนค่าเริ่มต้น" หรือเพิ่มด้วยตัวเอง')}
-              </div>
+              <div className="card"><EmptyState icon={<Icon name="ai-agent" size={20} />} title={t('aiAgent.team.noRoles', 'ยังไม่มีบทบาท')} description={t('aiAgent.team.noRolesDesc', 'กด "คืนค่าเริ่มต้น" หรือเพิ่มด้วยตัวเอง')} /></div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {roles.map((r) => (
@@ -926,7 +925,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
                             min={1}
                             defaultValue={r.count}
                             onBlur={(e) => { const v = Math.max(1, Number(e.target.value) || 1); if (v !== r.count) updateRole(r.id, { count: v }); }}
-                            className="w-16 bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-xs"
+                            className="input w-16 text-xs py-0.5"
                           />
                           <span className="text-gray-600">{t('aiAgent.team.countSuffix', 'คน (แบ่งเบาภาระ)')}</span>
                         </div>
@@ -944,7 +943,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
                             value={r.report_hour ?? 7}
                             onChange={(e) => updateRole(r.id, { report_hour: Number(e.target.value) })}
                             title={t('aiAgent.team.reportHourTitle', 'เวลาที่ส่งสรุป (ทุกเช้า)')}
-                            className="bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-[10px]"
+                            className="input text-[10px] py-0.5 px-1"
                           >
                             {Array.from({ length: 12 }, (_, i) => 6 + i).map((h) => (
                               <option key={h} value={h}>{h}:00</option>
@@ -961,7 +960,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
                         onKeyDown={(e) => e.key === 'Enter' && runRole(r.id)}
                         placeholder={t('aiAgent.team.phMission', 'ภารกิจ เช่น ตรวจเสบียงน้ำวันนี้...')}
                         disabled={!isSuperadmin || !r.enabled}
-                        className="flex-1 min-w-0 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs disabled:opacity-50"
+                        className="input flex-1 min-w-0 text-xs"
                       />
                       <button
                         onClick={() => runRole(r.id)}
@@ -1001,9 +1000,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
             </div>
 
             {jobs.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center py-8 border border-dashed border-gray-700 rounded-lg">
-                {t('aiAgent.jobs.noJobs', 'ยังไม่มีงาน — ไปแท็บ "ทีม Agent" แล้วสั่งงานบทบาทแรกสิ')}
-              </div>
+              <div className="card"><EmptyState icon={<Icon name="ai-agent" size={20} />} title={t('aiAgent.jobs.noJobs', 'ยังไม่มีงาน')} description={t('aiAgent.jobs.noJobsDesc', 'ไปแท็บ "ทีม Agent" แล้วสั่งงานบทบาทแรกสิ')} /></div>
             ) : (
               <div className="space-y-3">
                 {jobs.map((j) => {
@@ -1029,7 +1026,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
                             <button onClick={() => cancelJob(j.id)} className="text-[10px] px-2 py-0.5 rounded bg-red-900/50 border border-red-800 text-red-300">{t('common.cancel', 'ยกเลิก')}</button>
                           )}
                           {isSuperadmin && !active && (
-                            <button onClick={() => deleteJob(j.id)} className="text-[10px] px-2 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-500"><Icon name="trash" size={12} /></button>
+                            <button onClick={() => deleteJob(j.id)} className="btn-secondary text-[10px] px-2 py-0.5"><Icon name="trash" size={12} /></button>
                           )}
                         </div>
                       </div>

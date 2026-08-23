@@ -226,7 +226,7 @@ export default function RelayPage() {
             return (
               <div
                 key={relay.relayId}
-                className={`card panel-cyan p-5 flex flex-col gap-4 transition ${
+                className={`card card-hover panel-cyan p-5 flex flex-col gap-4 transition ${
                   isOn ? 'border-emerald-600/50' : ''
                 }`}
               >
@@ -258,9 +258,9 @@ export default function RelayPage() {
         </div>
 
         {relays.length === 0 && !loading && (
-          <div className="text-gray-500 text-center py-8">{t('relay.noRelays', 'ไม่มี relay ในระบบ')}</div>
+          <div className="card"><div className="flex flex-col items-center justify-center text-center py-12 px-6 gap-3"><div className="w-12 h-12 rounded-xl border border-gray-700 bg-gray-800/40 flex items-center justify-center text-gray-400"><Icon name="relay" size={20} /></div><div className="text-sm font-bold text-gray-100">{t('relay.noRelays', 'ไม่มี relay ในระบบ')}</div></div></div>
         )}
-        {loading && <div className="text-gray-400 text-center py-8">{t('relay.loadingStatus', 'กำลังโหลดสถานะ...')}</div>}
+        {loading && <div className="flex items-center justify-center py-12 gap-2 text-gray-500"><span className="w-4 h-4 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /><span className="text-sm">{t('relay.loadingStatus', 'กำลังโหลดสถานะ...')}</span></div>}
 
         {/* ⏰ Scheduled Relay */}
         <section className="space-y-4">
@@ -345,19 +345,21 @@ export default function RelayPage() {
           </div>
 
           {/* รายการตาราง */}
-          <div className="card panel-cyan overflow-x-auto">
+          <div className="card panel-cyan overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+            <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-3">{t('relay.relay', 'Relay')}</th>
-                  <th className="px-4 py-3">{t('common.time', 'เวลา')}</th>
-                  <th className="px-4 py-3">{t('relay.colDays', 'วัน')}</th>
-                  <th className="px-4 py-3">{t('relay.command', 'คำสั่ง')}</th>
-                  <th className="px-4 py-3">{t('common.status', 'สถานะ')}</th>
-                  <th className="px-4 py-3">{t('common.actions', 'จัดการ')}</th>
+              <thead className="bg-gray-950/40 backdrop-blur-sm">
+                <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                  <th className="px-4 py-3 font-semibold">{t('relay.relay', 'Relay')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('common.time', 'เวลา')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('relay.colDays', 'วัน')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('relay.command', 'คำสั่ง')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('common.status', 'สถานะ')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('common.actions', 'จัดการ')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-cyan-800/50">
+              <tbody className="divide-y divide-gray-800/50">
                 {schedules.map((sched) => (
                   <tr key={sched.id} className={`hover:bg-gray-800/50 ${sched.enabled ? '' : 'opacity-50'}`}>
                     <td className="px-4 py-2 text-gray-200">{sched.relayLabel}</td>
@@ -395,6 +397,7 @@ export default function RelayPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       </main>

@@ -118,7 +118,7 @@ export default function RestaurantPage() {
             <div className="flex-1 min-w-60">
               <label className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
               <div className="flex gap-2 mt-1">
-                <select value={selected} onChange={e=>setSelected(e.target.value)} className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <select value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm flex-1">
                   <option value="">{t('restaurant.selectPlaceholder', '— เลือกร้าน —')}</option>
                   {restaurants.map(r=><option key={r.id} value={r.id}>{r.name} {r.cameraId?`[cam:${r.cameraId.slice(0,6)}]`:''}</option>)}
                 </select>
@@ -126,11 +126,11 @@ export default function RestaurantPage() {
               </div>
             </div>
             <div className="flex gap-2 items-end">
-              <select value={orderType} onChange={e=>setOrderType(e.target.value as any)} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+              <select value={orderType} onChange={e=>setOrderType(e.target.value as any)} className="input text-sm">
                 <option value="DINE_IN">{t('restaurant.pos.dineIn', 'นั่งกิน')}</option><option value="TAKEAWAY">{t('restaurant.pos.takeaway', 'กลับบ้าน')}</option>
               </select>
-              <input value={tableNo} onChange={e=>setTableNo(e.target.value)} placeholder={t('restaurant.pos.tablePlaceholder', 'โต๊ะ (เช่น A1)')} className="w-28 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
-              <select value={customerId} onChange={e=>setCustomerId(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+              <input value={tableNo} onChange={e=>setTableNo(e.target.value)} placeholder={t('restaurant.pos.tablePlaceholder', 'โต๊ะ (เช่น A1)')} className="input text-sm" />
+              <select value={customerId} onChange={e=>setCustomerId(e.target.value)} className="input text-sm">
                 <option value="">{t('restaurant.pos.walkInCustomer', 'ลูกค้าทั่วไป')}</option>
                 {customers.map(c=><option key={c.id} value={c.id}>{c.name} ({c.points}{t('restaurant.pos.pointsUnit', 'แต้ม')})</option>)}
               </select>
@@ -194,9 +194,9 @@ export default function RestaurantPage() {
                 <button onClick={()=>setShowFace(!showFace)} className="text-xs text-sky-400 hover:underline">{showFace?t('restaurant.pos.face.toggleHide', 'ซ่อน'):t('restaurant.pos.face.toggleShow', 'สมัครลูกค้าใบหน้า (ไม่ใช้บัตร)')}</button>
                 {showFace && (
                   <div className="mt-2 space-y-2 bg-gray-900 rounded-lg p-3">
-                    <input value={faceName} onChange={e=>setFaceName(e.target.value)} placeholder={t('restaurant.pos.face.namePlaceholder', 'ชื่อลูกค้า')} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                    <input value={facePhone} onChange={e=>setFacePhone(e.target.value)} placeholder={t('restaurant.pos.face.phonePlaceholder', 'เบอร์ (ถ้ามี)')} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
-                    <input value={faceImage} onChange={e=>setFaceImage(e.target.value)} placeholder={t('restaurant.pos.face.imagePlaceholder', 'รูป base64 (ถ่ายจากกล้อง)')} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm" />
+                    <input value={faceName} onChange={e=>setFaceName(e.target.value)} placeholder={t('restaurant.pos.face.namePlaceholder', 'ชื่อลูกค้า')} className="input w-full text-sm" />
+                    <input value={facePhone} onChange={e=>setFacePhone(e.target.value)} placeholder={t('restaurant.pos.face.phonePlaceholder', 'เบอร์ (ถ้ามี)')} className="input w-full text-sm" />
+                    <input value={faceImage} onChange={e=>setFaceImage(e.target.value)} placeholder={t('restaurant.pos.face.imagePlaceholder', 'รูป base64 (ถ่ายจากกล้อง)')} className="input w-full text-sm" />
                     <label className="text-xs flex items-center gap-1"><input type="checkbox" checked /> {t('restaurant.pos.face.consent', 'ยินยอมใช้ใบหน้า (PDPA)')}</label>
                     <button onClick={enrollFace} className="w-full py-1.5 bg-sky-600 hover:bg-sky-500 rounded text-xs font-bold">{t('restaurant.pos.face.enrollButton', 'ลงทะเบียนใบหน้า + เก็บแต้ม')}</button>
                     <p className="text-[11px] text-gray-500">{t('restaurant.pos.face.note', 'เห็นหน้า → เข้าถึงแต้ม/ประวัติทันที ไม่ต้องใช้บัตร')}</p>

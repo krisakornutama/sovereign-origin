@@ -267,7 +267,7 @@ export default function AutomationPage() {
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className={`card panel-cyan p-4 transition ${
+                className={`card card-hover panel-cyan p-4 transition ${
                   rule.enabled ? '' : 'opacity-60'
                 }`}
               >
@@ -291,7 +291,7 @@ export default function AutomationPage() {
                           {rule.severity.toUpperCase()}
                         </span>
                         {rule.is_default && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 border border-gray-600 text-gray-400">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-gray-400">
                             {t('automation.isDefault', 'ค่าเริ่มต้น')}
                           </span>
                         )}
@@ -341,9 +341,7 @@ export default function AutomationPage() {
             ))}
 
             {rules.length === 0 && (
-              <div className="text-gray-500 text-center py-8">
-                {t('automation.noRules', 'ไม่มีกฎอัตโนมัติ — กด "สร้างกฎใหม่" เพื่อเพิ่ม')}
-              </div>
+              <div className="card"><div className="flex flex-col items-center justify-center text-center py-12 px-6 gap-3"><div className="w-12 h-12 rounded-xl border border-gray-700 bg-gray-800/40 flex items-center justify-center text-gray-400"><Icon name="automation" size={20} /></div><div className="text-sm font-bold text-gray-100">{t('automation.noRules', 'ไม่มีกฎอัตโนมัติ')}</div><div className="text-xs text-gray-500 max-w-sm">{t('automation.noRulesDesc', 'กด "สร้างกฎใหม่" เพื่อเพิ่ม')}</div></div></div>
             )}
           </div>
         )}
