@@ -119,7 +119,9 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
         `${process.env.NEXT_PUBLIC_API_URL}/api/sensors/all?metric=${filter}&limit=${limit}`
       );
       const data = await res.json();
-      setRecords(data);
+      // กรอง row ที่ metric ว่าง (ข้อมูลเสียจากอดีต) — แสดงไม่ได้และลบทีละแถวไม่ได้
+      // เพราะ URL ลบคือ /api/sensors/{metric} (segment ว่างไม่ match route)
+      setRecords(Array.isArray(data) ? data.filter((r: SensorRecord) => r.metric && r.metric.trim()) : []);
     } catch {
       setRecords([]);
     }
