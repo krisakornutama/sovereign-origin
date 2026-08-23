@@ -1,86 +1,88 @@
-// ─────────────────────────────────────────────────────────────
-//  Sovereign OS — Frontend Watchdog
-//  คอยเฝ้า Next.js dev server (:3000) — ถ้ามันตายกลางคัน เริ่มให้ใหม่เอง
-//  single-instance (lock file .freebuff/frontend-watchdog.pid)
-//  เรียกใช้ผ่าน autostart.mjs / รันเองก็ได้ — ล็อก .freebuff/frontend-watchdog.log
-// ─────────────────────────────────────────────────────────────
-import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import net from 'node:net';
 
-const ROOT = dirname(fileURLToPath(import.meta.url));
-const FRONTEND = join(ROOT, 'sovereign-frontend');
-const NEXT_BIN = join(FRONTEND, 'node_modules', 'next', 'dist', 'bin', 'next');
-const LOCK = join(ROOT, '.freebuff', 'frontend-watchdog.pid');
-const LOG = join(ROOT, '.freebuff', 'frontend-watchdog.log');
+> sovereign-frontend@1.0.0 dev
+> next dev
 
-mkdirSync(dirname(LOCK), { recursive: true });
+▲ Next.js 16.3.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.80.1:3000
+- Environments: .env.local
+✓ Ready in 1306ms
+✓ Running next.config.js took 43ms
 
-// กันรันซ้ำสองตัว — ตรวจว่า pid ใน lock ยังมีชีวิตอยู่หรือไม่
-if (existsSync(LOCK)) {
-  try {
-    const pid = Number(readFileSync(LOCK, 'utf8'));
-    if (pid > 0) {
-      process.kill(pid, 0);
-      console.log(`frontend-watchdog already running (pid ${pid}) — exit`);
-      process.exit(0);
-    }
-  } catch {
-    // lock เก่า (pid ตายแล้ว) = ทิ้งแล้วเริ่มใหม่
-  }
-}
-writeFileSync(LOCK, String(process.pid));
-
-const log = (...a) => console.log(`[${new Date().toLocaleString('th-TH')}]`, ...a);
-
-let child = null;
-let restarts = 0;
-
-function portOpen() {
-  return new Promise((resolve) => {
-    const sock = net.createConnection({ port: 3000, host: '127.0.0.1' });
-    const done = (v) => { sock.destroy(); resolve(v); };
-    sock.setTimeout(800, () => done(false));
-    sock.once('connect', () => done(true));
-    sock.once('error', () => done(false));
-  });
-}
-
-function start() {
-  if (child) return;
-  portOpen().then((open) => {
-    if (open) {
-      log('ℹ️ :3000 มี server รันอยู่แล้ว — เฝ้าอย่างเดียว ไม่ spawn ซ้ำ');
-      return;
-    }
-    const out = openSync(LOG, 'a');
-    restarts++;
-    log(`▶️ frontend dev เริ่ม (ครั้งที่ ${restarts})`);
-    child = spawn('node.exe', [NEXT_BIN, 'dev', '-p', '3000'], {
-      cwd: FRONTEND,
-      windowsHide: true,
-      stdio: ['ignore', out, out],
-    });
-    child.on('exit', (code, signal) => {
-      child = null;
-      log(`💀 frontend dev จบ (code=${code} signal=${signal}) — เริ่มใหม่ใน 5s`);
-      setTimeout(start, 5000);
-    });
-    child.on('error', (err) => {
-      child = null;
-      log(`❌ spawn ล้มเหลว: ${err.message} — ลองอีกครั้งใน 15s`);
-      setTimeout(start, 15000);
-    });
-  });
-}
-
-log('═══ Frontend Watchdog เริ่ม (เฝ้า :3000) ═══');
-start();
-
-process.on('exit', () => {
-  try { unlinkSync(LOCK); } catch {}
-});
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+○ Compiling / ...
+ GET / 200 in 4.7s (next.js: 4.6s, application-code: 67ms)
+ GET / 200 in 48ms (next.js: 21ms, application-code: 27ms)
+ GET / 200 in 36ms (next.js: 14ms, application-code: 22ms)
+ GET / 200 in 67ms (next.js: 29ms, application-code: 38ms)
+[browser] [i18n] Missing key "dashboard.inventory.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "dashboard.farm.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /dashboard 200 in 200ms (next.js: 165ms, application-code: 35ms)
+[browser] [i18n] Missing key "dashboard.inventory.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "dashboard.farm.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /sensors 200 in 373ms (next.js: 344ms, application-code: 29ms)
+[browser] [i18n] Missing key "sensorsHub.eyebrow" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "sensorsHub.title" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /energy 200 in 336ms (next.js: 316ms, application-code: 20ms)
+ GET /predictive 200 in 365ms (next.js: 341ms, application-code: 24ms)
+ GET /relay 200 in 396ms (next.js: 371ms, application-code: 25ms)
+ GET /automation 200 in 385ms (next.js: 363ms, application-code: 22ms)
+ GET /ota 200 in 353ms (next.js: 328ms, application-code: 25ms)
+ GET /security 200 in 510ms (next.js: 482ms, application-code: 28ms)
+ GET /ai-agent 200 in 502ms (next.js: 471ms, application-code: 31ms)
+ GET /ai 200 in 363ms (next.js: 335ms, application-code: 28ms)
+ GET /vision 200 in 347ms (next.js: 325ms, application-code: 22ms)
+ GET /property 200 in 991ms (next.js: 960ms, application-code: 32ms)
+[browser] [i18n] Missing key "property.eyebrow" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "property.terrain3d.title" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "property.terrain3d.show" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "property.terrain3d.hint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /alerts 200 in 413ms (next.js: 378ms, application-code: 34ms)
+[browser] [i18n] Missing key "alerts.emptyDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /risk-monitor 200 in 388ms (next.js: 369ms, application-code: 19ms)
+[browser] [i18n] Missing key "riskMonitor.defcon.0" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /governance-sim 200 in 423ms (next.js: 390ms, application-code: 33ms)
+ GET /infrastructure 200 in 356ms (next.js: 335ms, application-code: 21ms)
+ GET /health 200 in 345ms (next.js: 320ms, application-code: 25ms)
+[browser] [i18n] Missing key "health.page.selfCheck" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /inventory 200 in 310ms (next.js: 288ms, application-code: 23ms)
+[browser] [i18n] Missing key "inventory.page.noItemsDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /farm 200 in 345ms (next.js: 322ms, application-code: 24ms)
+[browser] [i18n] Missing key "farm.page.addSubtitle" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /livestock 200 in 400ms (next.js: 381ms, application-code: 19ms)
+[browser] [i18n] Missing key "livestock.page.noGroupsDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /restaurant 200 in 364ms (next.js: 344ms, application-code: 19ms)
+[browser] [i18n] Missing key "restaurant.selectFirstDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "restaurant.pos.cartEmptyDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "restaurant.pos.noMenusDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /treasury 200 in 434ms (next.js: 415ms, application-code: 19ms)
+[browser] [i18n] Missing key "treasury.positions.allocation" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "treasury.positions.return" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "treasury.stat.liquidityPlus" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /knowledge 200 in 656ms (next.js: 636ms, application-code: 19ms)
+[i18n] Missing key "healing.eyebrow" — กำลังใช้ fallback
+ GET /healing 200 in 377ms (next.js: 339ms, application-code: 38ms)
+[browser] [i18n] Missing key "healing.eyebrow" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /lifestyle 200 in 373ms (next.js: 349ms, application-code: 24ms)
+ GET /history 200 in 344ms (next.js: 324ms, application-code: 20ms)
+ GET /reports 200 in 318ms (next.js: 301ms, application-code: 18ms)
+[browser] [i18n] Missing key "reports.subtitle" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "reports.noReportsDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /change-password 200 in 402ms (next.js: 382ms, application-code: 20ms)
+ GET /system 200 in 400ms (next.js: 380ms, application-code: 21ms)
+ GET /backup 200 in 344ms (next.js: 323ms, application-code: 21ms)
+[browser] [i18n] Missing key "backup.page.subtitle" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "backup.emptyDesc" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /users 200 in 403ms (next.js: 380ms, application-code: 22ms)
+ GET /audit 200 in 303ms (next.js: 281ms, application-code: 22ms)
+ GET /settings 200 in 1046ms (next.js: 1010ms, application-code: 37ms)
+ GET /system 200 in 36ms (next.js: 17ms, application-code: 18ms)
+[browser] [i18n] Missing key "dashboard.inventory.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "dashboard.farm.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+ GET /dashboard 304 in 43ms (next.js: 22ms, application-code: 22ms)
+[browser] [i18n] Missing key "dashboard.inventory.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "dashboard.farm.enableHint" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "sensorsHub.eyebrow" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] [i18n] Missing key "sensorsHub.title" — กำลังใช้ fallback (src/stores/useLanguageStore.ts:77:19)
+[browser] WebSocket disconnected (src/hooks/useSocket.ts:66:15)
+✓ Compiled in 573ms
+✓ Compiled in 484ms
