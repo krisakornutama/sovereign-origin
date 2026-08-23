@@ -309,8 +309,16 @@ export default function FarmPage() {
 
           {/* Add form */}
           {canWrite && (
-            <div className="card panel-glow p-4 space-y-3">
-              <div className="text-sm font-semibold text-gray-200 flex items-center gap-1.5"><Icon name="plus" size={14} className="text-gray-400" />{t('farm.page.addTitle', 'เพิ่มแปลงใหม่')}</div>
+            <div className="card panel-glow p-5 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Icon name="plus" size={14} />
+                </span>
+                <div>
+                  <div className="text-sm font-bold text-gray-100">{t('farm.page.addTitle', 'เพิ่มแปลงใหม่')}</div>
+                  <div className="text-xs text-gray-500">{t('farm.page.addSubtitle', 'ตั้งชื่อแปลง เลือกพืช และกำหนดวันปลูก/เก็บเกี่ยว')}</div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('farm.page.namePlaceholder', 'ชื่อแปลง *')} className="input" />
                 <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder={t('farm.page.locationPlaceholder', 'ตำแหน่ง/โซน')} className="input" />
@@ -338,7 +346,7 @@ export default function FarmPage() {
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {plots.map((plot) => (
-                <div key={plot.id} className="card p-4 space-y-2.5 card-hover group">
+                <div key={plot.id} className="card p-5 space-y-3 card-hover group relative overflow-hidden">
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
                       <div className="font-bold text-white truncate group-hover:text-emerald-300 transition-colors">{plot.name}</div>
@@ -354,12 +362,14 @@ export default function FarmPage() {
                   </div>
 
                   {plot.crop && (
-                    <div className="text-sm text-emerald-300">{plot.crop}</div>
+                    <div className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                      <Icon name="farm" size={12} /> {plot.crop}
+                    </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-                    <div>{t('farm.page.planted', 'ปลูก:')} <span className="text-gray-200">{formatDate(plot.planted_at)}</span></div>
-                    <div>{t('farm.page.harvest', 'เก็บเกี่ยว:')} <span className="text-gray-200">{formatDate(plot.expected_harvest_at)}</span></div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-1"><Icon name="calendar" size={11} className="text-gray-600" />{t('farm.page.planted', 'ปลูก:')} <span className="text-gray-200">{formatDate(plot.planted_at)}</span></div>
+                    <div className="flex items-center gap-1"><Icon name="calendar" size={11} className="text-amber-500/60" />{t('farm.page.harvest', 'เก็บเกี่ยว:')} <span className="text-gray-200">{formatDate(plot.expected_harvest_at)}</span></div>
                   </div>
 
                   {typeof plot.daysToHarvest === 'number' && (

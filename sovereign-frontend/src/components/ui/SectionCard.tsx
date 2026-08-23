@@ -19,13 +19,17 @@ export default function SectionCard({
   className?: string;
 }) {
   return (
-    <section className={`card p-4 ${className}`}>
+    <section className={`card p-5 ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-800/60">
           {title && (
-            <h2 className="text-[13px] font-semibold text-gray-200 flex items-center gap-2 glow-text">
-              {icon && <span className="text-gray-400 flex items-center">{icon}</span>}
-              {title}
+            <h2 className="text-[13px] font-bold text-gray-100 flex items-center gap-2.5 tracking-wide">
+              {icon && (
+                <span className="w-7 h-7 rounded-lg bg-gray-800/60 border border-gray-700/60 flex items-center justify-center text-gray-400">
+                  {icon}
+                </span>
+              )}
+              <span className="glow-text">{title}</span>
             </h2>
           )}
           {action}
