@@ -305,7 +305,7 @@ export default function Dashboard() {
       case 'status':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <StatCard label={t('dashboard.status.totalDevices', 'อุปกรณ์ทั้งหมด')} value={deviceStatus.total} icon={<Icon name="server" size={14} />} />
+            <StatCard label={t('dashboard.status.totalDevices', 'อุปกรณ์ทั้งหมด')} value={deviceStatus.total} icon={<Icon name="grid" size={14} />} />
             <StatCard label={t('common.online', 'ออนไลน์')} value={<span className="text-emerald-400">{deviceStatus.online}</span>} icon={<Icon name="check" size={14} className="text-emerald-400" />} />
             <StatCard label={t('common.offline', 'ออฟไลน์')} value={<span className="text-rose-400">{deviceStatus.offline}</span>} icon={<Icon name="alert-triangle" size={14} className="text-rose-400" />} />
           </div>
@@ -317,7 +317,7 @@ export default function Dashboard() {
               { label: t('dashboard.stats.battery', 'แบตเตอรี่'), value: metrics.battery_soc, unit: '%', icon: 'battery' as const, tone: metrics.battery_soc != null && metrics.battery_soc < 20 ? 'text-rose-400' : 'text-emerald-400' },
               { label: t('dashboard.stats.waterLevel', 'ระดับน้ำ'), value: metrics.water_level_cm, unit: '%', icon: 'droplet' as const, tone: 'text-sky-400' },
               { label: t('dashboard.stats.temperature', 'อุณหภูมิ'), value: metrics.temperature, unit: '°C', icon: 'thermometer' as const, tone: metrics.temperature != null && metrics.temperature > 40 ? 'text-rose-400' : 'text-amber-400' },
-              { label: t('dashboard.stats.rain', 'ฝน'), value: metrics.rain_detect, isBoolean: true, trueLabel: t('dashboard.stats.raining', 'ตก'), falseLabel: t('dashboard.stats.notRaining', 'ไม่ตก'), icon: 'cloud-rain' as const, tone: 'text-indigo-400' },
+              { label: t('dashboard.stats.rain', 'ฝน'), value: metrics.rain_detect, isBoolean: true, trueLabel: t('dashboard.stats.raining', 'ตก'), falseLabel: t('dashboard.stats.notRaining', 'ไม่ตก'), icon: 'droplet' as const, tone: 'text-indigo-400' },
             ].map((stat, idx) => (
               <StatCard
                 key={idx}
