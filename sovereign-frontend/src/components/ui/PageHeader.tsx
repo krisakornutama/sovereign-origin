@@ -33,6 +33,7 @@ export default function PageHeader({
             </span>
           )}
           {title}
+          <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold tracking-widest text-emerald-300">✦ NEW DESIGN v2</span>
         </h1>
         {subtitle && <p className="text-[13px] text-gray-400 mt-1.5 leading-relaxed max-w-2xl">{subtitle}</p>}
       </div>
