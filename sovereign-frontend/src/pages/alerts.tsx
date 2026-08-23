@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -57,18 +57,16 @@ export default function AlertsPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
-          eyebrow={t('alerts.eyebrow', 'ความปลอดภัย')}
-          title="SOVEREIGN OS" icon={<Icon name="alerts" size={18} />}
-          subtitle={t('alerts.subtitle', 'Alert History')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('alerts.backDashboard', '← กลับ Dashboard')}</Link>}
-        />
-      </header>
-      <main className="max-w-4xl mx-auto p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('alerts.title', 'ประวัติการแจ้งเตือน')}</h2>
-        {alerts.length === 0 ? (
-          <div className="text-gray-500 text-center py-8">{t('alerts.empty', 'ไม่มีประวัติการแจ้งเตือน')}</div>
-        ) : (
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-4xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('alerts.eyebrow', 'ความปลอดภัย')}
+            title={t('alerts.title', 'ประวัติการแจ้งเตือน')}
+            subtitle={t('alerts.subtitle', 'บันทึกการแจ้งเตือนจาก Automation Engine')}
+            icon={<Icon name="alerts" size={18} />}
+          />
+          {alerts.length === 0 ? (
+            <div className="card"><EmptyState icon={<Icon name="alerts" size={20} />} title={t('alerts.empty', 'ไม่มีประวัติการแจ้งเตือน')} description={t('alerts.emptyDesc', 'เมื่อระบบตรวจจับเหตุการณ์จะบันทึกไว้ที่นี่')} /></div>
+          ) : (
           alerts.map((alert, i) => (
             <div
               key={i}

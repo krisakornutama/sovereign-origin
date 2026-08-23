@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
+import EmptyState from "../../components/ui/EmptyState";
 import { authFetch } from "../../lib/apiFetch";
 import { asArray } from "../../lib/fetchJson";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -107,10 +108,8 @@ export default function RestaurantPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-          <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.pos.title', 'ร้านอาหาร — POS จักรวรรดิ')} icon={<Icon name="inventory" size={18} />} subtitle={t('restaurant.pos.subtitle', 'Farm → Inventory → สูตร (เน้นผลิตเอง) → ขาย เงินสด/PromptPay + ใบหน้าแต้ม')} actions={<Link href="/farm" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToFarm', '← ฟาร์ม')}</Link>} />
-        </header>
-        <main className="max-w-7xl mx-auto p-6 space-y-4 w-full">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
+          <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.pos.title', 'ร้านอาหาร — POS')} subtitle={t('restaurant.pos.subtitle', 'Farm → Inventory → สูตรผลิตเอง → ขาย เงินสด/PromptPay + ใบหน้าแต้ม')} icon={<Icon name="inventory" size={18} />} />
           {msg && <div className="inset p-3 text-sm text-emerald-300 border-emerald-700">{msg}</div>}
           {err && <div className="inset p-3 text-sm text-red-400 border-red-700">{err}</div>}
 
@@ -145,8 +144,8 @@ export default function RestaurantPage() {
                 <h3 className="text-sm font-bold glow-text">{selected ? t('restaurant.pos.menuCount', 'เมนู ({n})', { n: menus.length }) : t('restaurant.pos.menuTitle', 'เมนู')}</h3>
                 <button onClick={()=>selected&&loadMenus(selected)} className="text-xs px-2 py-1 bg-gray-800 rounded">{t('restaurant.refresh', 'รีเฟรช')}</button>
               </div>
-              {!selected ? <div className="text-sm text-gray-500 py-8 text-center">{t('restaurant.selectFirst', 'เลือกร้านก่อน')}</div> :
-                menus.length===0 ? <div className="text-sm text-gray-500 py-8 text-center">{t('restaurant.pos.noMenus', 'ยังไม่มีเมนู — ไปเพิ่มที่ /restaurant/admin')}</div> :
+              {!selected ? <EmptyState icon={<Icon name="inventory" size={20} />} title={t('restaurant.selectFirst', 'เลือกร้านก่อน')} description={t('restaurant.selectFirstDesc', 'เลือกสาขาร้านด้านบนเพื่อโหลดเมนู')} /> :
+                menus.length===0 ? <EmptyState icon={<Icon name="inventory" size={20} />} title={t('restaurant.pos.noMenus', 'ยังไม่มีเมนู')} description={t('restaurant.pos.noMenusDesc', 'ไปเพิ่มที่ /restaurant/admin แล้วผูกสูตรผลิตเอง')} action={<Link href="/restaurant/admin" className="btn-primary text-sm">{t('restaurant.pos.manageMenu', 'จัดการเมนู/สูตร')}</Link>} /> :
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {menus.map(m=>(
                     <button key={m.id} onClick={()=>m.canMake===false?null:addToCart(m)} disabled={m.canMake===false} className={`p-3 rounded-xl border text-left ${m.canMake===false?'bg-gray-800 border-red-900 opacity-60':'bg-gray-900 border-gray-700 hover:border-emerald-600'}`}>
@@ -168,7 +167,7 @@ export default function RestaurantPage() {
             {/* ตะกร้า + จ่าย */}
             <div className="card p-4 space-y-3 panel-cyan">
               <h3 className="text-sm font-bold flex items-center gap-1"><Icon name="inventory" size={14}/> {t('restaurant.pos.cartCount', 'ตะกร้า ({n})', { n: cart.length })}</h3>
-              {cart.length===0 ? <div className="text-sm text-gray-500 py-4 text-center">{t('restaurant.pos.cartEmpty', 'ยังไม่มีรายการ')}</div> :
+              {cart.length===0 ? <EmptyState icon={<Icon name="inventory" size={20} />} title={t('restaurant.pos.cartEmpty', 'ยังไม่มีรายการ')} description={t('restaurant.pos.cartEmptyDesc', 'แตะเมนูด้านซ้ายเพื่อเพิ่มลงตะกร้า')} /> :
                 <div className="space-y-2">
                   {cart.map(c=>(
                     <div key={c.menuId} className="flex justify-between items-center bg-gray-900 rounded-lg px-3 py-2 text-sm">
