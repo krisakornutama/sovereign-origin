@@ -297,9 +297,9 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
               </div>
 
               {showAddDevice && (
-                <div className="panel p-4 space-y-3">
-                  <input type="text" value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder={t('sensorsHub.deviceNamePlaceholder', 'ชื่ออุปกรณ์ (เช่น ESP8266-Home)')} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white" />
-                  <select value={deviceType} onChange={(e) => setDeviceType(e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white">
+                <div className="card p-4 space-y-3">
+                  <input type="text" value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder={t('sensorsHub.deviceNamePlaceholder', 'ชื่ออุปกรณ์ (เช่น ESP8266-Home)')} className="input w-full" />
+                  <select value={deviceType} onChange={(e) => setDeviceType(e.target.value)} className="input w-full">
                     <option value="ESP8266">ESP8266</option>
                     <option value="ESP32">ESP32</option>
                     <option value="Arduino">Arduino</option>
@@ -312,7 +312,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
 
               <div className="space-y-4">
                 {devices.map((device) => (
-                  <div key={device.id} className="panel p-4">
+                  <div key={device.id} className="card p-4 card-hover">
                     <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
                       <div>
                         <h3 className="text-sm font-semibold text-gray-200">{device.type}</h3>
@@ -346,21 +346,21 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                     </div>
                   </div>
                 ))}
-                {devices.length === 0 && <div className="text-gray-500 text-center py-8">{t('sensorsHub.noDevices', 'ยังไม่มีอุปกรณ์ — เพิ่มอุปกรณ์แรกของคุณ')}</div>}
+                {devices.length === 0 && <div className="card"><EmptyState icon={<Icon name="sensors" size={20} />} title={t('sensorsHub.noDevices', 'ยังไม่มีอุปกรณ์')} description={t('sensorsHub.noDevicesDesc', 'เพิ่มอุปกรณ์แรกของคุณ')} /></div>}
               </div>
 
               {/* Generate Code Modal */}
               {selectedDevice && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-                  <div className="panel p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+                  <div className="card p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
                     <h3 className="text-lg font-bold mb-4">{t('sensorsHub.modalTitle', 'Generate Arduino Code for {type}', { type: selectedDevice.type })}</h3>
                     <div className="mb-4">
-                      <label className="text-sm text-gray-400">WiFi SSID</label>
-                      <input id="wifiSSID" className="w-full bg-gray-800 border rounded px-3 py-2" defaultValue="SolarKiller" />
+                      <label className="label">WiFi SSID</label>
+                      <input id="wifiSSID" className="input w-full" defaultValue="SolarKiller" />
                     </div>
                     <div className="mb-4">
-                      <label className="text-sm text-gray-400">WiFi Password</label>
-                      <input id="wifiPass" type="password" className="w-full bg-gray-800 border rounded px-3 py-2" />
+                      <label className="label">WiFi Password</label>
+                      <input id="wifiPass" type="password" className="input w-full" />
                     </div>
                     <button onClick={async () => {
                       const ssid = (document.getElementById('wifiSSID') as HTMLInputElement).value;
@@ -403,11 +403,11 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
               {/* Controls */}
               <div className="flex gap-4 flex-wrap items-end">
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">{t('sensorsHub.filterBy', 'กรองตามประเภท')}</label>
+                    <label className="label">{t('sensorsHub.filterBy', 'กรองตามประเภท')}</label>
                   <select
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
-                    className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                    className="input"
                   >
                     {METRIC_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{t(`sensorsHub.metric.${opt.value}`, opt.label)}</option>
@@ -415,11 +415,11 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">{t('sensorsHub.limitBy', 'จำนวนที่แสดง')}</label>
+                  <label className="label">{t('sensorsHub.limitBy', 'จำนวนที่แสดง')}</label>
                   <select
                     value={limit}
                     onChange={(e) => setLimit(Number(e.target.value))}
-                    className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+                    className="input"
                   >
                     {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
@@ -433,20 +433,22 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
               </div>
 
               {/* Table */}
-              <div className="panel panel-cyan overflow-x-auto">
+              <div className="card panel-cyan overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-                    <tr>
-                      <th className="px-4 py-3">{t('sensorsHub.colTime', 'เวลา')}</th>
-                      <th className="px-4 py-3">Device</th>
-                      <th className="px-4 py-3">Metric</th>
-                      <th className="px-4 py-3">{t('common.value', 'ค่า')}</th>
-                      <th className="px-4 py-3">{t('sensorsHub.colActions', 'จัดการ')}</th>
+                  <thead className="bg-gray-950/40 backdrop-blur-sm">
+                    <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                      <th className="px-4 py-3 font-semibold">{t('sensorsHub.colTime', 'เวลา')}</th>
+                      <th className="px-4 py-3 font-semibold">Device</th>
+                      <th className="px-4 py-3 font-semibold">Metric</th>
+                      <th className="px-4 py-3 font-semibold">{t('common.value', 'ค่า')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('sensorsHub.colActions', 'จัดการ')}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody className="divide-y divide-gray-800/50">
                     {records.map((rec, i) => (
-                      <tr key={i} className="hover:bg-gray-800/50">
+                      <tr key={i} className="hover:bg-gray-800/50 transition-colors group">
                         <td className="px-4 py-2 text-xs text-gray-400">{new Date(rec.time).toLocaleString(fmtLocale())}</td>
                         <td className="px-4 py-2 text-xs text-gray-300">{rec.device_id}</td>
                         <td className="px-4 py-2 text-emerald-300">{t(`sensorsHub.metric.${rec.metric}`, METRIC_LABEL[rec.metric] || rec.metric)}</td>
@@ -466,6 +468,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
               <div className="text-xs text-gray-500">{t('sensorsHub.footerInfo', 'แสดง {n} รายการ · โหลดอัตโนมัติทุก 10 วินาที', { n: records.length })}</div>
             </>

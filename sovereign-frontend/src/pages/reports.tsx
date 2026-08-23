@@ -134,7 +134,7 @@ export default function ReportsPage() {
 
         <div className="space-y-4">
           {reports.map((r) => (
-            <div key={r.id} className="card panel-cyan p-5">
+            <div key={r.id} className="card card-hover panel-cyan p-5">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{r.title}</h2>
                 <span

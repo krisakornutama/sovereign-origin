@@ -100,7 +100,7 @@ export default function AuditPage() {
             <select
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
-              className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+              className="input text-sm"
             >
               {LIMIT_OPTIONS.map((n) => (
                 <option key={n} value={n}>{t('audit.showLimit', 'แสดง {n} รายการ', { n })}</option>
@@ -118,21 +118,23 @@ export default function AuditPage() {
 
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 
-        <div className="card panel-cyan overflow-x-auto">
+        <div className="card panel-cyan overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+          <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3">{t('common.time', 'เวลา')}</th>
-                <th className="px-4 py-3">{t('audit.colUser', 'ผู้ใช้')}</th>
-                <th className="px-4 py-3">Action</th>
-                <th className="px-4 py-3">Method</th>
-                <th className="px-4 py-3">Path</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">IP</th>
-                <th className="px-4 py-3">{t('common.details', 'รายละเอียด')}</th>
+            <thead className="bg-gray-950/40 backdrop-blur-sm">
+              <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                <th className="px-4 py-3 font-semibold">{t('common.time', 'เวลา')}</th>
+                <th className="px-4 py-3 font-semibold">{t('audit.colUser', 'ผู้ใช้')}</th>
+                <th className="px-4 py-3 font-semibold">Action</th>
+                <th className="px-4 py-3 font-semibold">Method</th>
+                <th className="px-4 py-3 font-semibold">Path</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">IP</th>
+                <th className="px-4 py-3 font-semibold">{t('common.details', 'รายละเอียด')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-gray-800/50">
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-800/50">
                   <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
@@ -172,6 +174,7 @@ export default function AuditPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         <div className="text-xs text-gray-500">{t('audit.countLabel', 'แสดง {n} รายการ (ล่าสุดก่อน)', { n: logs.length })}</div>

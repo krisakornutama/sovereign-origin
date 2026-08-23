@@ -193,7 +193,7 @@ export default function BackupPage() {
                 type="time"
                 value={schedule.time}
                 onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
-                className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white"
+                className="input"
               />
             </div>
             <button
@@ -235,7 +235,7 @@ export default function BackupPage() {
                   <th className="py-2">{t('common.actions', 'การจัดการ')}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-800/50">
                 {backups.map((b) => (
                   <tr key={b.file} className="border-b border-gray-800">
                     <td className="py-2 pr-4 font-mono text-xs text-gray-300">{b.file}</td>
