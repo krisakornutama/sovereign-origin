@@ -52,15 +52,13 @@ export default function ChangePasswordPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-          <PageHeader
+        <PageHeader
             eyebrow={t('changePassword.eyebrow', 'บัญชีของฉัน')}
             title={t('changePassword.title', 'เปลี่ยนรหัสผ่าน')}
             icon={<Icon name="password" size={18} />}
             subtitle={t('changePassword.subtitle', 'ตั้งรหัสผ่านใหม่ด้วยตัวเอง')}
             actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>}
           />
-        </header>
         <main className="flex-1 w-full max-w-md mx-auto p-6 panel-glow">
           <ChangePasswordForm />
           <p className="mt-4 text-center text-[11px] text-gray-500 font-mono glow-text-cyan">

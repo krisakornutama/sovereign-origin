@@ -398,17 +398,15 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900 border-b border-gray-700 px-6 py-3">
-        <PageHeader
+      <PageHeader
           eyebrow={t('settings.eyebrow', 'ระบบ')}
           title="Settings"
           icon={<Icon name="settings" size={18} />}
           subtitle={t('settings.subtitle', 'ตั้งค่าระบบ · ธีม · clone/export')}
           actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>}
         />
-      </header>
 
-      <main className="max-w-3xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-3xl mx-auto w-full">
         {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 

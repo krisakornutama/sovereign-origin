@@ -32,10 +32,8 @@ export default function RiceResearchPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-          <PageHeader eyebrow="วิจัย" title="วิจัยพันธุ์ข้าว + ดิน (A)" icon={<Icon name="farm" size={18} />} subtitle="เทียบ yield/area + วิเคราะห์ดิน NPK — เก็บสูตรในคลังความรู้" actions={<Link href="/knowledge" className="text-sm text-sky-400 hover:underline">คลังความรู้</Link>} />
-        </header>
-        <main className="max-w-6xl mx-auto p-6 space-y-4 w-full">
+        <PageHeader eyebrow="วิจัย" title="วิจัยพันธุ์ข้าว + ดิน (A)" icon={<Icon name="farm" size={18} />} subtitle="เทียบ yield/area + วิเคราะห์ดิน NPK — เก็บสูตรในคลังความรู้" actions={<Link href="/knowledge" className="text-sm text-sky-400 hover:underline">คลังความรู้</Link>} />
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full space-y-4 w-full">
           {loading ? <div className="text-gray-500">กำลังโหลด...</div> : (
             <>
               <div className="card p-4">

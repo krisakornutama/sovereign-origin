@@ -217,8 +217,7 @@ export default function AutomationPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('automation.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title="SOVEREIGN OS" icon={<Icon name="automation" size={18} />}
           subtitle="Automation Rules" actions={<div className="flex gap-3">
@@ -226,9 +225,8 @@ export default function AutomationPage() {
           <Link href="/sensors" scroll={false} className="text-sm text-sky-400 hover:underline">{t('automation.sensorsLink', 'เซ็นเซอร์')}</Link>
         </div>}
         />
-      </header>
 
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
         <div className="flex justify-between items-start gap-4">
           <div>
             <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan mb-2">{t('automation.rulesTitle', 'กฎอัตโนมัติ')}</h2>

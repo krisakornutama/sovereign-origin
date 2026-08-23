@@ -51,10 +51,8 @@ export default function KitchenIOTPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-          <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.kitchen.title', 'ครัว IOT — น้ำหนัก + ตู้เย็น')} icon={<Icon name="sensors" size={18} />} subtitle={t('restaurant.kitchen.subtitle', 'HX711 น้ำหนัก → Inventory อัตโนมัติ • DS18B20 ตู้เย็น → เตือนของเสีย')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
-        </header>
-        <main className="max-w-6xl mx-auto p-6 space-y-4 w-full">
+        <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.kitchen.title', 'ครัว IOT — น้ำหนัก + ตู้เย็น')} icon={<Icon name="sensors" size={18} />} subtitle={t('restaurant.kitchen.subtitle', 'HX711 น้ำหนัก → Inventory อัตโนมัติ • DS18B20 ตู้เย็น → เตือนของเสีย')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full space-y-4 w-full">
           {msg && <div className="inset p-3 text-sm text-emerald-300">{msg}</div>}
           {err && <div className="inset p-3 text-sm text-red-400">{err}</div>}
           {alerts.length>0 && <div className="bg-red-900/30 border border-red-700 rounded-lg p-3 text-sm text-red-300 space-y-1">{alerts.map((a,i)=><div key={i}>⚠️ {a}</div>)}</div>}
