@@ -91,7 +91,7 @@ export default function TerrainDemoPage() {
               max={2000}
               value={landWidth}
               onChange={(e) => setLandWidth(Number(e.target.value) || 10)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+              className="input w-full text-sm"
             />
           </div>
 
@@ -105,7 +105,7 @@ export default function TerrainDemoPage() {
               max={2000}
               value={landLength}
               onChange={(e) => setLandLength(Number(e.target.value) || 10)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+              className="input w-full text-sm"
             />
           </div>
 
@@ -119,7 +119,7 @@ export default function TerrainDemoPage() {
               max={50}
               value={resolution}
               onChange={(e) => setResolution(Number(e.target.value) || 1)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+              className="input w-full text-sm"
             />
           </div>
 

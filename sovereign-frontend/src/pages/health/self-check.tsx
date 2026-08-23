@@ -295,7 +295,7 @@ export default function SelfCheckPage() {
               value={detail[q.id] ?? ""}
               onChange={(e) => setDetail((d) => ({ ...d, [q.id]: e.target.value }))}
               placeholder="รายละเอียดเพิ่มเติม (ถ้ามี) เช่น เป็นมา 3 วันแล้ว"
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm"
+              className="input text-sm w-full"
             />
 
             {/* voice controls */}

@@ -274,7 +274,7 @@ export default function PropertyPage() {
       <div className="card panel-glow p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('property.mapTitle', 'แผนที่จำลอง (2D + ไอโซเมตริก 3D)')}</h2>
-          <button onClick={reloadMap} className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs inline-flex items-center gap-1"><Icon name="refresh" size={12} /> {t('property.refreshMap', 'รีเฟรชแผนที่')}</button>
+          <button onClick={reloadMap} className="btn-secondary text-xs inline-flex items-center gap-1"><Icon name="refresh" size={12} /> {t('property.refreshMap', 'รีเฟรชแผนที่')}</button>
         </div>
         {loading ? (
           <div className="text-gray-500 text-sm py-8 text-center">{t('property.mapping', 'กำลังสร้างแผนที่...')}</div>
@@ -294,7 +294,7 @@ export default function PropertyPage() {
           <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('property.terrain3d.title', 'ภาพTerrain 3 มิติ')}</h2>
           <button
             onClick={() => setShow3D((v) => !v)}
-            className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs inline-flex items-center gap-1"
+            className="btn-secondary text-xs inline-flex items-center gap-1"
           >
             <Icon name={show3D ? 'eye-off' : 'eye'} size={12} />
             {show3D ? t('property.terrain3d.hide', 'ซ่อน') : t('property.terrain3d.show', 'แสดง 3D')}
@@ -389,16 +389,16 @@ export default function PropertyPage() {
             ))}
           </div>
           <div className="mt-4 space-y-2">
-            <input value={zoneForm.name} onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })} placeholder={t('property.zoneNamePlaceholder', 'ชื่อโซน เช่น สวนทุเรียน')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <input value={zoneForm.name} onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })} placeholder={t('property.zoneNamePlaceholder', 'ชื่อโซน เช่น สวนทุเรียน')} className="input w-full text-sm" />
             <div className="grid grid-cols-3 gap-2 text-xs">
-              <select value={zoneForm.type} onChange={(e) => setZoneForm({ ...zoneForm, type: e.target.value })} className="bg-gray-800 border border-gray-700 rounded px-2 py-2">
+              <select value={zoneForm.type} onChange={(e) => setZoneForm({ ...zoneForm, type: e.target.value })} className="input text-xs">
                 {ZONE_TYPES.map((zt) => <option key={zt} value={zt}>{t(`property.zoneType.${zt}`, zt)}</option>)}
               </select>
-              <input value={zoneForm.x} onChange={(e) => setZoneForm({ ...zoneForm, x: e.target.value })} placeholder={t('property.xM', 'X (ม.)')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.y} onChange={(e) => setZoneForm({ ...zoneForm, y: e.target.value })} placeholder={t('property.yM', 'Y (ม.)')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.width_m} onChange={(e) => setZoneForm({ ...zoneForm, width_m: e.target.value })} placeholder={t('property.width', 'กว้าง')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.length_m} onChange={(e) => setZoneForm({ ...zoneForm, length_m: e.target.value })} placeholder={t('property.length', 'ยาว')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={zoneForm.height_m} onChange={(e) => setZoneForm({ ...zoneForm, height_m: e.target.value })} placeholder={t('property.height', 'สูง')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={zoneForm.x} onChange={(e) => setZoneForm({ ...zoneForm, x: e.target.value })} placeholder={t('property.xM', 'X (ม.)')} className="input text-xs" />
+              <input value={zoneForm.y} onChange={(e) => setZoneForm({ ...zoneForm, y: e.target.value })} placeholder={t('property.yM', 'Y (ม.)')} className="input text-xs" />
+              <input value={zoneForm.width_m} onChange={(e) => setZoneForm({ ...zoneForm, width_m: e.target.value })} placeholder={t('property.width', 'กว้าง')} className="input text-xs" />
+              <input value={zoneForm.length_m} onChange={(e) => setZoneForm({ ...zoneForm, length_m: e.target.value })} placeholder={t('property.length', 'ยาว')} className="input text-xs" />
+              <input value={zoneForm.height_m} onChange={(e) => setZoneForm({ ...zoneForm, height_m: e.target.value })} placeholder={t('property.height', 'สูง')} className="input text-xs" />
             </div>
             <button onClick={addZone} disabled={busy} className="btn-primary w-full">{t('property.addZone', 'เพิ่มโซน')}</button>
           </div>
@@ -437,16 +437,16 @@ export default function PropertyPage() {
             })}
           </div>
           <div className="mt-4 space-y-2">
-            <input value={pointForm.name} onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })} placeholder={t('property.pointNamePlaceholder', 'ชื่อจุด เช่น กล้องมุมรั้ว')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <input value={pointForm.name} onChange={(e) => setPointForm({ ...pointForm, name: e.target.value })} placeholder={t('property.pointNamePlaceholder', 'ชื่อจุด เช่น กล้องมุมรั้ว')} className="input w-full text-sm" />
             <div className="grid grid-cols-4 gap-2 text-xs">
-              <select value={pointForm.type} onChange={(e) => setPointForm({ ...pointForm, type: e.target.value })} className="bg-gray-800 border border-gray-700 rounded px-1 py-2">
+              <select value={pointForm.type} onChange={(e) => setPointForm({ ...pointForm, type: e.target.value })} className="input text-xs px-1 py-2">
                 {POINT_TYPES.map((pt) => <option key={pt} value={pt}>{t(`property.pointType.${pt}`, pt)}</option>)}
               </select>
-              <input value={pointForm.x} onChange={(e) => setPointForm({ ...pointForm, x: e.target.value })} placeholder={t('property.x', 'X')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={pointForm.y} onChange={(e) => setPointForm({ ...pointForm, y: e.target.value })} placeholder={t('property.y', 'Y')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
-              <input value={pointForm.radius_m} onChange={(e) => setPointForm({ ...pointForm, radius_m: e.target.value })} placeholder={t('property.radius', 'รัศมี')} className="bg-gray-800 border border-gray-700 rounded px-2 py-2" />
+              <input value={pointForm.x} onChange={(e) => setPointForm({ ...pointForm, x: e.target.value })} placeholder={t('property.x', 'X')} className="input text-xs" />
+              <input value={pointForm.y} onChange={(e) => setPointForm({ ...pointForm, y: e.target.value })} placeholder={t('property.y', 'Y')} className="input text-xs" />
+              <input value={pointForm.radius_m} onChange={(e) => setPointForm({ ...pointForm, radius_m: e.target.value })} placeholder={t('property.radius', 'รัศมี')} className="input text-xs" />
             </div>
-            <input value={pointForm.reason} onChange={(e) => setPointForm({ ...pointForm, reason: e.target.value })} placeholder={t('property.reasonPlaceholder', 'เหตุผลที่วาง (เช่น คนต้องผ่านทางนี้)')} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm" />
+            <input value={pointForm.reason} onChange={(e) => setPointForm({ ...pointForm, reason: e.target.value })} placeholder={t('property.reasonPlaceholder', 'เหตุผลที่วาง (เช่น คนต้องผ่านทางนี้)')} className="input w-full text-sm" />
             <button onClick={() => addPoint()} disabled={busy} className="btn-primary w-full">{t('property.addPoint', 'เพิ่มจุด')}</button>
           </div>
         </div>
@@ -466,7 +466,7 @@ export default function PropertyPage() {
                   {s.name} @({s.x},{s.y})
                 </div>
                 <div className="text-gray-500 mt-0.5">{s.reason}</div>
-                <button onClick={() => addPoint(s)} className="mt-1.5 w-full py-1 bg-gray-800 hover:bg-gray-700 rounded text-[11px] font-bold">{t('property.addThisPoint', 'เพิ่มจุดนี้')}</button>
+                <button onClick={() => addPoint(s)} className="btn-secondary w-full mt-1.5 text-[11px] font-bold">{t('property.addThisPoint', 'เพิ่มจุดนี้')}</button>
               </div>
             ))}
           </div>

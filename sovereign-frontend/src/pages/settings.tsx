@@ -424,7 +424,7 @@ export default function SettingsPage() {
             value={apiUrl}
             onChange={(e) => setApiUrlInput(e.target.value)}
             placeholder="http://localhost:3001"
-            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+            className="input w-full text-sm"
           />
           <div className="flex gap-3 flex-wrap">
             <button onClick={saveApiUrl} className="btn-primary">
@@ -592,7 +592,7 @@ export default function SettingsPage() {
                       <th className="py-2 pr-3 w-10"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-800/50">
                     {queuedItems.map((item) => (
                       <tr key={item.id} className="border-b border-gray-800">
                         <td className="py-2 px-3">
@@ -900,7 +900,7 @@ function TelegramSection() {
             onChange={(e) => setBotToken(e.target.value)}
             placeholder={masked ? t('settings.telegram.botTokenMasked', 'ตั้งค่าแล้ว: {masked} — ปล่อยว่างเพื่อใช้ค่าเดิม', { masked }) : t('settings.telegram.botTokenPh', 'กรอก bot token จาก @BotFather (เช่น 123456789:AAF…)')}
             autoComplete="new-password"
-            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+            className="input w-full text-sm"
           />
         </div>
         <div>
@@ -910,7 +910,7 @@ function TelegramSection() {
             value={chatId}
             onChange={(e) => setChatId(e.target.value)}
             placeholder={t('settings.telegram.chatIdPh', 'เช่น 123456789 หรือ @username')}
-            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white"
+            className="input w-full text-sm"
           />
         </div>
       </div>
@@ -1088,7 +1088,7 @@ function MfaSection() {
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       placeholder={t('settings.mfa.codePh', 'รหัส 6 หลักจากแอป')}
                       inputMode="numeric"
-                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white tracking-widest"
+                      className="input text-sm flex-1"
                     />
                     <button onClick={confirm} disabled={busy || code.length !== 6} className="btn-primary">
                       {t('common.confirm', 'ยืนยัน')}

@@ -455,16 +455,16 @@ export default function SecurityPage() {
                   <h3 className="text-sm font-semibold text-gray-200 glow-text mb-2">{t('security.decisionHistory', 'ประวัติการตัดสินใจ ({n})', { n: history.length })}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
-                      <thead className="text-gray-500 uppercase">
-                        <tr>
-                          <th className="py-2 pr-3">{t('common.time', 'เวลา')}</th>
-                          <th className="py-2 pr-3">{t('security.tool', 'Tool')}</th>
-                          <th className="py-2 pr-3">{t('security.args', 'Args')}</th>
-                          <th className="py-2 pr-3">{t('security.result', 'ผล')}</th>
-                          <th className="py-2">{t('common.details', 'รายละเอียด')}</th>
+                      <thead className="bg-gray-950/40">
+                        <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                          <th className="px-3 py-2 font-semibold">{t('common.time', 'เวลา')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('security.tool', 'Tool')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('security.args', 'Args')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('security.result', 'ผล')}</th>
+                          <th className="px-3 py-2 font-semibold">{t('common.details', 'รายละเอียด')}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-800">
+                      <tbody className="divide-y divide-gray-800/50">
                         {history.slice(0, 10).map((a) => (
                           <tr key={a.id} className="text-gray-400">
                             <td className="py-2 pr-3 whitespace-nowrap">{fmtTime(a.decidedAt)}</td>
@@ -524,25 +524,27 @@ export default function SecurityPage() {
         </div>
 
         {/* Network Connections Table — ตารางการเชื่อมต่อเครือข่าย */}
-        <div className="card panel-cyan overflow-x-auto">
-          <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800">{t('security.activeConnections', 'Active Connections')} <span className="text-xs text-gray-500 font-normal">{t('security.connectionsNote', '— การเชื่อมต่อเครือข่ายที่กำลังใช้งาน (ตรวจสอบ + block IP แปลกปลอม)')}</span></h2>
+        <div className="card panel-cyan overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+          <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800/60">{t('security.activeConnections', 'Active Connections')} <span className="text-xs text-gray-500 font-normal">{t('security.connectionsNote', '— การเชื่อมต่อเครือข่ายที่กำลังใช้งาน (ตรวจสอบ + block IP แปลกปลอม)')}</span></h2>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3">{t('security.colProtocol', 'Protocol')} <span className="normal-case text-gray-600">{t('security.colProtocolHint', '(โปรโตคอล)')}</span></th>
-                <th className="px-4 py-3">{t('security.colLocal', 'Local Address')} <span className="normal-case text-gray-600">{t('security.colLocalHint', '(ที่อยู่เครื่องเรา)')}</span></th>
-                <th className="px-4 py-3">{t('security.colForeign', 'Foreign Address')} <span className="normal-case text-gray-600">{t('security.colForeignHint', '(ปลายทาง)')}</span></th>
-                <th className="px-4 py-3">{t('security.colState', 'State')} <span className="normal-case text-gray-600">{t('security.colStateHint', '(สถานะ)')}</span></th>
-                <th className="px-4 py-3">{t('security.colPid', 'PID')} <span className="normal-case text-gray-600">{t('security.colPidHint', '(โปรเซส)')}</span></th>
-                <th className="px-4 py-3">{t('security.colAction', 'Action')} <span className="normal-case text-gray-600">{t('security.colActionHint', '(จัดการ)')}</span></th>
+            <thead className="bg-gray-950/40 backdrop-blur-sm">
+              <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                <th className="px-4 py-3 font-semibold">{t('security.colProtocol', 'Protocol')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colLocal', 'Local Address')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colForeign', 'Foreign Address')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colState', 'State')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colPid', 'PID')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colAction', 'Action')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-gray-800/50">
               {connections.map((c, i) => {
                 const ip = extractIp(c.foreign_address);
                 const isBlocked = blockedIps.includes(ip.toLowerCase());
                 return (
-                  <tr key={i} className="hover:bg-gray-800/50">
+                  <tr key={i} className="hover:bg-gray-800/50 transition-colors">
                     <td className="px-4 py-2">{c.protocol}</td>
                     <td className="px-4 py-2 text-xs">{c.local_address}</td>
                     <td className="px-4 py-2 text-xs text-yellow-300">{c.foreign_address}</td>
@@ -572,25 +574,28 @@ export default function SecurityPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Security Events — ตารางเหตุการณ์ความปลอดภัย */}
-        <div className="card panel-cyan overflow-x-auto">
-          <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800">{t('security.securityEvents', 'Security Events')} <span className="text-xs text-gray-500 font-normal">{t('security.securityEventsNote', '— ประวัติเหตุการณ์ความปลอดภัยของระบบ')}</span></h2>
+        <div className="card panel-cyan overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+          <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800/60">{t('security.securityEvents', 'Security Events')} <span className="text-xs text-gray-500 font-normal">{t('security.securityEventsNote', '— ประวัติเหตุการณ์ความปลอดภัยของระบบ')}</span></h2>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3">{t('security.colTime', 'Time')} <span className="normal-case text-gray-600">{t('security.colTimeHint', '(เวลา)')}</span></th>
-                <th className="px-4 py-3">{t('security.colType', 'Type')} <span className="normal-case text-gray-600">{t('security.colTypeHint', '(ประเภท)')}</span></th>
-                <th className="px-4 py-3">{t('security.colSeverity', 'Severity')} <span className="normal-case text-gray-600">{t('security.colSeverityHint', '(ความรุนแรง)')}</span></th>
-                <th className="px-4 py-3">{t('security.colSourceIp', 'Source IP')} <span className="normal-case text-gray-600">{t('security.colSourceIpHint', '(ต้นทาง)')}</span></th>
-                <th className="px-4 py-3">{t('security.colDescription', 'Description')} <span className="normal-case text-gray-600">{t('security.colDescriptionHint', '(รายละเอียด)')}</span></th>
-                <th className="px-4 py-3">{t('security.colAi', 'AI')} <span className="normal-case text-gray-600">{t('security.colAiHint', '(เข้าใจผิด?)')}</span></th>
+            <thead className="bg-gray-950/40 backdrop-blur-sm">
+              <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                <th className="px-4 py-3 font-semibold">{t('security.colTime', 'Time')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colType', 'Type')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colSeverity', 'Severity')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colSourceIp', 'Source IP')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colDescription', 'Description')}</th>
+                <th className="px-4 py-3 font-semibold">{t('security.colAi', 'AI')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-gray-800/50">
               {events.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-800/50">
+                <tr key={e.id} className="hover:bg-gray-800/50 transition-colors">
                   <td className="px-4 py-2 text-xs text-gray-400">{new Date(e.timestamp).toLocaleString(fmtLocale())}</td>
                   <td className="px-4 py-2">{e.event_type}</td>
                   <td className={`px-4 py-2 font-bold ${severityColor(e.severity)}`}>{e.severity}</td>
@@ -608,7 +613,7 @@ export default function SecurityPage() {
                       }}
                       disabled={busyCorrectId === e.id}
                       title={t('security.falsePositiveTitle', 'ยืนยันว่าเหตุการณ์นี้ AI เตือนผิด — จะกลายเป็น reality anchor ให้ AI เรียนรู้')}
-                      className="text-[10px] px-2 py-1 rounded bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition disabled:opacity-50"
+                      className="btn-secondary text-[10px] px-2 py-1"
                     >
                       {busyCorrectId === e.id ? t('security.working', 'กำลัง...') : t('security.falsePositive', 'เตือนผิด')}
                     </button>
@@ -620,6 +625,7 @@ export default function SecurityPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Live Real-time Stream — เหตุการณ์สดจากทุก service */}

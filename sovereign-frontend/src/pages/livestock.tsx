@@ -827,9 +827,9 @@ function FinanceTab({ groups, canWrite, api, loadAll, setMsg, setErr, t }: any) 
         </div>
       </div>
 
-      {batches.length === 0 && <div className="text-gray-500 text-center py-8 border border-dashed border-gray-700 rounded-xl">{t('livestock.finance.noBatches', 'ยังไม่มีงวดบัญชี')}</div>}
+      {batches.length === 0 && <div className="card"><div className="flex flex-col items-center justify-center text-center py-12 px-6 gap-3"><div className="w-12 h-12 rounded-xl border border-gray-700 bg-gray-800/40 flex items-center justify-center text-gray-400"><Icon name="farm" size={20} /></div><div className="text-sm font-bold text-gray-100">{t('livestock.finance.noBatches', 'ยังไม่มีงวดบัญชี')}</div></div></div>}
       {batches.map((b) => (
-        <div key={b.id} className="card p-4 space-y-2">
+        <div key={b.id} className="card card-hover p-4 space-y-2">
           <div className="flex justify-between items-center">
             <div className="font-bold text-white">{b.batchCode}</div>
             <div className="flex items-center gap-2">
