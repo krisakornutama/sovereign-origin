@@ -129,13 +129,59 @@ export default function InfrastructurePage() {
         </div>}
         />
 
-      <div className="max-w-6xl mx-auto px-6 pt-4 flex gap-2 flex-wrap">
-        {tabs.map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 rounded-lg text-sm ${tab === key ? 'bg-sky-600 text-white shadow-neon-green' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{label}</button>
-        ))}
-      </div>
-
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+        {/* ── Dense Top — Infrastructure Map + System Health + User Registry (ภาพ 3) ── */}
+        <div className="grid grid-cols-12 gap-3">
+          <div className="col-span-12 lg:col-span-7 card panel-cyan p-3 overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-bold tracking-widest text-cyan-300 flex items-center gap-1.5"><Icon name="infrastructure" size={12} /> Infrastructure Map</h3>
+              <span className="text-[9px] font-mono tracking-widest text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">{cameras.length} CAMS · {equipment.length} EQUIP</span>
+            </div>
+            <div className="relative h-[132px] rounded-lg bg-[#0b1220] border border-gray-800 overflow-hidden">
+              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(300px 120px at 20% 30%, rgba(34,211,238,0.25), transparent 60%), radial-gradient(280px 120px at 70% 60%, rgba(52,211,153,0.18), transparent 60%)' }} />
+              <svg viewBox="0 0 320 120" className="absolute inset-0 w-full h-full">
+                {[
+                  { x: 40, y: 30 }, { x: 110, y: 22 }, { x: 190, y: 34 }, { x: 260, y: 28 },
+                  { x: 66, y: 78 }, { x: 140, y: 72 }, { x: 210, y: 82 },
+                ].map((p, i) => (
+                  <g key={i}>
+                    <circle cx={p.x} cy={p.y} r="7" fill={i < 4 ? 'rgba(34,211,238,0.9)' : 'rgba(52,211,153,0.85)'} stroke="rgba(255,255,255,0.9)" strokeWidth="0.8" />
+                    <circle cx={p.x} cy={p.y} r="12" fill="none" stroke={i < 4 ? 'rgba(34,211,238,0.25)' : 'rgba(52,211,153,0.2)'} strokeWidth="0.7" />
+                  </g>
+                ))}
+                <path d="M 40 30 L 110 22 L 190 34 L 260 28 M 40 30 L 66 78 L 140 72 L 210 82 M 110 22 L 140 72 M 190 34 L 210 82" stroke="rgba(100,150,200,0.35)" strokeWidth="0.8" fill="none" strokeDasharray="3 3" />
+              </svg>
+              <div className="absolute bottom-1 left-2 text-[8px] font-mono tracking-widest text-gray-500">MESH · {radio.length} MSGS · LAT -90→90</div>
+            </div>
+          </div>
+          <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-3">
+            <div className="card p-3 flex flex-col items-center justify-center">
+              <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-1">System Health</div>
+              <div className="w-16 h-16 rounded-full border-4 border-emerald-500/30 flex items-center justify-center relative">
+                <div className="absolute inset-1 rounded-full border-2 border-emerald-400" style={{ clipPath: 'inset(0 0 30% 0)' }} />
+                <span className="mono text-lg font-bold text-emerald-400">90%</span>
+              </div>
+              <div className="text-[9px] font-mono tracking-widest text-gray-500 mt-1">VALID · 121 NODES</div>
+            </div>
+            <div className="card p-3">
+              <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-2">User Registry</div>
+              <div className="flex -space-x-1.5">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-7 h-7 rounded-full bg-gray-700 border-2 border-gray-900 flex items-center justify-center text-[10px]">◯</div>
+                ))}
+                <div className="w-7 h-7 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-[9px] font-bold text-emerald-300">+3</div>
+              </div>
+              <div className="text-[9px] font-mono tracking-widest text-gray-500 mt-2">{cameras.length} REGISTRY · {equipment.filter(e=>e.maintenance_due).length} DUE</div>
+              <div className="h-1 bg-gray-800 rounded-full overflow-hidden mt-2"><div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, (cameras.length + equipment.length) * 8)}%` }} /></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          {tabs.map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 rounded-lg text-sm ${tab === key ? 'bg-sky-600 text-white shadow-neon-green' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>{label}</button>
+          ))}
+        </div>
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
         {flash && <div className="text-sm text-sky-300 inset px-4 py-3">{flash}</div>}
 
