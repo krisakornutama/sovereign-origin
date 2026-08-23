@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react';
 import HoverCard from '../components/ui/HoverCard';
 import Sparkline from '../components/ui/Sparkline';
 import Icon from '../components/ui/Icon';
+import Sidebar from '../components/layout/Sidebar';
+import PageHeader from '../components/ui/PageHeader';
+import { useLanguageStore } from '../stores/useLanguageStore';
 
 // Simulated live data for demo
 const generateTrend = (base: number, variance: number, points: number): number[] => {
@@ -26,6 +29,7 @@ const SAMPLE_DATA = {
 };
 
 export default function HoverCardsDemo() {
+  const t = useLanguageStore((s) => s.t);
   const [liveData, setLiveData] = useState(SAMPLE_DATA);
 
   // Simulate live data updates
@@ -74,18 +78,20 @@ export default function HoverCardsDemo() {
   const formatCurrency = (n: number) => `฿${formatNumber(Math.round(n))}`;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
-      {/* Header */}
-      <div className="max-w-6xl mx-auto mb-10">
-        <h1 className="text-3xl font-bold text-gray-100 mb-2">
-          Hover Cards
-          <span className="text-emerald-400 ml-2 text-lg font-normal">Interactive Dashboard Widgets</span>
-        </h1>
-        <p className="text-gray-400 text-sm max-w-2xl">
-          Hover over any card to reveal detailed metrics, sparkline trends, and action buttons.
-          Cards flip in 3D (left column) or expand downward (right column) to show dynamic content.
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 p-4 lg:p-6 space-y-6 max-w-6xl mx-auto w-full">
+          <PageHeader
+            eyebrow="Design System"
+            title="Hover Cards"
+            subtitle="Interactive Dashboard Widgets — flip 3D (ซ้าย) หรือ expand ลง (ขวา)"
+            icon={<Icon name="dashboard" size={18} />}
+          />
+          <p className="text-gray-400 text-sm max-w-2xl -mt-2">
+            Hover over any card to reveal detailed metrics, sparkline trends, and action buttons.
+            Cards flip in 3D (left column) or expand downward (right column) to show dynamic content.
+          </p>
 
       {/* Cards Grid */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -411,37 +417,39 @@ export default function HoverCardsDemo() {
         />
       </div>
 
-      {/* Legend */}
-      <div className="max-w-6xl mx-auto mt-10 flex flex-wrap items-center gap-6 text-xs text-gray-500">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 border border-gray-600 rounded-lg bg-gray-900/60 flex items-center justify-center">
-            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
+          {/* Legend */}
+          <div className="mt-10 flex flex-wrap items-center gap-6 text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 border border-gray-600 rounded-lg bg-gray-900/60 flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </div>
+              <span>Flip Card (3D rotate)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 border border-gray-600 rounded-lg bg-gray-900/60 flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              <span>Expand Card (slide down)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+              <span>Live status indicator</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg width="40" height="16" viewBox="0 0 40 16" className="overflow-visible">
+                <path d="M0,12 Q10,4 20,8 T40,6" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span>Sparkline trend</span>
+            </div>
           </div>
-          <span>Flip Card (3D rotate)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 border border-gray-600 rounded-lg bg-gray-900/60 flex items-center justify-center">
-            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-          <span>Expand Card (slide down)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-          </span>
-          <span>Live status indicator</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg width="40" height="16" viewBox="0 0 40 16" className="overflow-visible">
-            <path d="M0,12 Q10,4 20,8 T40,6" fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span>Sparkline trend</span>
-        </div>
+        </main>
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
+import Sidebar from '../components/layout/Sidebar';
+import PageHeader from '../components/ui/PageHeader';
 import dynamic from "next/dynamic";
 const TerrainViewer = dynamic(() => import("../components/terrain-viewer/TerrainViewer"), { ssr: false });
 
@@ -255,16 +256,16 @@ export default function PropertyPage() {
   if (!isAuthenticated || !user) return <div className="text-white p-8">{t('property.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold glow-text">{t('property.title', 'แผนที่บ้าน & จุดยุทธศาสตร์')}</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {t('property.subtitle', 'จำลองที่ดิน {w}×{l} ม. (3 มิติ) + วิเคราะห์จุดวางกับดัก/กล้อง/เซ็นเซอร์ตรวจจับคน-สัตว์', { w: land.width, l: land.length })}
-          </p>
-        </div>
-        <Link href="/dashboard" scroll={false} className="text-sm text-gray-400 hover:text-gray-200">{t('property.backDashboard', '← กลับ Dashboard')}</Link>
-      </div>
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('property.eyebrow', 'ความปลอดภัย')}
+            title={t('property.title', 'แผนที่บ้าน & จุดยุทธศาสตร์')}
+            subtitle={t('property.subtitle', 'จำลองที่ดิน {w}×{l} ม. (3 มิติ) + วิเคราะห์จุดวางกับดัก/กล้อง/เซ็นเซอร์ตรวจจับคน-สัตว์', { w: land.width, l: land.length })}
+            icon={<Icon name="property" size={18} />}
+          />
 
       {message && <div className="mb-3 bg-emerald-900/40 border border-emerald-700 rounded-lg px-4 py-2 text-sm text-emerald-300">{message}</div>}
       {error && <div className="mb-3 bg-red-900/40 border border-red-700 rounded-lg px-4 py-2 text-sm text-red-300">{error}</div>}
@@ -285,6 +286,7 @@ export default function PropertyPage() {
         ) : (
           <div className="text-gray-500 text-sm">{t('property.noZonesMap', 'ยังไม่มีโซน — เพิ่มโซนแรกด้านล่างเพื่อสร้างแผนที่')}</div>
         )}
+      </div>
 
       {/* ── ภาพ 3 มิติ (3D Terrain) ── */}
       <div className="card panel-glow p-4 mb-6">
@@ -316,8 +318,8 @@ export default function PropertyPage() {
       </div>
 
         {/* ── ลากจุดยุทธศาสตร์ด้วยเมาส์ ── */}
-        <div className="mt-4">
-          <h3 className="font-bold mb-1">{t('property.dragTitle', 'ลากจุดยุทธศาสตร์ (คลิกค้างแล้วลาก — บันทึกอัตโนมัติเมื่อปล่อย)')}</h3>
+        <div className="card panel-glow p-4 mb-6">
+          <h3 className="text-sm font-semibold text-gray-200 glow-text mb-1">{t('property.dragTitle', 'ลากจุดยุทธศาสตร์ (คลิกค้างแล้วลาก — บันทึกอัตโนมัติเมื่อปล่อย)')}</h3>
           <p className="text-xs text-gray-500 mb-3">{t('property.boardHint', 'มุมมอง 2 มิติ: พื้นที่ {w}×{l} ม. · สีจัตุรัส = โซน · จุด = กล้อง/เซ็นเซอร์/กับดัก/ไฟ', { w: land.width, l: land.length })}</p>
           <div
             ref={boardRef}
@@ -369,7 +371,6 @@ export default function PropertyPage() {
             )}
           </div>
         </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* ── โซน ── */}
@@ -470,6 +471,8 @@ export default function PropertyPage() {
             ))}
           </div>
         </div>
+        </div>
+        </main>
       </div>
     </div>
   );
