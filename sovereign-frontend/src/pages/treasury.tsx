@@ -644,8 +644,41 @@ export default function TreasuryPage() {
                 </div>
               </Section>
 
-              {/* ── View C: กลยุทธ์ 5 ตระกูล + Matrix ── */}
-              <Section id="strategies" title={t('treasury.view.strategiesTitle', 'กลยุทธ์ลงทุน — 5 ตระกูล')} desc={t('treasury.view.strategiesDesc', 'จัดสรรพอร์ตตามตระกูลกลยุทธ์')}>
+              {/* ── View C: กลยุทธ์ 5 ตระกูล + Matrix — Sankey แน่นแบบภาพ 1 ── */}
+              <Section id="strategies" title={t('treasury.view.strategiesTitle', 'กลยุทธ์ลงทุน — 5 ตระกูล')} desc={t('treasury.view.strategiesDesc', 'จัดสรรพอร์ตตามตระกูลกลยุทธ์ — เส้นไหล Alluvial เขียว→แดง')}>
+                <div className="bg-gray-950/40 border border-gray-800 rounded-xl p-2 mb-4 overflow-hidden">
+                  <svg viewBox="0 0 520 92" className="w-full h-[92px]">
+                    <text x="8" y="10" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">SOURCE · 5 FAMILIES</text>
+                    <text x="256" y="10" textAnchor="middle" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">SOVEREIGN HUB</text>
+                    <text x="512" y="10" textAnchor="end" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">ALLOCATION</text>
+                    {data.strategies.allocation.map((a, i) => {
+                      const h = Math.max(9, (a.pct / 100) * 52);
+                      const y = 16 + i * 14;
+                      const midY = 22 + i * 12;
+                      const col = FAMILY_COLORS[a.family] || '#9CA3AF';
+                      const midTop = 18 + i * 11;
+                      const midBot = midTop + 7;
+                      return (
+                        <g key={a.family}>
+                          <rect x="8" y={y} width="86" height={h} rx="3" fill={col} opacity="0.92" />
+                          <text x="14" y={y + h / 2 + 2} fill="#0b0f16" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">{a.family.slice(0, 4)}</text>
+                          <path d={`M 94 ${y + 2} C 150 ${y + 2}, 180 ${midTop}, 238 ${midTop} L 238 ${midBot} C 180 ${midBot}, 150 ${y + h - 2}, 94 ${y + h - 2} Z`} fill={col} opacity="0.22" />
+                          <path d={`M 282 ${midTop} C 340 ${midTop}, 380 ${18 + (i % 3) * 22}, 408 ${18 + (i % 3) * 22} L 408 ${22 + (i % 3) * 22} C 380 ${22 + (i % 3) * 22}, 340 ${midBot}, 282 ${midBot} Z`} fill={col} opacity="0.14" />
+                        </g>
+                      );
+                    })}
+                    <rect x="238" y="16" width="44" height="52" rx="6" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" strokeWidth="0.9" />
+                    <text x="260" y="32" textAnchor="middle" fill="#34d399" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">HUB</text>
+                    <text x="260" y="40" textAnchor="middle" fill="#9ca3af" fontSize="5.5" fontFamily="JetBrains Mono">{data.strategies.totalUsd > 60000 ? 'STABLE' : 'BUILD'}</text>
+                    <text x="260" y="48" textAnchor="middle" fill="#6b7889" fontSize="5" fontFamily="JetBrains Mono">{data.positions.length} POS</text>
+                    <rect x="408" y="14" width="68" height="22" rx="4" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" strokeWidth="0.7" />
+                    <text x="442" y="24" textAnchor="middle" fill="#34d399" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">GROWTH</text>
+                    <rect x="408" y="46" width="68" height="22" rx="4" fill="rgba(245,158,11,0.12)" stroke="rgba(245,158,11,0.35)" strokeWidth="0.7" />
+                    <text x="442" y="56" textAnchor="middle" fill="#f59e0b" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">INCOME</text>
+                    <rect x="408" y="78" width="68" height="10" rx="3" fill="rgba(239,68,68,0.10)" stroke="rgba(239,68,68,0.30)" strokeWidth="0.7" />
+                    <text x="442" y="85" textAnchor="middle" fill="#f87171" fontSize="5" fontFamily="JetBrains Mono">5 FAMS</text>
+                  </svg>
+                </div>
                 <div className="space-y-2">
                   {data.strategies.allocation.map((a) => (
                     <FamilyRow key={a.family} family={a.family} pct={a.pct} valueUsd={a.valueUsd} positions={a.positions} yieldPct={a.dividendYieldPct} />

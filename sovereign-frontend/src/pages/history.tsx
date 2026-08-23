@@ -314,11 +314,54 @@ export default function HistoryPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <PageHeader
+        <PageHeader
           eyebrow={t('history.eyebrow', 'ข้อมูล & รายงาน')}
-          title="Sensor History" icon={<Icon name="history" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('history.backDashboard', '← กลับ Dashboard')}</Link>}
+          title="Sensor History"
+          subtitle={t('history.subtitle', 'Timeline + Lifestyle — ประวัติศาสตร์และบันทึกวิถีชีวิต')}
+          icon={<Icon name="history" size={18} />}
         />
-      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          {/* ── Dense Top — History Timeline + Lifestyle (ภาพ 4 ขวาล่าง) ── */}
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 lg:col-span-7 card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-bold tracking-widest text-gray-200 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 glow-dot-cyan" /> Event History Timeline</h3>
+                <span className="text-[9px] font-mono tracking-widest text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">{series.length} SERIES · {allPoints.length} POINTS</span>
+              </div>
+              <div className="relative h-[84px] rounded-lg bg-[#0b1220] border border-gray-800 overflow-hidden p-2">
+                <div className="absolute left-2 top-2 bottom-2 w-px bg-gradient-to-b from-emerald-500/60 via-cyan-500/30 to-transparent" />
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-2 mb-2 ml-4">
+                    <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-emerald-400 glow-dot' : i === 1 ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+                    <span className="text-[10px] font-mono tracking-widest text-gray-400">
+                      {['2025-08-23 14:20 · sensor heartbeat', '2025-08-23 09:15 · harvest farm 1 growing', '2025-08-22 18:40 · treasury runway 6.2M'][i]}
+                    </span>
+                  </div>
+                ))}
+                <div className="absolute bottom-1 right-2 text-[8px] font-mono tracking-widest text-gray-600">LIVE · {spanText.slice(0, 22)}</div>
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-5 card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-bold tracking-widest text-gray-200">Lifestyle Activities & Goals</h3>
+                <span className="text-[9px] font-mono tracking-widest text-gray-500">{metrics.length} METRICS</span>
+              </div>
+              <div className="space-y-1.5">
+                {[
+                  { k: 'มื้ออาหาร', v: 3, max: 5, c: '#10b981' },
+                  { k: 'น้ำดื่ม', v: 4, max: 8, c: '#22d3ee' },
+                  { k: 'สมาธิ', v: 2, max: 3, c: '#a78bfa' },
+                ].map((a) => (
+                  <div key={a.k} className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-400 w-14">{a.k}</span>
+                    <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(a.v / a.max) * 100}%`, background: a.c }} /></div>
+                    <span className="mono text-[10px] font-bold text-gray-300">{a.v}/{a.max}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[9px] font-mono tracking-widest text-gray-500 border-t border-gray-800 pt-2">TODAY · {new Date().toLocaleDateString('th-TH')}</div>
+            </div>
+          </div>
         <div className="flex gap-2 flex-wrap items-center">
           {RANGES.map((r) => (
             <button
