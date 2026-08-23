@@ -82,7 +82,7 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
     <div className="border-t border-cyan-800/50 pt-2 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-lime-300">{t('farm.analyzer.title', 'วิเคราะห์ดิน')}</span>
-        <select value={crop} onChange={(e) => setCrop(e.target.value)} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[11px] flex-1">
+        <select value={crop} onChange={(e) => setCrop(e.target.value)} className="input text-[11px] flex-1">
           {['ทุเรียน', 'มะเขือเทศ', 'ข้าว', 'ผักสลัด', 'กล้วย', 'อ้อย', 'มะนาว', 'พริก'].map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
         </select>
         <button onClick={runAnalysis} disabled={loading} className="shrink-0 px-2 py-1 bg-lime-700/60 hover:bg-lime-700 border border-lime-600/50 rounded text-[11px] font-bold disabled:opacity-50">
@@ -94,13 +94,13 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
       <div className="grid grid-cols-4 gap-1.5 text-[11px]">
         {[['n', 'N'], ['p', 'P'], ['k', 'K'], ['ph', 'pH'], ['moisture_pct', 'ชื้น%'], ['ec', 'EC']].map(([key, label]) => (
           <input key={key} value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-            placeholder={t('farm.analyzer.' + key, label)} className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px]" />
+            placeholder={t('farm.analyzer.' + key, label)} className="input text-[11px] px-1.5 py-1" />
         ))}
-        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder={t('farm.analyzer.notesPlaceholder', 'หมายเหตุ')} className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-[11px] col-span-2" />
+        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder={t('farm.analyzer.notesPlaceholder', 'หมายเหตุ')} className="input text-[11px] px-1.5 py-1 col-span-2" />
       </div>
       <div className="flex gap-2">
         <button onClick={saveReading} className="px-2.5 py-1 bg-emerald-700/60 hover:bg-emerald-700 rounded text-[11px] font-bold inline-flex items-center gap-1"><Icon name="save" size={12} />{t('farm.analyzer.saveAndAnalyze', 'บันทึกค่า + วิเคราะห์')}</button>
-        <button onClick={runAnalysis} className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 rounded text-[11px] inline-flex items-center gap-1"><Icon name="refresh" size={12} />{t('farm.analyzer.analyzeLatest', 'วิเคราะห์จากค่าล่าสุด')}</button>
+        <button onClick={runAnalysis} className="btn-secondary text-[11px] inline-flex items-center gap-1"><Icon name="refresh" size={12} />{t('farm.analyzer.analyzeLatest', 'วิเคราะห์จากค่าล่าสุด')}</button>
       </div>
       {msg && <div className="text-[11px] text-emerald-400">{msg}</div>}
       {err && <div className="text-[11px] text-red-400">{err}</div>}

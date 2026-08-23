@@ -70,7 +70,7 @@ export default function AlertsPage() {
           alerts.map((alert, i) => (
             <div
               key={i}
-              className={`card p-4 ${
+              className={`card card-hover p-4 ${
                 alert.severity === 'critical' ? 'border-rose-800/60' :
                 alert.severity === 'warning' ? 'border-amber-800/60' : 'border-blue-800/60 panel-cyan'
               }`}

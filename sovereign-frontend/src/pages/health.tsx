@@ -288,18 +288,18 @@ export default function HealthPage() {
               </div>
 
               <div className="flex flex-wrap gap-2 items-end">
-                <select value={rType} onChange={(e) => { setRType(e.target.value); setRError(''); }} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <select value={rType} onChange={(e) => { setRType(e.target.value); setRError(''); }} className="input text-sm">
                   {Object.entries(VITAL_META).map(([k, v]) => <option key={k} value={k}>{t('health.vital.' + k, v.label)}</option>)}
                 </select>
                 {rType === 'BP' ? (
                   <>
-                    <input value={rSys} onChange={(e) => setRSys(e.target.value)} placeholder={t('health.vital.bpSys', 'ความดันบน (systolic)')} type="number" className="w-44 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
-                    <input value={rDia} onChange={(e) => setRDia(e.target.value)} placeholder={t('health.vital.bpDia', 'ความดันล่าง (diastolic)')} type="number" className="w-44 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                    <input value={rSys} onChange={(e) => setRSys(e.target.value)} placeholder={t('health.vital.bpSys', 'ความดันบน (systolic)')} type="number" className="input text-sm w-44" />
+                    <input value={rDia} onChange={(e) => setRDia(e.target.value)} placeholder={t('health.vital.bpDia', 'ความดันล่าง (diastolic)')} type="number" className="input text-sm w-44" />
                   </>
                 ) : (
-                  <input value={rValue} onChange={(e) => setRValue(e.target.value)} placeholder={t('health.vital.valuePlaceholder', 'ค่า ({unit})', { unit: VITAL_META[rType]?.unit ?? '' })} type="number" step="any" className="w-44 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                  <input value={rValue} onChange={(e) => setRValue(e.target.value)} placeholder={t('health.vital.valuePlaceholder', 'ค่า ({unit})', { unit: VITAL_META[rType]?.unit ?? '' })} type="number" step="any" className="input text-sm w-44" />
                 )}
-                <input value={rNote} onChange={(e) => setRNote(e.target.value)} placeholder={t('health.vital.notePlaceholder', 'หมายเหตุ (ตอนเช้า/หลังอาหาร...)')} className="flex-1 min-w-40 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                <input value={rNote} onChange={(e) => setRNote(e.target.value)} placeholder={t('health.vital.notePlaceholder', 'หมายเหตุ (ตอนเช้า/หลังอาหาร...)')} className="input text-sm flex-1" />
                 <button onClick={addReading} disabled={rSaving} className="btn-primary">
                   {rSaving ? t('health.vital.saving', 'กำลังบันทึก...') : <><Icon name="save" size={14} /> {t('health.vital.save', 'บันทึกค่า')}</>}
                 </button>
@@ -371,15 +371,15 @@ export default function HealthPage() {
               <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 panel-glow">
                 <h2 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-1.5 glow-text"><Icon name="note" size={14} className="text-emerald-400" /> {t('health.observation.title', 'บันทึกอาการ (Micro-Triage)')}</h2>
                 <div className="flex gap-2 flex-wrap">
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="input text-sm">
                     {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{t('health.category.' + k, v)}</option>)}
                   </select>
-                  <select value={severity} onChange={(e) => setSeverity(Number(e.target.value))} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                  <select value={severity} onChange={(e) => setSeverity(Number(e.target.value))} className="input text-sm">
                     <option value={1}>{t('health.observation.severity1', 'ความรุนแรง 1/5')}</option><option value={2}>{t('health.observation.severity2', '2/5')}</option><option value={3}>{t('health.observation.severity3', '3/5')}</option><option value={4}>{t('health.observation.severity4', '4/5')}</option><option value={5}>{t('health.observation.severity5', '5/5')}</option>
                   </select>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <input value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={t('health.observation.detailPlaceholder', 'รายละเอียด เช่น เข้าห้องน้ำ 3 ครั้งกลางดึก')} className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                  <input value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={t('health.observation.detailPlaceholder', 'รายละเอียด เช่น เข้าห้องน้ำ 3 ครั้งกลางดึก')} className="input text-sm flex-1" />
                   <button onClick={addObservation} disabled={adding} className="btn-primary">{t('common.save', 'บันทึก')}</button>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">{t('health.observation.hint', 'อาการซ้ำกัน ≥ 3 ครั้งใน 14 วัน → ระบบจะสร้าง Flag อัตโนมัติ')}</div>

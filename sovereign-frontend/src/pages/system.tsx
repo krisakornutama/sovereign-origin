@@ -239,22 +239,22 @@ export default function SystemHealthPage() {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t('system.filterPlaceholder', 'กรองชื่อ process...')}
-              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input text-sm"
             />
           </div>
           {loading ? (
-            <div className="text-gray-500 text-sm text-center py-8">{t('system.loadingProcesses', 'กำลังโหลดรายการ process...')}</div>
+            <div className="flex items-center justify-center py-12 gap-2 text-gray-500"><span className="w-4 h-4 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /><span className="text-sm">{t('system.loadingProcesses', 'กำลังโหลดรายการ process...')}</span></div>
           ) : (
             <table className="w-full text-sm text-left">
-              <thead className="bg-gray-800 text-gray-400 uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-3">{t('system.thPid', 'PID')}</th>
-                  <th className="px-4 py-3">{t('system.thName', 'Name')}</th>
-                  <th className="px-4 py-3">{t('system.thMemory', 'Memory')}</th>
-                  <th className="px-4 py-3">{t('system.thAction', 'Action')}</th>
+              <thead className="bg-gray-950/40 backdrop-blur-sm">
+                <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                  <th className="px-4 py-3 font-semibold">{t('system.thPid', 'PID')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('system.thName', 'Name')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('system.thMemory', 'Memory')}</th>
+                  <th className="px-4 py-3 font-semibold">{t('system.thAction', 'Action')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-gray-800/50">
                 {visible.map((p) => (
                   <tr key={p.pid} className="hover:bg-gray-800/50">
                     <td className="px-4 py-2 text-xs text-gray-400">{p.pid}</td>
@@ -347,16 +347,16 @@ function RadarTaskTable() {
         </div>
       )}
       <table className="w-full text-xs text-left">
-        <thead className="text-gray-500 uppercase text-[10px]">
-          <tr>
-            <th className="py-2 pr-3">{t('system.radarThTask', 'งาน')}</th>
-            <th className="py-2 pr-3">{t('system.radarThInterval', 'รอบ')}</th>
-            <th className="py-2 pr-3">{t('system.radarThEffort', 'เวลาที่ใช้')}</th>
-            <th className="py-2 pr-3">{t('system.radarThDue', 'ครบกำหนด')}</th>
-            <th className="py-2">{t('common.actions', 'จัดการ')}</th>
+        <thead className="bg-gray-950/40 backdrop-blur-sm">
+          <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[10px] uppercase tracking-widest">
+            <th className="py-2 pr-3 font-semibold">{t('system.radarThTask', 'งาน')}</th>
+            <th className="py-2 pr-3 font-semibold">{t('system.radarThInterval', 'รอบ')}</th>
+            <th className="py-2 pr-3 font-semibold">{t('system.radarThEffort', 'เวลาที่ใช้')}</th>
+            <th className="py-2 pr-3 font-semibold">{t('system.radarThDue', 'ครบกำหนด')}</th>
+            <th className="py-2 font-semibold">{t('common.actions', 'จัดการ')}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800">
+        <tbody className="divide-y divide-gray-800/50">
           {tasks.map((task) => (
             <tr key={task.id} className={task.overdue ? 'text-red-300' : 'text-gray-300'}>
               <td className="py-2 pr-3">
@@ -373,7 +373,7 @@ function RadarTaskTable() {
                 <button
                   onClick={() => done(task.id)}
                   disabled={busyId === task.id}
-                  className="text-[10px] px-2 py-1 rounded bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700 transition disabled:opacity-50"
+                  className="input text-[10px]"
                 >
                   {busyId === task.id ? '...' : <><Icon name="check" size={12} /> {t('system.doneBtn', 'ทำแล้ว')}</>}
                 </button>

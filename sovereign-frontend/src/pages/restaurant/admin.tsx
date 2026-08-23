@@ -69,7 +69,7 @@ export default function RestaurantAdminPage() {
           <div className="card p-4 flex flex-wrap gap-3 items-end">
             <div>
               <label className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
-              <select value={selected} onChange={e=>setSelected(e.target.value)} className="mt-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+              <select value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm">
                 <option value="">{t('restaurant.selectPlaceholder', '— เลือกร้าน —')}</option>
                 {restaurants.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
@@ -77,7 +77,7 @@ export default function RestaurantAdminPage() {
             <div className="flex gap-2 items-end">
               <div>
                 <label className="text-xs text-gray-400">{t('restaurant.admin.cameraLabel', 'ผูกกล้องหน้าร้าน (cameraId)')}</label>
-                <input value={cameraId} onChange={e=>setCameraId(e.target.value)} placeholder={t('restaurant.admin.cameraPlaceholder', 'เช่น Camera.id จาก /sensors')} className="mt-1 w-64 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
+                <input value={cameraId} onChange={e=>setCameraId(e.target.value)} placeholder={t('restaurant.admin.cameraPlaceholder', 'เช่น Camera.id จาก /sensors')} className="input text-sm" />
               </div>
               <button onClick={bindCamera} className="px-3 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm">{t('restaurant.admin.bindCamera', 'ผูกกล้อง')}</button>
             </div>
@@ -89,9 +89,9 @@ export default function RestaurantAdminPage() {
               <div className="card p-4">
                 <h3 className="font-bold mb-2">{t('restaurant.admin.addMenuTitle', 'เพิ่มเมนู')}</h3>
                 <div className="flex flex-wrap gap-2">
-                  <input value={name} onChange={e=>setName(e.target.value)} placeholder={t('restaurant.admin.menuNamePlaceholder', 'ชื่อเมนู เช่น ข้าวผัดกระเพรา')} className="flex-1 min-w-60 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
-                  <input value={price} onChange={e=>setPrice(e.target.value)} placeholder={t('restaurant.admin.pricePlaceholder', 'ราคา บาท')} type="number" className="w-32 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm" />
-                  <select value={category} onChange={e=>setCategory(e.target.value)} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                  <input value={name} onChange={e=>setName(e.target.value)} placeholder={t('restaurant.admin.menuNamePlaceholder', 'ชื่อเมนู เช่น ข้าวผัดกระเพรา')} className="input text-sm flex-1" />
+                  <input value={price} onChange={e=>setPrice(e.target.value)} placeholder={t('restaurant.admin.pricePlaceholder', 'ราคา บาท')} type="number" className="input text-sm" />
+                  <select value={category} onChange={e=>setCategory(e.target.value)} className="input text-sm">
                     <option value="FOOD">FOOD</option><option value="DRINK">DRINK</option><option value="DESSERT">DESSERT</option>
                   </select>
                   <button onClick={createMenu} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-bold">{t('restaurant.admin.addButton', '+ เพิ่ม')}</button>
@@ -108,12 +108,12 @@ export default function RestaurantAdminPage() {
                       <div className="space-y-2">
                         {recipeLines.map((l,i)=>(
                           <div key={i} className="flex gap-2">
-                            <input value={l.farmCrop} onChange={e=>{ const a=[...recipeLines]; a[i].farmCrop=e.target.value; setRecipeLines(a); }} placeholder={t('restaurant.admin.cropPlaceholder', 'ชื่อพืช/วัตถุดิบ (เช่น ข้าวหอม)')} className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
-                            <select value={l.inventoryItemId||""} onChange={e=>{ const a=[...recipeLines]; a[i].inventoryItemId=e.target.value; setRecipeLines(a); }} className="w-40 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs">
+                            <input value={l.farmCrop} onChange={e=>{ const a=[...recipeLines]; a[i].farmCrop=e.target.value; setRecipeLines(a); }} placeholder={t('restaurant.admin.cropPlaceholder', 'ชื่อพืช/วัตถุดิบ (เช่น ข้าวหอม)')} className="input text-xs flex-1" />
+                            <select value={l.inventoryItemId||""} onChange={e=>{ const a=[...recipeLines]; a[i].inventoryItemId=e.target.value; setRecipeLines(a); }} className="input text-xs">
                               <option value="">{t('restaurant.admin.fromStock', '— เลือกจากสต็อก —')}</option>
                               {inventory.map((it:any)=><option key={it.id} value={it.id}>{it.name} ({it.quantity}{it.unit})</option>)}
                             </select>
-                            <input value={l.qtyGram} onChange={e=>{ const a=[...recipeLines]; a[i].qtyGram=e.target.value; setRecipeLines(a); }} type="number" placeholder={t('restaurant.admin.gramPlaceholder', 'กรัม')} className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
+                            <input value={l.qtyGram} onChange={e=>{ const a=[...recipeLines]; a[i].qtyGram=e.target.value; setRecipeLines(a); }} type="number" placeholder={t('restaurant.admin.gramPlaceholder', 'กรัม')} className="input text-xs" />
                             <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={l.isSelfProduced} onChange={e=>{ const a=[...recipeLines]; a[i].isSelfProduced=e.target.checked; setRecipeLines(a); }} />{t('restaurant.admin.selfProduced', 'ผลิตเอง')}</label>
                             <button onClick={()=>setRecipeLines(recipeLines.filter((_,j)=>j!==i))} className="text-red-400 text-xs">{t('restaurant.admin.removeRow', 'ลบ')}</button>
                           </div>

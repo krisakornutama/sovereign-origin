@@ -247,7 +247,7 @@ export default function PredictivePage() {
                         <th className="py-2">{t('predictive.colLevel', 'ระดับ')}</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-800/50">
                       {anomalies.map((a, i) => (
                         <tr key={i} className="border-b border-cyan-800/50">
                           <td className="py-2 pr-3 text-gray-300">{fmtDate(a.time)}</td>

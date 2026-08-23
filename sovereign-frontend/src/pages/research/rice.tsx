@@ -38,7 +38,7 @@ export default function RiceResearchPage() {
             <>
               <div className="card p-4">
                 <label className="text-xs text-gray-400">เลือกแปลงข้าว</label>
-                <select value={selected} onChange={e=>setSelected(e.target.value)} className="mt-1 w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
+                <select value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm w-full">
                   {plots.map(p=><option key={p.id} value={p.id}>{p.name} — {p.crop||'ไม่ระบุ'} ({p.area_sqm||'-'} ตรม.) [{p.status}]</option>)}
                 </select>
                 {plots.length===0 && <div className="text-sm text-gray-500 mt-2">ยังไม่มีแปลง — ไปสร้างที่ <Link href="/farm" className="text-sky-400 underline">/farm</Link></div>}
