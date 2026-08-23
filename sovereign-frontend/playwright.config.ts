@@ -20,7 +20,7 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     {
       name: 'authenticated',
-      testMatch: /pages\.spec\.ts|pos-flow\.spec\.ts/,
+      testMatch: /pages\.spec\.ts|pos-flow\.spec\.ts|spa-nav\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/state.json' },
       dependencies: ['setup'],
     },

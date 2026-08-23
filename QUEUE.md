@@ -12,3 +12,4 @@
 
 หมายเหตุสถานะระบบ (22-23 ส.ค. 65): backend 994/994 tests + E2E 11/11 + `npm run verify` (5 ขั้น) ผ่านครบ
 งานเสร็จทั้งหมดอยู่ใน master แล้ว (branches ai/* รวมได้หมด) — ทุกงานใหม่เริ่มจาก master + backup commit
+- [ ] เพิ่ม E2E นำทางแบบ SPA (คลิก sidebar จริง ไม่ใช่ page.goto) — ตัวทดสอบเดิมติดเรื่อง locator: ลิงก์ปรากฏใน a11y snapshot แต่ locator('aside a', hasText) หาไม่เจอ สงสัยมี aside ซ้อน/โครงสร้าง wrapper — ไล่จาก error-context ใน test-results ได้

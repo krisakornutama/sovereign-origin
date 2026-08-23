@@ -1,9 +1,6 @@
 {
-  "version": 1787452755384,
+  "version": 1787454280980,
   "urls": [
-    "/_next/static/4mEVnjof4jnDvP5A3JbZr/_buildManifest.js",
-    "/_next/static/4mEVnjof4jnDvP5A3JbZr/_clientMiddlewareManifest.js",
-    "/_next/static/4mEVnjof4jnDvP5A3JbZr/_ssgManifest.js",
     "/_next/static/chunks/03_m02tg_1w4q.js",
     "/_next/static/chunks/04bsxtgabof-x.js",
     "/_next/static/chunks/056kg5qw7kzvc.js",
@@ -158,6 +155,9 @@
     "/_next/static/chunks/turbopack-4131uzikvgozp.js",
     "/_next/static/chunks/turbopack-42adc03njuv-p.js",
     "/_next/static/chunks/turbopack-42rn7teok38ys.js",
-    "/_next/static/chunks/turbopack-44_0-vbkql2sj.js"
+    "/_next/static/chunks/turbopack-44_0-vbkql2sj.js",
+    "/_next/static/QRTvp_4PvXDbw-HYdR1_c/_buildManifest.js",
+    "/_next/static/QRTvp_4PvXDbw-HYdR1_c/_clientMiddlewareManifest.js",
+    "/_next/static/QRTvp_4PvXDbw-HYdR1_c/_ssgManifest.js"
   ]
 }
