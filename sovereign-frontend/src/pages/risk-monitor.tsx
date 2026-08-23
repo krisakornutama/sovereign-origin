@@ -140,8 +140,7 @@ export default function RiskMonitorPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('riskMonitor.eyebrow', 'ความปลอดภัย')}
           title={t('riskMonitor.title', 'Risk Monitor + DEFCON Engine')} icon={<Icon name="risk" size={18} />} actions={<div className="flex items-center gap-3">
           <button
@@ -154,8 +153,7 @@ export default function RiskMonitorPage() {
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('riskMonitor.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
-      </header>
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
         {loading ? (
           <div className="text-gray-500">{t('riskMonitor.loading', 'กำลังโหลด…')}</div>

@@ -183,13 +183,11 @@ export default function OtaPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('ota.page.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title={t('ota.page.title', 'ESP OTA Updates')} icon={<Icon name="ota" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('ota.page.backDashboard', '← กลับ Dashboard')}</Link>}
         />
-      </header>
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
         {!isSuperAdmin && (
           <div className="card px-4 py-3 text-sm text-amber-400">
             {t('ota.adminOnly', 'อัปโหลด/Deploy ใช้งานได้เฉพาะ SUPERADMIN (ดูรายการได้ทุก role)')}

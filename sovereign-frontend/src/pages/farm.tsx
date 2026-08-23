@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 import type { FarmPlot } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -279,18 +279,13 @@ export default function FarmPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
           <PageHeader
             eyebrow={t('farm.page.eyebrow', 'ชีวิต & การเงิน')}
-            title={t('farm.page.title', 'SOVEREIGN OS')}
+            title={t('farm.page.title', 'แปลงเกษตร')}
+            subtitle={t('farm.page.subtitle', 'จัดการแปลงปลูก วิเคราะห์ดิน และติดตามการเก็บเกี่ยว')}
             icon={<Icon name="farm" size={18} />}
-            subtitle={t('farm.page.subtitle', 'Farm Plots')} actions={<div className="flex gap-3 items-center">
-              <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('farm.page.dashboardLink', 'Dashboard')}</Link>
-            </div>}
           />
-        </header>
-
-        <main className="max-w-7xl mx-auto p-6 space-y-4 w-full">
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('farm.page.h2', 'แปลงเกษตร (Farm Plots)')}</h2>
             <div className="text-sm text-gray-400">
@@ -337,9 +332,9 @@ export default function FarmPage() {
 
           {/* Plots */}
           {loading ? (
-            <div className="text-gray-500 text-center py-12">{t('farm.page.loading', 'กำลังโหลด…')}</div>
+            <div className="flex items-center justify-center py-12 gap-2 text-gray-500"><span className="w-4 h-4 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /><span className="text-sm">{t('farm.page.loading', 'กำลังโหลด…')}</span></div>
           ) : plots.length === 0 ? (
-            <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">{t('farm.page.noPlots', 'ยังไม่มีแปลง')}</div>
+            <div className="card"><EmptyState icon={<Icon name="farm" size={20} />} title={t('farm.page.noPlots', 'ยังไม่มีแปลง')} description={t('farm.page.noPlotsDesc', 'เริ่มสร้างแปลงแรกเพื่อติดตามการปลูกและวิเคราะห์ดิน')} /></div>
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {plots.map((plot) => (

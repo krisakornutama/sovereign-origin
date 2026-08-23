@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -9,6 +8,7 @@ import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 
 interface Report {
   id: string;
@@ -82,13 +82,13 @@ export default function ReportsPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
-          eyebrow={t('reports.eyebrow', 'ข้อมูล & รายงาน')}
-          title="AI Reports" icon={<Icon name="reports" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('reports.backDashboard', '← กลับ Dashboard')}</Link>}
-        />
-      </header>
-      <main className="max-w-4xl mx-auto p-6 space-y-6">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-4xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('reports.eyebrow', 'ข้อมูล & รายงาน')}
+            title="AI Reports"
+            subtitle={t('reports.subtitle', 'สรุปรายวัน/สัปดาห์จาก TimescaleDB + Ollama')}
+            icon={<Icon name="reports" size={18} />}
+          />
         <div className="flex flex-wrap gap-3 items-center">
           <button
             onClick={() => generate('daily')}
@@ -129,9 +129,7 @@ export default function ReportsPage() {
         {loading && reports.length === 0 && <div className="text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>}
 
         {!loading && reports.length === 0 && (
-          <div className="card p-6 text-center">
-            {t('reports.noReports', 'ยังไม่มีรายงาน — กดปุ่มด้านบนเพื่อสร้างรายงานแรก')}
-          </div>
+          <div className="card"><EmptyState icon={<Icon name="reports" size={20} />} title={t('reports.noReports', 'ยังไม่มีรายงาน')} description={t('reports.noReportsDesc', 'กดปุ่มด้านบนเพื่อสร้างรายงานแรก')} /></div>
         )}
 
         <div className="space-y-4">

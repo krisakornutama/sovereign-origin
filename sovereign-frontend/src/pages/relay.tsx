@@ -193,17 +193,15 @@ export default function RelayPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title="SOVEREIGN OS" icon={<Icon name="relay" size={18} />}
           subtitle={t('relay.subtitle', 'Relay Control')} actions={<div className="flex gap-3 items-center">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</Link>
         </div>}
         />
-      </header>
 
-      <main className="max-w-4xl mx-auto p-6 space-y-8">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-4xl mx-auto w-full space-y-8">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('relay.controlTitle', 'ควบคุมอุปกรณ์ไฟฟ้า')}</h2>

@@ -121,17 +121,15 @@ export default function LifestylePage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-          <PageHeader
+        <PageHeader
             eyebrow={t('lifestyle.page.eyebrow', 'วิถีชีวิต · Phase 5 — Embracing Chaos')}
             title={t('lifestyle.page.title', 'วิถีชีวิต')}
             icon={<Icon name="lifestyle" size={18} />}
             subtitle={t('lifestyle.page.subtitle', 'ออกแบบช่องว่างแห่งความไม่ควบคุมโดยตั้งใจ — ระบบเกิดมาเพื่อรับใช้ชีวิต ไม่ใช่ชีวิตเพื่อรับใช้กราฟ')}
             actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('lifestyle.page.backDashboard', '← กลับ Dashboard')}</Link>}
           />
-        </header>
 
-        <main className="max-w-5xl mx-auto p-6 space-y-6">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
           <div className="card panel-cyan p-4 text-xs text-gray-400 leading-relaxed">
             <b className="text-gray-200">{t('lifestyle.principles.title', 'หลักการ 5 ภัยซ่อนเร้น (Emergent Tier):')}</b>
             <br />{t('lifestyle.principles.p1Prefix', '① ')}<b>{t('lifestyle.principles.p1Bold', 'ภูมิคุ้มกันถดถอย')}</b>{t('lifestyle.principles.p1Rest', ' — บ้านสะอาดเกินไป ร่างกายไม่ได้ฝึก → ต้องเปิดรับธรรมชาติทุกวัน')}

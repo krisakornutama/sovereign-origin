@@ -30,10 +30,8 @@ export default function RestaurantReportsPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-          <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.reports.title', 'รายงานร้านอาหาร')} icon={<Icon name="reports" size={18} />} subtitle={t('restaurant.reports.subtitle', 'รายรับ • รายจ่าย • กำไร — แยกกระเป๋าร้าน superadmin เห็นหมด')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
-        </header>
-        <main className="max-w-6xl mx-auto p-6 space-y-4 w-full">
+        <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.reports.title', 'รายงานร้านอาหาร')} icon={<Icon name="reports" size={18} />} subtitle={t('restaurant.reports.subtitle', 'รายรับ • รายจ่าย • กำไร — แยกกระเป๋าร้าน superadmin เห็นหมด')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full space-y-4 w-full">
           <div className="flex gap-2 items-center">
             <span className="text-xs text-gray-400">{t('restaurant.reports.range', 'ช่วง')}</span>
             <select value={days} onChange={e=>setDays(Number(e.target.value))} className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm">

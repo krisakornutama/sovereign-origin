@@ -297,15 +297,13 @@ export default function UsersPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('users.page.eyebrow', 'ระบบ')}
           title="SOVEREIGN OS"
           subtitle={t('users.page.subtitle', 'User Management')} icon={<Icon name="users" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('users.page.dashboardLink', 'Dashboard')}</Link>}
         />
-      </header>
 
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
         {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 

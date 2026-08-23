@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -88,21 +88,13 @@ export default function LivestockPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
           <PageHeader
             eyebrow={t('livestock.page.eyebrow', 'ชีวิต & การเงิน')}
-            title={t('livestock.page.title', 'SOVEREIGN LIVESTOCK')}
+            title={t('livestock.page.title', 'ปศุสัตว์')}
+            subtitle={t('livestock.page.subtitle', '6 เสาหลัก ตั้งแต่เวชภัณฑ์ยันกำไรต่องวด')}
             icon={<Icon name="farm" size={18} />}
-            subtitle={t('livestock.page.subtitle', 'Livestock Engine')}
-            actions={
-              <div className="flex gap-3 items-center">
-                <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('livestock.page.dashboardLink', 'Dashboard')}</Link>
-              </div>
-            }
           />
-        </header>
-
-        <main className="max-w-7xl mx-auto p-6 space-y-4 w-full">
           {/* Dashboard summary strip */}
           {summary && (
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 text-center">
@@ -241,11 +233,11 @@ function GroupsTab({ groups, canWrite, api, loadAll, setMsg, setErr, t, setSel }
       )}
 
       {groups.length === 0 ? (
-        <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">{t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')}</div>
+        <div className="card"><EmptyState icon={<Icon name="farm" size={20} />} title={t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')} description={t('livestock.page.noGroupsDesc', 'เริ่มสร้างกลุ่มแรกจากประเภทและจำนวน')} /></div>
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {groups.map((g: Group) => (
-            <div key={g.id} className="card p-4 space-y-2">
+            <div key={g.id} className="card p-4 space-y-2 card-hover">
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-bold text-white">{g.code}</div>
@@ -386,7 +378,7 @@ function MedicalTab({ groups, canWrite, api, loadAll, setMsg, setErr, t, sel, se
         <GroupSelect groups={groups} selId={sel?.id ?? ''} onChange={setSel} t={t} />
       </div>
       {!sel ? (
-        <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">{t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')}</div>
+        <div className="card"><EmptyState icon={<Icon name="farm" size={20} />} title={t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')} description={t('livestock.page.selectGroup', 'เลือกกลุ่มด้านบนเพื่อดูข้อมูล')} /></div>
       ) : (
         <>
           {canWrite && (
@@ -610,7 +602,7 @@ function ProductionTab({ groups, canWrite, api, loadAll, setMsg, setErr, t, sel,
         <GroupSelect groups={groups} selId={sel?.id ?? ''} onChange={setSel} t={t} />
       </div>
       {!sel ? (
-        <div className="text-gray-500 text-center py-12 border border-dashed border-gray-700 rounded-xl">{t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')}</div>
+        <div className="card"><EmptyState icon={<Icon name="farm" size={20} />} title={t('livestock.page.noGroups', 'ยังไม่มีกลุ่มปศุสัตว์')} description={t('livestock.page.selectGroup', 'เลือกกลุ่มด้านบนเพื่อดูข้อมูล')} /></div>
       ) : (
         <>
           {canWrite && (
