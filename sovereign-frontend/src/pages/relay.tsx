@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -60,8 +61,8 @@ export default function RelayPage() {
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/relay/schedules`),
       ]);
       if (!statusRes.ok || !schedRes.ok) throw new Error(t('relay.errLoad', 'โหลดข้อมูลไม่สำเร็จ'));
-      setRelays(await statusRes.json());
-      setSchedules(await schedRes.json());
+      setRelays(asArray(await statusRes.json()));
+      setSchedules(asArray(await schedRes.json()));
     } catch (err: any) {
       setError(`${err.message || t('relay.errLoadData', 'ไม่สามารถโหลดข้อมูลได้')}`);
       setRelays([]);

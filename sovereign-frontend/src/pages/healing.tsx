@@ -3,6 +3,7 @@
 // ดีไซน์: ห้องสว่างเทียนในคฤหาสน์ command center — เทียนแห่งสติ = ไฟที่ลุกตามสมาธิที่ทำจริง
 import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '../lib/apiFetch';
+import { asObject } from '../lib/fetchJson';
 import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -182,7 +183,7 @@ export default function HealingPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ herb: herbCheck.herb, meds: herbCheck.meds.split(',').map((s) => s.trim()).filter(Boolean) }),
       });
-      setHerbResult(await r.json());
+      setHerbResult(asObject(await r.json()));
     } catch { setError(t('healing.herbTab.checkFailed', 'ตรวจสมุนไพรไม่สำเร็จ')); }
   };
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
+import { asObject } from '../lib/fetchJson';
 import { useAuthStore } from '../stores/useAuthStore';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
@@ -55,7 +56,7 @@ export default function PredictivePage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predictive/battery?hours=168`);
       if (!res.ok) return;
-      setBattery(await res.json());
+      setBattery(asObject(await res.json()));
     } catch {
       // offline
     }
@@ -65,7 +66,7 @@ export default function PredictivePage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/predictive/summary`);
       if (!res.ok) return;
-      setSummary(await res.json());
+      setSummary(asObject(await res.json()));
     } catch {
       // offline
     }

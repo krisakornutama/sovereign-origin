@@ -1,0 +1,11 @@
+{
+  "name": "sovereign-origin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sovereign Origin — Self-Sovereign Home OS (monorepo ของ sovereign-frontend + sovereign-os/core-api)",
+  "scripts": {
+    "verify": "node tools/verify.mjs",
+    "verify:full": "node tools/verify.mjs --e2e",
+    "e2e": "cd sovereign-frontend && npm run e2e"
+  }
+}
