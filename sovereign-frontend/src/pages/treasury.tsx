@@ -14,11 +14,11 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 
-// ── โทเค็นห้องคลัง (เหล็กกล้า + หมึกสมุด + ไฟสีของตระกูล) ──
-const PANEL = 'bg-gray-900/70 border border-gray-800 rounded-xl';
-const TILE = 'bg-gray-950/70 border border-gray-800 rounded-lg';
-const INPUT = 'bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/60';
-const BTN = 'px-4 py-1.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 rounded-lg text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400';
+// ── โทเค็นห้องคลัง (เหล็กกล้า + หมึกสมุด + ไฟสีของตระกูล) — premium ──
+const PANEL = 'bg-gray-900/70 border border-gray-800/80 rounded-2xl backdrop-blur-sm shadow-[0_8px_28px_rgba(0,0,0,0.35)]';
+const TILE = 'bg-gray-950/70 border border-gray-800/80 rounded-xl backdrop-blur-sm transition-all hover:border-gray-700/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)]';
+const INPUT = 'bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/60 focus:border-emerald-500/40 transition-colors';
+const BTN = 'px-4 py-2 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 hover:border-emerald-500/60 disabled:opacity-50 rounded-xl text-sm font-semibold transition-all shadow-[0_0_14px_rgba(52,211,153,0.12)] hover:shadow-[0_0_20px_rgba(52,211,153,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400';
 
 // สีประจำ 5 Strategy Families
 const FAMILY_COLORS: Record<string, string> = {
@@ -37,15 +37,18 @@ const fmtNum = (n: number) => (n ?? 0).toLocaleString(undefined, { maximumFracti
 
 function Section({ id, title, desc, children }: { id: string; title: string; desc: string; children: React.ReactNode }) {
   return (
-    <section id={id} className={`${PANEL} panel-glow scroll-mt-6`}>
-      <div className="flex items-baseline justify-between px-5 py-3 border-b border-gray-800">
+    <section id={id} className={`${PANEL} panel-glow scroll-mt-6 overflow-hidden`}>
+      <div className="flex items-baseline justify-between px-6 py-4 border-b border-gray-800/80 bg-gradient-to-r from-gray-900/50 via-transparent to-transparent">
         <div>
-          <h2 className="font-semibold text-gray-100 glow-text">{title}</h2>
-          <p className="text-[11px] text-gray-500 mt-0.5">{desc}</p>
+          <h2 className="font-bold text-gray-100 glow-text tracking-tight flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-emerald-500/60 shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
+            {title}
+          </h2>
+          <p className="text-[11px] text-gray-500 mt-1">{desc}</p>
         </div>
-        <span className="mono text-[10px] text-gray-600 tracking-widest uppercase">▍treasury</span>
+        <span className="mono text-[10px] text-gray-600 tracking-[0.2em] uppercase border border-gray-800 rounded-full px-2 py-1 bg-gray-950/50">▍treasury</span>
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }
