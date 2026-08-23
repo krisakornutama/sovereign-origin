@@ -12,6 +12,9 @@ import DefconWidget from '../components/dashboard/DefconWidget';
 import WealthWidget from '../components/dashboard/WealthWidget';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import StatCard from '../components/ui/StatCard';
+import SectionCard from '../components/ui/SectionCard';
+import EmptyState from '../components/ui/EmptyState';
 import { authFetch } from '../lib/apiFetch';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -302,37 +305,26 @@ export default function Dashboard() {
       case 'status':
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="card p-4">
-              <div className="text-xs text-gray-500">{t('dashboard.status.totalDevices', 'อุปกรณ์ทั้งหมด')}</div>
-              <div className="mono text-2xl font-semibold text-gray-50 mt-1">{deviceStatus.total}</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-xs text-gray-500">{t('common.online', 'ออนไลน์')}</div>
-              <div className="mono text-2xl font-semibold text-emerald-400 mt-1">{deviceStatus.online}</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-xs text-gray-500">{t('common.offline', 'ออฟไลน์')}</div>
-              <div className="mono text-2xl font-semibold text-rose-400 mt-1">{deviceStatus.offline}</div>
-            </div>
+            <StatCard label={t('dashboard.status.totalDevices', 'อุปกรณ์ทั้งหมด')} value={deviceStatus.total} icon={<Icon name="server" size={14} />} />
+            <StatCard label={t('common.online', 'ออนไลน์')} value={<span className="text-emerald-400">{deviceStatus.online}</span>} icon={<Icon name="check" size={14} className="text-emerald-400" />} />
+            <StatCard label={t('common.offline', 'ออฟไลน์')} value={<span className="text-rose-400">{deviceStatus.offline}</span>} icon={<Icon name="alert-triangle" size={14} className="text-rose-400" />} />
           </div>
         );
       case 'stats':
         return (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: t('dashboard.stats.battery', 'แบตเตอรี่'), value: metrics.battery_soc, unit: '%', color: 'text-emerald-400' },
-              { label: t('dashboard.stats.waterLevel', 'ระดับน้ำ'), value: metrics.water_level_cm, unit: '%', color: 'text-sky-400' },
-              { label: t('dashboard.stats.temperature', 'อุณหภูมิ'), value: metrics.temperature, unit: '°C', color: 'text-amber-400' },
-              { label: t('dashboard.stats.rain', 'ฝน'), value: metrics.rain_detect, isBoolean: true, trueLabel: t('dashboard.stats.raining', 'ตก'), falseLabel: t('dashboard.stats.notRaining', 'ไม่ตก'), color: 'text-indigo-400' },
+              { label: t('dashboard.stats.battery', 'แบตเตอรี่'), value: metrics.battery_soc, unit: '%', icon: 'battery' as const, tone: metrics.battery_soc != null && metrics.battery_soc < 20 ? 'text-rose-400' : 'text-emerald-400' },
+              { label: t('dashboard.stats.waterLevel', 'ระดับน้ำ'), value: metrics.water_level_cm, unit: '%', icon: 'droplet' as const, tone: 'text-sky-400' },
+              { label: t('dashboard.stats.temperature', 'อุณหภูมิ'), value: metrics.temperature, unit: '°C', icon: 'thermometer' as const, tone: metrics.temperature != null && metrics.temperature > 40 ? 'text-rose-400' : 'text-amber-400' },
+              { label: t('dashboard.stats.rain', 'ฝน'), value: metrics.rain_detect, isBoolean: true, trueLabel: t('dashboard.stats.raining', 'ตก'), falseLabel: t('dashboard.stats.notRaining', 'ไม่ตก'), icon: 'cloud-rain' as const, tone: 'text-indigo-400' },
             ].map((stat, idx) => (
-              <div key={idx} className="card p-4">
-                <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
-                {stat.isBoolean ? (
-                  <div className={`mono text-2xl font-semibold ${stat.color}`}>{stat.value === 1 ? stat.trueLabel : stat.falseLabel}</div>
-                ) : (
-                  <div className={`mono text-2xl font-semibold ${stat.color}`}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : t('dashboard.na', 'N/A')}</div>
-                )}
-              </div>
+              <StatCard
+                key={idx}
+                label={stat.label}
+                value={stat.isBoolean ? <span className={stat.tone}>{stat.value === 1 ? stat.trueLabel : stat.falseLabel}</span> : <span className={stat.tone}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : t('dashboard.na', 'N/A')}</span>}
+                icon={<Icon name={stat.icon} size={14} className="text-gray-500" />}
+              />
             ))}
           </div>
         );
@@ -349,42 +341,20 @@ export default function Dashboard() {
         return <WealthWidget />;
       case 'inventory':
         return (
-          <section className="card p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-sm font-semibold text-gray-200">{t('dashboard.inventory.title', 'เสบียง & สต็อก')}</h2>
-              <Link href="/inventory" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.inventory.openPage', 'เปิดหน้า Inventory')} <Icon name="arrow-right" size={11} /></Link>
-            </div>
+          <SectionCard title={t('dashboard.inventory.title', 'เสบียง & สต็อก')} icon={<Icon name="inventory" size={14} />} action={<Link href="/inventory" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.inventory.openPage', 'เปิดหน้า Inventory')} <Icon name="arrow-right" size={11} /></Link>}>
             {inventoryStatus ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('dashboard.inventory.totalItems', 'รายการทั้งหมด')}</div>
-                  <div className="mono text-xl font-semibold text-gray-50 mt-0.5">{inventoryStatus.items}</div>
-                </div>
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('dashboard.inventory.water', 'น้ำ')}</div>
-                  <div className="mono text-xl font-semibold text-sky-400 mt-0.5">{inventoryStatus.water}</div>
-                </div>
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('dashboard.inventory.food', 'อาหาร')}</div>
-                  <div className="mono text-xl font-semibold text-emerald-400 mt-0.5">{inventoryStatus.food}</div>
-                </div>
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('dashboard.inventory.expiring', 'ใกล้หมดอายุ')}</div>
-                  <div className="mono text-xl font-semibold text-amber-400 mt-0.5">{inventoryStatus.expiring}</div>
-                </div>
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('dashboard.inventory.expired', 'หมดอายุแล้ว')}</div>
-                  <div className="mono text-xl font-semibold text-rose-400 mt-0.5">{inventoryStatus.expired}</div>
-                </div>
-                <div className="card p-3">
-                  <div className="text-xs text-gray-500">{t('common.lowStock', 'สต็อกต่ำ')}</div>
-                  <div className="mono text-xl font-semibold text-gray-50 mt-0.5">{inventoryStatus.lowStock}</div>
-                </div>
+                <StatCard label={t('dashboard.inventory.totalItems', 'รายการทั้งหมด')} value={inventoryStatus.items} />
+                <StatCard label={t('dashboard.inventory.water', 'น้ำ')} value={<span className="text-sky-400">{inventoryStatus.water}</span>} />
+                <StatCard label={t('dashboard.inventory.food', 'อาหาร')} value={<span className="text-emerald-400">{inventoryStatus.food}</span>} />
+                <StatCard label={t('dashboard.inventory.expiring', 'ใกล้หมดอายุ')} value={<span className="text-amber-400">{inventoryStatus.expiring}</span>} />
+                <StatCard label={t('dashboard.inventory.expired', 'หมดอายุแล้ว')} value={<span className="text-rose-400">{inventoryStatus.expired}</span>} />
+                <StatCard label={t('common.lowStock', 'สต็อกต่ำ')} value={inventoryStatus.lowStock} />
               </div>
             ) : (
-              <div className="text-gray-500 text-sm py-4">{t('dashboard.inventory.disabled', 'โมดูล inventory ปิดอยู่ หรือไม่มีข้อมูล')}</div>
+              <EmptyState title={t('dashboard.inventory.disabled', 'โมดูล inventory ปิดอยู่ หรือไม่มีข้อมูล')} description={t('dashboard.inventory.enableHint', 'เปิด ENABLED_MODULES=inventory ใน infra/.env')} />
             )}
-          </section>
+          </SectionCard>
         );
       case 'kids':
         return (
@@ -464,26 +434,13 @@ export default function Dashboard() {
         );
       case 'farm':
         return (
-          <section className="card p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-sm font-semibold text-gray-200">{t('dashboard.farm.title', 'แปลงเกษตร')}</h2>
-              <Link href="/farm" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.farm.openPage', 'เปิดหน้า Farm')} <Icon name="arrow-right" size={11} /></Link>
-            </div>
+          <SectionCard title={t('dashboard.farm.title', 'แปลงเกษตร')} icon={<Icon name="farm" size={14} />} action={<Link href="/farm" scroll={false} className="flex items-center gap-1 text-xs text-sky-400 hover:underline">{t('dashboard.farm.openPage', 'เปิดหน้า Farm')} <Icon name="arrow-right" size={11} /></Link>}>
             {farmOverview ? (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div className="card p-3">
-                    <div className="text-xs text-gray-500">{t('dashboard.farm.totalPlots', 'แปลงทั้งหมด')}</div>
-                    <div className="mono text-xl font-semibold text-gray-50 mt-0.5">{farmOverview.plots}</div>
-                  </div>
-                  <div className="card p-3">
-                    <div className="text-xs text-gray-500">{t('dashboard.farm.growing', 'กำลังโต')}</div>
-                    <div className="mono text-xl font-semibold text-emerald-400 mt-0.5">{farmOverview.growing}</div>
-                  </div>
-                  <div className="card p-3">
-                    <div className="text-xs text-gray-500">{t('dashboard.farm.harvested', 'เก็บเกี่ยวแล้ว')}</div>
-                    <div className="mono text-xl font-semibold text-amber-400 mt-0.5">{farmOverview.harvested}</div>
-                  </div>
+                  <StatCard label={t('dashboard.farm.totalPlots', 'แปลงทั้งหมด')} value={farmOverview.plots} />
+                  <StatCard label={t('dashboard.farm.growing', 'กำลังโต')} value={<span className="text-emerald-400">{farmOverview.growing}</span>} />
+                  <StatCard label={t('dashboard.farm.harvested', 'เก็บเกี่ยวแล้ว')} value={<span className="text-amber-400">{farmOverview.harvested}</span>} />
                 </div>
                 {farmOverview.upcomingHarvests.length > 0 && (
                   <div className="mt-3 space-y-1">
@@ -500,9 +457,9 @@ export default function Dashboard() {
                 )}
               </>
             ) : (
-              <div className="text-gray-500 text-sm py-4">{t('dashboard.farm.disabled', 'โมดูล farm ปิดอยู่ หรือไม่มีข้อมูล')}</div>
+              <EmptyState title={t('dashboard.farm.disabled', 'โมดูล farm ปิดอยู่ หรือไม่มีข้อมูล')} description={t('dashboard.farm.enableHint', 'เปิด ENABLED_MODULES=farm ใน infra/.env')} />
             )}
-          </section>
+          </SectionCard>
         );
       case 'map':
         return (
