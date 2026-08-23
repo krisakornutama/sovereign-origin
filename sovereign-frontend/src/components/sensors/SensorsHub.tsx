@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import Sidebar from '../layout/Sidebar';
 import Icon from '../ui/Icon';
+import PageHeader from '../ui/PageHeader';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { fmtLocale } from '../../lib/formatDate';
 
@@ -254,30 +255,31 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex justify-between items-center">
-          <h1 className="text-sm font-semibold text-gray-200">
-            SOVEREIGN OS <span className="text-xs text-gray-500 ml-2">{t('sensorsHub.headerSub', 'Sensors & Devices')}</span>
-          </h1>
-          <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
-        </header>
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('sensorsHub.eyebrow', 'อุปกรณ์ & พลังงาน')}
+            title={t('sensorsHub.title', 'อุปกรณ์และเซ็นเซอร์')}
+            subtitle={t('sensorsHub.headerSub', 'จัดการอุปกรณ์ ESP/เซ็นเซอร์ และดูข้อมูลย้อนหลัง')}
+            icon={<Icon name="sensors" size={18} />}
+          />
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-800 bg-gray-900/60">
-          <button
-            onClick={() => setTab('devices')}
-            className={`px-6 py-3 text-sm font-bold border-b-2 transition ${tab === 'devices' ? 'border-emerald-400 text-emerald-400 shadow-neon-green' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-          >
-            {t('sensorsHub.tabDevices', 'อุปกรณ์ (Device Manager)')}
-          </button>
-          <button
-            onClick={() => setTab('data')}
-            className={`px-6 py-3 text-sm font-bold border-b-2 transition ${tab === 'data' ? 'border-emerald-400 text-emerald-400 shadow-neon-green' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-          >
-            {t('sensorsHub.tabData', 'ข้อมูลเซ็นเซอร์ (Sensor Data)')}
-          </button>
-        </div>
+          {/* Tabs */}
+          <div className="flex border-b border-gray-800 bg-gray-900/60 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setTab('devices')}
+              className={`px-6 py-3 text-sm font-bold border-b-2 transition ${tab === 'devices' ? 'border-emerald-400 text-emerald-400 shadow-neon-green' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+            >
+              {t('sensorsHub.tabDevices', 'อุปกรณ์ (Device Manager)')}
+            </button>
+            <button
+              onClick={() => setTab('data')}
+              className={`px-6 py-3 text-sm font-bold border-b-2 transition ${tab === 'data' ? 'border-emerald-400 text-emerald-400 shadow-neon-green' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+            >
+              {t('sensorsHub.tabData', 'ข้อมูลเซ็นเซอร์ (Sensor Data)')}
+            </button>
+          </div>
 
-        <main className="max-w-6xl mx-auto p-6 space-y-6 w-full">
+          <div className="space-y-6">
           {message && (
             <div className={`p-3 rounded text-sm ${message.startsWith('✅') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>{message}</div>
           )}
@@ -478,6 +480,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
               <div className="text-xs text-gray-500">{t('sensorsHub.footerInfo', 'แสดง {n} รายการ · โหลดอัตโนมัติทุก 10 วินาที', { n: records.length })}</div>
             </>
           )}
+          </div>
         </main>
       </div>
     </div>
