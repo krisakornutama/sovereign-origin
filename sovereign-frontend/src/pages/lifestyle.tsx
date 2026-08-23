@@ -129,7 +129,36 @@ export default function LifestylePage() {
             actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('lifestyle.page.backDashboard', '← กลับ Dashboard')}</Link>}
           />
 
-        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
+          {/* ── Dense Top — 5 Principles as cards (ภาพ 4) ── */}
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 lg:col-span-8 card p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-[11px] font-bold tracking-widest text-gray-200">5 Emergent Principles</h3>
+                <span className="text-[9px] font-mono tracking-widest text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">CHAOS WINDOWS</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { n: '01', c: '#10b981', t: 'Hygiene' },
+                  { n: '02', c: '#f59e0b', t: 'Goodhart' },
+                  { n: '03', c: '#22d3ee', t: 'Circadian' },
+                  { n: '04', c: '#ef4444', t: 'Sovereignty' },
+                  { n: '05', c: '#a78bfa', t: 'Generational' },
+                ].map((p) => (
+                  <div key={p.n} className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2 text-center">
+                    <div className="text-[10px] font-mono tracking-widest" style={{ color: p.c }}>{p.n}</div>
+                    <div className="text-[10px] font-bold text-gray-300 mt-1">{p.t}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-4 card p-3 flex flex-col items-center justify-center">
+              <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-1">Embracing Chaos</div>
+              <div className="text-2xl font-bold text-emerald-400 glow-text">5</div>
+              <div className="text-[11px] text-gray-400">Principles · Living</div>
+            </div>
+          </div>
+
           <div className="card panel-cyan p-4 text-xs text-gray-400 leading-relaxed">
             <b className="text-gray-200">{t('lifestyle.principles.title', 'หลักการ 5 ภัยซ่อนเร้น (Emergent Tier):')}</b>
             <br />{t('lifestyle.principles.p1Prefix', '① ')}<b>{t('lifestyle.principles.p1Bold', 'ภูมิคุ้มกันถดถอย')}</b>{t('lifestyle.principles.p1Rest', ' — บ้านสะอาดเกินไป ร่างกายไม่ได้ฝึก → ต้องเปิดรับธรรมชาติทุกวัน')}
