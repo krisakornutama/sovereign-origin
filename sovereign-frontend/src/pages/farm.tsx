@@ -286,6 +286,61 @@ export default function FarmPage() {
             subtitle={t('farm.page.subtitle', 'จัดการแปลงปลูก วิเคราะห์ดิน และติดตามการเก็บเกี่ยว')}
             icon={<Icon name="farm" size={18} />}
           />
+          {/* ── Agri-Hub Dense Top — 3D + Breedhouse + Forecast (ภาพ 3) ── */}
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 lg:col-span-7 card panel-glow p-3 overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-bold tracking-widest text-emerald-300 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 glow-dot" /> Agri-Hub · Few Plots</h3>
+                <span className="text-[9px] font-mono tracking-widest text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">{plots.length} PLOTS</span>
+              </div>
+              <div className="relative h-[148px] rounded-lg bg-[#0b1220] border border-gray-800 overflow-hidden flex items-center justify-center">
+                <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'linear-gradient(rgba(52,211,153,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.08) 1px, transparent 1px)', backgroundSize: '18px 18px', transform: 'perspective(300px) rotateX(38deg) translateY(-10px)' }} />
+                <div className="grid grid-cols-4 gap-1.5 p-4" style={{ transform: 'perspective(280px) rotateX(32deg) rotateZ(-8deg)' }}>
+                  {Array.from({ length: 8 }).map((_, i) => {
+                    const p = plots[i];
+                    const isActive = p != null;
+                    return (
+                      <div key={i} className={`w-14 h-10 rounded-sm border flex items-center justify-center text-[8px] font-mono ${isActive ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-gray-800/40 border-gray-700/40 text-gray-600'}`}>
+                        {p ? p.name.slice(0, 4) : '—'}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="absolute bottom-1 left-2 text-[8px] font-mono tracking-widest text-gray-500">ISOMETRIC · {plots.filter(p => p.status === 'growing').length} GROWING</div>
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-5 card p-3 space-y-2">
+              <h3 className="text-[11px] font-bold tracking-widest text-gray-200">Breedhouse Conditions</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { k: 'Dust', v: 23, max: 100, c: '#10b981' },
+                  { k: 'Stress', v: Math.min(100, plots.filter(p => p.status === 'fallow').length * 25 + 12), max: 100, c: '#f59e0b' },
+                  { k: 'Temp', v: 28.6, max: 50, c: '#22d3ee' },
+                  { k: 'Hum', v: 61, max: 100, c: '#38bdf8' },
+                ].map((m) => (
+                  <div key={m.k} className="bg-gray-800/40 border border-gray-700/40 rounded-lg px-2 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] tracking-widest font-mono text-gray-500">{m.k}</span>
+                      <span className="mono text-[11px] font-bold" style={{ color: m.c }}>{m.v}{m.k === 'Temp' ? '°C' : m.k === 'Hum' ? '%' : '%'}</span>
+                    </div>
+                    <div className="h-1 bg-gray-800 rounded-full overflow-hidden mt-1">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, (m.v / m.max) * 100)}%`, background: m.c }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-gray-950/40 border border-gray-800 rounded-lg p-2">
+                <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-1">Harvest Forecast</div>
+                <div className="flex items-end gap-1 h-[36px]">
+                  {[12, 18, 9, 22, 15].map((h, i) => (
+                    <div key={i} className="flex-1 bg-emerald-500/30 border border-emerald-500/30 rounded-sm" style={{ height: `${h * 1.6}px` }} />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[8px] font-mono tracking-widest text-gray-600 mt-1"><span>W1</span><span>W2</span><span>W3</span><span>W4</span><span>W5</span></div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('farm.page.h2', 'แปลงเกษตร (Farm Plots)')}</h2>
             <div className="text-sm text-gray-400">
