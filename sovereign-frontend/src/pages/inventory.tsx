@@ -319,24 +319,26 @@ export default function InventoryPage() {
           ) : items.length === 0 ? (
             <div className="card"><EmptyState icon={<Icon name="inventory" size={20} />} title={t('inventory.page.noItems', 'ไม่มีรายการ')} description={t('inventory.page.noItemsDesc', 'เพิ่มของชิ้นแรกหรือสแกนฉลากด้วย AI')} /></div>
           ) : (
-            <div className="card panel-cyan overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-400 border-b border-gray-700 text-xs uppercase tracking-wider">
-                    <th className="px-4 py-3">{t('inventory.table.item', 'รายการ')}</th>
-                    <th className="px-4 py-3">{t('inventory.table.category', 'หมวด')}</th>
-                    <th className="px-4 py-3 text-right">{t('inventory.table.qty', 'จำนวน')}</th>
-                    <th className="px-4 py-3 text-right">{t('inventory.table.value', 'มูลค่า ($)')}</th>
-                    <th className="px-4 py-3">{t('inventory.table.location', 'ที่เก็บ')}</th>
-                    <th className="px-4 py-3">{t('inventory.table.expiry', 'วันหมดอายุ')}</th>
-                    <th className="px-4 py-3">{t('inventory.table.status', 'สถานะ')}</th>
-                    <th className="px-4 py-3">{t('inventory.table.stock', 'สต็อก')}</th>
-                    {canWrite && <th className="px-4 py-3"></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b border-cyan-800/50 hover:bg-gray-800/40">
+            <div className="card panel-cyan overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-950/40 backdrop-blur-sm">
+                    <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.item', 'รายการ')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.category', 'หมวด')}</th>
+                      <th className="px-4 py-3 text-right font-semibold">{t('inventory.table.qty', 'จำนวน')}</th>
+                      <th className="px-4 py-3 text-right font-semibold">{t('inventory.table.value', 'มูลค่า ($)')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.location', 'ที่เก็บ')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.expiry', 'วันหมดอายุ')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.status', 'สถานะ')}</th>
+                      <th className="px-4 py-3 font-semibold">{t('inventory.table.stock', 'สต็อก')}</th>
+                      {canWrite && <th className="px-4 py-3"></th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800/50">
+                    {items.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-800/50 transition-colors group">
                       <td className="px-4 py-3 font-semibold">
                         {item.name}
                         {item.notes && <div className="text-xs text-gray-500 font-normal">{item.notes}</div>}
@@ -369,6 +371,7 @@ export default function InventoryPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
