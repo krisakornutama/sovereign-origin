@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
+import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -32,7 +33,7 @@ export default function ReportsPage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports?limit=50`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setReports(await res.json());
+      setReports(asArray(await res.json()));
     } catch (err) {
       console.error(err);
       setError(t('reports.loadError', 'โหลดรายงานไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และรัน migration ล่าสุดแล้ว'));

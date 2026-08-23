@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
+import { asArray, asObject } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -114,7 +115,7 @@ export default function KnowledgePage() {
       const q = typeFilter === 'ALL' ? '' : `?type=${typeFilter}`;
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/items${q}`);
       if (!res.ok) throw new Error('Failed to load');
-      setItems(await res.json());
+      setItems(asArray(await res.json()));
       setError('');
     } catch (err) {
       setError(t('knowledge.loadError', 'โหลดคลังความรู้ไม่สำเร็จ — ตรวจว่า Backend เปิดอยู่'));
@@ -135,7 +136,7 @@ export default function KnowledgePage() {
   const loadIndexStatus = useCallback(async () => {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/index/status`);
-      if (res.ok) setIndexInfo(await res.json());
+      if (res.ok) setIndexInfo(asObject(await res.json()));
     } catch {
       // backend ไม่มี semantic module → ข้าม
     }

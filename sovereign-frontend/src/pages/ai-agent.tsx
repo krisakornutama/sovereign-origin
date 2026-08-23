@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
+import { asArray } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -317,7 +318,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
     if (!isSuperadmin) return;
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/approvals`);
-      if (res.ok) setApprovals(await res.json());
+      if (res.ok) setApprovals(asArray(await res.json()));
     } catch (err) {
       // เงียบๆ — หน้า policy ยังใช้งานได้
     }

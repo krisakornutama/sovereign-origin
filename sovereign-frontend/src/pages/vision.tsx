@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
+import { asArray } from '../lib/fetchJson';
 import { useAuthStore } from '../stores/useAuthStore';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
@@ -250,14 +251,14 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
   const loadCameras = async () => {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/infrastructure/cameras`);
-      if (res.ok) setCameras(await res.json());
+      if (res.ok) setCameras(asArray(await res.json()));
     } catch { /* ไม่บังคับ */ }
   };
 
   const loadHistory = async () => {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vision/history?limit=30`);
-      if (res.ok) setHistory(await res.json());
+      if (res.ok) setHistory(asArray(await res.json()));
     } catch { /* ไม่บังคับ */ }
   };
 

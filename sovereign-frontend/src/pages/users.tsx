@@ -3,6 +3,7 @@ import { Fragment, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { asObject } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -248,7 +249,7 @@ export default function UsersPage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/features/summary`);
       if (!res.ok) throw new Error(t('users.summaryLoadFailed', 'โหลดสรุปไม่สำเร็จ'));
-      setSummary(await res.json());
+      setSummary(asObject(await res.json()));
     } catch (err: any) {
       setError(`${err.message || t('users.summaryLoadError', 'โหลดสรุปสิทธิ์ไม่สำเร็จ')}`);
       setSummary(null);
