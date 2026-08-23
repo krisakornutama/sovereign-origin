@@ -18,16 +18,25 @@ export default function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-3 mb-6">
-      <div className="min-w-0">
-        {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
-        <h1 className="text-xl font-semibold text-gray-50 tracking-tight flex items-center gap-2.5 glow-text">
-          {icon && <span className="text-emerald-400/90 flex items-center">{icon}</span>}
+    <header className="flex flex-wrap items-end justify-between gap-4 mb-7">
+      <div className="min-w-0 flex-1">
+        {eyebrow && (
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-6 h-px bg-gradient-to-r from-emerald-500/60 to-transparent" />
+            <span className="eyebrow">{eyebrow}</span>
+          </div>
+        )}
+        <h1 className="text-[22px] md:text-2xl font-bold text-gray-50 tracking-tight flex items-center gap-3 glow-text leading-none">
+          {icon && (
+            <span className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.15)]">
+              {icon}
+            </span>
+          )}
           {title}
         </h1>
-        {subtitle && <p className="text-[13px] text-gray-500 mt-1">{subtitle}</p>}
+        {subtitle && <p className="text-[13px] text-gray-400 mt-1.5 leading-relaxed max-w-2xl">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
     </header>
   );
 }
