@@ -161,15 +161,13 @@ export default function AiPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
         <PageHeader
           eyebrow={t('ai.eyebrow', 'ความปลอดภัย')}
           title="AI Command Center" icon={<Icon name="ai" size={18} />}
           subtitle={t('ai.subtitle', 'Decision Support — วิเคราะห์จากข้อมูลจริงในบ้าน')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('ai.backDashboard', '← กลับ Dashboard')}</Link>}
         />
-      </header>
 
-        <main className="max-w-5xl mx-auto p-6 space-y-6 w-full">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
           {/* ── Advisor ── */}
           <section className="card panel-glow p-5 space-y-4">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('ai.advisorTitle', 'ขอคำแนะนำจากข้อมูลจริง')}</h2>

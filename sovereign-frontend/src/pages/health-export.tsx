@@ -48,16 +48,14 @@ export default function HealthExportPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           title={t('healthExport.page.title', 'รายงานสุขภาพ 30 วัน (ส่งแพทย์)')} icon={<Icon name="reports" size={18} />} actions={<div className="flex items-center gap-3">
           <button onClick={() => (window.frames[0] as any)?.print?.() ?? window.print()} disabled={!html} className="btn-primary"><Icon name="file" size={13} /> {t('healthExport.printPdf', 'พิมพ์ / บันทึก PDF')}</button>
           <button onClick={downloadCsv} className="btn-secondary"><Icon name="download" size={13} /> {t('healthExport.downloadCsv', 'ดาวน์โหลด CSV')}</button>
           <Link href="/health" scroll={false} className="text-sm text-sky-400 hover:underline">{t('healthExport.back', '← กลับ')}</Link>
         </div>}
         />
-      </header>
-      <main className="max-w-4xl mx-auto p-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-4xl mx-auto w-full">
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
         {loading && <div className="text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>}
         {html && (

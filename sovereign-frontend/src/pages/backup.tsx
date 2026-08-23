@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import EmptyState from '../components/ui/EmptyState';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -146,13 +146,13 @@ export default function BackupPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
-          eyebrow={t('backup.page.eyebrow', 'ระบบ')}
-          title="Backup &amp; Restore" icon={<Icon name="backup" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('backup.page.backDashboard', '← กลับ Dashboard')}</Link>}
-        />
-      </header>
-      <main className="max-w-4xl mx-auto p-6 space-y-6">
+        <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-4xl mx-auto w-full">
+          <PageHeader
+            eyebrow={t('backup.page.eyebrow', 'ระบบ')}
+            title="Backup & Restore"
+            subtitle={t('backup.page.subtitle', 'สำรองและกู้คืนฐานข้อมูล TimescaleDB')}
+            icon={<Icon name="backup" size={18} />}
+          />
         {!isSuperAdmin && (
           <div className="card px-4 py-3 text-sm text-amber-400">
             {t('backup.adminOnly', 'หน้า Backup ใช้งานได้เฉพาะ SUPERADMIN')}
@@ -222,7 +222,7 @@ export default function BackupPage() {
           {loading && backups.length === 0 && <div className="text-gray-500 text-sm">{t('common.loading', 'กำลังโหลด…')}</div>}
 
           {!loading && backups.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-6">{t('backup.empty', 'ยังไม่มีไฟล์ backup — กดปุ่ม "Backup ตอนนี้"')}</div>
+            <div className="card"><EmptyState icon={<Icon name="backup" size={20} />} title={t('backup.empty', 'ยังไม่มีไฟล์ backup')} description={t('backup.emptyDesc', 'กดปุ่ม "Backup ตอนนี้" เพื่อสร้างไฟล์แรก')} /></div>
           )}
 
           <div className="overflow-x-auto">
