@@ -133,3 +133,6 @@ sovereign-os/infra/\[...prev
 sovereign-frontend/e2e/.auth/
 sovereign-frontend/playwright-report/
 sovereign-frontend/test-results/
+
+frontend-watchdog.mjs
+
