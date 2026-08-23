@@ -210,10 +210,8 @@ export default function SelfCheckPage() {
       <div className="min-h-screen bg-gray-950 text-gray-100 flex">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-            <PageHeader eyebrow="ชีวิต & สุขภาพ" title="ผลวินิจฉัยเบื้องต้น" icon={<Icon name="health" size={18} />} />
-          </header>
-          <main className="max-w-3xl mx-auto p-6 space-y-4 w-full">
+          <PageHeader eyebrow="ชีวิต & สุขภาพ" title="ผลวินิจฉัยเบื้องต้น" icon={<Icon name="health" size={18} />} />
+          <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-3xl mx-auto w-full space-y-4 w-full">
             <div className="card panel-glow p-6 text-center">
               <div className="text-5xl mb-3">✅</div>
               <h2 className="text-lg font-bold glow-text">บันทึกแล้ว {answered} ข้อ</h2>
@@ -248,15 +246,13 @@ export default function SelfCheckPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3">
-          <PageHeader
+        <PageHeader
             eyebrow="ชีวิต & สุขภาพ"
             title="Self-Check — วินิจฉัยตัวเอง 32 ข้อ"
             subtitle="พูดตอบหรือพิมพ์ตอบก็ได้ — AI เก็บให้อัตโนมัติ (0=ไม่มี 5=ทุกวัน/รุนแรง)"
             icon={<Icon name="health" size={18} />}
             actions={<Link href="/health" className="text-sm text-sky-400 hover:underline">← กลับ Health</Link>}
           />
-        </header>
 
         <main className="max-w-3xl mx-auto p-6 space-y-4 w-full">
           {/* progress */}

@@ -121,15 +121,13 @@ export default function InfrastructurePage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('infrastructure.eyebrow', 'ความปลอดภัย')}
           title={t('infrastructure.title', 'Off-Grid Infrastructure Hub')} icon={<Icon name="infrastructure" size={18} />} actions={<div className="flex items-center gap-3">
           {pendingAlerts > 0 && <span className="text-xs bg-red-900/40 text-red-300 border border-red-700 rounded-lg px-3 py-1 flex items-center gap-1"><Icon name="alert-triangle" size={12} /> {t('infrastructure.pendingAlerts', '{n} รายการต้องดูแล', { n: pendingAlerts })}</span>}
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('infrastructure.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
-      </header>
 
       <div className="max-w-6xl mx-auto px-6 pt-4 flex gap-2 flex-wrap">
         {tabs.map(([key, label]) => (
@@ -137,7 +135,7 @@ export default function InfrastructurePage() {
         ))}
       </div>
 
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
         {flash && <div className="text-sm text-sky-300 inset px-4 py-3">{flash}</div>}
 

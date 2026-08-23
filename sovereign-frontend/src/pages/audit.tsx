@@ -84,8 +84,7 @@ export default function AuditPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/70 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('audit.eyebrow', 'ระบบ')}
           title="SOVEREIGN OS"
           icon={<Icon name="audit" size={18} />}
@@ -93,9 +92,8 @@ export default function AuditPage() {
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
         </div>}
         />
-      </header>
 
-      <main className="max-w-7xl mx-auto p-6 space-y-4">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('audit.title', 'ประวัติการกระทำ (Audit Log)')}</h2>
           <div className="flex gap-3 items-center">

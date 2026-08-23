@@ -305,17 +305,15 @@ export default function SecurityPage() {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-gray-900/80 border-b border-gray-800 px-6 py-3 backdrop-blur-md">
-        <PageHeader
+      <PageHeader
           eyebrow={t('security.eyebrow', 'ความปลอดภัย')}
           title={t('security.title', 'Cyber Security')}
           icon={<Icon name="shield" size={18} />}
           subtitle={t('security.subtitle', 'Firewall + ระบบตรวจจับภัยคุกคาม')}
           actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('security.backDashboard', '← กลับ Dashboard')}</Link>}
         />
-      </header>
 
-      <main className="max-w-7xl mx-auto p-6 space-y-6">
+      <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
         {/* ⛔ แบนเนอร์ฉุกเฉิน — ทุก role เห็น เมื่อ Kill-Switch เปิดอยู่ */}
         {killSwitch?.active && (
           <div className="p-4 rounded-xl border-2 border-red-600 bg-red-950/60 space-y-1.5 animate-pulse">
