@@ -72,28 +72,44 @@ export default function LoginForm() {
       <div className="absolute top-4 right-4 z-10">
         <LanguageToggle compact />
       </div>
-      {/* พื้นหลัง: grid + glow แบบ command center (ตรงกับหน้า MFA) */}
+      {/* พื้นหลัง: grid เฟดขอบ + แสง 2 ชั้น (บนเขียว ล่างฟ้า) — command center แบบมีมิติ */}
       <div
         className="absolute inset-0 opacity-[0.07] pointer-events-none"
         style={{
           backgroundImage:
             'linear-gradient(#22c55e 1px, transparent 1px), linear-gradient(90deg, #22c55e 1px, transparent 1px)',
           backgroundSize: '44px 44px',
+          maskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 35%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 35%, transparent 100%)',
         }}
       />
-      <div className="absolute top-[-140px] left-1/2 -translate-x-1/2 w-[520px] h-[300px] rounded-full bg-green-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute top-[-160px] left-1/2 -translate-x-1/2 w-[560px] h-[320px] rounded-full bg-green-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-180px] right-[-120px] w-[420px] h-[280px] rounded-full bg-teal-500/[0.07] blur-3xl pointer-events-none" />
+      {/* เส้นขอบแสงบางๆ ด้านบนจอ — ให้ความรู้สึก "ประตู" */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent pointer-events-none" />
 
       <div className="relative w-full max-w-md px-6">
         <form
           onSubmit={handleSubmit}
-          className="card panel-glow p-8 space-y-4"
+          className="card panel-glow relative p-10 space-y-5"
         >
+          {/* เส้น accent บนการ์ด */}
+          <div className="absolute top-0 inset-x-8 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent pointer-events-none" />
+
           <div className="text-center">
-            <div className="flex justify-center text-emerald-400">
-              <Icon name="crown" size={28} />
+            {/* emblem มงกุฎในกรอบ — จุดจ้องสายตา */}
+            <div className="mx-auto w-14 h-14 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.07] flex items-center justify-center shadow-[0_0_24px_rgba(16,185,129,0.15)]">
+              <span className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">
+                <Icon name="crown" size={26} />
+              </span>
             </div>
-            <h1 className="mt-2 text-sm font-semibold text-gray-200 tracking-wide glow-text">SOVEREIGN OS</h1>
-            <p className="text-gray-500 text-xs mt-1">{t('login.subtitle')}</p>
+            <h1 className="mt-4 text-sm font-semibold text-gray-100 tracking-[0.32em] glow-text">SOVEREIGN OS</h1>
+            <div className="mt-3 flex items-center justify-center gap-3" aria-hidden="true">
+              <span className="h-px w-14 bg-gradient-to-r from-transparent to-emerald-500/40" />
+              <span className="w-1 h-1 rotate-45 bg-emerald-500/70" />
+              <span className="h-px w-14 bg-gradient-to-l from-transparent to-emerald-500/40" />
+            </div>
+            <p className="text-gray-400 text-xs mt-3">{t('login.subtitle')}</p>
           </div>
 
           {cooldown > 0 ? (
@@ -111,12 +127,12 @@ export default function LoginForm() {
             )
           )}
 
-          <div>
+          <div className="space-y-1">
             <label className="label">{t('login.username')}</label>
             <input
               type="text"
               autoComplete="username"
-              className="input w-full text-white"
+              className="input w-full text-white transition-colors focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin"
@@ -124,12 +140,12 @@ export default function LoginForm() {
               autoFocus
             />
           </div>
-          <div>
+          <div className="space-y-1">
             <label className="label">{t('login.password')}</label>
             <input
               type="password"
               autoComplete="current-password"
-              className="input w-full text-white"
+              className="input w-full text-white transition-colors focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -139,14 +155,27 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={cooldown > 0}
-            className="btn-primary w-full"
+            className="btn-primary w-full mt-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-[0_0_20px_rgba(16,185,129,0.25)] active:scale-[0.99] transition-all disabled:opacity-50 disabled:shadow-none"
           >
             {cooldown > 0 ? t('login.wait', 'รอ {time}', { time: formatCountdown(cooldown) }) : t('login.signIn')}
           </button>
 
-          <p className="pt-1 text-center text-[11px] text-gray-500 font-mono">
-            AUTH GATE · JWT 24h · 2FA REQUIRED · LOCAL-FIRST
-          </p>
+          {/* footer แบบ status line — จุดสถานะ + ตัวคั่น */}
+          <div className="pt-2 flex items-center justify-center gap-2 text-[10px] tracking-wider text-gray-500 font-mono">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-emerald-500/80" />
+              AUTH GATE
+            </span>
+            <span className="text-gray-700">·</span>
+            <span>JWT 24h</span>
+            <span className="text-gray-700">·</span>
+            <span>2FA</span>
+            <span className="text-gray-700">·</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-teal-500/80" />
+              LOCAL-FIRST
+            </span>
+          </div>
         </form>
       </div>
     </div>
