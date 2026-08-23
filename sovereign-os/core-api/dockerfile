@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm install
 # Survival: pg_dump/psql ใน container — backup DB ผ่าน docker network ได้โดยไม่ต้อง mount docker socket
 # + rsync/openssh-client สำหรับ offsite replication ไป remote server (MESH_RSYNC_TARGET / MESH_SCP_TARGET)
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client rsync openssh-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client rsync openssh-client iproute2 && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN npx prisma generate
 EXPOSE 3001
