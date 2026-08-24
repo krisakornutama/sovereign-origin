@@ -11,6 +11,7 @@ import { relayScheduler } from '../services/relay-scheduler.service';
 import { startDimeScheduler } from '../services/dime.service';
 import { dmsService } from '../services/dms.service';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from '../services/teach-kids.service';
+import { runSignalCheck } from '../services/portfolio-signal.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
@@ -223,6 +224,21 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runPortfolioSnapshot();
   setInterval(runPortfolioSnapshot, 6 * 60 * 60 * 1000);
+
+  // ── AI Portfolio Manager: ตรวจสัญญาณ Small-Cap ทุก 15 นาที (Rule 3 Daily gate กัน spam ใน service) ──
+  // กฎเก็บใน SystemSetting 'portfolio.triggers' — แก้ได้ผ่าน /api/treasury/signals
+  async function runPortfolioSignals() {
+    try {
+      const report = await runSignalCheck();
+      if (report.alerts.length > 0) {
+        console.log(`📈 Portfolio signals: ${report.alerts.map((a) => `${a.symbol}:${a.action}`).join(', ')}`);
+      }
+    } catch (err) {
+      console.error('Portfolio signal error:', err instanceof Error ? err.message : err);
+    }
+  }
+  runPortfolioSignals();
+  setInterval(runPortfolioSignals, 15 * 60 * 1000);
 
   // ── Agentic AI: สรุปประจำวันของแต่ละบทบาทส่ง Telegram ทุกเช้า (report_hour) ──
   async function runAgentMorningReports() {
