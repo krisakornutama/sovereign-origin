@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import axios from 'axios';
+import { getModelForTask } from './ai-router.service';
 import { prisma } from '../lib/prisma';
 import { sendTelegram, sendTelegramPhoto } from '../modules/telegram/telegram.routes';
 import { buildReportPng } from './chart-snapshot.service';
@@ -96,7 +97,7 @@ ${JSON.stringify(stats, null, 2)}
 
     const response = await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
+      { model: await getModelForTask('GENERAL_ASSISTANT', MODEL), prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 120000 }
     );
     const text = (response.data?.response || '').trim();

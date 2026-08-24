@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -133,7 +134,7 @@ export async function callVision(base64: string, prompt: string, deps: CallVisio
   const resp = await post(
     `${OLLAMA_URL}/api/generate`,
     {
-      model: VISION_MODEL,
+      model: await getModelForTask('VISION_AI', VISION_MODEL),
       prompt,
       images: [base64],
       stream: false,
@@ -189,5 +190,5 @@ export async function runVisionAnalysis(base64: string, opts: RunVisionOptions =
     await prisma.camera.update({ where: { id: opts.cameraId }, data: { last_event_at: new Date() } });
   }
 
-  return { ...parsed, model: VISION_MODEL, saved: savedEvents.length, savedEvents };
+  return { ...parsed, model: await getModelForTask('VISION_AI', VISION_MODEL), saved: savedEvents.length, savedEvents };
 }

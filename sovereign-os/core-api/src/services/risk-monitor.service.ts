@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
+import { getModelForTask } from './ai-router.service';
 import EventEmitter from 'events';
 import cron from 'node-cron';
 
@@ -271,14 +272,15 @@ async function translateSummaryToThai(summary: string, model: string): Promise<s
 
 export async function analyzeWithOllama(
   headlines: Array<{ title: string; summary: string | null }>,
-  model = process.env.RISK_MODEL || 'gemma3:4b'
+  model?: string
 ): Promise<ThreatResult | null> {
   if (headlines.length === 0) return null;
+  const m = model?.trim() || (await getModelForTask('REASONING_GOVERNOR', process.env.RISK_MODEL || 'gemma3:4b'));
   try {
     const res = await axios.post(
       `${OLLAMA_URL}/api/generate`,
       {
-        model,
+        model: m,
         prompt: buildThreatPrompt(headlines),
         stream: false,
         options: { temperature: 0.1 },
@@ -289,7 +291,7 @@ export async function analyzeWithOllama(
     const result = parseThreatResponse(res.data?.response || '');
     // self-healing ภาษา: ถ้า model พ่นสรุปเป็นภาษาอังกฤษ → ส่งกลับไปแปลเป็นไทย
     if (result?.summary) {
-      const thai = await translateSummaryToThai(result.summary, model);
+      const thai = await translateSummaryToThai(result.summary, m);
       if (thai) result.summary = thai;
     }
     return result;

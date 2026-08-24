@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { parseLivestockVisionResponse, LIVESTOCK_VISION_PROMPT } from '../../services/livestock-vet-ai.service';
 import { callVision, VISION_ENABLED, VISION_MODEL } from '../../services/vision.service';
+import { getModelForTask } from '../../services/ai-router.service';
 import { WRITE_ROLES, notify } from './livestock-shared';
 
 const router = Router();
@@ -28,7 +29,7 @@ router.post('/groups/:id/vision', authenticate, requireRole(...WRITE_ROLES), asy
     const report = await prisma.livestockVisionReport.create({
       data: {
         livestockGroupId: group.id,
-        model: VISION_MODEL,
+        model: await getModelForTask('VISION_AI', VISION_MODEL),
         severity: parsed.severity,
         summary: parsed.summary || 'ไม่สามารถสกัดอาการได้',
         symptomsJson: JSON.stringify({ symptoms: parsed.symptoms, recommendation: parsed.recommendation }),

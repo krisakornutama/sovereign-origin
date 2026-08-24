@@ -12,6 +12,18 @@ import {
 } from '../../services/ai-model-manager.service';
 import { TASK_TYPES, getAllRoutes, setModelForTask, getModelForTask } from '../../services/ai-router.service';
 import { config } from '../../config';
+// legacy env constants ของแต่ละโดเมน — ใช้แสดง effective default ใน UI (DB > env > spec)
+import { CODING_MODEL } from '../../services/coding-agent.service';
+import { VISION_MODEL } from '../../services/vision.service';
+import { MODEL as GOVERNOR_MODEL } from '../../services/governor.service';
+import { MODEL as ADVISOR_MODEL } from '../../services/advisor.service';
+
+const LEGACY_DEFAULTS = {
+  CODING_AGENT: CODING_MODEL,
+  VISION_AI: VISION_MODEL,
+  REASONING_GOVERNOR: GOVERNOR_MODEL,
+  GENERAL_ASSISTANT: ADVISOR_MODEL,
+} as const;
 
 // ────────────────────────────────────────────────────────────────────────────
 // /api/v1/ai — Ollama Control System (SUPERADMIN เท่านั้น — คุม engine กลาง)
@@ -55,7 +67,7 @@ router.get('/models', async (_req: Request, res: Response) => {
   try {
     const [inventory, routes, engineUp] = await Promise.all([
       listModels(),
-      getAllRoutes(),
+      getAllRoutes(LEGACY_DEFAULTS),
       isEngineUp(),
     ]);
     res.json({ ...inventory, routes, taskTypes: TASK_TYPES, engineUp, engineUrl: config.ollama.url });

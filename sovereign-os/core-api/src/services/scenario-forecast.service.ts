@@ -17,6 +17,7 @@
 
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -375,6 +376,7 @@ export async function generateScenarios(params: {
 } = {}): Promise<ScenarioForecastResult> {
   const focus: ForecastFocus = params.focus && FORECAST_FOCUSES.includes(params.focus) ? params.focus : 'general';
   const horizonDays = Math.min(Math.max(Math.floor(params.horizonDays || 90), 7), 365);
+  const model = await getModelForTask('REASONING_GOVERNOR', MODEL);
 
   const [headlines, threat, previous] = await Promise.all([
     loadHeadlines(),
@@ -398,7 +400,7 @@ export async function generateScenarios(params: {
     generatedAt: new Date().toISOString(),
     focus,
     horizonDays,
-    model: MODEL,
+    model,
     base,
     scenarios: [],
     summary: null,
@@ -430,7 +432,7 @@ export async function generateScenarios(params: {
     const prompt = buildPrompt({ focus, horizonDays, recent: headlines.recent, past: headlines.past, threat, previous });
     const res = await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: MODEL, prompt, stream: false, options: { temperature: 0.2 }, keep_alive: OLLAMA_KEEP_ALIVE },
+      { model, prompt, stream: false, options: { temperature: 0.2 }, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 180000 }
     );
     const parsed = parseForecastResponse(res.data?.response || '', focus, horizonDays);

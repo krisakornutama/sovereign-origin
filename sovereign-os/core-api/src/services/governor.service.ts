@@ -9,6 +9,7 @@ import axios from 'axios';
 import { saveJsonAtomic, readJsonVerified } from './data-integrity.service';
 import { securityStream } from './security-stream.service';
 import { aiKillSwitch } from './ai-kill-switch.service';
+import { getModelForTask } from './ai-router.service';
 import { syncActuatorsFromLevers } from './actuation.service';
 import {
   createScenario, listScenarios, loadScenario, applyLevers, tickScenario, govsimSnapshot,
@@ -18,7 +19,7 @@ import {
 const STATE_FILE = process.env.GOVERNOR_STATE_FILE || path.resolve(process.cwd(), 'data', 'governor.json');
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
-const MODEL = process.env.GOVERNOR_MODEL || process.env.RISK_MODEL || process.env.OLLAMA_MODEL || 'gemma3:4b';
+export const MODEL = process.env.GOVERNOR_MODEL || process.env.RISK_MODEL || process.env.OLLAMA_MODEL || 'gemma3:4b';
 const TICKS_PER_CYCLE = Math.min(Math.max(parseInt(process.env.GOVERNOR_TICKS_PER_CYCLE || '2', 10) || 2, 1), 12);
 const LEVER_WHITELIST = new Set([
   'welfare', 'subsidy', 'minorityRights', 'powerSharing', 'culturalEducation',
@@ -334,7 +335,7 @@ export async function runGovernorCycle(opts: { force?: boolean } = {}): Promise<
   let llmOk = false;
   try {
     const resp = await axios.post(`${OLLAMA_URL}/api/generate`, {
-      model: MODEL, prompt, stream: false, options: { temperature: 0.7, num_predict: 800 }, keep_alive: OLLAMA_KEEP_ALIVE,
+      model: await getModelForTask('REASONING_GOVERNOR', MODEL), prompt, stream: false, options: { temperature: 0.7, num_predict: 800 }, keep_alive: OLLAMA_KEEP_ALIVE,
     }, { timeout: 60000 });
     const raw = String(resp.data?.response ?? '').trim();
     decision = parseGovernorDecision(raw);
