@@ -12,6 +12,7 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { computePortfolioValue, computeInventoryValue } from './wealth.service';
 import { classifyDefcon } from './defcon-engine.service';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -483,7 +484,7 @@ export function runWhatIf(ctx: SituationContext, params: WhatIfParams): WhatIfRe
 async function callOllama(prompt: string): Promise<string> {
   const response = await axios.post(
     `${OLLAMA_URL}/api/generate`,
-    { model: MODEL, prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
+    { model: await getModelForTask('GENERAL_ASSISTANT', MODEL), prompt, stream: false, options: { temperature: 0.3 }, keep_alive: OLLAMA_KEEP_ALIVE },
     { timeout: 120000 }
   );
   const text = response.data?.response?.trim();

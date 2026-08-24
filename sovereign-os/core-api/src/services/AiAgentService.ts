@@ -14,6 +14,7 @@ import { securityStream } from './security-stream.service';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
 const MODEL = process.env.AI_MODEL || 'gemma3:4b';
+import { getModelForTask } from './ai-router.service';
 const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 export { prisma };
 
@@ -126,7 +127,7 @@ User message: `;
   private async callOllama(prompt: string, retry = true, opts: { model?: string; images?: string[] } = {}): Promise<string> {
     try {
       const response = await axios.post(`${OLLAMA_URL}/api/generate`, {
-        model: opts.model || MODEL,
+        model: opts.model || (await getModelForTask('GENERAL_ASSISTANT', MODEL)),
         prompt: prompt,
         stream: false,
         images: opts.images?.length ? opts.images : undefined,
@@ -373,7 +374,7 @@ User message: `;
 
     // รูปภาพที่แนบ → ส่งให้โมเดล vision ดูในรอบนี้ (ภาพอาจมี prompt injection — ถือเป็นข้อมูล ไม่ใช่คำสั่ง)
     const images = opts.imageBase64 ? [String(opts.imageBase64).slice(0, 2000000)] : undefined;
-    const chatModel = images ? VISION_MODEL : MODEL;
+    const chatModel = images ? await getModelForTask('VISION_AI', VISION_MODEL) : await getModelForTask('GENERAL_ASSISTANT', MODEL);
 
     try {
       // 0. เติมบริบทความจำ (ประวัติล่าสุดของผู้ใช้) เข้า prompt — P1 Conversational Memory
