@@ -4,6 +4,7 @@
 // หลักการ: สมุนไพร/แพทย์ดูแลกาย, สติปัฏฐานดูแลใจ, อริยสัจเข้าใจเหตุ, อนัตตาปล่อยวาง
 import { prisma } from '../lib/prisma';
 import axios from 'axios';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -154,7 +155,7 @@ export async function dhammaCompanion(userMessage: string): Promise<{ reply: str
     teachings[0] ||
     null;
   const prompt = buildDhammaPrompt(userMessage, teaching);
-  const resp = await axios.post(`${OLLAMA_URL}/api/generate`, { model: MODEL, prompt, stream: false, keep_alive: OLLAMA_KEEP_ALIVE }, { timeout: 180000 });
+  const resp = await axios.post(`${OLLAMA_URL}/api/generate`, { model: await getModelForTask('GENERAL_ASSISTANT', MODEL), prompt, stream: false, keep_alive: OLLAMA_KEEP_ALIVE }, { timeout: 180000 });
   return { reply: parseDhammaReply(resp.data?.response ?? ''), teaching };
 }
 

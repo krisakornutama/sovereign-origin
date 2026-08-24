@@ -4,6 +4,7 @@
 // ความคล้ายเชิงตัวเลข (cosine similarity / dhash) โดยไม่ต้องพึ่ง LLM ในการตัดสินทุกครั้ง
 import { prisma } from '../lib/prisma';
 import axios from 'axios';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -152,7 +153,7 @@ export async function embedFace(photo: string): Promise<FaceEmbedResult> {
 
     // ทางลัด: บรรยายด้วย VL → embed ข้อความ
     const gen = await faceDeps.generate?.(`${OLLAMA_URL}/api/generate`, {
-      model: VL_MODEL,
+      model: await getModelForTask('VISION_AI', VL_MODEL),
       prompt:
         'บรรยายใบหน้าคนในภาพนี้ให้สั้นที่สุด 1 ประโยค ในรูปแบบ "ใบหน้าของ[เพศ/อายุ/ลักษณะเด่น]" ' +
         'เพื่อใช้เป็นลายเซ็นเปรียบเทียบความคล้าย เช่น "ใบหน้าชายไทยวัยกลางคน หนวดเคราบาง ผมสั้น" — ตอบเฉพาะประโยคเดียว ไม่มีคำอธิบายอื่น',
@@ -206,7 +207,7 @@ export async function matchFaceInImage(
   if (withEmbed.length > 0) {
     try {
       const gen = await faceDeps.generate?.(`${OLLAMA_URL}/api/generate`, {
-        model: VL_MODEL,
+        model: await getModelForTask('VISION_AI', VL_MODEL),
         prompt:
           'บรรยายใบหน้าคนในภาพนี้สั้นที่สุด 1 ประโยค ในรูปแบบ "ใบหน้าของ[เพศ/อายุ/ลักษณะเด่น]" ' +
           'เพื่อใช้เปรียบเทียบความคล้าย — ตอบเฉพาะประโยคเดียว',
