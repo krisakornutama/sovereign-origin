@@ -6,6 +6,7 @@
 // และหน้าเว็บ poll สถานะได้ ระหว่างที่ผู้ใช้เปิดหน้าอื่นได้ตามปกติ
 import { prisma } from '../lib/prisma';
 import axios from 'axios';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
@@ -300,7 +301,7 @@ async function executeAgentJob(job: any): Promise<string | null> {
     const context = role ? await contextFor(role.capability) : '';
     const sys = role?.system_prompt || 'คุณคือผู้ช่วยอัตโนมัติของครอบครัว';
     const resp = await ollamaPost(`${OLLAMA_URL}/api/generate`, {
-      model: AGENT_MODEL,
+      model: await getModelForTask('GENERAL_ASSISTANT', AGENT_MODEL),
       system: sys,
       prompt:
         `ข้อมูลปัจจุบัน:\n${context}\n\nภารกิจ: ${job.prompt}\n\n` +

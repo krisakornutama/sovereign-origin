@@ -2,6 +2,7 @@
 // สร้างบทเรียน + แบบทดสอบจากคลังความรู้ (RAG + Ollama) + บันทึกเป็น NOTE
 
 import axios from 'axios';
+import { getModelForTask } from './ai-router.service';
 import { prisma } from '../lib/prisma';
 import { search, type SearchResult } from './semantic-search.service';
 
@@ -217,7 +218,7 @@ export async function generateLesson(
   const sourceLabels = results.map((r) => r.file).filter(Boolean).slice(0, 12);
 
   const prompt = buildTeachPrompt(topic, ageRange, excerpts, { quizCount: opts.quizCount });
-  const model = opts.model?.trim() || TEACH_MODEL;
+  const model = opts.model?.trim() || (await getModelForTask('GENERAL_ASSISTANT', TEACH_MODEL));
 
   const post = deps.post ?? ((url: string, body: unknown, opts?: any) => axios.post(url, body, opts));
   const resp = await post(

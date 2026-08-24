@@ -9,6 +9,7 @@ import os from 'os';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const CURRENT_MODEL = process.env.AI_MODEL || 'gemma3:4b';
+import { getModelForTask } from '../../services/ai-router.service';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.get('/status', authenticate, async (_req, res) => {
   res.json({
     ollamaOnline,
     ollamaUrl: OLLAMA_URL,
-    currentModel: CURRENT_MODEL,
+    currentModel: await getModelForTask('GENERAL_ASSISTANT', CURRENT_MODEL),
     models,
     resources: {
       cpuCores: cpuCount,

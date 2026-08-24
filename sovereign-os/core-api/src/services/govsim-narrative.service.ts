@@ -4,6 +4,7 @@
 
 import axios from 'axios';
 import { govsimSnapshot } from './governance-sim.service';
+import { getModelForTask } from './ai-router.service';
 
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 export const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
@@ -94,7 +95,7 @@ export async function generateNarrative(id: string, kind: string): Promise<Narra
   try {
     const resp = await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: MODEL, prompt, stream: false, options: { temperature: 0.8, num_predict: 512 }, keep_alive: OLLAMA_KEEP_ALIVE },
+      { model: await getModelForTask('REASONING_GOVERNOR', MODEL), prompt, stream: false, options: { temperature: 0.8, num_predict: 512 }, keep_alive: OLLAMA_KEEP_ALIVE },
       { timeout: 60000 }
     );
     const raw: string = resp.data?.response?.trim() || '';

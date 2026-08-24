@@ -22,20 +22,35 @@ function isTaskType(t: string): t is TaskType {
   return (TASK_TYPES as readonly string[]).includes(t);
 }
 
-/** คืนโมเดลที่ผูกกับโดเมนงาน — ไม่เคย throw (fallback default เสมอ เพื่อไม่ให้ระบบอื่นสะดุด) */
-export async function getModelForTask(taskType: string): Promise<string> {
-  if (!isTaskType(taskType)) return DEFAULT_ROUTES.GENERAL_ASSISTANT;
+/**
+ * คืนโมเดลที่ผูกกับโดเมนงาน — ลำดับ: DB override > legacyFallback (env เดิม) > spec default
+ * ไม่เคย throw (fallback ซ้อนเสมอ เพื่อไม่ให้ระบบอื่นสะดุด)
+ * @param legacyFallback ค่า env เดิมของ service ผู้เรียก (เช่น CODING_MODEL) — ใช้เมื่อยังไม่ตั้ง override ใน Matrix
+ */
+export async function getModelForTask(taskType: string, legacyFallback?: string): Promise<string> {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: keyOf(taskType) } });
     const v = row?.value?.trim();
     if (v) return v;
-  } catch { /* DB มีปัญหา → ใช้ default */ }
+  } catch { /* DB มีปัญหา → ตกไป fallback */ }
+  const legacy = legacyFallback?.trim();
+  if (legacy) return legacy;
+  if (!isTaskType(taskType)) return DEFAULT_ROUTES.GENERAL_ASSISTANT;
   return DEFAULT_ROUTES[taskType];
 }
 
-/** คืนแผนที่ทั้งหมด (effective) — override ทับ default ตามจริง */
-export async function getAllRoutes(): Promise<Record<TaskType, string>> {
-  const out = { ...DEFAULT_ROUTES };
+/**
+ * คืนแผนที่ effective ทั้งหมด — DB override ทับ legacy defaults ทับ spec default
+ * @param legacyDefaults แผนที่ env เดิมของแต่ละโดเมน (จาก constants ของ services) เพื่อแสดงค่าที่ใช้จริง
+ */
+export async function getAllRoutes(legacyDefaults?: Partial<Record<TaskType, string>>): Promise<Record<TaskType, string>> {
+  const out: Record<TaskType, string> = { ...DEFAULT_ROUTES };
+  if (legacyDefaults) {
+    for (const task of TASK_TYPES) {
+      const legacy = legacyDefaults[task]?.trim();
+      if (legacy) out[task] = legacy;
+    }
+  }
   try {
     const rows = await prisma.systemSetting.findMany({
       where: { key: { startsWith: 'ai.route.' } },

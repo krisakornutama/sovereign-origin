@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { getModelForTask } from './ai-router.service';
 import { embedFace, matchFaceInImage } from './face-embed.service';
 import { firstResponder } from './first-responder.service';
 
@@ -140,7 +141,7 @@ export async function analyzeStranger(
       ? '(ยังไม่มีใบหน้าที่ลงทะเบียนไว้)'
       : faces.map((f) => `- ${f.name}${f.photo_url ? ` (มีรูปอ้างอิงให้เทียบได้)` : ''}`).join('\n');
   const resp = await vlPost(`${OLLAMA_URL}/api/generate`, {
-    model: VL_MODEL,
+    model: await getModelForTask('VISION_AI', VL_MODEL),
     prompt:
       `คุณคือระบบเฝ้าระวังบ้าน วิเคราะห์ภาพนี้:\n` +
       `1. มีคน (person) อยู่ในภาพกี่คน?\n` +

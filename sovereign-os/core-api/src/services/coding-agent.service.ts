@@ -6,12 +6,13 @@ import { prisma } from '../lib/prisma';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getModelForTask } from './ai-router.service';
 
 export { prisma };
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
-const CODING_MODEL = process.env.CODING_MODEL || process.env.OLLAMA_MODEL || 'qwen3:8b';
+export const CODING_MODEL = process.env.CODING_MODEL || process.env.OLLAMA_MODEL || 'qwen3:8b';
 const VISION_MODEL = process.env.VISION_MODEL || 'qwen3-vl:8b';
 const CODING_PROJECT_PATH = process.env.CODING_PROJECT_PATH || 'E:/My work/Project Sovereign Origin';
 
@@ -163,7 +164,7 @@ export async function planTask(
   context?: string,
   opts: { model?: string; effort?: string; images?: string[]; autonomy?: string } = {}
 ): Promise<CodePlan> {
-  const model = opts.model || CODING_MODEL;
+  const model = opts.model || (await getModelForTask('CODING_AGENT', CODING_MODEL));
   const resp = await axios.post(
     `${OLLAMA_URL}/api/generate`,
     buildOllamaPayload(model, buildPlanPrompt(task, context) + autonomySuffix(opts.autonomy), 'คุณเป็นสถาปนิกโค้ด ตอบเป็นภาษาไทย ให้ JSON ตามรูปแบบที่ขอ', {
@@ -190,7 +191,7 @@ export async function generateFile(
   existingCode?: string,
   opts: { model?: string; effort?: string; images?: string[]; autonomy?: string } = {}
 ): Promise<string> {
-  const model = opts.model || CODING_MODEL;
+  const model = opts.model || (await getModelForTask('CODING_AGENT', CODING_MODEL));
   const resp = await axios.post(
     `${OLLAMA_URL}/api/generate`,
     buildOllamaPayload(
@@ -240,7 +241,7 @@ export async function suggestNext(task: string, resultSummary: string): Promise<
   const resp = await axios.post(
     `${OLLAMA_URL}/api/generate`,
     {
-      model: CODING_MODEL,
+      model: await getModelForTask('CODING_AGENT', CODING_MODEL),
       system: 'คุณเป็นผู้ช่วยวางแผนต่อ ตอบเป็นภาษาไทย สั้น เฉพาะรายการ',
       prompt:
         `งานที่เสร็จแล้ว: ${String(task).slice(0, 500)}\n` +
@@ -347,7 +348,7 @@ export async function executeCodingJob(job: any): Promise<string | null> {
       data: { status: 'running', started_at: new Date(), progress: 10 },
     });
     const images = job.image_base64 ? [job.image_base64] : undefined;
-    const model = job.model || CODING_MODEL;
+    const model = job.model || (await getModelForTask('CODING_AGENT', CODING_MODEL));
     const effort = job.reasoning_effort || undefined;
     const autonomy = job.autonomy || undefined;
     const plan = await planTask(job.task, undefined, { model, effort, images, autonomy });
