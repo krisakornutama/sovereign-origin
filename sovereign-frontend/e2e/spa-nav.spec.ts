@@ -65,6 +65,8 @@ test.describe('SPA navigation ผ่าน Sidebar', () => {
 
   test('ทุกลิงก์ใน NAV_GROUPS มีปุ่มจริงใน Sidebar (href ตรงเป๊ะ)', async ({ page }) => {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    // รอ hydration — Sidebar (และลิงก์ทั้งหมด) จะ render หลัง auth store hydrate เท่านั้น
+    await expect(page.locator('aside')).toBeVisible({ timeout: 20_000 });
     const hrefs = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href)).filter((h) => h.startsWith('/'));
     for (const href of hrefs) {
       const count = await page.locator(`aside a[href="${href}"]`).count();

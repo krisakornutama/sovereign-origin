@@ -275,4 +275,16 @@ export const config = {
     // (เดิมฝัง /35 ตายตัว — ปรับได้ผ่าน env ไม่ต้องแก้โค้ด)
     thbPerUsd: parseFloat(process.env.THB_PER_USD || '35'),
   },
+  // ── AI Model Manager (Ollama Control System) ──
+  // จุดต่อ engine หลัก — ใน docker-compose ตั้งเป็น http://sovereign-ollama:11434
+  // บน host ใช้ default http://127.0.0.1:11434 (เดิม env OLLAMA_URL ใช้อยู่แล้วทั่วระบบ)
+  ollama: {
+    url: (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, ''),
+    // timeout ต่อ request ปกติ (pull/create ใช้ stream ไม่่วน timeout นี้)
+    timeoutMs: parseInt(process.env.OLLAMA_TIMEOUT_MS || '10000', 10),
+    // โฟลเดอร์เก็บ .gguf ที่ดาวน์โหลดจาก HuggingFace ก่อน register เข้า Ollama
+    ggufDir: process.env.OLLAMA_GGUF_DIR || 'data/gguf',
+    // งาน import/pull ค้างนานสุดกี่ ms ถึงตัดสถานะ error (กัน job แขวน)
+    jobTimeoutMs: parseInt(process.env.OLLAMA_JOB_TIMEOUT_MS || '3600000', 10),
+  },
 };

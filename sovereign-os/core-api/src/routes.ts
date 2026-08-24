@@ -55,6 +55,7 @@ import governorRoutes from './modules/governor/governor.routes';
 import warRoomRoutes from './modules/war-room/war-room.routes';
 import actuationRoutes from './modules/actuation/actuation.routes';
 import dmsRoutes from './modules/dms/dms.routes';
+import aiModelsRoutes from './modules/ai-models/ai-models.routes';
 import featureRoutes from './modules/features/feature.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -142,6 +143,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/war-room', warRoomRoutes); // War Room Activity Gate — ข้อ 3: simulation หลับ-ตื่น
   app.use('/api/actuation', actuationRoutes); // Phase 7: Closed-Loop Actuation Sandbox — Safety Envelope + Mapper + Verifier
   app.use('/api/v1/dms', dmsRoutes); // Series 🔴: External Dead-Man Switch — ping (HMAC-only, ไม่มี featureGuard) + status
+  app.use('/api/v1/ai', aiModelsRoutes); // AI Model Manager — Ollama Control System (auth+SUPERADMIN ใน router)
 
   // ── สิทธิ์ฟังก์ชั่นต่อคน: API ตั้งสิทธิ์ (catalog / me / users/:id) ──
   app.use('/api/features', featureRoutes);
