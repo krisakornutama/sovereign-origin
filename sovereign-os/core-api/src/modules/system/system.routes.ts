@@ -4,7 +4,7 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { agentActions } from '../../services/agent-actions.service';
 import { listProcesses } from '../../services/system-processes.service';
 import { getDiskInfo } from '../../services/system-monitor.service';
-import { getWanState, checkWanNow, rebootRouter } from '../../services/wan-monitor.service';
+import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -84,12 +84,35 @@ router.get('/wan', authenticate, async (_req, res) => {
   res.json(getWanState());
 });
 
-// POST /api/system/wan/check — ping ใหม่ทันที (ไม่รอ cron 60 วิ)
+// POST /api/system/wan/check — ตรวจครบทั้ง router + WAN (สด)
 router.post('/wan/check', authenticate, async (_req, res) => {
   try {
-    res.json(await checkWanNow());
+    await checkRouterNow();
+    const wan = await checkWanNow();
+    const { classifyWanIssue } = await import('../../services/wan-monitor.service');
+    const s = getWanState();
+    res.json({ ...wan, router: s.router, issue: classifyWanIssue(s.router.up, wan.up) });
   } catch (err) {
     res.status(500).json({ error: 'WAN check failed' });
+  }
+});
+
+// GET /api/system/wan/devices — อุปกรณ์ที่ต่อ router ตอนนี้ + สแกนใหม่ทันที
+router.get('/wan/devices', authenticate, async (_req, res) => {
+  try {
+    const devices = await scanLanDevices();
+    res.json({ devices, count: devices.length, subnet: getWanState().subnet });
+  } catch (err) {
+    res.status(500).json({ error: 'LAN scan failed' });
+  }
+});
+
+// POST /api/system/wan/speedtest — วัดความเร็วซิมจริง (โหลด ~2MB จาก Cloudflare)
+router.post('/wan/speedtest', authenticate, async (_req, res) => {
+  try {
+    res.json(await runSpeedtest());
+  } catch (err) {
+    res.status(500).json({ error: 'Speedtest failed' });
   }
 });
 
