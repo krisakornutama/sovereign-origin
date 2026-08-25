@@ -53,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/farm', label: 'แปลงเกษตร', labelKey: 'common.nav.farm', icon: 'farm', keywords: 'ฟาร์ม แปลง ดิน พืช เกษตร' },
       { href: '/livestock', label: 'ปศุสัตว์', labelKey: 'common.nav.livestock', icon: 'farm', keywords: 'ปศุสัตว์ เล้า คอก ไก่ สุกร โค เป็ด ฟาร์มปศุสัตว์ เกษตร' },
       { href: '/restaurant', label: 'ร้านอาหาร', labelKey: 'common.nav.restaurant', icon: 'inventory', keywords: 'ร้านอาหาร จักรวรรดิ เมนู สูตร ออเดอร์ POS แต้ม ใบหน้า ครัว ขาย' },
+      { href: '/selfreliance', label: 'วันรอด', labelKey: 'common.nav.selfreliance', icon: 'shield', keywords: 'วันรอด พึ่งพาตัวเอง autonomy น้ำ อาหาร ไฟ เงิน จุดอ่อน เสบียง อยู่รอด ภัยพิบัติ' },
       {
         href: '/treasury',
         label: 'คลัง & ลงทุน',

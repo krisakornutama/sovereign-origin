@@ -15,7 +15,10 @@ const CATEGORIES = ['WATER', 'FOOD', 'FUEL', 'MATERIAL', 'PRECIOUS_METAL', 'OTHE
 const CATEGORY_ICON: Record<string, string> = {
   WATER: 'droplet',
   FOOD: 'package',
+  SEED: 'farm',
   FUEL: 'zap',
+  MEDICINE: 'health',
+  TOOL: 'settings',
   MATERIAL: 'package',
   PRECIOUS_METAL: 'coin',
   OTHER: 'package',

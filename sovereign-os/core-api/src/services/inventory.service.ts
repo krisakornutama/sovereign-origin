@@ -6,7 +6,10 @@
 export const INVENTORY_CATEGORIES = [
   'WATER',
   'FOOD',
+  'SEED', // เมล็ดพันธุ์ — คลังพันธุ์ที่เก็บได้ (ผูก shelf_life_days = อายุงอก)
   'FUEL',
+  'MEDICINE', // ยาประจำบ้าน/เวชภัณฑ์ (expiry สำคัญ)
+  'TOOL', // เครื่องมือซ่อมบำรุง
   'MATERIAL',
   'PRECIOUS_METAL',
   'OTHER',
