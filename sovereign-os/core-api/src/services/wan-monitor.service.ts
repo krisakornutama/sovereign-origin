@@ -9,13 +9,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { sendTelegramAlert } from './telegram-alert.service';
 
 const execAsync = promisify(exec);
 
-export const WAN_PING_HOST = process.env.WAN_PING_HOST || '1.1.1.1';
-export const WAN_PING_HOST_BACKUP = process.env.WAN_PING_HOST_BACKUP || '8.8.8.8';
+export const WAN_PING_HOST = process.env.WAN_PING_HOST || '1.1.1.1'; // HTTP probe (ไม่ใช่ ICMP)
+export const WAN_PING_HOST_BACKUP = process.env.WAN_PING_HOST_BACKUP || 'www.google.com';
 export const WAN_PING_TIMEOUT_MS = parseInt(process.env.WAN_PING_TIMEOUT_MS || '5000', 10);
 export const ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1'; // Archer admin
 export const ROUTER_REBOOT_CMD = process.env.ROUTER_REBOOT_CMD || ''; // ว่าง = ปิด
@@ -28,7 +29,7 @@ export interface WanState {
   host: string;
 }
 
-// ── Pure: ping exit code → ผล (testable) ──
+// ── Pure: ping exit code → ผล (testable, เก็บไว้เผื่อใช้ ICMP บน host) ──
 export function pingResultFromExit(code: number | null, latencyMs: number | null): boolean {
   return code === 0;
 }
@@ -52,20 +53,20 @@ export function getWanState(): WanState & { rebootConfigured: boolean; routerHos
   return { ...state, rebootConfigured: !!ROUTER_REBOOT_CMD, routerHost: ROUTER_HOST };
 }
 
-/** ping ครั้งเดียว — คืน { ok, latencyMs } */
+/** probe ครั้งเดียวผ่าน HTTP (container ไม่มี ping binary — HTTP วัด connectivity ได้จริงกว่า)
+ *  response อะไรก็แปลว่าเน็ต UP (แม้ 4xx/5xx) — แค่ network error เท่านั้น = DOWN */
 export async function pingOnce(host: string): Promise<{ ok: boolean; latencyMs: number | null }> {
-  const flag = process.platform === 'win32' ? '-n' : '-c';
-  const wflag = process.platform === 'win32' ? '-w' : '-W';
-  const timeoutSec = Math.ceil(WAN_PING_TIMEOUT_MS / 1000);
+  const url = host.includes('://') ? host : `https://${host}`;
+  const started = Date.now();
   try {
-    const { stdout } = await execAsync(`ping ${flag} 1 ${wflag} ${timeoutSec} ${host}`, {
-      timeout: WAN_PING_TIMEOUT_MS + 2000,
+    await axios.get(url, {
+      timeout: WAN_PING_TIMEOUT_MS,
+      validateStatus: () => true, // 4xx/5xx = เน็ตถึง ยังถือว่า UP
+      headers: { 'User-Agent': 'sovereign-os/1.0' },
     });
-    return { ok: true, latencyMs: parsePingLatency(stdout) };
-  } catch (err: any) {
-    // exit code != 0 = หลุด — ยังพยายาม parse latency (อาจ timeout ระหว่างทาง)
-    const latencyMs = err?.stdout ? parsePingLatency(err.stdout) : null;
-    return { ok: pingResultFromExit(err?.code ?? null, latencyMs), latencyMs };
+    return { ok: true, latencyMs: Date.now() - started };
+  } catch {
+    return { ok: false, latencyMs: null };
   }
 }
 
