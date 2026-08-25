@@ -13,6 +13,7 @@ import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import SignalsCard from '../components/treasury/SignalsCard';
 
 // ── โทเค็นห้องคลัง (เหล็กกล้า + หมึกสมุด + ไฟสีของตระกูล) — premium ──
 const PANEL = 'bg-gray-900/70 border border-gray-800/80 rounded-2xl backdrop-blur-sm shadow-[0_8px_28px_rgba(0,0,0,0.35)]';
@@ -582,6 +583,9 @@ export default function TreasuryPage() {
                 <Stat label={t('treasury.stat.runway', 'Survival Runway')} value={months == null ? '∞' : `${months.toFixed(1)} ${t('treasury.stat.months', 'เดือน')}`} sub={runwayWarnText} tone={runwayTone} />
                 <Stat label={t('treasury.stat.monthlyBurn', 'ค่าใช้จ่ายต่อเดือน')} value={fmtUsd(data.cashflow.monthlyBurnUsd)} sub={`${t('treasury.stat.yield', 'รายได้ปันผลต่อปี')} ${fmtUsd(data.cashflow.annualizedDividendUsd)}`} />
               </div>
+
+              {/* ── AI Portfolio Manager — Small-Cap signals ── */}
+              <SignalsCard />
 
               {/* ── View A: Net Worth & Cashflow ── */}
               <Section id="net-worth" title={t('treasury.view.netWorthTitle', 'ทรัพย์สิน & กระแสเงินสด')} desc={t('treasury.view.netWorthDesc', 'เงินสด + สินทรัพย์ + เสบียง − หนี้สิน')}>
