@@ -211,13 +211,48 @@ router.get('/orders', authenticate, async (req, res) => {
   res.json(list);
 });
 
+// POST /orders/:id/cancel — ยกเลิกออเดอร์ (เฉพาะ PENDING — จ่ายแล้วไม่ยกเลิกผ่าน API)
+router.post('/orders/:id/cancel', authenticate, async (req, res) => {
+  try {
+    const order = await prisma.restaurantOrder.findUnique({ where: { id: req.params.id } });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status !== 'PENDING') return res.status(400).json({ error: `ยกเลิกได้เฉพาะ PENDING (ตอนนี้ ${order.status})` });
+    const updated = await prisma.restaurantOrder.update({ where: { id: order.id }, data: { status: 'CANCELLED' } });
+    res.json(updated);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /orders/:id/status {status: PREPARING|READY} — ครัวอัปเดตคิว (KDS)
+// วงจร: PENDING → PREPARING (กำลังทำ) → READY (เสิร์ฟได้) → PAID (ผ่าน /pay)
+router.post('/orders/:id/status', authenticate, async (req, res) => {
+  try {
+    const status = String(req.body?.status || '');
+    if (!['PREPARING', 'READY'].includes(status)) return res.status(400).json({ error: 'status must be PREPARING or READY (ใช้ /pay เพื่อปิดบิล)' });
+    const order = await prisma.restaurantOrder.findUnique({ where: { id: req.params.id } });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'PAID' || order.status === 'CANCELLED') return res.status(400).json({ error: `ออเดอร์ ${order.status} แล้ว` });
+    const updated = await prisma.restaurantOrder.update({ where: { id: order.id }, data: { status } });
+    res.json(updated);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /orders/:id/pay — ปิดบิล (รับ usePoints: ใช้แต้มแลกส่วนลด 1 แต้ม = 1 บาท)
 router.post('/orders/:id/pay', authenticate, async (req, res) => {
   try {
     const order = await prisma.restaurantOrder.findUnique({ where: { id: req.params.id }, include: { lines: true } });
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.status === 'PAID') return res.json(order);
     const payment = req.body?.payment === 'PROMPTPAY' ? 'PROMPTPAY' : 'CASH';
-    const pointsEarned = Math.floor(order.totalTHB / 20);
+    // ใช้แต้มแลกส่วนลด (1 แต้ม = 1 บาท) — หักจากยอดจริง + ตัดแต้มลูกค้า
+    let pointsUsed = 0;
+    let discountTHB = 0;
+    if (order.customerId && Number(req.body?.usePoints) > 0) {
+      const cust = await prisma.restaurantCustomer.findUnique({ where: { id: order.customerId } });
+      pointsUsed = Math.min(Math.floor(Number(req.body.usePoints)), cust?.points ?? 0, Math.floor(order.totalTHB));
+      discountTHB = pointsUsed; // 1 แต้ม = 1 บาท
+    }
+    const netTHB = Math.max(0, order.totalTHB - discountTHB);
+    const pointsEarned = Math.floor(netTHB / 20);
     const actorId = (req as any).user?.id;
     const updated = await prisma.$transaction(async (tx) => {
       for (const line of order.lines) {
@@ -232,12 +267,18 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
           }
         }
       }
-      const upd = await tx.restaurantOrder.update({ where: { id: order.id }, data: { status: 'PAID', payment, pointsEarned } });
-      if (order.customerId && pointsEarned > 0) {
-        await tx.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { increment: pointsEarned } } });
+      const upd = await tx.restaurantOrder.update({ where: { id: order.id }, data: { status: 'PAID', payment, pointsEarned, totalTHB: netTHB } });
+      if (order.customerId) {
+        // ตัดแต้มที่ใช้ + ให้แต้มจากยอดสุทธิ (increment ติดลบได้ = ตัดแต้ม)
+        if (pointsUsed > 0) {
+          await tx.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { decrement: pointsUsed } } });
+        }
+        if (pointsEarned > 0) {
+          await tx.restaurantCustomer.update({ where: { id: order.customerId }, data: { points: { increment: pointsEarned } } });
+        }
       }
       if (actorId) {
-        await tx.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: order.totalTHB / config.restaurant.thbPerUsd, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}` } as any });
+        await tx.treasuryEvent.create({ data: { user_id: actorId, type: 'SALE', amount_usd: netTHB / 35, note: `ร้าน ${order.restaurantId} order ${order.orderNo} ${payment}${pointsUsed ? ` (ใช้ ${pointsUsed} แต้ม −${discountTHB}฿)` : ''}` } as any });
       }
       return upd;
     });
@@ -274,6 +315,33 @@ router.get('/kitchen-sensors', authenticate, async (_req, res) => {
     if (map.fridge_temp && map.fridge_temp.value > 8) alerts.push(`ตู้เย็นร้อน ${map.fridge_temp.value}°C (>8°C) — เสี่ยงของเสีย`);
     if (map.kitchen_weight && map.kitchen_weight.value < 1) alerts.push(`วัตถุดิบใกล้หมด (น้ำหนัก ${map.kitchen_weight.value}kg)`);
     res.json({ sensors: map, alerts });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /purchases — สั่ง/รับวัตถุดิบเข้าสต็อก + บันทึกรายจ่ายร้านพร้อมกัน
+// body: { name, qtyKg, priceTHB, supplier?, note? } → InventoryItem(FOOD) + TreasuryEvent(PURCHASE)
+router.post('/purchases', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const qtyKg = Number(req.body?.qtyKg);
+    const priceTHB = Number(req.body?.priceTHB);
+    if (!name) return res.status(400).json({ error: 'name required' });
+    if (!Number.isFinite(qtyKg) || qtyKg <= 0) return res.status(400).json({ error: 'qtyKg must be > 0' });
+    if (!Number.isFinite(priceTHB) || priceTHB < 0) return res.status(400).json({ error: 'priceTHB must be >= 0' });
+    const supplier = req.body?.supplier ? String(req.body.supplier).slice(0, 80) : null;
+    const userId = (req as any).user?.id;
+    const result = await prisma.$transaction(async (tx) => {
+      // เพิ่มเข้าสต็อก (ถ้ามีชื่อเดิมอยู่ → บวกเพิ่ม, ไม่มี → สร้างใหม่)
+      const existing = await tx.inventoryItem.findFirst({ where: { user_id: userId, name } });
+      const unitPriceUsd = priceTHB / qtyKg / 35; // ต้นทุนต่อหน่วย (ต่อ kg)
+      const item = existing
+        ? await tx.inventoryItem.update({ where: { id: existing.id }, data: { quantity: existing.quantity + qtyKg, unit_price_usd: unitPriceUsd } })
+        : await tx.inventoryItem.create({ data: { user_id: userId, name: name.slice(0, 80), category: 'FOOD', quantity: qtyKg, unit: 'kg', unit_price_usd: unitPriceUsd, location: 'ครัวร้าน', notes: supplier ? `ซื้อจาก ${supplier}` : null } });
+      // รายจ่ายร้าน (TreasuryEvent ติดลบ = expense)
+      const event = await tx.treasuryEvent.create({ data: { user_id: userId, type: 'PURCHASE', amount_usd: -priceTHB / 35, symbol: name.slice(0, 20), note: `ซื้อวัตถุดิบ ${name} ${qtyKg}kg ${priceTHB}฿${supplier ? ` (${supplier})` : ''}` } as any });
+      return { item, event };
+    });
+    res.status(201).json({ success: true, inventoryId: result.item.id, quantity: result.item.quantity, spentTHB: priceTHB });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

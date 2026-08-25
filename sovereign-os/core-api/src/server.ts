@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import https from 'https';
 import cors from 'cors';
+import helmet from 'helmet';
 import fs from 'fs';
 import { config } from './config';
 import { auditStateChange } from './middleware/auth.middleware';
@@ -24,6 +25,10 @@ const server = http.createServer(app);
 const io = createSocketServer(server);
 
 app.disable('x-powered-by');
+app.use(helmet({
+  contentSecurityPolicy: false, // Pages Router + inline SVG/img data URLs — ปิด CSP ไว้ก่อน (แจ้งผู้ใช้หากเปิด)
+  crossOriginEmbedderPolicy: false,
+}));
 // อยู่หลัง proxy (nginx/caddy) → rate-limit นับ IP จริงได้
 app.set('trust proxy', 1);
 app.use(cors({
