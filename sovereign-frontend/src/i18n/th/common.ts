@@ -28,6 +28,7 @@ export const common = {
     farm: 'แปลงเกษตร',
     livestock: 'ปศุสัตว์',
     restaurant: 'ร้านอาหาร',
+    selfreliance: 'วันรอด',
     portfolio: 'ทรัพย์สินและการเงิน',
     treasury: 'คลัง & ลงทุน',
     treasuryNetWorth: 'ทรัพย์สิน & เงินสด',

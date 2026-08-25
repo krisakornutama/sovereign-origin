@@ -31,6 +31,7 @@ import agentTeamRoutes from './modules/agent/agent.routes';
 import visionRuleRoutes from './modules/vision/vision-rule.routes';
 import portfolioRoutes from './modules/portfolio/portfolio.routes';
 import treasuryRoutes from './modules/treasury/treasury.routes';
+import selfrelianceRoutes from './modules/selfreliance/selfreliance.routes';
 import dimeRoutes from './modules/dime/dime.routes';
 import healingRoutes from './modules/healing/healing.routes';
 import codingRoutes from './modules/coding/coding.routes';
@@ -105,6 +106,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/vision', featureGuard('/vision'), visionRuleRoutes); // Vision AI คนแปลกหน้า
   app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes); // Phase 4: Wealth & Asset Tracker
   app.use('/api/treasury', featureGuard(['/treasury', '/portfolio']), treasuryRoutes); // LIFE & FINANCE: Treasury & Wealth Engine (Net Worth / Runway / 5 Families)
+  app.use('/api/selfreliance', selfrelianceRoutes); // วันรอด (Days of Autonomy) — น้ำ/อาหาร/ไฟ/เงิน + จุดอ่อนบ้าน
     app.use('/api/dime', featureGuard(['/treasury', '/portfolio']), dimeRoutes); // Dime! Statement — IMAP + PDF → อัปเดตพอร์ตอัตโนมัติ
   app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
   app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
