@@ -1,12 +1,13 @@
 // src/services/wan-monitor.service.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// WAN Monitor — TP-Link Archer MR505 (4G SIM) failover guard
-// - ping ผ่านเน็ตซิมทุก 60 วิ → state UP/DOWN + alert เปลี่ยนสถานะ (Telegram)
-// - บันทึก metric 'wan_state' (1/0) ลง sensor_telemetry → dashboard ใช้ได้ทันที
-// - ROUTER_REBOOT_CMD (env) = คำสั่งรีบูต router (SUPERADMIN เรียกผ่าน API เท่านั้น)
-//   เช่น: curl -u admin:pass "http://192.168.1.1/cgi-bin/..." (แล้วแต่ firmware)
-// - MR505 ไม่มี API เปิด → คุมผ่านคำสั่งภายนอก/relay ได้ ส่วน monitoring ใช้ ping ผ่านซิม
+// WAN + Router Monitor — TP-Link Archer MR505 (4G SIM) ครอบคลุมทั้งเส้นทาง
+// Phase 1: router_state — TCP probe ตัว router เอง (แยกปัญหา "สายแลน" ออกจาก "ซิม")
+// Phase 2: lan_devices — สแกนอุปกรณ์ที่ต่อ router (TCP sweep พอร์ต 80) + เตือนอุปกรณ์ใหม่
+// Phase 3: wan_downlink_mbps — speedtest โหลดจริงผ่านซิม (Cloudflare __down)
+// Phase 0 (เดิม): wan_state/wan_latency_ms — HTTP probe ผ่านเน็ตทุก 60 วิ
+// MR505 ไม่มี API เปิด → คุมผ่าน ROUTER_REBOOT_CMD (env) เท่านั้น
 // ─────────────────────────────────────────────────────────────────────────────
+import net from 'net';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
@@ -15,53 +16,98 @@ import { sendTelegramAlert } from './telegram-alert.service';
 
 const execAsync = promisify(exec);
 
-export const WAN_PING_HOST = process.env.WAN_PING_HOST || '1.1.1.1'; // HTTP probe (ไม่ใช่ ICMP)
+export const WAN_PING_HOST = process.env.WAN_PING_HOST || '1.1.1.1';
 export const WAN_PING_HOST_BACKUP = process.env.WAN_PING_HOST_BACKUP || 'www.google.com';
 export const WAN_PING_TIMEOUT_MS = parseInt(process.env.WAN_PING_TIMEOUT_MS || '5000', 10);
-export const ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1'; // Archer admin
-export const ROUTER_REBOOT_CMD = process.env.ROUTER_REBOOT_CMD || ''; // ว่าง = ปิด
+export const ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
+export const ROUTER_REBOOT_CMD = process.env.ROUTER_REBOOT_CMD || '';
+// Phase 2 config
+export const ROUTER_SUBNET = process.env.ROUTER_SUBNET || ROUTER_HOST.split('.').slice(0, 3).join('.');
+export const LAN_SCAN_PORT = parseInt(process.env.LAN_SCAN_PORT || '80', 10);
+export const LAN_SCAN_ENABLED = (process.env.LAN_SCAN_ENABLED || 'true') === 'true';
+// Phase 3 config
+export const SPEEDTEST_ENABLED = (process.env.SPEEDTEST_ENABLED || 'true') === 'true';
+export const SPEEDTEST_BYTES = parseInt(process.env.SPEEDTEST_BYTES || '2000000', 10); // 2MB
+
+const NODE_ID = '11111111-1111-1111-1111-111111111111';
+const KNOWN_DEVICES_KEY = 'router.knownDevices';
 
 export interface WanState {
   up: boolean;
-  since: string; // ISO เวลาที่เข้าสถานะปัจจุบัน
+  since: string;
   lastCheck: string;
   latencyMs: number | null;
   host: string;
 }
 
-// ── Pure: ping exit code → ผล (testable, เก็บไว้เผื่อใช้ ICMP บน host) ──
+export interface RouterState {
+  up: boolean;
+  since: string;
+  lastCheck: string;
+  latencyMs: number | null;
+}
+
+export interface LanDevice { ip: string; latencyMs: number; firstSeen: string }
+export interface SpeedtestResult { mbps: number; bytes: number; ms: number; at: string }
+
+// ── Pure helpers (testable) ──
 export function pingResultFromExit(code: number | null, latencyMs: number | null): boolean {
   return code === 0;
 }
 
-/** parse เวลา (ms) จาก output ของ ping (Windows/Linux) — null ถ้าไม่เจอ */
 export function parsePingLatency(output: string): number | null {
   const m =
-    output.match(/time[=<]\s*([\d.]+)\s*ms/i) || // Linux: time=12.3 ms
-    output.match(/Average\s*=\s*(\d+)ms/i) || // Windows: Average = 15ms
+    output.match(/time[=<]\s*([\d.]+)\s*ms/i) ||
+    output.match(/Average\s*=\s*(\d+)ms/i) ||
     output.match(/= (\d+)ms/i);
   if (!m) return null;
   const v = Number(m[1]);
   return Number.isFinite(v) ? v : null;
 }
 
-// ── State (in-memory + telemetry) ──
-let state: WanState = { up: true, since: new Date().toISOString(), lastCheck: new Date().toISOString(), latencyMs: null, host: WAN_PING_HOST };
-let started = false;
-
-export function getWanState(): WanState & { rebootConfigured: boolean; routerHost: string } {
-  return { ...state, rebootConfigured: !!ROUTER_REBOOT_CMD, routerHost: ROUTER_HOST };
+/** สร้าง IP จาก subnet + เลขโฮสต์ — ipFromSubnet('192.168.1', 5) → '192.168.1.5' */
+export function ipFromSubnet(subnet: string, hostNum: number): string {
+  return `${subnet}.${hostNum}`;
 }
 
-/** probe ครั้งเดียวผ่าน HTTP (container ไม่มี ping binary — HTTP วัด connectivity ได้จริงกว่า)
- *  response อะไรก็แปลว่าเน็ต UP (แม้ 4xx/5xx) — แค่ network error เท่านั้น = DOWN */
+/** จำแนกสาเหตุจากสถานะ router + wan — ใช้ตั้งข้อความ alert ให้ตรงจุด */
+export function classifyWanIssue(routerUp: boolean, wanUp: boolean): 'OK' | 'LAN_DOWN' | 'SIM_DOWN' {
+  if (routerUp && wanUp) return 'OK';
+  if (!routerUp) return 'LAN_DOWN'; // router ไม่ตอบ = สายแลน/ตัว router มีปัญหา (ซิมตัดสินไม่ได้)
+  return 'SIM_DOWN'; // router ปกติ แต่เน็ตหลุด = ซิม/สัญญาณ LTE
+}
+
+/** คำนวณ Mbps จาก bytes + มิลลิวินาที — parseSpeedtestMbps(2_000_000, 2000) → 8 */
+export function parseSpeedtestMbps(bytes: number, ms: number): number {
+  if (ms <= 0 || bytes <= 0) return 0;
+  return Math.round(((bytes * 8) / (ms / 1000)) / 1_000_000 * 10) / 10;
+}
+
+// ── TCP probe (container ไม่มี ping binary — TCP connect วัดได้ทั้ง LAN และ internet) ──
+export function probeTcp(host: string, port: number, timeoutMs: number): Promise<{ ok: boolean; latencyMs: number | null }> {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const socket = new net.Socket();
+    const done = (ok: boolean) => {
+      socket.destroy();
+      resolve({ ok, latencyMs: ok ? Date.now() - started : null });
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => done(true));
+    socket.once('timeout', () => done(false));
+    socket.once('error', () => done(false));
+    socket.connect(port, host);
+  });
+}
+
+/** HTTP probe ผ่านเน็ต — response อะไรก็ UP (แค่ network error = DOWN) */
 export async function pingOnce(host: string): Promise<{ ok: boolean; latencyMs: number | null }> {
   const url = host.includes('://') ? host : `https://${host}`;
   const started = Date.now();
   try {
     await axios.get(url, {
       timeout: WAN_PING_TIMEOUT_MS,
-      validateStatus: () => true, // 4xx/5xx = เน็ตถึง ยังถือว่า UP
+      validateStatus: () => true,
       headers: { 'User-Agent': 'sovereign-os/1.0' },
     });
     return { ok: true, latencyMs: Date.now() - started };
@@ -70,58 +116,176 @@ export async function pingOnce(host: string): Promise<{ ok: boolean; latencyMs: 
   }
 }
 
-/** ตรวจ WAN ครั้งเดียว: host หลัก → ถ้าหลุดลอง backup → ตัดสิน UP/DOWN + alert เปลี่ยนสถานะ */
+// ── State (in-memory) ──
+let wanState: WanState = { up: true, since: new Date().toISOString(), lastCheck: new Date().toISOString(), latencyMs: null, host: WAN_PING_HOST };
+let routerState: RouterState = { up: true, since: new Date().toISOString(), lastCheck: new Date().toISOString(), latencyMs: null };
+let lanDevices: LanDevice[] = [];
+let lastSpeedtest: SpeedtestResult | null = null;
+let knownDevices = new Set<string>();
+let started = false;
+
+async function writeMetric(metric: string, value: number, deviceId = 'wan-monitor'): Promise<void> {
+  try {
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '${NODE_ID}'::uuid, '${deviceId}', '${metric}', $1)`,
+      value
+    );
+  } catch { /* DB ล่ม = offline-first — ข้าม */ }
+}
+
+export function getWanState(): WanState & {
+  router: RouterState;
+  lanDevices: LanDevice[];
+  lastSpeedtest: SpeedtestResult | null;
+  rebootConfigured: boolean;
+  routerHost: string;
+  subnet: string;
+} {
+  return {
+    ...wanState,
+    router: routerState,
+    lanDevices,
+    lastSpeedtest,
+    rebootConfigured: !!ROUTER_REBOOT_CMD,
+    routerHost: ROUTER_HOST,
+    subnet: ROUTER_SUBNET,
+  };
+}
+
+/** Phase 1: ตรวจตัว router เอง (TCP พอร์ต admin 80) — แยกปัญหา LAN ออกจากซิม */
+export async function checkRouterNow(): Promise<RouterState> {
+  const [admin] = await Promise.all([
+    probeTcp(ROUTER_HOST, 80, 3000),
+  ]);
+  const ok = admin.ok;
+  const now = new Date().toISOString();
+  const prev = routerState.up;
+  routerState = { up: ok, since: ok === prev ? routerState.since : now, lastCheck: now, latencyMs: admin.latencyMs };
+  await writeMetric('router_state', ok ? 1 : 0, 'router-mr505');
+  if (admin.latencyMs != null) await writeMetric('router_latency_ms', admin.latencyMs, 'router-mr505');
+  if (ok !== prev) {
+    const issue = classifyWanIssue(ok, wanState.up);
+    const text = ok
+      ? `🟢 Router กลับมา (${ROUTER_HOST}) ${admin.latencyMs ?? ''}ms — ฝั่ง LAN ปกติ`
+      : `🔴 Router ไม่ตอบ (${ROUTER_HOST}) — สายแลน/ตัว router มีปัญหา (ไม่ใช่ซิม) — ตรวจสาย LAN กับโน้ตบุ๊ค`;
+    await sendTelegramAlert({ text, severity: ok ? 'info' : 'critical', eventKey: `router_state:${ok ? 'up' : 'down'}:${now.slice(0, 10)}` }).catch(() => {});
+    console.log(`🌐 Router ${ok ? 'UP' : 'DOWN'} (${issue})`);
+  }
+  return routerState;
+}
+
+/** Phase 2: สแกนอุปกรณ์ใน subnet (TCP sweep พอร์ต 80) — เตือนเมื่อเจออุปกรณ์ใหม่ */
+export async function scanLanDevices(): Promise<LanDevice[]> {
+  const found: LanDevice[] = [];
+  const hosts: number[] = [];
+  for (let i = 1; i <= 254; i++) hosts.push(i);
+  // ยิงขนานทีละ 40 — 254 โฮสต์ × timeout 400ms ≈ 3 วิ
+  const BATCH = 40;
+  for (let i = 0; i < hosts.length; i += BATCH) {
+    const batch = hosts.slice(i, i + BATCH).map(async (n) => {
+      const r = await probeTcp(ipFromSubnet(ROUTER_SUBNET, n), LAN_SCAN_PORT, 400);
+      if (r.ok && r.latencyMs != null) found.push({ ip: ipFromSubnet(ROUTER_SUBNET, n), latencyMs: r.latencyMs, firstSeen: new Date().toISOString() });
+    });
+    await Promise.all(batch);
+  }
+  lanDevices = found;
+  await writeMetric('lan_devices', found.length, 'router-mr505');
+
+  // เตือนอุปกรณ์ใหม่ (known set persist ใน SystemSetting — กัน spam หลัง restart)
+  try {
+    if (knownDevices.size === 0) {
+      const row = await prisma.systemSetting.findUnique({ where: { key: KNOWN_DEVICES_KEY } });
+      if (row?.value) knownDevices = new Set(JSON.parse(row.value) as string[]);
+    }
+    const newOnes = found.filter((d) => !knownDevices.has(d.ip));
+    if (knownDevices.size > 0 && newOnes.length > 0) {
+      await sendTelegramAlert({
+        text: `🔍 เจออุปกรณ์ใหม่บนเน็ต router: ${newOnes.map((d) => d.ip).join(', ')} (รวม ${found.length} เครื่อง)`,
+        severity: 'warn',
+        eventKey: `lan_new_device:${newOnes.map((d) => d.ip).join(',')}:${new Date().toISOString().slice(0, 10)}`,
+      }).catch(() => {});
+    }
+    knownDevices = new Set(found.map((d) => d.ip));
+    await prisma.systemSetting.upsert({
+      where: { key: KNOWN_DEVICES_KEY },
+      update: { value: JSON.stringify([...knownDevices]) },
+      create: { key: KNOWN_DEVICES_KEY, value: JSON.stringify([...knownDevices]) },
+    });
+  } catch { /* best-effort */ }
+  return found;
+}
+
+/** Phase 3: speedtest — โหลดไฟล์จริงจาก Cloudflare วัด Mbps ผ่านซิม */
+export async function runSpeedtest(): Promise<SpeedtestResult> {
+  const started = Date.now();
+  let bytes = 0;
+  try {
+    const res = await axios.get(`https://speed.cloudflare.com/__down?bytes=${SPEEDTEST_BYTES}`, {
+      timeout: 30_000,
+      responseType: 'arraybuffer',
+      headers: { 'User-Agent': 'sovereign-os/1.0' },
+    });
+    bytes = (res.data as ArrayBuffer).byteLength;
+  } catch {
+    lastSpeedtest = { mbps: 0, bytes: 0, ms: Date.now() - started, at: new Date().toISOString() };
+    return lastSpeedtest;
+  }
+  const ms = Date.now() - started;
+  lastSpeedtest = { mbps: parseSpeedtestMbps(bytes, ms), bytes, ms, at: new Date().toISOString() };
+  await writeMetric('wan_downlink_mbps', lastSpeedtest.mbps);
+  return lastSpeedtest;
+}
+
+/** Phase 0: ตรวจ WAN (HTTP ผ่านซิม) + ใช้ classify แจ้งเหตุผลตรงจุด */
 export async function checkWanNow(): Promise<WanState> {
   let r = await pingOnce(WAN_PING_HOST);
   let usedHost = WAN_PING_HOST;
   if (!r.ok) {
-    r = await pingOnce(WAN_PING_HOST_BACKUP); // กัน DNS/CDN ตัวเดียวล่ม
+    r = await pingOnce(WAN_PING_HOST_BACKUP);
     usedHost = WAN_PING_HOST_BACKUP;
   }
   const now = new Date().toISOString();
-  const prevUp = state.up;
+  const prevUp = wanState.up;
+  wanState = { up: r.ok, since: r.ok === prevUp ? wanState.since : now, lastCheck: now, latencyMs: r.latencyMs, host: usedHost };
+  await writeMetric('wan_state', r.ok ? 1 : 0);
+  if (r.latencyMs != null) await writeMetric('wan_latency_ms', r.latencyMs);
 
-  state = {
-    up: r.ok,
-    since: r.ok === prevUp ? state.since : now,
-    lastCheck: now,
-    latencyMs: r.latencyMs,
-    host: usedHost,
-  };
-
-  // เปลี่ยนสถานะ → Telegram (dedup ผ่าน eventKey + วันที่)
   if (r.ok !== prevUp) {
+    const issue = classifyWanIssue(routerState.up, r.ok);
+    const reason = issue === 'LAN_DOWN'
+      ? 'router เองไม่ตอบด้วย — ตรวจสาย LAN'
+      : issue === 'SIM_DOWN'
+        ? 'router ปกติ แต่ซิม/สัญญาณ LTE หลุด'
+        : '';
     const text = r.ok
-      ? `🟢 WAN กลับมาออนไลน์ — Archer MR505 (${ROUTER_HOST}) ping ${WAN_PING_HOST} สำเร็จ ${r.latencyMs != null ? `${r.latencyMs}ms` : ''} · หลุดไป ${Math.round((Date.now() - new Date(prevUp ? state.since : now).getTime()) / 1000)}s`
-      : `🔴 WAN หลุด — Archer MR505 (${ROUTER_HOST}) ping ${WAN_PING_HOST} + ${WAN_PING_HOST_BACKUP} ไม่ตอบ (ซิม/สัญญาณ LTE มีปัญหา?) — ระบบทำงานต่อแบบ offline-first`;
+      ? `🟢 WAN กลับมา — ผ่าน ${usedHost} ${r.latencyMs ?? ''}ms · หลุดไป ${Math.round((Date.now() - new Date(wanState.since).getTime()) / 1000)}s`
+      : `🔴 WAN หลุด — ${reason} ระบบทำงานต่อแบบ offline-first`;
     await sendTelegramAlert({ text, severity: r.ok ? 'info' : 'critical', eventKey: `wan_state:${r.ok ? 'up' : 'down'}:${now.slice(0, 10)}` }).catch(() => {});
   }
-
-  // บันทึก telemetry (best-effort — ไม่ให้พัง loop)
-  try {
-    await prisma.$queryRawUnsafe(
-      `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '11111111-1111-1111-1111-111111111111'::uuid, 'wan-monitor', 'wan_state', $1)`,
-      r.ok ? 1 : 0
-    );
-    if (r.latencyMs != null) {
-      await prisma.$queryRawUnsafe(
-        `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '11111111-1111-1111-1111-111111111111'::uuid, 'wan-monitor', 'wan_latency_ms', $1)`,
-        r.latencyMs
-      );
-    }
-  } catch {
-    // DB ล่ม = อยู่แล้ว (offline-first) — ข้าม
-  }
-  return state;
+  return wanState;
 }
 
-/** เริ่ม cron ทุก 60 วิ (เรียกครั้งเดียวตอน boot จาก workers/start.ts) */
+/** ตรวจครบทั้ง router + WAN ในรอบเดียว (ให้ classify แม่น — router ต้องสดก่อนตัดสินซิม) */
+export async function checkAllNow(): Promise<void> {
+  await checkRouterNow();
+  await checkWanNow();
+}
+
+/** เริ่ม cron ทั้งหมด (เรียกครั้งเดียวตอน boot จาก workers/start.ts) */
 export function startWanMonitor(intervalMs = 60_000): void {
   if (started) return;
   started = true;
-  checkWanNow().catch(() => {});
-  setInterval(() => checkWanNow().catch(() => {}), intervalMs);
-  console.log(`🌐 WAN monitor started (Archer MR505 @ ${ROUTER_HOST} · ping ${WAN_PING_HOST} ทุก ${Math.round(intervalMs / 1000)}s)`);
+  checkAllNow().catch(() => {});
+  setInterval(() => checkAllNow().catch(() => {}), intervalMs);
+  if (LAN_SCAN_ENABLED) {
+    scanLanDevices().catch(() => {});
+    setInterval(() => scanLanDevices().catch(() => {}), 5 * 60_000); // ทุก 5 นาที
+  }
+  if (SPEEDTEST_ENABLED) {
+    runSpeedtest().catch(() => {});
+    setInterval(() => runSpeedtest().catch(() => {}), 30 * 60_000); // ทุก 30 นาที
+  }
+  console.log(`🌐 WAN+Router monitor started (MR505 @ ${ROUTER_HOST} · WAN ${Math.round(intervalMs / 1000)}s · LAN scan 5m · speedtest 30m)`);
 }
 
 /** รีบูต router — เฉพาะเมื่อตั้ง ROUTER_REBOOT_CMD (SUPERADMIN API เรียก) */
