@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import multer from 'multer';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { resolveOwnerId } from '../portfolio/portfolio.routes';
 import {
   STRATEGY_FAMILIES,
@@ -618,5 +618,100 @@ router.post(
     }
   }
 );
+
+// ── AI Portfolio Manager — Small-Cap signal engine (กฎผู้ใช้กำหนดเอง ไม่ใช่คำแนะนำการลงทุน) ──
+import {
+  getTriggers, saveTriggers, getState, saveState,
+  runSignalCheck, evaluateTrigger, formatPortfolioAlert,
+  DEFAULT_TRIGGERS, type PortfolioTriggerDef,
+} from '../../services/portfolio-signal.service';
+import { fetchPrice } from '../../services/price-feed.service';
+
+// GET /api/treasury/signals — กฎทั้งหมด + state + ราคาล่าสุด (best-effort)
+router.get('/signals', authenticate, async (req, res) => {
+  try {
+    const triggers = await getTriggers();
+    const state = await getState();
+    const withPrices = await Promise.all(
+      triggers.map(async (t) => {
+        const quote = await fetchPrice(t.symbol, 'STOCK').catch(() => null);
+        const st = state[t.symbol] ?? {};
+        return { ...t, priceUsd: quote?.priceUsd ?? null, source: quote?.source ?? null, state: st };
+      })
+    );
+    res.json({ triggers: withPrices, disclaimer: 'ระบบแจ้งเตือนตามกฎที่ผู้ใช้กำหนดเอง — ไม่ใช่คำแนะนำการลงทุน' });
+  } catch (err) {
+    console.error('Signals list error:', err);
+    res.status(500).json({ error: 'Failed to load signals' });
+  }
+});
+
+// POST /api/treasury/signals/reset — คืนกฎเริ่มต้น 6 ตัวตามสเปก (SUPERADMIN)
+router.post('/signals/reset', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  try {
+    await saveTriggers(DEFAULT_TRIGGERS);
+    await saveState({});
+    res.json({ success: true, triggers: DEFAULT_TRIGGERS });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset signals' });
+  }
+});
+
+// PUT /api/treasury/signals/:symbol — แก้กฎตัวเดียว (SUPERADMIN)
+router.put('/signals/:symbol', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase().trim();
+    const triggers = await getTriggers();
+    const idx = triggers.findIndex((t) => t.symbol === symbol);
+    if (idx === -1) return res.status(404).json({ error: `Unknown symbol ${symbol}` });
+    const patch = req.body || {};
+    const current = triggers[idx];
+    const next: PortfolioTriggerDef = {
+      ...current,
+      role: ['CORE', 'SATELLITE', 'MOONSHOT'].includes(patch.role) ? patch.role : current.role,
+      weightTargetMin: Number.isFinite(Number(patch.weightTargetMin)) ? Number(patch.weightTargetMin) : current.weightTargetMin,
+      weightTargetMax: Number.isFinite(Number(patch.weightTargetMax)) ? Number(patch.weightTargetMax) : current.weightTargetMax,
+      buyDipMin: patch.buyDipMin === null ? null : Number.isFinite(Number(patch.buyDipMin)) ? Number(patch.buyDipMin) : current.buyDipMin,
+      buyDipMax: patch.buyDipMax === null ? null : Number.isFinite(Number(patch.buyDipMax)) ? Number(patch.buyDipMax) : current.buyDipMax,
+      sellLevels: Array.isArray(patch.sellLevels) ? patch.sellLevels.slice(0, 4) : current.sellLevels,
+      noNewMoney: typeof patch.noNewMoney === 'boolean' ? patch.noNewMoney : current.noNewMoney,
+      trailingStopPct: Number.isFinite(Number(patch.trailingStopPct)) ? Math.min(90, Math.max(0, Number(patch.trailingStopPct))) : current.trailingStopPct,
+      enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled,
+    };
+    triggers[idx] = next;
+    await saveTriggers(triggers);
+    res.json(next);
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to update trigger' });
+  }
+});
+
+// POST /api/treasury/signals/check — รันตรวจทันที (ดึงราคาจริง + ส่ง Telegram ถ้าชนเงื่อนไข)
+router.post('/signals/check', authenticate, async (_req, res) => {
+  try {
+    const report = await runSignalCheck();
+    res.json(report);
+  } catch (err) {
+    console.error('Signals check error:', err);
+    res.status(500).json({ error: 'Failed to run signal check' });
+  }
+});
+
+// POST /api/treasury/signals/preview/:symbol — ทดลองเทียบราคาสมมติ (ไม่ส่ง Telegram ไม่บันทึก state)
+router.post('/signals/preview/:symbol', authenticate, async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase().trim();
+    const price = Number(req.body?.price);
+    if (!Number.isFinite(price) || price <= 0) return res.status(400).json({ error: 'price must be > 0' });
+    const triggers = await getTriggers();
+    const trigger = triggers.find((t) => t.symbol === symbol);
+    if (!trigger) return res.status(404).json({ error: `Unknown symbol ${symbol}` });
+    const state = (await getState())[symbol] ?? {};
+    const { signal } = evaluateTrigger(trigger, price, state);
+    res.json({ signal: signal.alert ? formatPortfolioAlert(signal) : null, action: signal.action, priceUsd: signal.priceUsd, priceTHB: signal.priceTHB });
+  } catch (err) {
+    res.status(400).json({ error: 'Preview failed' });
+  }
+});
 
 export default router;
