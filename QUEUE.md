@@ -4,15 +4,19 @@
 เมื่องานเสร็จ agent จะเปลี่ยนเป็น `- [x]` พร้อมหมายเหตุผลลัพธ์
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
-  - ทำแล้วทั้ง 4 ลำดับที่วางไว้: (1) login redesign `da29420` (2) dashboard dense command center `3621d45` — DEFCON bar + กราฟ 1930-2040 + Threat Category + Sankey Alluvial + 8 Gauges + Radar ตามภาพอ้างอิง (3) restaurant POS premium `ce9fdf7` (4) สี/คอนทราสต์ตาม design tokens เดิม `69285b5` `7280b18`
-  - เพิ่มเติมเกินแผน: Agri-Hub 3D iso + Breedhouse (ภาพ 3) `8d0f9e8`, Infrastructure Map + System Health `8d0f9e8`, Treasury Sankey 5 Families (ภาพ 1) `0ccbf83`, History Timeline + Lifestyle 5 Principles (ภาพ 4) `b177401`, unify ทุกหน้า 31 ไฟล์ `7280b18`
-  - ไม่แตะ `globals.css` โครงหลัก/`_app.tsx`/`navigation.ts` (แก้เฉพาะ component classes ใน globals.css ที่อนุญาตแล้ว)
-  - ผ่าน `npm run verify` 4/4 (backend 994 tests + typecheck + build) และ E2E 44/44 ทุกรอบ
-- [x] เพิ่ม E2E นำทางแบบ SPA (คลิก sidebar จริง ไม่ใช่ page.goto) — **เสร็จแล้ว 23/8/69**
-  - สาเหตุที่ตัวเดิมติด: locator แบบ text (`aside a`, hasText) ไม่เสถียรกับ label ไทย + aside ซ้อน
-  - วิธีแก้: ใช้ locator แบบ `aside a[href="..."]` (deterministic) + พิสูจน์ไม่ reload ด้วย window marker (`__spaMarker` รอดเมื่อ SPA, หายเมื่อ full reload)
-  - ไฟล์: `sovereign-frontend/e2e/spa-nav.spec.ts` — 7 tests (5 หน้าตัวแทน + คลิกต่อกัน 3 หน้า + NAV_GROUPS href ครบ)
-  - config `playwright.config.ts:23` มี testMatch รองรับอยู่แล้ว
+  - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์
+  - ผ่าน `npm run verify` 4/4 + E2E 44/44
+- [x] เพิ่ม E2E นำทางแบบ SPA — **เสร็จแล้ว 23/8/69** (`e2e/spa-nav.spec.ts` 7 tests)
+- [x] แก้สิ่งค้างรอบ 25/8/69 — **เสร็จแล้ว 25/8/69** (`master aa8246f` + `ef50b64` + `b3569a0`)
+  - Migration debt ปิดแล้ว (`20260825000000_add_restaurant_empire` — schema up to date)
+  - Restaurant flow ครบ: สั่งวัตถุดิบ `/purchases` + ยกเลิกออเดอร์ + ใช้แต้ม 1=1฿ + สถานะครัว PREPARING/READY
+  - KDS จอครัว `/restaurant/kds` (อัปเดตทุก 10 วิ)
+  - helmet + CORS จำกัด origin (ผู้ใช้แก้ infra/.env เอง + recreate container แล้ว — ทดสอบ evil.com โดนบล็อก)
+  - SPCX disabled (ticker ซ้ำไม่ใช่ SpaceX)
+  - Portfolio Manager + WAN Monitor MR505 live ทดสอบผ่าน (ราคาจริง ASPI $3.89 อยู่โซนซื้อ)
+- [ ] ตั้ง Telegram token ใหม่ — **รอผู้ใช้** (token เดิมโดน Telegram revoke เพราะหลุดในข้อความ) → ไป @BotFather สร้างใหม่ + กด START ที่ bot 1 ครั้ง แล้วใส่ที่หน้า Settings (แล้ว agent ทดสอบส่งให้)
+- [ ] ใบหน้า auto-recognize บน POS — **รอ Ollama เปิด** (โค้ด face-embed พร้อม แต่ Ollama offline)
+- [ ] i18n หน้า restaurant + E2E หน้าใหม่ — priority ต่ำ (ใช้งานได้แล้ว แค่ไม่สลับภาษา/ไม่มี E2E)
 
-หมายเหตุสถานะระบบ (23 ส.ค. 69): backend 994/994 tests + E2E 44/44 (รวม spa-nav 7) + `npm run verify` 4/4 ขั้น ผ่านครบ
-งานเสร็จทั้งหมดอยู่ใน master แล้ว — ทุกงานใหม่เริ่มจาก master + backup commit
+หมายเหตุสถานะระบบ (25/8/69): backend tsc สะอาด + tests 9/9 (portfolio 5 + wan 4) + frontend 46 routes build ผ่าน
+หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
