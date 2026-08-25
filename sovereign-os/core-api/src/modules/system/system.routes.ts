@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import os from 'os';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { agentActions } from '../../services/agent-actions.service';
 import { listProcesses } from '../../services/system-processes.service';
 import { getDiskInfo } from '../../services/system-monitor.service';
+import { getWanState, checkWanNow, rebootRouter } from '../../services/wan-monitor.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -75,6 +76,28 @@ router.post('/processes/kill', authenticate, async (req, res) => {
   if (result.status === 'denied') return res.status(403).json(result);
   if (result.status === 'requires_approval') return res.status(202).json(result);
   return res.json(result);
+});
+
+// ── WAN Monitor (Archer MR505 SIM) ──
+// GET /api/system/wan — สถานะเน็ตผ่านซิม ณ ปัจจุบัน
+router.get('/wan', authenticate, async (_req, res) => {
+  res.json(getWanState());
+});
+
+// POST /api/system/wan/check — ping ใหม่ทันที (ไม่รอ cron 60 วิ)
+router.post('/wan/check', authenticate, async (_req, res) => {
+  try {
+    res.json(await checkWanNow());
+  } catch (err) {
+    res.status(500).json({ error: 'WAN check failed' });
+  }
+});
+
+// POST /api/system/wan/reboot — รีบูต router (SUPERADMIN, ต้องตั้ง ROUTER_REBOOT_CMD ก่อน)
+router.post('/wan/reboot', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  const result = await rebootRouter();
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ success: true });
 });
 
 export default router;
