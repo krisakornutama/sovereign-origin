@@ -13,6 +13,7 @@ import { dmsService } from '../services/dms.service';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from '../services/teach-kids.service';
 import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
+import { maybeAutoStart as maybeAutoStartAiLocal } from '../services/ai-local.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
@@ -243,6 +244,9 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
 
   // ── WAN Monitor: เฝ้าเน็ตซิม Archer MR505 ทุก 60 วิ (alert UP/DOWN + telemetry wan_state) ──
   startWanMonitor(60_000);
+
+  // ── AI Local: ถ้าเปิด + autoStart ถึงจะโหลด (ปิดเป็นค่าเริ่มต้น ต้องกดเปิดเอง) ──
+  maybeAutoStartAiLocal().catch(() => {});
 
   // ── Agentic AI: สรุปประจำวันของแต่ละบทบาทส่ง Telegram ทุกเช้า (report_hour) ──
   async function runAgentMorningReports() {
