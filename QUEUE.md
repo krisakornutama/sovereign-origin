@@ -17,10 +17,18 @@
 - [x] Self-Reliance S1+S2 วันรอด + ทรัพยากรทุกศาสตร์ — **เสร็จแล้ว 25/8/69** (`master 8145555`)
   - `/selfreliance` Days of Autonomy: น้ำ/อาหาร/ไฟ/เงิน + จุดอ่อนบ้านอัตโนมัติ (ทดสอบจริง: อาหาร 1.2 วัน = จุดอ่อน)
   - Inventory เพิ่ม category: SEED/MEDICINE/TOOL — tests 7/7 ผ่าน
+- [x] Router MR505 — ระบบเฝ้าดู + admin API ถอดรหัส — **เสร็จแล้ว 25/8/69** (`master b1417f1` + `efc67fb` + `0f11c7c`)
+  - ทำงานอยู่: router up/down + latency + speedtest + LAN device scan + Telegram alerts (ทุก 60 วิ)
+  - ถอด firmware architecture ครบ: 381 models, Data IDs, login flow, XOR+AES crypto (เอกสารใน `tplink-mr505.service.ts`)
+  - ขาด: AES key exchange (RSA) — ข้อมูลซิม (สัญญาณ/data usage/SMS) เข้ารหัสอยู่ → **defer ไป Sprint ถัดไป**
+- [ ] Router MR505 — AES crypto stack (RSA key exchange + AES-CBC decrypt) — **defer จาก 25/8/69**
+  - โค้ด framework พร้อมใน `tplink-mr505.service.ts` — แค่เพิ่ม crypto + `syncEncryptor` step
+  - ได้เมื่อเสร็จ: สัญญาณซิม RSRP/SINR · data usage · SMS · clients ทุกเครื่อง
 - [ ] Self-Reliance S3-S6 — สวนสมุนไพร+ยาต่อ HERB_DB · วงจรปิดขยะ→ปุ๋ย · Skills Matrix ต่อคน · Crisis Playbooks 1 ปุ่ม
 - [ ] ตั้ง Telegram token ใหม่ — **รอผู้ใช้** (token เดิมโดน Telegram revoke เพราะหลุดในข้อความ) → ไป @BotFather สร้างใหม่ + กด START ที่ bot 1 ครั้ง แล้วใส่ที่หน้า Settings (แล้ว agent ทดสอบส่งให้)
 - [ ] ใบหน้า auto-recognize บน POS — **รอ Ollama เปิด** (โค้ด face-embed พร้อม แต่ Ollama offline)
 - [ ] i18n หน้า restaurant + E2E หน้าใหม่ — priority ต่ำ (ใช้งานได้แล้ว แค่ไม่สลับภาษา/ไม่มี E2E)
 
-หมายเหตุสถานะระบบ (25/8/69): backend tsc สะอาด + tests 16/16 (portfolio 5 + wan 7 + selfreliance 7 - 3 ซ้ำ wan เดิม) + frontend 48 routes build ผ่าน
+หมายเหตุสถานะระบบ (25/8/69): backend tsc สะอาด + tests 16/16 + frontend 48 routes build ผ่าน + API 58 endpoints 0 server error + 43 หน้าเว็บ render ครบ
 หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
+หมายเหตุ hydration: dashboard layout + history range แก้แล้ว (`05a2264` + `ffac9e2`) — ห้ามอ่าน localStorage/URL ตอน render แรก ให้ไปอ่านใน useEffect
