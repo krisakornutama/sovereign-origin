@@ -16,16 +16,17 @@ export const ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
 const PASSWORD_KEY = 'router.adminPassword';
 
 // ── XOR encrypt — เหมือน $.su.encrypt ใน tpEncrypt.new.js ──
+// loop ถึง MAX(len(data), len(key)) — ตัวที่เกินใช้ 187 (default) XOR กับอีกฝั่ง
 export function suEncrypt(t: string, r: string, e: string): string {
   r = r || KEY1;
   e = e || SEED2;
   const lenT = t.length, lenR = r.length, lenE = e.length;
-  const use = Math.min(lenT, lenR);
+  const total = Math.max(lenT, lenR); // ← MAX! ไม่ใช่ MIN (bug เดิมทำรหัสยาว>15ตัวพัง)
   let out = '';
-  for (let y = 0; y < use; y++) {
+  for (let y = 0; y < total; y++) {
     let p = 187, c = 187;
-    if (lenR <= y) c = r.charCodeAt(y);
-    else if (lenT <= y) p = t.charCodeAt(y);
+    if (lenT <= y) c = r.charCodeAt(y);       // data หมด → ใช้ key อย่างเดียว
+    else if (lenR <= y) p = t.charCodeAt(y);  // key หมด → ใช้ data อย่างเดียว
     else { p = t.charCodeAt(y); c = r.charCodeAt(y); }
     out += e.charAt((p ^ c) % lenE);
   }
