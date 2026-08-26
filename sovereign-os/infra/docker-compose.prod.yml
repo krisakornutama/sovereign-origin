@@ -57,7 +57,7 @@ services:
       MQTT_HOST: emqx
       MQTT_PORT: 1883
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
-      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_URL: ${OLLAMA_URL:-http://sovereign-ollama:11434}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-2m}
       TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -138,8 +138,25 @@ services:
         condition: service_healthy
     networks: [internal]
 
+  # ── AI Engine (optional — เปิดด้วย: docker compose --profile ai up -d) ──
+  # โมเดลเก็บใน volume ของเรา — offline 100% ไม่ส่งข้อมูลออก
+  # เปิด: docker compose --profile ai up -d ollama
+  # ปิด: docker compose stop ollama
+  # โหลดโมเดลครั้งแรก: docker exec sovereign-ollama ollama pull gemma3:4b
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sovereign-ollama
+    restart: unless-stopped
+    profiles: ["ai"]
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "30m"
+    networks: [internal]
+
 volumes:
   pgdata:
+  ollama_models:
 
 networks:
   internal:
