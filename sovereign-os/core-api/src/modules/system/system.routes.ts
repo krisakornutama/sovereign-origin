@@ -145,42 +145,4 @@ router.post('/wan/reboot', authenticate, requireRole('SUPERADMIN'), async (_req,
   res.json({ success: true });
 });
 
-// ── AI Local — ปิดเป็นค่าเริ่มต้น ต้องกดเปิดเอง (consent) ──
-router.get('/ai-local/status', authenticate, async (_req, res) => {
-  try {
-    const { getStatus } = await import('../../services/ai-local.service');
-    res.json(await getStatus());
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
-router.put('/ai-local/enabled', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
-  try {
-    const { setEnabled } = await import('../../services/ai-local.service');
-    const enabled = !!req.body?.enabled;
-    const status = await setEnabled(enabled);
-    // ถ้าเปิดทันที ให้ลองโหลดโมเดล (ไม่บล็อก response)
-    if (enabled) {
-      const { loadModel } = await import('../../services/ai-local.service');
-      loadModel().then(r => console.log(r.ok ? '🤖 AI Local loaded' : '🤖 AI Local: ' + r.error));
-    }
-    res.json(status);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
-router.put('/ai-local/auto-start', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
-  try {
-    const { setAutoStart } = await import('../../services/ai-local.service');
-    res.json(await setAutoStart(!!req.body?.autoStart));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
-router.post('/ai-local/load', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
-  try {
-    const { loadModel } = await import('../../services/ai-local.service');
-    const r = await loadModel();
-    if (!r.ok) return res.status(400).json({ error: r.error });
-    res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
-});
-
 export default router;
