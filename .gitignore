@@ -113,6 +113,10 @@ coverage/
 **/infra/offsite/
 **/knowledge/uploads/
 
+# AI Local models (GGUF ~4GB — อย่า commit)
+sovereign-os/core-api/models/
+*.gguf
+
 # DMS firmware config (secret — อย่า commit)
 dms-firmware/config.py
 
