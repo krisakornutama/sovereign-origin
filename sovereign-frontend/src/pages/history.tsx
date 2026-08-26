@@ -42,18 +42,22 @@ export default function HistoryPage() {
   const t = useLanguageStore((s) => s.t);
   const [metrics, setMetrics] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
-  const [range, setRange] = useState<Range>(() => {
-    // เปิดจาก sparkline ใน dashboard (?range=7d/30d) -> ใช้ช่วงนั้นเลย
-    if (typeof window === 'undefined') return '24h';
-    const r = new URLSearchParams(window.location.search).get('range');
-    return r === '7d' || r === '30d' || r === 'custom' ? r : '24h';
-  });
+  // Hydration-safe: server เรนเดอร์ '24h' เสมอ — อ่าน ?range= จาก URL หลัง hydration
+  // (เดิม: useState(() => window ? URLSearchParams... : '24h') → เปิด /history?range=7d
+  //  แล้ว client render ต่างจาก server → hydration mismatch)
+  const [range, setRange] = useState<Range>('24h');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [series, setSeries] = useState<MetricSeries[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // อ่าน ?range= จาก URL (sparkline ที่ dashboard ส่งมา) — หลัง hydration เท่านั้น
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get('range');
+    if (r === '7d' || r === '30d' || r === 'custom') setRange(r);
+  }, []);
 
   // โหลดรายชื่อ metric ที่มีข้อมูลจริงใน TimescaleDB
   useEffect(() => {
