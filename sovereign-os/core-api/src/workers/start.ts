@@ -13,7 +13,6 @@ import { dmsService } from '../services/dms.service';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from '../services/teach-kids.service';
 import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
-import { maybeAutoStart as maybeAutoStartAiLocal } from '../services/ai-local.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
@@ -53,6 +52,7 @@ import { agentActions } from '../services/agent-actions.service';
 import { automationEmitter } from '../services/automation.service';
 import { buildSnapshotForAlert } from '../services/chart-snapshot.service';
 import { predictiveWorker } from '../services/predictive.service';
+import { autoInitLocalLlm } from '../services/local-llm.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // startWorkers — จุดรวมเริ่มงานเบื้องหลังทั้งหมด (ย้ายมาจาก server.ts)
@@ -245,9 +245,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   // ── WAN Monitor: เฝ้าเน็ตซิม Archer MR505 ทุก 60 วิ (alert UP/DOWN + telemetry wan_state) ──
   startWanMonitor(60_000);
 
-  // ── AI Local: ถ้าเปิด + autoStart ถึงจะโหลด (ปิดเป็นค่าเริ่มต้น ต้องกดเปิดเอง) ──
-  maybeAutoStartAiLocal().catch(() => {});
-
   // ── Agentic AI: สรุปประจำวันของแต่ละบทบาทส่ง Telegram ทุกเช้า (report_hour) ──
   async function runAgentMorningReports() {
     try {
@@ -395,6 +392,9 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   const riskWorker = createRiskWorker(config.risk);
   app.locals.riskWorker = riskWorker;
   riskWorker.start();
+
+  // Local LLM — จำสวิตช์ เปิด/ปิด ที่ผู้ใช้ตั้งไว้ (default ปิด — ไม่โหลดโมเดลจนกว่าจะกดเปิด)
+  autoInitLocalLlm();
 
   // Predictive — คาดการณ์แบต + ตรวจ anomaly ทุก 15 นาที (alert → automationEmitter
   // → บันทึก DB + socket 'new_alert' + Telegram — จัดการที่ automation handler ด้านบนแล้ว)
