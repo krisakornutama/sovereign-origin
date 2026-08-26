@@ -450,14 +450,21 @@ export default function Dashboard() {
     if (isHydrated && isAuthenticated && user && user.role !== 'SUPERADMIN') loadFeatures();
   }, [isHydrated, isAuthenticated, user, loadFeatures]);
 
-  const [order, setOrder] = useState<WidgetKey[]>(() =>
-    typeof window !== 'undefined' ? loadLayout().order : DEFAULT_ORDER
-  );
-  const [hidden, setHidden] = useState<Record<string, boolean>>(() =>
-    typeof window !== 'undefined' ? loadLayout().hidden : {}
-  );
+  // ── Hydration-safe layout: server เรนเดอร์ DEFAULT_ORDER เสมอ ──
+  // (เดิม: useState(() => window ? loadLayout() : default) → ผู้ใช้ที่เคยจัดเรียงแดชบอร์ด
+  //  ได้ order ต่างจาก server ตั้งแต่ render แรก → "Expected server HTML to contain
+  //  a matching <rect> in <svg>" — เพราะ WealthWidget/Sankey ไปอยู่คนละตำแหน่ง)
+  // แก้: init เท่ากันทั้งสองฝั่ง แล้วโหลดของที่เคยจัดไว้หลัง hydration (flash แวบเดียวรับได้)
+  const [order, setOrder] = useState<WidgetKey[]>(DEFAULT_ORDER);
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    const saved = loadLayout();
+    setOrder(saved.order);
+    setHidden(saved.hidden);
+  }, []);
 
   useEffect(() => {
     try {
