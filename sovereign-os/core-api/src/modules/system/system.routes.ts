@@ -5,6 +5,7 @@ import { agentActions } from '../../services/agent-actions.service';
 import { listProcesses } from '../../services/system-processes.service';
 import { getDiskInfo } from '../../services/system-monitor.service';
 import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
+import { fetchRouterSimData, setAdminPassword } from '../../services/tplink-mr505.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -113,6 +114,27 @@ router.post('/wan/speedtest', authenticate, async (_req, res) => {
     res.json(await runSpeedtest());
   } catch (err) {
     res.status(500).json({ error: 'Speedtest failed' });
+  }
+});
+
+// GET /api/system/wan/sim — ข้อมูลซิมจากใน router (สัญญาณ RSRP/SINR · data usage · clients ครบ)
+router.get('/wan/sim', authenticate, async (_req, res) => {
+  try {
+    res.json(await fetchRouterSimData());
+  } catch (err) {
+    res.status(500).json({ error: 'Router SIM fetch failed' });
+  }
+});
+
+// PUT /api/system/wan/admin-password {password} — ตั้งรหัส admin ของ router (SUPERADMIN)
+router.put('/wan/admin-password', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const pw = String(req.body?.password || '');
+    if (!pw) return res.status(400).json({ error: 'password required' });
+    await setAdminPassword(pw);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to set password' });
   }
 });
 

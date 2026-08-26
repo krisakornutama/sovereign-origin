@@ -22,6 +22,7 @@ function Dot({ ok }: { ok: boolean }) {
 
 export default function RouterCard() {
   const [d, setD] = useState<WanData | null>(null);
+  const [sim, setSim] = useState<any>(null);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -29,6 +30,8 @@ export default function RouterCard() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system/wan`);
       if (res.ok) setD(await res.json());
+      const s = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system/wan/sim`);
+      if (s.ok) setSim(await s.json());
     } catch { /* offline */ }
   }, []);
 
@@ -97,6 +100,25 @@ export default function RouterCard() {
           ))}
         </div>
       )}
+
+      {/* ── ข้อมูลซิมจากใน router (admin API) ── */}
+      {sim && (
+        <div className="border-t border-gray-800 pt-2">
+          {sim.loggedIn && sim.signal ? (
+            <div className="text-[11px] text-gray-400 space-y-1">
+              <div className="text-gray-300 font-semibold">ข้อมูลซิม (จากใน router):</div>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                {Object.entries(sim.signal).filter(([k]) => !/^(id|layers)/i.test(k)).slice(0, 8).map(([k, v]) => (
+                  <span key={k}>{k}: <b className="text-gray-200">{String(v).slice(0, 24)}</b></span>
+                ))}
+              </div>
+            </div>
+          ) : sim.error ? (
+            <div className="text-[10px] text-gray-600">📶 ข้อมูลซิม: {sim.error}</div>
+          ) : null}
+        </div>
+      )}
+
       <p className="text-[10px] text-gray-600">ตรวจ router ทุก 60 วิ · สแกนอุปกรณ์ทุก 5 นาที · speedtest ทุก 30 นาที — เตือน Telegram เมื่อหลุด/เจออุปกรณ์ใหม่</p>
     </section>
   );
