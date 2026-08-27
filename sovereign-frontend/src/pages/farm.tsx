@@ -26,7 +26,23 @@ const CROP_KEYS: Record<string, string> = {
   อ้อย: 'sugarcane',
   มะนาว: 'lime',
   พริก: 'chili',
+  'ฟ้าทะลายโจร': 'andrographis',
+  'ขมิ้นชัน': 'turmeric',
+  'กระเจี๊ยบแดง': 'hibiscus',
+  'ขิง': 'ginger',
+  'บัวบก': 'gotu-kola',
+  'มะขามป้อม': 'amla',
+  'ดอกคำฝอย': 'safflower',
+  'กระเพรา': 'holy-basil',
+  'ตะไคร้': 'lemongrass',
+  'ว่านหางจระเข้': 'aloe',
 };
+
+const HERB_CROPS = ['ฟ้าทะลายโจร', 'ขมิ้นชัน', 'กระเจี๊ยบแดง', 'ขิง', 'บัวบก', 'มะขามป้อม', 'ดอกคำฝอย', 'กระเพรา', 'ตะไคร้', 'ว่านหางจระเข้'];
+const STANDARD_CROPS = ['ทุเรียน', 'มะเขือเทศ', 'ข้าว', 'ผักสลัด', 'กล้วย', 'อ้อย', 'มะนาว', 'พริก'];
+const ALL_CROPS = [...STANDARD_CROPS, ...HERB_CROPS];
+const HERB_SET = new Set(HERB_CROPS);
+const isHerbCrop = (crop?: string | null) => !!crop && HERB_SET.has(crop.trim());
 
 // ── วิเคราะห์ดิน + NPK/ความชื้น + แผนบำรุงดิน (ต่อแปลง) ──
 function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
@@ -83,7 +99,7 @@ function SoilAnalyzer({ plot }: { plot: FarmPlot }) {
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-lime-300">{t('farm.analyzer.title', 'วิเคราะห์ดิน')}</span>
         <select value={crop} onChange={(e) => setCrop(e.target.value)} className="input text-[11px] flex-1">
-          {['ทุเรียน', 'มะเขือเทศ', 'ข้าว', 'ผักสลัด', 'กล้วย', 'อ้อย', 'มะนาว', 'พริก'].map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
+          {ALL_CROPS.map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
         </select>
         <button onClick={runAnalysis} disabled={loading} className="shrink-0 px-2 py-1 bg-lime-700/60 hover:bg-lime-700 border border-lime-600/50 rounded text-[11px] font-bold disabled:opacity-50">
           {loading ? t('farm.analyzer.analyzing', 'กำลังวิเคราะห์...') : t('farm.analyzer.analyze', 'วิเคราะห์')}
@@ -174,11 +190,13 @@ export default function FarmPage() {
   const t = useLanguageStore((s) => s.t);
   const [plots, setPlots] = useState<FarmPlot[]>([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [herbHarvest, setHerbHarvest] = useState<Record<string, { qtyGram: string; saveSeed: boolean }>>({});
 
   const canWrite = user?.role === 'SUPERADMIN' || user?.role === 'NODE_ADMIN' || user?.role === 'OPERATOR';
 
@@ -201,6 +219,17 @@ export default function FarmPage() {
   useEffect(() => {
     if (isAuthenticated) load();
   }, [isAuthenticated, load]);
+
+  // support ?crop= linking from healing/health
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const qc = sp.get('crop');
+      if (qc && ALL_CROPS.includes(qc)) {
+        setForm((prev) => ({ ...prev, crop: qc }));
+      }
+    }
+  }, []);
 
   if (!isHydrated) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
@@ -273,7 +302,36 @@ export default function FarmPage() {
     }
   };
 
+  const doHerbHarvest = async (plot: FarmPlot) => {
+    const state = herbHarvest[plot.id] || { qtyGram: '', saveSeed: false };
+    const qty = Number(state.qtyGram);
+    if (!qty || qty <= 0) {
+      setError(t('farm.herb.qtyRequired', 'ระบุปริมาณเป็นกรัม (qtyGram)'));
+      return;
+    }
+    setError(''); setMessage('');
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots/${plot.id}/herb-harvest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qtyGram: qty, saveSeed: state.saveSeed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('farm.herb.harvestFailed', 'เก็บเกี่ยวสมุนไพรไม่สำเร็จ'));
+      setMessage(t('farm.herb.harvested', 'เก็บเกี่ยว {crop} {qty}g แล้ว{seed}', { crop: plot.crop || plot.name, qty, seed: state.saveSeed ? t('farm.herb.withSeed', ' + เก็บเมล็ด') : '' }));
+      setHerbHarvest((prev) => ({ ...prev, [plot.id]: { qtyGram: '', saveSeed: false } }));
+      load();
+    } catch (e: any) {
+      setError(e.message || t('farm.herb.harvestFailed', 'เก็บเกี่ยวสมุนไพรไม่สำเร็จ'));
+    }
+  };
+
   const formatDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString(fmtLocale()) : '—');
+
+  const herbPlots = plots.filter((p) => isHerbCrop(p.crop));
+  const herbUpcoming = herbPlots.filter((p) => typeof p.daysToHarvest === 'number' && p.daysToHarvest >= 0 && p.daysToHarvest <= 30 && p.status !== 'harvested');
+  const herbHarvested = herbPlots.filter((p) => p.status === 'harvested');
+  const filteredPlots = categoryFilter === 'HERB' ? plots.filter((p) => isHerbCrop(p.crop)) : plots;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
@@ -286,6 +344,34 @@ export default function FarmPage() {
             subtitle={t('farm.page.subtitle', 'จัดการแปลงปลูก วิเคราะห์ดิน และติดตามการเก็บเกี่ยว')}
             icon={<Icon name="farm" size={18} />}
           />
+          {/* ── Herb Garden Dashboard — S3+S4 ── */}
+          <div className="card panel-cyan p-4 space-y-3">
+            <h3 className="text-xs font-bold tracking-widest text-emerald-300 flex items-center gap-1.5"><Icon name="healing" size={13} /> {t('farm.herbGarden.title', 'สวนสมุนไพร')}</h3>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2">
+                <div className="mono text-xl font-bold text-emerald-300">{herbPlots.length}</div>
+                <div className="text-[11px] text-gray-400">{t('farm.herbGarden.totalBeds', 'แปลงสมุนไพร')}</div>
+              </div>
+              <div className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2">
+                <div className="mono text-xl font-bold text-amber-300">{herbUpcoming.length}</div>
+                <div className="text-[11px] text-gray-400">{t('farm.herbGarden.upcoming', 'ใกล้เก็บเกี่ยว (30วัน)')}</div>
+              </div>
+              <div className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-2">
+                <div className="mono text-xl font-bold text-sky-300">{herbHarvested.length}</div>
+                <div className="text-[11px] text-gray-400">{t('farm.herbGarden.dryingStock', 'ตากแห้ง/เก็บแล้ว')}</div>
+              </div>
+            </div>
+            {herbUpcoming.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {herbUpcoming.slice(0, 6).map((p) => (
+                  <span key={p.id} className="px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                    {p.crop || p.name} · {t('farm.herbGarden.daysLeft', '{n} วัน', { n: p.daysToHarvest ?? 0 })}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* ── Agri-Hub Dense Top — 3D + Breedhouse + Forecast (ภาพ 3) ── */}
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 lg:col-span-7 card panel-glow p-3 overflow-hidden">
@@ -344,7 +430,9 @@ export default function FarmPage() {
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('farm.page.h2', 'แปลงเกษตร (Farm Plots)')}</h2>
             <div className="text-sm text-gray-400">
-              {t('farm.page.total', 'ทั้งหมด {n} แปลง', { n: plots.length })}
+              {categoryFilter === 'HERB'
+                ? t('farm.page.filteredTotal', 'ทั้งหมด {n} แปลง · สมุนไพร {m} แปลง', { n: plots.length, m: filteredPlots.length })
+                : t('farm.page.total', 'ทั้งหมด {n} แปลง', { n: plots.length })}
             </div>
           </div>
 
@@ -357,6 +445,10 @@ export default function FarmPage() {
               <option value="ALL">{t('farm.page.allStatus', 'ทุกสถานะ')}</option>
               {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{t('farm.status.' + key, label)}</option>)}
             </select>
+            <div className="flex gap-1">
+              <button onClick={() => setCategoryFilter('ALL')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${categoryFilter === 'ALL' ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>{t('farm.filter.all', 'ทั้งหมด')}</button>
+              <button onClick={() => setCategoryFilter('HERB')} className={`px-3 py-1.5 rounded-lg text-xs font-bold border inline-flex items-center gap-1 ${categoryFilter === 'HERB' ? 'bg-emerald-900/40 border-emerald-600 text-emerald-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}><Icon name="healing" size={12} /> {t('farm.filter.herb', 'สมุนไพร (HERB)')} · {herbPlots.length}</button>
+            </div>
             <button onClick={load} className="btn-secondary ml-auto">
               <Icon name="refresh" size={14} /> {t('farm.page.reload', 'รีโหลด')}
             </button>
@@ -377,7 +469,15 @@ export default function FarmPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('farm.page.namePlaceholder', 'ชื่อแปลง *')} className="input" />
                 <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder={t('farm.page.locationPlaceholder', 'ตำแหน่ง/โซน')} className="input" />
-                <input value={form.crop} onChange={(e) => setForm({ ...form, crop: e.target.value })} placeholder={t('farm.page.cropPlaceholder', 'พืชที่ปลูก')} className="input" />
+                <select value={form.crop} onChange={(e) => setForm({ ...form, crop: e.target.value })} className="input">
+                  <option value="">{t('farm.page.cropPlaceholder', 'พืชที่ปลูก')}</option>
+                  <optgroup label={t('farm.page.cropGroupStandard', 'พืชทั่วไป')}>
+                    {STANDARD_CROPS.map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
+                  </optgroup>
+                  <optgroup label={t('farm.page.cropGroupHerb', 'สมุนไพร')}>
+                    {HERB_CROPS.map((c) => <option key={c} value={c}>{t('farm.crops.' + CROP_KEYS[c], c)}</option>)}
+                  </optgroup>
+                </select>
                 <input value={form.area_sqm} onChange={(e) => setForm({ ...form, area_sqm: e.target.value })} placeholder={t('farm.page.areaPlaceholder', 'พื้นที่ (ตร.ม.)')} type="number" min="0" className="input" />
                 <input value={form.planted_at} onChange={(e) => setForm({ ...form, planted_at: e.target.value })} type="date" className="input" />
                 <input value={form.expected_harvest_at} onChange={(e) => setForm({ ...form, expected_harvest_at: e.target.value })} type="date" className="input" />
@@ -396,11 +496,11 @@ export default function FarmPage() {
           {/* Plots */}
           {loading ? (
             <div className="flex items-center justify-center py-12 gap-2 text-gray-500"><span className="w-4 h-4 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /><span className="text-sm">{t('farm.page.loading', 'กำลังโหลด…')}</span></div>
-          ) : plots.length === 0 ? (
+          ) : filteredPlots.length === 0 ? (
             <div className="card"><EmptyState icon={<Icon name="farm" size={20} />} title={t('farm.page.noPlots', 'ยังไม่มีแปลง')} description={t('farm.page.noPlotsDesc', 'เริ่มสร้างแปลงแรกเพื่อติดตามการปลูกและวิเคราะห์ดิน')} /></div>
           ) : (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {plots.map((plot) => (
+              {filteredPlots.map((plot) => (
                 <div key={plot.id} className="card p-5 space-y-3 card-hover group relative overflow-hidden">
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
@@ -417,8 +517,15 @@ export default function FarmPage() {
                   </div>
 
                   {plot.crop && (
-                    <div className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                      <Icon name="farm" size={12} /> {plot.crop}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                        <Icon name="farm" size={12} /> {plot.crop}
+                      </div>
+                      {isHerbCrop(plot.crop) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-lime-900/40 border border-lime-700 text-lime-300 font-bold">
+                          <Icon name="healing" size={10} /> {t('farm.badge.herb', 'สมุนไพร')}
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -442,6 +549,31 @@ export default function FarmPage() {
 
                   {/* ── วิเคราะห์ดิน + NPK/ความชื้น ── */}
                   <SoilAnalyzer plot={plot} />
+
+                  {isHerbCrop(plot.crop) && canWrite && (
+                    <div className="flex flex-wrap gap-1.5 items-center bg-lime-950/20 border border-lime-900/40 rounded-lg p-2">
+                      <input
+                        value={herbHarvest[plot.id]?.qtyGram ?? ''}
+                        onChange={(e) => setHerbHarvest((prev) => ({ ...prev, [plot.id]: { qtyGram: e.target.value, saveSeed: prev[plot.id]?.saveSeed ?? false } }))}
+                        placeholder={t('farm.herb.qtyPlaceholder', 'กรัม')}
+                        type="number"
+                        min="1"
+                        className="input text-[11px] w-20 px-1.5 py-1"
+                      />
+                      <label className="flex items-center gap-1 text-[11px] text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={herbHarvest[plot.id]?.saveSeed ?? false}
+                          onChange={(e) => setHerbHarvest((prev) => ({ ...prev, [plot.id]: { qtyGram: prev[plot.id]?.qtyGram ?? '', saveSeed: e.target.checked } }))}
+                          className="accent-emerald-500"
+                        />
+                        {t('farm.herb.saveSeed', 'เก็บเมล็ด')}
+                      </label>
+                      <button onClick={() => doHerbHarvest(plot)} className="text-xs bg-lime-700/60 hover:bg-lime-700 border border-lime-600/50 text-lime-100 rounded px-3 py-1 font-bold inline-flex items-center gap-1">
+                        <Icon name="healing" size={11} /> {t('farm.herb.harvestBtn', 'เก็บเกี่ยวสมุนไพร')}
+                      </button>
+                    </div>
+                  )}
 
                   {canWrite && (
                     <div className="flex gap-2 pt-1 border-t border-gray-800">

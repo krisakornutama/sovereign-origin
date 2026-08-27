@@ -9,6 +9,7 @@ import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import RouterCard from '../components/system/RouterCard';
+import LocalLLMCard from '../components/system/LocalLLMCard';
 
 interface ProcessInfo {
   pid: number;
@@ -122,6 +123,7 @@ export default function SystemHealthPage() {
         />
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
         <RouterCard />
+        <LocalLLMCard />
         {actionMsg && (
           <div className={`card p-3 text-sm ${ACTION_STYLES[actionMsg.type]}`}>
             {actionMsg.text}

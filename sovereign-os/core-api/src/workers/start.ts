@@ -52,6 +52,7 @@ import { agentActions } from '../services/agent-actions.service';
 import { automationEmitter } from '../services/automation.service';
 import { buildSnapshotForAlert } from '../services/chart-snapshot.service';
 import { predictiveWorker } from '../services/predictive.service';
+import { autoInitLocalLlm } from '../services/local-llm.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // startWorkers — จุดรวมเริ่มงานเบื้องหลังทั้งหมด (ย้ายมาจาก server.ts)
@@ -391,6 +392,9 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   const riskWorker = createRiskWorker(config.risk);
   app.locals.riskWorker = riskWorker;
   riskWorker.start();
+
+  // Local LLM — จำสวิตช์ เปิด/ปิด ที่ผู้ใช้ตั้งไว้ (default ปิด — ไม่โหลดโมเดลจนกว่าจะกดเปิด)
+  autoInitLocalLlm();
 
   // Predictive — คาดการณ์แบต + ตรวจ anomaly ทุก 15 นาที (alert → automationEmitter
   // → บันทึก DB + socket 'new_alert' + Telegram — จัดการที่ automation handler ด้านบนแล้ว)

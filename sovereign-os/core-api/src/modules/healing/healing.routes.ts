@@ -41,12 +41,59 @@ router.get('/herbs', authenticate, (_req, res) => {
   res.json({ herbs: HERB_DB });
 });
 
-// POST /api/healing/herbs/check { herb, meds[] } — ตรวจสมุนไพรกับยาที่ทาน
-router.post('/herbs/check', authenticate, (req, res) => {
+// GET /api/healing/herbs-unified — รวม HERB_DB + HERBAL_REMEDIES 12 ชนิด (SystemSetting หรือ hardcode)
+router.get('/herbs-unified', authenticate, async (_req, res) => {
+  try {
+    // ลองอ่านจาก SystemSetting ก่อน (admin อาจตั้งค่า herbs.unified ไว้)
+    try {
+      const setting = await (db as any).systemSetting?.findUnique?.({ where: { key: 'herbs.unified' } });
+      if (setting?.value) {
+        const parsed = JSON.parse(setting.value);
+        const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.herbs) ? parsed.herbs : null;
+        if (arr && arr.length > 0) {
+          return res.json({ herbs: arr.slice(0, 12), total: arr.length, source: 'systemSetting' });
+        }
+      }
+    } catch {}
+    // fallback: hardcode merge HERB_DB + HERBAL_REMEDIES (จาก health.routes.ts)
+    const HERBAL_REMEDIES_FALLBACK: Array<{ herb: string; herbId: string; note: string }> = [
+      { herb: 'กระเจี๊ยบแดง', herbId: 'hibiscus', note: 'ช่วยขับปัสสาวะและปรับสมดุลของเหลว เตือนให้ดื่มน้ำให้เพียงพอระหว่างวัน' },
+      { herb: 'ดอกคำฝอย', herbId: 'safflower', note: 'ช่วยผ่อนคลายและส่งเสริมการนอนหลับ ควรดื่มก่อนนอน 1 ชั่วโมง' },
+      { herb: 'ขิง', herbId: 'ginger', note: 'ช่วยเจริญอาหารและกระตุ้นการย่อยอาหาร ใช้ในปริมาณพอเหมาะ' },
+      { herb: 'บัวบก', herbId: 'gotu-kola', note: 'ช่วยฟื้นฟูความอ่อนเพลียและเพิ่มความสดชื่น ควรพักผ่อนให้เพียงพอร่วมด้วย' },
+      { herb: 'ฟ้าทะลายโจร', herbId: 'andrographis', note: 'ช่วยบรรเทาอาการไข้หวัด ใช้เฉพาะเมื่อมีอาการ และไม่ควรใช้ติดต่อกันเกิน 5 วัน' },
+      { herb: 'ขมิ้นชัน', herbId: 'turmeric', note: 'ช่วยลดท้องอืดและอาการไม่ย่อย ใช้ครั้งละเล็กน้อย' },
+      { herb: 'มะขามป้อม', herbId: 'amla', note: 'ช่วยปรับอารมณ์และลดความเครียด ควรหาเวลาพักผ่อนและพูดคุยกับคนใกล้ชิด' },
+    ];
+    const merged: typeof HERB_DB = [...HERB_DB];
+    for (const r of HERBAL_REMEDIES_FALLBACK) {
+      if (!merged.some((h) => h.name === r.herb)) {
+        merged.push({ name: r.herb, uses: [r.note], warnings: [], interactions: [] });
+      }
+    }
+    const unified = merged.slice(0, 12);
+    res.json({ herbs: unified, total: unified.length, source: 'merged' });
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message || 'ดึงข้อมูลสมุนไพรรวมไม่สำเร็จ') });
+  }
+});
+
+// POST /api/healing/herbs/check { herb, meds[] } — ตรวจสมุนไพรกับยาที่ทาน (auto-merge HealthProfile)
+router.post('/herbs/check', authenticate, async (req, res) => {
   try {
     const herb = String(req.body?.herb ?? '').trim();
-    const meds = Array.isArray(req.body?.meds) ? req.body.meds.map((m: any) => String(m)) : [];
     if (!herb) return res.status(400).json({ error: 'herb is required' });
+    let meds = Array.isArray(req.body?.meds) ? req.body.meds.map((m: any) => String(m)) : [];
+    // auto-merge HealthProfile medications/conditions
+    try {
+      const profile = await (db as any).healthProfile.findFirst();
+      if (profile) {
+        const pMeds = Array.isArray(profile.medications) ? (profile.medications as string[]) : [];
+        const pConds = Array.isArray(profile.conditions) ? (profile.conditions as string[]) : [];
+        const merged = [...meds, ...pMeds, ...pConds].map((s) => String(s).trim()).filter(Boolean);
+        meds = [...new Set(merged)];
+      }
+    } catch {}
     res.json(checkHerbWithMeds(herb, meds));
   } catch (err: any) {
     res.status(400).json({ error: String(err?.message || 'ตรวจสมุนไพรไม่สำเร็จ') });

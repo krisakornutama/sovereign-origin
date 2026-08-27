@@ -134,5 +134,9 @@ sovereign-frontend/e2e/.auth/
 sovereign-frontend/playwright-report/
 sovereign-frontend/test-results/
 
+# Local LLM models (GGUF — หลาย GB อย่า commit)
+sovereign-os/core-api/models/*.gguf
+sovereign-os/core-api/models/*.bin
+
 frontend-watchdog.mjs
 
