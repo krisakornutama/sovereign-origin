@@ -29,6 +29,8 @@ model User {
 
   assigned_node Node?      @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs    AuditLog[]
+  dose_logs     DoseLog[]
+  skill_matrix  SkillMatrix[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
   asset_positions  AssetPosition[]
@@ -45,7 +47,6 @@ model User {
   health_flags       HealthFlag[]
   health_consents    HealthConsent[]
   health_readings    HealthReading[]
-  dose_logs          DoseLog[]
   meditation_sessions MeditationSession[]
   healing_logs       HealingLog[]
 
@@ -1650,6 +1651,65 @@ model LivestockVisionReport {
   @@map("livestock_vision_reports")
 }
 
+// ── Dose Log — ติดตามกินยา/สมุนไพรต่อเนื่อง ──
+model DoseLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String?  @db.Uuid
+  herbId          String
+  inventoryItemId String?  @db.Uuid
+  dose            String? // เช่น "3g ชงน้ำ"
+  takenAt         DateTime @default(now()) @db.Timestamptz
+  note            String?
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, takenAt])
+  @@map("dose_logs")
+}
+
+// ── Herb Bed — แปลงย่อยสมุนไพรใน FarmPlot ──
+model HerbBed {
+  id        String   @id @default(uuid()) @db.Uuid
+  plot_id   String   @db.Uuid
+  herbId    String
+  area_sqm  Float?
+  plantedAt DateTime? @db.Timestamptz
+  status    String   @default("growing") // growing | ready | harvested
+
+  plot FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+
+  @@index([plot_id, status])
+  @@map("herb_beds")
+}
+
+// ── Skills Matrix — คน×ทักษะ ──
+model SkillMatrix {
+  id        String   @id @default(uuid()) @db.Uuid
+  user_id   String?  @db.Uuid
+  skill     String // เช่น "ปลูกข้าว", "ซ่อมปั๊ม"
+  level     Int      @default(1) // 1-5
+  note      String?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, skill])
+  @@index([skill])
+  @@map("skill_matrix")
+}
+
+// ── Crisis Playbook — โหมดวิกฤต 1 ปุ่ม ──
+model CrisisMode {
+  id          String   @id @default(uuid()) @db.Uuid
+  mode        String   @unique // flood | blackout | security
+  active      Boolean  @default(false)
+  actions     Json // string[] เช่น ["ปิดรีเลย์ non-critical","สำรองข้อมูล"]
+  activatedAt DateTime? @db.Timestamptz
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@map("crisis_modes")
+}
+
 // ── Herb Catalog — รวม HERB_DB + HERBAL_REMEDIES 12 ชนิด ──
 model HerbCatalog {
   id               String   @id @default(uuid()) @db.Uuid
@@ -1663,53 +1723,7 @@ model HerbCatalog {
   idealSoil        Json? // {ph: [6,7], moisture: [60,80]}
   createdAt        DateTime @default(now()) @db.Timestamptz
 
-  dose_logs DoseLog[]
-
   @@map("herb_catalogs")
-}
-
-model DoseLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  user_id   String   @db.Uuid
-  herbId    String
-  herbName  String
-  quantity  Float?
-  unit      String? // mg|ml|capsule|tsp
-  dose      String? // "1 เม็ด"
-  taken_at  DateTime @default(now()) @db.Timestamptz
-  note      String?
-  created_at DateTime @default(now()) @db.Timestamptz
-
-  user User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  herb HerbCatalog? @relation(fields: [herbId], references: [herbId])
-
-  @@index([user_id, herbId, taken_at])
-  @@index([user_id, taken_at])
-  @@map("dose_logs")
-}
-
-model HerbBed {
-  id                  String    @id @default(uuid()) @db.Uuid
-  plot_id             String    @db.Uuid
-  name                String? // เบด 1 — ฟ้าทะลายโจร
-  crop                String // 10 HERB_CROPS
-  x_m                 Float     @default(0)
-  y_m                 Float     @default(0)
-  width_m             Float     @default(0.5)
-  length_m            Float     @default(0.5)
-  status              String    @default("active") // active|growing|harvested|fallow
-  planted_at          DateTime? @db.Timestamptz
-  expected_harvest_at DateTime? @db.Timestamptz
-  notes               String?
-  created_at          DateTime  @default(now()) @db.Timestamptz
-  updated_at          DateTime  @updatedAt @db.Timestamptz
-
-  plot FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
-
-  @@index([plot_id])
-  @@index([crop])
-  @@index([status])
-  @@map("herb_beds")
 }
 
 // ── ขยะร้าน → ปุ๋ยหมัก (S4) ──
