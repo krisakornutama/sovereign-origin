@@ -10,7 +10,7 @@ import type { InventoryItem } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
-const CATEGORIES = ['WATER', 'FOOD', 'FUEL', 'MATERIAL', 'PRECIOUS_METAL', 'OTHER'];
+const CATEGORIES = ['WATER', 'FOOD', 'SEED', 'FUEL', 'MEDICINE', 'TOOL', 'MATERIAL', 'PRECIOUS_METAL', 'COMPOST', 'FERTILIZER', 'OTHER'];
 
 const CATEGORY_ICON: Record<string, string> = {
   WATER: 'droplet',
@@ -21,6 +21,8 @@ const CATEGORY_ICON: Record<string, string> = {
   TOOL: 'settings',
   MATERIAL: 'package',
   PRECIOUS_METAL: 'coin',
+  COMPOST: 'recycle',
+  FERTILIZER: 'flower',
   OTHER: 'package',
 };
 
@@ -242,6 +244,23 @@ export default function InventoryPage() {
     }
   };
 
+  const moveToWaste = async (item: InventoryItem) => {
+    if (!window.confirm(t('inventory.waste.confirm', 'ย้าย "{name}" ไปหมัก (move-to-waste)?', { name: item.name }))) return;
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/${item.id}/move-to-waste`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'expired' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('inventory.waste.failed', 'ย้ายไปหมักไม่สำเร็จ'));
+      setMessage(t('inventory.waste.moved', 'ย้าย "{name}" ไปหมักแล้ว', { name: item.name }));
+      load();
+    } catch (e: any) {
+      setError(e.message || t('inventory.waste.failed', 'ย้ายไปหมักไม่สำเร็จ'));
+    }
+  };
+
   const totalValue = items.reduce((sum, i) => sum + (i.quantity ?? 0) * (i.unit_price_usd ?? 0), 0);
 
   return (
@@ -286,6 +305,30 @@ export default function InventoryPage() {
               <Icon name="refresh" size={14} /> {t('inventory.page.reload', 'รีโหลด')}
             </button>
           </div>
+          {/* Category tabs — quick filter pills, MEDICINE has special warnings */}
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setCategory('ALL')} className={`px-2.5 py-1 rounded-full text-xs font-bold border ${category === 'ALL' ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>{t('inventory.tab.all', 'ทั้งหมด')}</button>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${category === c ? (c === 'MEDICINE' ? 'bg-emerald-900/40 border-emerald-600 text-emerald-300' : c === 'COMPOST' ? 'bg-lime-900/30 border-lime-700 text-lime-300' : 'bg-gray-800 border-gray-600 text-white') : 'bg-gray-900 border-gray-700 text-gray-400'}`}
+              >
+                <Icon name={CATEGORY_ICON[c] ?? 'package'} size={11} /> {c}
+                {c === 'MEDICINE' && <span className="ml-0.5 text-[10px] opacity-70">({items.filter((i) => i.category === 'MEDICINE').length})</span>}
+              </button>
+            ))}
+          </div>
+          {category === 'MEDICINE' && items.length > 0 && (
+            <div className="card p-3 bg-emerald-950/20 border-emerald-800/40 space-y-1">
+              <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5"><Icon name="health" size={12} /> {t('inventory.medicine.title', 'ยาสมุนไพร — ดูวันหมดอายุ & เตือนปริมาณน้อย')}</div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-1 rounded bg-red-900/30 border border-red-800 text-red-300">{t('inventory.medicine.expiredCount', 'หมดอายุ: {n}', { n: items.filter((i) => i.expiry.status === 'expired').length })}</span>
+                <span className="px-2 py-1 rounded bg-amber-900/30 border border-amber-800 text-amber-300">{t('inventory.medicine.expiringCount', 'ใกล้หมดอายุ: {n}', { n: items.filter((i) => i.expiry.status === 'expiring').length })}</span>
+                <span className="px-2 py-1 rounded bg-sky-900/30 border border-sky-800 text-sky-300">{t('inventory.medicine.lowCount', 'โดสต่ำ/สต็อกต่ำ: {n}', { n: items.filter((i) => i.lowStock).length })}</span>
+              </div>
+            </div>
+          )}
 
           {/* Add form */}
           {canWrite && (
@@ -341,10 +384,18 @@ export default function InventoryPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-800/50">
                     {items.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-800/50 transition-colors group">
+                      <tr key={item.id} className={`hover:bg-gray-800/50 transition-colors group ${item.category === 'MEDICINE' && (item.expiry.status === 'expiring' || item.expiry.status === 'expired') ? 'bg-red-950/10' : ''} ${item.lowStock && item.category === 'MEDICINE' ? 'bg-amber-950/10' : ''}`}>
                       <td className="px-4 py-3 font-semibold">
-                        {item.name}
+                        <span className="inline-flex items-center gap-1.5">
+                          {item.name}
+                          {item.notes && item.notes.includes('จากแปลง') && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-lime-900/40 border border-lime-700 text-lime-300 font-bold">{t('inventory.badge.fromGarden', 'จากสวน')}</span>
+                          )}
+                        </span>
                         {item.notes && <div className="text-xs text-gray-500 font-normal">{item.notes}</div>}
+                        {item.category === 'MEDICINE' && item.lowStock && (
+                          <div className="text-[11px] text-amber-400 inline-flex items-center gap-1 mt-0.5"><Icon name="alert-triangle" size={11} /> {t('inventory.medicine.lowDose', 'โดสใกล้หมด — เติมหรือเก็บเกี่ยวเพิ่ม')}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
@@ -361,13 +412,23 @@ export default function InventoryPage() {
                           {t('inventory.status.' + item.expiry.status, STATUS_LABEL[item.expiry.status] ?? item.expiry.status)}
                           {item.expiry.daysLeft != null && item.expiry.status !== 'expired' && item.expiry.status !== 'na' && t('inventory.page.daysLeft', ' ({n} วัน)', { n: item.expiry.daysLeft })}
                         </span>
+                        {item.category === 'MEDICINE' && item.expiry.status === 'expiring' && item.expiry.daysLeft != null && item.expiry.daysLeft <= 7 && (
+                          <span className="ml-1 text-[11px] text-red-400 font-bold">{t('inventory.medicine.urgent', 'ด่วน!')}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {item.lowStock ? <span className="inline-flex items-center gap-1 text-red-400 glow-text-red"><Icon name="alert-triangle" size={12} />{t('inventory.page.lowBadge', 'ต่ำกว่าเกณฑ์')}</span> : <span className="text-gray-500">OK</span>}
                       </td>
                       {canWrite && (
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => remove(item)} className="text-red-400 hover:text-red-300 text-xs"><Icon name="trash" size={14} /></button>
+                          <div className="flex items-center justify-end gap-2">
+                            {(item.expiry.status === 'expired' || item.expiry.status === 'expiring') && (
+                              <button onClick={() => moveToWaste(item)} className="text-xs px-2 py-1 bg-amber-700/30 hover:bg-amber-700/50 border border-amber-600/40 text-amber-300 rounded inline-flex items-center gap-1">
+                                <Icon name="recycle" size={12} /> {t('inventory.waste.move', 'ย้ายไปหมัก')}
+                              </button>
+                            )}
+                            <button onClick={() => remove(item)} className="text-red-400 hover:text-red-300 text-xs"><Icon name="trash" size={14} /></button>
+                          </div>
                         </td>
                       )}
                     </tr>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { buildFarmMapSvg } from '../../services/farm-map.service';
+import { deductStock } from '../../services/inventory.service';
 
 const router = Router();
 export { prisma };
@@ -281,6 +282,67 @@ router.post('/:id/harvest', authenticate, requireRole(...WRITE_ROLES), async (re
   }
 });
 
+// POST /api/farm/plots/:id/herb-harvest { qtyGram, saveSeed?, grade?, note?, seedQtyGram? } — เก็บสมุนไพร -> MEDICINE (+ SEED optional)
+router.post('/:id/herb-harvest', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const plot = await prisma.farmPlot.findUnique({ where: { id: req.params.id } });
+    if (!plot) return res.status(404).json({ error: 'Plot not found' });
+    // รองรับทั้ง qtyGram และ yieldKg (fallback) เพื่อความยืดหยุ่น
+    let qtyGram = Number(req.body?.qtyGram);
+    if (!qtyGram || Number.isNaN(qtyGram) || qtyGram <= 0) {
+      const y = Number(req.body?.yieldKg);
+      if (y && y > 0) qtyGram = y * 1000;
+    }
+    if (!qtyGram || Number.isNaN(qtyGram) || qtyGram <= 0) {
+      const q = Number(req.body?.qty);
+      if (q && q > 0) qtyGram = q;
+    }
+    if (!qtyGram || qtyGram <= 0) return res.status(400).json({ error: 'qtyGram must be > 0' });
+    if (qtyGram > 100000 * 1000) return res.status(400).json({ error: 'qtyGram too large (max 100000 kg)' });
+    const qtyKg = qtyGram / 1000;
+    const grade = req.body?.grade ? String(req.body.grade).slice(0, 20) : null;
+    const note = req.body?.note ? String(req.body.note).slice(0, 300) : null;
+    const saveSeed = req.body?.saveSeed === true || req.body?.saveSeed === 'true' || req.body?.saveSeed === 1 || req.body?.saveSeed === '1';
+    const seedQtyGramRaw = Number(req.body?.seedQtyGram ?? req.body?.seedQty ?? 0);
+    const userId = (req as any).user?.id as string;
+    const cropName = plot.crop || plot.name;
+    const item = await prisma.inventoryItem.create({
+      data: {
+        user_id: userId,
+        name: `${cropName}${grade ? ` (${grade})` : ''}`,
+        category: 'MEDICINE',
+        quantity: qtyKg,
+        unit: 'kg',
+        unit_price_usd: 0,
+        location: plot.name,
+        notes: note ? `สมุนไพรจากแปลง ${plot.name} — ${note}` : `สมุนไพรจากแปลง ${plot.name}`,
+      },
+    });
+    let seedItem: any = null;
+    if (saveSeed) {
+      const seedKg = seedQtyGramRaw > 0 ? seedQtyGramRaw / 1000 : Math.round(qtyGram * 0.1) / 1000;
+      const finalSeedKg = seedKg > 0 ? seedKg : qtyKg * 0.1;
+      seedItem = await prisma.inventoryItem.create({
+        data: {
+          user_id: userId,
+          name: `${cropName} เมล็ดพันธุ์${grade ? ` (${grade})` : ''}`,
+          category: 'SEED',
+          quantity: finalSeedKg,
+          unit: 'kg',
+          unit_price_usd: 0,
+          location: plot.name,
+          notes: `เมล็ดพันธุ์จากแปลง ${plot.name}${note ? ` — ${note}` : ''}`,
+        },
+      });
+    }
+    await prisma.farmPlot.update({ where: { id: plot.id }, data: { status: 'harvested' } });
+    res.status(201).json({ success: true, inventoryId: item.id, seedInventoryId: seedItem?.id ?? null, plotId: plot.id, qtyGram, qtyKg, saveSeed });
+  } catch (err) {
+    console.error('Herb harvest error:', err);
+    res.status(500).json({ error: 'Failed to herb-harvest' });
+  }
+});
+
 // GET /api/farm/plots/:id/analysis?crop=ทุเรียน — วิเคราะห์ดินเทียบกับพืชที่ต้องการปลูก
 router.get('/:id/analysis', authenticate, async (req, res) => {
   try {
@@ -309,6 +371,47 @@ router.get('/:id/analysis', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Soil analysis error:', err);
     res.status(500).json({ error: 'Failed to analyze soil' });
+  }
+});
+
+// POST /api/farm/plots/:id/apply-fertilizer {qtyKg, compostBatchId?, inventoryItemId?, note?}
+router.post('/:id/apply-fertilizer', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+  try {
+    const plot = await prisma.farmPlot.findUnique({ where: { id: req.params.id } });
+    if (!plot) return res.status(404).json({ error: 'Plot not found' });
+
+    const qtyKg = Number(req.body?.qtyKg);
+    if (!Number.isFinite(qtyKg) || qtyKg <= 0) return res.status(400).json({ error: 'qtyKg must be > 0' });
+    if (qtyKg > 100000) return res.status(400).json({ error: 'qtyKg too large (max 100000)' });
+
+    const compostBatchId = req.body?.compostBatchId ? String(req.body.compostBatchId) : null;
+    const inventoryItemId = req.body?.inventoryItemId ? String(req.body.inventoryItemId) : null;
+    const note = req.body?.note ? String(req.body.note).slice(0, 500) : null;
+
+    if (compostBatchId) {
+      const batch = await prisma.compostBatch.findUnique({ where: { id: compostBatchId } });
+      if (!batch) return res.status(404).json({ error: 'Compost batch not found' });
+    }
+
+    let stock: any = null;
+    if (inventoryItemId) {
+      stock = await deductStock(prisma as any, inventoryItemId, qtyKg);
+    }
+
+    const application = await prisma.fertilizerApplication.create({
+      data: {
+        plotId: plot.id,
+        compostBatchId,
+        inventoryItemId,
+        qtyKg,
+        note,
+      },
+    });
+
+    res.status(201).json({ success: true, application, stock });
+  } catch (err) {
+    console.error('Apply fertilizer error:', err);
+    res.status(500).json({ error: 'Failed to apply fertilizer' });
   }
 });
 
