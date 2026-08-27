@@ -29,6 +29,8 @@ model User {
 
   assigned_node Node?      @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs    AuditLog[]
+  dose_logs     DoseLog[]
+  skill_matrix  SkillMatrix[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
   asset_positions  AssetPosition[]
@@ -40,6 +42,13 @@ model User {
   treasury_events  TreasuryEvent[]
   transfer_orders  TransferOrder[]
   dime_statements  DimeStatement[]
+  health_profile     HealthProfile?
+  health_observations HealthObservation[]
+  health_flags       HealthFlag[]
+  health_consents    HealthConsent[]
+  health_readings    HealthReading[]
+  meditation_sessions MeditationSession[]
+  healing_logs       HealingLog[]
 
   @@map("users")
 }
@@ -465,6 +474,7 @@ model FarmPlot {
 
   soil_readings FarmSoilReading[]
   fertilizer_applications FertilizerApplication[]
+  herb_beds HerbBed[]
 
   @@index([status])
   @@index([category])
@@ -512,9 +522,10 @@ enum HealthFlagStatus {
   ADDRESSED
 }
 
-// อาการที่ดักจับได้ (จากเซ็นเซอร์ / บทสนทนา / ผู้ใช้กรอกเอง)
+// อาการที่ดักจับได้ (จากเซ็นเซอร์ / บทสนทนา / ผู้ใช้กรอกเอง) — ต่อคน
 model HealthObservation {
   id          String         @id @default(uuid()) @db.Uuid
+  user_id     String?        @db.Uuid
   category    HealthCategory
   detail      String? // เช่น "เข้าห้องน้ำ 3 ครั้งกลางดึก"
   source      String         @default("conversation") // manual | sensor | conversation
@@ -522,13 +533,17 @@ model HealthObservation {
   observed_at DateTime       @default(now()) @db.Timestamptz
   created_at  DateTime       @default(now()) @db.Timestamptz
 
-  @@index([category, observed_at])
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, category, observed_at])
+  @@index([user_id, observed_at])
   @@map("health_observations")
 }
 
-// Flag ข้อสงสัยทางสุขภาพ — ล้างได้เมื่อผู้ใช้ชี้แจง / ตอบรับแล้ว
+// Flag ข้อสงสัยทางสุขภาพ — ล้างได้เมื่อผู้ใช้ชี้แจง / ตอบรับแล้ว — ต่อคน
 model HealthFlag {
   id         String           @id @default(uuid()) @db.Uuid
+  user_id    String?          @db.Uuid
   flag_type  String // CHECK_URINATION, CHECK_SLEEP, ...
   category   HealthCategory
   status     HealthFlagStatus @default(PENDING)
@@ -536,27 +551,37 @@ model HealthFlag {
   created_at DateTime         @default(now()) @db.Timestamptz
   cleared_at DateTime?        @db.Timestamptz
 
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
   @@index([status])
   @@map("health_flags")
 }
 
-// ความยินยอมรายหมวด (Privacy Control) — ผู้ใช้เลือกได้ว่าให้ระบบเก็บ/ใช้ข้อมูลใด
+// ความยินยอมรายหมวด (Privacy Control) — ต่อคน
 model HealthConsent {
   id         String   @id @default(uuid()) @db.Uuid
-  category   String   @unique // telemetry | conversation | export
+  user_id    String?  @db.Uuid
+  category   String // telemetry | conversation | export
   granted    Boolean  @default(true)
   updated_at DateTime @default(now()) @db.Timestamptz
 
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, category])
+  @@index([user_id])
   @@map("health_consents")
 }
 
-// ประวัติสุขภาพผู้ใช้ (สำหรับ Medical Contraindication Check)
-// conditions/medications เก็บเป็นรหัสมาตรฐาน เช่น ["kidney_disease","gallbladder"] / ["anticoagulant"]
+// ประวัติสุขภาพผู้ใช้ (สำหรับ Medical Contraindication Check) — ต่อคน (Way A)
 model HealthProfile {
   id          String   @id @default(uuid()) @db.Uuid
+  user_id     String?  @unique @db.Uuid
   conditions  Json // []
   medications Json // []
   updated_at  DateTime @default(now()) @db.Timestamptz
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("health_profiles")
 }
@@ -574,6 +599,7 @@ enum HealthReadingType {
 
 model HealthReading {
   id          String            @id @default(uuid()) @db.Uuid
+  user_id     String?           @db.Uuid
   type        HealthReadingType
   value       Float // น้ำหนัก kg | น้ำตาล mg/dL | อุณหภูมิ °C ; BP = ค่า systolic
   systolic    Int? // BP เท่านั้น
@@ -582,6 +608,9 @@ model HealthReading {
   measured_at DateTime          @default(now()) @db.Timestamptz
   created_at  DateTime          @default(now()) @db.Timestamptz
 
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, type, measured_at])
   @@index([type, measured_at])
   @@map("health_readings")
 }
@@ -1216,21 +1245,29 @@ model BuddhistTeaching {
 
 model MeditationSession {
   id           String   @id @default(uuid()) @db.Uuid
+  user_id      String?  @db.Uuid
   type         String   @default("หายใจ")
   duration_min Int      @default(5)
   note         String?
   started_at   DateTime @default(now()) @db.Timestamptz
 
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, started_at])
   @@map("meditation_sessions")
 }
 
 model HealingLog {
   id        String   @id @default(uuid()) @db.Uuid
+  user_id   String?  @db.Uuid
   metric    String // stress | pain | anxiety | meditation_min | sleep_hours | hrv | wbc ...
   value     Float
   note      String?
   logged_at DateTime @default(now()) @db.Timestamptz
 
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, logged_at])
   @@map("healing_logs")
 }
 
@@ -1612,6 +1649,65 @@ model LivestockVisionReport {
 
   @@index([livestockGroupId, created_at])
   @@map("livestock_vision_reports")
+}
+
+// ── Dose Log — ติดตามกินยา/สมุนไพรต่อเนื่อง ──
+model DoseLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String?  @db.Uuid
+  herbId          String
+  inventoryItemId String?  @db.Uuid
+  dose            String? // เช่น "3g ชงน้ำ"
+  takenAt         DateTime @default(now()) @db.Timestamptz
+  note            String?
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, takenAt])
+  @@map("dose_logs")
+}
+
+// ── Herb Bed — แปลงย่อยสมุนไพรใน FarmPlot ──
+model HerbBed {
+  id        String   @id @default(uuid()) @db.Uuid
+  plot_id   String   @db.Uuid
+  herbId    String
+  area_sqm  Float?
+  plantedAt DateTime? @db.Timestamptz
+  status    String   @default("growing") // growing | ready | harvested
+
+  plot FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
+
+  @@index([plot_id, status])
+  @@map("herb_beds")
+}
+
+// ── Skills Matrix — คน×ทักษะ ──
+model SkillMatrix {
+  id        String   @id @default(uuid()) @db.Uuid
+  user_id   String?  @db.Uuid
+  skill     String // เช่น "ปลูกข้าว", "ซ่อมปั๊ม"
+  level     Int      @default(1) // 1-5
+  note      String?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, skill])
+  @@index([skill])
+  @@map("skill_matrix")
+}
+
+// ── Crisis Playbook — โหมดวิกฤต 1 ปุ่ม ──
+model CrisisMode {
+  id          String   @id @default(uuid()) @db.Uuid
+  mode        String   @unique // flood | blackout | security
+  active      Boolean  @default(false)
+  actions     Json // string[] เช่น ["ปิดรีเลย์ non-critical","สำรองข้อมูล"]
+  activatedAt DateTime? @db.Timestamptz
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@map("crisis_modes")
 }
 
 // ── Herb Catalog — รวม HERB_DB + HERBAL_REMEDIES 12 ชนิด ──
