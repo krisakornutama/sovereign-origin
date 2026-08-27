@@ -128,7 +128,8 @@ export function mapCategory(raw: unknown): string {
   if (/(water|drink|น้ำดื่ม|น้ำเปล่า|น้ำกิ่ง|น้ำ)/.test(s)) return 'WATER';
   if (/(food|rice|milk|snack|nut|meat|egg|ข้าว|อาหาร|นม|ผลไม้|เนื้อ|ไข่|เครื่องปรุง)/.test(s)) return 'FOOD';
   if (/(gold|silver|ทอง)/.test(s)) return 'PRECIOUS_METAL';
-  if (/(material|battery|tool|medicine|drug|medication|supplement|วัสดุ|แบตเตอรี่|ยา|เครื่องมือ|วิตามิน)/.test(s)) return 'MATERIAL';
+  if (/(medicine|drug|medication|supplement|ยา|วิตามิน)/.test(s)) return 'MEDICINE';
+  if (/(material|battery|tool|วัสดุ|แบตเตอรี่|เครื่องมือ)/.test(s)) return 'MATERIAL';
   return 'OTHER';
 }
 

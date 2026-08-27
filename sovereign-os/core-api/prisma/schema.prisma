@@ -458,13 +458,16 @@ model FarmPlot {
   planted_at          DateTime? @db.Timestamptz // วันที่ปลูก
   expected_harvest_at DateTime? @db.Timestamptz // คาดว่าออกผลเมื่อไหร่
   status              String    @default("active") // active | growing | harvested | fallow
+  category            String    @default("GENERAL") // GENERAL | HERB
   notes               String?
   created_at          DateTime  @default(now()) @db.Timestamptz
   updated_at          DateTime  @updatedAt @db.Timestamptz
 
   soil_readings FarmSoilReading[]
+  fertilizer_applications FertilizerApplication[]
 
   @@index([status])
+  @@index([category])
   @@index([expected_harvest_at])
   @@map("farm_plots")
 }
@@ -1609,4 +1612,71 @@ model LivestockVisionReport {
 
   @@index([livestockGroupId, created_at])
   @@map("livestock_vision_reports")
+}
+
+// ── Herb Catalog — รวม HERB_DB + HERBAL_REMEDIES 12 ชนิด ──
+model HerbCatalog {
+  id               String   @id @default(uuid()) @db.Uuid
+  herbId           String   @unique // andrographis, turmeric, hibiscus ...
+  thaiName         String
+  latinName        String?
+  uses             Json // string[]
+  warnings         Json // string[]
+  contraindications Json // string[] เช่น ["pregnancy","hypotension"]
+  growthDays       Int? // วันจากปลูกถึงเก็บ
+  idealSoil        Json? // {ph: [6,7], moisture: [60,80]}
+  createdAt        DateTime @default(now()) @db.Timestamptz
+
+  @@map("herb_catalogs")
+}
+
+// ── ขยะร้าน → ปุ๋ยหมัก (S4) ──
+model RestaurantWasteLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  restaurantId    String?  @db.Uuid
+  inventoryItemId String?  @db.Uuid
+  qtyKg           Float
+  unit            String   @default("kg")
+  reason          String   @default("spoiled") // trim | spoiled | expired | plate_waste | prep_error
+  note            String?
+  createdAt       DateTime @default(now()) @db.Timestamptz
+
+  @@index([restaurantId, createdAt])
+  @@index([reason])
+  @@map("restaurant_waste_logs")
+}
+
+model CompostBatch {
+  id           String    @id @default(uuid()) @db.Uuid
+  method       String    @default("hot") // hot | vermi | bokashi | biochar
+  status       String    @default("active") // active | curing | ready | applied
+  inputKg      Float
+  outputKg     Float? // หลังย่อย 50%
+  npkEstimate  Json? // {n,p,k}
+  startAt      DateTime  @default(now()) @db.Timestamptz
+  estReadyAt   DateTime?
+  readyAt      DateTime?
+  note         String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+
+  applications FertilizerApplication[]
+
+  @@index([status, estReadyAt])
+  @@map("compost_batches")
+}
+
+model FertilizerApplication {
+  id              String   @id @default(uuid()) @db.Uuid
+  plotId          String   @db.Uuid
+  compostBatchId  String?  @db.Uuid
+  inventoryItemId String?  @db.Uuid
+  qtyKg           Float
+  appliedAt       DateTime @default(now()) @db.Timestamptz
+  note            String?
+
+  plot         FarmPlot     @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  compostBatch CompostBatch? @relation(fields: [compostBatchId], references: [id])
+
+  @@index([plotId, appliedAt])
+  @@map("fertilizer_applications")
 }

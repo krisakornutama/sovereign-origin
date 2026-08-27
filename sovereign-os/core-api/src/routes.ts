@@ -49,6 +49,8 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import documentsRoutes from './modules/documents/documents.routes';
 import farmRoutes from './modules/farm/farm.routes';
 import livestockRoutes from './modules/livestock/livestock.routes';
+import compostRoutes from './modules/compost/compost.routes';
+import wasteRoutes from './modules/waste/waste.routes';
 import propertyRoutes from './modules/property/property.routes';
 import restaurantRoutes from './modules/restaurant/restaurant.routes';
 import govsimRoutes from './modules/govsim/govsim.routes';
@@ -128,7 +130,10 @@ export function mountRoutes(app: Express): void {
   // เปิด-ปิดกลุ่ม API ระดับโมดูลผ่าน infra/.env — ปิดแล้ว route ไม่ถูก mount (404)
   if (config.modules.isEnabled('inventory')) {
     app.use('/api/inventory', featureGuard('/inventory'), inventoryRoutes); // Water & Food Inventory + วันหมดอายุ
+    app.use('/api/inventory', featureGuard('/inventory'), wasteRoutes); // S4: ขยะร้าน → ปุ๋ยหมัก — move-to-waste
   }
+  // S4: Compost loop — ขยะร้าน → ปุ๋ยหมัก → แปลงเกษตร
+  app.use('/api/compost', featureGuard('/farm'), compostRoutes);
   if (config.modules.isEnabled('documents')) {
     app.use('/api/documents', featureGuard('/inventory'), documentsRoutes); // P5 Document Understanding
   }

@@ -6,12 +6,14 @@
 export const INVENTORY_CATEGORIES = [
   'WATER',
   'FOOD',
-  'SEED', // เมล็ดพันธุ์ — คลังพันธุ์ที่เก็บได้ (ผูก shelf_life_days = อายุงอก)
+  'SEED',
   'FUEL',
-  'MEDICINE', // ยาประจำบ้าน/เวชภัณฑ์ (expiry สำคัญ)
-  'TOOL', // เครื่องมือซ่อมบำรุง
+  'MEDICINE',
+  'TOOL',
   'MATERIAL',
   'PRECIOUS_METAL',
+  'COMPOST',
+  'FERTILIZER',
   'OTHER',
 ] as const;
 export type InventoryCategory = (typeof INVENTORY_CATEGORIES)[number];

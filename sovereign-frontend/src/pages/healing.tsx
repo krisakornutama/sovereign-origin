@@ -2,6 +2,7 @@
 // Sovereign Buddhist Healing Module — ห้องเยียวยา (ธรรมะบำบัดใจ + สมาธิ + สมุนไพรคู่ยา + ติดตามผล)
 // ดีไซน์: ห้องสว่างเทียนในคฤหาสน์ command center — เทียนแห่งสติ = ไฟที่ลุกตามสมาธิที่ทำจริง
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { authFetch } from '../lib/apiFetch';
 import { asObject } from '../lib/fetchJson';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -141,6 +142,24 @@ export default function HealingPage() {
   useEffect(() => {
     if (isAuthenticated) load();
   }, [isAuthenticated, load]);
+
+  // auto-fill meds from HealthProfile (fetch /api/health/profile and merge)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/profile`);
+        if (!r.ok) return;
+        const p = await r.json();
+        const meds: string[] = Array.isArray(p.medications) ? p.medications : [];
+        const conds: string[] = Array.isArray(p.conditions) ? p.conditions : [];
+        const merged = [...meds, ...conds].map((s) => String(s).trim()).filter(Boolean);
+        if (merged.length > 0) {
+          setHerbCheck((prev) => (prev.meds.trim() === '' ? { ...prev, meds: merged.join(', ') } : prev));
+        }
+      } catch {}
+    })();
+  }, [isAuthenticated]);
 
   const askCompanion = async () => {
     if (!chatMsg.trim()) return;
@@ -391,7 +410,12 @@ export default function HealingPage() {
               <div className="grid md:grid-cols-2 gap-3">
                 {herbs.map((h) => (
                   <div key={h.name} className={`${CARD} p-4 space-y-2`}>
-                    <h3 className="font-script font-semibold text-[#93A97E] flex items-center gap-1.5"><Icon name="farm" size={14} /> {h.name}</h3>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-script font-semibold text-[#93A97E] flex items-center gap-1.5"><Icon name="farm" size={14} /> {h.name}</h3>
+                      <Link href={`/farm?crop=${encodeURIComponent(h.name)}`} className="text-[11px] px-2 py-1 bg-[#E3B04B] text-[#1A1209] rounded font-semibold inline-flex items-center gap-1 hover:bg-[#F0C069]">
+                        <Icon name="farm" size={11} /> {t('healing.herbTab.plantInGarden', 'ปลูกในสวน')}
+                      </Link>
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {h.uses.map((u) => <span key={u} className="text-[10px] border border-[#3A2C1B] px-2 py-0.5 rounded-full text-[#B99F70]">{u}</span>)}
                     </div>

@@ -357,9 +357,19 @@ export default function HealthPage() {
                     <span className="text-xs text-gray-500">{t('health.daysWindow', '/ 14 วัน (เกณฑ์ {threshold})', { threshold: c.threshold })}</span>
                   </div>
                   {c.triggered && (
-                    <div className="mt-2 text-xs">
+                    <div className="mt-2 text-xs space-y-1.5">
                       <div className="text-amber-300 flex items-center gap-1"><Icon name="farm" size={12} /> {c.herb}</div>
                       {c.blocked && <div className="text-red-400 flex items-center gap-1"><Icon name="x-circle" size={12} /> {t('health.blocked', 'ห้ามใช้: {reasons}', { reasons: c.reasons.map((r) => t('health.condition.' + r, CONDITION_LABELS[r] || r)).join(', ') })}</div>}
+                      {!c.blocked && c.herb && c.herb !== '—' && (
+                        <div className="flex flex-wrap gap-1">
+                          <Link href={`/farm?crop=${encodeURIComponent(c.herb)}`} className="px-2 py-1 rounded bg-emerald-900/30 border border-emerald-700 text-emerald-300 inline-flex items-center gap-1 hover:bg-emerald-800/40">
+                            <Icon name="farm" size={11} /> {t('health.herb.hasInGarden', 'มีในสวนไหม?')}
+                          </Link>
+                          <Link href={`/inventory?category=MEDICINE`} className="px-2 py-1 rounded bg-lime-900/30 border border-lime-700 text-lime-300 inline-flex items-center gap-1 hover:bg-lime-800/40">
+                            <Icon name="healing" size={11} /> {t('health.herb.orderHarvest', 'สั่งเก็บเกี่ยว')}
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

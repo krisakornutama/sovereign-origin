@@ -144,7 +144,7 @@ router.post('/', authenticate, requireRole(...WRITE_ROLES), async (req, res) => 
     const cat = String(category || 'OTHER').toUpperCase();
     if (!isCategoryValid(cat)) {
       return res.status(400).json({
-        error: `Invalid category — ใช้ได้: WATER, FOOD, FUEL, MATERIAL, PRECIOUS_METAL, OTHER`,
+        error: `Invalid category — ใช้ได้: WATER, FOOD, SEED, FUEL, MEDICINE, TOOL, MATERIAL, PRECIOUS_METAL, COMPOST, FERTILIZER, OTHER`,
       });
     }
     if (!(Number(quantity) >= 0)) {
@@ -217,7 +217,7 @@ router.put('/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) =
           return res.status(400).json({ error: 'name cannot be empty' });
         }
         if (key === 'category' && value !== undefined && !isCategoryValid(String(value))) {
-          return res.status(400).json({ error: `Invalid category — ใช้ได้: WATER, FOOD, FUEL, MATERIAL, PRECIOUS_METAL, OTHER` });
+          return res.status(400).json({ error: `Invalid category — ใช้ได้: WATER, FOOD, SEED, FUEL, MEDICINE, TOOL, MATERIAL, PRECIOUS_METAL, COMPOST, FERTILIZER, OTHER` });
         }
         if (key === 'quantity' && value !== undefined && !(Number(value) >= 0)) {
           return res.status(400).json({ error: 'quantity must be >= 0' });

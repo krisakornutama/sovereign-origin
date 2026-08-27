@@ -13,12 +13,12 @@ interface Settings { people: number; waterTankL: number; waterLPerPersonDay: num
 interface Overview {
   settings: Settings; autonomy: AutonomyItem[];
   weakest: AutonomyItem | null;
-  resources: { waterL: number; foodKg: number; fuelL: number; seedCount: number; medicineCount: number; toolCount: number; batterySocPct: number | null; moneyMonths: number | null };
+  resources: { waterL: number; foodKg: number; fuelL: number; seedCount: number; medicineCount: number; toolCount: number; compostKg?: number; compostDays?: number | null; batterySocPct: number | null; moneyMonths: number | null };
 }
 
 const TARGET_ICON: Record<string, string> = {
   water: "droplet", food: "package", energy: "zap", money: "coin",
-  fuel: "zap", seed: "farm", medicine: "health", tool: "settings",
+  fuel: "zap", seed: "farm", medicine: "health", tool: "settings", compost: "recycle", herb: "healing",
 };
 
 export default function SelfReliancePage() {
@@ -86,6 +86,58 @@ export default function SelfReliancePage() {
               <div className="text-xs text-gray-400 mt-0.5">{data.weakest.detail}</div>
             </div>
           )}
+
+          {/* S3+S4: Herbal & Compost first-class cards */}
+          {data && (() => {
+            const people = data.settings.people || 1;
+            const target = data.settings.targetDays || 30;
+            const medicineCount = data.resources.medicineCount ?? 0;
+            // herbal coverage: assume each medicine item ~15 days supply for 1 person (approx) -> herbDays
+            const herbDays = medicineCount > 0 ? Math.round((medicineCount * 15) / people * 10) / 10 : null;
+            const herbCoverage = herbDays != null ? Math.min(100, Math.round((herbDays / target) * 100)) : null;
+            const compostKg = (data.resources as any).compostKg ?? 0;
+            const compostDays = (data.resources as any).compostDays ?? data.autonomy.find((x) => x.key === 'compost')?.days ?? null;
+            const compostPct = compostDays != null && target > 0 ? Math.round((compostDays / target) * 100) : null;
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="card p-4 space-y-2 border-emerald-800/40 bg-emerald-950/10">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm flex items-center gap-1.5"><Icon name="healing" size={14} className="text-emerald-400" /> {t('selfreliance.herbGarden.title', 'สวนสมุนไพร — ความครอบคลุมยา')}</span>
+                    <span className={`text-2xl font-bold ${herbDays != null && herbDays >= target ? 'text-emerald-400' : herbDays != null ? 'text-amber-400' : 'text-gray-500'}`}>{herbDays != null ? herbDays : '—'}<span className="text-xs text-gray-500 font-normal ml-1">{t('selfreliance.days', 'วัน')}</span></span>
+                  </div>
+                  {herbCoverage != null && (
+                    <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div className={`h-full ${herbCoverage >= 100 ? 'bg-emerald-500' : herbCoverage >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, herbCoverage)}%` }} />
+                    </div>
+                  )}
+                  <div className="text-[11px] text-gray-400">
+                    {t('selfreliance.herbGarden.detail', '{count} รายการยาในคลัง — ประมาณ {days} วัน / {people} คน', { count: medicineCount, days: herbDays ?? '—', people })}
+                    {herbCoverage != null && ` — ${herbCoverage}% ${t('selfreliance.ofTarget', 'ของเป้า')} ${target} ${t('selfreliance.days', 'วัน')}`}
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    <Link href="/inventory?category=MEDICINE" className="text-sky-400 hover:underline inline-flex items-center gap-1"><Icon name="health" size={11} /> {t('selfreliance.herbGarden.inventoryLink', 'คลังยา')}</Link>
+                    <Link href="/farm" className="text-emerald-400 hover:underline inline-flex items-center gap-1"><Icon name="farm" size={11} /> {t('selfreliance.herbGarden.farmLink', 'สวนสมุนไพร')}</Link>
+                  </div>
+                </div>
+                <div className="card p-4 space-y-2 border-lime-800/40 bg-lime-950/10">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm flex items-center gap-1.5"><Icon name="recycle" size={14} className="text-lime-400" /> {t('selfreliance.compost.title', 'ปุ๋ยหมัก — วงจรพึ่งพา')}</span>
+                    <span className={`text-2xl font-bold ${compostDays != null && compostDays >= target ? 'text-emerald-400' : compostDays != null ? 'text-amber-400' : 'text-gray-500'}`}>{compostDays != null ? compostDays : '—'}<span className="text-xs text-gray-500 font-normal ml-1">{t('selfreliance.days', 'วัน')}</span></span>
+                  </div>
+                  {compostPct != null && (
+                    <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div className={`h-full ${compostPct >= 100 ? 'bg-emerald-500' : compostPct >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, compostPct)}%` }} />
+                    </div>
+                  )}
+                  <div className="text-[11px] text-gray-400">
+                    {t('selfreliance.compost.detail', '{kg} kg ปุ๋ยหมัก — {days} วัน / {people} คน', { kg: compostKg, days: compostDays ?? '—', people })}
+                    {compostPct != null && ` — ${compostPct}% ${t('selfreliance.ofTarget', 'ของเป้า')} ${target} ${t('selfreliance.days', 'วัน')}`}
+                  </div>
+                  <div className="text-[11px] text-gray-500">{data.autonomy.find((x) => x.key === 'compost')?.detail ?? ''}</div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* การ์ดวันรอดทุกทรัพยากร */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
