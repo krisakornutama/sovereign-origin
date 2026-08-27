@@ -90,6 +90,11 @@ const CATEGORY_LABELS: Record<HealthCategory, string> = {
 
 const VALID_CATEGORIES = Object.keys(CATEGORY_LABELS) as HealthCategory[];
 
+function resolveOwnerId(req: any): string {
+  if (req.user?.role === 'SUPERADMIN' && typeof req.query.userId === 'string' && req.query.userId.trim()) return req.query.userId.trim();
+  return req.user?.id || '';
+}
+
 /** ตรวจข้อห้าม (contraindication) ระหว่างสมุนไพรกับประวัติผู้ใช้ */
 function checkContraindications(
   herbId: string,
