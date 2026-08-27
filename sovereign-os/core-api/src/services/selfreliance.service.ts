@@ -108,6 +108,8 @@ export interface AutonomyOverview {
     seedCount: number;
     medicineCount: number;
     toolCount: number;
+    compostKg: number;
+    compostDays: number | null;
     batterySocPct: number | null;
     avgPowerKw: number | null;
     batteryCapacityKwh: number;
@@ -122,7 +124,7 @@ export async function buildAutonomyOverview(userId: string): Promise<AutonomyOve
 
   // 1) สต็อกจาก Inventory — รวมเฉพาะ unit ที่แปลงได้ตรง
   const items = await prisma.inventoryItem.findMany({ where: { user_id: userId } });
-  let waterL = 0, foodKg = 0, fuelL = 0, seedCount = 0, medicineCount = 0, toolCount = 0;
+  let waterL = 0, foodKg = 0, fuelL = 0, seedCount = 0, medicineCount = 0, toolCount = 0, compostKg = 0;
   for (const it of items) {
     const q = Number(it.quantity) || 0;
     const unit = String(it.unit || '').toLowerCase();
@@ -132,6 +134,7 @@ export async function buildAutonomyOverview(userId: string): Promise<AutonomyOve
     else if (it.category === 'SEED') seedCount++;
     else if (it.category === 'MEDICINE') medicineCount++;
     else if (it.category === 'TOOL') toolCount++;
+    else if ((it.category === 'COMPOST' || it.category === 'FERTILIZER') && unit === 'kg') compostKg += q;
   }
 
   // 2) แบตเตอรี่จาก telemetry จริง (pattern เดียวกับ power-guard)
@@ -166,6 +169,9 @@ export async function buildAutonomyOverview(userId: string): Promise<AutonomyOve
   const foodDays = computeFoodDays(foodKg, settings.people, settings.foodKgPerPersonDay);
   const energyHours = computeEnergyHours(batterySocPct, capacityKwh, avgPowerKw);
   const energyDays = energyHours != null ? Math.round((energyHours / 24) * 10) / 10 : null;
+  // compost: similar to food — assume 0.5kg compost per person per day needed for fields
+  const compostDays = computeFoodDays(compostKg, settings.people, 0.5);
+  const compostSelfSufficiency = compostDays != null && settings.targetDays > 0 ? Math.round((compostDays / settings.targetDays) * 100) : null;
 
   const autonomy: AutonomyItem[] = [
     {
@@ -208,6 +214,11 @@ export async function buildAutonomyOverview(userId: string): Promise<AutonomyOve
       ok: medicineCount >= 3 ? true : null,
     },
     {
+      key: 'compost', label: '♻️ ปุ๋ยหมัก', days: compostDays,
+      detail: `${compostKg.toLocaleString()}kg ปุ๋ยหมักในคลัง ÷ (${settings.people}คน × 0.5kg/วัน) = ${compostDays ?? '?'} วัน${compostSelfSufficiency != null ? ` — ${compostSelfSufficiency}% ของเป้า ${settings.targetDays} วัน` : ''}`,
+      ok: compostDays != null ? compostDays >= settings.targetDays : null,
+    },
+    {
       key: 'tool', label: '🔧 เครื่องมือ', days: null,
       detail: `${toolCount} รายการ`,
       ok: toolCount >= 3 ? true : null,
@@ -220,6 +231,7 @@ export async function buildAutonomyOverview(userId: string): Promise<AutonomyOve
     weakest: findWeakestLink(autonomy),
     resources: {
       waterL, foodKg, fuelL, seedCount, medicineCount, toolCount,
+      compostKg, compostDays,
       batterySocPct, avgPowerKw, batteryCapacityKwh: capacityKwh,
       cashUsd, monthlyBurnUsd, moneyMonths,
     },

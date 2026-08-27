@@ -13,6 +13,32 @@ import { getModelForTask } from '../../services/ai-router.service';
 
 const router = Router();
 
+// GET /api/ai/local-status — สวิตช์ AI ในเครื่อง (default ปิด — ต้องกดเปิดในแอป)
+router.get('/local-status', authenticate, async (_req, res) => {
+  const { getAiEnabled } = await import('../../services/local-llm.service');
+  const s = await getAiEnabled();
+  res.json(s);
+});
+
+// PUT /api/ai/enabled {enabled: bool} — เปิด/ปิด AI ในเครื่อง (SUPERADMIN)
+router.put('/enabled', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const { setAiEnabled } = await import('../../services/local-llm.service');
+  const enabled = !!req.body?.enabled;
+  const r = await setAiEnabled(enabled);
+  res.json(r);
+});
+
+// PUT /api/ai/model {model: string} — เลือกโมเดล (SUPERADMIN)
+router.put('/model', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const { setAiModel } = await import('../../services/local-llm.service');
+    await setAiModel(String(req.body?.model || ''));
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // GET /api/ai/status — สถานะ AI: Ollama ออนไลน์ไหม, โมเดลที่ใช้, ทรัพยากรระบบ
 router.get('/status', authenticate, async (_req, res) => {
   let ollamaOnline = false;
