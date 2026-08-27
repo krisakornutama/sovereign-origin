@@ -90,6 +90,11 @@ const CATEGORY_LABELS: Record<HealthCategory, string> = {
 
 const VALID_CATEGORIES = Object.keys(CATEGORY_LABELS) as HealthCategory[];
 
+function resolveOwnerId(req: any): string {
+  if (req.user?.role === 'SUPERADMIN' && typeof req.query.userId === 'string' && req.query.userId.trim()) return req.query.userId.trim();
+  return req.user?.id || '';
+}
+
 /** ตรวจข้อห้าม (contraindication) ระหว่างสมุนไพรกับประวัติผู้ใช้ */
 function checkContraindications(
   herbId: string,
@@ -334,17 +339,28 @@ router.get('/consents', authenticate, async (req, res) => {
 // PUT /api/health/consents — { "telemetry": true, "conversation": false }
 router.put('/consents', authenticate, async (req, res) => {
   try {
+    const userId = (req as any).user?.id as string | undefined;
     const updates = req.body || {};
     const results = [];
     for (const [category, granted] of Object.entries(updates)) {
       if (typeof granted !== 'boolean') continue;
-      results.push(
-        await prisma.healthConsent.upsert({
-          where: { category },
-          update: { granted },
-          create: { category, granted },
-        })
-      );
+      if (userId) {
+        results.push(
+          await prisma.healthConsent.upsert({
+            where: { user_id_category: { user_id: userId, category } },
+            update: { granted },
+            create: { user_id: userId, category, granted },
+          })
+        );
+      } else {
+        results.push(
+          await prisma.healthConsent.upsert({
+            where: { category } as any,
+            update: { granted },
+            create: { category, granted } as any,
+          })
+        );
+      }
     }
     res.json(results);
   } catch (err) {
@@ -357,7 +373,9 @@ router.put('/consents', authenticate, async (req, res) => {
 // GET /api/health/profile
 router.get('/profile', authenticate, async (req, res) => {
   try {
-    const profile = await prisma.healthProfile.findFirst();
+    const userId = (req as any).user?.id as string | undefined;
+    const where = userId ? { user_id: userId } : {};
+    const profile = await prisma.healthProfile.findFirst({ where } as any);
     res.json(profile ?? { conditions: [], medications: [] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load profile' });
@@ -367,12 +385,15 @@ router.get('/profile', authenticate, async (req, res) => {
 // PUT /api/health/profile — { conditions: ["kidney_disease"], medications: ["anticoagulant"] }
 router.put('/profile', authenticate, async (req, res) => {
   try {
+    const userId = (req as any).user?.id as string | undefined;
     const { conditions, medications } = req.body || {};
-    const data = {
+    const data: any = {
       conditions: Array.isArray(conditions) ? conditions.slice(0, 50) : [],
       medications: Array.isArray(medications) ? medications.slice(0, 50) : [],
     };
-    const existing = await prisma.healthProfile.findFirst();
+    if (userId) data.user_id = userId;
+    const where = userId ? { user_id: userId } : {};
+    const existing = await prisma.healthProfile.findFirst({ where } as any);
     const profile = existing
       ? await prisma.healthProfile.update({ where: { id: existing.id }, data })
       : await prisma.healthProfile.create({ data });
