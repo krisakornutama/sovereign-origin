@@ -18,8 +18,68 @@ async function ollamaGenerate(prompt: string, model = DEFAULT_MODEL): Promise<st
   } catch { return null; }
 }
 
+// ── Sensor trend predictor (Engine A) — linear regression 7วัน → ทำนาย 7วันข้างหน้า ──
+async function fetchMetricSeries(metric: string, days = 7): Promise<{ t: number; v: number }[]> {
+  try {
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT EXTRACT(EPOCH FROM time) as t, value as v FROM sensor_telemetry WHERE metric = $1 AND time > NOW() - INTERVAL '${days} days' ORDER BY time ASC LIMIT 500`,
+      metric
+    );
+    return rows.map(r => ({ t: Number(r.t), v: Number(r.v) }));
+  } catch { return []; }
+}
+function linearForecast(series: { t: number; v: number }[], horizonSec: number): { slope: number; forecast: number | null; trend: string } {
+  if (series.length < 3) return { slope: 0, forecast: null, trend: 'insufficient' };
+  const n = series.length;
+  const sumT = series.reduce((s, p) => s + p.t, 0);
+  const sumV = series.reduce((s, p) => s + p.v, 0);
+  const sumTT = series.reduce((s, p) => s + p.t * p.t, 0);
+  const sumTV = series.reduce((s, p) => s + p.t * p.v, 0);
+  const denom = n * sumTT - sumT * sumT;
+  if (denom === 0) return { slope: 0, forecast: series[series.length - 1].v, trend: 'flat' };
+  const slope = (n * sumTV - sumT * sumV) / denom; // v per sec
+  const last = series[series.length - 1];
+  const forecast = last.v + slope * horizonSec;
+  const trend = slope > 1e-6 ? 'up' : slope < -1e-6 ? 'down' : 'flat';
+  return { slope, forecast, trend };
+}
+const SENSOR_THRESHOLDS: Record<string, { low?: number; high?: number; unit: string; label: string }> = {
+  water_level_cm: { low: 30, unit: 'cm', label: 'ระดับน้ำ' },
+  battery_soc: { low: 30, unit: '%', label: 'แบตเตอรี่' },
+  battery_voltage: { low: 11.5, unit: 'V', label: 'แรงดันแบต' },
+  soil_moisture: { low: 30, unit: '%', label: 'ความชื้นดิน' },
+  temperature: { high: 38, unit: '°C', label: 'อุณหภูมิ' },
+};
+export async function predictSensorTrends(): Promise<any[]> {
+  const out: any[] = [];
+  for (const [metric, cfg] of Object.entries(SENSOR_THRESHOLDS)) {
+    const series = await fetchMetricSeries(metric, 7);
+    if (series.length < 3) continue;
+    const { slope, forecast, trend } = linearForecast(series, 7 * 86400);
+    if (forecast == null) continue;
+    let risk = 0.2;
+    let advice = 'ปกติ';
+    if (cfg.low != null && forecast < cfg.low) { risk = 0.85; advice = `${cfg.label} จะต่ำกว่า ${cfg.low}${cfg.unit} ใน 7 วัน (คาด ${forecast.toFixed(1)}${cfg.unit}) — เตรียมเติม/ชาร์จ`; }
+    else if (cfg.high != null && forecast > cfg.high) { risk = 0.8; advice = `${cfg.label} จะสูงกว่า ${cfg.high}${cfg.unit} — เฝ้าระวัง`; }
+    else if (trend === 'down' && cfg.low != null) { risk = 0.4; advice = `${cfg.label} แนวโน้มลดลง`; }
+    else if (trend === 'up' && cfg.high != null) { risk = 0.4; advice = `${cfg.label} แนวโน้มเพิ่มขึ้น`; }
+    const lastVal = series[series.length - 1].v;
+    out.push({ metric, label: cfg.label, unit: cfg.unit, last: Number(lastVal.toFixed(2)), forecast: Number(forecast.toFixed(2)), slope: Number((slope * 86400).toFixed(4)), trend, risk, advice, samples: series.length });
+  }
+  return out;
+}
+
 // ทำนายต่อ domain: ส่ง features → Ollama → parse JSON
 export async function predict(domain: string, features: Record<string, any>): Promise<{ output: any; confidence: number; model: string }> {
+  // Engine A: sensor ใช้ trend predictor ผสม Ollama
+  if (domain === 'sensor' && !features.water_level_cm) {
+    const trends = await predictSensorTrends();
+    if (trends.length > 0) {
+      const maxRisk = Math.max(...trends.map(t => t.risk));
+      const top = trends.find(t => t.risk === maxRisk);
+      return { output: { risk: maxRisk, advice: top?.advice || 'เฝ้าระวัง', trends, confidence: 0.65 }, confidence: 0.65, model: 'trend-linear' };
+    }
+  }
   const history = await prisma.learningSnapshot.findMany({ where: { domain }, orderBy: { capturedAt: 'desc' }, take: 5 });
   const prompt = `คุณคือ AI ทำนาย ${domain} ของบ้านพึ่งพาตัวเอง
 ข้อมูลปัจจุบัน: ${JSON.stringify(features).slice(0, 1500)}

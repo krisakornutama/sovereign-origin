@@ -13,16 +13,18 @@ export default function LearningPage() {
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [preds, setPreds] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
+  const [sensorTrends, setSensorTrends] = useState<any[]>([]);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(async()=>{
     try{
-      const [s,p,m]=await Promise.all([
+      const [s,p,m,tr]=await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/snapshots?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predictions?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/models`).then(r=>r.ok?r.json():[]),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/sensor`).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
-      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]);
+      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]);
     }catch{}
   },[]);
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated, load]);
@@ -64,7 +66,24 @@ export default function LearningPage() {
             <button onClick={()=>predict('sensor')} className="px-3 py-2 bg-gray-800 rounded text-xs">ทำนาย sensor</button>
             <button onClick={()=>predict('farm')} className="px-3 py-2 bg-gray-800 rounded text-xs">ทำนาย farm</button>
             <button onClick={()=>predict('health')} className="px-3 py-2 bg-gray-800 rounded text-xs">ทำนาย health</button>
+            <button onClick={load} className="px-3 py-2 bg-gray-700 rounded text-xs">รีเฟรช trend</button>
           </div>
+          {sensorTrends.length>0 && (
+            <div className="card p-4 space-y-2 border-sky-800/40 bg-sky-950/10">
+              <h3 className="font-bold text-sm flex items-center gap-1"><Icon name="predictive" size={14} className="text-sky-400"/> Engine A — เซ็นเซอร์พยากรณ์พัง (trend 7วัน → 7วันข้างหน้า)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                {sensorTrends.map((tr:any)=>(
+                  <div key={tr.metric} className={`rounded-lg p-2 border ${tr.risk>=0.7?"border-red-700 bg-red-950/30":tr.risk>=0.4?"border-amber-700 bg-amber-950/20":"border-gray-700 bg-gray-900"}`}>
+                    <div className="font-bold">{tr.label} ({tr.metric}) <span className={tr.trend==="down"?"text-amber-400":tr.trend==="up"?"text-sky-400":"text-gray-500"}>{tr.trend}</span></div>
+                    <div className="text-gray-300">ตอนนี้ {tr.last}{tr.unit} → อีก7วัน {tr.forecast}{tr.unit} (slope {tr.slope}{tr.unit}/วัน)</div>
+                    <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
+                    <div className="text-gray-500">{tr.samples} samples 7วัน</div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[11px] text-gray-500">คำนวณจาก linear regression 7วันล่าสุดใน sensor_telemetry — ถ้าทำนายพังใกล้ threshold จะ risk สูงและขึ้น Telegram อัตโนมัติเมื่อ nightly</div>
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="card p-4 space-y-2">
               <h3 className="font-bold text-sm flex items-center gap-1"><Icon name="history" size={14}/> Snapshots ({snapshots.length})</h3>
