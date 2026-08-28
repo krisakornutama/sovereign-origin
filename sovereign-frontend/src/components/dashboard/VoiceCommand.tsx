@@ -5,6 +5,7 @@ import { useLanguageStore } from '../../stores/useLanguageStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import VoiceInput from './VoiceInput';
 import Icon from '../ui/Icon';
+import { useTTS } from '../../hooks/useTTS';
 
 interface VoiceCommandResult {
   intent: string;
@@ -24,37 +25,34 @@ interface PendingAction {
 
 export default function VoiceCommand({ onActionComplete }: { onActionComplete?: (result: VoiceCommandResult) => void }) {
   const t = useLanguageStore((s) => s.t);
+  const { speak } = useTTS();
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<VoiceCommandResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingAction | null>(null);
   const [transcript, setTranscript] = useState('');
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+
+  const speakResponse = useCallback(async (text: string) => {
+    if (!ttsEnabled || !text?.trim()) return;
+    try { await speak({ text, rate: 180 }); } catch (e: any) { console.warn('TTS failed:', e.message); }
+  }, [ttsEnabled, speak]);
 
   const handleVoiceResult = useCallback(async (text: string) => {
     setTranscript(text);
     setError(null);
     setIsProcessing(true);
-
     try {
-      // ตรวจสอบว่าเป็นคำถาม (query) หรือคำสั่ง (command)
-      const isQuery = /^(เช็ค|เช็คว่า|สถานะ|สถานะว่า|ค่า|ค่าเท่าไหร่|เท่าไหร่|สถานะว่า|ดู|ดูว่า|ได้ยินไหม|รู้ไหม|ข้อมูล|ข้อมูลว่า)/.test(text.trim().toLowerCase()) ||
-                      text.trim().endsWith('ไหม') || text.trim().endsWith('?');
-      
-      const endpoint = isQuery ? '/api/ai/voice-query' : '/api/ai/voice-command';
-      const method = isQuery ? 'GET' : 'POST';
-      
+      const isQuery = /^(เช็ค|เช็คว่า|สถานะ|ค่า|ดู|ข้อมูล)/.test(text.trim().toLowerCase()) || text.trim().endsWith('ไหม') || text.trim().endsWith('?');
       let url = `${process.env.NEXT_PUBLIC_API_URL}/api/ai/${isQuery ? 'voice-query' : 'voice-command'}`;
       if (isQuery) url += `?text=${encodeURIComponent(text)}`;
-
       const res = await authFetch(url, {
-        method,
+        method: isQuery ? 'GET' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: !isQuery ? JSON.stringify({ text }) : undefined,
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to parse voice command');
-
       const result: VoiceCommandResult = {
         intent: data.intent,
         entities: data.entities,
@@ -64,118 +62,73 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
         isQuery: data.isQuery,
         queryResult: data.queryResult,
       };
-
       setLastResult(result);
-
-      // ถ้าเป็น query และมีผลลัพธ์ → แสดงผลทันที
-      if (isQuery && result.isQuery) {
-        setLastResult({ ...result, queryResult: data.queryResult || data });
-      }
-
-      // ถ้า confidence สูงพอ (≥0.7) และมี action → ขอ confirm แล้ว execute
-      if (result.confidence >= 0.7 && result.action && !isQuery) {
-        const desc = buildDescription(result.intent, result.entities);
-        setPendingConfirm({
-          intent: result.intent,
-          description: desc,
-          execute: async (token?: string) => {
-            const t = token || useAuthStore.getState().token;
-            await executeAction(result.action!, t);
-            onActionComplete?.(result);
-          },
-        });
-      } else if (!isQuery && result.confidence < 0.7) {
-        // confidence ต่ำ → บอกผู้ใช้ว่าไม่เข้าใจ
-        setError(t('voiceCommand.lowConfidence', 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น'));
+      let responseText = '';
+      if (isQuery) {
+        if (data.queryResult?.metric) responseText = `${data.queryResult.metric} คือ ${data.queryResult.value} ${data.queryResult.unit || ''}`;
+        else if (data.queryResult?.count != null) responseText = `พบ ${data.queryResult.count} คน`;
+        else if (data.queryResult?.total != null) responseText = `รวม ${data.queryResult.total} รายการ`;
+        else if (data.queryResult?.recent) responseText = `พบ ${data.queryResult.recent.length} รายการล่าสุด`;
+        else if (data.queryResult?.relays) responseText = `พบรีเลย์ ${data.queryResult.relays.length} ตัว`;
+        else if (data.queryResult?.totalValue) responseText = `มูลค่ารวม ${data.queryResult.totalValue} ดอลลาร์`;
+        else if (data.queryResult?.uptime) responseText = `ระบบทำงานมาแล้ว ${data.queryResult.uptime}`;
+        else responseText = 'ดึงข้อมูลสำเร็จ';
+        await speakResponse(responseText);
+      } else {
+        if (result.confidence >= 0.7 && result.action) {
+          const desc = buildDescription(result.intent, result.entities);
+          responseText = `กำลัง${desc} กรุณายืนยัน`;
+          await speakResponse(responseText);
+          setPendingConfirm({
+            intent: result.intent,
+            description: desc,
+            execute: async (token?: string) => {
+              const tk = token || useAuthStore.getState().token;
+              await executeAction(result.action!, tk);
+              onActionComplete?.(result);
+              await speakResponse(`ทำ${desc}เสร็จแล้ว`);
+            },
+          });
+        } else if (result.confidence < 0.7) {
+          setError(t('voiceCommand.lowConfidence', 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น'));
+          await speakResponse('ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น');
+        }
       }
     } catch (err: any) {
       setError(err.message);
+      await speakResponse(`เกิดข้อผิดพลาด ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [t, speakResponse, onActionComplete]);
 
   return (
     <div className="space-y-3">
-      {/* Voice Input Button */}
-      <VoiceInput
-        onResult={handleVoiceResult}
-        onListeningChange={(isListening) => {}}
-      />
-
-      {/* Transcript Display */}
-      {transcript && (
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-sm">
-          <div className="text-xs text-gray-400 mb-1">{t('voiceCommand.heard', 'ได้ยิน:')}</div>
-          <div className="text-white">{transcript}</div>
-        </div>
-      )}
-
-      {/* Processing Indicator */}
-      {isProcessing && (
-        <div className="flex items-center gap-2 text-sm text-sky-400">
-          <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-          <span>{t('voiceCommand.processing', 'กำลังประมวลผล...')}</span>
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="bg-rose-950/50 border border-rose-700 rounded-lg p-3 text-sm text-rose-300">
-          {error}
-        </div>
-      )}
-
-      {/* Confirm Dialog */}
+      <div className="flex items-center gap-2">
+        <VoiceInput onResult={handleVoiceResult} onListeningChange={() => {}} />
+        <button onClick={() => setTtsEnabled(!ttsEnabled)} className={`p-2.5 rounded-full transition-all ${ttsEnabled ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`} title={ttsEnabled ? t('voiceCommand.ttsOn', 'เปิด TTS') : t('voiceCommand.ttsOff', 'ปิด TTS')}>
+          <Icon name={ttsEnabled ? 'volume-2' : 'volume-x'} size={18} />
+        </button>
+      </div>
+      {transcript && <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-sm"><div className="text-xs text-gray-400 mb-1">{t('voiceCommand.heard', 'ได้ยิน:')}</div><div className="text-white">{transcript}</div></div>}
+      {isProcessing && <div className="flex items-center gap-2 text-sm text-sky-400"><div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /><span>{t('voiceCommand.processing', 'กำลังประมวลผล...')}</span></div>}
+      {error && <div className="bg-rose-950/50 border border-rose-700 rounded-lg p-3 text-sm text-rose-300">{error}</div>}
       {pendingConfirm && (
         <div className="bg-amber-950/50 border border-amber-700 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon name="mic" size={16} className="text-amber-400" />
-            <span className="font-bold text-amber-300">{t('voiceCommand.confirmTitle', 'ยืนยันการดำเนินการ')}</span>
-          </div>
+          <div className="flex items-center gap-2 mb-2"><Icon name="mic" size={16} className="text-amber-400" /><span className="font-bold text-amber-300">{t('voiceCommand.confirmTitle', 'ยืนยันการดำเนินการ')}</span></div>
           <p className="text-sm text-amber-200 mb-3">{pendingConfirm.description}</p>
           <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                const token = useAuthStore.getState().token;
-                await pendingConfirm.execute(token);
-                setPendingConfirm(null);
-                setTranscript('');
-              }}
-              className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-bold"
-            >
-              {t('voiceCommand.confirm', 'ตกลง ดำเนินการ')}
-            </button>
-            <button
-              onClick={() => setPendingConfirm(null)}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-bold"
-            >
-              {t('voiceCommand.cancel', 'ยกเลิก')}
-            </button>
+            <button onClick={async () => { const token = useAuthStore.getState().token; await pendingConfirm.execute(token); setPendingConfirm(null); setTranscript(''); }} className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-bold">{t('voiceCommand.confirm', 'ตกลง ดำเนินการ')}</button>
+            <button onClick={() => setPendingConfirm(null)} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-bold">{t('voiceCommand.cancel', 'ยกเลิก')}</button>
           </div>
         </div>
       )}
-
-      {/* Last Result Summary */}
       {lastResult && !pendingConfirm && (
         <div className="bg-emerald-950/30 border border-emerald-700/50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon name="check" size={16} className="text-emerald-400" />
-            <span className="font-bold text-emerald-300">{t('voiceCommand.completed', 'เสร็จสิ้น')}</span>
-            <span className="text-xs text-gray-500">({lastResult.intent})</span>
-          </div>
-          <div className="text-xs text-gray-400">
-            {lastResult.originalText}
-          </div>
-          {lastResult.isQuery && lastResult.queryResult && (
-            <div className="mt-2 p-2 bg-gray-800/50 rounded text-xs text-sky-300">
-              <div className="font-bold text-sky-400 mb-1">ผลลัพธ์:</div>
-              <pre className="text-[10px] overflow-auto max-h-40">{JSON.stringify(lastResult.queryResult, null, 2).slice(0, 500)}</pre>
-            </div>
-          )}
-          <div className="text-[11px] text-gray-500 mt-1">
-            Entities: {JSON.stringify(lastResult.entities).slice(0, 100)}
-          </div>
+          <div className="flex items-center gap-2 mb-2"><Icon name="check" size={16} className="text-emerald-400" /><span className="font-bold text-emerald-300">{t('voiceCommand.completed', 'เสร็จสิ้น')}</span><span className="text-xs text-gray-500">({lastResult.intent})</span></div>
+          <div className="text-xs text-gray-400">{lastResult.originalText}</div>
+          {lastResult.isQuery && lastResult.queryResult && <div className="mt-2 p-2 bg-gray-800/50 rounded text-xs text-sky-300"><div className="font-bold text-sky-400 mb-1">ผลลัพธ์:</div><pre className="text-[10px] overflow-auto max-h-40">{JSON.stringify(lastResult.queryResult, null, 2).slice(0, 500)}</pre></div>}
+          <div className="text-[11px] text-gray-500 mt-1">Entities: {JSON.stringify(lastResult.entities).slice(0, 100)}</div>
         </div>
       )}
     </div>
@@ -184,22 +137,14 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
 
 function buildDescription(intent: string, entities: Record<string, any>): string {
   const labels: Record<string, string> = {
-    inventory_add: 'เพิ่มของเข้าคลัง',
-    inventory_remove: 'นำของออกจากคลัง',
-    farm_harvest: 'เก็บเกี่ยว',
-    farm_plant: 'ปลูกพืช',
-    health_bp: 'บันทึกความดัน',
-    health_weight: 'บันทึกน้ำหนัก',
-    health_sugar: 'บันทึกน้ำตาล',
-    restaurant_order: 'สั่งอาหาร',
-    restaurant_pay: 'จ่ายบิล',
-    sensor_check: 'เช็คเซ็นเซอร์',
-    system_status: 'เช็คสถานะระบบ',
+    inventory_add: 'เพิ่มของเข้าคลัง', inventory_remove: 'นำของออกจากคลัง', farm_harvest: 'เก็บเกี่ยว', farm_plant: 'ปลูกพืช',
+    health_bp: 'บันทึกความดัน', health_weight: 'บันทึกน้ำหนัก', health_sugar: 'บันทึกน้ำตาล',
+    restaurant_order: 'สั่งอาหาร', restaurant_pay: 'จ่ายบิล', sensor_check: 'เช็คเซ็นเซอร์', system_status: 'เช็คสถานะระบบ',
+    kids_chore: 'งานบ้านลูก', kids_bill: 'บิลลูก', kids_allowance: 'ค่าขนม', kids_coupon: 'คูปอง', kids_lesson: 'บทเรียน', kids_portfolio: 'พอร์ตลูก',
+    relay_control: 'ควบคุมรีเลย์', energy_status: 'สถานะพลังงาน',
   };
-
   const label = labels[intent] || intent;
   const parts: string[] = [];
-
   if (entities.item) parts.push(`${entities.item}`);
   if (entities.crop) parts.push(`พืช: ${entities.crop}`);
   if (entities.menu) parts.push(`เมนู: ${entities.menu}`);
@@ -208,7 +153,8 @@ function buildDescription(intent: string, entities: Record<string, any>): string
   if (entities.value != null) parts.push(`ค่า ${entities.value}`);
   if (entities.table) parts.push(`โต๊ะ ${entities.table}`);
   if (entities.payment) parts.push(`จ่าย ${entities.payment === 'promptpay' ? 'PromptPay' : 'เงินสด'}`);
-
+  if (entities.kidName) parts.push(`ลูก: ${entities.kidName}`);
+  if (entities.relayId) parts.push(`รีเลย์ ${entities.relayId} ${entities.relayAction || ''}`);
   return `${label}: ${parts.join(' · ') || '—'}`;
 }
 

@@ -196,5 +196,7 @@ mobileMenu: 'Main menu (mobile)',
       query: 'Query',
       command: 'Command',
       result: 'Result',
+      ttsOn: 'TTS On',
+      ttsOff: 'TTS Off',
     },
   } as const;
