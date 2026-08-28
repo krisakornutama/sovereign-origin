@@ -34,6 +34,8 @@ export const common = {
     restaurantKitchen: 'ครัว IOT',
     selfreliance: 'วันรอด',
     selfCheck: 'Self-Check 32 ข้อ',
+    skills: 'ทักษะทีม',
+    crisis: 'ภาวะวิกฤต',
     researchRice: 'วิจัยพันธุ์ข้าว',
     portfolio: 'ทรัพย์สินและการเงิน',
     treasury: 'คลัง & ลงทุน',
