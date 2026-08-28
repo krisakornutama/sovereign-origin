@@ -10,6 +10,7 @@ import GlobalMap from '../components/dashboard/GlobalMap';
 import AlertsPanel from '../components/dashboard/AlertsPanel';
 import DefconWidget from '../components/dashboard/DefconWidget';
 import WealthWidget from '../components/dashboard/WealthWidget';
+import VoiceCommand from '../components/dashboard/VoiceCommand';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
@@ -756,6 +757,9 @@ export default function Dashboard() {
                 <div className="bg-gray-900/50 border border-gray-700/40 rounded-xl p-2">
                   <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-2">SOVEREIGN HUB CHAT</div>
                   <div className="h-[380px] rounded-lg border border-gray-800 overflow-hidden"><AiChatPanel compact /></div>
+                </div>
+                <div className="mt-3">
+                  <VoiceCommand />
                 </div>
               </div>
             </div>

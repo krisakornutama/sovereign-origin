@@ -1,14 +1,14 @@
-"use client";
 import { useState, useEffect } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
 import EmptyState from "../../components/ui/EmptyState";
+import VoiceCommand from "../../components/dashboard/VoiceCommand";
+import Link from "next/link";
 import { authFetch } from "../../lib/apiFetch";
 import { asArray } from "../../lib/fetchJson";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useLanguageStore } from "../../stores/useLanguageStore";
-import Link from "next/link";
 
 interface Restaurant { id: string; name: string; cameraId?: string | null; status: string; }
 interface MenuItem { id: string; restaurantId: string; name: string; priceTHB: number; category: string; isActive: boolean; recipes?: any[]; canMake?: boolean; missing?: string[]; }
@@ -110,6 +110,7 @@ export default function RestaurantPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
           <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.pos.title', 'ร้านอาหาร — POS')} subtitle={t('restaurant.pos.subtitle', 'Farm → Inventory → สูตรผลิตเอง → ขาย เงินสด/PromptPay + ใบหน้าแต้ม')} icon={<Icon name="inventory" size={18} />} />
+          <VoiceCommand />
           {msg && <div className="inset p-3 text-sm text-emerald-300 border-emerald-700">{msg}</div>}
           {err && <div className="inset p-3 text-sm text-red-400 border-red-700">{err}</div>}
 
