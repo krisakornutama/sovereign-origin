@@ -400,27 +400,53 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   // → บันทึก DB + socket 'new_alert' + Telegram — จัดการที่ automation handler ด้านบนแล้ว)
   predictiveWorker.start();
 
-  // ── Self-Learning — Data Lake + Engine A/B/C (cron 02:00) ──
+  // ── Self-Learning — ระบบใช้งานเอง (ไม่ต้องรอผู้ใช้กด) ──
+  // เก็บ snapshot ทุก 6 ชม. + ทำนายทุกคืน 02:00 + สั่งงานระบบอัตโนมัติเมื่อ risk≥0.7
   async function runLearningNightly() {
     try {
       const { collectDailySnapshots } = await import('../services/data-lake.service');
-      const { predictSensorTrends, predictFarmTrends, predictHealthTrends } = await import('../services/learning-engine.service');
+      const { predictSensorTrends, predictFarmTrends, predictHealthTrends, createPrediction } = await import('../services/learning-engine.service');
       const n = await collectDailySnapshots();
       const sensor = await predictSensorTrends();
       const farm = await predictFarmTrends();
       const health = await predictHealthTrends();
       const highs: string[] = [];
-      for (const s of sensor) if (s.risk >= 0.7) highs.push(`เซ็นเซอร์ ${s.label} risk ${(s.risk*100).toFixed(0)}% — ${s.advice}`);
-      for (const f of farm) if (f.risk >= 0.7) highs.push(`ฟาร์ม ${f.name} risk ${(f.risk*100).toFixed(0)}% — ${f.advice}`);
-      for (const h of health) if (h.risk >= 0.7) highs.push(`สุขภาพ ${h.label} risk ${(h.risk*100).toFixed(0)}% — ${h.advice}`);
+      // ระบบใช้งานเอง: บันทึกเป็น LearningPrediction + สร้าง AutomationAlert อัตโนมัติ (ไม่รอผู้ใช้กด)
+      for (const s of sensor) {
+        try { await createPrediction('sensor', { metric: s.metric, last: s.last, forecast: s.forecast, trend: s.trend }); } catch {}
+        if (s.risk >= 0.7) {
+          highs.push(`เซ็นเซอร์ ${s.label} risk ${(s.risk*100).toFixed(0)}% — ${s.advice}`);
+          try { await prisma.automationAlert.create({ data: { rule_id: 'learning-sensor', metric: s.metric, value: s.forecast, threshold: 30, message: `🧠 ${s.advice}`, severity: 'warning' } }); } catch {}
+          automationEmitter.emit('alert', { ruleId: 'learning-sensor', metric: s.metric, value: s.forecast, threshold: 30, message: `🧠 Learning: ${s.advice}`, severity: 'warning', timestamp: new Date().toISOString() } as any);
+        }
+      }
+      for (const f of farm) {
+        try { await createPrediction('farm', { plotId: f.plotId, risk: f.risk, advice: f.advice }); } catch {}
+        if (f.risk >= 0.7) {
+          highs.push(`ฟาร์ม ${f.name} risk ${(f.risk*100).toFixed(0)}% — ${f.advice}`);
+          try { await prisma.automationAlert.create({ data: { rule_id: 'learning-farm', metric: 'farm', value: f.risk, threshold: 0.7, message: `🧠 ${f.advice}`, severity: 'warning' } }); } catch {}
+        }
+      }
+      for (const h of health) {
+        try { await createPrediction('health', { metric: h.metric, last: h.last, risk: h.risk }); } catch {}
+        if (h.risk >= 0.7) {
+          highs.push(`สุขภาพ ${h.label} risk ${(h.risk*100).toFixed(0)}% — ${h.advice}`);
+          try { await prisma.healthFlag.create({ data: { flag_type: `LEARNING_${h.metric}`, category: 'OTHER' as any, status: 'PENDING', note: `🧠 Learning: ${h.advice}` } }); } catch {}
+          try { await prisma.automationAlert.create({ data: { rule_id: 'learning-health', metric: h.metric, value: h.risk, threshold: 0.7, message: `🧠 ${h.advice}`, severity: 'warning' } }); } catch {}
+        }
+      }
       if (highs.length) {
         await sendTelegramAlert({ text: `🧠 Learning Nightly 02:00 — ${n} snapshots\n` + highs.slice(0,5).join('\n'), severity: 'warn', eventKey: 'learning:nightly' });
-        console.log(`🧠 Learning nightly: ${n} snapshots, highs ${highs.length}`);
+        console.log(`🧠 Learning nightly: ${n} snapshots, highs ${highs.length} → ระบบสั่งงานเอง (alert/flag)`);
       } else {
         console.log(`🧠 Learning nightly: ${n} snapshots, no high risk`);
       }
     } catch (e) { console.error('Learning nightly error', e); }
   }
+  // ระบบทำงานเอง: เก็บ snapshot ทุก 6 ชม. (ไม่รอผู้ใช้)
+  setInterval(async () => {
+    try { const { collectDailySnapshots } = await import('../services/data-lake.service'); await collectDailySnapshots(); } catch {}
+  }, 6 * 60 * 60 * 1000);
   // รันทันทีตอน boot ครั้งนึง (หลัง 30วิ ให้ DB พร้อม) + ทุกวัน 02:00
   setTimeout(runLearningNightly, 30_000);
   setInterval(() => {
