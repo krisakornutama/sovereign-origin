@@ -27,6 +27,7 @@ export const common = {
     inventory: 'เสบียงและของใช้',
     farm: 'แปลงเกษตร',
     livestock: 'ปศุสัตว์',
+    learning: 'เรียนรู้เอง',
     restaurant: 'ขายของ (POS)',
     restaurantAdmin: 'จัดการเมนู & สูตร',
     restaurantKds: 'จอครัว (KDS)',
