@@ -108,6 +108,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: '🤖 AI & อุปกรณ์',
     titleKey: 'common.nav.group.devicesEnergy',
     items: [
+      { href: '/learning', label: 'เรียนรู้เอง (Self-Learning)', labelKey: 'common.nav.learning', icon: 'ai', keywords: 'เรียนรู้เอง self-learning data lake พยากรณ์ ทำนาย ai เรียนรู้ต่อ' },
       { href: '/ai', label: 'ศูนย์บัญชาการ AI', labelKey: 'common.nav.ai', icon: 'ai', keywords: 'ai ปัญญาประดิษฐ์ คำสั่ง chat' },
       { href: '/ai-agent', label: 'AI Agent', labelKey: 'common.nav.aiAgent', icon: 'ai-agent', keywords: 'เอเจนต์ บทบาท ตัวแทน ai coding' },
       { href: '/predictive', label: 'พยากรณ์', labelKey: 'common.nav.predictive', icon: 'predictive', keywords: 'พยากรณ์ คาดการณ์ ทำนาย แบตเตอรี่' },

@@ -1776,3 +1776,52 @@ model FertilizerApplication {
   @@index([plotId, appliedAt])
   @@map("fertilizer_applications")
 }
+
+// ── Self-Learning Data Lake — ระบบเรียนรู้เอง D ทั้งหมด ──
+model LearningSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  capturedAt  DateTime @default(now()) @db.Timestamptz
+  domain      String // sensor | farm | livestock | health | treasury | inventory
+  features    Json // { temp: 32, waterLevel: 1.2, soilPh: 6.5, ... }
+  label       Json? // { pumpFailed7d: 0, yieldKg: 12, bpSpike: 1 }
+  source      String   @default("auto") // auto | manual | backfill
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  predictions LearningPrediction[]
+
+  @@index([domain, capturedAt])
+  @@index([capturedAt])
+  @@map("learning_snapshots")
+}
+
+model LearningPrediction {
+  id           String    @id @default(uuid()) @db.Uuid
+  snapshotId   String?   @db.Uuid
+  domain       String // sensor | farm | health ...
+  model        String // qwen3:8b | gemma3:4b | heuristic
+  input        Json // features ที่ใช้ทำนาย
+  output       Json // { risk: 0.8, advice: "..." }
+  confidence   Float? // 0-1
+  actual       Json? // ค่าจริงเมื่อเวลาผ่านไป (สำหรับเรียนรู้ต่อ)
+  correct      Boolean? // เทียบ actual vs output
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  evaluatedAt  DateTime? @db.Timestamptz
+
+  snapshot LearningSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([domain, createdAt])
+  @@index([model])
+  @@map("learning_predictions")
+}
+
+model LearningModelState {
+  id          String   @id @default(uuid()) @db.Uuid
+  domain      String   @unique // sensor | farm | health | unified
+  model       String // โมเดลปัจจุบันที่แม่นสุด
+  accuracy    Float? // หลัง evaluate ล่าสุด
+  trainedAt   DateTime @default(now()) @db.Timestamptz
+  prompt      String? // prompt ที่ใช้สอน Ollama (เรียนรู้ต่อ)
+  stats       Json? // { total: 100, correct: 82 }
+
+  @@map("learning_model_states")
+}

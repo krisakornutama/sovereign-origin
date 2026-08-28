@@ -25,6 +25,7 @@ export const common = {
     inventory: 'Inventory & Supplies',
     farm: 'Farm Plots',
     livestock: 'Livestock',
+    learning: 'Self-Learning',
     restaurant: 'Restaurant POS',
     restaurantAdmin: 'Menu & Recipes',
     restaurantKds: 'Kitchen Display',
