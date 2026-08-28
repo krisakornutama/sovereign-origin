@@ -68,8 +68,8 @@ router.post('/customers/face-enroll', authenticate, async (req, res) => {
     const { name, phone, imageBase64, consentFace } = req.body || {};
     if (!name || !imageBase64) return res.status(400).json({ error: 'name and imageBase64 required' });
     if (!consentFace) return res.status(400).json({ error: 'consentFace required for PDPA' });
-    // สร้าง KnownFace แบบง่าย (เก็บ embedding ภายหลังค่อยผูก face-embed)
-    const face = await prisma.knownFace.create({ data: { name: String(name).slice(0, 80), imagePath: String(imageBase64).slice(0, 5000) } as any });
+    // สร้าง KnownFace — เก็บรูป base64 ลง photo_data (imagePath เดิมไม่มีใน schema)
+    const face = await prisma.knownFace.create({ data: { name: String(name).slice(0, 80), photo_data: String(imageBase64).slice(0, 8000) } as any });
     const customer = await prisma.restaurantCustomer.create({
       data: { name: String(name).slice(0, 80), phone: phone ? String(phone).slice(0, 20) : null, knownFaceId: (face as any).id, consentFace: true },
     });
