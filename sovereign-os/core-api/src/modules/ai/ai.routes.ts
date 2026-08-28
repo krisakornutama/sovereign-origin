@@ -7,6 +7,7 @@ import * as advisor from '../../services/advisor.service';
 import axios from 'axios';
 import os from 'os';
 import { getModelForTask } from '../../services/ai-router.service';
+import { prisma } from '../../lib/prisma';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const CURRENT_MODEL = process.env.AI_MODEL || 'gemma3:4b';
@@ -407,7 +408,7 @@ router.post('/voice-command', authenticate, async (req, res) => {
   }
 });
 
-  // GET /api/ai/voice-query — ถามสถานะ/ข้อมูลระบบด้วยเสียง (query-only, ไม่ทำ action)
+  // GET /api/ai/voice-query — ถามสถานะ/ข้อมูลระบบด้วยเสียง (auto-execute query)
   router.get('/voice-query', authenticate, async (req, res) => {
     const text = String(req.query.text || '').trim();
     if (!text) return res.status(400).json({ error: 'text query parameter is required' });
@@ -415,7 +416,7 @@ router.post('/voice-command', authenticate, async (req, res) => {
 
     try {
       const parsed = parseVoiceCommandHeuristic(text);
-      // Query intents only return data, don't execute actions
+      // Query intents - auto-execute and return real data
       const queryIntents = ['sensor_query', 'system_query', 'farm_query', 'inventory_query', 'kids_query', 'kids_food_query', 'finance_query', 'energy_status', 'security_check', 'kids_query', 'help', 'kids_chore', 'kids_bill', 'kids_allowance', 'kids_coupon', 'kids_lesson', 'kids_portfolio', 'kids_piggy', 'relay_control', 'automation_create', 'automation_delete', 'security_check', 'door_lock', 'energy_status', 'energy_charge', 'kids_food_query', 'finance_query'];
       if (parsed.intent === 'help') {
         return res.json({ success: true, ...parsed, originalText: text, help: true, helpText: VOICE_HELP_TEXT });
@@ -423,7 +424,84 @@ router.post('/voice-command', authenticate, async (req, res) => {
       if (!queryIntents.includes(parsed.intent)) {
         return res.json({ success: true, ...parsed, originalText: text, message: 'คำสั่งนี้ต้องใช้ voice-command (POST) เพื่อดำเนินการ' });
       }
-      res.json({ success: true, ...parsed, originalText: text, isQuery: true });
+
+      // Auto-execute query based on intent
+      let queryResult: any = null;
+      try {
+        switch (parsed.intent) {
+          case 'sensor_query':
+            queryResult = await executeSensorQuery(parsed.entities);
+            break;
+          case 'system_query':
+            queryResult = await executeSystemQuery(parsed.entities);
+            break;
+          case 'farm_query':
+            queryResult = await executeFarmQuery(parsed.entities);
+            break;
+          case 'inventory_query':
+            queryResult = await executeInventoryQuery(parsed.entities);
+            break;
+          case 'kids_query':
+            queryResult = await executeKidsQuery(parsed.entities);
+            break;
+          case 'kids_food_query':
+            queryResult = await executeKidsFoodQuery(parsed.entities);
+            break;
+          case 'finance_query':
+            queryResult = await executeFinanceQuery(parsed.entities);
+            break;
+          case 'energy_status':
+            queryResult = await executeEnergyQuery(parsed.entities);
+            break;
+          case 'security_check':
+            queryResult = await executeSecurityQuery(parsed.entities);
+            break;
+          case 'kids_chore':
+            queryResult = await executeKidsChoreQuery(parsed.entities);
+            break;
+          case 'kids_bill':
+            queryResult = await executeKidsBillQuery(parsed.entities);
+            break;
+          case 'kids_allowance':
+            queryResult = await executeKidsAllowanceQuery(parsed.entities);
+            break;
+          case 'kids_coupon':
+            queryResult = await executeKidsCouponQuery(parsed.entities);
+            break;
+          case 'kids_lesson':
+            queryResult = await executeKidsLessonQuery(parsed.entities);
+            break;
+          case 'kids_portfolio':
+            queryResult = await executeKidsPortfolioQuery(parsed.entities);
+            break;
+          case 'kids_piggy':
+            queryResult = await executeKidsPiggyQuery(parsed.entities);
+            break;
+          case 'relay_control':
+            queryResult = await executeRelayQuery(parsed.entities);
+            break;
+          case 'security_check':
+            queryResult = await executeSecurityQuery(parsed.entities);
+            break;
+          case 'finance_query':
+            queryResult = await executeFinanceQuery(parsed.entities);
+            break;
+          case 'energy_status':
+          case 'energy_charge':
+            queryResult = await executeEnergyQuery(parsed.entities);
+            break;
+          case 'kids_food_query':
+            queryResult = await executeKidsFoodQuery(parsed.entities);
+            break;
+          default:
+            queryResult = { message: 'Query type not fully implemented yet' };
+        }
+      } catch (queryErr: any) {
+        console.error('Query execution error:', queryErr.message);
+        queryResult = { error: queryErr.message };
+      }
+
+      res.json({ success: true, ...parsed, originalText: text, isQuery: true, queryResult });
     } catch (err: any) {
       console.error('Voice query error:', err.message);
       res.status(500).json({ error: err.message });
@@ -465,5 +543,143 @@ router.post('/voice-command', authenticate, async (req, res) => {
 
 ใช้ POST /api/ai/voice-command สำหรับคำสั่งที่ทำ action (เพิ่ม/ลด/สั่ง/จ่าย)
 ใช้ GET /api/ai/voice-query?text=... สำหรับถามสถานะ/ข้อมูล (query only)`;
+
+// Voice query execution functions
+async function executeSensorQuery(entities: any) {
+  const metric = entities.queryMetric || 'water_level_cm';
+  const rows: any[] = await prisma.$queryRawUnsafe(
+    `SELECT value, time FROM sensor_telemetry WHERE metric = $1 ORDER BY time DESC LIMIT 1`,
+    metric
+  );
+  if (!rows.length) return { metric, message: 'No data available' };
+  const latest = rows[0];
+  return { metric, value: latest.value, time: latest.time, unit: getMetricUnit(metric) };
+}
+
+async function executeSystemQuery(entities: any) {
+  const os = await import('os');
+  const uptime = os.uptime();
+  const cpuUsage = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const memory = ((totalMem - freeMem) / totalMem * 100).toFixed(1) + '%';
+  return { uptime: Math.floor(uptime / 3600) + 'h ' + Math.floor((uptime % 3600) / 60) + 'm', cpuUsage, memory };
+}
+
+async function executeFarmQuery(entities: any) {
+  const plots = await prisma.farmPlot.findMany({ include: { soil_readings: { orderBy: { recorded_at: 'desc' }, take: 1 } } });
+  return { total: plots.length, growing: plots.filter(p => p.status === 'growing').length, harvested: plots.filter(p => p.status === 'harvested').length, plots: plots.map(p => ({ id: p.id, name: p.name, crop: p.crop, status: p.status, soil: p.soil_readings[0] })) };
+}
+
+async function executeInventoryQuery(entities: any) {
+  const category = entities.category;
+  const where: any = {};
+  if (category) where.category = category;
+  const items = await prisma.inventoryItem.findMany({ where });
+  return { total: items.length, items: items.map(i => ({ name: i.name, category: i.category, quantity: i.quantity, unit: i.unit, location: i.location, expiry: i.expiry_date })) };
+}
+
+async function executeKidsQuery(entities: any) {
+  const kidName = entities.kidName;
+  const where: any = {};
+  if (kidName) where.name = { contains: kidName, mode: 'insensitive' };
+  const kids = await prisma.kidProfile.findMany({ where, include: { chores: true, bills: true, progress: true } });
+  return { count: kids.length, kids: kids.map(k => ({ name: k.name, age: k.age, pendingChores: k.chores.filter((c: any) => c.status === 'pending').length, unpaidBills: k.bills.filter((b: any) => b.status === 'unpaid').length, wallet: 0, lessons: k.progress.length })) };
+}
+
+async function executeKidsFoodQuery(entities: any) {
+  const kidName = entities.kidName;
+  return { message: `Food query for ${kidName || 'all kids'} - not fully implemented yet` };
+}
+
+async function executeFinanceQuery(entities: any) {
+  const userId = 'f7aa134b-7436-475b-9346-5e914ab4a3e7';
+  const positions = await prisma.assetPosition.findMany({ where: { user_id: userId } });
+  const totalValue = positions.reduce((sum, p) => sum + p.quantity * (p.avg_cost_usd || 0), 0);
+  return { totalValue: totalValue.toFixed(2), positions: positions.map(p => ({ symbol: p.symbol, quantity: p.quantity, value: (p.quantity * (p.avg_cost_usd || 0)).toFixed(2) })) };
+}
+
+async function executeEnergyQuery(entities: any) {
+  const rows: any[] = await prisma.$queryRawUnsafe(`SELECT DISTINCT ON (metric) metric, value FROM sensor_telemetry WHERE metric IN ('battery_soc', 'power_kw', 'solar_radiation') ORDER BY metric, time DESC`);
+  const data: Record<string, any> = {};
+  rows.forEach(r => data[r.metric] = r.value);
+  return data;
+}
+
+async function executeSecurityQuery(entities: any) {
+  const events = await prisma.securityEvent.findMany({ orderBy: { timestamp: 'desc' }, take: 10 });
+  return { recent: events.map(e => ({ type: e.event_type, severity: e.severity, description: e.description, time: e.timestamp })) };
+}
+
+async function executeKidsChoreQuery(entities: any) {
+  const kidName = entities.kidName;
+  const where: any = {};
+  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
+  const chores = await prisma.kidChore.findMany({ where, include: { kid: true } });
+  return { pending: chores.filter(c => c.status === 'pending').length, done: chores.filter(c => c.status === 'done').length, chores: chores.map(c => ({ kid: c.kid.name, title: c.title, status: c.status, reward: c.reward })) };
+}
+async function executeKidsAllowanceQuery(entities: any) {
+  const kids = await prisma.kidProfile.findMany({ where: { allowance_amount: { not: null } } });
+  return { kids: kids.map(k => ({ name: k.name, allowance: k.allowance_amount, day: k.allowance_day, lastPaid: k.allowance_last_paid })) };
+}
+async function executeKidsPortfolioQuery(entities: any) {
+  const kidName = entities.kidName;
+  const where: any = {};
+  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
+  const portfolios = await prisma.kidInvestment.findMany({ where, include: { kid: true } });
+  return { portfolios: portfolios.map(p => ({ kid: p.kid.name, symbol: p.symbol, units: p.units, avgCost: p.avg_cost })) };
+}
+async function executeRelayQuery(entities: any) {
+  const relays = await prisma.relay.findMany({ include: { schedules: true } });
+  return { relays: relays.map(r => ({ id: r.id, label: r.label, state: r.state, schedules: r.schedules.length })) };
+}
+
+
+function getMetricUnit(metric: string): string {
+  const units: Record<string, string> = {
+    water_level_cm: 'cm',
+    battery_soc: '%',
+    power_kw: 'kW',
+    temperature: '°C',
+    humidity: '%',
+    soil_moisture: '%',
+    ec_value: 'dS/m',
+    ph: 'pH',
+  };
+  return units[metric] || '';
+}
+
+
+
+async function executeKidsLessonQuery(entities: any) {
+  const kidName = entities.kidName;
+  const where: any = {};
+  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
+  const lessons = await prisma.kidLessonProgress.findMany({ where, include: { kid: true } });
+  return { lessons: lessons.map(l => ({ kid: l.kid.name, lessonTitle: l.lesson_title, score: l.score, total: l.total, completedAt: l.completed_at })) };
+}
+
+async function executeKidsPiggyQuery(entities: any) {
+  const kidName = entities.kidName;
+  const where: any = {};
+  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
+  const piggy = await prisma.kidPiggyTx.findMany({ where, include: { kid: true } });
+  return { transactions: piggy.map(p => ({ kid: p.kid.name, amount: p.amount, note: p.note, time: p.created_at })) };
+}
+
+
+
+async function executeKidsBillQuery(entities: any) {
+  return { message: 'Kids bill query - not fully implemented yet' };
+}
+
+async function executeKidsCouponQuery(entities: any) {
+  return { message: 'Kids coupon query - not fully implemented yet' };
+}
+
+
+
+
+
 
 export default router;
