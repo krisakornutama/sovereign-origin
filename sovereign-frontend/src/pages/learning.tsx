@@ -81,6 +81,10 @@ export default function LearningPage() {
                     <div className="font-bold">{tr.label} ({tr.metric}) <span className={tr.trend==="down"?"text-amber-400":tr.trend==="up"?"text-sky-400":"text-gray-500"}>{tr.trend}</span></div>
                     <div className="text-gray-300">ตอนนี้ {tr.last}{tr.unit} → อีก7วัน {tr.forecast}{tr.unit} (slope {tr.slope}{tr.unit}/วัน)</div>
                     <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
+                    <div className="flex gap-2 mt-1">
+                      <a href="/sensors" className="text-[11px] text-sky-400 hover:underline">→ ดูเซ็นเซอร์</a>
+                      <a href="/inventory" className="text-[11px] text-sky-400 hover:underline">→ เติมน้ำ/แบต</a>
+                    </div>
                     <div className="text-gray-500">{tr.samples} samples 7วัน</div>
                   </div>
                 ))}
@@ -97,6 +101,7 @@ export default function LearningPage() {
                     <div className="font-bold">{tr.name} {tr.crop?`· ${tr.crop}`:""} <span className="text-gray-500">[{tr.status}]</span></div>
                     <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
                     {tr.soil && <div className="text-gray-500">pH {tr.soil.ph} · ชื้น {tr.soil.moisture}% {tr.soil.n!=null?`· N ${tr.soil.n}`:""}</div>}
+                    <div className="flex gap-2 mt-1"><a href="/farm" className="text-[11px] text-emerald-400 hover:underline">→ จัดการแปลง</a><a href="/inventory" className="text-[11px] text-sky-400 hover:underline">→ ปุ๋ย/เมล็ด</a></div>
                     <div className="text-gray-500">beds {tr.herbBeds}</div>
                   </div>
                 ))}
@@ -112,6 +117,7 @@ export default function LearningPage() {
                     <div className="font-bold">{tr.label} ({tr.metric}) <span className={tr.trend==="up"?"text-amber-400":"text-gray-500"}>{tr.trend}</span></div>
                     <div className="text-gray-300">ล่าสุด {tr.last}{tr.unit} · เฉลี่ย {tr.avg}{tr.unit}</div>
                     <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
+                    <div className="flex gap-2 mt-1"><a href="/health" className="text-[11px] text-rose-400 hover:underline">→ ตรวจสุขภาพ</a><a href="/health/self-check" className="text-[11px] text-sky-400 hover:underline">→ 32Q</a></div>
                     <div className="text-gray-500">{tr.samples} samples</div>
                   </div>
                 ))}
