@@ -21,15 +21,16 @@
   - ทำงานอยู่: router up/down + latency + speedtest + LAN device scan + Telegram alerts (ทุก 60 วิ)
   - ถอด firmware architecture ครบ: 381 models, Data IDs, login flow, XOR+AES crypto (เอกสารใน `tplink-mr505.service.ts`)
   - ขาด: AES key exchange (RSA) — ข้อมูลซิม (สัญญาณ/data usage/SMS) เข้ารหัสอยู่ → **defer ไป Sprint ถัดไป**
-- [ ] Router MR505 — AES crypto stack (RSA key exchange + AES-CBC decrypt) — **defer จาก 25/8/69**
-  - โค้ด framework พร้อมใน `tplink-mr505.service.ts` — แค่เพิ่ม crypto + `syncEncryptor` step
-  - ได้เมื่อเสร็จ: สัญญาณซิม RSRP/SINR · data usage · SMS · clients ทุกเครื่อง
+- [x] Router MR505 — AES crypto stack (RSA key exchange + AES-CBC decrypt) — **เสร็จแล้ว 29/8/69** (`tplink-mr505.service.ts` AES-128-CBC)
+  - `syncEncryptor` ถอด RSA `nn/ee` → สุ่ม AES key/iv 16B → RSA encrypt → `POST ?code=12` → บันทึก `aesKey/aesIv` + `aesDecryptBase64`/`isEncryptedBody` → `readModel` ถอดอัตโนมัติ + อ่าน data usage (145/142) เพิ่ม — ทดสอบ roundtrip ผ่าน, `fetchRouterSimData` พร้อม (รอ lockout 2 ชม. หมดจะทดสอบสัญญาณจริง)
 - [x] Self-Reliance S3-S6 — สวนสมุนไพร+ยาต่อ HERB_DB · วงจรปิดขยะ→ปุ๋ย · Skills Matrix ต่อคน · Crisis Playbooks 1 ปุ่ม — **เสร็จแล้ว 29/8/69** (`create_missing.sql` + `schema.prisma` per-user health)
   - DB drift ปิดแล้ว: `health_readings/observations/flags/consents user_id` + `farm_plots category` + `herb_catalogs/dose_logs/herb_beds/skill_matrix/crisis_modes` สร้างแล้ว + seed 12 สมุนไพร/3 crisis modes — build 50 routes + full CRUD 38/38 ผ่าน
 - [ ] ตั้ง Telegram token ใหม่ — **รอผู้ใช้** (token เดิมโดน Telegram revoke เพราะหลุดในข้อความ) → ไป @BotFather สร้างใหม่ + กด START ที่ bot 1 ครั้ง แล้วใส่ที่หน้า Settings (แล้ว agent ทดสอบส่งให้)
 - [ ] ใบหน้า auto-recognize บน POS — **รอ Ollama เปิด** (โค้ด face-embed พร้อม แต่ Ollama offline)
-- [ ] i18n หน้า restaurant + E2E หน้าใหม่ — priority ต่ำ (ใช้งานได้แล้ว แค่ไม่สลับภาษา/ไม่มี E2E)
+- [x] i18n หน้า restaurant + E2E หน้าใหม่ — **เสร็จแล้ว 29/8/69** (i18n `common.nav.skills/crisis` + `dashboard.inventory/farm.enableHint` + `e2e/queue-remaining.spec.ts` 8 หน้า + สลับภาษา, `pos-flow.spec.ts` เดิมครอบ POS)
+  - restaurant `th/en/pages/restaurant.ts` ครบแล้ว (POS/admin/kitchen/reports) — เติม `th/en/common` ที่ขาด, E2E ใหม่ตรวจ `/selfreliance` `/restaurant*` `/crisis` `/skills` `/system` render + ไม่ `Application error`
 
-หมายเหตุสถานะระบบ (29/8/69): backend tsc สะอาด + tests 16/16 + frontend 50 routes build ผ่าน + API 38/38 full CRUD ผ่าน + 43 หน้าเว็บ render ครบ — จ่ายร้านค้าครบวงจร (harvest→inventory→order→pay→report), health per-user, self-reliance Days-of-Autonomy พร้อม
+หมายเหตุสถานะระบบ (29/8/69 22:00): backend tsc สะอาด + frontend 50 routes build ผ่าน + API 38/38 full CRUD + E2E 56 tests (auth+pos+queue-remaining) — AES crypto พร้อม, i18n ครบ 100% (skills/crisis/enableHint), Telegram/Face รอ user (โค้ดพร้อม: `telegram.routes.ts` validate+mask, `restaurant.routes.ts` face-enroll PDPA)
+หมายเหตุรอผู้ใช้: Telegram สร้างใหม่ที่ @BotFather → `PUT /api/telegram/config` (SUPERADMIN) + กด START → `POST /test` · Face: เปิด `docker compose --profile ai up -d ollama` แล้ว face-recognize จะทำงาน (enroll ใบหน้าใช้ได้แล้วไม่ต้องรอ)
 หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
 หมายเหตุ hydration: dashboard layout + history range แก้แล้ว (`05a2264` + `ffac9e2`) — ห้ามอ่าน localStorage/URL ตอน render แรก ให้ไปอ่านใน useEffect

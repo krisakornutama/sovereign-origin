@@ -55,6 +55,7 @@ export default {
     expiring: 'ใกล้หมดอายุ',
     expired: 'หมดอายุแล้ว',
     disabled: 'โมดูล inventory ปิดอยู่ หรือไม่มีข้อมูล',
+    enableHint: 'เปิดใช้งานใน Settings → Features',
   },
 
   // ── dashboard.tsx: kids widget ──
@@ -102,6 +103,7 @@ export default {
     upcoming: 'ใกล้เก็บเกี่ยว (30 วัน):',
     today: 'วันนี้!',
     disabled: 'โมดูล farm ปิดอยู่ หรือไม่มีข้อมูล',
+    enableHint: 'เปิดใช้งานใน Settings → Features',
   },
 
   // ── dashboard.tsx: map widget + GlobalMap.tsx ──

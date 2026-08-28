@@ -32,6 +32,8 @@ export const common = {
     restaurantKitchen: 'Kitchen IOT',
     selfreliance: 'Autonomy Days',
     selfCheck: 'Self-Check 32Q',
+    skills: 'Team Skills',
+    crisis: 'Crisis Mode',
     researchRice: 'Rice Research',
     portfolio: 'Wealth & Assets',
     treasury: 'Treasury & Invest',
