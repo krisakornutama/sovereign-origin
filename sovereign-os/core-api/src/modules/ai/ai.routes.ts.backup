@@ -583,8 +583,8 @@ async function executeKidsQuery(entities: any) {
   const kidName = entities.kidName;
   const where: any = {};
   if (kidName) where.name = { contains: kidName, mode: 'insensitive' };
-  const kids = await prisma.kidProfile.findMany({ where, include: { chores: true, bills: true, progress: true } });
-  return { count: kids.length, kids: kids.map(k => ({ name: k.name, age: k.age, pendingChores: k.chores.filter((c: any) => c.status === 'pending').length, unpaidBills: k.bills.filter((b: any) => b.status === 'unpaid').length, wallet: 0, lessons: k.progress.length })) };
+  const kids = await prisma.kidProfile.findMany({ where, include: { chores: true, bills: true, lessons: true, wallet_txs: true } });
+  return { count: kids.length, kids: kids.map(k => ({ name: k.name, age: k.age, pendingChores: k.chores.filter((c: any) => c.status === 'pending').length, unpaidBills: k.bills.filter((b: any) => b.status === 'unpaid').length, wallet: k.wallet_txs.reduce((s: number, t: any) => s + t.amount, 0), lessons: k.lessons.length })) };
 }
 
 async function executeKidsFoodQuery(entities: any) {
@@ -595,8 +595,8 @@ async function executeKidsFoodQuery(entities: any) {
 async function executeFinanceQuery(entities: any) {
   const userId = 'f7aa134b-7436-475b-9346-5e914ab4a3e7';
   const positions = await prisma.assetPosition.findMany({ where: { user_id: userId } });
-  const totalValue = positions.reduce((sum, p) => sum + p.quantity * (p.avg_cost_usd || 0), 0);
-  return { totalValue: totalValue.toFixed(2), positions: positions.map(p => ({ symbol: p.symbol, quantity: p.quantity, value: (p.quantity * (p.avg_cost_usd || 0)).toFixed(2) })) };
+  const totalValue = positions.reduce((sum, p) => sum + p.quantity * (p.current_price_usd || 0), 0);
+  return { totalValue: totalValue.toFixed(2), positions: positions.map(p => ({ symbol: p.symbol, quantity: p.quantity, value: (p.quantity * (p.current_price_usd || 0)).toFixed(2) })) };
 }
 
 async function executeEnergyQuery(entities: any) {
@@ -618,10 +618,24 @@ async function executeKidsChoreQuery(entities: any) {
   const chores = await prisma.kidChore.findMany({ where, include: { kid: true } });
   return { pending: chores.filter(c => c.status === 'pending').length, done: chores.filter(c => c.status === 'done').length, chores: chores.map(c => ({ kid: c.kid.name, title: c.title, status: c.status, reward: c.reward })) };
 }
+
+async function executeKidsBillQuery(entities: any) {
+  return { message: 'Kids bill query - not fully implemented yet' };
+}
+
 async function executeKidsAllowanceQuery(entities: any) {
   const kids = await prisma.kidProfile.findMany({ where: { allowance_amount: { not: null } } });
   return { kids: kids.map(k => ({ name: k.name, allowance: k.allowance_amount, day: k.allowance_day, lastPaid: k.allowance_last_paid })) };
 }
+
+async function executeKidsCouponQuery(entities: any) {
+  return { message: 'Kids coupon query - not fully implemented yet' };
+}
+
+async function executeKidsLessonQuery(entities: any) {
+  return { message: 'Kids lesson query - not fully implemented yet' };
+}
+
 async function executeKidsPortfolioQuery(entities: any) {
   const kidName = entities.kidName;
   const where: any = {};
@@ -629,11 +643,71 @@ async function executeKidsPortfolioQuery(entities: any) {
   const portfolios = await prisma.kidInvestment.findMany({ where, include: { kid: true } });
   return { portfolios: portfolios.map(p => ({ kid: p.kid.name, symbol: p.symbol, units: p.units, avgCost: p.avg_cost })) };
 }
+
+async function executeKidsPiggyQuery(entities: any) {
+  return { message: 'Kids piggy query - not fully implemented yet' };
+}
+
 async function executeRelayQuery(entities: any) {
   const relays = await prisma.relay.findMany({ include: { schedules: true } });
   return { relays: relays.map(r => ({ id: r.id, label: r.label, state: r.state, schedules: r.schedules.length })) };
 }
 
+async function executeSecurityQuery(entities: any) {
+  const events = await prisma.securityEvent.findMany({ orderBy: { timestamp: 'desc' }, take: 10 });
+  return { recent: events.map(e => ({ type: e.event_type, severity: e.severity, description: e.description, time: e.timestamp })) };
+}
+
+async function executeFinanceQuery(entities: any) {
+  return executeFinanceQuery(entities);
+}
+
+async function executeEnergyQuery(entities: any) {
+  const rows: any[] = await prisma.$queryRawUnsafe(`SELECT DISTINCT ON (metric) metric, value FROM sensor_telemetry WHERE metric IN ('battery_soc', 'power_kw', 'solar_radiation') ORDER BY metric, time DESC`);
+  const data: Record<string, any> = {};
+  rows.forEach(r => data[r.metric] = r.value);
+  return data;
+}
+
+async function executeKidsFoodQuery(entities: any) {
+  return { message: 'Kids food query - not fully implemented yet' };
+}
+
+async function executeKidsCouponQuery(entities: any) {
+  return { message: 'Kids coupon query - not fully implemented yet' };
+}
+
+async function executeKidsLessonQuery(entities: any) {
+  return { message: 'Kids lesson query - not fully implemented yet' };
+}
+
+async function executeKidsPortfolioQuery(entities: any) {
+  return executeKidsPortfolioQuery(entities);
+}
+
+async function executeKidsPiggyQuery(entities: any) {
+  return { message: 'Kids piggy query - not fully implemented yet' };
+}
+
+async function executeRelayQuery(entities: any) {
+  return executeRelayQuery(entities);
+}
+
+async function executeSecurityQuery(entities: any) {
+  return executeSecurityQuery(entities);
+}
+
+async function executeFinanceQuery(entities: any) {
+  return executeFinanceQuery(entities);
+}
+
+async function executeEnergyQuery(entities: any) {
+  return executeEnergyQuery(entities);
+}
+
+async function executeKidsFoodQuery(entities: any) {
+  return executeKidsFoodQuery(entities);
+}
 
 function getMetricUnit(metric: string): string {
   const units: Record<string, string> = {
@@ -648,38 +722,5 @@ function getMetricUnit(metric: string): string {
   };
   return units[metric] || '';
 }
-
-
-
-async function executeKidsLessonQuery(entities: any) {
-  const kidName = entities.kidName;
-  const where: any = {};
-  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
-  const lessons = await prisma.kidLessonProgress.findMany({ where, include: { kid: true } });
-  return { lessons: lessons.map(l => ({ kid: l.kid.name, lessonTitle: l.lesson_title, score: l.score, total: l.total, completedAt: l.completed_at })) };
-}
-
-async function executeKidsPiggyQuery(entities: any) {
-  const kidName = entities.kidName;
-  const where: any = {};
-  if (kidName) where.kid = { name: { contains: kidName, mode: 'insensitive' } };
-  const piggy = await prisma.kidPiggyTx.findMany({ where, include: { kid: true } });
-  return { transactions: piggy.map(p => ({ kid: p.kid.name, amount: p.amount, note: p.note, time: p.created_at })) };
-}
-
-
-
-async function executeKidsBillQuery(entities: any) {
-  return { message: 'Kids bill query - not fully implemented yet' };
-}
-
-async function executeKidsCouponQuery(entities: any) {
-  return { message: 'Kids coupon query - not fully implemented yet' };
-}
-
-
-
-
-
 
 export default router;

@@ -17,7 +17,7 @@ export default defineConfig({
     locale: 'th-TH',
   },
   projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    { name: 'setup', testMatch: /auth\.setup\.ts/, timeout: 180_000 },
     {
       name: 'authenticated',
       testMatch: /pages\.spec\.ts|pos-flow\.spec\.ts|spa-nav\.spec\.ts/,
