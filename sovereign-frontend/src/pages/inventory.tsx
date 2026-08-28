@@ -6,6 +6,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
+import VoiceCommand from '../components/dashboard/VoiceCommand';
 import type { InventoryItem } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -274,6 +275,7 @@ export default function InventoryPage() {
             subtitle={t('inventory.page.subtitle', 'สต็อกวัตถุดิบ วันหมดอายุ และการสแกนฉลาก')}
             icon={<Icon name="inventory" size={18} />}
           />
+          <VoiceCommand />
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('inventory.page.h2', 'เสบียง & สต็อกสินค้า')}</h2>
             <div className="text-sm text-gray-400">

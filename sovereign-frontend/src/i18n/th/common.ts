@@ -191,5 +191,14 @@ export const common = {
   pages: 'หน้า',
   water: 'น้ำ',
   batteryVeryLow: 'ต่ำมาก',
-  mobileMenu: 'เมนูหลัก (มือถือ)',
-} as const;
+mobileMenu: 'เมนูหลัก (มือถือ)',
+    voiceCommand: {
+      heard: 'ได้ยิน:',
+      processing: 'กำลังประมวลผล...',
+      completed: 'เสร็จสิ้น',
+      confirmTitle: 'ยืนยันการดำเนินการ',
+      confirm: 'ตกลง ดำเนินการ',
+      cancel: 'ยกเลิก',
+      lowConfidence: 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น',
+    },
+  } as const;

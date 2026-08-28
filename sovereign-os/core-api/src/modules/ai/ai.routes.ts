@@ -6,12 +6,75 @@ import * as chatMemory from '../../services/chat-memory.service';
 import * as advisor from '../../services/advisor.service';
 import axios from 'axios';
 import os from 'os';
+import { getModelForTask } from '../../services/ai-router.service';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const CURRENT_MODEL = process.env.AI_MODEL || 'gemma3:4b';
-import { getModelForTask } from '../../services/ai-router.service';
 
 const router = Router();
+
+// Heuristic voice command parser (fallback when Ollama is slow/unavailable)
+function parseVoiceCommandHeuristic(text: string): any {
+  const t = text.toLowerCase().trim();
+  
+  // Intent detection
+  let intent = 'help';
+  if (/(เพิ่ม|ใส่|เพิ่มเข้า).*(น้ำ|water)/.test(t)) intent = 'inventory_add';
+  else if (/(นำออก|เอาออก|ลด).*(น้ำ|water)/.test(t)) intent = 'inventory_remove';
+  else if (/(เพิ่ม|ใส่).*(อาหาร|ข้าว|ผัก|ผลไม้|food)/.test(t)) intent = 'inventory_add';
+  else if (/(เก็บเกี่ยว|เก็บ).*(ข้าว|ผัก|ผลไม้|crop)/.test(t)) intent = 'farm_harvest';
+  else if (/(ปลูก|หว่าน).*(ข้าว|ผัก|crop)/.test(t)) intent = 'farm_plant';
+  else if (/(ความดัน|bp|บีพี)/.test(t)) intent = 'health_bp';
+  else if (/(น้ำหนัก|weight)/.test(t)) intent = 'health_weight';
+  else if (/(น้ำตาล|sugar|glucose)/.test(t)) intent = 'health_sugar';
+  else if (/(สั่ง|order).*(อาหาร|ข้าว|menu)/.test(t)) intent = 'restaurant_order';
+  else if (/(จ่าย|pay|ชำระ)/.test(t)) intent = 'restaurant_pay';
+  else if (/(เช็ค|check).*(เซ็นเซอร์|sensor|น้ำ|water|แบต|battery)/.test(t)) intent = 'sensor_check';
+  else if (/(สถานะ|status).*(ระบบ|system)/.test(t)) intent = 'system_status';
+
+  // Entity extraction
+  const entities: any = {};
+  
+  // Numbers with units
+  const qtyMatch = t.match(/(\d+(?:\.\d+)?)\s*(ลิตร|ล|กิโลกรัม|กิโล|กก\.|กิโลกรัม|mg\/dl|mmhg|จาน|ชิ้น|ถ้วย|ช้อน)/);
+  if (qtyMatch) {
+    entities.quantity = parseFloat(qtyMatch[1]);
+    entities.unit = qtyMatch[2].replace('กิโลกรัม', 'กิโลกรัม').replace('กก.', 'กิโลกรัม').replace('กิโล', 'กิโลกรัม').replace('ลิตร', 'ลิตร').replace('ล', 'ลิตร');
+  }
+
+  // Water
+  if (/(น้ำ|water)/.test(t)) entities.category = 'water';
+  
+  // Blood pressure
+  const bpMatch = t.match(/(\d{2,3})\s*[/\\\/]\s*(\d{2,3})/);
+  if (bpMatch) {
+    entities.systolic = parseInt(bpMatch[1]);
+    entities.diastolic = parseInt(bpMatch[2]);
+  }
+
+  // Numbers without units (generic value)
+  const numMatch = t.match(/(?:ค่า|value|เช็ค|check)\s*(\d+(?:\.\d+)?)/);
+  if (numMatch && !entities.value) entities.value = parseFloat(numMatch[1]);
+
+  // Table number
+  const tableMatch = t.match(/(โต๊ะ|table)\s*([A-Z]?\d+)/i);
+  if (tableMatch) entities.table = tableMatch[2].toUpperCase();
+
+  // Payment
+  if (/promptpay|พรอมต์เพย์/.test(t)) entities.payment = 'promptpay';
+  else if (/เงินสด|cash/.test(t)) entities.payment = 'cash';
+
+  // Confidence based on how many entities found
+  const entityCount = Object.keys(entities).length;
+  const confidence = Math.min(0.5 + entityCount * 0.15, 0.9);
+
+  return {
+    intent,
+    entities,
+    confidence,
+    action: intent !== 'help' ? { endpoint: `/api/${intent}`, method: 'POST', payload: entities } : undefined,
+  };
+}
 
 // GET /api/ai/local-status — สวิตช์ AI ในเครื่อง (default ปิด — ต้องกดเปิดในแอป)
 router.get('/local-status', authenticate, async (_req, res) => {
@@ -197,6 +260,82 @@ router.post('/advisor/what-if', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Advisor what-if route error:', err);
     res.status(500).json({ error: 'What-if failed' });
+  }
+});
+
+// POST /api/ai/voice-command — parse เสียงพูด → intent + entities + action ที่พร้อม execute
+router.post('/voice-command', authenticate, async (req, res) => {
+  const text = String(req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (text.length > 500) return res.status(400).json({ error: 'text too long (max 500)' });
+
+  try {
+    const prompt = `คุณคือ Voice Command Parser สำหรับ Sovereign OS
+ผู้ใช้พูด: "${text}"
+
+โปรดแปลงเป็น JSON เท่านั้น:
+{
+  "intent": "inventory_add|inventory_remove|farm_harvest|farm_plant|health_bp|health_weight|health_sugar|restaurant_order|restaurant_pay|sensor_check|system_status|help",
+  "entities": {
+    "item": "ชื่อสิ่งของ (ถ้ามี)",
+    "quantity": จำนวน (number ถ้ามี),
+    "unit": "หน่วย (ลิตร|กิโลกรัม|กิโล|ลิตร|mg/dL|mmHg|kg)",
+    "crop": "ชื่อพืช (ถ้ามี)",
+    "systolic": จำนวน (ถ้ามี),
+    "diastolic": จำนวน (ถ้ามี),
+    "value": ค่าเลขทั่วไป (ถ้ามี),
+    "category": "หมวดหมู่ (water|food|fuel|seed|medicine|tool)",
+    "menu": "ชื่อเมนู (ถ้ามี)",
+    "table": "หมายเลขโต๊ะ (ถ้ามี)",
+    "payment": "cash|promptpay",
+    "metric": "metric name สำหรับ sensor_check"
+  },
+  "confidence": 0-1,
+  "action": {
+    "endpoint": "API endpoint ที่ต้องเรียก",
+    "method": "POST|GET|PUT",
+    "payload": {}
+  }
+}
+
+ตัวอย่าง:
+"เพิ่มน้ำ 20 ลิตร" → intent: inventory_add, entities: {item:"น้ำ", quantity:20, unit:"ลิตร", category:"water"}
+"เก็บเกี่ยวข้าวหอมมะลิ 50 กิโลกรัม" → intent: farm_harvest, entities: {crop:"ข้าวหอมมะลิ", quantity:50, unit:"กิโลกรัม"}
+"บันทึกความดัน 130 สlash 85" → intent: health_bp, entities: {systolic:130, diastolic:85}
+"เช็คน้ำ 30 เซนติเมตร" → intent: sensor_check, entities: {metric:"water_level_cm", value:30}
+"สั่งข้าวผัด 2 จาน โต๊ะ A1 จ่าย promptpay" → intent: restaurant_order, entities: {menu:"ข้าวผัด", quantity:2, table:"A1", payment:"promptpay"}
+
+ห้ามตอบอย่างอื่น — ตอบ JSON เท่านั้น`;
+
+    const { getModelForTask } = await import('../../services/ai-router.service');
+    const model = await getModelForTask('GENERAL_ASSISTANT', process.env.AI_MODEL || 'gemma3:4b');
+    
+    // Try Ollama first with short timeout, fallback to heuristic parser
+    let parsed: any = null;
+    try {
+      const response = await axios.post(`${OLLAMA_URL}/api/generate`, {
+        model,
+        prompt,
+        stream: false,
+        options: { temperature: 0.1, num_predict: 300 },
+      }, { timeout: 8000 });
+
+      const raw = response.data?.response?.trim() || '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+    } catch (ollamaErr: any) {
+      console.warn('Voice command Ollama timeout/fallback:', ollamaErr?.message || ollamaErr);
+    }
+
+    // Fallback: simple heuristic parser (fast, no Ollama)
+    if (!parsed) {
+      parsed = parseVoiceCommandHeuristic(text);
+    }
+
+    res.json({ success: true, ...parsed, originalText: text });
+  } catch (err: any) {
+    console.error('Voice command error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

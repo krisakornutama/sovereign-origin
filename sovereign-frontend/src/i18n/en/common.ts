@@ -184,5 +184,14 @@ export const common = {
   pages: 'pages',
   water: 'Water',
   batteryVeryLow: 'Very low',
-  mobileMenu: 'Main menu (mobile)',
-} as const;
+mobileMenu: 'Main menu (mobile)',
+    voiceCommand: {
+      heard: 'Heard:',
+      processing: 'Processing...',
+      completed: 'Completed',
+      confirmTitle: 'Confirm Action',
+      confirm: 'Confirm',
+      cancel: 'Cancel',
+      lowConfidence: 'Could not understand clearly, please speak more clearly',
+    },
+  } as const;

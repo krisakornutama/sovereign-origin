@@ -7,6 +7,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import Sparkline from '../components/ui/Sparkline';
+import VoiceCommand from '../components/dashboard/VoiceCommand';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -271,6 +272,7 @@ export default function HealthPage() {
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('health.page.backDashboard', '← กลับ Dashboard')}</Link>
         </div>}
         />
+      <VoiceCommand />
 
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}

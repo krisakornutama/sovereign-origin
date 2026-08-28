@@ -6,6 +6,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
+import VoiceCommand from '../components/dashboard/VoiceCommand';
 import type { FarmPlot } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -344,6 +345,7 @@ export default function FarmPage() {
             subtitle={t('farm.page.subtitle', 'จัดการแปลงปลูก วิเคราะห์ดิน และติดตามการเก็บเกี่ยว')}
             icon={<Icon name="farm" size={18} />}
           />
+          <VoiceCommand />
           {/* ── Herb Garden Dashboard — S3+S4 ── */}
           <div className="card panel-cyan p-4 space-y-3">
             <h3 className="text-xs font-bold tracking-widest text-emerald-300 flex items-center gap-1.5"><Icon name="healing" size={13} /> {t('farm.herbGarden.title', 'สวนสมุนไพร')}</h3>
