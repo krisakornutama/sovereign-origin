@@ -755,7 +755,7 @@ export default function Dashboard() {
                 </div>
                 <div className="bg-gray-900/50 border border-gray-700/40 rounded-xl p-2">
                   <div className="text-[9px] tracking-widest font-mono text-gray-500 mb-2">SOVEREIGN HUB CHAT</div>
-                  <div className="h-[320px] overflow-hidden rounded-lg border border-gray-800"><AiChatPanel /></div>
+                  <div className="h-[380px] rounded-lg border border-gray-800 overflow-hidden"><AiChatPanel compact /></div>
                 </div>
               </div>
             </div>

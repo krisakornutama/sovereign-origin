@@ -10,10 +10,10 @@ export const TASK_TYPES = ['CODING_AGENT', 'VISION_AI', 'REASONING_GOVERNOR', 'G
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export const DEFAULT_ROUTES: Record<TaskType, string> = {
-  CODING_AGENT: 'qwen2.5-coder:7b',
-  VISION_AI: 'qwen2.5-vl:7b',
-  REASONING_GOVERNOR: 'deepseek-r1:14b',
-  GENERAL_ASSISTANT: 'qwen2.5:7b',
+  CODING_AGENT: 'qwen3:8b',
+  VISION_AI: 'qwen3-vl:8b',
+  REASONING_GOVERNOR: 'deepseek-r1:8b',
+  GENERAL_ASSISTANT: 'gemma3:4b',
 };
 
 const keyOf = (task: string) => `ai.route.${task}`;

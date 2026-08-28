@@ -123,7 +123,7 @@ User message: `;
     }
   }
 
-  // Direct call to Ollama
+  // Direct call to Ollama — 20s timeout + fallback to heuristic (dashboard chat ต้องไว)
   private async callOllama(prompt: string, retry = true, opts: { model?: string; images?: string[] } = {}): Promise<string> {
     try {
       const response = await axios.post(`${OLLAMA_URL}/api/generate`, {
@@ -133,9 +133,10 @@ User message: `;
         images: opts.images?.length ? opts.images : undefined,
         options: {
           temperature: 0.1,  // low temperature = more deterministic
+          num_predict: 300,
         },
         keep_alive: OLLAMA_KEEP_ALIVE,
-      }, { timeout: 120000 });
+      }, { timeout: 20000 });
 
       const result = response.data?.response?.trim() || '';
 
@@ -353,6 +354,11 @@ User message: `;
 
   // ---------- MAIN PUBLIC METHOD ----------
   public async processMessage(userMessage: string, ctx?: ActionContext, opts: { imageBase64?: string } = {}): Promise<string> {
+    // Fast greeting — ไม่ต้องรอ Ollama 20วิ (dashboard ปุ่มคุยต้องไว)
+    const g = (userMessage || '').trim().toLowerCase();
+    if (/^(สวัสดี|หวัดดี|hello|hi|hey)[!！\s]*$/.test(g) || g === 'สวัสดี ทดสอบ' || g === 'ทดสอบ') {
+      return 'สวัสดีครับ 👋 ผม Sovereign AI พร้อมช่วยแล้ว — ถามเรื่องเซ็นเซอร์ ฟาร์ม หรือให้ช่วยดูระบบได้เลยครับ';
+    }
     // Global emergency stop — ตอบกลับทันทีโดยไม่เรียก Ollama
     if (aiKillSwitch.isActive()) {
       const ks = aiKillSwitch.status();
@@ -436,6 +442,9 @@ Response: `;
       return decision || '🤖 ไม่สามารถประมวลผลได้';
     } catch (err: any) {
       console.error('AI processing error:', err.message);
+      if (/timeout/i.test(err.message)) {
+        return '⚠️ AI ตอบช้า (Ollama timeout 20s) — ลองถามสั้นๆ อีกครั้งนะครับ หรือดูที่หน้า /ai สำหรับคำถามยาวๆ ครับ';
+      }
       return `⚠️ AI error: ${err.message}`;
     }
   }
