@@ -51,6 +51,12 @@ router.get('/predictions', authenticate, async (req, res) => {
   res.json(list);
 });
 
+// GET /api/learning/predict/sensor — Engine A: trend 7วัน → พยากรณ์ 7วันข้างหน้า (ไม่ต้องส่ง features)
+router.get('/predict/sensor', authenticate, async (_req, res) => {
+  const { predictSensorTrends } = await import('../../services/learning-engine.service');
+  res.json(await predictSensorTrends());
+});
+
 // GET /api/learning/models — accuracy ต่อ domain
 router.get('/models', authenticate, async (_req, res) => {
   res.json(await getModelState());
