@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { authFetch } from '../../lib/apiFetch';
 import { useLanguageStore } from '../../stores/useLanguageStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 import VoiceInput from './VoiceInput';
 import Icon from '../ui/Icon';
 
@@ -11,12 +12,14 @@ interface VoiceCommandResult {
   confidence: number;
   action?: { endpoint: string; method: string; payload: any };
   originalText: string;
+  isQuery?: boolean;
+  queryResult?: any;
 }
 
 interface PendingAction {
   intent: string;
   description: string;
-  execute: () => Promise<void>;
+  execute: (token?: string) => Promise<void>;
 }
 
 export default function VoiceCommand({ onActionComplete }: { onActionComplete?: (result: VoiceCommandResult) => void }) {
@@ -33,10 +36,20 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
     setIsProcessing(true);
 
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/voice-command`, {
-        method: 'POST',
+      // ตรวจสอบว่าเป็นคำถาม (query) หรือคำสั่ง (command)
+      const isQuery = /^(เช็ค|เช็คว่า|สถานะ|สถานะว่า|ค่า|ค่าเท่าไหร่|เท่าไหร่|สถานะว่า|ดู|ดูว่า|ได้ยินไหม|รู้ไหม|ข้อมูล|ข้อมูลว่า)/.test(text.trim().toLowerCase()) ||
+                      text.trim().endsWith('ไหม') || text.trim().endsWith('?');
+      
+      const endpoint = isQuery ? '/api/ai/voice-query' : '/api/ai/voice-command';
+      const method = isQuery ? 'GET' : 'POST';
+      
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/api/ai/${isQuery ? 'voice-query' : 'voice-command'}`;
+      if (isQuery) url += `?text=${encodeURIComponent(text)}`;
+
+      const res = await authFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: !isQuery ? JSON.stringify({ text }) : undefined,
       });
 
       const data = await res.json();
@@ -48,22 +61,30 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
         confidence: data.confidence,
         action: data.action,
         originalText: data.originalText,
+        isQuery: data.isQuery,
+        queryResult: data.queryResult,
       };
 
       setLastResult(result);
 
+      // ถ้าเป็น query และมีผลลัพธ์ → แสดงผลทันที
+      if (isQuery && result.isQuery) {
+        setLastResult({ ...result, queryResult: data.queryResult || data });
+      }
+
       // ถ้า confidence สูงพอ (≥0.7) และมี action → ขอ confirm แล้ว execute
-      if (result.confidence >= 0.7 && result.action) {
+      if (result.confidence >= 0.7 && result.action && !isQuery) {
         const desc = buildDescription(result.intent, result.entities);
         setPendingConfirm({
           intent: result.intent,
           description: desc,
-          execute: async () => {
-            await executeAction(result.action!);
+          execute: async (token?: string) => {
+            const t = token || useAuthStore.getState().token;
+            await executeAction(result.action!, t);
             onActionComplete?.(result);
           },
         });
-      } else {
+      } else if (!isQuery && result.confidence < 0.7) {
         // confidence ต่ำ → บอกผู้ใช้ว่าไม่เข้าใจ
         setError(t('voiceCommand.lowConfidence', 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น'));
       }
@@ -116,7 +137,8 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
           <div className="flex gap-2">
             <button
               onClick={async () => {
-                await pendingConfirm.execute();
+                const token = useAuthStore.getState().token;
+                await pendingConfirm.execute(token);
                 setPendingConfirm(null);
                 setTranscript('');
               }}
@@ -145,6 +167,12 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
           <div className="text-xs text-gray-400">
             {lastResult.originalText}
           </div>
+          {lastResult.isQuery && lastResult.queryResult && (
+            <div className="mt-2 p-2 bg-gray-800/50 rounded text-xs text-sky-300">
+              <div className="font-bold text-sky-400 mb-1">ผลลัพธ์:</div>
+              <pre className="text-[10px] overflow-auto max-h-40">{JSON.stringify(lastResult.queryResult, null, 2).slice(0, 500)}</pre>
+            </div>
+          )}
           <div className="text-[11px] text-gray-500 mt-1">
             Entities: {JSON.stringify(lastResult.entities).slice(0, 100)}
           </div>
@@ -184,10 +212,10 @@ function buildDescription(intent: string, entities: Record<string, any>): string
   return `${label}: ${parts.join(' · ') || '—'}`;
 }
 
-async function executeAction(action: { endpoint: string; method: string; payload: any }) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${action.endpoint}`, {
+async function executeAction(action: { endpoint: string; method: string; payload: any }, token?: string) {
+  const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}${action.endpoint}`, {
     method: action.method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(action.payload),
   });
   const data = await res.json();
