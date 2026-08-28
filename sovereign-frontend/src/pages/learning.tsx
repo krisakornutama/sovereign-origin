@@ -15,18 +15,20 @@ export default function LearningPage() {
   const [models, setModels] = useState<any[]>([]);
   const [sensorTrends, setSensorTrends] = useState<any[]>([]);
   const [farmTrends, setFarmTrends] = useState<any[]>([]);
+  const [healthTrends, setHealthTrends] = useState<any[]>([]);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(async()=>{
     try{
-      const [s,p,m,tr,f]=await Promise.all([
+      const [s,p,m,tr,f,h]=await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/snapshots?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predictions?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/models`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/sensor`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/farm`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/health`).then(r=>r.ok?r.json():[]).catch(()=>[]),
       ]);
-      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]);
+      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]); setHealthTrends(Array.isArray(h)?h:[]);
     }catch{}
   },[]);
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated, load]);
@@ -96,6 +98,21 @@ export default function LearningPage() {
                     <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
                     {tr.soil && <div className="text-gray-500">pH {tr.soil.ph} · ชื้น {tr.soil.moisture}% {tr.soil.n!=null?`· N ${tr.soil.n}`:""}</div>}
                     <div className="text-gray-500">beds {tr.herbBeds}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {healthTrends.length>0 && (
+            <div className="card p-4 space-y-2 border-rose-800/40 bg-rose-950/10">
+              <h3 className="font-bold text-sm flex items-center gap-1"><Icon name="health" size={14} className="text-rose-400"/> Engine C — สุขภาพพยากรณ์ (BP/น้ำตาล/32Q)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                {healthTrends.map((tr:any)=>(
+                  <div key={tr.metric} className={`rounded-lg p-2 border ${tr.risk>=0.7?"border-red-700 bg-red-950/30":tr.risk>=0.4?"border-amber-700 bg-amber-950/20":"border-gray-700 bg-gray-900"}`}>
+                    <div className="font-bold">{tr.label} ({tr.metric}) <span className={tr.trend==="up"?"text-amber-400":"text-gray-500"}>{tr.trend}</span></div>
+                    <div className="text-gray-300">ล่าสุด {tr.last}{tr.unit} · เฉลี่ย {tr.avg}{tr.unit}</div>
+                    <div className={tr.risk>=0.7?"text-red-400":tr.risk>=0.4?"text-amber-400":"text-emerald-400"}>risk {(tr.risk*100).toFixed(0)}% — {tr.advice}</div>
+                    <div className="text-gray-500">{tr.samples} samples</div>
                   </div>
                 ))}
               </div>

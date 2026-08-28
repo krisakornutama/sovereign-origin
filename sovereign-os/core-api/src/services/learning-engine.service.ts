@@ -70,6 +70,36 @@ export async function predictSensorTrends(): Promise<any[]> {
 }
 
 // ── Farm trend predictor (Engine B) — ดิน pH/ความชื้น/ปุ๋ย + วันเก็บเกี่ยว ──
+export async function predictHealthTrends(): Promise<any[]> {
+  const out: any[] = [];
+  try {
+    const readings: any[] = await prisma.healthReading.findMany({ orderBy: { measured_at: 'desc' }, take: 20 });
+    if (readings.length >= 3) {
+      const byType: Record<string, any[]> = {};
+      for (const r of readings) { (byType[r.type] = byType[r.type] || []).push(r); }
+      for (const [type, arr] of Object.entries(byType)) {
+        if (arr.length < 3) continue;
+        const vals = arr.map(a => Number(a.value) || Number(a.systolic) || 0).filter(v => v > 0);
+        if (vals.length < 3) continue;
+        const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+        const trend = vals[0] > vals[vals.length - 1] ? 'up' : vals[0] < vals[vals.length - 1] ? 'down' : 'flat';
+        let risk = 0.2; let advice = 'ปกติ';
+        if (type === 'BP' && avg > 140) { risk = 0.85; advice = `ความดันเฉลี่ย ${avg.toFixed(0)} สูง — เฝ้าระวัง`; }
+        else if (type === 'SUGAR' && avg > 180) { risk = 0.8; advice = `น้ำตาลเฉลี่ย ${avg.toFixed(0)} สูง`; }
+        else if (type === 'WEIGHT' && trend === 'up' && vals[0] - vals[vals.length - 1] > 2) { risk = 0.5; advice = `น้ำหนักเพิ่ม ${ (vals[0] - vals[vals.length - 1]).toFixed(1)}kg`; }
+        out.push({ metric: type, label: type, unit: type === 'BP' ? 'mmHg' : type === 'SUGAR' ? 'mg/dL' : 'kg', last: vals[0], avg: Number(avg.toFixed(1)), trend, risk, advice, samples: vals.length });
+      }
+    }
+    const obs: any[] = await prisma.healthObservation.findMany({ where: { observed_at: { gte: new Date(Date.now() - 7 * 86400000) } }, take: 50 });
+    if (obs.length >= 5) {
+      const cats = [...new Set(obs.map(o => o.category))];
+      const fatigue = obs.filter(o => o.category === 'FATIGUE').length;
+      if (fatigue >= 3) out.push({ metric: 'FATIGUE', label: 'อ่อนเพลีย', unit: 'ครั้ง/7วัน', last: fatigue, avg: fatigue, trend: 'up', risk: 0.7, advice: `อ่อนเพลียบ่อย ${fatigue} ครั้งใน 7 วัน — พักผ่อน`, samples: obs.length });
+      else if (cats.length >= 4) out.push({ metric: 'MULTI', label: 'หลายอาการ', unit: 'หมวด', last: cats.length, avg: cats.length, trend: 'up', risk: 0.5, advice: `พบ ${cats.length} หมวดอาการใน 7 วัน`, samples: obs.length });
+    }
+  } catch {}
+  return out;
+}
 export async function predictFarmTrends(): Promise<any[]> {
   const plots = await prisma.farmPlot.findMany({ include: { soil_readings: { orderBy: { recorded_at: 'desc' }, take: 1 } } as any });
   const out: any[] = [];
@@ -118,6 +148,15 @@ export async function predict(domain: string, features: Record<string, any>): Pr
       const maxRisk = Math.max(...trends.map((t: any) => t.risk));
       const top = trends.find((t: any) => t.risk === maxRisk);
       return { output: { risk: maxRisk, advice: (top as any)?.advice || 'เฝ้าระวังแปลง', trends, confidence: 0.7 }, confidence: 0.7, model: 'farm-analyzer' };
+    }
+  }
+  // Engine C: health ใช้ reading+observation analyzer
+  if (domain === 'health' && (features.readings != null || Object.keys(features).length <= 2)) {
+    const trends = await predictHealthTrends();
+    if (trends.length > 0) {
+      const maxRisk = Math.max(...trends.map((t: any) => t.risk));
+      const top = trends.find((t: any) => t.risk === maxRisk);
+      return { output: { risk: maxRisk, advice: (top as any)?.advice || 'เฝ้าระวังสุขภาพ', trends, confidence: 0.7 }, confidence: 0.7, model: 'health-analyzer' };
     }
   }
   const history = await prisma.learningSnapshot.findMany({ where: { domain }, orderBy: { capturedAt: 'desc' }, take: 5 });
