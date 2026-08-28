@@ -400,6 +400,34 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   // → บันทึก DB + socket 'new_alert' + Telegram — จัดการที่ automation handler ด้านบนแล้ว)
   predictiveWorker.start();
 
+  // ── Self-Learning — Data Lake + Engine A/B/C (cron 02:00) ──
+  async function runLearningNightly() {
+    try {
+      const { collectDailySnapshots } = await import('../services/data-lake.service');
+      const { predictSensorTrends, predictFarmTrends, predictHealthTrends } = await import('../services/learning-engine.service');
+      const n = await collectDailySnapshots();
+      const sensor = await predictSensorTrends();
+      const farm = await predictFarmTrends();
+      const health = await predictHealthTrends();
+      const highs: string[] = [];
+      for (const s of sensor) if (s.risk >= 0.7) highs.push(`เซ็นเซอร์ ${s.label} risk ${(s.risk*100).toFixed(0)}% — ${s.advice}`);
+      for (const f of farm) if (f.risk >= 0.7) highs.push(`ฟาร์ม ${f.name} risk ${(f.risk*100).toFixed(0)}% — ${f.advice}`);
+      for (const h of health) if (h.risk >= 0.7) highs.push(`สุขภาพ ${h.label} risk ${(h.risk*100).toFixed(0)}% — ${h.advice}`);
+      if (highs.length) {
+        await sendTelegramAlert({ text: `🧠 Learning Nightly 02:00 — ${n} snapshots\n` + highs.slice(0,5).join('\n'), severity: 'warn', eventKey: 'learning:nightly' });
+        console.log(`🧠 Learning nightly: ${n} snapshots, highs ${highs.length}`);
+      } else {
+        console.log(`🧠 Learning nightly: ${n} snapshots, no high risk`);
+      }
+    } catch (e) { console.error('Learning nightly error', e); }
+  }
+  // รันทันทีตอน boot ครั้งนึง (หลัง 30วิ ให้ DB พร้อม) + ทุกวัน 02:00
+  setTimeout(runLearningNightly, 30_000);
+  setInterval(() => {
+    const now = new Date();
+    if (now.getHours() === 2 && now.getMinutes() < 5) runLearningNightly();
+  }, 5 * 60 * 1000);
+
   // Power guard — เฝ้าดูแบตเตอรี่ แล้วแจ้งเตือน / สั่ง graceful shutdown
   // (อ่านข้อมูลเดียวกันกับ /api/energy/summary — battery_soc + power_kw จาก TimescaleDB)
   const powerGuard = new PowerGuardWorker(
