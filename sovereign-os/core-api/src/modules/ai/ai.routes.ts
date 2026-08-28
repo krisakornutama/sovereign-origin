@@ -32,6 +32,38 @@ function parseVoiceCommandHeuristic(text: string): any {
   else if (/(เช็ค|check).*(เซ็นเซอร์|sensor|น้ำ|water|แบต|battery)/.test(t)) intent = 'sensor_check';
   else if (/(สถานะ|status).*(ระบบ|system)/.test(t)) intent = 'system_status';
 
+  // Kids domain
+  else if (/(งานบ้าน|chore|ภาระ)/.test(t)) intent = 'kids_chore';
+  else if (/(บิล|cost|ค่าใช้จ่าย|cost).*(ลูก|kid|con)/.test(t)) intent = 'kids_bill';
+  else if (/(ค่าขนม|allowance|เงินกิน|pocket money)/.test(t)) intent = 'kids_allowance';
+  else if (/(แลกคูปอง|redeem|coupon)/.test(t)) intent = 'kids_coupon';
+  else if (/(เรียน|lesson|quiz|แบบทดสอบ|คะแนน)/.test(t)) intent = 'kids_lesson';
+  else if (/(พอร์ต|portfolio|หุ้น|stock).*(ลูก|kid)/.test(t)) intent = 'kids_portfolio';
+  else if (/(กระปุก|piggy|เก็บเงิน|ออม)/.test(t)) intent = 'kids_piggy';
+
+  // Security/Relay/Automation
+  else if (/(รีเลย์|relay|สวิตช์|switch|ปิด|เปิด).*(ไฟ|light|ปั๊ม|pump|พัดลม|fan)/.test(t)) intent = 'relay_control';
+  else if (/(อัตโนมัติ|automation|กฎ|rule).*(เพิ่ม|เพิ่มเข้า|สร้าง|create)/.test(t)) intent = 'automation_create';
+  else if (/(อัตโนมัติ|automation|กฎ|rule).*(ลบ|delete|ปิด|disable)/.test(t)) intent = 'automation_delete';
+  else if (/(ความปลอดภัย|security|กล้อง|camera|การตรวจจับ|detection)/.test(t)) intent = 'security_check';
+  else if (/(ล็อก|lock|ปลดล็อก|unlock).*(ประตู|door|ประตูหน้า|front door)/.test(t)) intent = 'door_lock';
+
+  // Energy/Power
+  else if (/(พลังงาน|energy|ไฟฟ้า|electric|แบตเตอรี่|battery|โซล่า|solar|inverter)/.test(t)) intent = 'energy_status';
+  else if (/(ชาร์จ|charge|ชาร์จ).*(แบต|battery|โซล่า|solar)/.test(t)) intent = 'energy_charge';
+
+  // Query intents (ask about status/behavior)
+  else if (/(ลูก|kid|con).*(ทำอะไร|ทำไร|พฤติกรรม|behavior|เรียน|เรียนรู้|course|progress)/.test(t)) intent = 'kids_query';
+  else if (/(เซ็นเซอร์|sensor|น้ำ|water|แบต|battery|ไฟ|power|ไฟฟ้า).*(สถานะ|status|ค่า|value|คือเท่าไหร่|เท่าไหร่)/.test(t)) intent = 'sensor_query';
+  else if (/(ระบบ|system|เซิร์ฟเวอร์|server).*(สถานะ|status|ปกติไหม|ปกติไหม|ทำงานไหม)/.test(t)) intent = 'system_query';
+  else if (/(ฟาร์ม|farm|แปลง|plot|พืช|crop|เก็บเกี่ยว|harvest).*(สถานะ|status|พร้อมไหม|พร้อมไหม|เมื่อไหร่)/.test(t)) intent = 'farm_query';
+  else if (/(คลัง|inventory|ของ|stock|วัตถุดิบ|ingredient).*(มีอะไร|มีเท่าไหร่|เหลือเท่าไหร่|หมดอะไร)/.test(t)) intent = 'inventory_query';
+  else if (/(ลูก|kid|con).*(กิน|กินอะไร|กินแล้วไหม|กินยัง|อาหาร|food)/.test(t)) intent = 'kids_food_query';
+  else if (/(เงิน|money|กระเป๋า|wallet|พอร์ต|portfolio|หุ้น|stock|กำไร|profit|ขาดทุน|loss)/.test(t)) intent = 'finance_query';
+
+  // Help
+  else if (/(ช่วย|help|วิธีใช้|วิธี|คำสั่ง|command|ทำได้อะไร|ทำได้อะไร)/.test(t)) intent = 'help';
+
   // Entity extraction
   const entities: any = {};
   
@@ -63,6 +95,42 @@ function parseVoiceCommandHeuristic(text: string): any {
   // Payment
   if (/promptpay|พรอมต์เพย์/.test(t)) entities.payment = 'promptpay';
   else if (/เงินสด|cash/.test(t)) entities.payment = 'cash';
+
+  // Kids entities
+  if (/(ลูก|kid|con|ลูกชาย|ลูกสาว|son|daughter)/.test(t)) {
+    const kidNameMatch = t.match(/(ลูก|kid|con|ลูกชาย|ลูกสาว|son|daughter)\s*([ก-๙a-zA-Z]+)/);
+    if (kidNameMatch) entities.kidName = kidNameMatch[2];
+  }
+  if (/(ช็อค|chore|ภาระ|งานบ้าน|ทำ|ทำไร)/.test(t)) entities.choreType = 'chore';
+  if (/(บิล|bill|ค่าใช้จ่าย|cost|จ่าย)/.test(t)) entities.billType = 'bill';
+  if (/(คูปอง|coupon|แลก|redeem|รางวัล|reward)/.test(t)) entities.couponType = 'coupon';
+  if (/(บทเรียน|lesson|เรียน|quiz|แบบทดสอบ|คะแนน|score)/.test(t)) entities.lessonType = 'lesson';
+  if (/(พอร์ต|portfolio|หุ้น|stock|ซื้อ|buy|ขาย|sell)/.test(t)) entities.portfolioAction = 'portfolio';
+
+  // Security/Relay
+  if (/(รีเลย์|relay|สวิตช์|switch|ปิด|เปิด|on|off).*(ไฟ|light|ปั๊ม|pump|พัดลม|fan|น้ำ|water)/.test(t)) {
+    entities.relayAction = /(ปิด|off)/.test(t) ? 'off' : 'on';
+    const relayMatch = t.match(/(relay|รีเลย์)\s*(\d+)/i);
+    if (relayMatch) entities.relayId = relayMatch[2];
+  }
+  if (/(ล็อก|lock|ปลดล็อก|unlock)/.test(t)) entities.lockAction = /(ปลดล็อก|unlock)/.test(t) ? 'unlock' : 'lock';
+  if (/(กล้อง|camera|การตรวจจับ|detection|คนแปลก|stranger)/.test(t)) entities.securityCheck = true;
+
+  // Energy
+  if (/(แบตเตอรี่|battery|โซล่า|solar|inverter|ชาร์จ|charge)/.test(t)) {
+    entities.energyType = 'battery';
+    const chargeMatch = t.match(/(ชาร์จ|charge)\s*(\d+)\s*%/);
+    if (chargeMatch) entities.targetPercent = parseInt(chargeMatch[1]);
+  }
+
+  // Query entities
+  if (/status|สถานะ|ค่า|value|เท่าไหร่|เท่าไร|คือเท่าไหร่/.test(t)) {
+    if (/(น้ำ|water)/.test(t)) entities.queryMetric = 'water_level_cm';
+    else if (/(แบต|battery|แบตเตอรี่)/.test(t)) entities.queryMetric = 'battery_soc';
+    else if (/(ไฟ|power|electric|พลังงาน|energy)/.test(t)) entities.queryMetric = 'power_kw';
+    else if (/(อุณหภูมิ|temp|temperature)/.test(t)) entities.queryMetric = 'temperature';
+    else if (/(ความชื้น|humidity|concentration)/.test(t)) entities.queryMetric = 'humidity';
+  }
 
   // Confidence based on how many entities found
   const entityCount = Object.keys(entities).length;
@@ -338,5 +406,64 @@ router.post('/voice-command', authenticate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+  // GET /api/ai/voice-query — ถามสถานะ/ข้อมูลระบบด้วยเสียง (query-only, ไม่ทำ action)
+  router.get('/voice-query', authenticate, async (req, res) => {
+    const text = String(req.query.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'text query parameter is required' });
+    if (text.length > 500) return res.status(400).json({ error: 'text too long (max 500)' });
+
+    try {
+      const parsed = parseVoiceCommandHeuristic(text);
+      // Query intents only return data, don't execute actions
+      const queryIntents = ['sensor_query', 'system_query', 'farm_query', 'inventory_query', 'kids_query', 'kids_food_query', 'finance_query', 'energy_status', 'security_check', 'kids_query', 'help', 'kids_chore', 'kids_bill', 'kids_allowance', 'kids_coupon', 'kids_lesson', 'kids_portfolio', 'kids_piggy', 'relay_control', 'automation_create', 'automation_delete', 'security_check', 'door_lock', 'energy_status', 'energy_charge', 'kids_food_query', 'finance_query'];
+      if (parsed.intent === 'help') {
+        return res.json({ success: true, ...parsed, originalText: text, help: true, helpText: VOICE_HELP_TEXT });
+      }
+      if (!queryIntents.includes(parsed.intent)) {
+        return res.json({ success: true, ...parsed, originalText: text, message: 'คำสั่งนี้ต้องใช้ voice-command (POST) เพื่อดำเนินการ' });
+      }
+      res.json({ success: true, ...parsed, originalText: text, isQuery: true });
+    } catch (err: any) {
+      console.error('Voice query error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Voice help text constant
+  const VOICE_HELP_TEXT = `คำสั่งเสียงที่รองรับ:
+
+📦 คลังสินค้า (Inventory):
+- "เพิ่มน้ำ 20 ลิตร" / "เพิ่มข้าว 5 กก." / "เพิ่มอาหาร 3 ชิ้น"
+- "เอาน้ำออก 10 ลิตร" / "ลดข้าว 2 กก."
+
+🌾 ฟาร์ม:
+- "เก็บเกี่ยวข้าว 50 กก." / "ปลูกข้าวหอมมะลิ"
+- "เช็คฟาร์มสถานะ" / "ฟาร์มพร้อมเก็บเกี่ยวไหม"
+
+🏥 สุขภาพ:
+- "บันทึกความดัน 130/85" / "บันทึกน้ำหนัก 65 กก." / "บันทึกน้ำตาล 120"
+
+🍽️ ร้านอาหาร:
+- "สั่งข้าวผัด 2 จาน โต๊ะ A1" / "จ่ายบิลโต๊ะ A1 promptpay"
+
+🔧 ระบบ/อุปกรณ์:
+- "เปิดไฟ" / "ปิดปั๊มน้ำ" / "ล็อกประตูหน้า" / "ปลดล็อกประตูหลัง"
+- "เช็คน้ำ 30 เซนติเมตร" / "เช็คแบตเตอรี่" / "เช็คไฟฟ้า"
+- "สถานะระบบ" / "เช็คกล้อง" / "เช็คเซ็นเซอร์"
+
+⚡ พลังงาน:
+- "ชาร์จแบตเตอรี่ 80%" / "สถานะแบตเตอรี่" / "สถานะโซล่าเซลล์"
+
+👶 ลูก:
+- "ลูกน้ำทำภาระเสร็จ" / "ลูกชายกินข้าวยัง" / "ค่าขนมลูก 50 บาท"
+- "แลกคูปองลูก" / "พอร์ตลูกซื้อหุ้น" / "บันทึกบทเรียนลูก"
+- "ลูกน้ำทำภาระเสร็จ" / "บิลลูกชาย 50 บาท" / "ค่าขนมลูก 50 บาท"
+- "แลกคูปองลูกน้ำ" / "พอร์ตลูกชายซื้อหุ้น" / "บันทึกบทเรียนลูกสาว"
+
+❓ ช่วยเหลือ: "ช่วย" / "วิธีใช้" / "ทำได้อะไร"
+
+ใช้ POST /api/ai/voice-command สำหรับคำสั่งที่ทำ action (เพิ่ม/ลด/สั่ง/จ่าย)
+ใช้ GET /api/ai/voice-query?text=... สำหรับถามสถานะ/ข้อมูล (query only)`;
 
 export default router;
