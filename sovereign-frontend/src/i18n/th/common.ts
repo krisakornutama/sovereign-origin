@@ -200,5 +200,8 @@ mobileMenu: 'เมนูหลัก (มือถือ)',
       confirm: 'ตกลง ดำเนินการ',
       cancel: 'ยกเลิก',
       lowConfidence: 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น',
+      query: 'คำถาม',
+      command: 'คำสั่ง',
+      result: 'ผลลัพธ์',
     },
   } as const;

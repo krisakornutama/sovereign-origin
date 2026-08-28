@@ -193,5 +193,8 @@ mobileMenu: 'Main menu (mobile)',
       confirm: 'Confirm',
       cancel: 'Cancel',
       lowConfidence: 'Could not understand clearly, please speak more clearly',
+      query: 'Query',
+      command: 'Command',
+      result: 'Result',
     },
   } as const;
