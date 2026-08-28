@@ -18,7 +18,7 @@ function isApprovalReply(text: string): boolean {
   return /ต้องรอการอนุมัติ|รหัสคำขอ|api\/ai\/approvals/.test(text);
 }
 
-export default function AiChatPanel() {
+export default function AiChatPanel({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = user?.role === 'SUPERADMIN';
@@ -174,7 +174,7 @@ export default function AiChatPanel() {
   ];
 
   return (
-    <div className="panel panel-glow flex flex-col h-[600px] lg:h-[700px]">
+    <div className={`panel panel-glow flex flex-col ${compact ? 'h-[380px]' : 'h-[600px] lg:h-[700px]'}`}>
       {/* Header */}
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5 glow-text">
