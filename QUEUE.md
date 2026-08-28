@@ -24,11 +24,12 @@
 - [ ] Router MR505 — AES crypto stack (RSA key exchange + AES-CBC decrypt) — **defer จาก 25/8/69**
   - โค้ด framework พร้อมใน `tplink-mr505.service.ts` — แค่เพิ่ม crypto + `syncEncryptor` step
   - ได้เมื่อเสร็จ: สัญญาณซิม RSRP/SINR · data usage · SMS · clients ทุกเครื่อง
-- [ ] Self-Reliance S3-S6 — สวนสมุนไพร+ยาต่อ HERB_DB · วงจรปิดขยะ→ปุ๋ย · Skills Matrix ต่อคน · Crisis Playbooks 1 ปุ่ม
+- [x] Self-Reliance S3-S6 — สวนสมุนไพร+ยาต่อ HERB_DB · วงจรปิดขยะ→ปุ๋ย · Skills Matrix ต่อคน · Crisis Playbooks 1 ปุ่ม — **เสร็จแล้ว 29/8/69** (`create_missing.sql` + `schema.prisma` per-user health)
+  - DB drift ปิดแล้ว: `health_readings/observations/flags/consents user_id` + `farm_plots category` + `herb_catalogs/dose_logs/herb_beds/skill_matrix/crisis_modes` สร้างแล้ว + seed 12 สมุนไพร/3 crisis modes — build 50 routes + full CRUD 38/38 ผ่าน
 - [ ] ตั้ง Telegram token ใหม่ — **รอผู้ใช้** (token เดิมโดน Telegram revoke เพราะหลุดในข้อความ) → ไป @BotFather สร้างใหม่ + กด START ที่ bot 1 ครั้ง แล้วใส่ที่หน้า Settings (แล้ว agent ทดสอบส่งให้)
 - [ ] ใบหน้า auto-recognize บน POS — **รอ Ollama เปิด** (โค้ด face-embed พร้อม แต่ Ollama offline)
 - [ ] i18n หน้า restaurant + E2E หน้าใหม่ — priority ต่ำ (ใช้งานได้แล้ว แค่ไม่สลับภาษา/ไม่มี E2E)
 
-หมายเหตุสถานะระบบ (25/8/69): backend tsc สะอาด + tests 16/16 + frontend 48 routes build ผ่าน + API 58 endpoints 0 server error + 43 หน้าเว็บ render ครบ
+หมายเหตุสถานะระบบ (29/8/69): backend tsc สะอาด + tests 16/16 + frontend 50 routes build ผ่าน + API 38/38 full CRUD ผ่าน + 43 หน้าเว็บ render ครบ — จ่ายร้านค้าครบวงจร (harvest→inventory→order→pay→report), health per-user, self-reliance Days-of-Autonomy พร้อม
 หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
 หมายเหตุ hydration: dashboard layout + history range แก้แล้ว (`05a2264` + `ffac9e2`) — ห้ามอ่าน localStorage/URL ตอน render แรก ให้ไปอ่านใน useEffect
