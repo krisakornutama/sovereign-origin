@@ -69,6 +69,37 @@ export async function predictSensorTrends(): Promise<any[]> {
   return out;
 }
 
+// ── Farm trend predictor (Engine B) — ดิน pH/ความชื้น/ปุ๋ย + วันเก็บเกี่ยว ──
+export async function predictFarmTrends(): Promise<any[]> {
+  const plots = await prisma.farmPlot.findMany({ include: { soil_readings: { orderBy: { recorded_at: 'desc' }, take: 1 } } as any });
+  const out: any[] = [];
+  for (const p of plots) {
+    const r = p.soil_readings[0] as any;
+    let risk = 0.2; let advice = 'ปกติ';
+    const issues: string[] = [];
+    if (r) {
+      if (r.ph != null && (r.ph < 5.5 || r.ph > 7.5)) { risk = Math.max(risk, 0.7); issues.push(`pH ${r.ph.toFixed(1)} นอกช่วง 5.5-7.5`); }
+      if (r.moisture_pct != null && r.moisture_pct < 30) { risk = Math.max(risk, 0.75); issues.push(`ชื้น ${r.moisture_pct.toFixed(0)}% ต่ำ`); }
+      if (r.n != null && r.n < 40) issues.push(`N ต่ำ`);
+    }
+    if (p.expected_harvest_at) {
+      const daysLeft = Math.ceil((new Date(p.expected_harvest_at).getTime() - Date.now()) / 86400000);
+      if (daysLeft < 0) { risk = Math.max(risk, 0.9); advice = `เลยเก็บเกี่ยว ${-daysLeft} วัน — เก็บด่วน`; }
+      else if (daysLeft <= 3) { risk = Math.max(risk, 0.6); advice = `ใกล้เก็บเกี่ยว ${daysLeft} วัน`; }
+      else advice = `อีก ${daysLeft} วันเก็บเกี่ยว`;
+    }
+    if (issues.length) advice = issues.join(' · ') + (advice !== 'ปกติ' ? ` · ${advice}` : '');
+    if (risk > 0.3 || p.status === 'growing') {
+      out.push({ plotId: p.id, name: p.name, crop: p.crop, status: p.status, risk, advice, soil: r ? { ph: r.ph, moisture: r.moisture_pct, n: r.n, p: r.p, k: r.k } : null, herbBeds: 0, expectedHarvestAt: p.expected_harvest_at });
+    }
+  }
+  // ถ้าไม่มีแปลง growing แต่มีข้อมูลรวม → สรุปภาพรวม
+  if (out.length === 0 && plots.length > 0) {
+    out.push({ plotId: 'summary', name: `รวม ${plots.length} แปลง`, crop: '-', status: 'summary', risk: 0.2, advice: 'ไม่มีแปลงเสี่ยง', soil: null, herbBeds: 0, expectedHarvestAt: null });
+  }
+  return out;
+}
+
 // ทำนายต่อ domain: ส่ง features → Ollama → parse JSON
 export async function predict(domain: string, features: Record<string, any>): Promise<{ output: any; confidence: number; model: string }> {
   // Engine A: sensor ใช้ trend predictor ผสม Ollama
@@ -78,6 +109,15 @@ export async function predict(domain: string, features: Record<string, any>): Pr
       const maxRisk = Math.max(...trends.map(t => t.risk));
       const top = trends.find(t => t.risk === maxRisk);
       return { output: { risk: maxRisk, advice: top?.advice || 'เฝ้าระวัง', trends, confidence: 0.65 }, confidence: 0.65, model: 'trend-linear' };
+    }
+  }
+  // Engine B: farm ใช้ plot analyzer
+  if (domain === 'farm' && Object.keys(features).length <= 2) {
+    const trends = await predictFarmTrends();
+    if (trends.length > 0) {
+      const maxRisk = Math.max(...trends.map((t: any) => t.risk));
+      const top = trends.find((t: any) => t.risk === maxRisk);
+      return { output: { risk: maxRisk, advice: (top as any)?.advice || 'เฝ้าระวังแปลง', trends, confidence: 0.7 }, confidence: 0.7, model: 'farm-analyzer' };
     }
   }
   const history = await prisma.learningSnapshot.findMany({ where: { domain }, orderBy: { capturedAt: 'desc' }, take: 5 });
