@@ -63,6 +63,7 @@ import featureRoutes from './modules/features/feature.routes';
 import skillMatrixRoutes from './modules/skillmatrix/skillmatrix.routes';
 import crisisRoutes from './modules/crisis/crisis.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import learningRoutes from './modules/learning/learning.routes';
 import usersRoutes from './modules/users/users.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import systemRoutes, { livenessRouter } from './modules/system/system.routes';
@@ -113,6 +114,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/selfreliance', selfrelianceRoutes); // วันรอด (Days of Autonomy) — น้ำ/อาหาร/ไฟ/เงิน + จุดอ่อนบ้าน
   app.use('/api/skill-matrix', skillMatrixRoutes); // S5: Skills Matrix — คน×ทักษะ 1-5 + summary
   app.use('/api/crisis', crisisRoutes); // S6: Crisis Playbooks — flood / blackout / security (one active at a time)
+  app.use('/api/learning', learningRoutes); // Self-Learning Data Lake + Engine — A/B/C/D ทั้งหมดเรียนรู้ต่อจากอดีต
     app.use('/api/dime', featureGuard(['/treasury', '/portfolio']), dimeRoutes); // Dime! Statement — IMAP + PDF → อัปเดตพอร์ตอัตโนมัติ
   app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
   app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
