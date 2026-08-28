@@ -56,6 +56,10 @@ router.get('/predict/sensor', authenticate, async (_req, res) => {
   const { predictSensorTrends } = await import('../../services/learning-engine.service');
   res.json(await predictSensorTrends());
 });
+router.get('/predict/farm', authenticate, async (_req, res) => {
+  const { predictFarmTrends } = await import('../../services/learning-engine.service');
+  res.json(await predictFarmTrends());
+});
 
 // GET /api/learning/models — accuracy ต่อ domain
 router.get('/models', authenticate, async (_req, res) => {
