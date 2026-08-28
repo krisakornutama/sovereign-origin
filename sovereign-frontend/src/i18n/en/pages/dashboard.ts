@@ -55,6 +55,7 @@ export default {
     expiring: 'Expiring soon',
     expired: 'Expired',
     disabled: 'Inventory module is disabled or has no data',
+    enableHint: 'Enable in Settings → Features',
   },
 
   // ── dashboard.tsx: kids widget ──
@@ -102,6 +103,7 @@ export default {
     upcoming: 'Harvesting soon (30 days):',
     today: 'Today!',
     disabled: 'Farm module is disabled or has no data',
+    enableHint: 'Enable in Settings → Features',
   },
 
   // ── dashboard.tsx: map widget + GlobalMap.tsx ──

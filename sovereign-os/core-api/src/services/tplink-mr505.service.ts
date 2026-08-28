@@ -7,6 +7,7 @@
 // รหัส admin เก็บใน SystemSetting 'router.adminPassword' — ห้าม hardcode
 // ⚠️ ระวัง lockout: รหัสผิด 4 ครั้ง = lock 7200 วินาที — cron ต้องไม่ยิงถ้า password ว่าง
 // ─────────────────────────────────────────────────────────────────────────────
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 
 const KEY1 = 'RDpbLfCPsJZ7fiv';
@@ -70,6 +71,82 @@ export async function setAdminPassword(password: string): Promise<void> {
   });
 }
 
+// ── AES session (หลัง syncEncryptor สำเร็จ Response body จะ AES-CBC base64) ──
+let aesKey: Buffer | null = null;
+let aesIv: Buffer | null = null;
+
+export function aesDecryptBase64(b64: string): string | null {
+  if (!aesKey || !aesIv) return null;
+  try {
+    const decipher = crypto.createDecipheriv('aes-128-cbc', aesKey, aesIv);
+    const dec = Buffer.concat([decipher.update(Buffer.from(b64, 'base64')), decipher.final()]);
+    return dec.toString('utf8');
+  } catch { return null; }
+}
+export function aesEncryptToBase64(plain: string): string | null {
+  if (!aesKey || !aesIv) return null;
+  try {
+    const cipher = crypto.createCipheriv('aes-128-cbc', aesKey, aesIv);
+    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    return enc.toString('base64');
+  } catch { return null; }
+}
+export function isEncryptedBody(body: string): boolean {
+  if (!body || body.includes('\r\n')) return false;
+  if (body.startsWith('<!DOCTYPE') || body.includes(' ')) return false;
+  const t = body.trim();
+  if (t.length < 16 || t.length % 4 !== 0) return false;
+  return /^[A-Za-z0-9+/=]+$/.test(t);
+}
+export function __setAesParamsForTest(key: Buffer, iv: Buffer) { aesKey = key; aesIv = iv; }
+export function __clearAesParamsForTest() { aesKey = null; aesIv = null; }
+
+function parseRsaPublicKey(raw: string): { modHex: string; expHex: string } | null {
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw);
+    if (j.nn && j.ee) return { modHex: String(j.nn), expHex: String(j.ee) };
+    if (j.n && j.e) return { modHex: String(j.n), expHex: String(j.e) };
+  } catch {}
+  const parts = raw.trim().split(/\s+/);
+  if (parts.length >= 2) return { modHex: parts[0], expHex: parts[1] };
+  return null;
+}
+function rsaEncryptHex(plainHex: string, modHex: string, expHex: string): string | null {
+  try {
+    const n = BigInt('0x' + modHex);
+    const e = BigInt('0x' + expHex);
+    let m = BigInt('0x' + plainHex);
+    if (m >= n) return null;
+    let result = 1n; let base = m; let exp = e;
+    while (exp > 0n) { if (exp & 1n) result = (result * base) % n; base = (base * base) % n; exp >>= 1n; }
+    let hex = result.toString(16);
+    if (hex.length % 2) hex = '0' + hex;
+    const padLen = Math.ceil(modHex.length / 2) * 2 - hex.length;
+    if (padLen > 0) hex = '0'.repeat(padLen) + hex;
+    return hex;
+  } catch { return null; }
+}
+function randomAesParams(): { key: Buffer; iv: Buffer } {
+  return { key: crypto.randomBytes(16), iv: crypto.randomBytes(16) };
+}
+async function syncEncryptor(token: string, rsaRaw: string): Promise<boolean> {
+  const rsa = parseRsaPublicKey(rsaRaw);
+  if (!rsa) return false;
+  const { key, iv } = randomAesParams();
+  const keyHex = key.toString('hex');
+  const ivHex = iv.toString('hex');
+  const encKey = rsaEncryptHex(keyHex, rsa.modHex, rsa.expHex);
+  const encIv = rsaEncryptHex(ivHex, rsa.modHex, rsa.expHex);
+  if (!encKey || !encIv) return false;
+  try {
+    const r = await httpPost(`/?code=12&asyn=0&id=${encodeURIComponent(token)}`, `key=${encKey}&iv=${encIv}`);
+    const ok = r.text.split('\r\n').filter(Boolean)[0] === '00000' || r.status === 200;
+    if (ok) { aesKey = key; aesIv = iv; console.log('🔐 MR505 AES sync OK (128-CBC)'); return true; }
+  } catch {}
+  return false;
+}
+
 // ── Session ──
 interface RouterSession { token: string; loggedInAt: number }
 let session: RouterSession | null = null;
@@ -112,15 +189,24 @@ export async function loginRouter(): Promise<RouterSession | null> {
   // session token = encrypt(seq, firstStage, salt) (ตาม main.js login success)
   session = { token: authToken, loggedInAt: Date.now() };
   console.log('🔑 MR505 login OK — session 30 นาที');
+  // Step 5: sync AES if router ส่ง RSA key มา (firmware ใหม่) — ไม่บังคับ ถ้าล้มเหลวก็ใช้งาน XOR-only ต่อ
+  if (challenge.rsaKey) {
+    try { await syncEncryptor(authToken, challenge.rsaKey); } catch {}
+  }
   return session;
 }
 
-/** อ่าน model ตาม data ID — คืน key-value หรือ null */
+/** อ่าน model ตาม data ID — คืน key-value หรือ null (ถอด AES ถ้า body เข้ารหัส) */
 export async function readModel(dataId: number, session: RouterSession): Promise<Record<string, string> | null> {
   const url = `/?code=2&asyn=1&id=${encodeURIComponent(session.token)}`;
   const r = await httpPost(url, `id ${dataId}|1,0,0\r\n`);
   if (r.status !== 200 || r.text.startsWith('<!DOCTYPE')) return null; // session ตาย → ให้ login ใหม่รอบหน้า
-  return parseModelResponse(r.text);
+  let body = r.text;
+  if (isEncryptedBody(body)) {
+    const dec = aesDecryptBase64(body.trim());
+    if (dec) body = dec;
+  }
+  return parseModelResponse(body);
 }
 
 // ── Public: ดึงข้อมูลซิมทั้งหมดจาก router ──
@@ -149,11 +235,23 @@ export async function fetchRouterSimData(): Promise<RouterSimData> {
   // WLAN STA list (111) — list format: "key index value\r\n"
   const r = await httpPost(`/?code=2&asyn=1&id=${encodeURIComponent(sess.token)}`, 'id 111|1,0,0\r\n');
   if (r.status === 200 && !r.text.startsWith('<!DOCTYPE')) {
-    const parsed = parseModelResponse(r.text);
+    let body = r.text;
+    if (isEncryptedBody(body)) { const dec = aesDecryptBase64(body.trim()); if (dec) body = dec; }
+    const parsed = parseModelResponse(body);
     // รวม IP/MAC/hostname จาก list fields (รูปแบบขึ้นกับ firmware — เก็บดิบไว้ก่อน)
     out.clients = Object.entries(parsed).map(([k, v]) => `${k}=${v}`.slice(0, 60));
+  }
+  // ถ้า AES sync สำเร็จแต่ตัวเก่ายังเป็น XOR-only, อ่าน data usage เพิ่ม (ID 145/142 ตาม firmware MR505)
+  if (aesKey) {
+    for (const id of [145, 142]) {
+      const extra = await readModel(id, sess);
+      if (extra && Object.keys(extra).length) {
+        out.signal = { ...(out.signal || {}), ...extra };
+        break;
+      }
+    }
   }
   return out;
 }
 
-export function invalidateSession(): void { session = null; }
+export function invalidateSession(): void { session = null; aesKey = null; aesIv = null; }
