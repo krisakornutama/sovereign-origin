@@ -203,5 +203,7 @@ mobileMenu: 'เมนูหลัก (มือถือ)',
       query: 'คำถาม',
       command: 'คำสั่ง',
       result: 'ผลลัพธ์',
+      ttsOn: 'เปิด TTS',
+      ttsOff: 'ปิด TTS',
     },
   } as const;
