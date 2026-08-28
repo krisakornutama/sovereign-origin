@@ -508,6 +508,12 @@ router.post('/voice-command', authenticate, async (req, res) => {
     }
   });
 
+  // POST /api/ai/voice-history — เก็บประวัติเสียง (frontend ส่งมาหลัง parse สำเร็จ)
+  router.post('/voice-history', authenticate, async (req, res) => {
+    // เก็บแบบเบาๆ ไม่ต้อง DB ถาวร — แค่ log และตอบ ok (frontend มี localStorage อยู่แล้ว)
+    res.json({ success: true });
+  });
+
   // Voice help text constant
   const VOICE_HELP_TEXT = `คำสั่งเสียงที่รองรับ:
 

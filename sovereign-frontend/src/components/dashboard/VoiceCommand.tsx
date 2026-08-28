@@ -32,6 +32,19 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
   const [pendingConfirm, setPendingConfirm] = useState<PendingAction | null>(null);
   const [transcript, setTranscript] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [wakeEnabled, setWakeEnabled] = useState(false);
+  const [history, setHistory] = useState<VoiceCommandResult[]>(() => {
+    try { return JSON.parse(localStorage.getItem('voice_history') || '[]'); } catch { return []; }
+  });
+
+  const pushHistory = useCallback((r: VoiceCommandResult) => {
+    setHistory(h => {
+      const nh = [r, ...h].slice(0, 20);
+      try { localStorage.setItem('voice_history', JSON.stringify(nh)); } catch {}
+      try { authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/voice-history`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text: r.originalText, intent: r.intent, entities: r.entities }) }).catch(()=>{}); } catch {}
+      return nh;
+    });
+  }, []);
 
   const speakResponse = useCallback(async (text: string) => {
     if (!ttsEnabled || !text?.trim()) return;
@@ -62,7 +75,7 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
         isQuery: data.isQuery,
         queryResult: data.queryResult,
       };
-      setLastResult(result);
+      setLastResult(result); pushHistory(result);
       let responseText = '';
       if (isQuery) {
         if (data.queryResult?.metric) responseText = `${data.queryResult.metric} คือ ${data.queryResult.value} ${data.queryResult.unit || ''}`;
@@ -102,13 +115,25 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
     }
   }, [t, speakResponse, onActionComplete]);
 
+  // wake word: ถ้าเปิด จะฟังต่อเนื่องและกรองเฉพาะที่มีคำว่า sovereign/สวัสดี
+  const handleWakeResult = useCallback((text: string) => {
+    const low = text.toLowerCase();
+    if (wakeEnabled && !/(sovereign|สวัสดี|หวัดดี)/.test(low)) return;
+    const cleaned = text.replace(/(sovereign|สวัสดี|หวัดดี)/gi, '').trim() || text;
+    handleVoiceResult(cleaned);
+  }, [wakeEnabled, handleVoiceResult]);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <VoiceInput onResult={handleVoiceResult} onListeningChange={() => {}} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <VoiceInput onResult={wakeEnabled ? handleWakeResult : handleVoiceResult} onListeningChange={() => {}} />
         <button onClick={() => setTtsEnabled(!ttsEnabled)} className={`p-2.5 rounded-full transition-all ${ttsEnabled ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`} title={ttsEnabled ? t('voiceCommand.ttsOn', 'เปิด TTS') : t('voiceCommand.ttsOff', 'ปิด TTS')}>
           <Icon name={ttsEnabled ? 'volume-2' : 'volume-x'} size={18} />
         </button>
+        <button onClick={() => setWakeEnabled(!wakeEnabled)} className={`px-3 py-2 rounded-full text-xs font-bold border ${wakeEnabled ? 'bg-sky-600 border-sky-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`} title="ฟังต่อเนื่องด้วย wake word sovereign/สวัสดี">
+          {wakeEnabled ? '🎙️ Wake ON' : '💤 Wake OFF'}
+        </button>
+        {history.length > 0 && <span className="text-[11px] text-gray-500">{history.length} ครั้ง</span>}
       </div>
       {transcript && <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-sm"><div className="text-xs text-gray-400 mb-1">{t('voiceCommand.heard', 'ได้ยิน:')}</div><div className="text-white">{transcript}</div></div>}
       {isProcessing && <div className="flex items-center gap-2 text-sm text-sky-400"><div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" /><span>{t('voiceCommand.processing', 'กำลังประมวลผล...')}</span></div>}
@@ -130,6 +155,15 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
           {lastResult.isQuery && lastResult.queryResult && <div className="mt-2 p-2 bg-gray-800/50 rounded text-xs text-sky-300"><div className="font-bold text-sky-400 mb-1">ผลลัพธ์:</div><pre className="text-[10px] overflow-auto max-h-40">{JSON.stringify(lastResult.queryResult, null, 2).slice(0, 500)}</pre></div>}
           <div className="text-[11px] text-gray-500 mt-1">Entities: {JSON.stringify(lastResult.entities).slice(0, 100)}</div>
         </div>
+      )}
+      {history.length > 0 && (
+        <details className="bg-gray-900/40 border border-gray-800 rounded-lg p-2">
+          <summary className="text-xs font-bold text-gray-400 cursor-pointer">ประวัติ {history.length} คำสั่ง</summary>
+          <div className="mt-2 space-y-1 max-h-40 overflow-auto">
+            {history.map((h, i) => <div key={i} className="text-[11px] flex justify-between bg-gray-800/50 rounded px-2 py-1"><span className="text-gray-300 truncate">{h.originalText}</span><span className="text-gray-500 ml-2">{h.intent}</span></div>)}
+          </div>
+          <button onClick={() => { setHistory([]); try { localStorage.removeItem('voice_history'); } catch {} }} className="mt-2 text-[11px] text-red-400 hover:underline">ล้างประวัติ</button>
+        </details>
       )}
     </div>
   );
