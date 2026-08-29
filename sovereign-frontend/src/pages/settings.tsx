@@ -512,6 +512,9 @@ export default function SettingsPage() {
           </p>
         </section>
 
+        {/* พูดคุยอัตโนมัติ */}
+        <VoiceAutoSection />
+
         {/* ขนาดตัวอักษร */}
         <section className="panel p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200">{t('settings.font.title', 'ขนาดตัวอักษร')}</h2>
@@ -1103,6 +1106,39 @@ function MfaSection() {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+function VoiceAutoSection() {
+  const t = useLanguageStore((s) => s.t);
+  const [enabled, setEnabled] = useState(false);
+  const [wakeWord, setWakeWord] = useState('sovereign');
+  useEffect(() => {
+    try {
+      setEnabled(localStorage.getItem('voice:autoListen') === '1');
+      const w = localStorage.getItem('voice:wakeWord');
+      if (w) setWakeWord(w);
+    } catch {}
+  }, []);
+  const toggle = (v: boolean) => {
+    setEnabled(v);
+    try { localStorage.setItem('voice:autoListen', v ? '1' : '0'); } catch {}
+  };
+  const saveWake = (v: string) => {
+    setWakeWord(v);
+    try { localStorage.setItem('voice:wakeWord', v); } catch {}
+  };
+  return (
+    <section className="panel panel-cyan p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan flex items-center gap-2"><Icon name="mic" size={14} className="text-emerald-400" /> พูดคุยอัตโนมัติ</h2>
+      <p className="text-xs text-gray-500">เปิดแล้วไมค์จะฟังต่อเนื่อง — พูดคำปลุก <b className="text-gray-300">{wakeWord}</b> หรือ <b className="text-gray-300">สวัสดี</b> แล้วตามด้วยคำสั่ง ระบบจัดการให้เลย ไม่ต้องกดปุ่มพูด</p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={() => toggle(!enabled)} className={enabled ? 'btn-primary' : 'btn-secondary'}>{enabled ? '✓ เปิดอยู่ — ฟังอัตโนมัติ' : 'เปิดพูดคุยอัตโนมัติ'}</button>
+        {enabled && <span className="text-xs px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-700 text-emerald-300 animate-pulse">🎙️ ฟังต่อเนื่อง</span>}
+        <input value={wakeWord} onChange={e => saveWake(e.target.value)} placeholder="คำปลุก เช่น sovereign" className="input text-sm w-40" />
+      </div>
+      <div className="text-[11px] text-gray-600">ต้องใช้ <b>HTTPS / localhost</b> และอนุญาตไมค์ครั้งเดียว — ถ้าปิดแท็บแล้วเปิดใหม่ ต้องกดอนุญาตอีกครั้ง (เบราว์เซอร์จำกัด)</div>
     </section>
   );
 }

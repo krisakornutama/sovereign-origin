@@ -32,7 +32,7 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
   const [pendingConfirm, setPendingConfirm] = useState<PendingAction | null>(null);
   const [transcript, setTranscript] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [wakeEnabled, setWakeEnabled] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(() => { try { return localStorage.getItem('voice:autoListen') === '1'; } catch { return false; } });
   const [history, setHistory] = useState<VoiceCommandResult[]>(() => {
     try { return JSON.parse(localStorage.getItem('voice_history') || '[]'); } catch { return []; }
   });
@@ -126,11 +126,11 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <VoiceInput onResult={wakeEnabled ? handleWakeResult : handleVoiceResult} onListeningChange={() => {}} />
+        <VoiceInput onResult={wakeEnabled ? handleWakeResult : handleVoiceResult} onListeningChange={() => {}} autoListen={wakeEnabled} />
         <button onClick={() => setTtsEnabled(!ttsEnabled)} className={`p-2.5 rounded-full transition-all ${ttsEnabled ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`} title={ttsEnabled ? t('voiceCommand.ttsOn', 'เปิด TTS') : t('voiceCommand.ttsOff', 'ปิด TTS')}>
           <Icon name={ttsEnabled ? 'volume-2' : 'volume-x'} size={18} />
         </button>
-        <button onClick={() => setWakeEnabled(!wakeEnabled)} className={`px-3 py-2 rounded-full text-xs font-bold border ${wakeEnabled ? 'bg-sky-600 border-sky-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`} title="ฟังต่อเนื่องด้วย wake word sovereign/สวัสดี">
+        <button onClick={() => { const v = !wakeEnabled; setWakeEnabled(v); try { localStorage.setItem('voice:autoListen', v ? '1' : '0'); } catch {} }} className={`px-3 py-2 rounded-full text-xs font-bold border ${wakeEnabled ? 'bg-sky-600 border-sky-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`} title="ฟังต่อเนื่องด้วย wake word sovereign/สวัสดี">
           {wakeEnabled ? '🎙️ Wake ON' : '💤 Wake OFF'}
         </button>
         {history.length > 0 && <span className="text-[11px] text-gray-500">{history.length} ครั้ง</span>}
