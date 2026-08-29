@@ -446,9 +446,11 @@ export default function SettingsPage() {
             type="text"
             value={apiUrl}
             onChange={(e) => setApiUrlInput(e.target.value)}
+            onBlur={() => { if (apiUrl.trim()) testConnection(); }}
             placeholder="http://localhost:3001"
             className="input w-full text-sm"
           />
+          {testResult && <div className={`text-xs ${testResult.ok?'text-emerald-400':'text-amber-400'}`}>{testResult.ok?`✓ เชื่อมต่อได้ ${testResult.ms}ms`:`○ ${testResult.detail}`}</div>}
           <div className="flex gap-3 flex-wrap">
             <button onClick={saveApiUrl} className="btn-primary">
               <Icon name="save" size={14} />
@@ -897,6 +899,17 @@ function TelegramSection() {
     }
   };
 
+  const [chats, setChats] = useState<Array<{chatId:string,title:string,type:string,text:string}>>([]);
+  const fetchChats = async () => {
+    setBusy(true); setErr(''); try {
+      const res = await authFetch(`${getApiUrl()}/api/telegram/updates`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setChats(data.chats || []);
+      if ((data.chats||[]).length===0) setErr('ยังไม่พบข้อความ — ส่งข้อความหา bot หรือเชิญบอทเข้ากลุ่มแล้วพิมพ์อะไรสักอย่างก่อน');
+      else setMsg(`พบ ${data.chats.length} แชท — กดเลือกเพื่อใส่ Chat ID อัตโนมัติ`);
+    } catch(e:any){ setErr(e.message); } finally { setBusy(false); }
+  };
   const statusBadge = !configured
     ? t('settings.telegram.notConfigured', 'ยังไม่ได้ตั้งค่า')
     : source === 'db'
@@ -947,6 +960,9 @@ function TelegramSection() {
           <Icon name="save" size={14} />
           {t('settings.telegram.save', 'บันทึก')}
         </button>
+        <button onClick={fetchChats} disabled={busy || !botToken.trim()} className="btn-secondary">
+          <Icon name="search" size={14} /> ดึง Chat ID อัตโนมัติ
+        </button>
         <button onClick={test} disabled={busy || !configured} className="btn-secondary">
           {busy ? t('common.loading', 'กำลังโหลด...') : t('settings.telegram.test', 'ส่งข้อความทดสอบ')}
         </button>
@@ -956,6 +972,16 @@ function TelegramSection() {
           </button>
         )}
       </div>
+      {chats.length>0 && (
+        <div className="grid gap-1.5">
+          {chats.map(c=>(
+            <button key={c.chatId} onClick={()=>setChatId(c.chatId)} className="text-left px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-xs flex justify-between">
+              <span><b className="text-gray-200">{c.chatId}</b> <span className="text-gray-500">{c.title} · {c.type}</span></span>
+              <span className="text-gray-500 truncate ml-2">{c.text}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {testOutcome === 'fail' && (
         <div className="card p-3 text-sm text-rose-400">
           {t('settings.telegram.testFail', 'ส่งไม่สำเร็จ — ตรวจ token / chat ID หรือการเชื่อมต่ออินเทอร์เน็ต')}
@@ -1138,11 +1164,15 @@ function VoiceAutoSection() {
   const t = useLanguageStore((s) => s.t);
   const [enabled, setEnabled] = useState(false);
   const [wakeWord, setWakeWord] = useState('sovereign');
+  const [micOk, setMicOk] = useState<'idle'|'ok'|'fail'>('idle');
+  const [ttsVoice, setTtsVoice] = useState('piper');
   useEffect(() => {
     try {
       setEnabled(localStorage.getItem('voice:autoListen') === '1');
       const w = localStorage.getItem('voice:wakeWord');
       if (w) setWakeWord(w);
+      const tv = localStorage.getItem('voice:ttsVoice');
+      if (tv) setTtsVoice(tv);
     } catch {}
   }, []);
   const toggle = (v: boolean) => {
@@ -1153,6 +1183,16 @@ function VoiceAutoSection() {
     setWakeWord(v);
     try { localStorage.setItem('voice:wakeWord', v); } catch {}
   };
+  const testMic = async () => {
+    try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t=>t.stop()); setMicOk('ok'); setTimeout(()=>setMicOk('idle'),2000); } catch { setMicOk('fail'); setTimeout(()=>setMicOk('idle'),2000); }
+  };
+  const testTts = async () => {
+    try { const { useTTS } = await import('../hooks/useTTS'); } catch {}
+    try {
+      const res = await fetch(`${localStorage.getItem('sovereign-api-url') || 'http://localhost:3001'}/api/tts/speak`, { method:'POST', headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${localStorage.getItem('sovereign-token') || ''}`}, body: JSON.stringify({ text: 'ทดสอบเสียง สวัสดีครับ', rate: 180 }) });
+      if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = new Audio(url); a.play(); }
+    } catch {}
+  };
   return (
     <section className="panel panel-cyan p-5 space-y-4">
       <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan flex items-center gap-2"><Icon name="mic" size={14} className="text-emerald-400" /> พูดคุยอัตโนมัติ</h2>
@@ -1161,6 +1201,12 @@ function VoiceAutoSection() {
         <button onClick={() => toggle(!enabled)} className={enabled ? 'btn-primary' : 'btn-secondary'}>{enabled ? '✓ เปิดอยู่ — ฟังอัตโนมัติ' : 'เปิดพูดคุยอัตโนมัติ'}</button>
         {enabled && <span className="text-xs px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-700 text-emerald-300 animate-pulse">🎙️ ฟังต่อเนื่อง</span>}
         <input value={wakeWord} onChange={e => saveWake(e.target.value)} placeholder="คำปลุก เช่น sovereign" className="input text-sm w-40" />
+        <button onClick={testMic} className="btn-secondary text-xs">{micOk==='ok'?'✓ ไมค์พร้อม':micOk==='fail'?'✗ ไมค์ไม่พร้อม':'ทดสอบไมค์'}</button>
+        <button onClick={testTts} className="btn-secondary text-xs">ทดสอบเสียง</button>
+        <select value={ttsVoice} onChange={e=>{ setTtsVoice(e.target.value); try{localStorage.setItem('voice:ttsVoice', e.target.value);}catch{}}} className="input text-xs w-28">
+          <option value="piper">Piper ไทย</option>
+          <option value="pyttsx3">pyttsx3</option>
+        </select>
       </div>
       <div className="text-[11px] text-gray-600">ต้องใช้ <b>HTTPS / localhost</b> และอนุญาตไมค์ครั้งเดียว — ถ้าปิดแท็บแล้วเปิดใหม่ ต้องกดอนุญาตอีกครั้ง (เบราว์เซอร์จำกัด)</div>
     </section>
