@@ -398,11 +398,12 @@ export default function SettingsPage() {
   }
 
   const tabDefs = [
-    { id: 'general' as const, label: 'ทั่วไป', icon: 'settings' },
-    { id: 'connection' as const, label: 'การเชื่อมต่อ', icon: 'wifi' },
-    { id: 'app' as const, label: 'แอป & ข้อมูล', icon: 'package' },
-    { id: 'security' as const, label: 'ความปลอดภัย', icon: 'shield' },
-  ];
+    { id: 'general' as const, label: 'ทั่วไป', icon: 'settings', target: 'sec-general' },
+    { id: 'connection' as const, label: 'การเชื่อมต่อ', icon: 'wifi', target: 'sec-connection' },
+    { id: 'app' as const, label: 'แอป & ข้อมูล', icon: 'package', target: 'sec-app' },
+    { id: 'security' as const, label: 'ความปลอดภัย', icon: 'shield', target: 'sec-security' },
+  ] as const;
+  const scrollToSec = (id: string) => { try { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {} };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
@@ -420,11 +421,11 @@ export default function SettingsPage() {
         {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
 
-        {/* Tabs + Search */}
-        <div className="flex flex-wrap gap-2 items-center">
+        {/* Tabs + Search - คลิกแล้วเลื่อนไปหา section */}
+        <div className="flex flex-wrap gap-2 items-center sticky top-2 z-10 bg-gray-950/80 backdrop-blur p-1 rounded-full">
           <div className="flex gap-1.5 p-1 bg-gray-900 border border-gray-800 rounded-full">
             {tabDefs.map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${activeTab===tab.id?'bg-emerald-600 text-white':'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}`}><Icon name={tab.icon} size={12} />{tab.label}</button>
+              <button key={tab.id} onClick={() => { setActiveTab(tab.id); scrollToSec((tab as any).target); }} className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${activeTab===tab.id?'bg-emerald-600 text-white':'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}`}><Icon name={tab.icon} size={12} />{tab.label}</button>
             ))}
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -433,8 +434,8 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* MFA */}
-        <MfaSection />
+        <div id="sec-security"><MfaSection /></div>
+        <div id="sec-connection" className="space-y-5">
         <section className="panel panel-glow p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200 glow-text">API URL</h2>
           <p className="text-xs text-gray-500">
@@ -490,8 +491,8 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
-
-        {/* ธีม */}
+        </div>
+        <div id="sec-general" className="space-y-5">
         <section className="panel p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200">{t('settings.theme.title', 'ธีม')}</h2>
           <div className="flex gap-3">
@@ -554,7 +555,8 @@ export default function SettingsPage() {
             ))}
           </div>
         </section>
-
+        </div>
+        <div id="sec-app" className="space-y-5">
         {/* PWA */}
         <section className="panel p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200">{t('settings.pwa.title', 'PWA / ติดตั้งแอป')}</h2>
@@ -789,6 +791,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        </div>
         {/* รีเซ็ต */}
         <section className="panel p-5">
           <button

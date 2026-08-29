@@ -68,21 +68,27 @@ function parseVoiceCommandHeuristic(text: string): any {
   // Entity extraction
   const entities: any = {};
   
-  // Numbers with units
+  // Numbers with units — ห้ามติดลบและเกิน 10000
   const qtyMatch = t.match(/(\d+(?:\.\d+)?)\s*(ลิตร|ล|กิโลกรัม|กิโล|กก\.|กิโลกรัม|mg\/dl|mmhg|จาน|ชิ้น|ถ้วย|ช้อน)/);
   if (qtyMatch) {
-    entities.quantity = parseFloat(qtyMatch[1]);
+    const q = parseFloat(qtyMatch[1]);
+    if (q < 0 || q > 10000) return { intent: 'help', entities: {}, confidence: 0.9, action: undefined };
+    entities.quantity = q;
     entities.unit = qtyMatch[2].replace('กิโลกรัม', 'กิโลกรัม').replace('กก.', 'กิโลกรัม').replace('กิโล', 'กิโลกรัม').replace('ลิตร', 'ลิตร').replace('ล', 'ลิตร');
   }
 
   // Water
   if (/(น้ำ|water)/.test(t)) entities.category = 'water';
   
-  // Blood pressure
+  // Blood pressure — validate range 70-250 / 40-150
   const bpMatch = t.match(/(\d{2,3})\s*[/\\\/]\s*(\d{2,3})/);
   if (bpMatch) {
-    entities.systolic = parseInt(bpMatch[1]);
-    entities.diastolic = parseInt(bpMatch[2]);
+    const sys = parseInt(bpMatch[1]); const dia = parseInt(bpMatch[2]);
+    if (sys >= 70 && sys <= 250 && dia >= 40 && dia <= 150) {
+      entities.systolic = sys; entities.diastolic = dia;
+    } else {
+      return { intent: 'help', entities: {}, confidence: 0.9, action: undefined };
+    }
   }
 
   // Numbers without units (generic value)
