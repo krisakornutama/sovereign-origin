@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
-import { asArray, asObject } from '../lib/fetchJson';
+import { api, asArray, asObject } from '../lib/apiClient';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -112,10 +112,7 @@ export default function KnowledgePage() {
 
   const loadItems = useCallback(async () => {
     try {
-      const q = typeFilter === 'ALL' ? '' : `?type=${typeFilter}`;
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/items${q}`);
-      if (!res.ok) throw new Error('Failed to load');
-      setItems(asArray(await res.json()));
+      setItems(await api.getArray<KnowledgeItem>('/api/knowledge/items', typeFilter === 'ALL' ? undefined : { type: typeFilter }));
       setError('');
     } catch (err) {
       setError(t('knowledge.loadError', 'โหลดคลังความรู้ไม่สำเร็จ — ตรวจว่า Backend เปิดอยู่'));

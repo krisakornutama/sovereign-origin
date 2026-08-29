@@ -26,7 +26,7 @@ interface FeatureState {
   // key ของหน้าที่เห็น เช่น "/portfolio" | "/health" (null = ยังโหลดไม่เสร็จ)
   granted: string[] | null;
   loading: boolean;
-  load: () => Promise<void>;
+  load: (force?: boolean) => Promise<void>;
   has: (feature: string) => boolean;
   isBlocked: (pathname: string) => boolean;
 }
@@ -35,9 +35,9 @@ export const useFeatureStore = create<FeatureState>((set, get) => ({
   granted: null,
   loading: false,
 
-  load: async () => {
-    // กันเรียกซ้ำพร้อมกัน
-    if (get().loading || get().granted !== null) return;
+  load: async (force?: boolean) => {
+    // กันเรียกซ้ำพร้อมกัน — ถ้าเคยโหลดแล้วให้ข้ามเว้นแต่ force=true (grant เปลี่ยน)
+    if (get().loading || (!force && get().granted !== null)) return;
     set({ loading: true });
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/features/me`);
