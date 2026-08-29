@@ -386,6 +386,9 @@ export default function SettingsPage() {
     setError('');
   };
 
+  const [activeTab, setActiveTab] = useState<'general'|'connection'|'app'|'security'>('general');
+  const [settingsSearch, setSettingsSearch] = useState('');
+
   if (!isHydrated) {
     return <div className="text-white p-8">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
@@ -393,6 +396,13 @@ export default function SettingsPage() {
   if (!isAuthenticated || !user) {
     return <div className="text-white p-8">{t('settings.unauthorized', 'Unauthorized')}</div>;
   }
+
+  const tabDefs = [
+    { id: 'general' as const, label: 'ทั่วไป', icon: 'settings' },
+    { id: 'connection' as const, label: 'การเชื่อมต่อ', icon: 'wifi' },
+    { id: 'app' as const, label: 'แอป & ข้อมูล', icon: 'package' },
+    { id: 'security' as const, label: 'ความปลอดภัย', icon: 'shield' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
@@ -409,6 +419,19 @@ export default function SettingsPage() {
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-3xl mx-auto w-full">
         {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
+
+        {/* Tabs + Search */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex gap-1.5 p-1 bg-gray-900 border border-gray-800 rounded-full">
+            {tabDefs.map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${activeTab===tab.id?'bg-emerald-600 text-white':'text-gray-400 hover:text-gray-200 hover:bg-gray-800'}`}><Icon name={tab.icon} size={12} />{tab.label}</button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <input value={settingsSearch} onChange={e=>setSettingsSearch(e.target.value)} placeholder="ค้นหาตั้งค่า..." className="input text-sm w-40" />
+            {settingsSearch && <button onClick={()=>setSettingsSearch('')} className="text-xs text-gray-500 hover:text-gray-300">ล้าง</button>}
+          </div>
+        </div>
 
         {/* MFA */}
         <MfaSection />
@@ -437,6 +460,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Connection */}
         {/* Telegram Alerts */}
         <TelegramSection />
 
