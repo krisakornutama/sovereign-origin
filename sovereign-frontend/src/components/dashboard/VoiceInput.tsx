@@ -1,23 +1,26 @@
 "use client";
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { authFetch } from '../../lib/apiFetch';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 
 interface VoiceInputProps {
   onResult: (text: string) => void;
   onListeningChange?: (isListening: boolean) => void;
+  autoListen?: boolean;
 }
 
 // Web Speech API (Chrome/Edge) — รู้จำเสียงภาษาไทยในเบราว์เซอร์ ไม่ต้องพึ่ง backend
 // ถ้าไม่มี → fallback ไป whisper backend (สำหรับเครื่องที่ตั้ง whisper ไว้เอง)
 type SpeechRecognitionLike = any;
 
-export default function VoiceInput({ onResult, onListeningChange }: VoiceInputProps) {
+export default function VoiceInput({ onResult, onListeningChange, autoListen }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const t = useLanguageStore((s) => s.t);
+  const autoListenRef = useRef(autoListen);
+  autoListenRef.current = autoListen;
 
   const hasWebSpeech =
     typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
@@ -29,8 +32,8 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
     recognitionRef.current = recognition;
 
     recognition.lang = 'th-TH';
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = !!autoListenRef.current;
+    recognition.interimResults = !!autoListenRef.current;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
@@ -39,9 +42,17 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
     };
 
     recognition.onresult = (event: any) => {
-      const text = event.results?.[0]?.[0]?.transcript?.trim();
+      let text = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) text += event.results[i][0].transcript + ' ';
+      }
+      text = text.trim() || event.results?.[0]?.[0]?.transcript?.trim() || '';
       if (text) {
         onResult(text);
+        if (autoListenRef.current) {
+          // continuous mode keeps listening, don't stop
+          return;
+        }
       } else {
         setError(t('dashboard.voiceInput.noHear', 'ไม่ได้ยินเสียง กรุณาลองใหม่'));
       }
@@ -63,6 +74,9 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
     recognition.onend = () => {
       setIsListening(false);
       onListeningChange?.(false);
+      if (autoListenRef.current) {
+        try { setTimeout(() => recognition.start(), 400); } catch {}
+      }
     };
 
     try {
@@ -143,6 +157,16 @@ export default function VoiceInput({ onResult, onListeningChange }: VoiceInputPr
     setIsListening(false);
     onListeningChange?.(false);
   }, [hasWebSpeech, stopWebSpeech, onListeningChange]);
+
+  useEffect(() => {
+    if (autoListen && hasWebSpeech && !isListening) {
+      const t = setTimeout(() => startWebSpeech(), 500);
+      return () => clearTimeout(t);
+    }
+    if (!autoListen && isListening) {
+      stopWebSpeech();
+    }
+  }, [autoListen, hasWebSpeech, isListening]);
 
   return (
     <div className="relative inline-flex items-center">
