@@ -435,8 +435,6 @@ export default function SettingsPage() {
 
         {/* MFA */}
         <MfaSection />
-
-        {/* API URL */}
         <section className="panel panel-glow p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200 glow-text">API URL</h2>
           <p className="text-xs text-gray-500">
