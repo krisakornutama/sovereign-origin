@@ -166,6 +166,27 @@ router.delete('/config', authenticate, requireRole('SUPERADMIN'), async (req, re
   });
 });
 
+// GET /api/telegram/updates — ดึง chat ID อัตโนมัติจาก getUpdates (SUPERADMIN) — ช่วยกรอก Chat ID ไม่ต้องพิมพ์เอง
+router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken) return res.status(400).json({ error: 'ตั้ง Bot Token ก่อน' });
+  try {
+    const r = await axios.get(`https://api.telegram.org/bot${creds.botToken}/getUpdates`, { timeout: 8000 });
+    const chats = ((r.data?.result as any[]) || []).map((u: any) => ({
+      chatId: String(u.message?.chat?.id || u.channel_post?.chat?.id || ''),
+      title: u.message?.chat?.title || u.message?.chat?.username || u.message?.chat?.first_name || '',
+      type: u.message?.chat?.type || u.channel_post?.chat?.type || 'unknown',
+      text: (u.message?.text || u.channel_post?.text || '').slice(0, 60),
+    })).filter((c: any) => c.chatId);
+    // dedup
+    const seen = new Set<string>();
+    const uniq = chats.filter((c: any) => !seen.has(c.chatId) && seen.add(c.chatId));
+    res.json({ chats: uniq.slice(0, 10) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || 'getUpdates failed' });
+  }
+});
+
 // POST /api/telegram/test — ส่งข้อความทดสอบด้วย credential ปัจจุบัน (SUPERADMIN)
 router.post('/test', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const creds = await getTelegramCredentials();
