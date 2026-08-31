@@ -515,10 +515,17 @@ router.post('/voice-command', authenticate, async (req, res) => {
   });
 
   // POST /api/ai/voice-history — เก็บประวัติเสียง (frontend ส่งมาหลัง parse สำเร็จ)
-  const voiceHistoryMem=[]; try{const f=require('fs');const pp='/tmp/voice_history.json';if(f.existsSync(pp)) voiceHistoryMem.push(...JSON.parse(f.readFileSync(pp,'utf8')).slice(0,200));}catch{}
+  const voiceHistoryMem:any[]=[]; try{const f=require('fs');const pp='/tmp/voice_history.json';if(f.existsSync(pp)) voiceHistoryMem.push(...JSON.parse(f.readFileSync(pp,'utf8')).slice(0,200));}catch{}
   router.post('/voice-history', authenticate, async (req, res) => {
-    // เก็บแบบเบาๆ ไม่ต้อง DB ถาวร — แค่ log และตอบ ok (frontend มี localStorage อยู่แล้ว)
-    res.json({ success: true });
+    const {text,intent,entities}=req.body||{} as any;
+    const row={id:Date.now().toString(),text,intent,entities,user_id:(req as any).user?.id||(req as any).user?.userId,created_at:new Date().toISOString()};
+    voiceHistoryMem.unshift(row); if(voiceHistoryMem.length>200) voiceHistoryMem.pop();
+    try{require('fs').writeFileSync('/tmp/voice_history.json',JSON.stringify(voiceHistoryMem.slice(0,200)));}catch{}
+    res.json({success:true,row});
+  });
+  router.get('/voice-history', authenticate, async (req,res)=>{
+    const limit=Math.min(100, Number(req.query.limit)||20);
+    res.json(voiceHistoryMem.slice(0,limit));
   });
 
   // Voice help text constant
