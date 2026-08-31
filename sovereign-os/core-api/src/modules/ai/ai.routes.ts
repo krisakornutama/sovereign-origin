@@ -515,6 +515,7 @@ router.post('/voice-command', authenticate, async (req, res) => {
   });
 
   // POST /api/ai/voice-history — เก็บประวัติเสียง (frontend ส่งมาหลัง parse สำเร็จ)
+  const voiceHistoryMem=[]; try{const f=require('fs');const pp='/tmp/voice_history.json';if(f.existsSync(pp)) voiceHistoryMem.push(...JSON.parse(f.readFileSync(pp,'utf8')).slice(0,200));}catch{}
   router.post('/voice-history', authenticate, async (req, res) => {
     // เก็บแบบเบาๆ ไม่ต้อง DB ถาวร — แค่ log และตอบ ok (frontend มี localStorage อยู่แล้ว)
     res.json({ success: true });
