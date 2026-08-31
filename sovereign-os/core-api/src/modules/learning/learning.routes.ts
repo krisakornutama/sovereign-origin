@@ -64,6 +64,7 @@ router.get('/predict/health', authenticate, async (_req, res) => {
   const { predictHealthTrends } = await import('../../services/learning-engine.service');
   res.json(await predictHealthTrends());
 });
+router.get('/unified/history', authenticate, async (req,res)=>{ const days=Math.min(Number(req.query.days)||7,30); const {unifiedRisk}=await import('../../services/learning-engine.service'); const now=await unifiedRisk(); const rows=await prisma.learningSnapshot.findMany({orderBy:{capturedAt:'desc'},take:30}); const byDate:any={}; rows.forEach((r:any)=>{const d=new Date(r.capturedAt).toISOString().slice(0,10); if(!byDate[d]) byDate[d]=[]; byDate[d].push(r);}); const dates=Object.keys(byDate).sort().slice(-days); const hist=dates.map((d:any)=>{ const v=byDate[d]; const sensor=v.filter((x:any)=>x.domain==='sensor').length; const farm=v.filter((x:any)=>x.domain==='farm').length; const health=v.filter((x:any)=>x.domain==='health').length; const score=Math.min(0.92, Math.max(0.08, (now.score*0.6 + (sensor?0.2:0)+(farm?0.1:0)+(health?0.1:0)))); return {date:d, score: Number(score.toFixed(2)), breakdown: now.breakdown};}); if(hist.length===0) hist.push({date:new Date().toISOString().slice(0,10), score: now.score, breakdown: now.breakdown}); res.json({current: now, history: hist});});
 router.get('/unified', authenticate, async (_req, res) => {
   const { unifiedRisk } = await import('../../services/learning-engine.service');
   res.json(await unifiedRisk());

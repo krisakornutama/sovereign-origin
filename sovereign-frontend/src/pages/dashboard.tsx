@@ -17,6 +17,7 @@ import StatCard from '../components/ui/StatCard';
 import SectionCard from '../components/ui/SectionCard';
 import EmptyState from '../components/ui/EmptyState';
 import { authFetch } from '../lib/apiFetch';
+import { api } from '../lib/apiClient';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -480,33 +481,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
     const fetchData = () => {
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/stats`)
-        .then((res) => res.json())
-        .then((data) => {
-          setMetrics(data.metrics || {});
-          authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/automation/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ metrics: data.metrics || {} }),
-          });
-        })
-        .catch(() => {});
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices/status`)
-        .then((res) => res.json())
-        .then((data) => setDeviceStatus(data))
-        .catch(() => {});
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/status`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => data && setInventoryStatus(data.totals))
-        .catch(() => setInventoryStatus(null));
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots/overview`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null))
-        .catch(() => setFarmOverview(null));
-      authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/dashboard`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => data && setKidsSummary(data.kids || []))
-        .catch(() => setKidsSummary(null));
+      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ setMetrics(data.metrics||{}); api.post('/api/automation/check',{metrics:data.metrics||{}}).catch(()=>{}); }).catch(()=>{});
+      api.getObject<any>('/api/devices/status').then((data:any)=> setDeviceStatus(data)).catch(()=>{});
+      api.getObject<any>('/api/inventory/status').then((data:any)=> data && setInventoryStatus(data.totals)).catch(()=> setInventoryStatus(null));
+      api.getObject<any>('/api/farm/plots/overview').then((data:any)=> data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null)).catch(()=> setFarmOverview(null));
+      api.getObject<any>('/api/knowledge/teach/dashboard').then((data:any)=> data && setKidsSummary(data.kids||[])).catch(()=> setKidsSummary(null));
     };
     fetchData();
     const interval = setInterval(fetchData, 5000);
@@ -1057,8 +1036,7 @@ function SensorCard({ label, value, metric, trendRange }: { label: string; value
     const cacheKey = `${metric}:${trendRange}`;
     const cached = trendCache.get(cacheKey);
     if (cached) { setTrend(cached); return; }
-    authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/history?metric=${encodeURIComponent(metric)}&range=${trendRange}`)
-      .then((res) => res.json())
+    api.getArray<any>(`/api/timescale/history`,{metric,range:trendRange} as any)
       .then((result: any[]) => {
         if (cancelled) return;
         const points = result.map((r: any) => ({ time: new Date(r.bucket).getTime(), value: r.avg_value }));
