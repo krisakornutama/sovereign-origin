@@ -64,6 +64,10 @@ router.get('/predict/health', authenticate, async (_req, res) => {
   const { predictHealthTrends } = await import('../../services/learning-engine.service');
   res.json(await predictHealthTrends());
 });
+router.get('/unified', authenticate, async (_req, res) => {
+  const { unifiedRisk } = await import('../../services/learning-engine.service');
+  res.json(await unifiedRisk());
+});
 
 // GET /api/learning/models — accuracy ต่อ domain
 router.get('/models', authenticate, async (_req, res) => {
