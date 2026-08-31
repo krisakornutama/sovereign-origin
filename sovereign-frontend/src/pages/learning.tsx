@@ -20,6 +20,7 @@ export default function LearningPage() {
   const [unifiedHistory, setUnifiedHistory] = useState<number[]>(()=>{
     try{ if(typeof window==='undefined') return []; const v=JSON.parse(localStorage.getItem('unified_history')||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; }
   });
+  const [unifiedHistDates, setUnifiedHistDates] = useState<string[]>([]);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(async()=>{
@@ -35,6 +36,7 @@ export default function LearningPage() {
       ]);
       setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]); setHealthTrends(Array.isArray(h)?h:[]); setUnified(u);
       if(u && typeof u.score==='number'){ setUnifiedHistory(his=>{ const nh=[...his, Math.round(u.score*100)].slice(-14); try{ localStorage.setItem('unified_history', JSON.stringify(nh)); }catch{} return nh; }); }
+      try{ const uh=await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/unified/history?days=7`).then(r=>r.ok?r.json():null).catch(()=>null); if(uh?.history?.length){ setUnifiedHistory(uh.history.map((x:any)=>Math.round(x.score*100))); setUnifiedHistDates(uh.history.map((x:any)=>x.date.slice(5))); setUnified(uh.current); } }catch{}
     }catch{}
   },[]);
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated, load]);
@@ -90,7 +92,7 @@ export default function LearningPage() {
                     {unifiedHistory.map((v,i)=><circle key={i} cx={(i/(unifiedHistory.length-1))*190+5} cy={34-(v/100)*28} r="2" fill={v>=70?'#ef4444':v>=40?'#f59e0b':'#10b981'} />)}
                   </svg>
                 )}
-                {unifiedHistory.length>1 && <div className="text-[10px] text-gray-500">{unifiedHistory.length} จุดล่าสุด · สูงสุด {Math.max(...unifiedHistory)}% ต่ำสุด {Math.min(...unifiedHistory)}%</div>}
+                {unifiedHistory.length>1 && <div className="text-[10px] text-gray-500 flex gap-1">{unifiedHistDates.length? unifiedHistDates.join(' → ') : `${unifiedHistory.length} จุดล่าสุด`} · สูงสุด {Math.max(...unifiedHistory)}% ต่ำสุด {Math.min(...unifiedHistory)}%</div>}
               </div>
               <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center text-sm font-bold ml-4" style={{borderColor: unified.score>=0.7?'#b91c1c':unified.score>=0.4?'#b45309':'#065f46'}}>{(unified.score*100).toFixed(0)}</div>
             </div>
