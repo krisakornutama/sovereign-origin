@@ -16,19 +16,21 @@ export default function LearningPage() {
   const [sensorTrends, setSensorTrends] = useState<any[]>([]);
   const [farmTrends, setFarmTrends] = useState<any[]>([]);
   const [healthTrends, setHealthTrends] = useState<any[]>([]);
+  const [unified, setUnified] = useState<any>(null);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(async()=>{
     try{
-      const [s,p,m,tr,f,h]=await Promise.all([
+      const [s,p,m,tr,f,h,u]=await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/snapshots?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predictions?limit=20`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/models`).then(r=>r.ok?r.json():[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/sensor`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/farm`).then(r=>r.ok?r.json():[]).catch(()=>[]),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/predict/health`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/unified`).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
-      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]); setHealthTrends(Array.isArray(h)?h:[]);
+      setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]); setHealthTrends(Array.isArray(h)?h:[]); setUnified(u);
     }catch{}
   },[]);
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated, load]);
@@ -72,6 +74,16 @@ export default function LearningPage() {
             <button onClick={()=>predict('health')} className="px-3 py-2 bg-gray-800 rounded text-xs">ทำนาย health</button>
             <button onClick={load} className="px-3 py-2 bg-gray-700 rounded text-xs">รีเฟรช trend</button>
           </div>
+          {unified && (
+            <div className={`card p-4 flex items-center justify-between border-2 ${unified.score>=0.7?'border-red-700 bg-red-950/30':unified.score>=0.4?'border-amber-700 bg-amber-950/20':'border-emerald-700 bg-emerald-950/20'}`}>
+              <div>
+                <div className="text-xs text-gray-400">Unified Risk D — เฉลี่ย 3 โดเมน</div>
+                <div className={`text-2xl font-bold ${unified.score>=0.7?'text-red-400':unified.score>=0.4?'text-amber-400':'text-emerald-400'}`}>{(unified.score*100).toFixed(0)}% — {unified.advice}</div>
+                <div className="text-[11px] text-gray-500">sensor {(unified.breakdown.sensor*100).toFixed(0)}% · farm {(unified.breakdown.farm*100).toFixed(0)}% · health {(unified.breakdown.health*100).toFixed(0)}%</div>
+              </div>
+              <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center text-sm font-bold" style={{borderColor: unified.score>=0.7?'#b91c1c':unified.score>=0.4?'#b45309':'#065f46'}}>{(unified.score*100).toFixed(0)}</div>
+            </div>
+          )}
           {sensorTrends.length>0 && (
             <div className="card p-4 space-y-2 border-sky-800/40 bg-sky-950/10">
               <h3 className="font-bold text-sm flex items-center gap-1"><Icon name="predictive" size={14} className="text-sky-400"/> Engine A — เซ็นเซอร์พยากรณ์พัง (trend 7วัน → 7วันข้างหน้า)</h3>

@@ -220,6 +220,17 @@ export async function getModelState(domain?: string) {
   return prisma.learningModelState.findMany();
 }
 
+export async function unifiedRisk(): Promise<{ score: number; breakdown: Record<string, number>; advice: string }> {
+  const [sensor, farm, health] = await Promise.all([predictSensorTrends(), predictFarmTrends(), predictHealthTrends()]);
+  const avg = (arr: any[]) => arr.length ? arr.reduce((s: number, x: any) => s + x.risk, 0) / arr.length : 0;
+  const breakdown = { sensor: Number(avg(sensor).toFixed(2)), farm: Number(avg(farm).toFixed(2)), health: Number(avg(health).toFixed(2)) };
+  const score = Number(((breakdown.sensor + breakdown.farm + breakdown.health) / 3).toFixed(2));
+  let advice = 'ปกติ';
+  if (score >= 0.7) advice = 'เสี่ยงสูง — ตรวจสอบเซ็นเซอร์/ฟาร์ม/สุขภาพทันที';
+  else if (score >= 0.4) advice = 'เฝ้าระวัง — มีบางโดเมนเริ่มเสี่ยง';
+  return { score, breakdown, advice };
+}
+
 export async function nightlyLearn(): Promise<{ snapshots: number; predictions: number }> {
   const snapshots = await (await import('./data-lake.service')).collectDailySnapshots();
   let predictions = 0;
