@@ -76,6 +76,9 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
         queryResult: data.queryResult,
       };
       setLastResult(result); pushHistory(result);
+      try { window.dispatchEvent(new CustomEvent('sovereign:voice', { detail: result })); } catch {}
+      const autoFillIntents = new Set(['inventory_add','inventory_remove','farm_plant','farm_harvest','health_bp','health_weight','health_sugar','restaurant_order']);
+      if (autoFillIntents.has(result.intent)) { try { window.dispatchEvent(new CustomEvent('sovereign:voice-prefill', { detail: result })); } catch {} }
       let responseText = '';
       if (isQuery) {
         if (data.queryResult?.metric) responseText = `${data.queryResult.metric} คือ ${data.queryResult.value} ${data.queryResult.unit || ''}`;

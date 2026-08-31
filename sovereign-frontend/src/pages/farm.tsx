@@ -220,6 +220,16 @@ export default function FarmPage() {
   useEffect(() => {
     if (isAuthenticated) load();
   }, [isAuthenticated, load]);
+  useEffect(()=>{
+    const h=(e:any)=>{
+      const r=e.detail as any;
+      if(!r) return;
+      if(r.intent==='farm_plant' && r.entities?.crop){ setForm(f=>({...f, crop: r.entities.crop, name: f.name||`แปลง ${r.entities.crop}`})); setMessage(`🎙️ เติมฟอร์มจากเสียง: ปลูก ${r.entities.crop}`); }
+      if(r.intent==='farm_harvest' && r.entities?.crop){ const target=plots.find(p=> (p.crop||'').toLowerCase().includes(String(r.entities.crop).toLowerCase())); if(target) window.location.hash=`plot-${target.id}`; setMessage(`🎙️ สั่งเก็บเกี่ยว: ${r.entities.crop}`); }
+    };
+    window.addEventListener('sovereign:voice-prefill', h as any);
+    return ()=> window.removeEventListener('sovereign:voice-prefill', h as any);
+  },[plots]);
 
   // support ?crop= linking from healing/health
   useEffect(() => {
