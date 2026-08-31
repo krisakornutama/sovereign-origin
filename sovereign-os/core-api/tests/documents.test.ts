@@ -71,7 +71,7 @@ describe('mapCategory', () => {
     assert.equal(mapCategory('ข้าว'), 'FOOD');
     assert.equal(mapCategory('น้ำมัน'), 'FUEL');
     assert.equal(mapCategory('น้ำดื่ม'), 'WATER');
-    assert.equal(mapCategory('ยา'), 'MATERIAL');
+    assert.equal(mapCategory('ยา'), 'MEDICINE');
   });
 
   test('fuel wins over water (น้ำมัน has น้ำ)', () => {

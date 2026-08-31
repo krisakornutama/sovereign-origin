@@ -38,26 +38,26 @@ describe('ai-router.service', () => {
 
   test('TASK_TYPES ครบ 4 โดเมน + default ตรงตามสเปก', () => {
     assert.deepEqual([...TASK_TYPES].sort(), ['CODING_AGENT', 'GENERAL_ASSISTANT', 'REASONING_GOVERNOR', 'VISION_AI']);
-    assert.equal(DEFAULT_ROUTES.CODING_AGENT, 'qwen2.5-coder:7b');
-    assert.equal(DEFAULT_ROUTES.VISION_AI, 'qwen2.5-vl:7b');
-    assert.equal(DEFAULT_ROUTES.REASONING_GOVERNOR, 'deepseek-r1:14b');
-    assert.equal(DEFAULT_ROUTES.GENERAL_ASSISTANT, 'qwen2.5:7b');
+    assert.equal(DEFAULT_ROUTES.CODING_AGENT, 'qwen3:8b');
+    assert.equal(DEFAULT_ROUTES.VISION_AI, 'qwen3-vl:8b');
+    assert.equal(DEFAULT_ROUTES.REASONING_GOVERNOR, 'deepseek-r1:8b');
+    assert.equal(DEFAULT_ROUTES.GENERAL_ASSISTANT, 'gemma3:4b');
   });
 
   test('getModelForTask — ไม่มี override → คืน default', async () => {
-    assert.equal(await getModelForTask('CODING_AGENT'), 'qwen2.5-coder:7b');
-    assert.equal(await getModelForTask('VISION_AI'), 'qwen2.5-vl:7b');
+    assert.equal(await getModelForTask('CODING_AGENT'), 'qwen3:8b');
+    assert.equal(await getModelForTask('VISION_AI'), 'qwen3-vl:8b');
   });
 
   test('getModelForTask — มี override ใน SystemSetting → ใช้ค่าที่ตั้ง', async () => {
     store.set('ai.route.CODING_AGENT', 'qwen3-coder:30b');
     assert.equal(await getModelForTask('CODING_AGENT'), 'qwen3-coder:30b');
     // โดเมนอื่นยังใช้ default
-    assert.equal(await getModelForTask('VISION_AI'), 'qwen2.5-vl:7b');
+    assert.equal(await getModelForTask('VISION_AI'), 'qwen3-vl:8b');
   });
 
   test('getModelForTask — task ไม่รู้จัก → fallback GENERAL_ASSISTANT ไม่ throw', async () => {
-    assert.equal(await getModelForTask('UNKNOWN_TASK'), 'qwen2.5:7b');
+    assert.equal(await getModelForTask('UNKNOWN_TASK'), 'gemma3:4b');
   });
 
   test('setModelForTask → getModelForTask อ่านค่ากลับมาได้ (round-trip)', async () => {
@@ -77,13 +77,13 @@ describe('ai-router.service', () => {
     await setModelForTask('GENERAL_ASSISTANT', 'gemma3:4b');
     const all = await getAllRoutes();
     assert.equal(all.GENERAL_ASSISTANT, 'gemma3:4b');
-    assert.equal(all.CODING_AGENT, 'qwen2.5-coder:7b');
+    assert.equal(all.CODING_AGENT, 'qwen3:8b');
     assert.equal(Object.keys(all).length, 4);
   });
 
   test('resetModelForTask — ล้าง override แล้วกลับไป default', async () => {
     await setModelForTask('VISION_AI', 'llava:13b');
     await resetModelForTask('VISION_AI');
-    assert.equal(await getModelForTask('VISION_AI'), 'qwen2.5-vl:7b');
+    assert.equal(await getModelForTask('VISION_AI'), 'qwen3-vl:8b');
   });
 });

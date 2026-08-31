@@ -20,8 +20,8 @@ mockModel(prisma as any, 'systemSetting', {
 describe('ai-router wiring (priority chain)', () => {
   beforeEach(() => store.clear());
 
-  test('ไม่มี override + ไม่มี legacy → spec default (qwen2.5-coder:7b)', async () => {
-    assert.equal(await getModelForTask('CODING_AGENT'), 'qwen2.5-coder:7b');
+  test('ไม่มี override + ไม่มี legacy → spec default (qwen3:8b)', async () => {
+    assert.equal(await getModelForTask('CODING_AGENT'), 'qwen3:8b');
   });
 
   test('ไม่มี override + มี legacy env → ใช้ legacy (back-compat: tests/.env เดิมไม่พัง)', async () => {
@@ -60,7 +60,7 @@ describe('ai-router wiring (priority chain)', () => {
   });
 
   test('legacy ว่าง/ช่องว่าง → ข้ามไป spec default', async () => {
-    assert.equal(await getModelForTask('CODING_AGENT', '   '), 'qwen2.5-coder:7b');
-    assert.equal(await getModelForTask('CODING_AGENT', ''), 'qwen2.5-coder:7b');
+    assert.equal(await getModelForTask('CODING_AGENT', '   '), 'qwen3:8b');
+    assert.equal(await getModelForTask('CODING_AGENT', ''), 'qwen3:8b');
   });
 });
