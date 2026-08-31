@@ -191,13 +191,13 @@ export default function LearningPage() {
                 <div className="space-y-2">
                   {models.map((m:any)=>(
                     <div key={m.domain} className="bg-gray-900 rounded-lg p-2 text-xs">
-                      <div className="font-bold">{m.domain} · {m.model}</div>
-                      <div className={m.accuracy!=null && m.accuracy>=0.7?"text-emerald-400":m.accuracy!=null?"text-amber-400":"text-gray-500"}>accuracy {m.accuracy!=null?(m.accuracy*100).toFixed(0)+"%":"—"} · {m.stats?`${m.stats.correct}/${m.stats.total}`:""}</div>
-                      <div className="text-gray-500">{new Date(m.trainedAt).toLocaleString('th-TH')}</div>
+                      <div className="font-bold flex justify-between"><span>{m.domain} · {m.model}</span><span className={m.accuracy!=null && m.accuracy>=0.7?"text-emerald-400":m.accuracy!=null?"text-amber-400":"text-gray-500"}>{m.accuracy!=null?(m.accuracy*100).toFixed(0)+"%":"—"}</span></div>
+                      <div className="w-full h-2 bg-gray-800 rounded mt-1"><div className={`h-2 rounded ${m.accuracy!=null && m.accuracy>=0.7?'bg-emerald-500':m.accuracy!=null && m.accuracy>=0.5?'bg-amber-500':'bg-gray-600'}`} style={{width: `${m.accuracy!=null?Math.round(m.accuracy*100):0}%`}} /></div>
+                      <div className="text-gray-500">{m.stats?`${m.stats.correct}/${m.stats.total} correct`:""} · {new Date(m.trainedAt).toLocaleString('th-TH')}</div>
                     </div>
                   ))}
                 </div>
-              }
+               }
               <div className="text-[11px] text-gray-500 mt-2">เรียนรู้ต่อ: ทุกครั้งที่ใส่ actual → accuracy อัปเดต → nightly จะใช้ model ที่แม่นสุด</div>
             </div>
           </div>

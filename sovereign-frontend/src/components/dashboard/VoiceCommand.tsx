@@ -92,19 +92,24 @@ export default function VoiceCommand({ onActionComplete }: { onActionComplete?: 
         await speakResponse(responseText);
       } else {
         if (result.confidence >= 0.7 && result.action) {
+          const lowRisk = new Set(['health_weight','health_sugar','health_bp','inventory_add','farm_plant','sensor_check']);
           const desc = buildDescription(result.intent, result.entities);
-          responseText = `กำลัง${desc} กรุณายืนยัน`;
-          await speakResponse(responseText);
-          setPendingConfirm({
-            intent: result.intent,
-            description: desc,
-            execute: async (token?: string) => {
-              const tk = token || useAuthStore.getState().token;
-              await executeAction(result.action!, tk);
-              onActionComplete?.(result);
-              await speakResponse(`ทำ${desc}เสร็จแล้ว`);
-            },
-          });
+          if (lowRisk.has(result.intent) && result.confidence >= 0.85) {
+            try { const tk = useAuthStore.getState().token; await executeAction(result.action, tk); onActionComplete?.(result); responseText=`ทำ${desc}เสร็จแล้ว`; await speakResponse(responseText); setLastResult({...result}); } catch(e:any){ setError(e.message); await speakResponse('ทำไม่สำเร็จ '+e.message); }
+          } else {
+            responseText = `กำลัง${desc} กรุณายืนยัน`;
+            await speakResponse(responseText);
+            setPendingConfirm({
+              intent: result.intent,
+              description: desc,
+              execute: async (token?: string) => {
+                const tk = token || useAuthStore.getState().token;
+                await executeAction(result.action!, tk);
+                onActionComplete?.(result);
+                await speakResponse(`ทำ${desc}เสร็จแล้ว`);
+              },
+            });
+          }
         } else if (result.confidence < 0.7) {
           setError(t('voiceCommand.lowConfidence', 'ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น'));
           await speakResponse('ไม่เข้าใจชัดเจน โปรดพูดชัดเจนขึ้น');
