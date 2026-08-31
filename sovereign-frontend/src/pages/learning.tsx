@@ -17,6 +17,9 @@ export default function LearningPage() {
   const [farmTrends, setFarmTrends] = useState<any[]>([]);
   const [healthTrends, setHealthTrends] = useState<any[]>([]);
   const [unified, setUnified] = useState<any>(null);
+  const [unifiedHistory, setUnifiedHistory] = useState<number[]>(()=>{
+    try{ if(typeof window==='undefined') return []; const v=JSON.parse(localStorage.getItem('unified_history')||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; }
+  });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
 
   const load = useCallback(async()=>{
@@ -31,6 +34,7 @@ export default function LearningPage() {
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/learning/unified`).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
       setSnapshots(Array.isArray(s)?s:[]); setPreds(Array.isArray(p)?p:[]); setModels(Array.isArray(m)?m:[]); setSensorTrends(Array.isArray(tr)?tr:[]); setFarmTrends(Array.isArray(f)?f:[]); setHealthTrends(Array.isArray(h)?h:[]); setUnified(u);
+      if(u && typeof u.score==='number'){ setUnifiedHistory(his=>{ const nh=[...his, Math.round(u.score*100)].slice(-14); try{ localStorage.setItem('unified_history', JSON.stringify(nh)); }catch{} return nh; }); }
     }catch{}
   },[]);
   useEffect(()=>{ if(isAuthenticated) load(); },[isAuthenticated, load]);
@@ -76,12 +80,19 @@ export default function LearningPage() {
           </div>
           {unified && (
             <div className={`card p-4 flex items-center justify-between border-2 ${unified.score>=0.7?'border-red-700 bg-red-950/30':unified.score>=0.4?'border-amber-700 bg-amber-950/20':'border-emerald-700 bg-emerald-950/20'}`}>
-              <div>
+              <div className="flex-1">
                 <div className="text-xs text-gray-400">Unified Risk D — เฉลี่ย 3 โดเมน</div>
                 <div className={`text-2xl font-bold ${unified.score>=0.7?'text-red-400':unified.score>=0.4?'text-amber-400':'text-emerald-400'}`}>{(unified.score*100).toFixed(0)}% — {unified.advice}</div>
                 <div className="text-[11px] text-gray-500">sensor {(unified.breakdown.sensor*100).toFixed(0)}% · farm {(unified.breakdown.farm*100).toFixed(0)}% · health {(unified.breakdown.health*100).toFixed(0)}%</div>
+                {unifiedHistory.length>1 && (
+                  <svg width="200" height="36" className="mt-2">
+                    <polyline fill="none" stroke={unified.score>=0.7?'#ef4444':unified.score>=0.4?'#f59e0b':'#10b981'} strokeWidth="2" points={unifiedHistory.map((v,i)=>`${(i/(unifiedHistory.length-1))*190+5},${34-(v/100)*28}`).join(' ')} />
+                    {unifiedHistory.map((v,i)=><circle key={i} cx={(i/(unifiedHistory.length-1))*190+5} cy={34-(v/100)*28} r="2" fill={v>=70?'#ef4444':v>=40?'#f59e0b':'#10b981'} />)}
+                  </svg>
+                )}
+                {unifiedHistory.length>1 && <div className="text-[10px] text-gray-500">{unifiedHistory.length} จุดล่าสุด · สูงสุด {Math.max(...unifiedHistory)}% ต่ำสุด {Math.min(...unifiedHistory)}%</div>}
               </div>
-              <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center text-sm font-bold" style={{borderColor: unified.score>=0.7?'#b91c1c':unified.score>=0.4?'#b45309':'#065f46'}}>{(unified.score*100).toFixed(0)}</div>
+              <div className="w-16 h-16 rounded-full border-4 flex items-center justify-center text-sm font-bold ml-4" style={{borderColor: unified.score>=0.7?'#b91c1c':unified.score>=0.4?'#b45309':'#065f46'}}>{(unified.score*100).toFixed(0)}</div>
             </div>
           )}
           {sensorTrends.length>0 && (

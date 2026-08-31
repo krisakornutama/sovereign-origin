@@ -200,9 +200,20 @@ export default function HealthPage() {
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    load().catch(() => setError(t('health.loadingFail', 'โหลดข้อมูลสุขภาพไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'))).finally(() => setLoading(false));
+    load().catch(() => setError(t('health.loadingFail', 'โหลดข้อมูลไม่สำเร็จ — ตรวจ backend อีกครั้ง'))).finally(() => setLoading(false));
     loadReadings();
   }, [isAuthenticated, user]);
+  useEffect(()=>{
+    const h=(e:any)=>{
+      const r=e.detail as any;
+      if(!r) return;
+      if(r.intent==='health_bp' && r.entities?.systolic){ setRType('BP'); setRSys(String(r.entities.systolic)); setRDia(String(r.entities.diastolic||'')); setFlash(`🎙️ เสียง: BP ${r.entities.systolic}/${r.entities.diastolic||''}`); }
+      if(r.intent==='health_weight' && r.entities?.value){ setRType('WEIGHT'); setRValue(String(r.entities.value)); setFlash(`🎙️ เสียง: น้ำหนัก ${r.entities.value}kg`); }
+      if(r.intent==='health_sugar' && r.entities?.value){ setRType('SUGAR'); setRValue(String(r.entities.value)); setFlash(`🎙️ เสียง: น้ำตาล ${r.entities.value}`); }
+    };
+    window.addEventListener('sovereign:voice-prefill', h as any);
+    return ()=> window.removeEventListener('sovereign:voice-prefill', h as any);
+  },[]);
 
   const addObservation = async () => {
     setAdding(true);

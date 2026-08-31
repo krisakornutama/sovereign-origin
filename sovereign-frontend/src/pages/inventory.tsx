@@ -111,6 +111,18 @@ export default function InventoryPage() {
   useEffect(() => {
     if (isAuthenticated) load();
   }, [isAuthenticated, load]);
+  useEffect(()=>{
+    const h=(e:any)=>{
+      const r=e.detail as any;
+      if(!r || r.intent!=='inventory_add') return;
+      const catMap: Record<string,string>={น้ำ:'WATER',อาหาร:'FOOD',เมล็ด:'SEED',ยา:'MEDICINE',เชื้อเพลิง:'FUEL',water:'WATER',food:'FOOD',seed:'SEED',medicine:'MEDICINE'};
+      const mapped=catMap[String(r.entities?.item||'').toLowerCase()];
+      setForm(f=>({...f, name: r.entities?.item||f.name, quantity: r.entities?.quantity!=null?String(r.entities.quantity):f.quantity, unit: r.entities?.unit||f.unit, ...(mapped?{category:mapped}:{}) }));
+      setMessage(`🎙️ เติมฟอร์มจากเสียง: ${r.originalText}`);
+    };
+    window.addEventListener('sovereign:voice-prefill', h as any);
+    return ()=> window.removeEventListener('sovereign:voice-prefill', h as any);
+  },[]);
 
   // รอ hydration ก่อน (SSR กับ first client render ต้องตรงกัน ไม่งั้น React hydration
   // error → หน้าเข้าวง "Unauthorized" ค้าง) — แพทเทิร์นเดียวกับหน้าที่ทำกันทั่วแอป
