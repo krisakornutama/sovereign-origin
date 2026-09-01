@@ -395,10 +395,11 @@ function SankeyAlluvial({ wealth, inventory, farm }: { wealth: any; inventory: a
 }
 
 function PerfGauges({ metrics, deviceStatus }: { metrics: Record<string, number>; deviceStatus: any }) {
+  const ds = deviceStatus ?? { total:0, online:0, offline:0 };
   const gauges = [
     { label: 'CPU', val: 38 + ((metrics.temperature ?? 30) % 20), color: '#22d3ee' },
     { label: 'MEM', val: 56 + ((metrics.humidity ?? 50) % 16), color: '#a78bfa' },
-    { label: 'NET', val: deviceStatus.total ? (deviceStatus.online / Math.max(1, deviceStatus.total)) * 100 : 72, color: '#34d399' },
+    { label: 'NET', val: ds.total ? (ds.online / Math.max(1, ds.total)) * 100 : 72, color: '#34d399' },
     { label: 'PWR', val: metrics.battery_soc != null ? metrics.battery_soc : 64, color: metrics.battery_soc != null && metrics.battery_soc < 20 ? '#ef4444' : '#10b981' },
     { label: 'HUM', val: metrics.humidity ?? 58, color: '#38bdf8' },
     { label: 'TMP', val: metrics.temperature ? Math.min(100, (metrics.temperature / 45) * 100) : 62, color: metrics.temperature != null && metrics.temperature > 40 ? '#ef4444' : '#f59e0b' },
@@ -481,8 +482,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
     const fetchData = () => {
-      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ setMetrics(data.metrics||{}); api.post('/api/automation/check',{metrics:data.metrics||{}}).catch(()=>{}); }).catch(()=>{});
-      api.getObject<any>('/api/devices/status').then((data:any)=> setDeviceStatus(data)).catch(()=>{});
+      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); api.post('/api/automation/check',{metrics:data.metrics||{}}).catch(()=>{}); } }).catch(()=>{});
+      api.getObject<any>('/api/devices/status').then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); }).catch(()=>{});
       api.getObject<any>('/api/inventory/status').then((data:any)=> data && setInventoryStatus(data.totals)).catch(()=> setInventoryStatus(null));
       api.getObject<any>('/api/farm/plots/overview').then((data:any)=> data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null)).catch(()=> setFarmOverview(null));
       api.getObject<any>('/api/knowledge/teach/dashboard').then((data:any)=> data && setKidsSummary(data.kids||[])).catch(()=> setKidsSummary(null));
@@ -634,7 +635,7 @@ export default function Dashboard() {
           <div className="card panel-cyan p-3 h-full flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[11px] font-bold tracking-widest text-gray-200 flex items-center gap-1.5"><Icon name="globe" size={12} className="text-cyan-400" /> NODE MAP · HEATMAP</h3>
-              <span className="text-[9px] font-mono tracking-widest text-gray-500">{deviceStatus.total} NODES · {deviceStatus.online} ONLINE</span>
+              <span className="text-[9px] font-mono tracking-widest text-gray-500">{deviceStatus?.total ?? 0} NODES · {deviceStatus?.online ?? 0} ONLINE</span>
             </div>
             <div className="rounded-xl overflow-hidden border border-gray-700/60 bg-[#0b1220] relative h-[240px]">
               <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(520px 220px at 20% 28%, rgba(239,68,68,0.22), transparent 55%), radial-gradient(420px 220px at 70% 60%, rgba(245,158,11,0.20), transparent 60%), radial-gradient(380px 180px at 85% 20%, rgba(52,211,153,0.10), transparent 60%)' }} />
@@ -644,9 +645,9 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-1.5 mt-2">
-              <div className="bg-rose-950/20 border border-rose-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-rose-400">CRITICAL</div><div className="mono text-[11px] font-bold text-rose-300">{deviceStatus.offline}</div></div>
-              <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-amber-400">ELEVATED</div><div className="mono text-[11px] font-bold text-amber-300">{Math.max(0, deviceStatus.total - deviceStatus.online - deviceStatus.offline)}</div></div>
-              <div className="bg-emerald-950/20 border border-emerald-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-emerald-400">STABLE</div><div className="mono text-[11px] font-bold text-emerald-300">{deviceStatus.online}</div></div>
+              <div className="bg-rose-950/20 border border-rose-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-rose-400">CRITICAL</div><div className="mono text-[11px] font-bold text-rose-300">{deviceStatus?.offline ?? 0}</div></div>
+              <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-amber-400">ELEVATED</div><div className="mono text-[11px] font-bold text-amber-300">{Math.max(0, (deviceStatus?.total ?? 0) - (deviceStatus?.online ?? 0) - (deviceStatus?.offline ?? 0))}</div></div>
+              <div className="bg-emerald-950/20 border border-emerald-800/30 rounded-lg px-2 py-1 text-center"><div className="text-[9px] font-mono tracking-widest text-emerald-400">STABLE</div><div className="mono text-[11px] font-bold text-emerald-300">{deviceStatus?.online ?? 0}</div></div>
             </div>
           </div>
         );
@@ -660,9 +661,9 @@ export default function Dashboard() {
             </div>
             <PerfGauges metrics={metrics} deviceStatus={deviceStatus} />
             <div className="grid grid-cols-3 gap-1.5 mt-2 text-[10px]">
-              <StatCard label="อุปกรณ์ทั้งหมด" value={deviceStatus.total} icon={<Icon name="grid" size={10} />} />
-              <StatCard label="ออนไลน์" value={<span className="text-emerald-400">{deviceStatus.online}</span>} icon={<Icon name="check" size={10} className="text-emerald-400" />} />
-              <StatCard label="ออฟไลน์" value={<span className="text-rose-400">{deviceStatus.offline}</span>} icon={<Icon name="alert-triangle" size={10} className="text-rose-400" />} />
+              <StatCard label="อุปกรณ์ทั้งหมด" value={deviceStatus?.total ?? 0} icon={<Icon name="grid" size={10} />} />
+              <StatCard label="ออนไลน์" value={<span className="text-emerald-400">{deviceStatus?.online ?? 0}</span>} icon={<Icon name="check" size={10} className="text-emerald-400" />} />
+              <StatCard label="ออฟไลน์" value={<span className="text-rose-400">{deviceStatus?.offline ?? 0}</span>} icon={<Icon name="alert-triangle" size={10} className="text-rose-400" />} />
             </div>
           </div>
         );
@@ -728,7 +729,7 @@ export default function Dashboard() {
                   <div className="text-[9px] tracking-widest font-mono text-emerald-400/80 mb-2 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> AI THOUGHT STREAM · DeepSeek-R1</div>
                   <div className="space-y-1.5 font-mono text-[10px] leading-relaxed text-gray-400">
                     <div className="text-emerald-300">[08:14:22] fusing telemetry · bat {metrics.battery_soc != null ? metrics.battery_soc.toFixed(0) : '—'}% · tmp {metrics.temperature != null ? metrics.temperature.toFixed(1) : '—'}°C</div>
-                    <div>→ risk delta {overall != null ? `${overall}` : '—'}/100 · defcon {defconLevel || 5} · nodes {deviceStatus.online}/{deviceStatus.total}</div>
+                    <div>→ risk delta {overall != null ? `${overall}` : '—'}/100 · defcon {defconLevel || 5} · nodes {deviceStatus?.online ?? 0}/{deviceStatus?.total ?? 0}</div>
                     <div className="text-gray-500">→ inventory {inventoryStatus ? `${inventoryStatus.items} items, ${inventoryStatus.lowStock} low` : '—'} · farm {farmOverview ? `${farmOverview.growing} growing` : '—'}</div>
                     <div className="text-cyan-400/70">▌ reasoning: {threat?.summary ? threat.summary.slice(0, 92) : 'waiting for threat intel ...'}</div>
                   </div>
@@ -755,7 +756,7 @@ export default function Dashboard() {
             <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
               <AlertsPanel />
               <div className="log-stream space-y-1 text-[10px]">
-                <div className="flex gap-2 text-gray-500"><span className="text-emerald-400">[08:14:03]</span> telemetry heartbeat · node {deviceStatus.devices[0]?.node ?? '—'} online</div>
+                <div className="flex gap-2 text-gray-500"><span className="text-emerald-400">[08:14:03]</span> telemetry heartbeat · node {deviceStatus?.devices?.[0]?.node ?? '—'} online</div>
                 <div className="flex gap-2 text-gray-500"><span className="text-cyan-400">[08:13:51]</span> automation check · {Object.keys(metrics).length} metrics evaluated</div>
                 <div className="flex gap-2 text-gray-500"><span className="text-amber-400">[08:13:42]</span> threat sync · overall {overall ?? '—'} · defcon {defconLevel || 5}</div>
                 <div className="flex gap-2 text-gray-500"><span className="text-gray-400">[08:12:59]</span> inventory audit · {inventoryStatus ? `${inventoryStatus.expiring} expiring` : 'pending'}</div>
@@ -899,7 +900,7 @@ export default function Dashboard() {
               <h1 className="text-[18px] md:text-[20px] font-bold tracking-tight flex items-center gap-2 leading-none">
                 <span className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.14)]"><Icon name="dashboard" size={14} /></span>
                 <span className="glow-text">Dashboard</span>
-                <span className="hidden sm:inline text-[10px] font-normal tracking-widest text-gray-500 ml-1">· DENSE · {deviceStatus.online}/{deviceStatus.total} ONLINE · THREAT {overall ?? '—'}</span>
+                <span className="hidden sm:inline text-[10px] font-normal tracking-widest text-gray-500 ml-1">· DENSE · {deviceStatus?.online ?? 0}/{deviceStatus?.total ?? 0} ONLINE · THREAT {overall ?? '—'}</span>
               </h1>
               <p className="text-[11px] text-gray-500 mt-1 hidden md:block">สถานะบ้านทั้งระบบ — จัดเรียงแดชบอร์ด หรือ Ctrl/Cmd+K เพื่อค้นหาหน้า</p>
             </div>
@@ -927,10 +928,10 @@ export default function Dashboard() {
           <div className="grid grid-cols-12 gap-2.5 auto-rows-min">
             {/* Top ticker strip — dense mono */}
             <div className="col-span-12 bg-gray-900/60 border border-gray-800 rounded-xl px-2.5 py-1.5 flex flex-wrap gap-2 items-center text-[10px] font-mono backdrop-blur">
-              <span className="flex items-center gap-1.5 text-gray-400"><Icon name="cpu" size={11} className="text-emerald-400" /> {deviceStatus.total} DEVICES</span>
+              <span className="flex items-center gap-1.5 text-gray-400"><Icon name="cpu" size={11} className="text-emerald-400" /> {deviceStatus?.total ?? 0} DEVICES</span>
               <span className="w-px h-3 bg-gray-700" />
-              <span className="text-emerald-400">● {deviceStatus.online} ONLINE</span>
-              <span className="text-rose-400">● {deviceStatus.offline} OFFLINE</span>
+              <span className="text-emerald-400">● {deviceStatus?.online ?? 0} ONLINE</span>
+              <span className="text-rose-400">● {deviceStatus?.offline ?? 0} OFFLINE</span>
               <span className="w-px h-3 bg-gray-700" />
               <span className="text-gray-400">BAT {metrics.battery_soc != null ? metrics.battery_soc.toFixed(0) + '%' : '—'}</span>
               <span className="text-gray-600">·</span>
