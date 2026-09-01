@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { api } from '../lib/apiClient';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -205,11 +206,9 @@ export default function FarmPage() {
     setLoading(true);
     setError('');
     try {
-      const params = statusFilter !== 'ALL' ? `?status=${statusFilter}` : '';
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots${params}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await res.json();
-      setPlots(body.plots ?? []);
+      const q:any={}; if(statusFilter!=='ALL') q.status=statusFilter;
+      const body = await api.getObject<any>('/api/farm/plots', q);
+      setPlots(body?.plots ?? []);
     } catch (e: any) {
       setError(e.message || t('farm.page.loadFailed', 'โหลดข้อมูลไม่สำเร็จ'));
     } finally {
@@ -268,13 +267,7 @@ export default function FarmPage() {
       if (form.expected_harvest_at) body.expected_harvest_at = form.expected_harvest_at;
       if (form.notes) body.notes = form.notes;
 
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/farm/plots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('farm.page.saveFailed', 'บันทึกไม่สำเร็จ'));
+      await api.post('/api/farm/plots', body);
       setMessage(t('farm.page.added', 'เพิ่มแปลง "{name}" แล้ว', { name: form.name }));
       setForm(EMPTY_FORM);
       load();
