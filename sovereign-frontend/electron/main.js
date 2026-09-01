@@ -1,14 +1,13 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const fs = require('fs');
 
 let win;
-let backend;
 
 function createWindow(){
   win = new BrowserWindow({
     width: 1280, height: 800,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') },
     icon: path.join(__dirname, '../public/icon.png'),
     title: 'Sovereign OS'
   });
@@ -17,10 +16,19 @@ function createWindow(){
 }
 
 app.whenReady().then(()=>{
-  // try to ensure backend is running (docker compose up if needed)
-  // for now just open window, backend is expected via Docker Desktop
+  app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   createWindow();
   app.on('activate', ()=> { if(BrowserWindow.getAllWindows().length===0) createWindow(); });
+}
+
+ipcMain.handle('sovereign:pickFile', async ()=> {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'All', extensions: ['*'] }] });
+  if(r.canceled) return null;
+  const fp = r.filePaths[0];
+  try{ const data = fs.readFileSync(fp); return { path: fp, size: data.length, name: path.basename(fp) }; }catch(e){ return { path: fp, error: e.message }; }
+});
+ipcMain.handle('sovereign:readDir', async (_e, dir)=> {
+  try{ const list = fs.readdirSync(dir || 'C:\\', { withFileTypes: true }); return list.map(d=>({ name:d.name, isDir:d.isDirectory() })).slice(0,200); }catch(e){ return { error: e.message }; }
 });
 
 app.on('window-all-closed', ()=>{
