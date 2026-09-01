@@ -515,12 +515,13 @@ router.post('/voice-command', authenticate, async (req, res) => {
   });
 
   // POST /api/ai/voice-history — เก็บประวัติเสียง (frontend ส่งมาหลัง parse สำเร็จ)
-  const voiceHistoryMem:any[]=[]; try{const f=require('fs');const pp='/tmp/voice_history.json';if(f.existsSync(pp)) voiceHistoryMem.push(...JSON.parse(f.readFileSync(pp,'utf8')).slice(0,200));}catch{}
+  const voiceHistoryMem:any[]=[]; const voiceHistoryPath='/app/data/voice_history.json';
+  try{const f=require('fs'); if(f.existsSync(voiceHistoryPath)) voiceHistoryMem.push(...JSON.parse(f.readFileSync(voiceHistoryPath,'utf8')).slice(0,200)); else if(f.existsSync('/tmp/voice_history.json')) voiceHistoryMem.push(...JSON.parse(f.readFileSync('/tmp/voice_history.json','utf8')).slice(0,200));}catch{}
   router.post('/voice-history', authenticate, async (req, res) => {
     const {text,intent,entities}=req.body||{} as any;
     const row={id:Date.now().toString(),text,intent,entities,user_id:(req as any).user?.id||(req as any).user?.userId,created_at:new Date().toISOString()};
     voiceHistoryMem.unshift(row); if(voiceHistoryMem.length>200) voiceHistoryMem.pop();
-    try{require('fs').writeFileSync('/tmp/voice_history.json',JSON.stringify(voiceHistoryMem.slice(0,200)));}catch{}
+    try{const f=require('fs'); f.mkdirSync('/app/data',{recursive:true}); f.writeFileSync(voiceHistoryPath,JSON.stringify(voiceHistoryMem.slice(0,200)));}catch{} try{require('fs').writeFileSync('/tmp/voice_history.json',JSON.stringify(voiceHistoryMem.slice(0,200)));}catch{}
     res.json({success:true,row});
   });
   router.get('/voice-history', authenticate, async (req,res)=>{

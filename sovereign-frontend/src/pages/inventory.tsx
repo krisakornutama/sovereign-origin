@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { api } from '../lib/apiClient';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -93,14 +94,9 @@ export default function InventoryPage() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams();
-      if (category !== 'ALL') params.set('category', category);
-      if (status !== 'ALL') params.set('status', status);
-      if (lowOnly) params.set('low', 'true');
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory?${params}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await res.json();
-      setItems(body.items ?? []);
+      const q: Record<string,string>={}; if(category!=='ALL') q.category=category; if(status!=='ALL') q.status=status; if(lowOnly) q.low='true';
+      const body = await api.getObject<any>('/api/inventory', q as any);
+      setItems(body?.items ?? []);
     } catch (e: any) {
       setError(e.message || t('inventory.page.loadFailed', 'โหลดข้อมูลไม่สำเร็จ'));
     } finally {
@@ -153,13 +149,7 @@ export default function InventoryPage() {
       if (form.shelf_life_days) body.shelf_life_days = Number(form.shelf_life_days);
       if (form.minimum_stock) body.minimum_stock = Number(form.minimum_stock);
 
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('inventory.page.saveFailed', 'บันทึกไม่สำเร็จ'));
+      const data = await api.post<any>('/api/inventory', body);
       setMessage(t('inventory.page.added', 'เพิ่ม "{name}" แล้ว', { name: form.name }));
       setForm(EMPTY_FORM);
       load();
@@ -248,8 +238,7 @@ export default function InventoryPage() {
   const remove = async (item: InventoryItem) => {
     if (!window.confirm(t('inventory.page.deleteConfirm', 'ลบ "{name}" ออกจากสต็อก?', { name: item.name }))) return;
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(t('inventory.page.deleteFailed', 'ลบไม่สำเร็จ'));
+      await api.del(`/api/inventory/${item.id}`);
       setMessage(t('inventory.page.deleted', 'ลบ "{name}" แล้ว', { name: item.name }));
       load();
     } catch (e: any) {
@@ -260,13 +249,7 @@ export default function InventoryPage() {
   const moveToWaste = async (item: InventoryItem) => {
     if (!window.confirm(t('inventory.waste.confirm', 'ย้าย "{name}" ไปหมัก (move-to-waste)?', { name: item.name }))) return;
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/${item.id}/move-to-waste`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'expired' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('inventory.waste.failed', 'ย้ายไปหมักไม่สำเร็จ'));
+      await api.post(`/api/inventory/${item.id}/move-to-waste`, { reason: 'expired' });
       setMessage(t('inventory.waste.moved', 'ย้าย "{name}" ไปหมักแล้ว', { name: item.name }));
       load();
     } catch (e: any) {

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { api } from '../lib/apiClient';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -140,12 +141,11 @@ export default function HealthPage() {
 
   const loadReadings = async () => {
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/readings?limit=40`);
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await api.getObject<any>('/api/health/readings', { limit: 40 } as any);
+      if(!data) return;
       setReadings(data.rows ?? []);
       setVitalAnalysis(data.analysis ?? {});
-    } catch { /* ไม่บังคับ */ }
+    } catch { /* เงียบไว้ ไม่ต้องแจ้ง */ }
   };
 
   const addReading = async () => {
@@ -189,8 +189,8 @@ export default function HealthPage() {
   };
 
   const load = async () => {
-    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/overview`);
-    const data = await res.json();
+    const data = await api.getObject<any>('/api/health/overview');
+    if(!data) return;
     setCounts(data.counts || []);
     setObservations(data.observations || []);
     setFlags(data.flags || []);
