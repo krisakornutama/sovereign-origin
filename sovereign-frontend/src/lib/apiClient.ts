@@ -1,5 +1,6 @@
 import { authFetch } from './apiFetch';
 import { fetchJsonArray, fetchJsonObject, asArray, asObject } from './fetchJson';
+import { getApiUrl } from './config';
 
 // ── Centralized typed API client — deprecates raw `${process.env.NEXT_PUBLIC_API_URL}/api/...` ──
 // Usage: `api.getArray<MenuItem>('/restaurant/menus?restaurantId=xxx')` guarantees array, never throws into render
@@ -14,23 +15,24 @@ function toQuery(q?: Query): string {
   return s ? `?${s}` : '';
 }
 
+function abs(path: string): string { const base = getApiUrl().replace(/\/$/, ''); return `${base}${path.startsWith('/') ? path : '/' + path}`; }
 export const api = {
-  getArray: <T>(path: string, query?: Query) => fetchJsonArray<T>(`${path}${toQuery(query)}`),
-  getObject: <T>(path: string, query?: Query) => fetchJsonObject<T>(`${path}${toQuery(query)}`),
+  getArray: <T>(path: string, query?: Query) => fetchJsonArray<T>(`${abs(path)}${toQuery(query)}`),
+  getObject: <T>(path: string, query?: Query) => fetchJsonObject<T>(`${abs(path)}${toQuery(query)}`),
   post: <T>(path: string, body?: unknown) =>
-    authFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => {
+    authFetch(abs(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((data as any).error || `HTTP ${r.status}`);
       return data as T;
     }),
   put: <T>(path: string, body?: unknown) =>
-    authFetch(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => {
+    authFetch(abs(path), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((data as any).error || `HTTP ${r.status}`);
       return data as T;
     }),
   del: <T>(path: string) =>
-    authFetch(path, { method: 'DELETE' }).then(async (r) => {
+    authFetch(abs(path), { method: 'DELETE' }).then(async (r) => {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((data as any).error || `HTTP ${r.status}`);
       return data as T;
