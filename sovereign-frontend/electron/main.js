@@ -19,7 +19,7 @@ app.whenReady().then(()=>{
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   createWindow();
   app.on('activate', ()=> { if(BrowserWindow.getAllWindows().length===0) createWindow(); });
-}
+});
 
 ipcMain.handle('sovereign:pickFile', async ()=> {
   const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'All', extensions: ['*'] }] });
