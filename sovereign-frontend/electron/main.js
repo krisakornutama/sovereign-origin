@@ -26,10 +26,16 @@ function createWindow(){
 
 function startBackend(){
   try{
-    const coreApiPath = path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
+    const isPackaged = app.isPackaged;
+    const coreApiPath = isPackaged
+      ? path.join(process.resourcesPath, 'core-api/dist/server.js')
+      : path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
+    const cwd = isPackaged ? path.join(process.resourcesPath, 'core-api') : path.join(__dirname, '../../sovereign-os/core-api');
     if(fs.existsSync(coreApiPath)){
-      backend = spawn('node', [coreApiPath], { env: { ...process.env, DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db'), PORT: '3001' }, stdio: 'inherit', cwd: path.join(__dirname, '../../sovereign-os/core-api') });
+      backend = spawn('node', [coreApiPath], { env: { ...process.env, DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db'), PORT: '3001' }, stdio: 'inherit', cwd });
       backend.on('error', e=> console.error('backend spawn error', e.message));
+    } else {
+      console.error('coreApi not found at', coreApiPath);
     }
   }catch(e){ console.error('startBackend failed', e.message); }
 }
