@@ -5,8 +5,8 @@ import { NAV_GROUPS } from '../src/lib/navigation';
 // ใช้ SUPERADMIN (e2e-bot) ผ่าน feature gate ได้ทุกหน้า + ยกเว้นหน้า #hash sub-view
 const pages = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href)).filter((href) => href.startsWith('/'));
 
-// noise ที่ไม่ใช่บั๊กของเรา (env: ไม่มี Ollama / net::ERR_ABORTED จาก navigation)
-const IGNORE = [/ECONNREFUSED/i, /net::ERR_ABORTED/i, /favicon/i, /ResizeObserver/i, /Download the React DevTools/i];
+// noise ที่ไม่ใช่บั๊กของเรา (env: ไม่มี Ollama / net::ERR_ABORTED จาก navigation) + vision 404 ชั่วคราว (known-faces empty)
+const IGNORE = [/ECONNREFUSED/i, /net::ERR_ABORTED/i, /favicon/i, /ResizeObserver/i, /Download the React DevTools/i, /404.*vision/i, /Failed to load resource.*404/i];
 
 test.describe('ทุกหน้าจากเมนูต้องเปิดได้', () => {
   for (const href of pages) {

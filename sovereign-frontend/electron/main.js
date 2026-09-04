@@ -11,15 +11,9 @@ function createWindow(){
     icon: path.join(__dirname, '../public/icon.png'),
     title: 'Sovereign OS'
   });
-  const outPath = path.join(__dirname, '../out/index.html');
-  if(fs.existsSync(outPath)){
-    win.loadFile(outPath);
-  } else {
-    win.loadURL('http://localhost:3000');
-  }
+  win.loadURL('http://localhost:3000');
   win.webContents.on('did-fail-load', (_e, code, desc, url)=>{
     console.error('load failed', code, desc, url);
-    if(url.startsWith('http://localhost:3000') && fs.existsSync(outPath)) win.loadFile(outPath);
   });
   win.on('closed', ()=> win=null);
 }
