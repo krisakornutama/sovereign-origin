@@ -7,19 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  SUPERADMIN
-  NODE_ADMIN
-  OPERATOR
-  SYSTEM_AI
-  KID // ลูก/สมาชิกในครอบครัว (มีอยู่ใน DB จริงแล้ว — สอดคล้องกับ teach-kids)
-}
 
 model User {
   id                   String  @id @default(uuid())
   username             String  @unique
   password_hash        String
-  role                 Role    @default(OPERATOR)
+  role                 String    @default("OPERATOR")
   mfa_secret           String?
   // MFA ใหม่ที่รอ confirm (ตั้งค่าแล้วยังไม่ activate — ต้องกรอกรหัสจากแอปยืนยันก่อน)
   pending_mfa_secret   String?
@@ -63,7 +56,7 @@ model Node {
   admins    User[]            @relation("NodeAdmins")
   devices   Device[]
   relays    Relay[]
-  telemetry SensorTelemetry[]
+  
 
   @@map("nodes")
 }
@@ -125,29 +118,23 @@ model AuditLog {
 }
 
 model SensorTelemetry {
+  id        String @id @default(uuid())
   time      DateTime
   node_id   String  
   device_id String
   metric    String
   value     Float
 
-  node Node @relation(fields: [node_id], references: [id])
-
   @@map("sensor_telemetry")
   
 }
 
-enum AssetType {
-  CRYPTO
-  STOCK
-  COMMODITY
-}
 
 model AssetPosition {
   id                          String    @id @default(uuid())
   user_id                     String    // เจ้าของพอร์ต — สมาชิกแต่ละคนมีพอร์ตแยก
   symbol                      String
-  type                        AssetType // CRYPTO | STOCK | COMMODITY
+  type                        String // CRYPTO | STOCK | COMMODITY
   quantity                    Float     @default(0)
   wallet_address              String?
   notes                       String?
@@ -398,7 +385,7 @@ model AutomationAlert {
 model AssetPrice {
   time      DateTime 
   symbol    String
-  type      AssetType
+  type      String
   price_usd Float
   source    String // "binance" | "stooq" | ...
 
@@ -505,28 +492,13 @@ model FarmSoilReading {
 // ─────────────────────────────────────────────────────────────
 // Phase 5: Ambient Conversational Health Screening
 // ─────────────────────────────────────────────────────────────
-enum HealthCategory {
-  URINATION
-  SLEEP
-  APPETITE
-  FATIGUE
-  FEVER
-  DIGESTION
-  MOOD
-  OTHER
-}
 
-enum HealthFlagStatus {
-  PENDING
-  CLEARED
-  ADDRESSED
-}
 
 // อาการที่ดักจับได้ (จากเซ็นเซอร์ / บทสนทนา / ผู้ใช้กรอกเอง) — ต่อคน
 model HealthObservation {
   id          String         @id @default(uuid())
   user_id     String?       
-  category    HealthCategory
+  category    String
   detail      String? // เช่น "เข้าห้องน้ำ 3 ครั้งกลางดึก"
   source      String         @default("conversation") // manual | sensor | conversation
   severity    Int            @default(1) // 1-5
@@ -545,8 +517,8 @@ model HealthFlag {
   id         String           @id @default(uuid())
   user_id    String?         
   flag_type  String // CHECK_URINATION, CHECK_SLEEP, ...
-  category   HealthCategory
-  status     HealthFlagStatus @default(PENDING)
+  category   String
+  status     String @default("PENDING")
   note       String?
   created_at DateTime         @default(now())
   cleared_at DateTime?       
@@ -590,17 +562,11 @@ model HealthProfile {
 // Phase 6: Health Reading Tracker — ค่าที่วัดด้วยมือ + AI วิเคราะห์แนวโน้ม
 // type: WEIGHT (kg) | BP (systolic/diastolic) | SUGAR (mg/dL) | TEMP (°C)
 // ─────────────────────────────────────────────────────────────
-enum HealthReadingType {
-  WEIGHT
-  BP
-  SUGAR
-  TEMP
-}
 
 model HealthReading {
   id          String            @id @default(uuid())
   user_id     String?          
-  type        HealthReadingType
+  type        String
   value       Float // น้ำหนัก kg | น้ำตาล mg/dL | อุณหภูมิ °C ; BP = ค่า systolic
   systolic    Int? // BP เท่านั้น
   diastolic   Int? // BP เท่านั้น
@@ -783,18 +749,18 @@ model KidProfile {
   emoji               String? // อวตาร เช่น 🧒 👧
   color               String? // สีเน้นใน UI
   // ค่าขนมรายสัปดาห์อัตโนมัติ: day = 0 (อาทิตย์)…6 (เสาร์), amount = บาท, last_paid = กันจ่ายซ้ำ
-  allowance_day       Int?      @db.Integer
-  allowance_amount    Int?      @db.Integer
+  allowance_day       Int?     
+  allowance_amount    Int?     
   allowance_last_paid DateTime?
   // PIN ส่วนตัวของลูก (bcrypt hash) — บังคับก่อนทำงานเสร็จ/แลกคูปอง ให้เด็กทำเองได้
   pin_hash            String?
   // เป้าหมายออมรายเดือน (บาท) — เทียบกับยอดฝากเข้ากระปุกในเดือนนั้น
-  savings_goal        Int?      @db.Integer
+  savings_goal        Int?     
   // เป้าหมายระยะยาวของถังสะสมแต้ม เช่น "ซื้อจักรยาน 500฿" + ETA
   piggy_target_title  String?
-  piggy_target_amount Int?      @db.Integer
+  piggy_target_amount Int?     
   // ระดับ/ดาว — XP สะสมจากการเรียน (คะแนน*10) + ทำงานบ้าน (รางวัล) → เลื่อนระดับ + เกียรติบัตรอัตโนมัติ
-  xp                  Int       @default(0) @db.Integer
+  xp                  Int       @default(0)
   // โหมดเงิน: play = เงินจำลอง (หัดเล่น) | real = เงินจริงที่พ่อแม่มอบหมายให้ลูกบริหาร
   money_mode          String    @default("play")
   // นโยบายการลงทุนของพ่อแม่ เช่น "ลูกต้องเก็บ 20% ของรายได้เข้าถังและลงทุนเสมอ"
@@ -961,7 +927,7 @@ model KidCoupon {
 model KidCertificate {
   id         String   @id @default(uuid())
   kid_id     String  
-  level      Int      @db.Integer // ระดับที่ได้รับ (subject = 0)
+  level      Int      // ระดับที่ได้รับ (subject = 0)
   kind       String   @default("level") // level = เลื่อนระดับจาก XP | subject = จบสาขาหลักสูตร
   title      String // เช่น "เกียรติบัตรระดับ 2 — นักเรียนเก่งแห่งบ้าน" / "เกียรติบัตรจบสาขา ..."
   detail     String?
@@ -1012,7 +978,7 @@ model CurriculumTrack {
   description String?
   emoji       String           @default("🎓")
   color       String           @default("#10b981")
-  sort_order  Int              @default(0) @db.Integer
+  sort_order  Int              @default(0)
   created_at  DateTime         @default(now())
 
   items CurriculumItem[]
@@ -1026,8 +992,8 @@ model CurriculumItem {
   track_id    String              
   title       String // ชื่อบทเรียน เช่น "ตั้งเป้าหมายออมเดือนนี้"
   description String?
-  stage       Int                  @default(1) @db.Integer // 1 เริ่มต้น · 2 พื้นฐาน · 3 ประยุกต์ · 4 เชี่ยวชาญ
-  sequence    Int                  @default(1) @db.Integer // ลำดับในสาขา
+  stage       Int                  @default(1) // 1 เริ่มต้น · 2 พื้นฐาน · 3 ประยุกต์ · 4 เชี่ยวชาญ
+  sequence    Int                  @default(1) // ลำดับในสาขา
   created_at  DateTime             @default(now())
 
   track    CurriculumTrack     @relation(fields: [track_id], references: [id], onDelete: Cascade)

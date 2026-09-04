@@ -11,12 +11,31 @@ function createWindow(){
     icon: path.join(__dirname, '../public/icon.png'),
     title: 'Sovereign OS'
   });
-  win.loadURL('http://localhost:3000');
+  const outPath = path.join(__dirname, '../out/index.html');
+  if(fs.existsSync(outPath)){
+    win.loadFile(outPath);
+  } else {
+    win.loadURL('http://localhost:3000');
+  }
+  win.webContents.on('did-fail-load', (_e, code, desc, url)=>{
+    console.error('load failed', code, desc, url);
+    if(url.startsWith('http://localhost:3000') && fs.existsSync(outPath)) win.loadFile(outPath);
+  });
   win.on('closed', ()=> win=null);
 }
 
+function startBackend(){
+  try{
+    const coreApiPath = path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
+    if(fs.existsSync(coreApiPath)){
+      backend = spawn('node', [coreApiPath], { env: { ...process.env, DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db'), PORT: '3001' }, stdio: 'inherit', cwd: path.join(__dirname, '../../sovereign-os/core-api') });
+      backend.on('error', e=> console.error('backend spawn error', e.message));
+    }
+  }catch(e){ console.error('startBackend failed', e.message); }
+}
 app.whenReady().then(()=>{
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
+  startBackend();
   createWindow();
   app.on('activate', ()=> { if(BrowserWindow.getAllWindows().length===0) createWindow(); });
 });
