@@ -140,3 +140,11 @@ sovereign-os/core-api/models/*.bin
 
 frontend-watchdog.mjs
 
+# ── Desktop dist (rebuildable — ไม่ commit binaries ใหญ่) ──
+dist-portable/_backup/
+dist-portable/Sovereign OS.exe
+dist-portable/resources/app.asar
+dist-portable/resources/default_app.asar
+dist-portable/resources/core-api/prisma/**/*.db
+dist-portable/LICENSE
+dist-portable/version

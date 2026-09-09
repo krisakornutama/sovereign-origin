@@ -1,0 +1,7 @@
+{
+  "name": "sovereign-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron/main.js",
+  "_comment": "Overlay fix: Electron loads resources/app BEFORE app.asar — tiered loading (dashboard → launcher → offline) + one-click start"
+}
