@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld('sovereign', {
   // สถานะระบบ + ปุ่มควบคุม (หน้า offline)
   getStatus: () => ipcRenderer.invoke('sovereign:getStatus'),
   startSystem: () => ipcRenderer.invoke('sovereign:startSystem'),
+  isAutoStarted: () => ipcRenderer.invoke('sovereign:isAutoStarted'),
   openExternal: (url) => ipcRenderer.invoke('sovereign:openExternal', url),
   retryDashboard: () => ipcRenderer.invoke('sovereign:retryDashboard'),
   onStatus: (cb) => ipcRenderer.on('sovereign:status', (_e, st) => cb(st)),
+  onAutostart: (cb) => ipcRenderer.on('sovereign:autostart', (_e, r) => cb(r)),
 });
