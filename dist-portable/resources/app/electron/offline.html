@@ -77,9 +77,9 @@
 
     <div class="card" style="margin-top:14px">
       <div class="hint">
-        • กด <b style="color:var(--text)">🚀 เริ่มระบบทั้งหมด</b> แล้วรอ 1–2 นาที — หน้านี้จะพาเข้า Dashboard เองเมื่อพร้อม<br>
-        • ถ้ายังไม่ขึ้น เปิด Docker Desktop ก่อน แล้วกดเริ่มระบบอีกครั้ง<br>
-        • ตรวจสถานะทุก 3 วินาทีอัตโนมัติ — ไม่ต้องกดรีเฟรช
+        • เปิดโปรแกรมมาตอนระบบดับ → จะ<b style="color:var(--text)">เริ่มระบบให้เองอัตโนมัติ</b> รอ 1–2 นาทีแล้วเข้า Dashboard เอง<br>
+        • ถ้า Docker ยังไม่เปิด โปรแกรมจะเปิด Docker Desktop ให้เองแล้วรอจนพร้อม<br>
+        • ปุ่มด้านล่างไว้กดมือได้ ถ้าอยากเริ่มเอง / ตรวจสถานะทุก 3 วินาที — ไม่ต้องกดรีเฟรช
       </div>
     </div>
   </div>
@@ -87,6 +87,19 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let starting = false;
+
+    // one-click: เชลล์เริ่มระบบให้เองตอนบูต → ล็อกปุ่มไว้เลย ไม่ให้กดซ้ำ
+    try {
+      window.sovereign.isAutoStarted().then((auto) => {
+        if (auto) { starting = true; $('btnStart').disabled = true; $('btnStart').textContent = '⏳ กำลังเริ่มระบบอัตโนมัติ…'; }
+      }).catch(() => {});
+      window.sovereign.onAutostart((r) => {
+        starting = true;
+        $('btnStart').disabled = true;
+        $('btnStart').textContent = '⏳ กำลังเริ่มระบบอัตโนมัติ…';
+        if (r && r.message) showMsg(r.message, r.ok !== false);
+      });
+    } catch { /* ignore */ }
 
     function setRow(key, on, waiting) {
       const d = $('d-' + key), v = $('v-' + key);
@@ -104,7 +117,7 @@
       } else if (starting) {
         $('headline').innerHTML = 'กำลังเริ่มระบบ <span class="spin"></span>';
       } else {
-        $('headline').innerHTML = 'ระบบยังไม่ทำงาน — กดปุ่มด้านล่างเพื่อเริ่ม';
+        $('headline').innerHTML = 'ระบบยังไม่ทำงาน — กำลังเริ่มให้อัตโนมัติ…';
       }
     }
 
