@@ -163,15 +163,23 @@ function dockerEngineUp() {
 }
 
 // ถ้า engine ยังไม่ขึ้น → เปิด Docker Desktop เอง แล้วรอได้สูงสุด ~3 นาที
+// หมายเหตุ: docker info สำเร็จ = pipe ขึ้นแล้ว แต่ engine อาจยัง init อยู่ → เช็คซ้ำหลังพักก่อนคืนค่า
 async function ensureDockerEngine() {
-  if (await dockerEngineUp()) return true;
+  const settled = async () => {
+    if (!(await dockerEngineUp())) return false;
+    await new Promise((r) => setTimeout(r, 6000));
+    const ok = await dockerEngineUp();
+    if (ok) dlog('autostart: engine settled');
+    return ok;
+  };
+  if (await settled()) return true;
   const exe = DOCKER_DESKTOP_CANDIDATES.find((p) => { try { return !!p && fs.existsSync(p); } catch { return false; } });
   if (!exe) { dlog('autostart: docker engine down, Docker Desktop not found'); return false; }
   dlog('autostart: engine down — launching Docker Desktop:', exe);
   try { spawn(exe, [], { detached: true, windowsHide: true, stdio: 'ignore' }).unref(); } catch (e) { dlog('docker desktop spawn error', e.message); return false; }
   for (let tries = 0; tries < 60; tries++) {
     await new Promise((r) => setTimeout(r, 3000));
-    if (await dockerEngineUp()) { dlog('autostart: docker engine up after', (tries + 1) * 3, 's'); return true; }
+    if (await settled()) { dlog('autostart: docker engine up after', (tries + 1) * 3, 's'); return true; }
   }
   return false;
 }
@@ -194,7 +202,7 @@ async function startSystem() {
       cwd: found.cwd, detached: true, windowsHide: true, stdio: 'ignore',
     });
     child.unref();
-    dlog('startSystem: launched', found.bat);
+    dlog('startSystem: launched', found.bat, 'engineSettled=true');
     return { ok: true, message: 'กำลังเริ่มระบบ — รอ 1–2 นาที หน้านี้จะพาเข้า Dashboard เองเมื่อพร้อม' };
   } catch (e) {
     dlog('startSystem error:', e.message);

@@ -44,9 +44,17 @@ if %errorlevel% neq 0 set "COMPOSE_CMD=docker-compose"
 :: ============ [1/3] เริ่ม Docker containers ============
 call :note "== [1/3] เริ่ม Docker containers (TimescaleDB + EMQX + Core API) =="
 cd /d "%ROOT%\sovereign-os\infra"
+set /a compose_tries=0
+:compose_retry
+set /a compose_tries+=1
 %COMPOSE_CMD% up -d timescaledb emqx core-api
 if %errorlevel% neq 0 (
-    call :note "[ERROR] เริ่ม container ไม่สำเร็จ — ดู: docker compose logs"
+    if %compose_tries% lss 3 (
+        call :note "  - compose ยังไม่สำเร็จ ครั้งที่ !compose_tries! — รอ 10 วิ แล้วลองใหม่ (engine เพิ่งบูตอาจยัง init อยู่)"
+        timeout /t 10 /nobreak >nul 2>&1
+        goto :compose_retry
+    )
+    call :note "[ERROR] เริ่ม container ไม่สำเร็จหลัง 3 ครั้ง — ดู: docker compose logs"
     pause
     exit /b 1
 )
@@ -77,8 +85,8 @@ powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://localho
 if %errorlevel% equ 0 goto :frontend_wait
 set /a count+=3
 title Sovereign OS - กำลังเริ่ม... ผ่านไป !count! วินาที
-if %count% geq 90 (
-    call :note "[ERROR] Backend ไม่พร้อมใน 90 วินาที — ดู: docker logs sovereign-core-api"
+if %count% geq 240 (
+    call :note "[ERROR] Backend ไม่พร้อมใน 240 วินาที — ดู: docker logs sovereign-core-api"
     pause
     exit /b 1
 )
