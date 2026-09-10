@@ -1,16 +1,23 @@
-// สร้าง precache manifest หลัง `next build` — สแกน .next/static (js/css chunks)
+// สร้าง precache manifest หลัง `next build` — สแกน static chunks (js/css)
 // แล้วเขียน public/sw-precache.json ให้ service worker ดึงไป precache ตอน install
-// เรียกจาก package.json: "build": "next build && node scripts/generate-sw-precache.mjs"
+// เรียกจาก package.json: "build" (server → .next/static) หรือ "build:static" (export → out/_next/static)
 import fs from 'fs';
 import path from 'path';
 
-const nextStatic = path.join(process.cwd(), '.next', 'static');
+const candidates = [
+  path.join(process.cwd(), '.next', 'static'),   // server build (`next start`)
+  path.join(process.cwd(), 'out', '_next', 'static'), // static export (desktop shell)
+];
+const nextStatic = candidates.find((p) => fs.existsSync(p));
+if (!nextStatic) {
+  console.error('[SW] ไม่พบ static chunks (.next/static และ out/_next/static) — เรียกหลัง next build เท่านั้น');
+  process.exit(1);
+}
 const outFile = path.join(process.cwd(), 'public', 'sw-precache.json');
 
 const urls = [];
 
 function walk(dir, base = '') {
-  if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const rel = path.join(base, entry.name).replace(/\\/g, '/');
     if (entry.isDirectory()) {

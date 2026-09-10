@@ -22,8 +22,15 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: [guard] ถ้าเครื่องมี MAIN installation ให้รัน compose/frontend จาก MAIN เสมอ
+:: เหตุผล: compose จาก worktree จะ mount PGDATA ไปที่ data/pg ของ worktree (ว่าง)
+:: ทำให้ตาราง users หายทั้งหมด — incident 2026-09-09
+set "ROOT=%~dp0"
+if exist "E:\My work\Project Sovereign Origin\sovereign-os\infra\docker-compose.yml" set "ROOT=E:\My work\Project Sovereign Origin"
+call :note "  - ROOT = %ROOT%"
+
 :: ============ ตรวจสอบว่า setup ครั้งแรกแล้วหรือยัง ============
-if not exist "%~dp0sovereign-os\infra\.env" (
+if not exist "%ROOT%\sovereign-os\infra\.env" (
     call :note "[ERROR] ยังไม่พบ infra\.env — ให้รัน setup-first-time.bat ก่อนครั้งแรก"
     pause
     exit /b 1
@@ -36,26 +43,59 @@ if %errorlevel% neq 0 set "COMPOSE_CMD=docker-compose"
 
 :: ============ [1/3] เริ่ม Docker containers ============
 call :note "== [1/3] เริ่ม Docker containers (TimescaleDB + EMQX + Core API) =="
-cd /d "%~dp0sovereign-os\infra"
+cd /d "%ROOT%\sovereign-os\infra"
+set /a compose_tries=0
+:compose_retry
+set /a compose_tries+=1
 %COMPOSE_CMD% up -d timescaledb emqx core-api
 if %errorlevel% neq 0 (
-    call :note "[ERROR] เริ่ม container ไม่สำเร็จ — ดู: docker compose logs"
+    if %compose_tries% lss 3 (
+        call :note "  - compose ยังไม่สำเร็จ ครั้งที่ !compose_tries! — รอ 10 วิ แล้วลองใหม่ (engine เพิ่งบูตอาจยัง init อยู่)"
+        timeout /t 10 /nobreak >nul 2>&1
+        goto :compose_retry
+    )
+    call :note "[ERROR] เริ่ม container ไม่สำเร็จหลัง 3 ครั้ง — ดู: docker compose logs"
     pause
     exit /b 1
 )
 call :note "  - containers พร้อมแล้ว"
 
-:: ============ [2/3] เริ่ม Frontend (ถ้ายังไม่มีรันอยู่) ============
-call :note "== [2/3] เริ่ม Frontend =="
-powershell -NoProfile -Command "$c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if ($c) { exit 0 } else { exit 1 }" >nul 2>&1
+:: ============ [2/3] เริ่ม Frontend (production `next start` เช็คด้วย HTTP จริง) ============
+:: เช็คด้วย HTTP จริง ไม่ใช่แค่พอร์ต — พอร์ตมีคนฟังแต่ไม่ตอบ = frontend ค้าง ต้องล้างแล้วเริ่มใหม่
+:: pin พอร์ต 3000 เสมอ กัน env PORT หลุดไป bind พอร์ตอื่น | หน้าต่าง /min ย่อไว้ดู error ได้ถ้าพัง
+:: production: `next start` ให้บริการ build ใน .next (เร็ว + เบากว่า dev มาก ไม่ compile ตอนเปิด)
+:: build ล้าสมัย (src/ ใหม่กว่า .next) → build ใหม่ให้อัตโนมัติ | build ล้มเหลว → fallback กลับ dev mode
+call :note "== [2/3] เริ่ม Frontend (production) =="
+powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3000 -TimeoutSec 3 -UseBasicParsing; if ($r.StatusCode -ge 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
-    call :note "  - Frontend รันอยู่แล้วที่พอร์ต 3000 — ข้าม"
+    call :note "  - Frontend ตอบปกติที่ :3000 — ข้าม"
 ) else (
-    cd /d "%~dp0sovereign-frontend"
-    :: pin พอร์ต 3000 เสมอ - กัน env PORT หลุดมาแล้วไป bind พอร์ตอื่น
-    :: ใช้ /k เพื่อให้หน้าต่างค้าง ถ้า npm fail จะได้เห็น error ไม่ปิดหายเงียบ ๆ
-    start "Sovereign-Frontend" cmd /k "npm run dev -- -p 3000"
-    call :note "  - เปิดหน้าต่าง Frontend แล้ว (ใช้เวลา ~30 วินาทีในการพร้อม)"
+    call :note "  - ล้าง frontend ค้างบนพอร์ต 3000 ถ้ามี แล้วเริ่มใหม่"
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { taskkill /PID $_ /T /F 2>$null | Out-Null }" >nul 2>&1
+    timeout /t 2 >nul 2>&1
+    cd /d "%ROOT%\sovereign-frontend"
+    set "FE_MODE=prod"
+    REM ไม่มี build .next\BUILD_ID หรือซอร์ส src/ ใหม่กว่า build → build ใหม่ก่อนสตาร์ท
+    REM เช็คผ่าน exit code จาก powershell — กันวงเล็บใน for /f ที่ทำ bat parse พัง
+    REM exit 0 = build ใช้ได้ | ไม่ใช่ 0 = ไม่มี build หรือ mtime ไฟล์ใต้ src ใหม่กว่า BUILD_ID → build
+    powershell -NoProfile -Command "if (-not (Test-Path .next\BUILD_ID)) { exit 1 }; $s = (Get-ChildItem src -Recurse -File | Measure-Object LastWriteTimeUtc -Maximum).Maximum; if ($s -gt (Get-Item .next\BUILD_ID).LastWriteTimeUtc) { exit 1 }; exit 0" >nul 2>&1
+    if !errorlevel! neq 0 (
+        call :note "  - production build ไม่มีหรือล้าสมัย — npm run build ก่อน (ครั้งแรกอาจใช้เวลาหลายนาที)"
+        call npm run build >> "%LOG%" 2>&1
+        if !errorlevel! neq 0 (
+            call :note "[WARN] production build ล้มเหลว — กลับไปใช้ dev mode (hot reload) ดู log: start-sovereign.log"
+            set "FE_MODE=dev"
+        ) else (
+            call :note "  - production build เสร็จ"
+        )
+    )
+    if "!FE_MODE!"=="dev" (
+        start "Sovereign-Frontend" /min cmd /k "npm run dev -- -p 3000"
+    ) else (
+        set "PORT=3000"
+        start "Sovereign-Frontend" /min cmd /k "npm run start -- -p 3000"
+    )
+    call :note "  - เปิด Frontend แล้ว (production) โหลดครั้งแรกเร็ว — ถ้าเพิ่ง build จะช้าหน่อย"
 )
 
 :: ============ [3/3] รอ Backend พร้อมแล้วเปิด Dashboard ============
@@ -67,8 +107,8 @@ powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://localho
 if %errorlevel% equ 0 goto :frontend_wait
 set /a count+=3
 title Sovereign OS - กำลังเริ่ม... ผ่านไป !count! วินาที
-if %count% geq 90 (
-    call :note "[ERROR] Backend ไม่พร้อมใน 90 วินาที — ดู: docker logs sovereign-core-api"
+if %count% geq 240 (
+    call :note "[ERROR] Backend ไม่พร้อมใน 240 วินาที — ดู: docker logs sovereign-core-api"
     pause
     exit /b 1
 )
@@ -84,8 +124,8 @@ timeout /t 3 /nobreak >nul 2>&1
 powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://localhost:3000 -TimeoutSec 2; if ($r.StatusCode -ge 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 goto :ready
 set /a fcount+=3
-if %fcount% geq 90 (
-    call :note "[WARN] Frontend ยังไม่พร้อมใน 90 วิ — เปิด browser ไปก่อน (รีเฟรชใหม่ถ้ายังไม่ขึ้น)"
+if %fcount% geq 150 (
+    call :note "[WARN] Frontend ยังไม่พร้อมใน 150 วิ — เปิด browser ไปก่อน (รีเฟรชใหม่ถ้ายังไม่ขึ้น)"
     goto :ready
 )
 echo   ยังรอ Frontend... ผ่านไป !fcount! วินาที
