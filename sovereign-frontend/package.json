@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/generate-sw-precache.mjs",
+    "build:static": "node scripts/build-static.mjs && node scripts/generate-sw-precache.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
     "electron": "electron .",
-    "electron:build": "next build && electron-builder --win --x64"
+    "electron:build": "npm run build:static && electron-builder --win --x64"
   },
   "dependencies": {
     "@types/three": "^0.185.4",
@@ -25,10 +26,10 @@
     "appId": "com.sovereign.os",
     "productName": "Sovereign OS",
     "directories": { "output": "dist-electron" },
-    "files": ["electron/**/*", "out/**/*", "public/**/*", "package.json"],
-    "extraResources": [{ "from": "../sovereign-os/core-api/dist", "to": "core-api/dist" }, { "from": "../sovereign-os/core-api/prisma", "to": "core-api/prisma" }, { "from": "../sovereign-os/core-api/package.json", "to": "core-api/package.json" }],
-    "win": { "target": "nsis", "icon": "public/icon.png" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "files": ["electron/**/*", "public/**/*", "package.json"],
+    "extraResources": [{ "from": "../sovereign-os/core-api/dist", "to": "core-api/dist" }, { "from": "../sovereign-os/core-api/prisma", "to": "core-api/prisma" }, { "from": "../sovereign-os/core-api/package.json", "to": "core-api/package.json" }, { "from": "../sovereign-os/core-api/node_modules", "to": "core-api/node_modules" }, { "from": "out", "to": "out" }],
+    "win": { "target": ["portable", "zip"], "icon": "public/icon.png" },
+    "portable": { "artifactName": "Sovereign-OS-${version}-portable.${ext}" }
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
