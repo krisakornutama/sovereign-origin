@@ -119,6 +119,16 @@ router.post('/mfa/disable', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/auth/mfa/backup-codes — รหัสสำรองชุดใหม่ (ทับชุดเก่า; ต้องผ่าน MFA แล้วเท่านั้น)
+router.post('/mfa/backup-codes', authenticate, async (req, res) => {
+  try {
+    const result = await AuthService.regenerateBackupCodes(req.user!.id);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // GET /api/auth/mfa/status — MFA เปิด/ปิด หรือมี pending enrollment
 router.get('/mfa/status', authenticate, async (req, res) => {
   try {

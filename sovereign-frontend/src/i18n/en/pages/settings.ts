@@ -129,6 +129,11 @@ export default {
     manualEntry: 'Or enter this key in the app (manual entry):',
     codePh: '6-digit code from the app',
     howTo: 'Open Google Authenticator / Microsoft Authenticator → scan the QR (or + → enter the key manually) → 2FA is enabled only when the app code matches',
+    backupTitle: '8 backup codes (each usable once) — store them safely, this is the only time they are shown:',
+    backupRegen: 'Generate new backup codes',
+    backupRegenConfirm: 'Generate a new set of backup codes? (The old set becomes completely invalid)',
+    backupNew: 'New backup codes — store them well, they are shown only this once',
+    backupFailed: 'Failed to generate backup codes',
   },
   telegram: {
     title: 'Telegram Alerts',

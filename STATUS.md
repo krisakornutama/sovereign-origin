@@ -4,8 +4,14 @@
 
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
-- **สาขา:** freebuff/task-26201e6b (merge master 3c25866e แล้ว)
-- **ล่าสุด:** 2026-09-10 — cold-start hardening: production `next start` + overlay generate จากซอร์ส + รหัส admin
+- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว — merge 39841d0)
+- **ล่าสุด:** 2026-09-11 — merge เข้า master + MFA สมบูรณ์ (backup codes) + desktop pipeline E2E
+  - **Merge branch เข้า master (39841d0):** secret-scan commits ก่อนรวม (สะอาด), เช็คไฟล์ dirty ใน MAIN byte-identical กับ branch ก่อน reset, merge ไม่มี conflict — `npm run verify` หลัง merge ผ่าน 4/4 (backend build + 994 tests, frontend typecheck + build) — repo นี้ไม่มี git remote จึงไม่มี PR (merge local เท่านั้น)
+  - **MFA admin:** enroll + confirm ผ่าน API จริง → login รหัสผ่านอย่างเดียวโดน gate (`mfa_required:true`), password + TOTP → token เต็ม (`mfa_verified:true`) — QR/secret ส่งให้เจ้าของแล้ว (admin-mfa-qr.png / admin-mfa-secret.txt ที่ root — ไฟล์ลับถูก gitignore แล้ว ห้าม commit)
+  - **MFA backup codes (ใหม่):** เปิด MFA ครั้งแรกได้รหัสสำรอง 8 ตัว (ใช้ครั้งเดียวทิ้ง) เก็บเฉพาะ sha256 ใน `users.mfa_backup_hash` (migration 20260911000000); `/api/auth/verify-mfa` รับทั้ง TOTP และรหัสสำรอง; `/api/auth/mfa/backup-codes` ออกชุดใหม่ทับเก่า; ปิด MFA = ล้างรหัสสำรอง — พิสูจน์ E2E จริง: ใช้รหัส → 200, ใช้ซ้ำ → 400, TOTP ยังใช้ได้, regen แล้วชุดเก่าตาย, tests ผ่าน 7/7 — admin ได้รหัสสำรองแล้ว (แนบใน admin-mfa-secret.txt)
+  - **Desktop pipeline E2E:** `build:static` (out/ 176 assets) → `electron:build` (win-unpacked + portable + zip) → `build:desktop` (runtime + overlay sync 100% + sidecar) → เปิด exe ใหม่จริงได้ window "Sovereign OS" (path ยืนยันเป็น build ใหม่) — และ start-sovereign.bat พิสูจน์ตัวเอง: กู้ prod :3000 หลัง verify kill dev ให้ (เช็ค stale build + rebuild + next start อัตโนมัติ)
+  - **หมายเหตุ :3000:** frontend เป็น production `next start` ตาม bat ใหม่ / API อยู่ที่ core-api container :3001 (หน้าเว็บยิงตรงจาก browser — NEXT_PUBLIC_API_URL ฝังใน build)
+- **ก่อนหน้า:** 2026-09-10 — cold-start hardening: production `next start` + overlay generate จากซอร์ส + รหัส admin
   - **start-sovereign.bat:** เริ่ม frontend ด้วย production (`next start`) แทน dev — ถ้าไม่มี build หรือไฟล์ใต้ `src/` ใหม่กว่า `.next/BUILD_ID` → build ให้ก่อนอัตโนมัติ, build พัง → fallback dev mode (พิสูจน์แล้ว: `next start` ตอบ 200 ใน ~24ms จากที่ dev เคยกิน ~30 วิ)
   - **next.config.js:** `output:'export'` เป็น opt-in ผ่าน `SOVEREIGN_STATIC_EXPORT=1` (script `build:static` สำหรับ electron) — เพราะ export บังคับอยู่ทำให้ `next start` ใช้ไม่ได้เลย; `generate-sw-precache` รองรับทั้ง `.next/static` และ `out/_next/static`
   - **tools/build-desktop.mjs (ใหม่ → `npm run build:desktop`):** generate electron overlay (dist-portable/resources/app) + sidecar จากซอร์สเสมอ — เลิกก๊อปมือที่เคย drift, ตรวจ sync ทุกไฟล์ ไม่ตรง 100% = exit 1; overlay package.json ถูก generate จากซอร์ส (เติม main + ตัด scripts) — รันแล้วทั้ง MAIN และ worktree ผ่าน

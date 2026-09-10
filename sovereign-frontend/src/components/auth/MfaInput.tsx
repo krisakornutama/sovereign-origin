@@ -15,6 +15,8 @@ function formatCountdown(totalSec: number): string {
 
 export default function MfaInput() {
   const [digits, setDigits] = useState<string[]>(Array(DIGIT_COUNT).fill(''));
+  const [useBackup, setUseBackup] = useState(false);
+  const [backupCode, setBackupCode] = useState('');
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -101,6 +103,39 @@ export default function MfaInput() {
     }
   };
 
+  // โหมดรหัสสำรอง (10 hex ตัวอักษร-ตัวเลข) — ใช้ endpoint เดียวกับ TOTP; backend แยก format เอง
+  const submitBackup = async () => {
+    const normalized = backupCode.trim().toLowerCase();
+    if (submitting || locked || !/^[0-9a-f]{10}$/.test(normalized)) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify-mfa`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: normalized }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 429) {
+          const retryAfter = Number(res.headers.get('Retry-After') || 0);
+          if (retryAfter > 0) setCooldown(retryAfter);
+        }
+        throw new Error(data.error || t('login.otpInvalid', 'รหัส OTP ไม่ถูกต้อง'));
+      }
+      login(data.token);
+      setBackupCode('');
+      router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // auto-submit เมื่อครบ 6 หลัก (ดีเลย์นิดหน่อยให้ user เห็นตัวสุดท้าย)
   useEffect(() => {
     if (code.length !== DIGIT_COUNT) return;
@@ -156,6 +191,31 @@ export default function MfaInput() {
             )
           )}
 
+          {useBackup ? (
+            <div className="mt-6 space-y-3">
+              <p className="text-xs text-gray-500">{t('login.mfaBackupHint', 'กรอกรหัสสำรอง 10 ตัวที่เก็บไว้ (ใช้ได้ครั้งเดียว)')}</p>
+              <input
+                type="text"
+                value={backupCode}
+                onChange={(e) => setBackupCode(e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 10))}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitBackup(); }}
+                placeholder="xxxxxxxxxx"
+                autoComplete="off"
+                autoFocus
+                disabled={locked}
+                className="w-full h-12 rounded-lg border border-gray-600 bg-gray-800 px-4 text-center font-mono text-lg tracking-widest text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={submitBackup}
+                disabled={locked || submitting || backupCode.trim().length !== 10}
+                className="w-full btn-primary disabled:opacity-50"
+              >
+                {locked ? t('login.wait', 'รอ {time}', { time: formatCountdown(cooldown) }) : submitting ? t('login.verifying') : t('login.confirm')}
+              </button>
+            </div>
+          ) : (
+            <>
           {/* ช่องกรอกรหัส 6 ช่อง */}
           <div className="mt-6 flex justify-between gap-2">
             {digits.map((d, i) => (
@@ -189,6 +249,18 @@ export default function MfaInput() {
             className="mt-6 w-full btn-primary"
           >
             {locked ? t('login.wait', 'รอ {time}', { time: formatCountdown(cooldown) }) : submitting ? t('login.verifying') : t('login.confirm')}
+          </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => { setUseBackup((v) => !v); setError(''); }}
+            className="mt-3 mx-auto block text-xs text-gray-400 hover:text-emerald-300 underline underline-offset-2"
+          >
+            {useBackup
+              ? t('login.mfaUseTotp', 'กลับไปกรอกรหัสจากแอป Authenticator')
+              : t('login.mfaUseBackup', 'โทรศัพท์หาย? ใช้รหัสสำรองแทน')}
           </button>
 
           <p className="mt-4 text-center text-[11px] text-gray-500 font-mono">
