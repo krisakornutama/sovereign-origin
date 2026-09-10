@@ -4,10 +4,26 @@ import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
+import crypto from 'node:crypto';
 
 export { prisma };
 
 export class AuthService {
+  // ── MFA backup codes (ใช้ครั้งเดียวทิ้ง กัน lockout ตอนโทรศัพท์หาย) ──
+  // เก็บเฉพาะ sha256 hash ใน users.mfa_backup_hash (JSON array) — plaintext แสดงให้ผู้ใช้ครั้งเดียวตอน generate
+  static generateBackupCodes(): string[] {
+    return Array.from({ length: 8 }, () => crypto.randomBytes(5).toString('hex'));
+  }
+
+  private static hashCode(code: string): string {
+    return crypto.createHash('sha256').update(code.trim().toLowerCase()).digest('hex');
+  }
+
+  private static async setBackupCodes(userId: string, codes: string[]) {
+    const hashes = codes.map((c) => this.hashCode(c));
+    await prisma.user.update({ where: { id: userId }, data: { mfa_backup_hash: JSON.stringify(hashes) } });
+  }
+
   static async createUser(username: string, password: string, role: string = 'OPERATOR', nodeId?: string) {
     const hash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
@@ -47,6 +63,21 @@ export class AuthService {
   static async verifyMfa(userId: string, code: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.mfa_secret) throw new Error('MFA not configured');
+
+    const normalized = code.trim().toLowerCase();
+
+    // รหัสสำรอง (10 hex) — ตรงเป๊ะครั้งเดียวแล้วเผาทิ้ง (single-use)
+    if (/^[0-9a-f]{10}$/.test(normalized) && user.mfa_backup_hash) {
+      const hashes: string[] = JSON.parse(user.mfa_backup_hash);
+      const idx = hashes.indexOf(this.hashCode(normalized));
+      if (idx === -1) throw new Error('Invalid MFA code');
+      hashes.splice(idx, 1);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { mfa_backup_hash: JSON.stringify(hashes) },
+      });
+      return this.generateToken(user, true);
+    }
 
     const verified = speakeasy.totp.verify({
       secret: user.mfa_secret,
@@ -93,11 +124,15 @@ export class AuthService {
     });
     if (!verified) throw new Error('Invalid MFA code — ตรวจสอบว่าแอปแสดงรหัส 6 หลักจากคีย์ที่สแกนใหม่');
 
+    // generate รหัสสำรองใหม่ทุกครั้งที่เปิด MFA (เก็บเฉพาะ hash — ส่ง plaintext กลับครั้งเดียว)
+    const backupCodes = this.generateBackupCodes();
+    await this.setBackupCodes(userId, backupCodes);
+
     await prisma.user.update({
       where: { id: userId },
       data: { mfa_secret: user.pending_mfa_secret, pending_mfa_secret: null },
     });
-    return { enabled: true };
+    return { enabled: true, backupCodes };
   }
 
   /** ปิด MFA ชั่วคราว (ยกเลิก enrollment ด้วย) */
@@ -106,7 +141,7 @@ export class AuthService {
     if (!user) throw new Error('User not found');
     await prisma.user.update({
       where: { id: userId },
-      data: { mfa_secret: null, pending_mfa_secret: null },
+      data: { mfa_secret: null, pending_mfa_secret: null, mfa_backup_hash: null },
     });
     return { enabled: false };
   }
@@ -118,6 +153,15 @@ export class AuthService {
       enabled: !!user.mfa_secret,
       pending: !!user.pending_mfa_secret,
     };
+  }
+
+  /** รหัสสำรองชุดใหม่ (ทับชุดเก่า) — route นี้อยู่หลัง middleware authenticate เสมอ */
+  static async regenerateBackupCodes(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.mfa_secret) throw new Error('MFA not configured');
+    const codes = this.generateBackupCodes();
+    await this.setBackupCodes(userId, codes);
+    return { backupCodes: codes };
   }
 
   /** เปลี่ยนรหัสผ่านด้วยตัวเอง — ต้องกรอกรหัสปัจจุบันถูกต้องก่อน */

@@ -23,6 +23,8 @@ model User {
   mfa_secret           String?
   // MFA ใหม่ที่รอ confirm (ตั้งค่าแล้วยังไม่ activate — ต้องกรอกรหัสจากแอปยืนยันก่อน)
   pending_mfa_secret   String?
+  // รหัสสำรอง MFA ใช้ครั้งเดียวทิ้ง กัน lockout ตอนโทรศัพท์หาย — JSON array ของ sha256(รหัส)
+  mfa_backup_hash      String?
   // true = ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน (บังคับหลัง login ครั้งแรก / admin ตั้งให้)
   must_change_password Boolean @default(false)
   assigned_node_id     String? @db.Uuid

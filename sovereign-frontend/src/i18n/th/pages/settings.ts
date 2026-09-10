@@ -129,6 +129,11 @@ export default {
     manualEntry: 'หรือกรอกคีย์นี้ในแอป (manual entry):',
     codePh: 'รหัส 6 หลักจากแอป',
     howTo: 'เปิดแอป Google Authenticator / Microsoft Authenticator → สแกน QR (หรือ + → ป้อนคีย์ด้วยตนเอง) → ระบบจะเปิด 2FA ต่อเมื่อรหัสจากแอปตรงกัน',
+    backupTitle: 'รหัสสำรอง 8 ตัว (ใช้ได้ครั้งเดียวต่อรหัส) — เก็บไว้ที่ปลอดภัย จะแสดงครั้งนี้ครั้งเดียว:',
+    backupRegen: 'สร้างรหัสสำรองใหม่',
+    backupRegenConfirm: 'สร้างรหัสสำรองชุดใหม่? (รหัสชุดเก่าจะใช้ไม่ได้ทั้งหมด)',
+    backupNew: 'รหัสสำรองชุดใหม่ — เก็บไว้ให้ดี จะแสดงครั้งนี้ครั้งเดียว',
+    backupFailed: 'สร้างรหัสสำรองไม่สำเร็จ',
   },
   telegram: {
     title: 'Telegram Alerts',

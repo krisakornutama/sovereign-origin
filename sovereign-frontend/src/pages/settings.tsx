@@ -1006,6 +1006,7 @@ function MfaSection() {
   const [qr, setQr] = useState('');
   const [secret, setSecret] = useState('');
   const [code, setCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -1058,6 +1059,8 @@ function MfaSection() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('settings.mfa.confirmFailed', 'ยืนยันไม่สำเร็จ'));
       setQr(''); setSecret(''); setCode('');
+      // รหัสสำรองชุดแรก — แสดงครั้งเดียว ให้เก็บไว้กัน lockout ตอนโทรศัพท์หาย
+      if (Array.isArray(data.backupCodes) && data.backupCodes.length) setBackupCodes(data.backupCodes);
       setMsg(t('settings.mfa.enabled', 'เปิดใช้งาน 2FA แล้ว — ครั้งหน้า login จะต้องกรอกรหัสจากแอป'));
       await refresh();
     } catch (e: any) {
@@ -1075,8 +1078,26 @@ function MfaSection() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('settings.mfa.disableFailed', 'ปิดไม่สำเร็จ'));
       setQr(''); setSecret(''); setCode('');
+      setBackupCodes(null);
       setMsg(t('settings.mfa.disabled', 'ปิด 2FA ชั่วคราวแล้ว — เปิดใหม่ได้จากหน้านี้'));
       await refresh();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // รหัสสำรองชุดใหม่ (ทับชุดเก่า — ชุดเก่าใช้ไม่ได้อีก)
+  const regenerateCodes = async () => {
+    if (!window.confirm(t('settings.mfa.backupRegenConfirm', 'สร้างรหัสสำรองชุดใหม่? (รหัสชุดเก่าจะใช้ไม่ได้ทั้งหมด)'))) return;
+    setBusy(true); setMsg(''); setErr('');
+    try {
+      const res = await authFetch(`${getApiUrl()}/api/auth/mfa/backup-codes`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('settings.mfa.backupFailed', 'สร้างรหัสสำรองไม่สำเร็จ'));
+      setBackupCodes(data.backupCodes);
+      setMsg(t('settings.mfa.backupNew', 'รหัสสำรองชุดใหม่ — เก็บไว้ให้ดี จะแสดงครั้งนี้ครั้งเดียว'));
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -1100,10 +1121,28 @@ function MfaSection() {
           <p className="text-xs text-gray-500">
             {t('settings.mfa.enabledDesc', '2FA เปิดอยู่ — ทุกครั้งที่ login ต้องกรอกรหัส 6 หลักจากแอป Authenticator')}
           </p>
-          <button onClick={disable} disabled={busy} className="btn-danger disabled:opacity-50">
-            <Icon name="x-circle" size={14} />
-            {t('settings.mfa.disable', 'ปิด 2FA ชั่วคราว')}
-          </button>
+          {backupCodes && (
+            <div className="card p-3 space-y-2">
+              <div className="text-xs font-semibold text-amber-300">
+                {t('settings.mfa.backupTitle', 'รหัสสำรอง 8 ตัว (ใช้ได้ครั้งเดียวต่อรหัส) — เก็บไว้ที่ปลอดภัย จะแสดงครั้งนี้ครั้งเดียว:')}
+              </div>
+              <div className="grid grid-cols-4 gap-1 font-mono text-sm text-green-300 select-all">
+                {backupCodes.map((c) => (
+                  <code key={c} className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-center">{c}</code>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={regenerateCodes} disabled={busy} className="btn-primary">
+              <Icon name="refresh" size={14} />
+              {t('settings.mfa.backupRegen', 'สร้างรหัสสำรองใหม่')}
+            </button>
+            <button onClick={disable} disabled={busy} className="btn-danger disabled:opacity-50">
+              <Icon name="x-circle" size={14} />
+              {t('settings.mfa.disable', 'ปิด 2FA ชั่วคราว')}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
