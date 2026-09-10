@@ -76,6 +76,7 @@ Docker/
 
 # ── Installers / binaries ──────────────────────
 tools/*
+!tools/build-desktop.mjs
 !tools/
 !tools/install/
 tools/install/*

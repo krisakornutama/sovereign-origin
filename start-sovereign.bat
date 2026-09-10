@@ -60,10 +60,12 @@ if %errorlevel% neq 0 (
 )
 call :note "  - containers พร้อมแล้ว"
 
-:: ============ [2/3] เริ่ม Frontend (เช็คด้วย HTTP จริง ไม่ใช่แค่พอร์ต) ============
+:: ============ [2/3] เริ่ม Frontend (production `next start` เช็คด้วย HTTP จริง) ============
 :: เช็คด้วย HTTP จริง ไม่ใช่แค่พอร์ต — พอร์ตมีคนฟังแต่ไม่ตอบ = frontend ค้าง ต้องล้างแล้วเริ่มใหม่
 :: pin พอร์ต 3000 เสมอ กัน env PORT หลุดไป bind พอร์ตอื่น | หน้าต่าง /min ย่อไว้ดู error ได้ถ้าพัง
-call :note "== [2/3] เริ่ม Frontend =="
+:: production: `next start` ให้บริการ build ใน .next (เร็ว + เบากว่า dev มาก ไม่ compile ตอนเปิด)
+:: build ล้าสมัย (src/ ใหม่กว่า .next) → build ใหม่ให้อัตโนมัติ | build ล้มเหลว → fallback กลับ dev mode
+call :note "== [2/3] เริ่ม Frontend (production) =="
 powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3000 -TimeoutSec 3 -UseBasicParsing; if ($r.StatusCode -ge 200) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
     call :note "  - Frontend ตอบปกติที่ :3000 — ข้าม"
@@ -72,8 +74,28 @@ if %errorlevel% equ 0 (
     powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { taskkill /PID $_ /T /F 2>$null | Out-Null }" >nul 2>&1
     timeout /t 2 >nul 2>&1
     cd /d "%ROOT%\sovereign-frontend"
-    start "Sovereign-Frontend" /min cmd /k "npm run dev -- -p 3000"
-    call :note "  - เปิด Frontend แล้ว โหลดครั้งแรกอาจใช้เวลาราว 1 นาที"
+    set "FE_MODE=prod"
+    REM ไม่มี build .next\BUILD_ID หรือซอร์ส src/ ใหม่กว่า build → build ใหม่ก่อนสตาร์ท
+    REM เช็คผ่าน exit code จาก powershell — กันวงเล็บใน for /f ที่ทำ bat parse พัง
+    REM exit 0 = build ใช้ได้ | ไม่ใช่ 0 = ไม่มี build หรือ mtime ไฟล์ใต้ src ใหม่กว่า BUILD_ID → build
+    powershell -NoProfile -Command "if (-not (Test-Path .next\BUILD_ID)) { exit 1 }; $s = (Get-ChildItem src -Recurse -File | Measure-Object LastWriteTimeUtc -Maximum).Maximum; if ($s -gt (Get-Item .next\BUILD_ID).LastWriteTimeUtc) { exit 1 }; exit 0" >nul 2>&1
+    if !errorlevel! neq 0 (
+        call :note "  - production build ไม่มีหรือล้าสมัย — npm run build ก่อน (ครั้งแรกอาจใช้เวลาหลายนาที)"
+        call npm run build >> "%LOG%" 2>&1
+        if !errorlevel! neq 0 (
+            call :note "[WARN] production build ล้มเหลว — กลับไปใช้ dev mode (hot reload) ดู log: start-sovereign.log"
+            set "FE_MODE=dev"
+        ) else (
+            call :note "  - production build เสร็จ"
+        )
+    )
+    if "!FE_MODE!"=="dev" (
+        start "Sovereign-Frontend" /min cmd /k "npm run dev -- -p 3000"
+    ) else (
+        set "PORT=3000"
+        start "Sovereign-Frontend" /min cmd /k "npm run start -- -p 3000"
+    )
+    call :note "  - เปิด Frontend แล้ว (production) โหลดครั้งแรกเร็ว — ถ้าเพิ่ง build จะช้าหน่อย"
 )
 
 :: ============ [3/3] รอ Backend พร้อมแล้วเปิด Dashboard ============
