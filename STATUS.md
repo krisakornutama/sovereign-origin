@@ -5,7 +5,16 @@
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
 - **สาขา:** freebuff/task-26201e6b (merge master 3c25866e แล้ว)
-- **ล่าสุด:** 2026-09-09 — desktop shell v1.2.0 (auto-start) + แก้ shortcut/ปัญหา "เทอร์มินัลแป๊บเดียวแล้วหาย"
+- **ล่าสุด:** 2026-09-10 — cold-start hardening: production `next start` + overlay generate จากซอร์ส + รหัส admin
+  - **start-sovereign.bat:** เริ่ม frontend ด้วย production (`next start`) แทน dev — ถ้าไม่มี build หรือไฟล์ใต้ `src/` ใหม่กว่า `.next/BUILD_ID` → build ให้ก่อนอัตโนมัติ, build พัง → fallback dev mode (พิสูจน์แล้ว: `next start` ตอบ 200 ใน ~24ms จากที่ dev เคยกิน ~30 วิ)
+  - **next.config.js:** `output:'export'` เป็น opt-in ผ่าน `SOVEREIGN_STATIC_EXPORT=1` (script `build:static` สำหรับ electron) — เพราะ export บังคับอยู่ทำให้ `next start` ใช้ไม่ได้เลย; `generate-sw-precache` รองรับทั้ง `.next/static` และ `out/_next/static`
+  - **tools/build-desktop.mjs (ใหม่ → `npm run build:desktop`):** generate electron overlay (dist-portable/resources/app) + sidecar จากซอร์สเสมอ — เลิกก๊อปมือที่เคย drift, ตรวจ sync ทุกไฟล์ ไม่ตรง 100% = exit 1; overlay package.json ถูก generate จากซอร์ส (เติม main + ตัด scripts) — รันแล้วทั้ง MAIN และ worktree ผ่าน
+  - **รหัสผ่าน admin:** (1) ตั้งรหัสแข็งใหม่ (random 24-char, bcrypt cost 12) พิสูจน์ผ่าน API: login 200 + token, รหัสเก่า 123456 โดน 401 — แล้วทำตามที่เจ้าของขอต่อ: (2) กู้ hash เดิมจาก DB v1 (sovereign) กลับเข้า sovereign_v2 (ตรวจ byte-identical) → รหัสผ่านเดิมของเจ้าของใช้ได้อีกครั้งตามเดิม, ทุกลอง login อื่นโดน 401 (verify แล้ว) — แนะนำค่อยเปลี่ยนเป็นรหัสแข็งผ่านหน้า change-password ในแอป
+- **ก่อนหน้า:** 2026-09-10 — แก้ "รหัสเก่าเข้าไม่ได้" (login admin)
+  - **สาเหตุ:** ตอน migrate ฐานข้อมูล v1→v2 (12 ส.ค.) hash รหัสผ่าน admin ใน sovereign_v2 กลายเป็นค่าใหม่ ไม่ใช่ตัวเดิมจาก DB เก่า (sovereign) → รหัสเดิมเลยไม่ตรงอีกเลย (ตรวจแล้วว่าไม่ใช่อย่างอื่น: users ครบ 8 คน, MFA ปิดหมด, rate-limit ไม่ล็อก, endpoint login ปกติ)
+  - **วิธีแก้:** ตั้งรหัสผ่านใหม่ให้ admin ตามที่เจ้าของเลือก (bcrypt cost 12 เขียนลง DB โดยตรง) — พิสูจน์แล้วผ่าน API จริง: POST /api/auth/login → HTTP 200 + token (mfa_required=false), รหัสผิดยังโดน 401 ตามเดิม
+  - **ควรทำต่อ:** (1) รหัส 123456 อ่อนมาก — เข้าใช้งานแล้วเปลี่ยนเป็นรหัสแข็งในแอป (หน้า change-password) (2) ถ้าอยากได้รหัสเดิมคืน ยังกู้ได้จาก hash เก่าใน DB v1 (sovereign) — hash ยังอยู่ครบ
+- **ก่อนหน้า:** 2026-09-09 — desktop shell v1.2.0 (auto-start) + แก้ shortcut/ปัญหา "เทอร์มินัลแป๊บเดียวแล้วหาย"
   - **สาเหตุที่กดแล้วไม่เข้า:** shortcut เดสก์ท็อปชี้ไป `E:\New folder\Sovereign OS\` ที่ถูกย้าย/ลบไปแล้ว + exe ใน MAIN เป็น portable build เก่า (asar ฝังในตัว) ที่เข้าเปล่า และ `start-sovereign.bat` ใน MAIN เป็น LF line endings ทำให้ cmd รันแล้วพังทันที (อาการหน้าต่างแวบเดียว)
   - **วิธีแก้:** (1) shell v1.2.0 — เปิดแอปตอนระบบดับ → เริ่มระบบให้เองอัตโนมัติ (เปิด Docker Desktop ให้ถ้ายังไม่เปิด รอ engine ได้ถึง 3 นาที แล้ว spawn bat แบบ `cmd /d /c call <full-path>` ผ่าน args array + windowsHide — กันบั๊ก cmd start + quote กับ path มีเว้นวรรค และไม่มีเทอร์มินัลแวบ) (2) ติดตั้ง app ที่ stable home: `C:\Users\com\Sovereign OS` (junction → MAIN dist-portable, runtime 44.1.0 แบบ patchable + overlay) (3) shortcut บนเดสก์ท็อปชี้มาที่นี่แล้ว (4) แก้ MAIN bat เป็น CRLF + ROOT guard
   - **ทดสอบแล้ว (E2E จริง):** ปิด frontend+launcher ทิ้ง → เปิดแอปผ่าน shortcut path → log แสดง autostart → 15 วิต่อมา frontend ขึ้น → shell เด้งเข้า `http://localhost:3000/` เองโดยไม่ต้องกดอะไรเลย
