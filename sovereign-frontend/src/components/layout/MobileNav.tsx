@@ -1,5 +1,6 @@
 ﻿"use client";
 import Link from 'next/link';
+import { useIsSuperadmin } from '../../lib/roles';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { openCommandPalette } from '../CommandPalette';
@@ -24,7 +25,7 @@ export default function MobileNav() {
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   useEffect(() => {
     if (user && !isSuperadmin) loadFeatures();

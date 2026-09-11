@@ -2,6 +2,7 @@
 // components/coding/CodingIde.tsx
 // Coding Agent ในแบบ IDE: toolbar บน → กลาง 70% (สั่งงาน + ดูงาน/โค้ด) → ขวา 30% (แท็บ ไฟล์/งาน&คิว/โน้ต) → เทอร์มินัลล่าง (ย่อได้)
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsSuperadmin } from '../../lib/roles';
 import { authFetch } from '../../lib/apiFetch';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -51,7 +52,7 @@ function CodeView({ content }: { content: string }) {
 export default function CodingIde() {
   const t = useLanguageStore((s) => s.t);
   const user = useAuthStore((s) => s.user);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   // ── สถานะงานเขียนโค้ด ──
   const [models, setModels] = useState<string[]>([]);

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
@@ -52,7 +53,7 @@ interface Approval {
 export default function SecurityPage() {
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [firewallStatus, setFirewallStatus] = useState<string>('unknown');

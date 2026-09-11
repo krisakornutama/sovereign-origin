@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import { roleIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
@@ -450,7 +451,7 @@ export default function Dashboard() {
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
   useEffect(() => {
-    if (isHydrated && isAuthenticated && user && user.role !== 'SUPERADMIN') loadFeatures();
+    if (isHydrated && isAuthenticated && user && !roleIsSuperadmin(user.role)) loadFeatures();
   }, [isHydrated, isAuthenticated, user, loadFeatures]);
 
   // ── Hydration-safe layout: server เรนเดอร์ DEFAULT_ORDER เสมอ ──
@@ -529,9 +530,9 @@ export default function Dashboard() {
     kids: '/knowledge',
   };
   const isVisibleForUser = (k: WidgetKey) => {
-    if (k === 'map') return user.role === 'SUPERADMIN';
+    if (k === 'map') return roleIsSuperadmin(user.role);
     const feat = FEATURE_BY_WIDGET[k];
-    if (feat && user.role !== 'SUPERADMIN' && !hasFeature(feat)) return false;
+    if (feat && !roleIsSuperadmin(user.role) && !hasFeature(feat)) return false;
     return true;
   };
   const visibleOrder = order.filter((k) => isVisibleForUser(k) && (editMode || !hidden[k]));

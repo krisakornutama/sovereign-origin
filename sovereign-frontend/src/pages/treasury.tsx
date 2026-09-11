@@ -7,6 +7,7 @@
 // ข้อมูลเดียวจาก GET /api/treasury/overview — ขาย/ปันผล/ปรับเงินสด อัปเดตเงินสดอัตโนมัติ
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
@@ -222,7 +223,7 @@ interface Member { id: string; username: string; role: string }
 export default function TreasuryPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   const [members, setMembers] = useState<Member[]>([]);
   const [viewOwnerId, setViewOwnerId] = useState('');

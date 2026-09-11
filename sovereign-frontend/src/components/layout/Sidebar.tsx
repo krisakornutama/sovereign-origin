@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
+import { useIsSuperadmin } from '../../lib/roles';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
@@ -23,7 +24,7 @@ export default function Sidebar() {
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
   // โมดูลที่เปิดใช้งาน (จาก GET /api/modules) — fetch ไม่สำเร็จ = แสดงทุกเมนู
   const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
 

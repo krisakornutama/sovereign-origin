@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useState, useEffect, useMemo } from 'react';
+import { roleIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
@@ -134,7 +135,7 @@ export default function UsersPage() {
         const list = listRes.ok ? await listRes.json() : [];
         setUsers(list);
         const created = (list as User[]).find((x) => x.username === username);
-        if (created && created.role !== 'SUPERADMIN') {
+        if (created && !roleIsSuperadmin(created.role)) {
           setGrantedByUser((prev) => ({ ...prev, [created.id]: [] }));
         }
       } else {
@@ -202,7 +203,7 @@ export default function UsersPage() {
 
   // โหลดสิทธิ์ของสมาชิกคนหนึ่ง (กดปุ่ม "สิทธิ์")
   const toggleGrantEditor = async (u: User) => {
-    if (u.role === 'SUPERADMIN') return;
+    if (roleIsSuperadmin(u.role)) return;
     if (grantLoading === u.id) return;
     if (grantedByUser[u.id]) {
       // ซ่อนลง
@@ -289,7 +290,7 @@ export default function UsersPage() {
     return <div className="text-white p-8">{t('users.unauthorized', 'Unauthorized')}</div>;
   }
 
-  if (user.role !== 'SUPERADMIN') {
+  if (!roleIsSuperadmin(user.role)) {
     return <div className="min-h-screen bg-gray-950 text-gray-100 p-8">{t('users.superadminOnly', 'หน้านี้ใช้ได้เฉพาะ SUPERADMIN')}</div>;
   }
 
@@ -404,7 +405,7 @@ export default function UsersPage() {
                       </select>
                     </td>
                     <td className="px-4 py-2">
-                      {u.role === 'SUPERADMIN' ? (
+                      {roleIsSuperadmin(u.role) ? (
                         <span className="text-xs text-emerald-400 glow-text">{t('users.superadminSeesAll', 'เห็นทั้งหมด (superadmin)')}</span>
                       ) : (
                         <button
@@ -438,7 +439,7 @@ export default function UsersPage() {
                     </td>
                   </tr>
                   {/* แผงตั้งสิทธิ์ของสมาชิกคนนี้ */}
-                  {u.role !== 'SUPERADMIN' && grantedByUser[u.id] && (
+                  {!roleIsSuperadmin(u.role) && grantedByUser[u.id] && (
                     <tr className="bg-gray-950/60">
                       <td colSpan={5} className="px-4 py-3">
                         <div className="flex items-center justify-between mb-2">
@@ -566,7 +567,7 @@ function SummaryMatrix({ data, myId }: { data: SummaryData; myId: string }) {
     g.items.push(f);
   }
   const allKeys = data.catalog.map((f) => f.key);
-  const isSuper = (m: MemberSummary) => m.role === 'SUPERADMIN';
+  const isSuper = (m: MemberSummary) => roleIsSuperadmin(m.role);
 
   return (
     <table className="border-collapse text-xs w-full">

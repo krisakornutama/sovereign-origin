@@ -5,6 +5,7 @@
 // ต่อ /api/v1/ai/* — pull ใช้ fetch stream (NDJSON) เพื่อส่ง Bearer header ได้
 // ────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsSuperadmin } from '../../lib/roles';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import Sidebar from '../../components/layout/Sidebar';
@@ -75,7 +76,7 @@ export default function AiModelsPage() {
   const [ggufJob, setGgufJob] = useState<{ id: string; status: string; phase: string; percent: number; error?: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const isSuper = user?.role === 'SUPERADMIN';
+  const isSuper = useIsSuperadmin();
 
   const load = useCallback(async () => {
     try {

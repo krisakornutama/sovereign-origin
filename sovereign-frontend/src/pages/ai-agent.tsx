@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -102,7 +103,7 @@ function fmtArgs(args: any): string {
 export default function AiAgentPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   const [policy, setPolicy] = useState<AiPolicy | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);

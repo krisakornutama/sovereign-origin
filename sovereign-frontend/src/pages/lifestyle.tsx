@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useCanWriteModules } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
@@ -57,7 +58,7 @@ function exposureBadge(status: string, tr: Tr): { label: string; cls: string } {
 export default function LifestylePage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const canToggle = user?.role === 'SUPERADMIN' || user?.role === 'NODE_ADMIN' || user?.role === 'OPERATOR';
+  const canToggle = useCanWriteModules();
   const [plan, setPlan] = useState<DayPlan | null>(null);
   const [living, setLiving] = useState<LivingModeState | null>(null);
   const [manual, setManual] = useState<ManualDayState | null>(null);

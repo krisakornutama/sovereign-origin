@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -31,7 +32,7 @@ import {
 export default function KnowledgePage() {
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [typeFilter, setTypeFilter] = useState<ItemType | 'ALL'>('ALL');

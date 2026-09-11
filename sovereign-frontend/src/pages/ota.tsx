@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
@@ -62,7 +63,7 @@ export default function OtaPage() {
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const isSuperAdmin = useIsSuperadmin();
   const t = useLanguageStore((s) => s.t);
 
   const load = useCallback(async () => {

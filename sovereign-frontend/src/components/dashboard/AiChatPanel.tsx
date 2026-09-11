@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useIsSuperadmin } from '../../lib/roles';
 import Link from 'next/link';
 import { authFetch } from '../../lib/apiFetch';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -21,7 +22,7 @@ function isApprovalReply(text: string): boolean {
 export default function AiChatPanel({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');

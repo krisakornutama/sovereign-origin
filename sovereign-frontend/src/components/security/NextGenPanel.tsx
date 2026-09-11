@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useIsSuperadmin } from '../../lib/roles';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import { asArray } from '../../lib/fetchJson';
@@ -80,7 +81,7 @@ function fmtTime(ts?: string): string {
 export default function NextGenPanel() {
   const { user } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
   const catLabel = (c: string) => t(`securityComponents.nextgen.category.${c}`, CATEGORY_LABEL[c] || c);
   const [tab, setTab] = useState<'intel' | 'dns' | 'ids' | 'apps' | 'av' | 'net' | 'ai'>('intel');
   const [status, setStatus] = useState<any>(null);

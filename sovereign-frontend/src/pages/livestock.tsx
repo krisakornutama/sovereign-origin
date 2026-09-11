@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useCanWriteModules } from '../lib/roles';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { authFetch } from '../lib/apiFetch';
@@ -51,7 +52,7 @@ export default function LivestockPage() {
   const [message, setMessage] = useState('');
   const [selId, setSelId] = useState<string>('');
 
-  const canWrite = user?.role === 'SUPERADMIN' || user?.role === 'NODE_ADMIN' || user?.role === 'OPERATOR';
+  const canWrite = useCanWriteModules();
 
   const api = useCallback((path: string, init?: RequestInit) => authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/livestock${path}`, init), []);
   const loadAll = useCallback(async () => {
