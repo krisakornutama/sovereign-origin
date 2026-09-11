@@ -16,7 +16,7 @@
 //
 // ใช้: node tools/build-desktop.mjs [--skip-runtime] [--skip-sidecar]
 // ─────────────────────────────────────────────────────────────
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,6 +63,18 @@ writeFileSync(path.join(APP, 'package.json'), JSON.stringify(overlayPkg, null, 2
 log('overlay: package.json generated (main=electron/main.js, ไม่มี scripts)');
 // overlay ต้องเป็นไฟล์ซอร์สเท่านั้น — ห้าม node_modules ติดมา
 if (readdirSync(APP).includes('node_modules')) die('resources/app/node_modules ไม่ควรมี — ตรวจซอร์ส');
+
+// ── 2.5) ลบ app.asar ที่มากับ runtime copy — Electron โหลด asar ก่อน app/ เสมอ
+// (STATUS 2026-09-11: exe ที่งาน overlay ใหม่เพราะ asar เก่าจาก electron:build ตามมากับ win-unpacked)
+const ASAR_FILES = ['app.asar', 'app.asar.unpacked'];
+for (const name of ASAR_FILES) {
+  const p = path.join(PORTABLE, 'resources', name);
+  if (existsSync(p)) {
+    rmSync(p, { recursive: true, force: true });
+    log('ลบ', name, '— บังคับโหลด overlay จาก resources/app/ (asar เกาะมากับ runtime copy ทำให้แก้ overlay ไม่มีผล)');
+  }
+}
+if (!existsSync(path.join(APP, 'electron', 'main.js'))) die('resources/app/electron/main.js ไม่มี — overlay พัง');
 
 // ── 3) sidecar backend → resources/core-api ──
 if (!skipSidecar) {
