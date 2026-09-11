@@ -1,0 +1,8 @@
+# EOL ตายตัว — กัน diff หลอนจากการ build บนเครื่องต่างกัน (เคสจริง: LICENSE.electron.txt/bat เด้ง CRLF↔LF ทุกครั้ง)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.woff binary
+*.woff2 binary
+*.exe binary
+*.asar binary
