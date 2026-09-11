@@ -1,12 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useIsSuperadmin } from '../../lib/roles';
 import { authFetch } from "../../lib/apiFetch";
 import Icon from "../ui/Icon";
 import { useAuthStore } from "../../stores/useAuthStore";
 
 export default function LocalLLMCard() {
   const user = useAuthStore((s) => s.user);
-  const isSuper = user?.role === "SUPERADMIN";
+  const isSuper = useIsSuperadmin();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [model, setModel] = useState("gemma3:4b");
   const [busy, setBusy] = useState(false);

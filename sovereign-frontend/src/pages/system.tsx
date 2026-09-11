@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { roleIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
@@ -161,7 +162,7 @@ export default function SystemHealthPage() {
         </div>
 
         {/* Chaos Drill — ซ้อมรับวิกฤต: ตรวจ self-check โครงสร้างพื้นฐานสำคัญ */}
-        {user.role === 'SUPERADMIN' && (
+        {roleIsSuperadmin(user.role) && (
         <div className="panel panel-glow p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -199,7 +200,7 @@ export default function SystemHealthPage() {
         )}
 
         {/* Maintenance Radar — Sovereignty Tax: ทุกงานบำรุงต้องมองเห็น */}
-        {user.role === 'SUPERADMIN' && (
+        {roleIsSuperadmin(user.role) && (
         <div className="panel panel-cyan p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>

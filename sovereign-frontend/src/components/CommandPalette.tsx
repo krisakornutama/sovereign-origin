@@ -6,6 +6,7 @@
 //  ใช้: ↑↓ เลือก · Enter เปิด · Esc ปิด
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import { useRouter } from 'next/router';
 import { ALL_PAGES } from '../lib/navigation';
 import { useFeatureStore } from '../stores/useFeatureStore';
@@ -60,7 +61,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

@@ -1,4 +1,5 @@
 import type { AppProps } from 'next/app';
+import { useIsSuperadmin } from '../lib/roles';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -27,7 +28,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const granted = useFeatureStore((s) => s.granted);
   const isBlocked = useFeatureStore((s) => s.isBlocked);
   const loadFeatures = useFeatureStore((s) => s.load);
-  const isSuperadmin = user?.role === 'SUPERADMIN';
+  const isSuperadmin = useIsSuperadmin();
   const [blocked, setBlocked] = useState(false);
 
   // กันหน้าเปิดสิทธิ์: ยังไม่ได้เปลี่ยนรหัสผ่าน (บังคับหลัง login ครั้งแรก)

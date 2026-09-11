@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
+import { roleIsSuperadmin } from '../lib/roles';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
@@ -64,7 +65,7 @@ export default function AuditPage() {
     return <div className="text-white p-8">{t('audit.unauthorized', 'Unauthorized')}</div>;
   }
 
-  if (user.role !== 'SUPERADMIN') {
+  if (!roleIsSuperadmin(user.role)) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
         {t('audit.superadminOnly', 'หน้านี้ใช้ได้เฉพาะ SUPERADMIN')}

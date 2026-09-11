@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useCanWriteModules } from '../lib/roles';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import { api } from '../lib/apiClient';
@@ -200,7 +201,7 @@ export default function FarmPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [herbHarvest, setHerbHarvest] = useState<Record<string, { qtyGram: string; saveSeed: boolean }>>({});
 
-  const canWrite = user?.role === 'SUPERADMIN' || user?.role === 'NODE_ADMIN' || user?.role === 'OPERATOR';
+  const canWrite = useCanWriteModules();
 
   const load = useCallback(async () => {
     setLoading(true);

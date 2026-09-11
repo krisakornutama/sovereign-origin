@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useIsSuperadmin } from '../lib/roles';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
@@ -35,7 +36,7 @@ export default function BackupPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const isSuperAdmin = useIsSuperadmin();
   const t = useLanguageStore((s) => s.t);
 
   const load = useCallback(async () => {

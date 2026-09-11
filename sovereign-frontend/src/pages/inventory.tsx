@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useCanWriteModules } from '../lib/roles';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
 import { api } from '../lib/apiClient';
@@ -88,7 +89,7 @@ export default function InventoryPage() {
   const [scanLabel, setScanLabel] = useState<ScanLabel | null>(null);
   const [scanForm, setScanForm] = useState(EMPTY_FORM);
 
-  const canWrite = user?.role === 'SUPERADMIN' || user?.role === 'NODE_ADMIN' || user?.role === 'OPERATOR';
+  const canWrite = useCanWriteModules();
 
   const load = useCallback(async () => {
     setLoading(true);
