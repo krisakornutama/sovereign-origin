@@ -247,17 +247,13 @@ function startBackend() {
   } catch (e) { console.error('startBackend failed', e.message); }
 }
 
-// ── single instance — startup folder + HKCU\Run เคยยิง exe พร้อมกัน 2 ตัว (log 07:48 ทั้งคู่แข่ง startSystem) ──
+// ── single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง ──
 const hasSingleLock = app.requestSingleInstanceLock();
-if (!hasSingleLock) {
-  dlog('single-instance: Sovereign OS รันอยู่แล้ว — ปิดตัวซ้ำ');
-  app.quit();
-} else {
-  app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); } });
-}
+if (hasSingleLock) app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); } });
+else app.quit();
 
 app.whenReady().then(() => {
-  if (!hasSingleLock) return;
+  if (!hasSingleLock) return; // กันหน้าต่างซ้อนในช่วงรอ app.quit() ของ instance ที่แพ้ lock
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   startBackend();
   createWindow();
