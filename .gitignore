@@ -57,7 +57,7 @@ backups/
 **/infra/certs/
 
 # ── PWA build artifacts ──────────────────────
-public/sw-precache.json
+sovereign-frontend/public/sw-precache.json
 
 # ── Editor / OS ──────────────────────────────
 .DS_Store
