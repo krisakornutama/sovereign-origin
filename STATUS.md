@@ -4,8 +4,15 @@
 
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
-- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว — merge 39841d0)
-- **ล่าสุด:** 2026-09-11 — simplify pass + พิสูจน์พฤติกรรมจริงทุกเส้นทางของโค้ดเดสก์ท็อปที่แก้
+- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว — ล่าสุด f3cde90)
+- **ล่าสุด:** 2026-09-12 — กวาดทดสอบทั้งโปรเจ็กบนระบบจริง (API ทุกโมดูล + UI เกือบทุกหน้า + desktop exe)
+  - **API sweep 56 mounts จริงจาก routes.ts:** 55 ผ่าน 200 ด้วย JWT admin — จุดเดียวที่ไม่ผ่านคือ /api/v1/ai/models 502 เพราะ engine Ollama ปิดอยู่ (ตอบ error description ตามที่ออกแบบไว้, engineUp:false)
+  - **พบ+แก้บั๊กเดิม:** CompostBatch/RestaurantWasteLog/FertilizerApplication อยู่ใน schema.prisma แต่ไม่เคยมี migration → endpoint จริง 500 (P2021 table ไม่มีใน sovereign_v2) ตั้งแต่วันสร้างโมดูล — สร้าง migration 20260912000000_add_compost_waste_fertilizer_tables (additive เท่านั้น: 3 ตาราง + 4 index + 2 FK; ตัด ALTER/DROP drift ของตารางเดิมทิ้งเพราะเสี่ยงข้อมูล ต้องตัดสินใจเฉพาะ) → migrate deploy สำเร็จ
+  - **พิสูจน์ lifecycle จริงบน endpoint ที่เพิ่งแก้:** POST /api/compost/batches → 201 → POST /api/compost/:id/harvest → 200 (status active→ready, outputKg 3.5 บันทึกลง DB จริง) → ลบแถวทดสอบออกแล้ว (DB กลับ 0 แถว)
+  - **UI sweep บน :3000 (production):** login ผ่านฟอร์มจริง → /dashboard "Command Center SUPERADMIN" + WebSocket connected — กดลิงก์ไล่ 30+ หน้า (devices/sensors/relay/automation/energy/ota/infrastructure/security/vision/property/alerts/risk-monitor/learning/knowledge/reports/treasury/portfolio/farm/livestock/inventory/health/healing/lifestyle/crisis/selfreliance/skills/history/backup/users/audit/settings/system/governance-sim/restaurant/ai/ai-agent/predictive/change-password/research) — ไม่มีหน้าไหน 404/Unauthorized และ console สะอาดบน dashboard (404 ช่วงแรกคือ SW chunk เก่าตอน reload หลัง build ใหม่ — settle แล้วหาย)
+  - **ข้อสังเกต automation:** สคริปต์ทดสอบโดน rate-limit login + หลอกด้วย placeholder "admin" (ช่องจริงว่าง) 2 รอบ — ตัวแอปทำงานถูกต้อง ผิดที่สคริปต์
+  - **Desktop:** exe มีชีวิต 4 processes, shell log ครบวงจร boot → autostart → flip: offline → dashboard `[16:26:50Z]`
+- **ก่อนหน้า:** 2026-09-11 — simplify pass + พิสูจน์พฤติกรรมจริงทุกเส้นทางของโค้ดเดสก์ท็อปที่แก้
   - **โค้ดเล็กลง พฤติกรรมเดิม:** main.js guard แบนเหลือ 2 บรรทัด (winner จับ second-instance / loser ปิดตัว + log — log เส้นนี้ต้องเก็บไว้เพราะเป็นหลักฐานว่า guard เคยทำงาน), build-desktop.mjs ตัด die() ซ้ำซ้อน (sync 100% ครอบอยู่แล้ว) + inline รายชื่อ asar — รวมสุทธิ −6 บรรทัด ไม่มีพฤติกรรมเปลี่ยน
   - **พิสูจน์บนของจริง:** (1) ปลูก app.asar ปลอม + unpacked → build-desktop ลบทิ้งถูกต้อง ไฟล์ .disabled/.extracted ไม่โดนแตะ, sync 100% (2) exe บูตจริงด้วยโค้ด overlay ใหม่ + instance ที่สอง: A pid 11072 มีชีวิต / B pid 9736 ปิดตัวพร้อม log `single-instance` / A ยังอยู่ (3) ปิด :3000 → บูต exe → offline branch (`frontend:false`) → กู้ :3000 → **flip: offline → dashboard ติด log `[16:26:50Z]`** (4) verify 4/4 (build + 994 tests + typecheck + build) — npm run verify วิ่งผ่านหลัง simplify
   - **หมายเหตุ verify dev-restore:** คราวนี้ลบ .next ทิ้งแล้ว dev ใหม่ค้างไม่ bind :3000 — กู้ prod เองด้วย `next start -p 3000` (ต้อง pin -p 3000 เพราะ next start ไม่อ่าน PORT env ตอน npx) — อาการนี้เกิดซ้ำ ควรแก้ verify ให้ข้าม restore เมื่อ prod กำลัง serve อยู่
