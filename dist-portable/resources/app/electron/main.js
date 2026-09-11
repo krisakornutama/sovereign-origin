@@ -92,6 +92,7 @@ async function showOffline() {
     const st = await probeStatus();
     if (st.frontend) {
       // Dashboard ขึ้นแล้ว → เข้าแอปจริงทันที
+      dlog('flip: offline → dashboard (:3000 answering)');
       showingOffline = false;
       stopProbe();
       win.loadURL(DASHBOARD_URL).catch(() => showOffline());
@@ -119,7 +120,7 @@ async function boot() {
     const t = setInterval(async () => {
       tries++;
       if (!win || win.isDestroyed() || showingOffline) { clearInterval(t); return; }
-      if (await probe(DASHBOARD_URL)) { clearInterval(t); win.loadURL(DASHBOARD_URL).catch(() => {}); return; }
+      if (await probe(DASHBOARD_URL)) { dlog('flip: launcher → dashboard (:3000 answering)'); clearInterval(t); win.loadURL(DASHBOARD_URL).catch(() => {}); return; }
       if (tries === 10) autoStartOnce();
       else if (tries > 200) clearInterval(t); // รอได้ถึง 10 นาที — เผื่อ cold start (เปิด Docker + compose + build)
     }, PROBE_MS);
@@ -246,7 +247,13 @@ function startBackend() {
   } catch (e) { console.error('startBackend failed', e.message); }
 }
 
+// ── single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง ──
+const hasSingleLock = app.requestSingleInstanceLock();
+if (hasSingleLock) app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); } });
+else { dlog('single-instance: Sovereign OS รันอยู่แล้ว — ปิดตัวซ้ำ'); app.quit(); }
+
 app.whenReady().then(() => {
+  if (!hasSingleLock) return; // กันหน้าต่างซ้อนในช่วงรอ app.quit() ของ instance ที่แพ้ lock
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   startBackend();
   createWindow();
