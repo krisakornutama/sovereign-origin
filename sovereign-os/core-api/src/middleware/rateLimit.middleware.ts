@@ -19,6 +19,14 @@ export interface RateLimitOptions {
   backoff?: boolean;
   /** Cap ของ backoff cooldown (default 24 ชม.) */
   maxBlockMs?: number;
+  /**
+   * จัด bucket ด้วย key อื่นแทน IP — เช่น per-account:
+   *   keyBy: (req) => String(req.body?.username || '') || req.ip
+   * คืนค่าว่าง → ตกไปใช้ IP เหมือนเดิม
+   */
+  keyBy?: (req: Request) => string;
+  /** เรียกทุกครั้งที่ request โดน 429 (เช่น เขียน audit log) — fire-and-forget */
+  onBlock?: (key: string, req: Request) => void;
 }
 
 export interface RateLimitState {
@@ -49,7 +57,7 @@ export type RateLimitMiddleware = RequestHandler & {
  */
 export function rateLimit(options: RateLimitOptions): RateLimitMiddleware {
   const buckets = new Map<string, Bucket>();
-  const { windowMs, max, backoff = false, maxBlockMs = 24 * 60 * 60 * 1000 } = options;
+  const { windowMs, max, backoff = false, maxBlockMs = 24 * 60 * 60 * 1000, keyBy, onBlock } = options;
   const message = options.message || 'Too many requests, please try again later';
 
   // Periodically drop expired buckets so the map cannot grow unbounded.
@@ -90,7 +98,7 @@ export function rateLimit(options: RateLimitOptions): RateLimitMiddleware {
   };
 
   const middleware: RateLimitMiddleware = (req, res, next) => {
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = (keyBy?.(req) || req.ip || req.socket.remoteAddress || 'unknown').trim() || 'unknown';
     const now = Date.now();
 
     let bucket = buckets.get(key);
@@ -113,6 +121,7 @@ export function rateLimit(options: RateLimitOptions): RateLimitMiddleware {
         : Math.max(0, bucket.blockedUntil - now);
       bucket.blockedUntil = now + cooldown;
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil(cooldown / 1000))));
+      onBlock?.(key, req);
       return res.status(429).json({ error: message });
     }
 
@@ -122,6 +131,7 @@ export function rateLimit(options: RateLimitOptions): RateLimitMiddleware {
       bucket.blockLevel = 1;
       bucket.blockedUntil = now + cooldown;
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil(cooldown / 1000))));
+      onBlock?.(key, req);
       return res.status(429).json({ error: message });
     }
 

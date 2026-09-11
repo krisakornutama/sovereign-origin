@@ -5,7 +5,14 @@
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
 - **สาขา:** master (รวม freebuff/task-26201e6b แล้ว)
-- **ล่าสุด:** 2026-09-12 — กวาดทดสอบทั้งโปรเจ็กบนระบบจริง (API ทุกโมดูล + UI เกือบทุกหน้า + desktop exe)
+- **ล่าสุด:** 2026-09-12 — ความปลอดภัย: per-account lockout + audit + หมุนรอบรหัส admin (123456 หมดอายุ)
+  - **Per-account rate limit (แก้ช่องโหว่ credential stuffing):** เดิม limiter รวมต่อ IP เดียว — โจมตีบัญชีเดียวจากหลาย IP ไม่เคยโดน; เพิ่ม `keyBy`/`onBlock` hooks ใน rateLimit.middleware แล้วผูก limiter ระดับบัญชีคู่ขนานกับต่อ IP ที่ `/login` (bucket ตาม username, max 5 < IP 10) และ `/verify-mfa` (bucket ตาม userId, หลัง authenticatePartial) — โดน 429 ระดับบัญชีเขียน audit log `RATE_LIMIT_BLOCK` (endpoint/username/ip; AuditLog.user_id เป็น FK จึง resolve username→id ก่อน, username แปลกปลอมข้าม)
+  - **แก้ช่องโหว่จริงที่ review เจอ:** `must_change_password` บังคับแค่ฝั่ง client — เรียก API ตรง ๆ ข้ามได้; ตอนนี้ `authenticate` ตอบ 403 `MUST_CHANGE_PASSWORD` server-side (สมาชิกเปลี่ยนรหัสผ่านตัวเองได้ผ่าน /change-password ซึ่งใช้ authenticatePartial)
+  - **พิสูจน์ live บน :3001:** brute 5 ครั้ง → ครั้ง 6 เป็น 429 ระดับบัญชี, รหัสถูกขณะล็อกยัง 429, username อื่นจาก IP เดิม 401 (bucket แยก), แถว RATE_LIMIT_BLOCK ลง audit_logs จริง (2 แถว), token ที่มี flag → 403 ทุก API ทั่วไป, change-password → 200 → login รหัสใหม่ → API ผ่าน — ลบบัญชีทดสอบพร้อม audit แล้ว (DB สะอาด)
+  - **tests:** ใหม่ 4 ตัว (accountLockout.test.ts) — รวม `npm test` 1046/1046 + tsc clean; deploy เข้า container (mount src) แล้ว + sidecar sync 100%
+  - **หมุนรอบของลับแล้ว:** admin 123456 → รหัสแข็ง 24-char สุ่ม (ผ่าน API change-password จริง — พิสูจน์: รหัสเก่า 401, ใหม่ 200); MFA enroll ชุดใหม่รอเจ้าของสแกน — QR: `admin-mfa-qr.png`, secret: `admin-mfa-secret.txt`, รหัสใหม่ทั้งหมด: `admin-credentials.txt` (ทั้งสามไฟล์ gitignore แล้ว — เก็บเข้า password manager แล้วลบทิ้ง; หลังยืนยัน MFA จะได้รหัสสำรอง 8 ตัวใหม่ในตัว)
+  - **หมายเหตุ:** login จากเครื่องเดียวติดลิมิต 10 ครั้ง/15 นาที ถ้าเจ้าของล็อกตัวเอง ใช้ recovery: `POST /api/auth/rate-limit/clear` ด้วยบัญชี SUPERADMIN (รองรับ `{username}` ล้างระดับบัญชี หรือ `{ip}`)
+- **ก่อนหน้า:** 2026-09-12 — กวาดทดสอบทั้งโปรเจ็กบนระบบจริง (API ทุกโมดูล + UI เกือบทุกหน้า + desktop exe)
   - **API sweep 56 mounts จริงจาก routes.ts:** 55 ผ่าน 200 ด้วย JWT admin — จุดเดียวที่ไม่ผ่านคือ /api/v1/ai/models 502 เพราะ engine Ollama ปิดอยู่ (ตอบ error description ตามที่ออกแบบไว้, engineUp:false)
   - **พบ+แก้บั๊กเดิม:** CompostBatch/RestaurantWasteLog/FertilizerApplication อยู่ใน schema.prisma แต่ไม่เคยมี migration → endpoint จริง 500 (P2021 table ไม่มีใน sovereign_v2) ตั้งแต่วันสร้างโมดูล — สร้าง migration 20260912000000_add_compost_waste_fertilizer_tables (additive เท่านั้น: 3 ตาราง + 4 index + 2 FK; ตัด ALTER/DROP drift ของตารางเดิมทิ้งเพราะเสี่ยงข้อมูล ต้องตัดสินใจเฉพาะ) → migrate deploy สำเร็จ
   - **พิสูจน์ lifecycle จริงบน endpoint ที่เพิ่งแก้:** POST /api/compost/batches → 201 → POST /api/compost/:id/harvest → 200 (status active→ready, outputKg 3.5 บันทึกลง DB จริง) → ลบแถวทดสอบออกแล้ว (DB กลับ 0 แถว)
