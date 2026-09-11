@@ -37,6 +37,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (!decoded.mfa_verified) {
       return res.status(403).json({ error: 'MFA verification required' });
     }
+    // บังคับเปลี่ยนรหัสผ่านให้เป็น server-side (เดิมฝั่ง client เท่านั้น — เรียก API ตรง ๆ ข้ามได้)
+    // /api/auth/change-password ใช้ authenticatePartial พอดี จึงยังเป็นทางออกของ flow นี้
+    if (decoded.must_change_password === true) {
+      return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
+    }
     req.user = {
       id: decoded.userId,
       role: decoded.role,

@@ -163,6 +163,7 @@ dist-portable-copy/
 # ── Secrets / credentials (ห้ามเข้า git เด็ดขาด) ──
 admin-mfa-qr.png
 admin-mfa-secret.txt
+admin-credentials.txt
 login.json
 health.json
 
