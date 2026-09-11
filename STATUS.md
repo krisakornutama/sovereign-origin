@@ -4,7 +4,7 @@
 
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
-- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว — ล่าสุด f3cde90)
+- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว)
 - **ล่าสุด:** 2026-09-12 — กวาดทดสอบทั้งโปรเจ็กบนระบบจริง (API ทุกโมดูล + UI เกือบทุกหน้า + desktop exe)
   - **API sweep 56 mounts จริงจาก routes.ts:** 55 ผ่าน 200 ด้วย JWT admin — จุดเดียวที่ไม่ผ่านคือ /api/v1/ai/models 502 เพราะ engine Ollama ปิดอยู่ (ตอบ error description ตามที่ออกแบบไว้, engineUp:false)
   - **พบ+แก้บั๊กเดิม:** CompostBatch/RestaurantWasteLog/FertilizerApplication อยู่ใน schema.prisma แต่ไม่เคยมี migration → endpoint จริง 500 (P2021 table ไม่มีใน sovereign_v2) ตั้งแต่วันสร้างโมดูล — สร้าง migration 20260912000000_add_compost_waste_fertilizer_tables (additive เท่านั้น: 3 ตาราง + 4 index + 2 FK; ตัด ALTER/DROP drift ของตารางเดิมทิ้งเพราะเสี่ยงข้อมูล ต้องตัดสินใจเฉพาะ) → migrate deploy สำเร็จ
