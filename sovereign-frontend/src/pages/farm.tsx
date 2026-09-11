@@ -9,6 +9,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import VoiceCommand from '../components/dashboard/VoiceCommand';
+import CompostPanel from '../components/farm/CompostPanel';
 import type { FarmPlot } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -377,6 +378,9 @@ export default function FarmPage() {
               </div>
             )}
           </div>
+
+          {/* ── วงจรปุ๋ยหมัก — ขยะ → กองหมัก → ปุ๋ยเข้าคลังอัตโนมัติ ── */}
+          <CompostPanel />
 
           {/* ── Agri-Hub Dense Top — 3D + Breedhouse + Forecast (ภาพ 3) ── */}
           <div className="grid grid-cols-12 gap-3">
