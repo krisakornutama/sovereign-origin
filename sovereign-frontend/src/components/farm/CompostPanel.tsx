@@ -31,28 +31,26 @@ const METHOD_LABEL: Record<string, string> = { hot: 'หมักร้อน', 
 const METHOD_COLOR: Record<string, string> = { hot: '#E8730C', vermi: '#B4654A', bokashi: '#C9A227', biochar: '#9CA3AF' };
 const REASON_LABEL: Record<string, string> = { trim: 'แต่งก้าน/เศษผัก', spoiled: 'เน่าเสีย', expired: 'หมดอายุ', plate_waste: 'เศษจาน', prep_error: 'เตรียมผิด' };
 
-const EMBER = '#E8730C';
-const SPROUT = '#7BC96A';
-const HUMUS = '#1C140D';
-const LOAM = '#3A2C1B';
-
 const API = `${process.env.NEXT_PUBLIC_API_URL}/api/compost`;
 const DAY_MS = 86_400_000;
 
+/** เวลาที่กองควรพร้อม (ms) — จาก estReadyAt หรือคำนวณจากระยะเวลาวิธี */
+function readyMs(b: Batch): number {
+  const start = new Date(b.startAt).getTime();
+  const days = METHOD_DAYS[b.method] ?? 30;
+  return b.estReadyAt ? new Date(b.estReadyAt).getTime() : start + days * DAY_MS;
+}
+
 /** % ความร้อนของกอง = เวลาผ่านไป / ระยะเวลาวิธีนั้น */
 function heatPct(b: Batch): number {
-  const days = METHOD_DAYS[b.method] ?? 30;
   const start = new Date(b.startAt).getTime();
-  const est = b.estReadyAt ? new Date(b.estReadyAt).getTime() : start + days * DAY_MS;
+  const est = readyMs(b);
   if (est <= start) return 100;
   return Math.max(0, Math.min(100, Math.round(((Date.now() - start) / (est - start)) * 100)));
 }
 
 function daysLeft(b: Batch): number {
-  const days = METHOD_DAYS[b.method] ?? 30;
-  const start = new Date(b.startAt).getTime();
-  const est = b.estReadyAt ? new Date(b.estReadyAt).getTime() : start + days * DAY_MS;
-  return Math.ceil((est - Date.now()) / DAY_MS);
+  return Math.ceil((readyMs(b) - Date.now()) / DAY_MS);
 }
 
 export default function CompostPanel() {
@@ -61,8 +59,7 @@ export default function CompostPanel() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   // ฟอร์มเริ่มกอง
   const [inputKg, setInputKg] = useState('');
   const [method, setMethod] = useState('hot');
@@ -85,8 +82,10 @@ export default function CompostPanel() {
   useEffect(() => { load(); }, [load]);
 
   const run = async (fn: () => Promise<string>) => {
-    setBusy(true); setErr(''); setMsg('');
-    try { setMsg(await fn()); } catch (e: any) { setErr(e.message || 'ผิดพลาด'); } finally { setBusy(false); }
+    setBusy(true); setNotice(null);
+    try { setNotice({ ok: true, text: await fn() }); }
+    catch (e: any) { setNotice({ ok: false, text: e.message || 'ผิดพลาด' }); }
+    finally { setBusy(false); }
   };
 
   const startBatch = () => run(async () => {
@@ -144,7 +143,7 @@ export default function CompostPanel() {
   const emberBtnCls = `${emberBtn} bg-[#E8730C]/15 hover:bg-[#E8730C]/25 text-[#E8730C] border-[#E8730C]/40`;
 
   return (
-    <div className="card p-4 space-y-4 border-[#3A2C1B]/60" style={{ background: `linear-gradient(180deg, ${HUMUS}cc, rgba(17,24,39,0.6))` }}>
+    <div className="card p-4 space-y-4 border-[#3A2C1B]/60" style={{ background: 'linear-gradient(180deg, #1C140Dcc, rgba(17,24,39,0.6))' }}>
       {/* หัว panel + สายงานขยะ→กอง→ปุ๋ย */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xs font-bold tracking-widest text-[#D9CDB8] flex items-center gap-1.5">
@@ -194,9 +193,9 @@ export default function CompostPanel() {
         </div>
       )}
 
-      {(msg || err) && (
-        <div role="status" className={`text-[11px] rounded px-2 py-1 border ${err ? 'text-red-300 border-red-800/60 bg-red-950/30' : 'text-[#7BC96A] border-[#3A2C1B]/60 bg-[#1C140D]/40'}`}>
-          {err || msg}
+      {(notice) && (
+        <div role="status" className={`text-[11px] rounded px-2 py-1 border ${notice.ok ? 'text-[#7BC96A] border-[#3A2C1B]/60 bg-[#1C140D]/40' : 'text-red-300 border-red-800/60 bg-red-950/30'}`}>
+          {notice.text}
         </div>
       )}
 
@@ -214,7 +213,7 @@ export default function CompostPanel() {
               {active.map((b) => {
                 const pct = heatPct(b);
                 const left = daysLeft(b);
-                const color = METHOD_COLOR[b.method] ?? EMBER;
+                const color = METHOD_COLOR[b.method] ?? '#E8730C';
                 const done = left <= 0;
                 return (
                   <div key={b.id} className="rounded-lg border border-[#3A2C1B]/60 bg-[#1C140D]/40 p-2.5 space-y-2">
