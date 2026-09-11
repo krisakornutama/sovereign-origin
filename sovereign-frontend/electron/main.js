@@ -250,7 +250,7 @@ function startBackend() {
 // ── single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง ──
 const hasSingleLock = app.requestSingleInstanceLock();
 if (hasSingleLock) app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); } });
-else app.quit();
+else { dlog('single-instance: Sovereign OS รันอยู่แล้ว — ปิดตัวซ้ำ'); app.quit(); }
 
 app.whenReady().then(() => {
   if (!hasSingleLock) return; // กันหน้าต่างซ้อนในช่วงรอ app.quit() ของ instance ที่แพ้ lock
