@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
+import { fetchJsonArray, fetchJsonObject } from '../../lib/fetchJson';
 import { getApiUrl } from '../../lib/config';
 import Icon from '../ui/Icon';
 import EmptyState from '../ui/EmptyState';
@@ -79,29 +80,24 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
   const base = `${getApiUrl()}/api/business/${biz.id}`;
 
   const load = useCallback(async () => {
-    const j = async (url: string) => { try { const r = await authFetch(url); return r.ok ? await r.json() : null; } catch { return null; } };
-    setProducts((await j(`${base}/products`)) ?? []);
-    setCustomers((await j(`${base}/customers`)) ?? []);
-    setOrders((await j(`${base}/orders`)) ?? []);
-    setInstallations((await j(`${base}/installations`)) ?? []);
-    setAgents((await j(`${base}/agents`)) ?? []);
-    setMembers((await j(`${base}/members`)) ?? []);
-    if (can('ACCOUNTANT')) setSummary(await j(`${base}/summary`));
-    if (can('ACCOUNTANT')) setLedger((await j(`${base}/ledger`)) ?? []);
+    setProducts(await fetchJsonArray(`${base}/products`));
+    setCustomers(await fetchJsonArray(`${base}/customers`));
+    setOrders(await fetchJsonArray(`${base}/orders`));
+    setInstallations(await fetchJsonArray(`${base}/installations`));
+    setAgents(await fetchJsonArray(`${base}/agents`));
+    setMembers(await fetchJsonArray(`${base}/members`));
+    if (can('ACCOUNTANT')) {
+      setSummary(await fetchJsonObject(`${base}/summary`));
+      setLedger(await fetchJsonArray(`${base}/ledger`));
+    }
   }, [base]);
 
   useEffect(() => { void load(); }, [load]);
 
-  // งาน agent รันบน Ollama ~1-3 นาที — ขณะเปิดแท็บผู้ช่วย AI ค้างไว้ ดึงสถานะใหม่เองทุก 20 วิ
-  // (เคสจริง: งานเสร็จแล้วแต่ต้องออกจากธุรกิจแล้วเข้าใหม่ถึงจะเห็นผล — badge นับงานแต่ลิสต์ไม่รีเฟรช)
+  // งาน agent รันบน Ollama ~1-3 นาที — ขณะเปิดแท็บผู้ช่วย AI ดึงสถานะใหม่เองทุก 20 วิ
   useEffect(() => {
     if (tab !== 'agents') return;
-    const t = setInterval(() => {
-      authFetch(`${base}/agents`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => { if (j) setAgents(j); })
-        .catch(() => {});
-    }, 20000);
+    const t = setInterval(() => { void fetchJsonArray(`${base}/agents`).then(setAgents); }, 20000);
     return () => clearInterval(t);
   }, [tab, base]);
 
