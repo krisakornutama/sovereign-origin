@@ -5,7 +5,14 @@
 - **สถานะ:** ✅ เสร็จแล้ว
 - **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
 - **สาขา:** master (รวม freebuff/task-26201e6b แล้ว)
-- **ล่าสุด:** 2026-09-12 — BUSINESS PLATFORM: ระบบธุรกิจขายสินค้า IoT ครบวงจรในโปรเจ็ก (สร้างธุรกิจ → ทีม/ตำแหน่ง → สินค้า → ลูกค้า → ออเดอร์ → ติดตั้ง → การเงิน → ผู้ช่วย AI 5 คน)
+- **ล่าสุด:** 2026-09-12 — ผู้ช่วย AI ธุรกิจพิสูจน์บนโมเดลจริง (Ollama กลับมาออนไลน์)
+  - **Ollama กลับมาทำงาน:** engine ปิดตั้งแต่ uninstall (app หาย แต่โมเดล 19GB ครบบน E:) — รันผ่าน Docker `sovereign-ollama` (loopback-only :11434, mount โมเดลจาก E:\...\Ollama), เห็นครบ 4 โมเดล (gemma3:4b, qwen3:8b, qwen3-vl:8b, deepseek-r1:8b), core-api เข้าถึงผ่าน host.docker.internal ได้จริง
+  - **จับบั๊ก: timeout 120s ของ executor ไม่พอกับเครื่อง CPU-only** — วัดจริง ~29s prompt-eval + ~2.3 tok/s คำตอบจริงหลุด 120s กลายเป็น error เสมอ; แก้เป็น env `OLLAMA_TIMEOUT_MS` (default 300000) ไม่กระทบเครื่องเร็ว — verify 4/4 ผ่าน (backend build + 1057 tests + tsc FE + next build), commit 53f6945 merge master แล้ว + deploy ในคอนเทนเนอร์แล้ว
+  - **งานจริง 2 agent ผ่าน API จริง:** sales_analyst → done 340 ตัวอักษร อ้างข้อมูลจริง "Agent E2E Shop ยอดขาย/ต้นทุน 0 บาท" (~2.5 นาที), stock_manager → done อ้าง SKU จริง "AGT-1 เซนเซอร์วัดอุณหภูมิ: สั่งเติม 5 / AGT-2 กล้องวงจรปิด WiFi: สั่งเติม 3" รันซ้ำสองรอบได้ผลตรงกัน (~80s) — agent_jobs: status done/progress 100/started_at+completed_at จริง; บริบทธุรกิจถูกฉีดจริง (ตอบอ้างสินค้า/ตัวเลขที่เพิ่งสร้าง)
+  - **ปรับเครื่องให้รองรับ:** ตั้ง Docker Desktop VM memoryMiB=6144 (เดิม default ~50% RAM + โมเดล 3.3GB ทำ Postgres อด RAM — docker CLI ค้าง 6 รอบ, กู้ทุกครั้งด้วย taskkill→wsl --shutdown→start), กำจัด next start ซ้ำซ้อน 1 คู่
+  - **Desktop:** exe ปิดอยู่ → `build:desktop` รีเฟรช overlay (sync 100%) + sidecar จาก dist ใหม่ที่มี fix
+  - **สะอาด:** ตารางธุรกิจทั้ง 12 = 0 แถว, agent_roles กลับ 8 (ลบ orphan business-capability 25 แถวจากรอบที่พังกลางทาง), users กลับ 8, ไม่เหลือสคริปต์ชั่วคราว, git clean
+- **ก่อนหน้า:** 2026-09-12 — BUSINESS PLATFORM: ระบบธุรกิจขายสินค้า IoT ครบวงจรในโปรเจ็ก (สร้างธุรกิจ → ทีม/ตำแหน่ง → สินค้า → ลูกค้า → ออเดอร์ → ติดตั้ง → การเงิน → ผู้ช่วย AI 5 คน)
   - **สิทธิ์ต่อธุรกิจบังคับฝั่ง server:** ตำแหน่ง OWNER/MANAGER/SALES/TECHNICIAN/STOCK_KEEPER/ACCOUNTANT/VIEWER ตรวจผ่าน hasBusinessAccess ทุก endpoint (UI ซ่อนปุ่มเป็นแค่ UX — เรียนรู้จากช่องโหว่ must_change_password เดิม); SUPERADMIN ของระบบผ่านทุกธุรกิจ
   - **state machine ออเดอร์กันสต็อกติดลบ:** QUOTE→ORDERED (ยืนยัน = หักสต็อกใน transaction ด้วย row-lock + conditional UPDATE — concurrent ยืนยันเกินสต็อกไม่ได้), ORDERED→PAID (ชำระเต็มเท่านั้น, รายรับลงสมุดบัญชีอัตโนมัติกันซ้ำด้วย refOrderId), PAID→DELIVERED, ยกเลิกจาก ORDERED คืนสต็อก; รับของเข้า = ต้นทุนเฉลี่ยเคลื่อนที่ + รายจ่ายอัตโนมัติ
   - **ผู้ช่วย AI ประจำธุรกิจ:** seed อัตโนมัติ 5 บทบาท (📊 ยอดขาย / 📦 สต็อก / 💬 ลูกค้า / 📣 การตลาด / 🧾 บัญชี) ลงระบบ AgentRole/AgentJob เดิม (Ollama local) — ฉีดข้อมูลจริงของธุรกิจเข้า prompt แบบอ่านอย่างเดียว; สต็อกต่ำกว่าจุดสั่งเติมเตือน Telegram ผ่าน worker ทุก 6 ชม.
