@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import { fetchJsonArray, fetchJsonObject } from '../../lib/fetchJson';
@@ -117,16 +117,19 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
   // ── ผู้ช่วย AI: สั่งงาน ──
   const [agentPrompt, setAgentPrompt] = useState<Record<string, string>>({});
   const [runningAgent, setRunningAgent] = useState<string | null>(null);
+  const runningRef = useRef<string | null>(null); // sync guard — rapid same-tick clicks bypass disabled-state renders
   async function runAgent(agent: Agent) {
     const prompt = (agentPrompt[agent.key] ?? '').trim();
     if (!prompt) { setNotice({ ok: false, text: 'พิมพ์ภารกิจก่อนสั่งงาน' }); return; }
+    if (runningRef.current) return;
+    runningRef.current = agent.id;
     setRunningAgent(agent.id);
     try {
       await post(`${base}/agents/${agent.id}/run`, { prompt });
       setNotice({ ok: true, text: `${agent.emoji} ${agent.name} กำลังทำงาน — รอสักครู่แล้วกดรีเฟรช` });
       setAgentPrompt((s) => ({ ...s, [agent.key]: '' }));
     } catch (e: any) { setNotice({ ok: false, text: e.message }); }
-    finally { setRunningAgent(null); }
+    finally { runningRef.current = null; setRunningAgent(null); }
   }
 
   // ── ออเดอร์: สร้าง + transition ──
@@ -146,7 +149,7 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
       await post(`${base}/orders/${order.id}/transition`, { action });
       setNotice({ ok: true, text: `${order.orderNo} → ${label}` });
       await load();
-    } catch (e: any) { setNotice({ ok: false, text: e.message }); }
+    } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
   }
   async function markPaid(order: Order) {
     const remain = Math.max(0, order.total - order.paidAmount);
@@ -154,7 +157,7 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
       await post(`${base}/orders/${order.id}/payments`, { amount: remain, method: 'CASH' });
       setNotice({ ok: true, text: `รับชำระ ${order.orderNo} ครบ ${baht(order.total)}` });
       await load();
-    } catch (e: any) { setNotice({ ok: false, text: e.message }); }
+    } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
   }
 
   const tabOk = (t: Tab) => (TABS.find((x) => x.key === t)?.minRank ?? 6) >= (POSITION_RANK[myPosition] ?? 6);
@@ -386,8 +389,12 @@ function ProductsTab({ products, canWrite, onAdded, onError, base, post }: any) 
           <input placeholder="สเปคย่อ" value={form.specs} onChange={(e) => setForm({ ...form, specs: e.target.value })} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="สเปค" />
         </div>
         <button onClick={async () => {
+          if (!form.sku.trim()) { onError('กรอก SKU ก่อน'); return; }
+          if (!form.name.trim()) { onError('กรอกชื่อสินค้าก่อน'); return; }
+          if (Number(form.costPrice) < 0 || Number(form.salePrice) < 0) { onError('ราคาติดลบไม่ได้'); return; }
           try {
-            await post(`${base}/products`, { ...form, costPrice: Number(form.costPrice) || 0, salePrice: Number(form.salePrice) || 0, stockQty: Number(form.stockQty) || 0, reorderPoint: Number(form.reorderPoint) || 0, warrantyMonths: Number(form.warrantyMonths) || 0 });
+            const payload = { ...form, costPrice: Number(form.costPrice) || 0, salePrice: Number(form.salePrice) || 0, stockQty: Number(form.stockQty) || 0, reorderPoint: Number(form.reorderPoint) || 0, warrantyMonths: Number(form.warrantyMonths) || 0 };
+            await post(`${base}/products`, payload).catch((e: any) => { throw new Error(/Unique constraint/i.test(e.message) ? 'SKU นี้มีอยู่แล้ว' : e.message); });
             setForm({ sku: '', name: '', category: 'SENSOR', costPrice: '', salePrice: '', stockQty: '', reorderPoint: '3', warrantyMonths: '12', specs: '' });
             onAdded();
           } catch (e: any) { onError(e.message); }

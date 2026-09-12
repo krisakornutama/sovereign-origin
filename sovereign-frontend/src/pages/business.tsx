@@ -47,6 +47,8 @@ export default function BusinessPage() {
 
   async function createBusiness() {
     if (!form.name.trim()) { setNotice({ ok: false, text: 'ตั้งชื่อธุรกิจก่อน' }); return; }
+    const vat = Number(form.vatRate);
+    if (!Number.isFinite(vat) || vat < 0 || vat > 30) { setNotice({ ok: false, text: 'VAT ต้องอยู่ระหว่าง 0-30%' }); return; }
     setBusy(true);
     try {
       const res = await authFetch(`${getApiUrl()}/api/business`, {

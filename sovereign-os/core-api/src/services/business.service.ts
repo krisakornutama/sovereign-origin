@@ -100,6 +100,12 @@ export async function createProduct(businessId: string, input: any): Promise<any
   const sku = str(input?.sku, 40);
   const name = str(input?.name, 120);
   if (!sku || !name) throw new Error('sku and name are required');
+  // ราคาติดลบหรือไม่ใช่ตัวเลขต้อง reject ไม่ใช่เก็บเป็น 0 (เคสจริง: 'abc'/-50 กลายเป็นสินค้าฟรี)
+  const costPrice = Number(input?.costPrice ?? 0);
+  const salePrice = Number(input?.salePrice ?? 0);
+  if (!Number.isFinite(costPrice) || costPrice < 0 || !Number.isFinite(salePrice) || salePrice < 0) {
+    throw new Error('costPrice and salePrice must be non-negative numbers');
+  }
   return prisma.businessProduct.create({
     data: {
       businessId,
@@ -107,8 +113,8 @@ export async function createProduct(businessId: string, input: any): Promise<any
       name,
       category: str(input?.category, 40) || 'GENERAL',
       specs: input?.specs ? str(input.specs, 500) : null,
-      costPrice: num(input?.costPrice, 0, 10_000_000),
-      salePrice: num(input?.salePrice, 0, 10_000_000),
+      costPrice,
+      salePrice,
       stockQty: Math.floor(num(input?.stockQty, 0, 1_000_000)),
       reorderPoint: Math.floor(num(input?.reorderPoint, 0, 1_000_000)),
       warrantyMonths: Math.floor(num(input?.warrantyMonths, 0, 120)),
