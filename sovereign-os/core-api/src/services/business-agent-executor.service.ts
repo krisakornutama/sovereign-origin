@@ -9,6 +9,8 @@ import { businessContextFor } from './business.service';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || '2m';
+// CPU-only เครื่อง (~2 tok/s) คำตอบจริงอาจนานเกิน 120s — ปรับได้ผ่าน env, ค่าเริ่ม 5 นาที
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS) || 300000;
 
 /** รัน job ของผู้ช่วยธุรกิจ: context ธุรกิจ + system prompt ของ role → Ollama → บันทึกผลลง AgentJob เดิม */
 export async function runBusinessAgentJob(jobId: string, agentKey: string, businessId: string): Promise<void> {
@@ -31,7 +33,7 @@ export async function runBusinessAgentJob(jobId: string, agentKey: string, busin
     const resp = await axios.post(
       OLLAMA_URL + '/api/generate',
       { model, system: sys, prompt: userPrompt, stream: false, keep_alive: OLLAMA_KEEP_ALIVE },
-      { timeout: 120000 }
+      { timeout: OLLAMA_TIMEOUT_MS }
     );
     const result = String(resp.data?.response ?? '').trim().slice(0, 8000);
     await prisma.agentJob.update({
