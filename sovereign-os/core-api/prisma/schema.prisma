@@ -52,6 +52,10 @@ model User {
   meditation_sessions MeditationSession[]
   healing_logs       HealingLog[]
 
+  // ── BUSINESS PLATFORM: ธุรกิจที่เป็นเจ้าของ + ตำแหน่งที่ถือ ──
+  businesses_owned    Business[]        @relation("BusinessOwner")
+  business_memberships BusinessMember[] @relation("BusinessMemberships")
+
   @@map("users")
 }
 
@@ -1826,4 +1830,244 @@ model LearningModelState {
   stats       Json? // { total: 100, correct: 82 }
 
   @@map("learning_model_states")
+}
+
+// ─────────────────────────────────────────────
+// BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT
+// หนึ่งธุรกิจ = ทีม+ตำแหน่ง / สินค้า / ลูกค้า / ออเดอร์ / ติดตั้ง / การเงิน / ผู้ช่วย AI
+// สิทธิ์บังคับฝั่ง server ผ่าน requireBusinessAccess — ห้ามไว้แค่ client
+// ─────────────────────────────────────────────
+
+// ตำแหน่งในธุรกิจ — ลำดับ = ระดับสิทธิ์ (มาก → น้อย)
+// OWNER ทุกอย่าง · MANAGER บริหาร · SALES ขาย · TECHNICIAN ติดตั้ง ·
+// STOCK_KEEPER คลัง · ACCOUNTANT การเงินอ่าน+กระทบยอด · VIEWER อ่านอย่างเดียว
+model Business {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  bizType      String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
+  vatRate      Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
+  isActive     Boolean  @default(true)
+  ownerId      String   @db.Uuid // ผู้สร้างธุรกิจ (User)
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+
+  owner        User                  @relation("BusinessOwner", fields: [ownerId], references: [id])
+  members      BusinessMember[]
+  products     BusinessProduct[]
+  customers    BusinessCustomer[]
+  orders       BusinessOrder[]
+  suppliers    BusinessSupplier[]
+  purchaseOrders BusinessPurchaseOrder[]
+  installations BusinessInstallation[]
+  ledger       BusinessLedgerEntry[]
+  agents       BusinessAgent[]
+
+  @@map("businesses")
+}
+
+model BusinessMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  userId     String   @db.Uuid
+  position   String   @default("VIEWER") // OWNER | MANAGER | SALES | TECHNICIAN | STOCK_KEEPER | ACCOUNTANT | VIEWER
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation("BusinessMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@map("business_members")
+}
+
+model BusinessProduct {
+  id           String   @id @default(uuid()) @db.Uuid
+  businessId   String   @db.Uuid
+  sku          String
+  name         String
+  category     String   @default("GENERAL")
+  specs        String? // สเปคย่อ (เช่น ESP32, วัด 3 เฟส)
+  costPrice    Float    @default(0) // ทุน
+  salePrice    Float    @default(0) // ราคาขาย
+  stockQty     Int      @default(0)
+  reorderPoint Int      @default(0) // ต่ำกว่านี้ = ควรสั่งเติม
+  warrantyMonths Int    @default(0)
+  inventoryItemId String? @db.Uuid // เชื่อมคลังกลาง (InventoryItem) ได้
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderLines BusinessOrderLine[]
+
+  @@unique([businessId, sku])
+  @@index([businessId, isActive])
+  @@map("business_products")
+}
+
+model BusinessCustomer {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  name       String
+  phone      String?
+  lineId     String? // LINE ID สำหรับติดต่อ
+  address    String?
+  taxId      String?
+  channel    String   @default("ONLINE") // ONLINE | SHOP | B2B
+  notes      String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  updatedAt  DateTime @updatedAt @db.Timestamptz
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   BusinessOrder[]
+
+  @@index([businessId, phone])
+  @@map("business_customers")
+}
+
+// สถานะออเดอร์: QUOTE → ORDERED → PAID → DELIVERED (ยกเลิกได้จาก QUOTE/ORDERED)
+// ยืนยันออเดอร์ (ORDERED) = หักสต็อก · ยกเลิก = คืนสต็อก
+model BusinessOrder {
+  id           String    @id @default(uuid()) @db.Uuid
+  businessId   String    @db.Uuid
+  orderNo      String // B20260912-0001
+  customerId   String?   @db.Uuid
+  channel      String    @default("ONLINE") // ONLINE | SHOP | B2B
+  status       String    @default("QUOTE") // QUOTE | ORDERED | PAID | DELIVERED | CANCELLED
+  subtotal     Float     @default(0)
+  vat          Float     @default(0)
+  total        Float     @default(0)
+  paidAmount   Float     @default(0)
+  assignedToId String?   @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
+  note         String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
+
+  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   BusinessCustomer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lines      BusinessOrderLine[]
+  payments   BusinessPayment[]
+  installations BusinessInstallation[]
+
+  @@unique([businessId, orderNo])
+  @@index([businessId, status])
+  @@map("business_orders")
+}
+
+model BusinessOrderLine {
+  id          String @id @default(uuid()) @db.Uuid
+  orderId     String @db.Uuid
+  productId   String @db.Uuid
+  qty         Int
+  unitPrice   Float // snapshot ราคาขาย ณ ตอนเปิดออเดอร์
+  unitCost    Float  @default(0) // snapshot ทุน ณ ตอนเปิดออเดอร์ (คิดกำไรจริง)
+  description String?
+
+  order    BusinessOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product  BusinessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("business_order_lines")
+}
+
+model BusinessPayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @db.Uuid
+  amount    Float
+  method    String   @default("CASH") // CASH | TRANSFER | PROMPTPAY
+  reference String? // เลขอ้างอิงโอน/PromptPay
+  paidAt    DateTime @default(now()) @db.Timestamptz
+
+  order BusinessOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("business_payments")
+}
+
+model BusinessSupplier {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  name       String
+  phone      String?
+  note       String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  business Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   BusinessPurchaseOrder[]
+
+  @@map("business_suppliers")
+}
+
+model BusinessPurchaseOrder {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  supplierId String   @db.Uuid
+  productId  String   @db.Uuid
+  qty        Int
+  unitCost   Float
+  status     String   @default("DRAFT") // DRAFT | SENT | RECEIVED
+  note       String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  receivedAt DateTime? @db.Timestamptz
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier BusinessSupplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  product  BusinessProduct  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("business_purchase_orders")
+}
+
+// งานติดตั้งหน้างาน — IoT ต้องมีช่างลงไปตั้งค่าจริง
+model BusinessInstallation {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  orderId     String?   @db.Uuid
+  title       String
+  scheduledAt DateTime?
+  technicianId String?  @db.Uuid // User ตำแหน่ง TECHNICIAN
+  checklist   Json?     // ["ติดตั้งเซ็นเซอร์","ตั้งค่า WiFi","ทดสอบแจ้งเตือน"]
+  status      String    @default("TODO") // TODO | IN_PROGRESS | DONE
+  note        String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  completedAt DateTime? @db.Timestamptz
+
+  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order      BusinessOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("business_installations")
+}
+
+// สมุดบัญชีต่อธุรกิจ — ขาย = INCOME อัตโนมัติ, ของเข้า/ค่าใช้จ่าย = EXPENSE
+model BusinessLedgerEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  type       String // INCOME | EXPENSE
+  category   String   @default("SALES") // SALES | RESTOCK | TRANSPORT | ADS | OTHER
+  amount     Float
+  note       String?
+  refOrderId String?  @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@map("business_ledger_entries")
+}
+
+// ผู้ช่วย AI ประจำธุรกิจ — รันบน AgentRole ของ Ollama เดิม (capability = business:<id>)
+model BusinessAgent {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  roleId     String   @db.Uuid // AgentRole.id
+  key        String // sales_analyst | stock_manager | customer_service | marketer | accountant
+  name       String
+  emoji      String   @default("🤖")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, key])
+  @@map("business_agents")
 }

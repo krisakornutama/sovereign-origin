@@ -44,6 +44,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: '/farm', label: 'Farm Plots', group: 'ชีวิต & การเงิน' },
   { key: '/livestock', label: 'Sovereign Livestock', group: 'ชีวิต & การเงิน' },
   { key: '/restaurant', label: 'Restaurant Empire', group: 'ชีวิต & การเงิน' },
+  { key: '/business', label: 'ธุรกิจของฉัน (Business Platform)', group: 'ชีวิต & การเงิน' },
   { key: '/selfreliance', label: 'วันรอด (Autonomy)', group: 'ชีวิต & การเงิน' },
   { key: '/portfolio', label: 'Wealth & Assets (legacy)', group: 'ชีวิต & การเงิน' },
   { key: '/treasury', label: 'Treasury & Invest', group: 'ชีวิต & การเงิน' },

@@ -14,6 +14,7 @@ import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySumma
 import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
+import { notifyLowStock } from '../services/business.service';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
 import { warRoomActive } from '../services/war-room.service';
@@ -256,6 +257,18 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runAgentMorningReports();
   setInterval(runAgentMorningReports, 30 * 60 * 1000);
+
+  // ── BUSINESS PLATFORM: เตือนสต็อกต่ำของทุกธุรกิจผ่าน Telegram (ทุก 6 ชม.) ──
+  async function runBusinessLowStockCheck() {
+    try {
+      const n = await notifyLowStock();
+      if (n > 0) console.log(`📦 Business low-stock: พบ ${n} รายการ เตือนแล้ว`);
+    } catch (err) {
+      console.error('Business low-stock error:', err instanceof Error ? err.message : err);
+    }
+  }
+  runBusinessLowStockCheck();
+  setInterval(runBusinessLowStockCheck, 6 * 60 * 60 * 1000);
 
   // ── Vision AI คนแปลกหน้า: ตรวจตามกฎ (ทุก 60 วิ — ตัวกฎกันการตรวจซ้ำด้วย interval_min) ──
   async function runVisionCheckWorker() {
