@@ -43,6 +43,10 @@ model User {
   meditation_sessions MeditationSession[]
   healing_logs       HealingLog[]
 
+  // ── BUSINESS PLATFORM: ธุรกิจที่เป็นเจ้าของ + ตำแหน่งที่ถือ ──
+  businesses_owned    Business[]        @relation("BusinessOwner")
+  business_memberships BusinessMember[] @relation("BusinessMemberships")
+
   @@map("users")
 }
 
@@ -1790,4 +1794,234 @@ model LearningModelState {
   stats       String? // { total: 100, correct: 82 }
 
   @@map("learning_model_states")
+}
+
+// ─────────────────────────────────────────────
+// BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (SQLite sidecar เวอร์ชัน)
+// ─────────────────────────────────────────────
+
+model Business {
+  id           String   @id @default(uuid())
+  name         String
+  bizType      String   @default("IOT_RETAIL")
+  vatRate      Float    @default(0.07)
+  isActive     Boolean  @default(true)
+  ownerId      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  owner        User                  @relation("BusinessOwner", fields: [ownerId], references: [id])
+  members      BusinessMember[]
+  products     BusinessProduct[]
+  customers    BusinessCustomer[]
+  orders       BusinessOrder[]
+  suppliers    BusinessSupplier[]
+  purchaseOrders BusinessPurchaseOrder[]
+  installations BusinessInstallation[]
+  ledger       BusinessLedgerEntry[]
+  agents       BusinessAgent[]
+
+  @@map("businesses")
+}
+
+model BusinessMember {
+  id         String   @id @default(uuid())
+  businessId String
+  userId     String
+  position   String   @default("VIEWER")
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation("BusinessMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@map("business_members")
+}
+
+model BusinessProduct {
+  id           String   @id @default(uuid())
+  businessId   String
+  sku          String
+  name         String
+  category     String   @default("GENERAL")
+  specs        String?
+  costPrice    Float    @default(0)
+  salePrice    Float    @default(0)
+  stockQty     Int      @default(0)
+  reorderPoint Int      @default(0)
+  warrantyMonths Int    @default(0)
+  inventoryItemId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderLines BusinessOrderLine[]
+
+  @@unique([businessId, sku])
+  @@index([businessId, isActive])
+  @@map("business_products")
+}
+
+model BusinessCustomer {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  phone      String?
+  lineId     String?
+  address    String?
+  taxId      String?
+  channel    String   @default("ONLINE")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   BusinessOrder[]
+
+  @@index([businessId, phone])
+  @@map("business_customers")
+}
+
+model BusinessOrder {
+  id           String    @id @default(uuid())
+  businessId   String
+  orderNo      String
+  customerId   String?
+  channel      String    @default("ONLINE")
+  status       String    @default("QUOTE")
+  subtotal     Float     @default(0)
+  vat         Float     @default(0)
+  total        Float     @default(0)
+  paidAmount   Float     @default(0)
+  assignedToId String?
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime @updatedAt
+
+  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   BusinessCustomer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lines      BusinessOrderLine[]
+  payments   BusinessPayment[]
+  installations BusinessInstallation[]
+
+  @@unique([businessId, orderNo])
+  @@index([businessId, status])
+  @@map("business_orders")
+}
+
+model BusinessOrderLine {
+  id          String @id @default(uuid())
+  orderId     String
+  productId   String
+  qty         Int
+  unitPrice   Float
+  unitCost    Float  @default(0)
+  description String?
+
+  order    BusinessOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product  BusinessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("business_order_lines")
+}
+
+model BusinessPayment {
+  id        String   @id @default(uuid())
+  orderId   String
+  amount    Float
+  method    String   @default("CASH")
+  reference String?
+  paidAt    DateTime @default(now())
+
+  order BusinessOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("business_payments")
+}
+
+model BusinessSupplier {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  phone      String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  business Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders   BusinessPurchaseOrder[]
+
+  @@map("business_suppliers")
+}
+
+model BusinessPurchaseOrder {
+  id         String   @id @default(uuid())
+  businessId String
+  supplierId String
+  productId  String
+  qty        Int
+  unitCost   Float
+  status     String   @default("DRAFT")
+  note       String?
+  createdAt  DateTime @default(now())
+  receivedAt DateTime?
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier BusinessSupplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  product  BusinessProduct  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("business_purchase_orders")
+}
+
+model BusinessInstallation {
+  id          String    @id @default(uuid())
+  businessId  String
+  orderId     String?
+  title       String
+  scheduledAt DateTime?
+  technicianId String?
+  checklist   String?
+  status      String    @default("TODO")
+  note        String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order      BusinessOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("business_installations")
+}
+
+model BusinessLedgerEntry {
+  id         String   @id @default(uuid())
+  businessId String
+  type       String
+  category   String   @default("SALES")
+  amount     Float
+  note       String?
+  refOrderId String?
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@map("business_ledger_entries")
+}
+
+model BusinessAgent {
+  id         String   @id @default(uuid())
+  businessId String
+  roleId     String
+  key        String
+  name       String
+  emoji      String   @default("🤖")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, key])
+  @@map("business_agents")
 }
