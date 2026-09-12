@@ -92,6 +92,19 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
 
   useEffect(() => { void load(); }, [load]);
 
+  // งาน agent รันบน Ollama ~1-3 นาที — ขณะเปิดแท็บผู้ช่วย AI ค้างไว้ ดึงสถานะใหม่เองทุก 20 วิ
+  // (เคสจริง: งานเสร็จแล้วแต่ต้องออกจากธุรกิจแล้วเข้าใหม่ถึงจะเห็นผล — badge นับงานแต่ลิสต์ไม่รีเฟรช)
+  useEffect(() => {
+    if (tab !== 'agents') return;
+    const t = setInterval(() => {
+      authFetch(`${base}/agents`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j) setAgents(j); })
+        .catch(() => {});
+    }, 20000);
+    return () => clearInterval(t);
+  }, [tab, base]);
+
   useEffect(() => {
     if (!notice || !notice.ok) return;
     const t = setTimeout(() => setNotice(null), 4000);
