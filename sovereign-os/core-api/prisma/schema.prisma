@@ -29,31 +29,31 @@ model User {
   must_change_password Boolean @default(false)
   assigned_node_id     String? @db.Uuid
 
-  assigned_node Node?      @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
+  assigned_node Node?         @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs    AuditLog[]
   dose_logs     DoseLog[]
   skill_matrix  SkillMatrix[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
-  asset_positions  AssetPosition[]
-  inventory_items  InventoryItem[]
-  wealth_history   WealthHistory[]
-  feature_grants   UserFeatureGrant[]
-  balance_sheet    PersonalBalanceSheet?
-  survival_runways SurvivalRunway[]
-  treasury_events  TreasuryEvent[]
-  transfer_orders  TransferOrder[]
-  dime_statements  DimeStatement[]
-  health_profile     HealthProfile?
+  asset_positions     AssetPosition[]
+  inventory_items     InventoryItem[]
+  wealth_history      WealthHistory[]
+  feature_grants      UserFeatureGrant[]
+  balance_sheet       PersonalBalanceSheet?
+  survival_runways    SurvivalRunway[]
+  treasury_events     TreasuryEvent[]
+  transfer_orders     TransferOrder[]
+  dime_statements     DimeStatement[]
+  health_profile      HealthProfile?
   health_observations HealthObservation[]
-  health_flags       HealthFlag[]
-  health_consents    HealthConsent[]
-  health_readings    HealthReading[]
+  health_flags        HealthFlag[]
+  health_consents     HealthConsent[]
+  health_readings     HealthReading[]
   meditation_sessions MeditationSession[]
-  healing_logs       HealingLog[]
+  healing_logs        HealingLog[]
 
   // ── BUSINESS PLATFORM: ธุรกิจที่เป็นเจ้าของ + ตำแหน่งที่ถือ ──
-  businesses_owned    Business[]        @relation("BusinessOwner")
+  businesses_owned     Business[]       @relation("BusinessOwner")
   business_memberships BusinessMember[] @relation("BusinessMemberships")
 
   @@map("users")
@@ -273,15 +273,15 @@ model TransferOrder {
 //       upsert AssetPosition (STOCK) + AssetPrice → เก็บ raw ไว้เป็น history
 // dedupe 2 ชั้น: message_id (จากอีเมล) / raw_text_hash (จาก PDF) — ป้องกัน import ซ้ำ
 model DimeStatement {
-  id               String   @id @default(uuid()) @db.Uuid
-  user_id          String?  @db.Uuid // เจ้าของพอร์ตที่ statement ผูก (null = ยัง mapping ไม่ได้)
-  statement_period String // "YYYY-MM" — เดือนของสเตตเมนต์
-  message_id       String?  @unique // Message-ID จากอีเมลต้นทาง
-  raw_text_hash    String?  @unique // sha1 ของข้อความ PDF ที่ extract — กันไฟล์ซ้ำ
-  source           String   @default("EMAIL") // EMAIL | UPLOAD
-  subject          String? // subject ของอีเมล / ชื่อไฟล์ที่อัปโหลด
-  assets           Json // [{ statement_period, ticker, company_name, shares, avg_cost, current_price, total_value, currency, allocation_pct?, total_return_pct?, total_return_usd? }]
-  skipped          Json? // แถวที่ validate ไม่ผ่าน [{ line, ticker?, reason }]
+  id                    String   @id @default(uuid()) @db.Uuid
+  user_id               String?  @db.Uuid // เจ้าของพอร์ตที่ statement ผูก (null = ยัง mapping ไม่ได้)
+  statement_period      String // "YYYY-MM" — เดือนของสเตตเมนต์
+  message_id            String?  @unique // Message-ID จากอีเมลต้นทาง
+  raw_text_hash         String?  @unique // sha1 ของข้อความ PDF ที่ extract — กันไฟล์ซ้ำ
+  source                String   @default("EMAIL") // EMAIL | UPLOAD
+  subject               String? // subject ของอีเมล / ชื่อไฟล์ที่อัปโหลด
+  assets                Json // [{ statement_period, ticker, company_name, shares, avg_cost, current_price, total_value, currency, allocation_pct?, total_return_pct?, total_return_usd? }]
+  skipped               Json? // แถวที่ validate ไม่ผ่าน [{ line, ticker?, reason }]
   // ── สรุปหน้าแรกของสเตตเมนต์ ──
   account_no            String? // เช่น "47170"
   investment_account_no String? // เช่น "1478800017601"
@@ -478,9 +478,9 @@ model FarmPlot {
   created_at          DateTime  @default(now()) @db.Timestamptz
   updated_at          DateTime  @updatedAt @db.Timestamptz
 
-  soil_readings FarmSoilReading[]
+  soil_readings           FarmSoilReading[]
   fertilizer_applications FertilizerApplication[]
-  herb_beds HerbBed[]
+  herb_beds               HerbBed[]
 
   @@index([status])
   @@index([category])
@@ -827,17 +827,17 @@ model KidProfile {
 
 // ผลแบบทดสอบ / บทเรียนที่เรียนจบของเด็กแต่ละคน
 model KidLessonProgress {
-  id                 String           @id @default(uuid()) @db.Uuid
-  kid_id             String           @db.Uuid
-  lesson_item_id     String?          @db.Uuid // knowledge item id ของบทเรียนที่เก็บไว้ (ถ้ามี)
+  id                 String   @id @default(uuid()) @db.Uuid
+  kid_id             String   @db.Uuid
+  lesson_item_id     String?  @db.Uuid // knowledge item id ของบทเรียนที่เก็บไว้ (ถ้ามี)
   lesson_title       String
   score              Int // จำนวนข้อที่ตอบถูก
   total              Int // จำนวนข้อทั้งหมด
-  curriculum_item_id String?          @db.Uuid // บทเรียนจากหลักสูตรสาขา (curriculum_items) — ถ้าบันทึกผ่านหลักสูตรสร้างยอดคน
-  completed_at       DateTime         @default(now()) @db.Timestamptz
+  curriculum_item_id String?  @db.Uuid // บทเรียนจากหลักสูตรสาขา (curriculum_items) — ถ้าบันทึกผ่านหลักสูตรสร้างยอดคน
+  completed_at       DateTime @default(now()) @db.Timestamptz
 
-  kid              KidProfile      @relation(fields: [kid_id], references: [id], onDelete: Cascade)
-  curriculum_item  CurriculumItem? @relation(fields: [curriculum_item_id], references: [id])
+  kid             KidProfile      @relation(fields: [kid_id], references: [id], onDelete: Cascade)
+  curriculum_item CurriculumItem? @relation(fields: [curriculum_item_id], references: [id])
 
   @@index([kid_id, completed_at])
   @@index([curriculum_item_id])
@@ -1012,14 +1012,14 @@ model KidPortfolioSnapshot {
 // + หลักสูตรรายบท (item) ที่เรียนได้จริงที่บ้าน — เชื่อมกับบันทึกเรียนจบ (kid_lesson_progress)
 // ─────────────────────────────────────────────
 model CurriculumTrack {
-  id          String           @id @default(uuid()) @db.Uuid
-  code        String           @unique // เช่น INNER_OS | MICRO_ECONOMY | ENGINEERING | ...
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique // เช่น INNER_OS | MICRO_ECONOMY | ENGINEERING | ...
   title       String // ชื่อสาขา เช่น "Inner OS — จัดการใจและตัวเอง"
   description String?
-  emoji       String           @default("🎓")
-  color       String           @default("#10b981")
-  sort_order  Int              @default(0) @db.Integer
-  created_at  DateTime         @default(now()) @db.Timestamptz
+  emoji       String   @default("🎓")
+  color       String   @default("#10b981")
+  sort_order  Int      @default(0) @db.Integer
+  created_at  DateTime @default(now()) @db.Timestamptz
 
   items CurriculumItem[]
 
@@ -1028,13 +1028,13 @@ model CurriculumTrack {
 
 // บทเรียนในแต่ละสาขา — ระดับ 1-4 (เริ่มต้น/พื้นฐาน/ประยุกต์/เชี่ยวชาญ)
 model CurriculumItem {
-  id          String               @id @default(uuid()) @db.Uuid
-  track_id    String               @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  track_id    String   @db.Uuid
   title       String // ชื่อบทเรียน เช่น "ตั้งเป้าหมายออมเดือนนี้"
   description String?
-  stage       Int                  @default(1) @db.Integer // 1 เริ่มต้น · 2 พื้นฐาน · 3 ประยุกต์ · 4 เชี่ยวชาญ
-  sequence    Int                  @default(1) @db.Integer // ลำดับในสาขา
-  created_at  DateTime             @default(now()) @db.Timestamptz
+  stage       Int      @default(1) @db.Integer // 1 เริ่มต้น · 2 พื้นฐาน · 3 ประยุกต์ · 4 เชี่ยวชาญ
+  sequence    Int      @default(1) @db.Integer // ลำดับในสาขา
+  created_at  DateTime @default(now()) @db.Timestamptz
 
   track    CurriculumTrack     @relation(fields: [track_id], references: [id], onDelete: Cascade)
   progress KidLessonProgress[]
@@ -1555,15 +1555,15 @@ model Restaurant {
 }
 
 model RestaurantCustomer {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String
-  phone        String?
-  knownFaceId  String?  @db.Uuid
-  points       Int      @default(0)
-  tier         String   @default("BRONZE")
-  consentFace  Boolean  @default(false)
-  createdAt    DateTime @default(now()) @db.Timestamptz
-  updatedAt    DateTime @updatedAt @db.Timestamptz
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  phone       String?
+  knownFaceId String?  @db.Uuid
+  points      Int      @default(0)
+  tier        String   @default("BRONZE")
+  consentFace Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   orders RestaurantOrder[]
 
@@ -1618,8 +1618,8 @@ model RestaurantOrder {
   createdAt    DateTime @default(now()) @db.Timestamptz
   updatedAt    DateTime @updatedAt @db.Timestamptz
 
-  restaurant Restaurant          @relation(fields: [restaurantId], references: [id])
-  customer   RestaurantCustomer? @relation(fields: [customerId], references: [id])
+  restaurant Restaurant            @relation(fields: [restaurantId], references: [id])
+  customer   RestaurantCustomer?   @relation(fields: [customerId], references: [id])
   lines      RestaurantOrderLine[]
 
   @@index([restaurantId, createdAt])
@@ -1675,12 +1675,12 @@ model DoseLog {
 
 // ── Herb Bed — แปลงย่อยสมุนไพรใน FarmPlot ──
 model HerbBed {
-  id        String   @id @default(uuid()) @db.Uuid
-  plot_id   String   @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  plot_id   String    @db.Uuid
   herbId    String
   area_sqm  Float?
   plantedAt DateTime? @db.Timestamptz
-  status    String   @default("growing") // growing | ready | harvested
+  status    String    @default("growing") // growing | ready | harvested
 
   plot FarmPlot @relation(fields: [plot_id], references: [id], onDelete: Cascade)
 
@@ -1706,28 +1706,28 @@ model SkillMatrix {
 
 // ── Crisis Playbook — โหมดวิกฤต 1 ปุ่ม ──
 model CrisisMode {
-  id          String   @id @default(uuid()) @db.Uuid
-  mode        String   @unique // flood | blackout | security
-  active      Boolean  @default(false)
+  id          String    @id @default(uuid()) @db.Uuid
+  mode        String    @unique // flood | blackout | security
+  active      Boolean   @default(false)
   actions     Json // string[] เช่น ["ปิดรีเลย์ non-critical","สำรองข้อมูล"]
   activatedAt DateTime? @db.Timestamptz
-  createdAt   DateTime @default(now()) @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
 
   @@map("crisis_modes")
 }
 
 // ── Herb Catalog — รวม HERB_DB + HERBAL_REMEDIES 12 ชนิด ──
 model HerbCatalog {
-  id               String   @id @default(uuid()) @db.Uuid
-  herbId           String   @unique // andrographis, turmeric, hibiscus ...
-  thaiName         String
-  latinName        String?
-  uses             Json // string[]
-  warnings         Json // string[]
+  id                String   @id @default(uuid()) @db.Uuid
+  herbId            String   @unique // andrographis, turmeric, hibiscus ...
+  thaiName          String
+  latinName         String?
+  uses              Json // string[]
+  warnings          Json // string[]
   contraindications Json // string[] เช่น ["pregnancy","hypotension"]
-  growthDays       Int? // วันจากปลูกถึงเก็บ
-  idealSoil        Json? // {ph: [6,7], moisture: [60,80]}
-  createdAt        DateTime @default(now()) @db.Timestamptz
+  growthDays        Int? // วันจากปลูกถึงเก็บ
+  idealSoil         Json? // {ph: [6,7], moisture: [60,80]}
+  createdAt         DateTime @default(now()) @db.Timestamptz
 
   @@map("herb_catalogs")
 }
@@ -1749,17 +1749,17 @@ model RestaurantWasteLog {
 }
 
 model CompostBatch {
-  id           String    @id @default(uuid()) @db.Uuid
-  method       String    @default("hot") // hot | vermi | bokashi | biochar
-  status       String    @default("active") // active | curing | ready | applied
-  inputKg      Float
-  outputKg     Float? // หลังย่อย 50%
-  npkEstimate  Json? // {n,p,k}
-  startAt      DateTime  @default(now()) @db.Timestamptz
-  estReadyAt   DateTime?
-  readyAt      DateTime?
-  note         String?
-  createdAt    DateTime  @default(now()) @db.Timestamptz
+  id          String    @id @default(uuid()) @db.Uuid
+  method      String    @default("hot") // hot | vermi | bokashi | biochar
+  status      String    @default("active") // active | curing | ready | applied
+  inputKg     Float
+  outputKg    Float? // หลังย่อย 50%
+  npkEstimate Json? // {n,p,k}
+  startAt     DateTime  @default(now()) @db.Timestamptz
+  estReadyAt  DateTime?
+  readyAt     DateTime?
+  note        String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz
 
   applications FertilizerApplication[]
 
@@ -1776,7 +1776,7 @@ model FertilizerApplication {
   appliedAt       DateTime @default(now()) @db.Timestamptz
   note            String?
 
-  plot         FarmPlot     @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  plot         FarmPlot      @relation(fields: [plotId], references: [id], onDelete: Cascade)
   compostBatch CompostBatch? @relation(fields: [compostBatchId], references: [id])
 
   @@index([plotId, appliedAt])
@@ -1785,13 +1785,13 @@ model FertilizerApplication {
 
 // ── Self-Learning Data Lake — ระบบเรียนรู้เอง D ทั้งหมด ──
 model LearningSnapshot {
-  id          String   @id @default(uuid()) @db.Uuid
-  capturedAt  DateTime @default(now()) @db.Timestamptz
-  domain      String // sensor | farm | livestock | health | treasury | inventory
-  features    Json // { temp: 32, waterLevel: 1.2, soilPh: 6.5, ... }
-  label       Json? // { pumpFailed7d: 0, yieldKg: 12, bpSpike: 1 }
-  source      String   @default("auto") // auto | manual | backfill
-  createdAt   DateTime @default(now()) @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  capturedAt DateTime @default(now()) @db.Timestamptz
+  domain     String // sensor | farm | livestock | health | treasury | inventory
+  features   Json // { temp: 32, waterLevel: 1.2, soilPh: 6.5, ... }
+  label      Json? // { pumpFailed7d: 0, yieldKg: 12, bpSpike: 1 }
+  source     String   @default("auto") // auto | manual | backfill
+  createdAt  DateTime @default(now()) @db.Timestamptz
 
   predictions LearningPrediction[]
 
@@ -1801,17 +1801,17 @@ model LearningSnapshot {
 }
 
 model LearningPrediction {
-  id           String    @id @default(uuid()) @db.Uuid
-  snapshotId   String?   @db.Uuid
-  domain       String // sensor | farm | health ...
-  model        String // qwen3:8b | gemma3:4b | heuristic
-  input        Json // features ที่ใช้ทำนาย
-  output       Json // { risk: 0.8, advice: "..." }
-  confidence   Float? // 0-1
-  actual       Json? // ค่าจริงเมื่อเวลาผ่านไป (สำหรับเรียนรู้ต่อ)
-  correct      Boolean? // เทียบ actual vs output
-  createdAt    DateTime  @default(now()) @db.Timestamptz
-  evaluatedAt  DateTime? @db.Timestamptz
+  id          String    @id @default(uuid()) @db.Uuid
+  snapshotId  String?   @db.Uuid
+  domain      String // sensor | farm | health ...
+  model       String // qwen3:8b | gemma3:4b | heuristic
+  input       Json // features ที่ใช้ทำนาย
+  output      Json // { risk: 0.8, advice: "..." }
+  confidence  Float? // 0-1
+  actual      Json? // ค่าจริงเมื่อเวลาผ่านไป (สำหรับเรียนรู้ต่อ)
+  correct     Boolean? // เทียบ actual vs output
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  evaluatedAt DateTime? @db.Timestamptz
 
   snapshot LearningSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
 
@@ -1821,13 +1821,13 @@ model LearningPrediction {
 }
 
 model LearningModelState {
-  id          String   @id @default(uuid()) @db.Uuid
-  domain      String   @unique // sensor | farm | health | unified
-  model       String // โมเดลปัจจุบันที่แม่นสุด
-  accuracy    Float? // หลัง evaluate ล่าสุด
-  trainedAt   DateTime @default(now()) @db.Timestamptz
-  prompt      String? // prompt ที่ใช้สอน Ollama (เรียนรู้ต่อ)
-  stats       Json? // { total: 100, correct: 82 }
+  id        String   @id @default(uuid()) @db.Uuid
+  domain    String   @unique // sensor | farm | health | unified
+  model     String // โมเดลปัจจุบันที่แม่นสุด
+  accuracy  Float? // หลัง evaluate ล่าสุด
+  trainedAt DateTime @default(now()) @db.Timestamptz
+  prompt    String? // prompt ที่ใช้สอน Ollama (เรียนรู้ต่อ)
+  stats     Json? // { total: 100, correct: 82 }
 
   @@map("learning_model_states")
 }
@@ -1842,25 +1842,25 @@ model LearningModelState {
 // OWNER ทุกอย่าง · MANAGER บริหาร · SALES ขาย · TECHNICIAN ติดตั้ง ·
 // STOCK_KEEPER คลัง · ACCOUNTANT การเงินอ่าน+กระทบยอด · VIEWER อ่านอย่างเดียว
 model Business {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String
-  bizType      String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
-  vatRate      Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
-  isActive     Boolean  @default(true)
-  ownerId      String   @db.Uuid // ผู้สร้างธุรกิจ (User)
-  createdAt    DateTime @default(now()) @db.Timestamptz
-  updatedAt    DateTime @updatedAt @db.Timestamptz
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  bizType   String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
+  vatRate   Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
+  isActive  Boolean  @default(true)
+  ownerId   String   @db.Uuid // ผู้สร้างธุรกิจ (User)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
-  owner        User                  @relation("BusinessOwner", fields: [ownerId], references: [id])
-  members      BusinessMember[]
-  products     BusinessProduct[]
-  customers    BusinessCustomer[]
-  orders       BusinessOrder[]
-  suppliers    BusinessSupplier[]
+  owner          User                    @relation("BusinessOwner", fields: [ownerId], references: [id])
+  members        BusinessMember[]
+  products       BusinessProduct[]
+  customers      BusinessCustomer[]
+  orders         BusinessOrder[]
+  suppliers      BusinessSupplier[]
   purchaseOrders BusinessPurchaseOrder[]
-  installations BusinessInstallation[]
-  ledger       BusinessLedgerEntry[]
-  agents       BusinessAgent[]
+  installations  BusinessInstallation[]
+  ledger         BusinessLedgerEntry[]
+  agents         BusinessAgent[]
 
   @@map("businesses")
 }
@@ -1881,24 +1881,25 @@ model BusinessMember {
 }
 
 model BusinessProduct {
-  id           String   @id @default(uuid()) @db.Uuid
-  businessId   String   @db.Uuid
-  sku          String
-  name         String
-  category     String   @default("GENERAL")
-  specs        String? // สเปคย่อ (เช่น ESP32, วัด 3 เฟส)
-  costPrice    Float    @default(0) // ทุน
-  salePrice    Float    @default(0) // ราคาขาย
-  stockQty     Int      @default(0)
-  reorderPoint Int      @default(0) // ต่ำกว่านี้ = ควรสั่งเติม
-  warrantyMonths Int    @default(0)
-  inventoryItemId String? @db.Uuid // เชื่อมคลังกลาง (InventoryItem) ได้
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now()) @db.Timestamptz
-  updatedAt    DateTime @updatedAt @db.Timestamptz
+  id              String   @id @default(uuid()) @db.Uuid
+  businessId      String   @db.Uuid
+  sku             String
+  name            String
+  category        String   @default("GENERAL")
+  specs           String? // สเปคย่อ (เช่น ESP32, วัด 3 เฟส)
+  costPrice       Float    @default(0) // ทุน
+  salePrice       Float    @default(0) // ราคาขาย
+  stockQty        Int      @default(0)
+  reorderPoint    Int      @default(0) // ต่ำกว่านี้ = ควรสั่งเติม
+  warrantyMonths  Int      @default(0)
+  inventoryItemId String?  @db.Uuid // เชื่อมคลังกลาง (InventoryItem) ได้
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  updatedAt       DateTime @updatedAt @db.Timestamptz
 
-  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  orderLines BusinessOrderLine[]
+  business              Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orderLines            BusinessOrderLine[]
+  BusinessPurchaseOrder BusinessPurchaseOrder[]
 
   @@unique([businessId, sku])
   @@index([businessId, isActive])
@@ -1918,7 +1919,7 @@ model BusinessCustomer {
   createdAt  DateTime @default(now()) @db.Timestamptz
   updatedAt  DateTime @updatedAt @db.Timestamptz
 
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   orders   BusinessOrder[]
 
   @@index([businessId, phone])
@@ -1928,25 +1929,25 @@ model BusinessCustomer {
 // สถานะออเดอร์: QUOTE → ORDERED → PAID → DELIVERED (ยกเลิกได้จาก QUOTE/ORDERED)
 // ยืนยันออเดอร์ (ORDERED) = หักสต็อก · ยกเลิก = คืนสต็อก
 model BusinessOrder {
-  id           String    @id @default(uuid()) @db.Uuid
-  businessId   String    @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  businessId   String   @db.Uuid
   orderNo      String // B20260912-0001
-  customerId   String?   @db.Uuid
-  channel      String    @default("ONLINE") // ONLINE | SHOP | B2B
-  status       String    @default("QUOTE") // QUOTE | ORDERED | PAID | DELIVERED | CANCELLED
-  subtotal     Float     @default(0)
-  vat          Float     @default(0)
-  total        Float     @default(0)
-  paidAmount   Float     @default(0)
-  assignedToId String?   @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
+  customerId   String?  @db.Uuid
+  channel      String   @default("ONLINE") // ONLINE | SHOP | B2B
+  status       String   @default("QUOTE") // QUOTE | ORDERED | PAID | DELIVERED | CANCELLED
+  subtotal     Float    @default(0)
+  vat          Float    @default(0)
+  total        Float    @default(0)
+  paidAmount   Float    @default(0)
+  assignedToId String?  @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
   note         String?
-  createdAt    DateTime  @default(now()) @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @db.Timestamptz
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
 
-  business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer   BusinessCustomer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  lines      BusinessOrderLine[]
-  payments   BusinessPayment[]
+  business      Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer      BusinessCustomer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lines         BusinessOrderLine[]
+  payments      BusinessPayment[]
   installations BusinessInstallation[]
 
   @@unique([businessId, orderNo])
@@ -1955,16 +1956,16 @@ model BusinessOrder {
 }
 
 model BusinessOrderLine {
-  id          String @id @default(uuid()) @db.Uuid
-  orderId     String @db.Uuid
-  productId   String @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  orderId     String  @db.Uuid
+  productId   String  @db.Uuid
   qty         Int
   unitPrice   Float // snapshot ราคาขาย ณ ตอนเปิดออเดอร์
-  unitCost    Float  @default(0) // snapshot ทุน ณ ตอนเปิดออเดอร์ (คิดกำไรจริง)
+  unitCost    Float   @default(0) // snapshot ทุน ณ ตอนเปิดออเดอร์ (คิดกำไรจริง)
   description String?
 
-  order    BusinessOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product  BusinessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order   BusinessOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product BusinessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@map("business_order_lines")
@@ -1992,22 +1993,22 @@ model BusinessSupplier {
   note       String?
   createdAt  DateTime @default(now()) @db.Timestamptz
 
-  business Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
   orders   BusinessPurchaseOrder[]
 
   @@map("business_suppliers")
 }
 
 model BusinessPurchaseOrder {
-  id         String   @id @default(uuid()) @db.Uuid
-  businessId String   @db.Uuid
-  supplierId String   @db.Uuid
-  productId  String   @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  businessId String    @db.Uuid
+  supplierId String    @db.Uuid
+  productId  String    @db.Uuid
   qty        Int
   unitCost   Float
-  status     String   @default("DRAFT") // DRAFT | SENT | RECEIVED
+  status     String    @default("DRAFT") // DRAFT | SENT | RECEIVED
   note       String?
-  createdAt  DateTime @default(now()) @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
   receivedAt DateTime? @db.Timestamptz
 
   business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -2019,20 +2020,20 @@ model BusinessPurchaseOrder {
 
 // งานติดตั้งหน้างาน — IoT ต้องมีช่างลงไปตั้งค่าจริง
 model BusinessInstallation {
-  id          String    @id @default(uuid()) @db.Uuid
-  businessId  String    @db.Uuid
-  orderId     String?   @db.Uuid
-  title       String
-  scheduledAt DateTime?
-  technicianId String?  @db.Uuid // User ตำแหน่ง TECHNICIAN
-  checklist   Json?     // ["ติดตั้งเซ็นเซอร์","ตั้งค่า WiFi","ทดสอบแจ้งเตือน"]
-  status      String    @default("TODO") // TODO | IN_PROGRESS | DONE
-  note        String?
-  createdAt   DateTime  @default(now()) @db.Timestamptz
-  completedAt DateTime? @db.Timestamptz
+  id           String    @id @default(uuid()) @db.Uuid
+  businessId   String    @db.Uuid
+  orderId      String?   @db.Uuid
+  title        String
+  scheduledAt  DateTime?
+  technicianId String?   @db.Uuid // User ตำแหน่ง TECHNICIAN
+  checklist    Json? // ["ติดตั้งเซ็นเซอร์","ตั้งค่า WiFi","ทดสอบแจ้งเตือน"]
+  status       String    @default("TODO") // TODO | IN_PROGRESS | DONE
+  note         String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  completedAt  DateTime? @db.Timestamptz
 
-  business   Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  order      BusinessOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order    BusinessOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([businessId, status])
   @@map("business_installations")
@@ -2066,7 +2067,7 @@ model BusinessAgent {
   enabled    Boolean  @default(true)
   createdAt  DateTime @default(now()) @db.Timestamptz
 
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, key])
   @@map("business_agents")
