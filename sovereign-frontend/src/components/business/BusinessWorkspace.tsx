@@ -161,8 +161,10 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
     const wht = Math.max(0, Number(whtInput[order.id]) || 0);
     if (wht >= remain) { setNotice({ ok: false, text: 'ภาษีหัก ณ ที่จ่ายต้องน้อยกว่ายอดค้างชำระ (เงินโอนเข้าจริง = ค้าง − WHT)' }); return; }
     try {
-      await post(`${base}/orders/${order.id}/payments`, { amount: remain, method: wht > 0 ? 'TRANSFER' : 'CASH', ...(wht > 0 ? { whtAmount: wht } : {}) });
-      setNotice({ ok: true, text: wht > 0 ? `รับชำระ ${order.orderNo} ครบ ${baht(order.total)} (โอนเข้า ${baht(remain - wht)} — WHT ${baht(wht)})` : `รับชำระ ${order.orderNo} ครบ ${baht(order.total)}` });
+      await post(`${base}/orders/${order.id}/payments`, { amount: remain, method: 'CASH', ...(wht > 0 ? { whtAmount: wht, method: 'TRANSFER' } : {}) });
+      setNotice({ ok: true, text: wht > 0
+        ? `รับชำระ ${order.orderNo} ครบ ${baht(order.total)} (โอนเข้า ${baht(remain - wht)} — WHT ${baht(wht)})`
+        : `รับชำระ ${order.orderNo} ครบ ${baht(order.total)}` });
       setWhtInput((s) => ({ ...s, [order.id]: '' }));
       await load();
     } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
@@ -391,7 +393,6 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
 
 // ── ภาษี — อ่านตัวเลขจาก GET /tax (server บังคับสิทธิ์เอง; tab เห็นเฉพาะ ACCOUNTANT ขึ้นไป) ──
 interface TaxData {
-  asOf: string;
   vatRate: number;
   currentVatRate: number;
   vat: { thisMonth: { salesBase: number; outputVat: number; inputVat: number; netVat: number }; lastMonth: { outputVat: number } };
@@ -406,18 +407,14 @@ const daysLeft = (due: string) => Math.round((new Date(`${due}T00:00:00Z`).getTi
 function TaxTab({ base }: { base: string }) {
   const [data, setData] = useState<TaxData | null>(null);
   const [err, setErr] = useState('');
-  // ทุนจดทะเบียนปรับการทดสอบ SME (ทุน > 5M = ไม่ SME แม้รายได้ต่ำ) — apply เมื่อ blur
-  const [capital, setCapital] = useState('');
-  const [capitalApplied, setCapitalApplied] = useState('');
+  // ทุนจดทะเบียนปรับการทดสอบ SME (ทุน > 5M = ไม่ SME แม้รายได้ต่ำ) — uncontrolled, apply เมื่อ blur
+  const [capitalQ, setCapitalQ] = useState('');
 
   useEffect(() => {
-    let alive = true;
-    const q = capitalApplied ? `?capital=${encodeURIComponent(capitalApplied)}` : '';
-    fetchJsonObject<TaxData>(`${base}/tax${q}`)
-      .then((d) => { if (alive) setData(d); })
-      .catch((e: any) => { if (alive) setErr(e.message); });
-    return () => { alive = false; };
-  }, [base, capitalApplied]);
+    void fetchJsonObject<TaxData>(`${base}/tax${capitalQ ? `?capital=${encodeURIComponent(capitalQ)}` : ''}`)
+      .then(setData)
+      .catch((e: any) => setErr(e.message));
+  }, [base, capitalQ]);
 
   if (err) return <div className="card p-4 text-sm text-slate-400">{err}</div>;
   if (!data) return <div className="card p-4 text-sm text-slate-400">กำลังโหลดตัวเลขภาษี…</div>;
@@ -429,11 +426,8 @@ function TaxTab({ base }: { base: string }) {
         {[
           { label: 'ภาษีขาย (งวดนี้)', value: baht(v.outputVat), cls: 'text-amber-300' },
           { label: 'ภาษีซื้อ (งวดนี้)', value: baht(v.inputVat), cls: 'text-slate-300' },
-          { label: 'VAT จ่ายสุทธิ ภ.พ.30', value: baht(v.netVat), cls: v.netVat >= 0 ? 'text-rose-300' : 'text-emerald-300' },
-          { label: 'ภาษีขาย (เดือนก่อน)', value: baht(data.vat.lastMonth.outputVat), cls: 'text-slate-300' },
-        ].map((k) => (
-          <div key={k.label} className="card p-3"><div className="text-[11px] text-slate-400">{k.label}</div><div className={`text-lg font-bold ${k.cls}`}>{k.value}</div></div>
-        ))}
+          { label: 'VAT จ่ายสุทธิ ภ.พ.30', value: baht(v.netVat), cls: v.netVat >= 0 ? 'text-rose-300' : 'text-emerald-300' },          {label: 'ภาษีขาย (เดือนก่อน)', value: baht(data.vat.lastMonth.outputVat), cls: 'text-slate-300' },
+        ].map((k) => <StatCard key={k.label} {...k} />)}
       </div>
       <div className="card p-3 text-xs text-slate-400">
         อัตราของร้าน {(data.vatRate * 100).toFixed(0)}% · อัตราลดพิเศษปัจจุบัน {(data.currentVatRate * 100).toFixed(0)}% (ถึง 30 ก.ย. 2027) · ฐานขายงวดนี้ {baht(v.salesBase)} · netVat ติดลบ = ภาษีซื้อเกินภาษีขาย (ยกไปงวดหน้า/ขอคืนได้)
@@ -442,11 +436,8 @@ function TaxTab({ base }: { base: string }) {
         {[
           { label: 'รายได้ (ปีนี้)', value: baht(y.income), cls: 'text-emerald-300' },
           { label: 'VAT ในรายได้', value: baht(y.incomeVat), cls: 'text-slate-300' },
-          { label: 'รายจ่าย (ปีนี้)', value: baht(y.expense), cls: 'text-rose-300' },
-          { label: 'กำไรก่อนภาษี', value: baht(y.netProfitBeforeTax), cls: 'text-cyan-300' },
-        ].map((k) => (
-          <div key={k.label} className="card p-3"><div className="text-[11px] text-slate-400">{k.label}</div><div className={`text-lg font-bold ${k.cls}`}>{k.value}</div></div>
-        ))}
+          { label: 'รายจ่าย (ปีนี้)', value: baht(y.expense), cls: 'text-rose-300' },          {label: 'กำไรก่อนภาษี', value: baht(y.netProfitBeforeTax), cls: 'text-cyan-300' },
+        ].map((k) => <StatCard key={k.label} {...k} />)}
       </div>
       <div className="grid md:grid-cols-3 gap-3">
         <div className="card p-3 space-y-1">
@@ -457,7 +448,7 @@ function TaxTab({ base }: { base: string }) {
           <TaxRow label="เครดิตหัก ณ ที่จ่าย" value={baht(data.cit.whtCredits)} />
           <TaxRow label="ต้องจ่ายเพิ่ม" value={baht(data.cit.taxDue)} strong />
           <label className="block text-[11px] text-slate-500 pt-1" htmlFor="tax-capital-input">ทุนจดทะเบียน (บาท) — แก้เพื่อทดสอบเพดาน SME</label>
-          <input id="tax-capital-input" type="number" min={0} value={capital} onChange={(e) => setCapital(e.target.value)} onBlur={() => setCapitalApplied(capital)}
+          <input id="tax-capital-input" type="number" min={0} defaultValue="" onBlur={(e) => setCapitalQ(e.target.value)}
             placeholder="เช่น 1000000" className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right text-xs" />
         </div>
         <div className="card p-3 space-y-1">
@@ -495,6 +486,10 @@ function TaxTab({ base }: { base: string }) {
       </div>
     </div>
   );
+}
+
+function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
+  return <div className="card p-3"><div className="text-[11px] text-slate-400">{label}</div><div className={`text-lg font-bold ${cls}`}>{value}</div></div>;
 }
 
 function TaxRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
