@@ -2,9 +2,15 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ deploy ครบแล้ว — ร้านสาธารณะ live บน :3000 + :3001 (migration apply บน sovereign_v2 สำเร็จ)
-- **งาน:** BUSINESS PUBLIC SHOP — หน้าร้านสาธารณะ /shop + ชำระเงิน PromptPay (จุดต่อยอดที่ 1 ของ business platform)
-- **สาขา:** freebuff/task-26201e6b (บน master 3629bb8)
+- **สถานะ:** ✅ รายได้ร้านเข้า Treasury แล้ว — merge `db2f620` + deploy :3000/:3001 แล้ว (ไม่มี migration — ใช้ตารางเดิม)
+- **งาน:** TREASURY × BUSINESS — รายได้ร้านไหลเข้า Treasury ของเจ้าของอัตโนมัติ (จุดต่อยอดที่ 2 ของ business platform)
+- **สาขา:** freebuff/task-26201e6b (sync master 648f458)
+  - **หลักการเดียวกับ transfer:** ทั้ง 2 ทางชำระ (addPayment + mark-paid) จุดที่ ledger INCOME ถูกสร้าง (guard refOrderId กันซ้ำเดิม) จะเครดิตเงินสดให้เจ้าของธุรกิจต่อทันที — reuse `creditLiquidCash` จาก treasury.service (฿→$ ด้วย USD_THB_RATE default 35) + TreasuryEvent `SHOP_INCOME` หมายเหตุอ้างร้าน/เลขออเดอร์/ยอดบาท
+  - **best-effort ไม่ดันออเดอร์:** Treasury พัง → log error แต่ออเดอร์ยัง PAID (เงินจริงเข้าร้านแล้ว ต้องไม่พลาดเพราะบัญชีส่วนกลางล่ม)
+  - **UI:** ฟีดรายได้ Treasury ติดป้าย "รายได้ร้าน" สีฟ้า (eventLabels + badge SHOP_INCOME)
+  - **tests:** +1 (shop suite 9/9 — mark-paid → SHOP_INCOME event + เงินสดเจ้าของเพิ่มจริง) · business family 29/29 · backend tsc+build · FE tsc+build (53 pages)
+  - **deploy:** `docker restart sovereign-core-api` (prisma generate + tsc ใหม่จาก src ที่ mount ใน container) · prod :3000 รีสตาร์ทด้วย start-sovereign.bat (จับ build ล้าสมัย → rebuild เอง พร้อมใน 1:32)
+- **ก่อนหน้า:** 2026-09-13 — BUSINESS PUBLIC SHOP — หน้าร้านสาธารณะ /shop + ชำระเงิน PromptPay (จุดต่อยอดที่ 1)
 - **ก่อนหน้า:** 2026-09-12 — ผู้ช่วย AI ครบวงจรบน UI จริง (กดรัน → เห็นผล จบในหน้าเดียว)
   - **Backend:** `/api/shop` สาธารณะ 5 เส้น (หน้าร้าน/สั่งซื้อ/สถานะ/แจ้งชำระ/QR) + rate limit แยก bucket (browse 60/นาที, order 10/นาที, pay 15/นาที); ปิดร้าน/ไม่มีธุรกิจ = 404 กลาง (ไม่เผยว่ามีอยู่); สาธารณะไม่เห็นต้นทุน/จุดสั่งเติม; สั่ง = QUOTE ไม่หักสต็อก (หักตอนร้านยืนยันผ่าน state machine เดิม); แจ้งชำระบันทึก PROMPTPAY จำกัด amount = ส่วนค้างชำระเสมอ รอร้านตรวจเงินเข้าจริงก่อน mark-paid
   - **เจาะลึกลิงก์ลับ:** ออเดอร์หน้าร้านได้ `publicToken` UUID ตั้งแต่สร้าง + index unique — จับบั๊กตัวเอง: บริการลืมสร้าง token ตอน create (mock เติมเงียบ ๆ ทำให้เทสผ่านหลอม) แก้แล้วพินเทสยืนยันรูปแบบ UUID + paymentUrl; token ผิดรูปแบบตอบ 404 เดียวกัน (กัน prisma uuid cast error รั่ว 500)
