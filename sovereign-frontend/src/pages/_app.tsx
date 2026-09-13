@@ -18,8 +18,12 @@ import '../styles/globals.css';
 // หน้าเฉพาะ SUPERADMIN — ซ่อน/ปิดให้สมาชิกเสมอ (กันเดา URL เข้า)
 const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
 
+// หน้าสาธารณะ (ไม่ต้อง login) — ลูกค้าไม่ควรเห็นเมนู/แผงควบคุมภายในของระบบ
+const PUBLIC_PAGES = new Set(['/shop']);
+
 export default function MyApp({ Component, pageProps }: AppProps) {
   const pathname = usePathname();
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/';
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -144,7 +148,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       )}
       {/* ยังไม่ได้เปลี่ยนรหัสผ่านครั้งแรก (โหมดบังคับ) — ซ่อนเมนู/ป้าย ให้จดจ่อกับหน้าเปลี่ยนรหัส */}
-      {!mustChangePassword && (
+      {!mustChangePassword && !PUBLIC_PAGES.has(normalizedPath) && (
         <>
           {/* ป้ายแจ้งเตือนงาน AI เบื้องหลัง (ทุกหน้า) — คลิกไปหน้า AI Agent */}
           <AgentBackgroundBadge />
