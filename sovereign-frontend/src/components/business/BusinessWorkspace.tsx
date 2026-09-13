@@ -117,12 +117,12 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
   // ── ผู้ช่วย AI: สั่งงาน ──
   const [agentPrompt, setAgentPrompt] = useState<Record<string, string>>({});
   const [runningAgent, setRunningAgent] = useState<string | null>(null);
-  const runningRef = useRef<string | null>(null); // sync guard — rapid same-tick clicks bypass disabled-state renders
+  const runningRef = useRef(false); // sync guard — rapid same-tick clicks bypass disabled-state renders
   async function runAgent(agent: Agent) {
     const prompt = (agentPrompt[agent.key] ?? '').trim();
     if (!prompt) { setNotice({ ok: false, text: 'พิมพ์ภารกิจก่อนสั่งงาน' }); return; }
     if (runningRef.current) return;
-    runningRef.current = agent.id;
+    runningRef.current = true;
     setRunningAgent(agent.id);
     try {
       await post(`${base}/agents/${agent.id}/run`, { prompt });
@@ -394,10 +394,10 @@ function ProductsTab({ products, canWrite, onAdded, onError, base, post }: any) 
           if (Number(form.costPrice) < 0 || Number(form.salePrice) < 0) { onError('ราคาติดลบไม่ได้'); return; }
           try {
             const payload = { ...form, costPrice: Number(form.costPrice) || 0, salePrice: Number(form.salePrice) || 0, stockQty: Number(form.stockQty) || 0, reorderPoint: Number(form.reorderPoint) || 0, warrantyMonths: Number(form.warrantyMonths) || 0 };
-            await post(`${base}/products`, payload).catch((e: any) => { throw new Error(/Unique constraint/i.test(e.message) ? 'SKU นี้มีอยู่แล้ว' : e.message); });
+            await post(`${base}/products`, payload);
             setForm({ sku: '', name: '', category: 'SENSOR', costPrice: '', salePrice: '', stockQty: '', reorderPoint: '3', warrantyMonths: '12', specs: '' });
             onAdded();
-          } catch (e: any) { onError(e.message); }
+          } catch (e: any) { onError(/Unique constraint/i.test(e.message) ? 'SKU นี้มีอยู่แล้ว' : e.message); }
         }} className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-sm font-medium">เพิ่มสินค้า</button>
       </div>
       <div className="space-y-2">
