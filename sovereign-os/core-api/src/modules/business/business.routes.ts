@@ -360,6 +360,25 @@ router.get('/:businessId/agent-jobs', authenticate, async (req, res) => {
   }
 });
 
+// ── Public Shop settings — เปิด/ปิดหน้าร้านสาธารณะ + PromptPay (MANAGER ขึ้นไป) ──
+router.get('/:businessId/shop', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'MANAGER'))) return;
+  try {
+    res.json(await svc.getShopSettings(req.params.businessId));
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+router.put('/:businessId/shop', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'MANAGER'))) return;
+  try {
+    res.json(await svc.updateShopSettings(req.params.businessId, req.body));
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ── รายชื่อ user สำหรับเพิ่มสมาชิก (OWNER เท่านั้น) ──
 router.get('/user-lookup', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   const users = await prisma.user.findMany({ select: { id: true, username: true, role: true }, orderBy: { username: 'asc' } });
