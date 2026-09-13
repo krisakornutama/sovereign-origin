@@ -2,9 +2,13 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ สต็อกธุรกิจเชื่อมคลังกลางแล้ว — merge `875b776` + deploy :3001 (ไม่มี migration — FK มีอยู่แล้ว); roadmap business platform ครบทั้ง 3 จุดต่อยอด
-- **งาน:** BUSINESS × WAREHOUSE — สินค้าธุรกิจผูก InventoryItem แล้วสต็อก mirror กันทั้งสองฝั่ง (จุดต่อยอดที่ 3)
-- **สาขา:** freebuff/task-26201e6b (sync master 0655b62)
+- **สถานะ:** ✅ /shop ออกแบบใหม่เป็น "สลิปบนเคาน์เตอร์ยามค่ำ" — merge `bf07b32` + deploy :3000 แล้ว (frontend-only: shop.tsx + globals.css + _app.tsx)
+- **งาน:** SHOP UI — หน้าร้านสาธารณะใช้ภาษาใบเสร็จ/สมุดบัญชี: font-ledger หัวข้อ, JetBrains Mono ตัวเลขทุกบาท, รายการแบบบรรทัดจุดไข่ปลา, สลิปขอบฉีก (shop-tear) + ตราสถานะปั๊มครั้งเดียว (shop-seal, เคารพ reduced-motion), ปุ่ม +/− จำนวน — ไม่เพิ่มสีใหม่ ใช้ token บ้านเดิมทั้งหมด
+  - **แก้จากการขับหน้าจริง:** (1) _app.tsx เพิ่ม PUBLIC_PAGES — เดิม MobileNav 40+ เมนูเจ้าของ + Command Palette + ป้าย AI รั่วออกหน้าลูกค้า (2) แวบ "ไม่พบหน้าร้าน" ทุกครั้งก่อนอ่าน URL — เปลี่ยนเป็น skeleton จน mount
+  - **gate:** FE tsc + next build (53 pages, /shop prerendered) ทั้ง worktree และ MAIN หลัง merge · ขับ lifecycle ลูกค้าจริงผ่าน UI บน dev :3100 (สั่ง 2,760.60 ฿ → ลิงก์ลับ → QR → แจ้งชำระ → ค้างชำระ 0) · ข้อมูลทดสอบล้างเป็นศูนย์ · dev :3100 ปิดแล้ว
+  - **deploy:** kill stale :3000 → start-sovereign.bat (BUILD_ID ใหม่กว่า src → ไม่ rebuild, พร้อมใน 29 วิ) → พิสูจน์บน prod: /shop 200, marker shop-tear ใน JS chunk + CSS จริง, เกตลูกค้ายังซ่อนเมนูภายใน, API :3001 healthz 200 · หมายเหตุเครื่อง: detached spawn จาก shell เงียบไปเองครั้งนี้ — ใช้ schtasks /Create+/Run เป็นทางผ่าน (งาน ShipShop3000 ยังค้างใน Task Scheduler ลบได้)
+- **ก่อนหน้า:** 2026-09-13 — BUSINESS × WAREHOUSE — สต็อกธุรกิจ mirror คลังกลาง (merge `875b776`, deploy :3001; ไม่มี migration — FK มีอยู่แล้ว); roadmap business platform ครบทั้ง 3 จุดต่อยอด
+- **สาขา:** freebuff/task-26201e6b (sync master bf07b32)
   - **ทิศทางความจริง (document ในโค้ด):** สต็อกธุรกิจ = ความจริงช่องทางธุรกิจ, InventoryItem ของเจ้าของ mirror ทุก delta — ยืนยันออเดอร์ −, ยกเลิกจาก ORDERED +, รับขอเข้า (PO) +, แก้ stockQty มือ ±; ยอดเริ่มต้นตอนผูกไม่ย้อนเติม (mirror เฉพาะ delta หลังผูก)
   - **กันคลังติดลบ:** ยืนยันออเดอร์ที่ผูกคลังไว้ → เช็ค quantity คลังพอก่อนหัก ใน tx เดียวกัน (ไม่พอ = 400 ยกเลิกทั้ง tx เหมือนสต็อกไม่พอ); mirror best-effort — ลิงก์แขวน/พังไม่เคยบล็อกธุรกิจ
   - **ผูกลิงก์:** create/update product รับ inventoryItemId แล้ว (เดิมดรอปทิ้งเงียบ ๆ) — สิทธิ์ STOCK_KEEPER+ ตาม route เดิม
