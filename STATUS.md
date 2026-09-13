@@ -2,9 +2,10 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ ภาษีไทยครบชุดแรก (VAT ภ.พ.30 · CIT SME 0/15/20% · PIT · WHT · ปฏิทินยื่น) — 1082/1082 + tsc ผ่าน + migration ลง DB จริง (backend บน :3001 รอ merge master ก่อน restart)
+- **สถานะ:** ✅ ภาษีไทยครบชุดแรก (VAT ภ.พ.30 · CIT SME 0/15/20% · PIT · WHT · ปฏิทินยื่น) — merge `8917a8d` + deploy แล้ว: :3001 /tax ตอบจริง, :3000 rebuild ลูกค้าได้ fix สลิปไม่ต้องรีเฟรช
 - **งาน:** BUSINESS × THAI TAX — คำนวณภาษีจากข้อมูลจริงในระบบ (บริการ pure + เส้น /tax + ตอนชำระเงิน/บันทึกบัญชี)
 - **สาขา:** freebuff/task-26201e6b (ต่อจาก shop verify + แก้ /shop stale-route ในรอบก่อน)
+  - **deploy (2026-09-13):** merge `8917a8d` → prisma generate บน MAIN (client เก่าไม่รู้จัก whtAmount — จุดเดียวที่ tsc พังหลัง merge) → restart :3001 (healthz 200 · /tax ไร้ token 401 / มี token 500 business-not-found = route มีชีวิต) · :3000 kill+rebuild+next start (ready 0.2 วิ) — พิสูจน์บน prod จริง: lifecycle ภาษีผ่าน HTTP  deployed (สั่ง ฿32,100 → WHT 900 → /tax ตรงเป๊ะ: outputVat 2100 / netVat 2100 / income 32100 / wht.received 900 / กำไร 30000 / CIT SME tax 0) และลูกค้าแขกสั่ง S20260913-0001 → กด "ดูสถานะ/ชำระเงิน" → สลิปขึ้นทันที **ไม่ reload** (marker JS รอด + h1 = เลขออเดอร์ + ขอบฉีก/ตราอยู่ครบ) · ล้างข้อมูลทดสอบคืน baseline (users 8 / businesses 0 / agent_roles 8) — e2e-bot balance sheet ถูกล้างพลาดจาก cleanup แล้วสร้างคืนตามหลักฐาน ($35.71 = ผลรวม SALE เดิม)
   - **ตัวเลขตามกฎหมาย ณ ก.ย. 2026:** VAT 7% ต่ออายุถึง 30 ก.ย. 2027 (ครม. ต่อ 1 ปี — ค้นเว็บยืนยัน) แล้วขึ้น 10% เองตามวันที่; นิติบุคคล SME (ทุน ≤5M + รายได้ ≤30M) 0%/15%/20% ก้าวหน้า, เกินเพดาน = 20% แบบ; บุคคลธรรมดา 8 ขั้น 0–35% หักค่าใช้จ่าย 60k (ประมาณการหยาบ — ลดหย่อนอื่นไม่รองรับ)
   - **ที่มาเดียว:** `thai-tax.service.ts` — RATES + pure functions (splitVatFromGross / computeVatMonthly / computeCit / computePit / taxCalendar / businessTaxOverview) ไม่แตะ prisma เทสตรงได้ทุกกรณี
   - **ผูกข้อมูลจริง:** ชำระครบ → ledger INCOME แยก VAT อัตโนมัติจากยอด "รวม VAT" ด้วยอัตราร้าน (ระบุเองได้ — vatAmount:0 = ยกเว้น) + whtAmount ที่ลูกค้า B2B หัก (POST payments รับ whtAmount, เกินยอด = 400) — เงินเข้า Treasury ลดตาม WHT; รายจ่ายเก็บ vatAmount (ภาษีซื้อ) + whtAmount (ที่เราหัก ท.ป.4) ตามใบกำกับ
