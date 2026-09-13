@@ -221,6 +221,54 @@ pre,
   .glow-dot-cyan {
     box-shadow: 0 0 6px rgba(34, 211, 238, 0.9);
   }
+
+  /* ── หน้า /shop (สาธารณะ) — สลิปบนเคาน์เตอร์ยามค่ำ: สมุดบัญชี + สลิปขอบฉีก ──
+     ผูกกับ design system เดิม (เขียวเงิน/ไซอัน) ไม่เพิ่มสีใหม่ */
+  .shop-tear {
+    background: #0f1620;
+    border: 1px solid rgba(52, 211, 153, 0.22);
+    position: relative;
+    margin-block: 0.65rem;
+  }
+  .shop-tear::before,
+  .shop-tear::after {
+    content: '';
+    position: absolute;
+    left: -7px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #0a0f14;
+    border: 1px solid rgba(52, 211, 153, 0.22);
+  }
+  .shop-tear::before { top: -8px; }
+  .shop-tear::after { bottom: -8px; }
+  .shop-leader {
+    flex: 1;
+    min-width: 1.25rem;
+    margin-inline: 0.5rem;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+    transform: translateY(-3px);
+  }
+  .shop-seal {
+    display: inline-block;
+    border: 2px dashed currentColor;
+    border-radius: 6px;
+    padding: 0.35rem 0.7rem;
+    font-family: var(--font-thai);
+    font-size: 11px;
+    font-weight: 600;
+    transform: rotate(-4deg);
+    animation: shop-stamp 0.45s ease-out both;
+  }
+  @keyframes shop-stamp {
+    0% { opacity: 0; transform: rotate(-4deg) scale(1.6); }
+    60% { opacity: 1; transform: rotate(-4deg) scale(0.96); }
+    100% { opacity: 1; transform: rotate(-4deg) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shop-seal { animation: none; }
+  }
   .glow-dot-red {
     box-shadow: 0 0 6px rgba(251, 113, 133, 0.9);
   }
