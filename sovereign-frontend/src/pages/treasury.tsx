@@ -518,6 +518,7 @@ export default function TreasuryPage() {
     REALIZED_GAIN: t('treasury.income.eventRealizedGain', 'กำไรรับรู้'),
     DIVIDEND: t('treasury.income.eventDividend', 'ปันผล'),
     CASH_ADJUST: t('treasury.income.eventCashAdjust', 'ปรับเงินสด'),
+    SHOP_INCOME: t('treasury.income.eventShopIncome', 'รายได้ร้าน'),
     TRANSFER_IN: t('treasury.transfers.eventIn', 'โอนเข้า'),
     TRANSFER_OUT: t('treasury.transfers.eventOut', 'โอนออก'),
   };
@@ -784,6 +785,7 @@ export default function TreasuryPage() {
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
                             e.type === 'DIVIDEND' ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/50' :
                             e.type === 'REALIZED_GAIN' ? 'bg-amber-950/60 text-amber-300 border border-amber-800/50' :
+                            e.type === 'SHOP_INCOME' ? 'bg-sky-950/60 text-sky-300 border border-sky-800/50' :
                             'bg-gray-900 text-gray-400 border border-gray-800'
                           }`}>{eventLabels[e.type] || e.type}</span>
                           <span className="mono text-gray-300 font-bold">{e.amount_usd > 0 ? '+' : ''}{fmtUsd(e.amount_usd)}</span>

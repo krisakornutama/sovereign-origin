@@ -5,10 +5,11 @@
 // กติกาสถานะออเดอร์: QUOTE → ORDERED → PAID → DELIVERED (ยกเลิกได้เฉพาะ QUOTE/ORDERED)
 // - ยืนยันออเดอร์ (QUOTE→ORDERED) = หักสต็อกใน transaction (กันสต็อกติดลบ)
 // - ยกเลิกจาก ORDERED = คืนสต็อก
-// - ชำระครบ (→PAID) = บันทึกรายรับในสมุดบัญชีธุรกิจอัตโนมัติ
+// - ชำระครบ (→PAID) = บันทึกรายรับในสมุดบัญชีธุรกิจอัตโนมัติ + เครดิตเงินสดเข้า Treasury ของเจ้าของ (SHOP_INCOME)
 import { prisma } from '../lib/prisma';
 import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
+import { creditLiquidCash } from './treasury.service';
 
 // ── helpers ──
 function str(v: unknown, max: number): string {
@@ -263,6 +264,7 @@ export async function transitionOrder(
         await tx.businessLedgerEntry.create({
           data: { businessId, type: 'INCOME', category: 'SALES', amount: o.total, note: `ขาย ${o.orderNo}`, refOrderId: id },
         });
+        await creditShopIncomeToTreasury(tx, businessId, o.orderNo, o.total);
       }
       return tx.businessOrder.update({ where: { id }, data: { status: 'PAID' } });
     }
@@ -271,6 +273,21 @@ export async function transitionOrder(
     if (o.status !== 'PAID') throw new Error(`ส่งของได้เฉพาะหลังชำระเงินครบ (ปัจจุบัน ${o.status})`);
     return tx.businessOrder.update({ where: { id }, data: { status: 'DELIVERED' } });
   });
+}
+
+/** รายได้ร้านเข้า Treasury ของเจ้าของธุรกิจ — บาท → ดอลลาร์ด้วย USD_THB_RATE (best-effort: พังไม่ดัน PAID ให้ล้ม) */
+async function creditShopIncomeToTreasury(tx: any, businessId: string, orderNo: string, totalThb: number): Promise<void> {
+  try {
+    const rate = Number(process.env.USD_THB_RATE || 35) || 35;
+    const biz = await tx.business.findUnique({ where: { id: businessId } });
+    if (!biz) return;
+    await creditLiquidCash(tx, biz.ownerId, totalThb / rate, {
+      type: 'SHOP_INCOME',
+      note: `รายได้ร้าน ${biz.name} จาก ${orderNo} (฿${totalThb.toFixed(2)})`,
+    });
+  } catch (err) {
+    console.error('💸 shop income → treasury failed (order stays PAID):', err);
+  }
 }
 
 /** บันทึกการชำระเงิน — ครบเท่า total แล้ว auto ไป PAID + บันทึกรายรับใน ledger */
@@ -298,6 +315,7 @@ export async function addPayment(businessId: string, id: string, input: any): Pr
         await tx.businessLedgerEntry.create({
           data: { businessId, type: 'INCOME', category: 'SALES', amount: o.total, note: `ขาย ${o.orderNo}`, refOrderId: id },
         });
+        await creditShopIncomeToTreasury(tx, businessId, o.orderNo, o.total);
       }
     }
     return updated;

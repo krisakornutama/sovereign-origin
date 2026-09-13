@@ -139,7 +139,7 @@ export async function ensureBalanceSheet(
 }
 
 export interface CashCreditOpts {
-  type: 'REALIZED_GAIN' | 'DIVIDEND' | 'CASH_ADJUST';
+  type: 'REALIZED_GAIN' | 'DIVIDEND' | 'CASH_ADJUST' | 'SHOP_INCOME';
   symbol?: string | null;
   assetPositionId?: string | null;
   note?: string | null;

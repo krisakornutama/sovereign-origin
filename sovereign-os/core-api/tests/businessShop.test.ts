@@ -29,6 +29,8 @@ const orderLines = new Map<string, any[]>();
 const payments = new Map<string, any[]>();
 const ledger = new Map<string, any[]>();
 const users = new Map<string, any>();
+const treasuryEvents: any[] = [];
+const sheets = new Map<string, any>();
 
 let memberSeq = 0;
 let customerSeq = 0;
@@ -162,6 +164,29 @@ before(async () => {
       return entry;
     },
   };
+  // treasury delegates — เช็คว่ารายได้ร้านไหลเข้า Treasury ของเจ้าของจริง (SHOP_INCOME)
+  (prisma as any).personalBalanceSheet = {
+    findUnique: async ({ where }: any) => sheets.get(where.user_id) ?? null,
+    upsert: async ({ where, create }: any) => {
+      const s = { liquid_cash_usd: 0, monthly_burn_usd: 0, monthly_income_usd: 0, liabilities_usd: 0, ...create };
+      sheets.set(where.user_id, s);
+      return s;
+    },
+    update: async ({ where, data }: any) => {
+      const s = { ...sheets.get(where.user_id), ...data };
+      sheets.set(where.user_id, s);
+      return s;
+    },
+    updateMany: async () => ({ count: 0 }),
+  };
+  (prisma as any).treasuryEvent = {
+    create: async ({ data }: any) => {
+      const e = { id: `ev-${treasuryEvents.length}`, created_at: new Date(), ...data };
+      treasuryEvents.push(e);
+      return e;
+    },
+    findMany: async () => treasuryEvents,
+  };
 
   // $transaction (callback form) — รองรับ raw query ทั้งของ business (ล็อกด้วย id) และ shop (ล็อกด้วย publicToken)
   const fakeTx: any = {
@@ -198,6 +223,9 @@ before(async () => {
     businessProduct: (prisma as any).businessProduct,
     businessPayment: (prisma as any).businessPayment,
     businessLedgerEntry: (prisma as any).businessLedgerEntry,
+    business: (prisma as any).business,
+    personalBalanceSheet: (prisma as any).personalBalanceSheet,
+    treasuryEvent: (prisma as any).treasuryEvent,
   };
   mock.method(prisma, '$transaction', async (fn: any) => (typeof fn === 'function' ? fn(fakeTx) : Promise.all(fn)));
 
@@ -354,6 +382,21 @@ test('ร้านยืนยันออเดอร์จากเว็บ�
   const confirmed = await (await post(`${API}/${BIZ_ID}/orders/${created.id}/transition`, { action: 'confirm' }, mgr)).json();
   assert.equal(confirmed.status, 'ORDERED');
   assert.equal(products.get(PRODUCT_ID).stockQty, stockBefore - 2);
+});
+
+// ── รายได้ร้านเข้า Treasury ของเจ้าของอัตโนมัติ ──
+test('ร้าน mark-paid → เงินเข้า Treasury เจ้าของเป็น SHOP_INCOME (แปลง ฿→$ ด้วย USD_THB_RATE)', async () => {
+  const created = await (await shopOrder({ items: [{ productId: PRODUCT_ID, qty: 1 }], customerName: 'ทรสอ', customerPhone: '0890001111' })).json();
+  const mgr = makeToken('OPERATOR', { userId: MANAGER_ID });
+  await post(`${API}/${BIZ_ID}/orders/${created.id}/transition`, { action: 'confirm' }, mgr);
+  const paid = await (await post(`${API}/${BIZ_ID}/orders/${created.id}/transition`, { action: 'mark-paid' }, mgr)).json();
+  assert.equal(paid.status, 'PAID');
+
+  const rate = Number(process.env.USD_THB_RATE || 35) || 35;
+  const ev = treasuryEvents.find((e) => e.type === 'SHOP_INCOME' && e.note.includes(created.orderNo));
+  assert.ok(ev, 'ต้องมี SHOP_INCOME event อ้างออเดอร์ร้าน');
+  assert.ok(Math.abs(ev.amount_usd - created.total / rate) < 0.0001, 'ยอดเป็นดอลลาร์ถูกต้อง');
+  assert.equal(sheets.get(OWNER_ID).liquid_cash_usd, ev.amount_usd, 'เงินสดของเจ้าของเพิ่มจริง');
 });
 
 // ── PromptPay ──
