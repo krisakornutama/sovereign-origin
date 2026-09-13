@@ -5,6 +5,7 @@ import { fetchJsonArray, fetchJsonObject } from '../../lib/fetchJson';
 import { getApiUrl } from '../../lib/config';
 import Icon from '../ui/Icon';
 import EmptyState from '../ui/EmptyState';
+import TaxInvoice from './TaxInvoice';
 
 // ────────────────────────────────────────────────────────────────────────────
 // BusinessWorkspace — พื้นที่ทำงานของธุรกิจเดียว (แท็บทั้งหมด)
@@ -48,7 +49,7 @@ interface Business {
 interface Product { id: string; sku: string; name: string; category: string; specs?: string; costPrice: number; salePrice: number; stockQty: number; reorderPoint: number; warrantyMonths: number; isActive: boolean; }
 interface Customer { id: string; name: string; phone?: string; lineId?: string; address?: string; channel: string; }
 interface OrderLine { id: string; productId: string; qty: number; unitPrice: number; unitCost: number; product?: { name: string; sku: string }; }
-interface Order { id: string; orderNo: string; status: string; channel: string; subtotal: number; vat: number; total: number; paidAmount: number; customer?: { name: string } | null; lines: OrderLine[]; createdAt: string; }
+interface Order { id: string; orderNo: string; status: string; channel: string; subtotal: number; vat: number; total: number; paidAmount: number; customer?: { name: string } | null; lines: OrderLine[]; createdAt: string; payments?: Array<{ amount: number; method: string; whtAmount: number; paidAt: string; reference?: string | null }>; }
 interface Installation { id: string; title: string; status: string; scheduledAt?: string; note?: string; order?: { orderNo: string } | null; }
 interface LedgerEntry { id: string; type: string; category: string; amount: number; note?: string; createdAt: string; }
 interface Summary { income: number; expense: number; profit: number; revenue: number; cost: number; grossProfit: number; topProducts: Array<{ name: string; qty: number; profit: number }>; lowStock: Product[]; openOrders: number; todayInstallations: number; }
@@ -78,6 +79,7 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
   const [summary, setSummary] = useState<Summary | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 
   // absolute URL ตาม house convention — relative จะตกไปที่ Next server ไม่ใช่ API :3001
   const base = `${getApiUrl()}/api/business/${biz.id}`;
@@ -280,6 +282,7 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
                   </>
                 )}
                 {can('MANAGER') && o.status === 'PAID' && <button onClick={() => transition(o, 'deliver', 'ส่งแล้ว')} className="px-3 py-1 rounded bg-sky-600/80 hover:bg-sky-500 text-xs">ส่งของ</button>}
+                {(o.status === 'PAID' || o.status === 'DELIVERED') && <button onClick={() => setInvoiceOrder(o)} className="px-3 py-1 rounded border border-slate-500/50 text-slate-200 text-xs hover:bg-slate-500/10">ใบกำกับภาษี</button>}
                 {can('MANAGER') && (o.status === 'QUOTE' || o.status === 'ORDERED') && <button onClick={() => transition(o, 'cancel', 'ยกเลิก')} className="px-3 py-1 rounded border border-rose-500/40 text-rose-300 text-xs hover:bg-rose-500/10">ยกเลิก</button>}
               </div>
             ))}
@@ -387,6 +390,9 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
           {!can('OWNER') && <div className="text-sm text-slate-500">เฉพาะเจ้าของธุรกิจจึงจัดการทีมได้</div>}
         </div>
       )}
+
+      {/* ── ใบกำกับภาษี/ใบเสร็จ (พิมพ์/บันทึก PDF) ── */}
+      {invoiceOrder && <TaxInvoice order={invoiceOrder} business={biz} onClose={() => setInvoiceOrder(null)} />}
     </div>
   );
 }
