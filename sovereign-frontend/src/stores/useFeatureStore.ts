@@ -8,7 +8,8 @@ import { create } from 'zustand';
 import { authFetch } from '../lib/apiFetch';
 
 // หน้าแรก (landing) — ทุกคนเห็นได้เสมอ (widget ในหน้าแสดงตามสิทธิ์อีกที)
-const ALWAYS_VISIBLE = ['/dashboard', '/change-password'];
+// /shop — หน้าร้านสาธารณะ (ไม่ต้อง login) — สมาชิกที่ login แล้วก็ต้องเข้าได้ ไม่โดน NoAccessScreen
+const ALWAYS_VISIBLE = ['/dashboard', '/change-password', '/shop'];
 
 // ฟีเจอร์ทดแทน (alias) — เมนูย้ายที่แล้วแต่สิทธิ์กลุ่มเดิมยังใช้ได้
 // เช่น /treasury ย้ายมาจาก /portfolio — คนที่ได้สิทธิ์ /portfolio เก่าต้องเข้าได้ทั้งคู่

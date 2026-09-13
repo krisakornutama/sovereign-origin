@@ -1806,6 +1806,9 @@ model Business {
   bizType      String   @default("IOT_RETAIL")
   vatRate      Float    @default(0.07)
   isActive     Boolean  @default(true)
+  shopName     String?
+  shopOpen     Boolean  @default(false)
+  shopPromptPay String?
   ownerId      String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -1894,10 +1897,10 @@ model BusinessOrder {
   subtotal     Float     @default(0)
   vat         Float     @default(0)
   total        Float     @default(0)
-  paidAmount   Float     @default(0)
-  assignedToId String?
+  paidAmount   Float     @default(0)  assignedToId String?
   note         String?
-  createdAt    DateTime  @default(now())
+  publicToken  String?  @unique
+  createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   business   Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
