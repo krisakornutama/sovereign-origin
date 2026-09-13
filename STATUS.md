@@ -2,7 +2,7 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ เสร็จแล้ว (commit `378b529` บน branch — รอ merge master + deploy)
+- **สถานะ:** ✅ merge master แล้ว (`cfdc287`) — เหลือ deploy + apply migration (รอกู้ Docker engine + Postgres ก่อน)
 - **งาน:** BUSINESS PUBLIC SHOP — หน้าร้านสาธารณะ /shop + ชำระเงิน PromptPay (จุดต่อยอดที่ 1 ของ business platform)
 - **สาขา:** freebuff/task-26201e6b (บน master 3629bb8)
 - **ก่อนหน้า:** 2026-09-12 — ผู้ช่วย AI ครบวงจรบน UI จริง (กดรัน → เห็นผล จบในหน้าเดียว)
@@ -12,7 +12,8 @@
   - **Frontend:** `/shop` สาธารณะ (หน้าร้าน `?id=<businessId>` / สถานะ+ชำระ `?order=<token>` ในหน้าเดียว, อ่าน URL ใน useEffect ตามกฎ hydration, `getApiUrl()` ตามบ้าน) + แท็บ "หน้าร้าน" ใน BusinessWorkspace (เปิด/ปิดร้าน, ชื่อร้าน, PromptPay ตั้งค่าได้ MANAGER+) + feature store อนุญาต `/shop` สำหรับสมาชิกที่ล็อกอยู่
   - **schema:** additive migration `20260913000000_add_business_public_shop` (businesses.shopName/shopOpen/shopPromptPay + business_orders.publicToken unique) ทั้ง postgres+sqlite mirror
   - **tests:** 8 ใหม่ (businessShop.test.ts) — ผ่าน 8/8; full suite บนเครื่องนี้ 1025 tests = 1022 pass + 3 fail ที่วัดแล้วเป็นสภาพแวดล้อม (Postgres :5432 ดับกลางรัน → ไฟล์ท้ายโหลดไม่ผ่าน; รันแยก/รวมกลุ่มผ่านหมด) — advisor.test.ts เพิ่มช่วงเวลา 4+ นาทีเมื่อ Ollama ดับ (2 tests × timeout 120s) ควรแยกไฟล์นี้ออก
-  - **gate:** backend build + tsc สะอาด, frontend tsc + next build ผ่าน (/shop prerendered static), ไม่แตะ :3000 production ของ MAIN
+  - **gate:** backend build + tsc สะอาด, frontend tsc + next build ผ่าน (/shop prerendered static) — และผ่านซ้ำบน MAIN หลัง merge (prisma generate + build + เทสธุรกิจ 28/28 + tsc + next build 53 pages); พฤติกรรมพิสูจน์แล้ว 2 ชั้น: headless lifecycle บน HTTP จริง 28 checks + หน้าเว็บจริงใน headless Chromium 32 checks (ลูกค้าสั่ง→ได้ลิงก์ลับ→แจ้งชำระ→ร้านยืนยัน→สต็อกหัก→PAID→หน้าลูกค้ารีเฟรชเอง)
+  - **ข้อจำกัดตอนนี้:** :3000 ยังเสิร์ฟ build เก่า (/shop ยังไม่ขึ้นจริง) — รีสตาร์ท prod + deploy container + `prisma migrate deploy` ต้องรอ Docker engine หายค้างก่อน (docker pipe 500); ช่วง verify ที่ MAIN มีการ next build ทับ .next ของ prod ที่รันอยู่ — ตรวจแล้ว root/chunks ยังตอบ 200 ปกติ
   - **tidy pass (f9cb0dd):** ตัดสิ่งที่สะสมมาแทนที่จำเป็น — ลบ landing "ร้านเปิดทั้งหมด" (GET /api/shop + UI หน้าแรก /shop; ลูกค้ามาทางลิงก์ร้านเสมอ), ลบฟิลด์ตอบกลับที่ไม่มีใครอ่าน (payload EMVCo ดิบ, paymentUrl, sku/channel/note/createdAt, include customer), รวม nextOrderNo เป็น nextBusinessOrderNo ใน lib/business (B=ในระบบ / S=หน้าร้าน), ใช้ fetchJsonObject แทน publicGet เขียนเอง, ตัด timer ซ่อน notice (ลิงก์ชำระเงินต้องอยู่ครบจนกว่าจะกด), poll สถานะเฉพาะตอนยังค้างชำระ — net −94 บรรทัด, เทสผ่านครบทั้งเดิม
   - **พิสูจน์บน :3000 (production):** สร้างธุรกิจผ่าน wizard → เพิ่มสินค้า (กล้อง IP Cam สต็อก 1/จุดสั่ง 4) ผ่านฟอร์ม → แท็บผู้ช่วย AI พิมพ์ภารกิจกด ▶ ที่การ์ด ผู้จัดการสต็อก → AgentJob ลง DB จริง (running→done, คำตอบโมเดลอ้างของจริง: "ต้องสั่งเติม UI-1 เซนเซอร์อุณหภูมิ UI จำนวน 5 ชิ้น" = จุดสั่ง 5 − สต็อก 2 จากรอบก่อน) — คำตอบเรนเดอร์ในการ์ด "งานล่าสุด: ✅ เสร็จ" + สกรีนช็อต, console สะอาด
   - **แก้ UX ที่จับได้จากการทดสอบจริง:** งานเสร็จแล้วการ์ดไม่เคยอัปเดตเอง — ต้องออกจากธุรกิจแล้วเข้าใหม่ (badge นับงานแต่ลิสต์ไม่รีเฟรช, hint "กดรีเฟรช" ไม่มีปุ่มจริง); แก้ด้วย poll /agents ทุก 20 วิขณาแท็บเปิด — พิสูจน์ live: การ์ดเปลี่ยน ⏳ กำลังทำ → ❌/✅ เองในหน้าเดียว (gate: tsc + next build + 1057/1057, commit 70b30f3 merge master + deploy :3000 แล้ว)
