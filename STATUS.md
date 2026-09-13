@@ -2,9 +2,15 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ รายได้ร้านเข้า Treasury แล้ว — merge `db2f620` + deploy :3000/:3001 แล้ว (ไม่มี migration — ใช้ตารางเดิม)
-- **งาน:** TREASURY × BUSINESS — รายได้ร้านไหลเข้า Treasury ของเจ้าของอัตโนมัติ (จุดต่อยอดที่ 2 ของ business platform)
-- **สาขา:** freebuff/task-26201e6b (sync master 648f458)
+- **สถานะ:** ✅ สต็อกธุรกิจเชื่อมคลังกลางแล้ว — merge `875b776` + deploy :3001 (ไม่มี migration — FK มีอยู่แล้ว); roadmap business platform ครบทั้ง 3 จุดต่อยอด
+- **งาน:** BUSINESS × WAREHOUSE — สินค้าธุรกิจผูก InventoryItem แล้วสต็อก mirror กันทั้งสองฝั่ง (จุดต่อยอดที่ 3)
+- **สาขา:** freebuff/task-26201e6b (sync master 0655b62)
+  - **ทิศทางความจริง (document ในโค้ด):** สต็อกธุรกิจ = ความจริงช่องทางธุรกิจ, InventoryItem ของเจ้าของ mirror ทุก delta — ยืนยันออเดอร์ −, ยกเลิกจาก ORDERED +, รับขอเข้า (PO) +, แก้ stockQty มือ ±; ยอดเริ่มต้นตอนผูกไม่ย้อนเติม (mirror เฉพาะ delta หลังผูก)
+  - **กันคลังติดลบ:** ยืนยันออเดอร์ที่ผูกคลังไว้ → เช็ค quantity คลังพอก่อนหัก ใน tx เดียวกัน (ไม่พอ = 400 ยกเลิกทั้ง tx เหมือนสต็อกไม่พอ); mirror best-effort — ลิงก์แขวน/พังไม่เคยบล็อกธุรกิจ
+  - **ผูกลิงก์:** create/update product รับ inventoryItemId แล้ว (เดิมดรอปทิ้งเงียบ ๆ) — สิทธิ์ STOCK_KEEPER+ ตาม route เดิม
+  - **TDD:** เขียนเทสก่อน 5 ตัว แล้วดู fail จริง (ลิงก์หาย undefined / คลังไม่ขยับ 20vs18, 5vs15, 9vs14 / ไม่บล็อก 200vs400) → เขียนโค้ดขั้นต่ำ → 34/34; หมายเหตุ: mock $transaction ไม่ rollback raw SQL ที่ยิงแล้ว — เทส guard จึงไม่ assert สต็อกธุรกิจหลัง tx ล้ม (ครอบคลุมในเทสเกินสต็อกเดิม)
+  - **deploy:** `docker restart sovereign-core-api` (prisma generate + tsc ใหม่ใน container, healthz 200) — FE ไม่เปลี่ยนจึงไม่ต้องรีสตาร์ท :3000
+- **ก่อนหน้า:** 2026-09-13 — TREASURY × BUSINESS — รายได้ร้านไหลเข้า Treasury ของเจ้าของอัตโนมัติ (จุดต่อยอดที่ 2 ของ business platform)
   - **หลักการเดียวกับ transfer:** ทั้ง 2 ทางชำระ (addPayment + mark-paid) จุดที่ ledger INCOME ถูกสร้าง (guard refOrderId กันซ้ำเดิม) จะเครดิตเงินสดให้เจ้าของธุรกิจต่อทันที — reuse `creditLiquidCash` จาก treasury.service (฿→$ ด้วย USD_THB_RATE default 35) + TreasuryEvent `SHOP_INCOME` หมายเหตุอ้างร้าน/เลขออเดอร์/ยอดบาท
   - **best-effort ไม่ดันออเดอร์:** Treasury พัง → log error แต่ออเดอร์ยัง PAID (เงินจริงเข้าร้านแล้ว ต้องไม่พลาดเพราะบัญชีส่วนกลางล่ม)
   - **UI:** ฟีดรายได้ Treasury ติดป้าย "รายได้ร้าน" สีฟ้า (eventLabels + badge SHOP_INCOME)
