@@ -245,6 +245,19 @@ router.get('/:businessId/summary', authenticate, async (req, res) => {
   }
 });
 
+// ── ภาษีไทย — VAT/CIT/PIT/WHT คำนวณจากข้อมูลจริง (ACCOUNTANT ขึ้นไป — ตัวเลขเงิน) ──
+router.get('/:businessId/tax', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'ACCOUNTANT'))) return;
+  try {
+    res.json(await svc.businessTax(req.params.businessId, {
+      capitalRegistered: req.query.capital ? Number(req.query.capital) : undefined,
+      fiscalYearEnd: (req.query.fyEnd as string | undefined) || undefined,
+    }));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Suppliers & Purchase Orders ──
 router.get('/:businessId/suppliers', authenticate, async (req, res) => {
   if (!(await guard(req, res, 'VIEWER'))) return;

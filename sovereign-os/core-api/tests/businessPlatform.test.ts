@@ -245,6 +245,7 @@ before(async () => {
 
   // $transaction (callback form) — ส่ง fakeTx ที่ใช้ delegate เดียวกัน + raw helpers
   const fakeTx: any = {
+    business: (prisma as any).business, // recordSaleIncome อ่าน vatRate ของร้านตอนแยก VAT
     $queryRaw: async (_sql: any, ...vals: any[]) => {
       const [id, businessId] = vals;
       const o = orders.get(id);

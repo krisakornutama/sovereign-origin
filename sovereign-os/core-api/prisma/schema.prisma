@@ -1981,6 +1981,7 @@ model BusinessPayment {
   amount    Float
   method    String   @default("CASH") // CASH | TRANSFER | PROMPTPAY
   reference String? // เลขอ้างอิงโอน/PromptPay
+  whtAmount Float    @default(0) // ภาษีหัก ณ ที่จ่ายของงวดนี้ (รัฐหักจากเงินโอน — ยอดโอน = amount - whtAmount)
   paidAt    DateTime @default(now()) @db.Timestamptz
 
   order BusinessOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -2051,6 +2052,8 @@ model BusinessLedgerEntry {
   category   String   @default("SALES") // SALES | RESTOCK | TRANSPORT | ADS | OTHER
   amount     Float
   note       String?
+  vatAmount  Float    @default(0) // VAT ของรายการนี้ (รายรับ = ภาษีขาย, รายจ่าย = ภาษีซื้อนำไปคืนได้)
+  whtAmount  Float    @default(0) // ภาษีหัก ณ ที่จ่าย (เครดิตภาษีตอนยื่น ภ.ง.ด.50)
   refOrderId String?  @db.Uuid
   createdAt  DateTime @default(now()) @db.Timestamptz
 
