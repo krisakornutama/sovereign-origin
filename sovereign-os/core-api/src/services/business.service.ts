@@ -12,6 +12,7 @@ import { prisma } from '../lib/prisma';
 import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
 import { creditLiquidCash } from './treasury.service';
+import { businessTaxOverview, splitVatFromGross } from './thai-tax.service';
 
 // ── helpers ──
 function str(v: unknown, max: number): string {
@@ -297,18 +298,20 @@ export async function transitionOrder(
 
 /** รายรับออเดอร์ → ledger INCOME + รายได้ร้านเข้า Treasury เจ้าของ (บาท → ดอลลาร์ด้วย USD_THB_RATE)
  *  กันซ้ำด้วย refOrderId (addPayment เป็นทางหลัก, mark-paid เป็นทางลัด — ใช้ตัวกันตัวเดียวกัน)
+ *  ภาษี: VAT แยกจากยอด "รวม VAT" ด้วยอัตราของร้าน (ภาษีขาย ภ.พ.30) + WHT ที่ลูกค้าธุรกิจหัก (เครดิต ภ.ง.ด.50)
  *  ส่วน Treasury เป็น best-effort: พังไม่ดัน PAID ให้ล้ม (เงินจริงถึงร้านแล้ว) */
-async function recordSaleIncome(tx: any, businessId: string, order: { id: string; orderNo: string; total: number }): Promise<void> {
+async function recordSaleIncome(tx: any, businessId: string, order: { id: string; orderNo: string; total: number }, whtAmount = 0): Promise<void> {
   const existing = await tx.businessLedgerEntry.findFirst({ where: { refOrderId: order.id, type: 'INCOME', category: 'SALES' } });
   if (existing) return;
+  const { vat } = splitVatFromGross(order.total, (await tx.business.findUnique({ where: { id: businessId } }))?.vatRate ?? 0);
   await tx.businessLedgerEntry.create({
-    data: { businessId, type: 'INCOME', category: 'SALES', amount: order.total, note: `ขาย ${order.orderNo}`, refOrderId: order.id },
+    data: { businessId, type: 'INCOME', category: 'SALES', amount: order.total, vatAmount: vat, whtAmount, note: `ขาย ${order.orderNo}`, refOrderId: order.id },
   });
   try {
-    const rate = Number(process.env.USD_THB_RATE || 35) || 35;
     const biz = await tx.business.findUnique({ where: { id: businessId } });
     if (!biz) return;
-    await creditLiquidCash(tx, biz.ownerId, order.total / rate, {
+    const rate = Number(process.env.USD_THB_RATE || 35) || 35;
+    await creditLiquidCash(tx, biz.ownerId, (order.total - whtAmount) / rate, {
       type: 'SHOP_INCOME',
       note: `รายได้ร้าน ${biz.name} จาก ${order.orderNo} (฿${order.total.toFixed(2)})`,
     });
@@ -317,10 +320,14 @@ async function recordSaleIncome(tx: any, businessId: string, order: { id: string
   }
 }
 
-/** บันทึกการชำระเงิน — ครบเท่า total แล้ว auto ไป PAID + บันทึกรายรับใน ledger */
+/** บันทึกการชำระเงิน — ครบเท่า total แล้ว auto ไป PAID + บันทึกรายรับใน ledger
+ *  whtAmount = ภาษีหัก ณ ที่จ่ายที่ลูกค้าธุรกิจหักจากงวดนี้ (ท.ป.4) — ยอดโอนเข้าจริง = amount − whtAmount
+ *  วางบิลยอดเต็ม: paidAmount นับ amount เต็ม (ลูกค้าจ่ายหน้าร้านทั้งยอด ส่วน WHT รัฐโอนเข้าเราทีหลัง) */
 export async function addPayment(businessId: string, id: string, input: any): Promise<any> {
   const amount = num(input?.amount, 0.01, 10_000_000);
   const method = str(input?.method, 20) || 'CASH';
+  const whtAmount = Math.max(0, num(input?.whtAmount, 0, 10_000_000));
+  if (whtAmount > amount) throw new Error('ภาษีหัก ณ ที่จ่ายห้ามเกินยอดชำระของงวดนี้');
   const result = await prisma.$transaction(async (tx) => {
     const order = await tx.$queryRaw<any[]>`SELECT * FROM "business_orders" WHERE "id" = ${id}::uuid AND "businessId" = ${businessId}::uuid FOR UPDATE`;
     const o = order[0];
@@ -329,13 +336,13 @@ export async function addPayment(businessId: string, id: string, input: any): Pr
     const paidAmount = o.paidAmount + amount;
     if (paidAmount > o.total + 0.001) throw new Error(`เกินยอดที่ต้องชำระ (คงเหลือ ${Math.max(0, o.total - o.paidAmount)})`);
     await tx.businessPayment.create({
-      data: { orderId: id, amount, method, reference: input?.reference ? str(input.reference, 100) : null },
+      data: { orderId: id, amount, method, whtAmount, reference: input?.reference ? str(input.reference, 100) : null },
     });
     const updated = await tx.businessOrder.update({
       where: { id },
       data: { paidAmount, ...(paidAmount >= o.total - 0.001 ? { status: 'PAID' } : {}) },
     });
-    if (updated.status === 'PAID') await recordSaleIncome(tx, businessId, updated);
+    if (updated.status === 'PAID') await recordSaleIncome(tx, businessId, updated, whtAmount);
     return updated;
   });
   return result;
@@ -389,12 +396,25 @@ export async function listLedger(businessId: string, take = 200): Promise<any[]>
 export async function addLedgerEntry(businessId: string, input: any): Promise<any> {
   const type = str(input?.type, 10) === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const amount = num(input?.amount, 0.01, 10_000_000);
+  // ภาษี: รายรับไม่ระบุ vatAmount → แยกอัตโนมัติจากยอดรวมด้วยอัตราของร้าน (กันลืม = ยอด VAT ตรงกับที่ยื่น ภ.พ.30)
+  // รายจ่าย: vatAmount จากใบกำกับซัพพลายเออร์ (ภาษีซื้อ) + whtAmount ที่เราหักตอนจ่าย (ท.ป.4) — ไม่เกินยอดรายการ
+  let vatAmount = Math.max(0, num(input?.vatAmount, 0, 10_000_000));
+  const whtAmount = Math.max(0, Math.min(num(input?.whtAmount, 0, 10_000_000), amount));
+  if (type === 'INCOME') {
+    if (input?.vatAmount === undefined || input?.vatAmount === null) {
+      const biz = await prisma.business.findUnique({ where: { id: businessId } });
+      vatAmount = splitVatFromGross(amount, biz?.vatRate ?? 0).vat;
+    }
+    vatAmount = Math.min(vatAmount, amount);
+  }
   return prisma.businessLedgerEntry.create({
     data: {
       businessId,
       type,
       category: str(input?.category, 30) || (type === 'INCOME' ? 'SALES' : 'OTHER'),
       amount,
+      vatAmount,
+      whtAmount,
       note: input?.note ? str(input.note, 300) : null,
     },
   });
@@ -447,6 +467,27 @@ export async function businessSummary(businessId: string): Promise<any> {
     openOrders,
     todayInstallations,
   };
+}
+
+// ── ภาษีไทย — สรุป VAT/CIT/PIT/WHT + ปฏิทินยื่น (คำนวณจากข้อมูลจริงในระบบ) ──
+export async function businessTax(businessId: string, opts?: { capitalRegistered?: number; fiscalYearEnd?: string }): Promise<Record<string, unknown>> {
+  const biz = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!biz) throw new Error('business not found');
+  const [orders, ledger] = await Promise.all([
+    prisma.businessOrder.findMany({
+      where: { businessId, status: { in: ['PAID', 'DELIVERED'] } },
+      select: { payments: { select: { amount: true, paidAt: true } } },
+    }),
+    prisma.businessLedgerEntry.findMany({ where: { businessId } }),
+  ]);
+  // ยอดขายนับเมื่อ "เก็บเงินได้" (เกิดหนี้ VAT ตอนรับเงิน/แจ้งชำระ — ไม่ใช่ตอนส่งของ)
+  return businessTaxOverview({
+    vatRate: biz.vatRate,
+    salesPayments: orders.flatMap((o: any) => o.payments.map((p: any) => ({ amount: p.amount, vatRate: biz.vatRate, paidAt: p.paidAt }))),
+    ledger,
+    capitalRegistered: opts?.capitalRegistered,
+    fiscalYearEnd: opts?.fiscalYearEnd,
+  });
 }
 
 // ── Suppliers & Purchase Orders ──
