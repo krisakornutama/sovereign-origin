@@ -1936,6 +1936,7 @@ model BusinessPayment {
   amount    Float
   method    String   @default("CASH")
   reference String?
+  whtAmount Float    @default(0)
   paidAt    DateTime @default(now())
 
   order BusinessOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -2004,6 +2005,8 @@ model BusinessLedgerEntry {
   category   String   @default("SALES")
   amount     Float
   note       String?
+  vatAmount  Float    @default(0)
+  whtAmount  Float    @default(0)
   refOrderId String?
   createdAt  DateTime @default(now())
 

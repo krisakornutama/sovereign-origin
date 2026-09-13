@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 
@@ -33,17 +34,23 @@ const SEAL_CLS: Record<string, string> = { QUOTE: 'border-amber-400/60 text-ambe
 export default function ShopPage() {
   // mode ตัดสินจาก URL ใน useEffect (กัน hydration mismatch) — ก่อน mount แสดง skeleton เฉย ๆ
   // (ห้ามโชว์ "ไม่พบหน้าร้าน" ตอนยังไม่อ่าน URL = แวบผิดทุกครั้งที่เปิดลิงก์)
+  const router = useRouter();
   const [route, setRoute] = useState<{ mode: 'store' | 'order'; key: string } | null>(null);
   const [mounted, setMounted] = useState(false);
 
+  // อ่าน URL ใหม่ทุกครั้งที่ asPath เปลี่ยน (ไม่ใช่แค่ mount) — _app.tsx แปลงคลิก <a> ภายใน
+  // เป็น router.push หน้าเดียวกัน ทำให้ลิงก์ "ดูสถานะ/ชำระเงิน" หลังสั่งซื้อไม่ reload หน้า;
+  // ถ้าอ่าน URL ครั้งเดียว ลูกค้าจะติดหน้าร้านทั้งที่ URL เปลี่ยนเป็นลิงก์ลับแล้ว (ต้องรีเฟรชเอง)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const query = router.asPath.split('?')[1]?.split('#')[0] ?? '';
+    const params = new URLSearchParams(query);
     const orderToken = params.get('order');
     const shopId = params.get('id');
     if (orderToken) setRoute({ mode: 'order', key: orderToken });
     else if (shopId) setRoute({ mode: 'store', key: shopId });
+    else setRoute(null);
     setMounted(true);
-  }, []);
+  }, [router.asPath]);
 
   if (!route) return <ShopShell>{mounted ? <Empty title="ไม่พบหน้าร้าน" text="กรุณาใช้ลิงก์จากร้านค้า — ลิงก์จะมีรหัสร้านหรือรหัสออเดอร์ต่อท้าย" /> : <Loading label="กำลังเปิดหน้าร้าน…" />}</ShopShell>;
   if (route.mode === 'order') return <OrderView key={route.key} token={route.key} />;
