@@ -1847,6 +1847,9 @@ model Business {
   bizType   String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
   vatRate   Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
   isActive  Boolean  @default(true)
+  shopName  String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)
+  shopOpen  Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
+  shopPromptPay String? // เบอร์ PromptPay (08x…) หรือเลขบัตร 13 หลัก สำหรับรับชำระหน้าร้าน
   ownerId   String   @db.Uuid // ผู้สร้างธุรกิจ (User)
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz
@@ -1941,6 +1944,7 @@ model BusinessOrder {
   paidAmount   Float    @default(0)
   assignedToId String?  @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
   note         String?
+  publicToken  String?  @unique @default(uuid()) // ลิงก์ลับต่อออเดอร์ — ลูกค้าใช้เช็คสถานะ/ชำระเงินที่ /shop โดยไม่ต้อง login
   createdAt    DateTime @default(now()) @db.Timestamptz
   updatedAt    DateTime @updatedAt @db.Timestamptz
 

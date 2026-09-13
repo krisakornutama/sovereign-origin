@@ -48,3 +48,15 @@ export async function hasBusinessAccess(
 export function businessAccessError(): { status: number; json: Record<string, string> } {
   return { status: 403, json: { error: 'คุณไม่มีสิทธิ์ในธุรกิจนี้' } };
 }
+
+/** เลขออเดอร์ถัดไป B20260912-0001 (นับของวันเดียวกัน +1; prefix แยกช่องทาง B=หน้าร้าน, S=หน้าร้านสาธารณะ) */
+export async function nextBusinessOrderNo(businessId: string, prefix: string): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const full = `${prefix}${today}-`;
+  const last = await prisma.businessOrder.findFirst({
+    where: { businessId, orderNo: { startsWith: full } },
+    orderBy: { orderNo: 'desc' },
+  });
+  const seq = last ? Number(last.orderNo.slice(full.length)) + 1 : 1;
+  return `${full}${String(seq).padStart(4, '0')}`;
+}

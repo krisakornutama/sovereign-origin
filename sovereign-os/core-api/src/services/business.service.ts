@@ -7,6 +7,7 @@
 // - ยกเลิกจาก ORDERED = คืนสต็อก
 // - ชำระครบ (→PAID) = บันทึกรายรับในสมุดบัญชีธุรกิจอัตโนมัติ
 import { prisma } from '../lib/prisma';
+import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
 
 // ── helpers ──
@@ -32,16 +33,8 @@ export async function listBusinesses(userId: string, systemRole?: string): Promi
 }
 
 /** เลขออเดอร์ถัดไป B20260912-0001 (นับของวันเดียวกัน +1) */
-async function nextOrderNo(businessId: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const prefix = `B${today}-`;
-  const last = await prisma.businessOrder.findFirst({
-    where: { businessId, orderNo: { startsWith: prefix } },
-    orderBy: { orderNo: 'desc' },
-  });
-  const seq = last ? Number(last.orderNo.slice(prefix.length)) + 1 : 1;
-  return `${prefix}${String(seq).padStart(4, '0')}`;
-}
+const nextOrderNo = (businessId: string) => nextBusinessOrderNo(businessId, 'B');
+
 
 export async function createBusiness(userId: string, input: any): Promise<any> {
   const name = str(input?.name, 120);
@@ -472,6 +465,43 @@ export async function receivePurchaseOrder(businessId: string, id: string): Prom
     });
     return tx.businessPurchaseOrder.update({ where: { id }, data: { status: 'RECEIVED', receivedAt: new Date() } });
   });
+}
+
+// ── Public Shop settings (เจ้าของ/ผู้จัดการตั้งค่าหน้าร้านสาธารณะ) ──
+export async function getShopSettings(businessId: string): Promise<any> {
+  const biz = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!biz) throw new Error('business not found');
+  // ไม่ส่ง PromptPay แบบเต็มกลับ UI — โชว์ mask 4 ตัวท้ายพอ (ตั้งใหม่ได้เสมอ)
+  const target = String(biz.shopPromptPay ?? '').replace(/\D/g, '');
+  return {
+    shopOpen: Boolean(biz.shopOpen),
+    shopName: biz.shopName ?? '',
+    promptPayMasked: target ? `••• ${target.slice(-4)}` : '',
+    promptPaySet: Boolean(biz.shopPromptPay),
+  };
+}
+
+export async function updateShopSettings(businessId: string, input: any): Promise<any> {
+  const biz = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!biz) throw new Error('business not found');
+  const data: any = {};
+  if (input?.shopName !== undefined) data.shopName = input.shopName ? str(input.shopName, 120) : null;
+  if (input?.shopOpen !== undefined) data.shopOpen = Boolean(input.shopOpen);
+  if (input?.shopPromptPay !== undefined) {
+    const target = str(input.shopPromptPay, 20);
+    if (target) {
+      const digits = target.replace(/\D/g, '');
+      // รับเบอร์ 10 หลักขึ้นต้น 0 หรือเลขบัตร 13 หลัก เท่านั้น — กัน QR พังเงียบ ๆ
+      if (!(digits.length === 10 && digits.startsWith('0')) && digits.length !== 13) {
+        throw new Error('PromptPay ต้องเป็นเบอร์มือถือ 10 หลักหรือเลขบัตรประชาชน 13 หลัก');
+      }
+      data.shopPromptPay = digits;
+    } else {
+      data.shopPromptPay = null;
+    }
+  }
+  const updated = await prisma.business.update({ where: { id: businessId }, data });
+  return getShopSettings(updated.id);
 }
 
 // ── Business Agents (ผู้ช่วย AI ประจำธุรกิจ) ──

@@ -2,10 +2,18 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ เสร็จแล้ว
-- **งาน:** Desktop app แบบ one-click — เปิดโปรแกรมเดียว กดครั้งเดียว ใช้งานได้เลย
-- **สาขา:** master (รวม freebuff/task-26201e6b แล้ว)
-- **ล่าสุด:** 2026-09-12 — ผู้ช่วย AI ครบวงจรบน UI จริง (กดรัน → เห็นผล จบในหน้าเดียว)
+- **สถานะ:** ✅ เสร็จแล้ว (commit `378b529` บน branch — รอ merge master + deploy)
+- **งาน:** BUSINESS PUBLIC SHOP — หน้าร้านสาธารณะ /shop + ชำระเงิน PromptPay (จุดต่อยอดที่ 1 ของ business platform)
+- **สาขา:** freebuff/task-26201e6b (บน master 3629bb8)
+- **ก่อนหน้า:** 2026-09-12 — ผู้ช่วย AI ครบวงจรบน UI จริง (กดรัน → เห็นผล จบในหน้าเดียว)
+  - **Backend:** `/api/shop` สาธารณะ 5 เส้น (หน้าร้าน/สั่งซื้อ/สถานะ/แจ้งชำระ/QR) + rate limit แยก bucket (browse 60/นาที, order 10/นาที, pay 15/นาที); ปิดร้าน/ไม่มีธุรกิจ = 404 กลาง (ไม่เผยว่ามีอยู่); สาธารณะไม่เห็นต้นทุน/จุดสั่งเติม; สั่ง = QUOTE ไม่หักสต็อก (หักตอนร้านยืนยันผ่าน state machine เดิม); แจ้งชำระบันทึก PROMPTPAY จำกัด amount = ส่วนค้างชำระเสมอ รอร้านตรวจเงินเข้าจริงก่อน mark-paid
+  - **เจาะลึกลิงก์ลับ:** ออเดอร์หน้าร้านได้ `publicToken` UUID ตั้งแต่สร้าง + index unique — จับบั๊กตัวเอง: บริการลืมสร้าง token ตอน create (mock เติมเงียบ ๆ ทำให้เทสผ่านหลอม) แก้แล้วพินเทสยืนยันรูปแบบ UUID + paymentUrl; token ผิดรูปแบบตอบ 404 เดียวกัน (กัน prisma uuid cast error รั่ว 500)
+  - **PromptPay:** reuse `services/promptpay.ts` (EMVCo payload) + `qrcode` เดิม → QR เป็น data URL จาก backend (frontend ไม่เพิ่ม dependency), เบอร์/เลขปลายทาง mask เหลือท้าย 4 หลัก
+  - **Frontend:** `/shop` สาธารณะ (หน้าร้าน `?id=<businessId>` / สถานะ+ชำระ `?order=<token>` ในหน้าเดียว, อ่าน URL ใน useEffect ตามกฎ hydration, `getApiUrl()` ตามบ้าน) + แท็บ "หน้าร้าน" ใน BusinessWorkspace (เปิด/ปิดร้าน, ชื่อร้าน, PromptPay ตั้งค่าได้ MANAGER+) + feature store อนุญาต `/shop` สำหรับสมาชิกที่ล็อกอยู่
+  - **schema:** additive migration `20260913000000_add_business_public_shop` (businesses.shopName/shopOpen/shopPromptPay + business_orders.publicToken unique) ทั้ง postgres+sqlite mirror
+  - **tests:** 8 ใหม่ (businessShop.test.ts) — ผ่าน 8/8; full suite บนเครื่องนี้ 1025 tests = 1022 pass + 3 fail ที่วัดแล้วเป็นสภาพแวดล้อม (Postgres :5432 ดับกลางรัน → ไฟล์ท้ายโหลดไม่ผ่าน; รันแยก/รวมกลุ่มผ่านหมด) — advisor.test.ts เพิ่มช่วงเวลา 4+ นาทีเมื่อ Ollama ดับ (2 tests × timeout 120s) ควรแยกไฟล์นี้ออก
+  - **gate:** backend build + tsc สะอาด, frontend tsc + next build ผ่าน (/shop prerendered static), ไม่แตะ :3000 production ของ MAIN
+  - **tidy pass (f9cb0dd):** ตัดสิ่งที่สะสมมาแทนที่จำเป็น — ลบ landing "ร้านเปิดทั้งหมด" (GET /api/shop + UI หน้าแรก /shop; ลูกค้ามาทางลิงก์ร้านเสมอ), ลบฟิลด์ตอบกลับที่ไม่มีใครอ่าน (payload EMVCo ดิบ, paymentUrl, sku/channel/note/createdAt, include customer), รวม nextOrderNo เป็น nextBusinessOrderNo ใน lib/business (B=ในระบบ / S=หน้าร้าน), ใช้ fetchJsonObject แทน publicGet เขียนเอง, ตัด timer ซ่อน notice (ลิงก์ชำระเงินต้องอยู่ครบจนกว่าจะกด), poll สถานะเฉพาะตอนยังค้างชำระ — net −94 บรรทัด, เทสผ่านครบทั้งเดิม
   - **พิสูจน์บน :3000 (production):** สร้างธุรกิจผ่าน wizard → เพิ่มสินค้า (กล้อง IP Cam สต็อก 1/จุดสั่ง 4) ผ่านฟอร์ม → แท็บผู้ช่วย AI พิมพ์ภารกิจกด ▶ ที่การ์ด ผู้จัดการสต็อก → AgentJob ลง DB จริง (running→done, คำตอบโมเดลอ้างของจริง: "ต้องสั่งเติม UI-1 เซนเซอร์อุณหภูมิ UI จำนวน 5 ชิ้น" = จุดสั่ง 5 − สต็อก 2 จากรอบก่อน) — คำตอบเรนเดอร์ในการ์ด "งานล่าสุด: ✅ เสร็จ" + สกรีนช็อต, console สะอาด
   - **แก้ UX ที่จับได้จากการทดสอบจริง:** งานเสร็จแล้วการ์ดไม่เคยอัปเดตเอง — ต้องออกจากธุรกิจแล้วเข้าใหม่ (badge นับงานแต่ลิสต์ไม่รีเฟรช, hint "กดรีเฟรช" ไม่มีปุ่มจริง); แก้ด้วย poll /agents ทุก 20 วิขณาแท็บเปิด — พิสูจน์ live: การ์ดเปลี่ยน ⏳ กำลังทำ → ❌/✅ เองในหน้าเดียว (gate: tsc + next build + 1057/1057, commit 70b30f3 merge master + deploy :3000 แล้ว)
   - **ข้อจำกัดเครื่อง (owner ควรรู้):** โหลดโมเดลบน VM 4GB cap ล้มเหลวเป็นครั้งคราว (Ollama 500 กลาง load_tensors เมื่อ host เหลือ ~1.7GB) — รอบที่ RAM ว่างพอสำเร็จทุกครั้ง; แนะนำปิด chrome บางส่วนหรือเพิ่ม RAM ก่อนใช้ agent จริงจัง; Docker engine ค้างอีก 3 รอบช่วงทดสอบ (กู้ครบทุกครั้ง, สถานะจบ: stack เขียว, engine idle)
