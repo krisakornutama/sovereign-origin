@@ -17,14 +17,16 @@ import { creditLiquidCash } from './treasury.service';
 function str(v: unknown, max: number): string {
   return String(v ?? '').trim().slice(0, max);
 }
-/** คลังกลาง mirror — สินค้าผูก InventoryItem ไว้ → ขยับ quantity ตาม delta (best-effort: ลิงก์พัง/ไม่มี = ข้าม) */
-async function mirrorWarehouseDelta(client: any, productId: string, delta: number): Promise<void> {
+/** คลังกลาง mirror — สินค้าผูก InventoryItem ไว้ → ขยับ quantity ตาม delta (best-effort: ลิงก์พัง/ไม่มี = ข้าม)
+ *  ใส่ `need` เพื่อบังคับคลังต้องมีของพอก่อนหัก (ไม่พอ = throw → transaction ทั้งก้อนยกเลิก กันคลังติดลบ) */
+async function mirrorWarehouseDelta(client: any, productId: string, delta: number, need?: number): Promise<void> {
   if (!delta) return;
+  const p = await client.businessProduct.findUnique({ where: { id: productId } });
+  if (!p?.inventoryItemId) return;
+  const item = await client.inventoryItem.findUnique({ where: { id: p.inventoryItemId } });
+  if (!item) return; // ลิงก์แขวน (ของถูกลบ) — ไม่บล็อกธุรกิจ
+  if (need !== undefined && item.quantity < need) throw new Error(`สต็อกคลังกลางไม่พอสำหรับบางรายการ (ต้องการ ${need})`);
   try {
-    const p = await client.businessProduct.findUnique({ where: { id: productId } });
-    if (!p?.inventoryItemId) return;
-    const item = await client.inventoryItem.findUnique({ where: { id: p.inventoryItemId } });
-    if (!item) return; // ลิงก์แขวน (ของถูกลบ) — ไม่บล็อกธุรกิจ
     await client.inventoryItem.update({ where: { id: item.id }, data: { quantity: Math.max(0, item.quantity + delta) } });
   } catch (err) {
     console.error('📦 warehouse mirror failed (business stock unchanged):', err);
@@ -149,7 +151,7 @@ export async function updateProduct(businessId: string, id: string, input: any):
   if (input.isActive !== undefined) data.isActive = Boolean(input.isActive);
   const updated = await prisma.businessProduct.update({ where: { id }, data });
   // แก้ stockQty มือบนสินค้าที่ผูกคลังอยู่ → คลังขยับตาม delta (เพิ่งผูกใหม่ = ไม่ย้อนเติมยอดเก่า)
-  if (existing.inventoryItemId && updated.inventoryItemId && data.stockQty !== undefined) {
+  if (existing.inventoryItemId && data.stockQty !== undefined) {
     await mirrorWarehouseDelta(prisma, id, data.stockQty - existing.stockQty);
   }
   return updated;
@@ -264,12 +266,7 @@ export async function transitionOrder(
         const res = await tx.$executeRaw`UPDATE "business_products" SET "stockQty" = "stockQty" - ${line.qty}::int, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${line.productId}::uuid AND "stockQty" >= ${line.qty}::int`;
         if (res !== 1) throw new Error(`สต็อกไม่พอสำหรับบางรายการ (ต้องการ ${line.qty})`);
         // ผูกคลังกลางไว้ → คลังต้องมีของพอด้วย (ไม่พอ = ยกเลิกทั้ง transaction กันคลังติดลบ)
-        const p = await tx.businessProduct.findUnique({ where: { id: line.productId } });
-        if (p?.inventoryItemId) {
-          const item = await tx.inventoryItem.findUnique({ where: { id: p.inventoryItemId } });
-          if (item && item.quantity < line.qty) throw new Error(`สต็อกคลังกลางไม่พอสำหรับบางรายการ (ต้องการ ${line.qty})`);
-          if (item) await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: Math.max(0, item.quantity - line.qty) } });
-        }
+        await mirrorWarehouseDelta(tx, line.productId, -line.qty, line.qty);
       }
       return tx.businessOrder.update({ where: { id }, data: { status: 'ORDERED' } });
     }
@@ -288,14 +285,7 @@ export async function transitionOrder(
 
     if (action === 'mark-paid') {
       if (o.status !== 'ORDERED') throw new Error(`ชำระเงินได้เฉพาะจาก ORDERED (ปัจจุบัน ${o.status})`);
-      // บันทึกรายรับอัตโนมัติ — กันซ้ำด้วย refOrderId (addPayment เป็นทางหลัก, mark-paid เป็นทางลัด)
-      const existing = await tx.businessLedgerEntry.findFirst({ where: { refOrderId: id, type: 'INCOME', category: 'SALES' } });
-      if (!existing) {
-        await tx.businessLedgerEntry.create({
-          data: { businessId, type: 'INCOME', category: 'SALES', amount: o.total, note: `ขาย ${o.orderNo}`, refOrderId: id },
-        });
-        await creditShopIncomeToTreasury(tx, businessId, o.orderNo, o.total);
-      }
+      await recordSaleIncome(tx, businessId, o);
       return tx.businessOrder.update({ where: { id }, data: { status: 'PAID' } });
     }
 
@@ -305,15 +295,22 @@ export async function transitionOrder(
   });
 }
 
-/** รายได้ร้านเข้า Treasury ของเจ้าของธุรกิจ — บาท → ดอลลาร์ด้วย USD_THB_RATE (best-effort: พังไม่ดัน PAID ให้ล้ม) */
-async function creditShopIncomeToTreasury(tx: any, businessId: string, orderNo: string, totalThb: number): Promise<void> {
+/** รายรับออเดอร์ → ledger INCOME + รายได้ร้านเข้า Treasury เจ้าของ (บาท → ดอลลาร์ด้วย USD_THB_RATE)
+ *  กันซ้ำด้วย refOrderId (addPayment เป็นทางหลัก, mark-paid เป็นทางลัด — ใช้ตัวกันตัวเดียวกัน)
+ *  ส่วน Treasury เป็น best-effort: พังไม่ดัน PAID ให้ล้ม (เงินจริงถึงร้านแล้ว) */
+async function recordSaleIncome(tx: any, businessId: string, order: { id: string; orderNo: string; total: number }): Promise<void> {
+  const existing = await tx.businessLedgerEntry.findFirst({ where: { refOrderId: order.id, type: 'INCOME', category: 'SALES' } });
+  if (existing) return;
+  await tx.businessLedgerEntry.create({
+    data: { businessId, type: 'INCOME', category: 'SALES', amount: order.total, note: `ขาย ${order.orderNo}`, refOrderId: order.id },
+  });
   try {
     const rate = Number(process.env.USD_THB_RATE || 35) || 35;
     const biz = await tx.business.findUnique({ where: { id: businessId } });
     if (!biz) return;
-    await creditLiquidCash(tx, biz.ownerId, totalThb / rate, {
+    await creditLiquidCash(tx, biz.ownerId, order.total / rate, {
       type: 'SHOP_INCOME',
-      note: `รายได้ร้าน ${biz.name} จาก ${orderNo} (฿${totalThb.toFixed(2)})`,
+      note: `รายได้ร้าน ${biz.name} จาก ${order.orderNo} (฿${order.total.toFixed(2)})`,
     });
   } catch (err) {
     console.error('💸 shop income → treasury failed (order stays PAID):', err);
@@ -338,16 +335,7 @@ export async function addPayment(businessId: string, id: string, input: any): Pr
       where: { id },
       data: { paidAmount, ...(paidAmount >= o.total - 0.001 ? { status: 'PAID' } : {}) },
     });
-    // ชำระครบ → รายรับอัตโนมัติ (กันซ้ำด้วย refOrderId)
-    if (updated.status === 'PAID') {
-      const existing = await tx.businessLedgerEntry.findFirst({ where: { refOrderId: id, type: 'INCOME', category: 'SALES' } });
-      if (!existing) {
-        await tx.businessLedgerEntry.create({
-          data: { businessId, type: 'INCOME', category: 'SALES', amount: o.total, note: `ขาย ${o.orderNo}`, refOrderId: id },
-        });
-        await creditShopIncomeToTreasury(tx, businessId, o.orderNo, o.total);
-      }
-    }
+    if (updated.status === 'PAID') await recordSaleIncome(tx, businessId, updated);
     return updated;
   });
   return result;

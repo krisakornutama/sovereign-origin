@@ -177,7 +177,6 @@ before(async () => {
       sheets.set(where.user_id, s);
       return s;
     },
-    updateMany: async () => ({ count: 0 }),
   };
   (prisma as any).treasuryEvent = {
     create: async ({ data }: any) => {
