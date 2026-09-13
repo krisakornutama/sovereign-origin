@@ -2,13 +2,32 @@
 
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
-- **สถานะ:** ✅ /shop ออกแบบใหม่เป็น "สลิปบนเคาน์เตอร์ยามค่ำ" — merge `bf07b32` + deploy :3000 แล้ว (frontend-only: shop.tsx + globals.css + _app.tsx)
-- **งาน:** SHOP UI — หน้าร้านสาธารณะใช้ภาษาใบเสร็จ/สมุดบัญชี: font-ledger หัวข้อ, JetBrains Mono ตัวเลขทุกบาท, รายการแบบบรรทัดจุดไข่ปลา, สลิปขอบฉีก (shop-tear) + ตราสถานะปั๊มครั้งเดียว (shop-seal, เคารพ reduced-motion), ปุ่ม +/− จำนวน — ไม่เพิ่มสีใหม่ ใช้ token บ้านเดิมทั้งหมด
+- **สถานะ:** ✅ ภาษีไทยครบชุดแรก (VAT ภ.พ.30 · CIT SME 0/15/20% · PIT · WHT · ปฏิทินยื่น) — 1082/1082 + tsc ผ่าน + migration ลง DB จริง (backend บน :3001 รอ merge master ก่อน restart)
+- **งาน:** BUSINESS × THAI TAX — คำนวณภาษีจากข้อมูลจริงในระบบ (บริการ pure + เส้น /tax + ตอนชำระเงิน/บันทึกบัญชี)
+- **สาขา:** freebuff/task-26201e6b (ต่อจาก shop verify + แก้ /shop stale-route ในรอบก่อน)
+  - **ตัวเลขตามกฎหมาย ณ ก.ย. 2026:** VAT 7% ต่ออายุถึง 30 ก.ย. 2027 (ครม. ต่อ 1 ปี — ค้นเว็บยืนยัน) แล้วขึ้น 10% เองตามวันที่; นิติบุคคล SME (ทุน ≤5M + รายได้ ≤30M) 0%/15%/20% ก้าวหน้า, เกินเพดาน = 20% แบบ; บุคคลธรรมดา 8 ขั้น 0–35% หักค่าใช้จ่าย 60k (ประมาณการหยาบ — ลดหย่อนอื่นไม่รองรับ)
+  - **ที่มาเดียว:** `thai-tax.service.ts` — RATES + pure functions (splitVatFromGross / computeVatMonthly / computeCit / computePit / taxCalendar / businessTaxOverview) ไม่แตะ prisma เทสตรงได้ทุกกรณี
+  - **ผูกข้อมูลจริง:** ชำระครบ → ledger INCOME แยก VAT อัตโนมัติจากยอด "รวม VAT" ด้วยอัตราร้าน (ระบุเองได้ — vatAmount:0 = ยกเว้น) + whtAmount ที่ลูกค้า B2B หัก (POST payments รับ whtAmount, เกินยอด = 400) — เงินเข้า Treasury ลดตาม WHT; รายจ่ายเก็บ vatAmount (ภาษีซื้อ) + whtAmount (ที่เราหัก ท.ป.4) ตามใบกำกับ
+  - **เส้น API:** GET /api/business/:id/tax (ACCOUNTANT ขึ้นไป) → VAT งวดนี้/เดือนก่อน (netVat = ขาย−ซื้อ ติดลบได้) + สรุปปี + CIT (WHT เป็นเครดิต ไม่ติดลบ) + PIT + ปฏิทิน 5 แบบยื่น (ภ.พ.30 วันที่ 15, ภ.ง.ด.3 วันที่ 7 เลื่อนเดือนเองเมื่อผ่านแล้ว, ภ.ง.ด.50 +150 วัน, ภ.ง.ด.51 31 ส.ค., ภ.ง.ด.90 31 มี.ค.) รับ ?capital / ?fyEnd ปรับ SME/กำหนดยื่น
+  - **schema:** additive migration `20260913200000_add_business_tax_fields` (payments.whtAmount + ledger.vatAmount/whtAmount, default 0) — apply บน sovereign_v2 จริงแล้ว (เก่าไม่กระทบ); sqlite mirror แก้ตาม
+  - **TDD:** เทสก่อน 13 → เจอบั๊กจริง 2 จุด (vatAmount:0 falsy ถูกทับ / mock tx.business ขาด) + จับสิทธิ์ผิดของเทสเอง (ledger เขียน = MANAGER ขึ้นไป) → แก้จน 11/11 ของไฟล์นี้ + businessPlatform/Shop/Treasury 48/48 + full suite 1082/1082 + tsc สะอาด
+  - **ตัดเกินจำเป็น (tidy pass):** ลบ endpoint /tax/wht ที่ยังไม่มี UI เรียก + ตารางอัตรา WHT (ระบบเก็บยอดที่ถูกหักจริง อัตรากรอกตอนออกบิล), ซื้อฝั่ง computeVatMonthly (caller ประกอบ inputVat จาก ledger เอง), option personalAllowance, VAT_RATES export — บริการเหลือแต่ที่มีคนใช้
+  - **ยังไม่ทำ (ต่อยอดถัดไป):** แท็บ "ภาษี" บน BusinessWorkspace (ตัวเลขพร้อมทาง API แล้ว) + แนบ WHT ตอนออกบิลใน UI + deploy หลัง merge (container mount src ของ MAIN — restart เฉพาะหลัง merge master)
+- **ก่อนหน้า:** 2026-09-13 — VERIFY + FIX — พิสูจน์ shop-flow บน UI จริงครบวงจร (สั่ง→ยืนยัน→รับชำระ→Treasury) + แก้บั๊ก /shop ลิงก์หลังสั่งซื้อไม่เปลี่ยนหน้า (shop.tsx — tsc ผ่าน, รอ rebuild :3000)
+  - **seed ชั่วคราว (ล้างแล้ว):** owner OPERATOR + ธุรกิจเปิดร้าน + สินค้าผูกคลัง (50↔100) + ออเดอร์แขก S20260913-0001 (30×1,290+VAT = ฿41,409)
+  - **UI เจ้าของจริง (:3000):** แท็บออเดอร์เห็นใบเสนอราคา → กดยืนยัน = ORDERED + สต็อก 50→20 + คลัง 100→70 → กดรับชำระ = PAID
+  - **เงินไหลจริง:** ledger INCOME 41,409 (refOrderId กันซ้ำ) + Treasury SHOP_INCOME $1,183.11 (÷35) + liquid_cash เจ้าของ 0→1,183.11 — ตรวจ DB จริงทุกจุด
+  - **ลูกค้าแขกจริง:** /shop?id= สลิป-ledger ถูกต้อง → สั่ง S-0002 → ลิงก์ลับแสดงใบสรุป + QR PromptPay ฝังยอด 1,380.3฿ (mask ••• 5678)
+  - **บั๊กใหม่ที่จับได้:** กด "ดูสถานะ/ชำระเงิน →" หลังสั่ง = URL เปลี่ยนแต่หน้าค้างหน้าร้าน — _app.tsx แปลงคลิก <a> ภายในเป็น router.push แต่ shop.tsx อ่าน URL แค่ตอน mount; แก้ = อ่านซ้ำตาม asPath + รีเซ็ต route เมื่อไม่มี params; พิสูจน์บน dev :3100 (กดลิงก์เห็นสลิปทันที + back กลับหน้าร้านได้); **build :3000 ยังเก่า — ต้อง rebuild ฝั่ง MAIN ก่อนใช้จริง**
+  - **สะอาด:** ล้างใน tx เดียว (audit RESTRICT ลบก่อน, order_lines FK ลบ orders ก่อน businesses, business agent_roles 10 แถวลบแยก) → users 8 / businesses 0 / agents 8; e2e-bot คงไว้ (infra ของ Playwright suite ตาม README); ลบ verify-tmp/ + owner-seed.json
+  - **หมายเหตุ:** พรีวิว Freebuff จับ pid :3000 ไว้ ตอนสลับไป dev :3100 เลยปิด prod ไปด้วย — รีสตาร์ทตามสูตร bat (production next start จาก MAIN, ready 1.7 วิ) คืนเรียบร้อย
+- **ก่อนหน้า:** 2026-09-13 — SHOP UI — /shop ออกแบบใหม่เป็นสลิป-ledger (merge `bf07b32` + deploy :3000 แล้ว)
+  - **งาน:** SHOP UI — หน้าร้านสาธารณะใช้ภาษาใบเสร็จ/สมุดบัญชี: font-ledger หัวข้อ, JetBrains Mono ตัวเลขทุกบาท, รายการแบบบรรทัดจุดไข่ปลา, สลิปขอบฉีก (shop-tear) + ตราสถานะปั๊มครั้งเดียว (shop-seal, เคารพ reduced-motion), ปุ่ม +/− จำนวน — ไม่เพิ่มสีใหม่ ใช้ token บ้านเดิมทั้งหมด
   - **แก้จากการขับหน้าจริง:** (1) _app.tsx เพิ่ม PUBLIC_PAGES — เดิม MobileNav 40+ เมนูเจ้าของ + Command Palette + ป้าย AI รั่วออกหน้าลูกค้า (2) แวบ "ไม่พบหน้าร้าน" ทุกครั้งก่อนอ่าน URL — เปลี่ยนเป็น skeleton จน mount
   - **gate:** FE tsc + next build (53 pages, /shop prerendered) ทั้ง worktree และ MAIN หลัง merge · ขับ lifecycle ลูกค้าจริงผ่าน UI บน dev :3100 (สั่ง 2,760.60 ฿ → ลิงก์ลับ → QR → แจ้งชำระ → ค้างชำระ 0) · ข้อมูลทดสอบล้างเป็นศูนย์ · dev :3100 ปิดแล้ว
   - **deploy:** kill stale :3000 → start-sovereign.bat (BUILD_ID ใหม่กว่า src → ไม่ rebuild, พร้อมใน 29 วิ) → พิสูจน์บน prod: /shop 200, marker shop-tear ใน JS chunk + CSS จริง, เกตลูกค้ายังซ่อนเมนูภายใน, API :3001 healthz 200 · หมายเหตุเครื่อง: detached spawn จาก shell เงียบไปเองครั้งนี้ — ใช้ schtasks /Create+/Run เป็นทางผ่าน (งาน ShipShop3000 ยังค้างใน Task Scheduler ลบได้)
-- **ก่อนหน้า:** 2026-09-13 — BUSINESS × WAREHOUSE — สต็อกธุรกิจ mirror คลังกลาง (merge `875b776`, deploy :3001; ไม่มี migration — FK มีอยู่แล้ว); roadmap business platform ครบทั้ง 3 จุดต่อยอด
-- **สาขา:** freebuff/task-26201e6b (sync master bf07b32)
+- **ก่อนหน้า:** 2026-09-13 — BUSINESS × WAREHOUSE — สต็อกธุรกิจผูก InventoryItem mirror กันสองฝั่ง (merge `875b776` + deploy :3001, ไม่มี migration — FK มีอยู่แล้ว; roadmap business platform ครบทั้ง 3 จุดต่อยอด)
+  - **สาขาตอนนั้น:** freebuff/task-26201e6b (sync master 0655b62)
   - **ทิศทางความจริง (document ในโค้ด):** สต็อกธุรกิจ = ความจริงช่องทางธุรกิจ, InventoryItem ของเจ้าของ mirror ทุก delta — ยืนยันออเดอร์ −, ยกเลิกจาก ORDERED +, รับขอเข้า (PO) +, แก้ stockQty มือ ±; ยอดเริ่มต้นตอนผูกไม่ย้อนเติม (mirror เฉพาะ delta หลังผูก)
   - **กันคลังติดลบ:** ยืนยันออเดอร์ที่ผูกคลังไว้ → เช็ค quantity คลังพอก่อนหัก ใน tx เดียวกัน (ไม่พอ = 400 ยกเลิกทั้ง tx เหมือนสต็อกไม่พอ); mirror best-effort — ลิงก์แขวน/พังไม่เคยบล็อกธุรกิจ
   - **ผูกลิงก์:** create/update product รับ inventoryItemId แล้ว (เดิมดรอปทิ้งเงียบ ๆ) — สิทธิ์ STOCK_KEEPER+ ตาม route เดิม
