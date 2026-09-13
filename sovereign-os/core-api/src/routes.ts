@@ -69,6 +69,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import systemRoutes, { livenessRouter } from './modules/system/system.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
+import businessShopRoutes from './modules/business/business-shop.routes';
 import { featureGuard } from './services/feature-grant.service';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export function mountRoutes(app: Express): void {
   // SUPERADMIN ผ่านเสมอ, สมาชิกต้องได้รับ grant ในตาราง user_feature_grants
   // (หน้า auth/devices/telemetry/sensors เป็นโครงสร้างพื้นฐาน — ใคร login แล้วใช้ได้)
   app.use('/api/auth', authRoutes);
+  app.use('/api/shop', businessShopRoutes); // PUBLIC SHOP — หน้าร้านสาธารณะ (rate limit ใน router — ต้องมาก่อน /api/business)
   app.use('/api/business', businessRoutes); // BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (สิทธิ์ต่อธุรกิจใน router)
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);
