@@ -37,6 +37,9 @@ const installations = new Map<string, any>();
 const suppliers = new Map<string, any>();
 const purchaseOrders = new Map<string, any>();
 const users = new Map<string, any>();
+const warehouseItems = new Map<string, any>();
+
+const WAREHOUSE_ITEM_ID = '99999999-9999-9999-9999-999999999999';
 
 let memberSeq = 0;
 let ledgerSeq = 0;
@@ -100,6 +103,14 @@ before(async () => {
   (prisma as any).user = {
     findUnique: async ({ where }: any) => users.get(where.id) ?? null,
     findMany: async () => [...users.values()],
+  };
+  (prisma as any).inventoryItem = {
+    findUnique: async ({ where }: any) => warehouseItems.get(where.id) ?? null,
+    update: async ({ where, data }: any) => {
+      const it = { ...warehouseItems.get(where.id), ...data };
+      warehouseItems.set(where.id, it);
+      return it;
+    },
   };
   (prisma as any).businessProduct = {
     findUnique: async ({ where }: any) => products.get(where.id) ?? null,
@@ -263,6 +274,7 @@ before(async () => {
     businessPayment: (prisma as any).businessPayment,
     businessLedgerEntry: (prisma as any).businessLedgerEntry,
     businessPurchaseOrder: (prisma as any).businessPurchaseOrder,
+    inventoryItem: (prisma as any).inventoryItem,
   };
   mock.method(prisma, '$transaction', async (fn: any) => (typeof fn === 'function' ? fn(fakeTx) : Promise.all(fn)));
 
@@ -428,6 +440,91 @@ test('รับของเข้า: สต็อกบวก + ต้นทุ
 
   const again = await post(`/${BIZ_ID}/purchase-orders/${po.id}/receive`, {}, memberToken('STOCK_KEEPER'));
   assert.equal(again.status, 400);
+});
+
+// ── เชื่อมคลังกลาง: stock ของสินค้าธุรกิจ = ความจริงช่องทางธุรกิจ, InventoryItem ของเจ้าของ mirror ทุก delta ──
+test('ผูก inventoryItemId ผ่าน create/update product — VIEWER ผูกไม่ได้ (403)', async () => {
+  const stockKeeper = memberToken('STOCK_KEEPER');
+  const created = await (await post(`/${BIZ_ID}/products`, { sku: 'WS-1', name: 'สินค้าผูกคลัง', stockQty: 4, inventoryItemId: WAREHOUSE_ITEM_ID }, stockKeeper)).json();
+  assert.equal(created.inventoryItemId, WAREHOUSE_ITEM_ID, 'create ต้องบันทึกลิงก์ (ตอนนี้ดรอปทิ้ง)');
+
+  const patched = await (await fetch(server.baseUrl + `${API}/${BIZ_ID}/products/${PRODUCT_ID}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stockKeeper}` },
+    body: JSON.stringify({ inventoryItemId: WAREHOUSE_ITEM_ID }),
+  })).json();
+  assert.equal(patched.inventoryItemId, WAREHOUSE_ITEM_ID, 'update ต้องบันทึกลิงก์ (ตอนนี้ดรอปทิ้ง)');
+
+  const viewer = await fetch(server.baseUrl + `${API}/${BIZ_ID}/products/${PRODUCT_ID}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${memberToken('VIEWER')}` },
+    body: JSON.stringify({ inventoryItemId: WAREHOUSE_ITEM_ID }),
+  });
+  assert.equal(viewer.status, 403);
+});
+
+test('ยืนยันออเดอร์ → คลังกลางหักตาม (−2) · ยกเลิกจาก ORDERED → คลังคืน (+2)', async () => {
+  products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: WAREHOUSE_ITEM_ID });
+  warehouseItems.set(WAREHOUSE_ITEM_ID, { id: WAREHOUSE_ITEM_ID, user_id: OWNER_ID, quantity: 20 });
+  try {
+    const create = await post(`/${BIZ_ID}/orders`, { items: [{ productId: PRODUCT_ID, qty: 2 }] }, memberToken('SALES'));
+    const order = await create.json();
+    await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'confirm' }, memberToken('MANAGER'));
+    assert.equal(warehouseItems.get(WAREHOUSE_ITEM_ID).quantity, 18, 'คลังต้องหัก 20→18 ตามธุรกิจ');
+
+    await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'cancel' }, memberToken('MANAGER'));
+    assert.equal(warehouseItems.get(WAREHOUSE_ITEM_ID).quantity, 20, 'ยกเลิกต้องคืนคลัง 18→20');
+  } finally {
+    products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: null });
+    warehouseItems.delete(WAREHOUSE_ITEM_ID);
+  }
+});
+
+test('ยืนยันเกินสต็อกคลัง → 400 + ยอดคลัง/สต็อกธุรกิจไม่เปลี่ยน', async () => {
+  const stockBefore = products.get(PRODUCT_ID).stockQty;
+  products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: WAREHOUSE_ITEM_ID });
+  warehouseItems.set(WAREHOUSE_ITEM_ID, { id: WAREHOUSE_ITEM_ID, user_id: OWNER_ID, quantity: 1 });
+  try {
+    const create = await post(`/${BIZ_ID}/orders`, { items: [{ productId: PRODUCT_ID, qty: 2 }] }, memberToken('SALES'));
+    const order = await create.json();
+    const res = await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'confirm' }, memberToken('MANAGER'));
+    assert.equal(res.status, 400, 'คลังไม่พอต้องบล็อกเหมือนสต็อกไม่พอ');
+    assert.equal(warehouseItems.get(WAREHOUSE_ITEM_ID).quantity, 1, 'คลังไม่ถูกหัก (เช็คก่อนหักใน tx เดียวกัน)');
+    // mock $transaction ไม่ rollback raw SQL ที่ยิงไปแล้ว — สต็อกธุรกิจคืนที่จริงด้วย tx (ครอบคลุมในเทสเกินสต็อกเดิม)
+    assert.equal(orders.get(order.id).status, 'QUOTE');
+  } finally {
+    products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: null, stockQty: stockBefore });
+    warehouseItems.delete(WAREHOUSE_ITEM_ID);
+  }
+});
+
+test('รับของเข้า (PO) → คลังกลางบวกตาม (+10)', async () => {
+  products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: WAREHOUSE_ITEM_ID });
+  warehouseItems.set(WAREHOUSE_ITEM_ID, { id: WAREHOUSE_ITEM_ID, user_id: OWNER_ID, quantity: 5 });
+  try {
+    const sup = await (await post(`/${BIZ_ID}/suppliers`, { name: 'ผู้ขายคลัง' }, memberToken('STOCK_KEEPER'))).json();
+    const po = await (await post(`/${BIZ_ID}/purchase-orders`, { supplierId: sup.id, productId: PRODUCT_ID, qty: 10, unitCost: 50 }, memberToken('STOCK_KEEPER'))).json();
+    await post(`/${BIZ_ID}/purchase-orders/${po.id}/receive`, {}, memberToken('STOCK_KEEPER'));
+    assert.equal(warehouseItems.get(WAREHOUSE_ITEM_ID).quantity, 15, 'รับของเข้าธุรกิจ = คลังบวกตาม');
+  } finally {
+    products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: null });
+    warehouseItems.delete(WAREHOUSE_ITEM_ID);
+  }
+});
+
+test('แก้ stockQty มือ → คลังขยับตาม delta (ตั้งค่าใหม่ทั้งยอด)', async () => {
+  products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: WAREHOUSE_ITEM_ID });
+  warehouseItems.set(WAREHOUSE_ITEM_ID, { id: WAREHOUSE_ITEM_ID, user_id: OWNER_ID, quantity: 9 });
+  try {
+    const before = products.get(PRODUCT_ID).stockQty; // 10
+    const res = await fetch(server.baseUrl + `${API}/${BIZ_ID}/products/${PRODUCT_ID}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${memberToken('STOCK_KEEPER')}` },
+      body: JSON.stringify({ stockQty: before + 5 }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(warehouseItems.get(WAREHOUSE_ITEM_ID).quantity, 14, 'แก้มือ 10→15 = คลัง 9→14 (delta +5)');
+  } finally {
+    products.set(PRODUCT_ID, { ...products.get(PRODUCT_ID), inventoryItemId: null });
+    warehouseItems.delete(WAREHOUSE_ITEM_ID);
+  }
 });
 
 test('สร้างธุรกิจ → 201 + OWNER member + seed ผู้ช่วย AI 5 คน', async () => {

@@ -6,6 +6,8 @@
 // - ยืนยันออเดอร์ (QUOTE→ORDERED) = หักสต็อกใน transaction (กันสต็อกติดลบ)
 // - ยกเลิกจาก ORDERED = คืนสต็อก
 // - ชำระครบ (→PAID) = บันทึกรายรับในสมุดบัญชีธุรกิจอัตโนมัติ + เครดิตเงินสดเข้า Treasury ของเจ้าของ (SHOP_INCOME)
+// - สินค้าผูกคลังกลาง (inventoryItemId): สต็อกธุรกิจ = ความจริงช่องทางธุรกิจ — InventoryItem ของเจ้าของ mirror ทุก delta
+//   (ยืนยัน −/ยกเลิก +/รับขอเข้า +/แก้มือ ±; ยอดเริ่มต้นตอนผูกไม่ย้อนเติม — mirror เฉพาะ delta หลังจากนั้น)
 import { prisma } from '../lib/prisma';
 import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
@@ -14,6 +16,19 @@ import { creditLiquidCash } from './treasury.service';
 // ── helpers ──
 function str(v: unknown, max: number): string {
   return String(v ?? '').trim().slice(0, max);
+}
+/** คลังกลาง mirror — สินค้าผูก InventoryItem ไว้ → ขยับ quantity ตาม delta (best-effort: ลิงก์พัง/ไม่มี = ข้าม) */
+async function mirrorWarehouseDelta(client: any, productId: string, delta: number): Promise<void> {
+  if (!delta) return;
+  try {
+    const p = await client.businessProduct.findUnique({ where: { id: productId } });
+    if (!p?.inventoryItemId) return;
+    const item = await client.inventoryItem.findUnique({ where: { id: p.inventoryItemId } });
+    if (!item) return; // ลิงก์แขวน (ของถูกลบ) — ไม่บล็อกธุรกิจ
+    await client.inventoryItem.update({ where: { id: item.id }, data: { quantity: Math.max(0, item.quantity + delta) } });
+  } catch (err) {
+    console.error('📦 warehouse mirror failed (business stock unchanged):', err);
+  }
 }
 function num(v: unknown, min: number, max: number, fallback = 0): number {
   const n = Number(v);
@@ -112,6 +127,7 @@ export async function createProduct(businessId: string, input: any): Promise<any
       stockQty: Math.floor(num(input?.stockQty, 0, 1_000_000)),
       reorderPoint: Math.floor(num(input?.reorderPoint, 0, 1_000_000)),
       warrantyMonths: Math.floor(num(input?.warrantyMonths, 0, 120)),
+      inventoryItemId: input?.inventoryItemId ? str(input.inventoryItemId, 36) : null,
       isActive: input?.isActive !== false,
     },
   });
@@ -129,8 +145,14 @@ export async function updateProduct(businessId: string, id: string, input: any):
   if (input.stockQty !== undefined) data.stockQty = Math.floor(num(input.stockQty, 0, 1_000_000));
   if (input.reorderPoint !== undefined) data.reorderPoint = Math.floor(num(input.reorderPoint, 0, 1_000_000));
   if (input.warrantyMonths !== undefined) data.warrantyMonths = Math.floor(num(input.warrantyMonths, 0, 120));
+  if (input.inventoryItemId !== undefined) data.inventoryItemId = input.inventoryItemId ? str(input.inventoryItemId, 36) : null;
   if (input.isActive !== undefined) data.isActive = Boolean(input.isActive);
-  return prisma.businessProduct.update({ where: { id }, data });
+  const updated = await prisma.businessProduct.update({ where: { id }, data });
+  // แก้ stockQty มือบนสินค้าที่ผูกคลังอยู่ → คลังขยับตาม delta (เพิ่งผูกใหม่ = ไม่ย้อนเติมยอดเก่า)
+  if (existing.inventoryItemId && updated.inventoryItemId && data.stockQty !== undefined) {
+    await mirrorWarehouseDelta(prisma, id, data.stockQty - existing.stockQty);
+  }
+  return updated;
 }
 
 // ── Customers ──
@@ -241,6 +263,13 @@ export async function transitionOrder(
         // หักสต็อกแบบมีเงื่อนไข — stockQty >= qty ถึงจะสำเร็จ (กันสต็อกติดลบจาก concurrency)
         const res = await tx.$executeRaw`UPDATE "business_products" SET "stockQty" = "stockQty" - ${line.qty}::int, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${line.productId}::uuid AND "stockQty" >= ${line.qty}::int`;
         if (res !== 1) throw new Error(`สต็อกไม่พอสำหรับบางรายการ (ต้องการ ${line.qty})`);
+        // ผูกคลังกลางไว้ → คลังต้องมีของพอด้วย (ไม่พอ = ยกเลิกทั้ง transaction กันคลังติดลบ)
+        const p = await tx.businessProduct.findUnique({ where: { id: line.productId } });
+        if (p?.inventoryItemId) {
+          const item = await tx.inventoryItem.findUnique({ where: { id: p.inventoryItemId } });
+          if (item && item.quantity < line.qty) throw new Error(`สต็อกคลังกลางไม่พอสำหรับบางรายการ (ต้องการ ${line.qty})`);
+          if (item) await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: Math.max(0, item.quantity - line.qty) } });
+        }
       }
       return tx.businessOrder.update({ where: { id }, data: { status: 'ORDERED' } });
     }
@@ -251,6 +280,7 @@ export async function transitionOrder(
         const lines = await tx.businessOrderLine.findMany({ where: { orderId: id } });
         for (const line of lines) {
           await tx.$executeRaw`UPDATE "business_products" SET "stockQty" = "stockQty" + ${line.qty}::int, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${line.productId}::uuid`;
+          await mirrorWarehouseDelta(tx, line.productId, line.qty);
         }
       }
       return tx.businessOrder.update({ where: { id }, data: { status: 'CANCELLED' } });
@@ -478,6 +508,7 @@ export async function receivePurchaseOrder(businessId: string, id: string): Prom
       where: { id: product.id },
       data: { stockQty: newQty, costPrice: Math.round(newCost * 100) / 100 },
     });
+    await mirrorWarehouseDelta(tx, product.id, po.qty);
     await tx.businessLedgerEntry.create({
       data: { businessId, type: 'EXPENSE', category: 'RESTOCK', amount: po.qty * po.unitCost, note: `ซื้อเข้า ${product.name} ×${po.qty}` },
     });
