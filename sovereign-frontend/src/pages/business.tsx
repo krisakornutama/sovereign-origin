@@ -54,7 +54,7 @@ export default function BusinessPage() {
       const res = await authFetch(`${getApiUrl()}/api/business`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name.trim(), bizType: form.bizType, vatRate: Number(form.vatRate) / 100 }),
+        body: JSON.stringify({ name: form.name.trim(), bizType: form.bizType, vatRate: vat / 100 }),
       });
       const data = res.ok ? await res.json() : await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? 'สร้างไม่สำเร็จ');
