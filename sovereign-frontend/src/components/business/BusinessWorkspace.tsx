@@ -23,7 +23,7 @@ export const POSITION_LABELS: Record<string, string> = {
 
 const POSITION_RANK: Record<string, number> = { OWNER: 0, MANAGER: 1, SALES: 2, TECHNICIAN: 3, STOCK_KEEPER: 3, ACCOUNTANT: 3, VIEWER: 6 };
 
-type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'agents' | 'team' | 'shop';
+type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'tax' | 'agents' | 'team' | 'shop';
 
 const TABS: Array<{ key: Tab; label: string; minRank: number }> = [
   { key: 'overview', label: 'ภาพรวม', minRank: 6 },
@@ -32,6 +32,7 @@ const TABS: Array<{ key: Tab; label: string; minRank: number }> = [
   { key: 'orders', label: 'ออเดอร์', minRank: 6 },
   { key: 'installations', label: 'ติดตั้ง', minRank: 6 },
   { key: 'finance', label: 'การเงิน', minRank: 3 },
+  { key: 'tax', label: 'ภาษี', minRank: 3 },
   { key: 'agents', label: 'ผู้ช่วย AI', minRank: 6 },
   { key: 'team', label: 'ทีม', minRank: 6 },
   { key: 'shop', label: 'หน้าร้าน', minRank: 1 },
@@ -136,6 +137,8 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
 
   // ── ออเดอร์: สร้าง + transition ──
   const [cart, setCart] = useState<Record<string, number>>({});
+  // หัก ณ ที่จ่ายต่อออเดอร์ (ท.ป.4 ที่ลูกค้า B2B หัก) — ค่าว่าง = ไม่มี WHT
+  const [whtInput, setWhtInput] = useState<Record<string, string>>({});
   async function createOrder(customerId?: string) {
     const items = Object.entries(cart).filter(([, q]) => q > 0).map(([productId, qty]) => ({ productId, qty }));
     if (items.length === 0) { setNotice({ ok: false, text: 'เลือกสินค้าก่อนเปิดออเดอร์' }); return; }
@@ -155,9 +158,12 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
   }
   async function markPaid(order: Order) {
     const remain = Math.max(0, order.total - order.paidAmount);
+    const wht = Math.max(0, Number(whtInput[order.id]) || 0);
+    if (wht >= remain) { setNotice({ ok: false, text: 'ภาษีหัก ณ ที่จ่ายต้องน้อยกว่ายอดค้างชำระ (เงินโอนเข้าจริง = ค้าง − WHT)' }); return; }
     try {
-      await post(`${base}/orders/${order.id}/payments`, { amount: remain, method: 'CASH' });
-      setNotice({ ok: true, text: `รับชำระ ${order.orderNo} ครบ ${baht(order.total)}` });
+      await post(`${base}/orders/${order.id}/payments`, { amount: remain, method: wht > 0 ? 'TRANSFER' : 'CASH', ...(wht > 0 ? { whtAmount: wht } : {}) });
+      setNotice({ ok: true, text: wht > 0 ? `รับชำระ ${order.orderNo} ครบ ${baht(order.total)} (โอนเข้า ${baht(remain - wht)} — WHT ${baht(wht)})` : `รับชำระ ${order.orderNo} ครบ ${baht(order.total)}` });
+      setWhtInput((s) => ({ ...s, [order.id]: '' }));
       await load();
     } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
   }
@@ -262,7 +268,15 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
                 <span className="ml-auto font-semibold">{baht(o.total)}{o.paidAmount > 0 && o.paidAmount < o.total ? <span className="text-xs text-amber-300"> (จ่ายแล้ว {baht(o.paidAmount)})</span> : null}</span>
                 <span className="text-[11px] text-slate-500 w-full sm:w-auto">{o.lines.map((l) => `${l.product?.name ?? '?'}×${l.qty}`).join(', ')}</span>
                 {can('MANAGER') && o.status === 'QUOTE' && <button onClick={() => transition(o, 'confirm', 'รอชำระ')} className="px-3 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-xs">ยืนยัน (หักสต็อก)</button>}
-                {can('SALES') && o.status === 'ORDERED' && <button onClick={() => markPaid(o)} className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">รับชำระ {baht(Math.max(0, o.total - o.paidAmount))}</button>}
+                {can('SALES') && o.status === 'ORDERED' && (
+                  <>
+                    <input type="number" min={0} step="0.01" value={whtInput[o.id] ?? ''} onChange={(e) => setWhtInput((s) => ({ ...s, [o.id]: e.target.value }))}
+                      placeholder="WHT ฿" aria-label={`ภาษีหัก ณ ที่จ่าย ออเดอร์ ${o.orderNo}`}
+                      title="ภาษีหัก ณ ที่จ่ายที่ลูกค้าหัก (ท.ป.4) — เงินโอนเข้า = ยอดค้าง − WHT; ว่าง = ไม่มี"
+                      className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right text-xs" />
+                    <button onClick={() => markPaid(o)} className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">รับชำระ {baht(Math.max(0, o.total - o.paidAmount))}</button>
+                  </>
+                )}
                 {can('MANAGER') && o.status === 'PAID' && <button onClick={() => transition(o, 'deliver', 'ส่งแล้ว')} className="px-3 py-1 rounded bg-sky-600/80 hover:bg-sky-500 text-xs">ส่งของ</button>}
                 {can('MANAGER') && (o.status === 'QUOTE' || o.status === 'ORDERED') && <button onClick={() => transition(o, 'cancel', 'ยกเลิก')} className="px-3 py-1 rounded border border-rose-500/40 text-rose-300 text-xs hover:bg-rose-500/10">ยกเลิก</button>}
               </div>
@@ -312,6 +326,9 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
           )}
         </div>
       )}
+
+      {/* ── ภาษี ── */}
+      {tab === 'tax' && <TaxTab base={base} />}
 
       {/* ── ผู้ช่วย AI ── */}
       {tab === 'agents' && (
@@ -370,6 +387,118 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
       )}
     </div>
   );
+}
+
+// ── ภาษี — อ่านตัวเลขจาก GET /tax (server บังคับสิทธิ์เอง; tab เห็นเฉพาะ ACCOUNTANT ขึ้นไป) ──
+interface TaxData {
+  asOf: string;
+  vatRate: number;
+  currentVatRate: number;
+  vat: { thisMonth: { salesBase: number; outputVat: number; inputVat: number; netVat: number }; lastMonth: { outputVat: number } };
+  year: { income: number; incomeVat: number; expense: number; expenseVat: number; wht: { received: number; paid: number }; netProfitBeforeTax: number };
+  cit: { isSme: boolean; netProfit: number; grossTax: number; whtCredits: number; taxDue: number };
+  pit: { taxable: number; grossTax: number; taxDue: number };
+  calendar: Array<{ key: string; label: string; due: string; periodLabel: string }>;
+}
+
+const daysLeft = (due: string) => Math.round((new Date(`${due}T00:00:00Z`).getTime() - Date.now()) / 86_400_000);
+
+function TaxTab({ base }: { base: string }) {
+  const [data, setData] = useState<TaxData | null>(null);
+  const [err, setErr] = useState('');
+  // ทุนจดทะเบียนปรับการทดสอบ SME (ทุน > 5M = ไม่ SME แม้รายได้ต่ำ) — apply เมื่อ blur
+  const [capital, setCapital] = useState('');
+  const [capitalApplied, setCapitalApplied] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    const q = capitalApplied ? `?capital=${encodeURIComponent(capitalApplied)}` : '';
+    fetchJsonObject<TaxData>(`${base}/tax${q}`)
+      .then((d) => { if (alive) setData(d); })
+      .catch((e: any) => { if (alive) setErr(e.message); });
+    return () => { alive = false; };
+  }, [base, capitalApplied]);
+
+  if (err) return <div className="card p-4 text-sm text-slate-400">{err}</div>;
+  if (!data) return <div className="card p-4 text-sm text-slate-400">กำลังโหลดตัวเลขภาษี…</div>;
+  const v = data.vat.thisMonth;
+  const y = data.year;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'ภาษีขาย (งวดนี้)', value: baht(v.outputVat), cls: 'text-amber-300' },
+          { label: 'ภาษีซื้อ (งวดนี้)', value: baht(v.inputVat), cls: 'text-slate-300' },
+          { label: 'VAT จ่ายสุทธิ ภ.พ.30', value: baht(v.netVat), cls: v.netVat >= 0 ? 'text-rose-300' : 'text-emerald-300' },
+          { label: 'ภาษีขาย (เดือนก่อน)', value: baht(data.vat.lastMonth.outputVat), cls: 'text-slate-300' },
+        ].map((k) => (
+          <div key={k.label} className="card p-3"><div className="text-[11px] text-slate-400">{k.label}</div><div className={`text-lg font-bold ${k.cls}`}>{k.value}</div></div>
+        ))}
+      </div>
+      <div className="card p-3 text-xs text-slate-400">
+        อัตราของร้าน {(data.vatRate * 100).toFixed(0)}% · อัตราลดพิเศษปัจจุบัน {(data.currentVatRate * 100).toFixed(0)}% (ถึง 30 ก.ย. 2027) · ฐานขายงวดนี้ {baht(v.salesBase)} · netVat ติดลบ = ภาษีซื้อเกินภาษีขาย (ยกไปงวดหน้า/ขอคืนได้)
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'รายได้ (ปีนี้)', value: baht(y.income), cls: 'text-emerald-300' },
+          { label: 'VAT ในรายได้', value: baht(y.incomeVat), cls: 'text-slate-300' },
+          { label: 'รายจ่าย (ปีนี้)', value: baht(y.expense), cls: 'text-rose-300' },
+          { label: 'กำไรก่อนภาษี', value: baht(y.netProfitBeforeTax), cls: 'text-cyan-300' },
+        ].map((k) => (
+          <div key={k.label} className="card p-3"><div className="text-[11px] text-slate-400">{k.label}</div><div className={`text-lg font-bold ${k.cls}`}>{k.value}</div></div>
+        ))}
+      </div>
+      <div className="grid md:grid-cols-3 gap-3">
+        <div className="card p-3 space-y-1">
+          <div className="text-sm font-semibold">🏢 ภาษีนิติบุคคล ภ.ง.ด.50</div>
+          <div className="text-[11px] text-slate-500">{data.cit.isSme ? 'SME — อัตราก้าวหน้า 0/15/20% (ทุน ≤5M + รายได้ ≤30M)' : 'อัตรากลาง 20% (เกินเพดาน SME)'}</div>
+          <TaxRow label="กำไรสุทธิ" value={baht(data.cit.netProfit)} />
+          <TaxRow label="ภาษีตามขั้น" value={baht(data.cit.grossTax)} />
+          <TaxRow label="เครดิตหัก ณ ที่จ่าย" value={baht(data.cit.whtCredits)} />
+          <TaxRow label="ต้องจ่ายเพิ่ม" value={baht(data.cit.taxDue)} strong />
+          <label className="block text-[11px] text-slate-500 pt-1" htmlFor="tax-capital-input">ทุนจดทะเบียน (บาท) — แก้เพื่อทดสอบเพดาน SME</label>
+          <input id="tax-capital-input" type="number" min={0} value={capital} onChange={(e) => setCapital(e.target.value)} onBlur={() => setCapitalApplied(capital)}
+            placeholder="เช่น 1000000" className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right text-xs" />
+        </div>
+        <div className="card p-3 space-y-1">
+          <div className="text-sm font-semibold">👤 ภาษีบุคคลธรรมดา ภ.ง.ด.90</div>
+          <div className="text-[11px] text-slate-500">ประมาณการหยาบ — หักค่าใช้จ่าย 60,000 เท่านั้น (ลดหย่อนอื่นตกลงตอนยื่นจริง)</div>
+          <TaxRow label="ฐานภาษี" value={baht(data.pit.taxable)} />
+          <TaxRow label="ภาษีตามขั้น" value={baht(data.pit.grossTax)} />
+          <TaxRow label="ต้องจ่ายเพิ่ม" value={baht(data.pit.taxDue)} strong />
+        </div>
+        <div className="card p-3 space-y-1">
+          <div className="text-sm font-semibold">🧾 หัก ณ ที่จ่าย (ปีนี้)</div>
+          <TaxRow label="โดนลูกค้าหัก" value={baht(y.wht.received)} />
+          <TaxRow label="ที่เราหักผู้รับจ้าง" value={baht(y.wht.paid)} />
+          <div className="text-[11px] text-slate-500">โดนหัก = เครดิต ภ.ง.ด.50/90 · ที่เราหัก = ส่ง ภ.ง.ด.3 ภายในวันที่ 7 เดือนถัดไป (e-filing +8 วิ)</div>
+        </div>
+      </div>
+      <div className="card p-3">
+        <div className="text-sm font-semibold mb-2">📅 ปฏิทินยื่น</div>
+        <div className="space-y-1">
+          {data.calendar.map((c) => {
+            const left = daysLeft(c.due);
+            return (
+              <div key={c.key} className="flex flex-wrap items-center gap-2 text-sm border-b border-slate-800 pb-1">
+                <span className="text-slate-300 flex-1">{c.label}</span>
+                <span className="text-[11px] text-slate-500">{c.periodLabel}</span>
+                <span className="font-mono text-xs">{c.due}</span>
+                <span className={`text-[10px] px-1.5 rounded border ${left < 0 ? 'border-slate-700 text-slate-500' : left <= 14 ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'border-slate-700 text-slate-400'}`}>
+                  {left < 0 ? 'ผ่านแล้ว' : `อีก ${left} วัน`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-[11px] text-slate-500 mt-2">ตัวเลขทั้งหมดประมาณการจากข้อมูลในระบบ — ไม่ใช่คำแนะนำภาษี · ภ.พ.30 ยื่นภายในวันที่ 15 ของเดือนถัดไป · ปีบัญชีอื่น (fyEnd) ติดต่อผู้ดูแลระบบ</div>
+      </div>
+    </div>
+  );
+}
+
+function TaxRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return <div className="flex justify-between text-sm"><span className="text-slate-400">{label}</span><span className={strong ? 'font-bold text-slate-200' : 'text-slate-300'}>{value}</span></div>;
 }
 
 function ShopTab({ bizId, bizName, canManage, base, setNotice }: { bizId: string; bizName: string; canManage: boolean; base: string; setNotice: (n: { ok: boolean; text: string } | null) => void }) {
