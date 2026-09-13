@@ -725,6 +725,9 @@ function InstallationsTab({ installations, canCreate, canWork, post, base, reloa
 
 function LedgerForm({ post, base, reload, setNotice }: any) {
   const [form, setForm] = useState({ type: 'EXPENSE', category: 'RESTOCK', amount: '', note: '' });
+  // ภาษีจากใบกำกับ — เว้นว่าง = ให้ระบบจัดการ (รายรับ: แยก VAT ให้เองตามอัตราร้าน)
+  const [vat, setVat] = useState('');
+  const [wht, setWht] = useState('');
   return (
     <div className="card p-4 space-y-3">
       <div className="text-sm font-semibold">✍️ บันทึกรายรับ-รายจ่าย</div>
@@ -740,10 +743,19 @@ function LedgerForm({ post, base, reload, setNotice }: any) {
         <input type="number" placeholder="จำนวนเงิน (บาท)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="จำนวนเงิน" />
         <input placeholder="หมายเหตุ" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="หมายเหตุ" />
       </div>
+      <div className="grid sm:grid-cols-3 gap-2">
+        <input type="number" min={0} placeholder={form.type === 'EXPENSE' ? 'ภาษีซื้อ VAT (จากใบกำกับ)' : 'ภาษีขาย VAT (ว่าง = แยกให้เอง)'} value={vat} onChange={(e) => setVat(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="ยอด VAT" />
+        <input type="number" min={0} placeholder="หัก ณ ที่จ่าย WHT (ถ้ามี)" value={wht} onChange={(e) => setWht(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="ภาษีหัก ณ ที่จ่าย" />
+        <div className="text-[11px] text-slate-500 self-center">รายจ่าย: VAT จากใบกำกับซัพพลายเออร์ + WHT ที่เราหัก (ท.ป.4) · รายรับ: ว่าง = ระบบแยก VAT ตามอัตราร้าน</div>
+      </div>
       <button onClick={async () => {
         const amount = Number(form.amount);
         if (!amount || amount <= 0) { setNotice({ ok: false, text: 'กรอกจำนวนเงิน' }); return; }
-        try { await post(`${base}/ledger`, { ...form, amount }); setForm({ ...form, amount: '', note: '' }); setNotice({ ok: true, text: 'บันทึกบัญชีแล้ว' }); await reload(); }
+        const vatN = vat.trim() === '' ? undefined : Number(vat);
+        const whtN = wht.trim() === '' ? undefined : Number(wht);
+        if (vatN !== undefined && (Number.isNaN(vatN) || vatN < 0 || vatN > amount)) { setNotice({ ok: false, text: 'VAT ต้องเป็นตัวเลข 0 ถึงยอดเงิน' }); return; }
+        if (whtN !== undefined && (Number.isNaN(whtN) || whtN < 0 || whtN > amount)) { setNotice({ ok: false, text: 'WHT ต้องเป็นตัวเลข 0 ถึงยอดเงิน' }); return; }
+        try { await post(`${base}/ledger`, { ...form, amount, ...(vatN !== undefined ? { vatAmount: vatN } : {}), ...(whtN !== undefined && whtN > 0 ? { whtAmount: whtN } : {}) }); setForm({ ...form, amount: '', note: '' }); setVat(''); setWht(''); setNotice({ ok: true, text: 'บันทึกบัญชีแล้ว' }); await reload(); }
         catch (e: any) { setNotice({ ok: false, text: e.message }); }
       }} className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-sm font-medium">บันทึก</button>
     </div>
