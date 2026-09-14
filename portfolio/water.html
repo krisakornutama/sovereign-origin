@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ชัยภูมิน้ำ — Project Sovereign</title>
+<meta name="description" content="แนวคิดจัดการน้ำและพื้นที่เพาะปลูกแบบวางแผน: The Pioneer (เปิดหัวน้ำ), ค่ายกล 8 ทิศ (จัดวางราง-บ่อ-แปลงแบบกลยุทธ์จูกัดเหลียง) และ The Patriarch (ธรรมาภิบาลน้ำ) — วางรางตรงไหน ขุดบ่อจุดไหน ทำดินให้ชุ่มชื้นอย่างไร รวมเป็นชัยภูมิเกษตรหนึ่งเดียว">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M3 10c2-3 8-3 10 0-2 3-8 3-10 0z' fill='%2322d3ee'/%3E%3Cpath d='M8 4c1.2 1.4 1.2 2.6 0 4-1.2-1.4-1.2-2.6 0-4z' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 12% -12%,rgba(34,211,238,.12),transparent 62%),
+  radial-gradient(980px 620px at 88% -8%,rgba(52,211,153,.09),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(34,211,238,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(34,211,238,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(52,211,153,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(34,211,238,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+a{color:var(--cyan)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--cyan)}
+.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:820px}
+h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:700px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 22px}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--cyan);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(34,211,238,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 30px;max-width:700px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.modepills{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+.fbtn{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--dim);background:transparent;
+  border:1px solid rgba(156,163,175,.3);border-radius:999px;padding:6px 14px;cursor:pointer;transition:color .15s ease,border-color .15s ease,background .15s ease}
+.fbtn:hover{color:#ecfdf5;border-color:rgba(34,211,238,.5)}
+.fbtn[aria-pressed="true"]{color:#030712;background:var(--cyan);border-color:var(--cyan);font-weight:700}
+
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:560px}
+.cell{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px;cursor:pointer;
+  display:flex;flex-direction:column;gap:6px;transition:border-color .15s ease,background .15s ease}
+.cell:hover{border-color:rgba(34,211,238,.45)}
+.cell[aria-pressed="true"]{border-color:var(--cyan);background:rgba(34,211,238,.08)}
+.cell.center{border-color:rgba(34,211,238,.35)}
+.cell .no{font-family:var(--mono);font-size:.62rem;color:var(--cyan)}
+.cell .tg{font-family:'Sarabun',var(--thai);font-weight:600;font-size:.8rem;color:#ecfdf5;line-height:1.4;margin:0}
+.cell.dir{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:.56rem;color:var(--faint)}
+.cellwrap{position:relative}
+.formrow{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:34px;align-items:start}
+.principle{border-left:3px solid var(--cyan);background:rgba(34,211,238,.05);border-radius:0 12px 12px 0;padding:14px 18px;color:var(--dim);font-size:.88rem;margin:0 0 16px}
+.principle b{color:#ecfdf5}
+.detail{border:1px dashed rgba(34,211,238,.35);border-radius:12px;padding:14px 18px;color:var(--dim);font-size:.86rem;min-height:76px}
+.detail b{color:#a5f3fc}
+.checks li{margin:6px 0}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 26px}
+.step{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px}
+.step .n{font-family:var(--mono);font-size:.62rem;color:var(--cyan);letter-spacing:.14em;margin:0 0 6px}
+.step h3{font-size:.92rem;font-weight:600;color:#ecfdf5;margin:0 0 6px}
+.step p{font-size:.8rem;color:var(--dim);margin:0}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+.honest code{font-family:var(--mono);font-size:.74rem;color:#a5f3fc;background:rgba(34,211,238,.07);padding:1px 6px;border-radius:5px}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+  .formrow{grid-template-columns:1fr}
+  .steps{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .board{max-width:100%;gap:7px}
+  .cell{padding:9px}
+  .cell .tg{font-size:.7rem}
+  .steps{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html">ประมง</a>
+    <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="water.html" aria-current="page">ชัยภูมิน้ำ</a>
+    <a href="iot.html">บ้าน IoT</a>
+    <a href="books.html">คลังหนังสือ</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · WATER TERRAIN &amp; IRRIGATION (แนวคิด)</p>
+    <h1>ชัยภูมิน้ำ — <em>วางราง ขุดบ่อ</em><br>ให้ดินชุ่มด้วยแผน</h1>
+    <p class="lede">ระบบรางน้ำ การทำพื้นที่ให้เหมาะเพาะปลูก และการใช้ทรัพยากรอย่างคุ้มค่า รวมเป็นแผนเดียวด้วยสามชั้นความคิด: <b class="hl">The Pioneer</b> เปิดหัวนำน้ำเข้าพื้นที่ · <b class="hl">ค่ายกล 8 ทิศ</b> จัดวางบ่อ-ราง-แปลงทั้งไร่แบบกลยุทธ์จูกัดเหลียง · <b class="hl">The Patriarch</b> ตั้งกติกาให้ระบบน้ำอยู่ได้หลายสิบปี</p>
+    <p class="meta-line">หน้านี้คือแนวคิด + แผนผังสาธิต · ยังไม่ผูก endpoint จริงในระบบ (ต่างจากแปลงเกษตรที่มีโค้ดจริง) · ตัวเลขความลาดเป็นค่าอธิบาย ต้องวัดหน้างานจริงก่อนขุดทุกครั้ง</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#formation">ดูกระดานค่ายกล 8 ทิศ →</a>
+      <a class="btn btn-ghost" href="#how">วิธีทำทีละขั้น</a>
+    </div>
+  </section>
+
+  <!-- ═══ FORMATION BOARD ═══ -->
+  <section id="formation">
+    <p class="k-ch">// กระดานชัยภูมิ · <b>สาธิต</b></p>
+    <h2>สามชื่อ หนึ่งกระดาน</h2>
+    <p class="sub">เลือกโหมดเพื่อดูจังหวะคิดของแต่ละชื่อ แล้วกดที่ช่องกระดานเพื่ออ่านรายละเอียดจุดนั้น — ลำดับเลข 1–9 คือลำดับที่ลงมือจริงในพื้นที่</p>
+    <div class="formrow">
+      <div>
+        <div class="modepills" id="modePills" role="group" aria-label="เลือกโหมดชัยภูมิ"></div>
+        <div class="cellwrap">
+          <div class="board" id="waterBoard" aria-label="กระดาน 9 ช่อง: ศูนย์กลาง + 8 ทิศ"></div>
+        </div>
+      </div>
+      <div>
+        <p class="principle" id="waterPrinciple" aria-live="polite"></p>
+        <div class="detail" id="cellDetail" aria-live="polite"></div>
+        <p class="k-ch" style="margin:18px 0 8px">// หลักตรวจของโหมดนี้</p>
+        <ul class="bullet checks" id="waterChecks"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ HOW ═══ -->
+  <section id="how">
+    <p class="k-ch">// วิธีทำพื้นที่ให้เหมาะเพาะปลูก · <b>ทีละขั้น</b></p>
+    <h2>จากหน้าดินถึงรางน้ำ หกขั้น</h2>
+    <p class="sub">ขั้นทั้งหกทำให้คำถาม "รางวางตรงไหน บ่อขุดจุดไหน" ตอบได้จากข้อมูลหน้างาน ไม่ใช่จากการเดา</p>
+    <div class="steps">
+      <div class="step"><p class="n">ขั้น 1</p><h3>อ่านดิน อ่านลาน</h3><p>ไล่ความสูง-ต่ำด้วยเส้นด้าย+ระดับน้ำ เดินดูทางไหลจริงของน้ำฝนหลังฝนใหญ่ — จุดแฉะคือข้อมูล ไม่ใช่ปัญหา</p></div>
+      <div class="step"><p class="n">ขั้น 2</p><h3>ตีเส้นรางแม่</h3><p>เดินตามเส้นศูนย์สูง ให้ลาดเบา ๆ พอน้ำไหลเองแต่ไม่ชันจนกัดตลิ่ง — รางแม่เส้นเดียวก่อน แตกแขนงทีหลัง</p></div>
+      <div class="step"><p class="n">ขั้น 3</p><h3>ขุดบ่อจุดต่ำของโซน</h3><p>บ่อหลัก+บ่อซ้อมอยู่จุดต่ำสุดของแต่ละโซน ใกล้แปลงที่ใช้จริง มีทางเข้า-ออกน้ำพร้อมตะแกรงกันตะกอน</p></div>
+      <div class="step"><p class="n">ขั้น 4</p><h3>แตกรางลูกรอบแปลง</h3><p>รางลูกปิด-เปิดเป็นส่วน ๆ ด้วยประตูเล็ก ทำให้ให้น้ำแปลงนี้ได้โดยไม่ต้องท่วมทั้งไร่</p></div>
+      <div class="step"><p class="n">ขั้น 5</p><h3>ปรับหน้าดินให้เก็บชื้น</h3><p>ไถกลบฟางเศษพืช ปลูกพืชตระกูลถั่วนำหน้า ทำขอบแปลงสูงเล็กน้อยกักน้ำค้างไว้ในแปลงให้นานขึ้น</p></div>
+      <div class="step"><p class="n">ขั้น 6</p><h3>รันน้ำจริงหนึ่งฤดู</h3><p>ปล่อยน้ำตามเส้นที่วาด จดจุดตก-จุดแฉะ-จุดแห้ง แก้เส้นรางก่อนลงทุนหนัก — ขั้นนี้ถูกที่สุดในทั้งแผน</p></div>
+    </div>
+    <ul class="bullet">
+      <li><b>หลักคุ้มค่าข้อแรก</b> — น้ำที่เดินเองด้วยแรงโน้มถ่วงชนะน้ำที่สูบด้วยไฟฟ้าเสมอ ออกแบบให้ไหลก่อนคิดปั๊ม</li>
+      <li><b>รางยาวเท่าไรดี</b> — ยาวพอถึงแปลงแต่ไม่เกินที่คนล้าง/ลอกจบในหนึ่งวัน — รางที่ล้างไม่ได้คือรางที่กำลังตาย</li>
+      <li><b>ดินชุ่มด้วยระบบ ไม่ใช่ด้วยการรด</b> — รางลูกเติมน้ำช้า ๆ ให้ซึมตามแนว ดินเก็บความชื้นได้นานกว่าการรดท่วมหัว</li>
+    </ul>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>สถานะจริงของชิ้นนี้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>แนวคิด + แผนผังสาธิต</b> — ยังไม่มีโมดูล/endpoint จริงในระบบ (ต่างจากแปลงเกษตรที่มีโค้ดจริง 14 endpoints)</li>
+        <li><b>ตัวเลขความลาดเป็นค่าอธิบาย</b> — หน้างานจริงต้องวัดด้วยระดับก่อนขุดทุกเส้น ท่าไม้ตายของงานน้ำคือ "ไล่ระดับ" ไม่ใช่แผนบนกระดาน</li>
+        <li><b>ตัวต่อไปที่ทำได้จริง</b> — ให้ <code>/api/farm/map.svg</code> วาดบ่อ-รางจากข้อมูลแปลงจริง + ผูกเซ็นเซอร์ความชื้นดิน (sensor.soil-*) กับจุดป้อนน้ำรายแปลง เปลี่ยนกระดานนี้เป็นแผนที่มีข้อมูลจริงเลี้ยง</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  หน้านี้คือแนวคิดเปิดเผย · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ชัยภูมิน้ำ — สามโหมดบนกระดาน 9 ช่อง (ศูนย์กลาง + 8 ทิศ)
+   The Pioneer  = เปิดหัวนำน้ำเข้าพื้นที่ (จังหวะที่ 1)
+   ค่ายกล 8 ทิศ = จัดวางบ่อ-ราง-แปลงทั้งไร่ (จังหวะที่ 2)
+   The Patriarch = กติกาและธรรมาภิบาลของระบบน้ำ (จังหวะที่ 3)
+   โครงสร้าง: แก้ข้อมูลใน MODES ได้โดยไม่ต้องแก้เรนเดอร์
+   ═══════════════════════════════════════════════════════════════ */
+var ORDER = ['nw','n','ne','w','c','e','sw','s','se']; /* DOM ลำดับกระดาน */
+var DIR_TH = { nw:'รฝ.', n:'เหนือ', ne:'ออ.เหนือ', w:'ตะวันตก', c:'กลาง', e:'ตะวันออก', sw:'อต.ใต้', s:'ใต้', se:'ออ.ใต้' };
+
+var MODES = {
+  pioneer: {
+    label: 'The Pioneer — เปิดหัวน้ำ',
+    principle: '<b>จังหวะที่ 1 — เดินหน้าเปิดทางทรัพยากร:</b> หา "หัวน้ำ" จุดสูงสุดที่พื้นที่เข้าถึงได้ แล้วเปิดทางให้น้ำเดินเองด้วยแรงโน้มถ่วงเส้นแรก ก่อนจะคิดแปลง ก่อนจะคิดปั๊ม ก่อนจะลงทุนอะไรหนัก',
+    checks: [
+      'ไล่ระดับหน้างานก่อนขุดทุกเส้น — เอียงเบา ๆ พอไหล ไม่ชันจนกัดตลิ่ง',
+      'ขุดบ่อที่จุดต่ำของโซนเพื่อรับ-กัก ไม่ใช่จุดสูงเพื่อสวย',
+      'เปิดหัวแบบน้อยแต่จบ — หลีเลี้ยวหลายทางไม่จบสักทาง',
+      'ทุกจุดรับน้ำมีประตู+ตะแกรง กันตะกอนหนาตั้งแต่วันแรก'
+    ],
+    cells: {
+      n:  { tag: 'สำรวจหัวน้ำ', text: 'จุดสูงสุด/ลำน้ำเดิมที่พื้นที่เข้าถึงได้ — วัดฤดูน้ำหลาก-แล้งอย่างน้อยหนึ่งรอบก่อนตัดสินใจ' },
+      ne: { tag: 'เปิดทางเส้นแรก', text: 'รางแม่เส้นเดียวจากหัวน้ำลงสู่ใจกลางพื้นที่ ให้แรงโน้มถ่วงทำงานแทนคนและไฟฟ้า' },
+      e:  { tag: 'บ่อพักแรก', text: 'ขุดรองน้ำจากรางแม่ กักไว้ให้แปลงใกล้ ๆ ดูดกินเอง — พิสูจน์แนวคิดด้วยบ่อเดียว' },
+      se: { tag: 'แปลงนำร่อง', text: 'แปลงเล็กใกล้บ่อพัก ลองปลูกจริงหนึ่งฤดูเพื่อดูดิน-น้ำจับกันหรือไม่' },
+      s:  { tag: 'คันทางคน-เครื่อง', text: 'ทางเข็นถัง/รถคู่รางน้ำ ให้เข้าถึงทุกจุดได้ทั้งฤดูฝนและฤดูแล้ง' },
+      sw: { tag: 'หญ้าเก็บน้ำ', text: 'ฝั่งที่รับน้ำท่วม ปลูกหญ้ารากลึกให้ชะลอน้ำและซึมลงดินแทนให้ไหลทิ้งไป' },
+      w:  { tag: 'เก็บฝนจากหลังคา', text: 'รางรูดหลังคาโรงเรือน/บ้านพักเข้าบ่อพัก — น้ำฟรีที่คนมักปล่อยไหลทิ้ง' },
+      nw: { tag: 'เส้นสำรอง', text: 'ทางน้ำสำรองไว้ก่อนบนกระดาน ถ้าเส้นแรกตันหรือแล้งหนักจะได้ไม่เริ่มใหม่จากศูนย์' },
+      c:  { tag: 'ฐานชั่วคราว', text: 'ที่พักคนงาน+โรงเก็บเครื่องมือกลางพื้นที่ ช่วงเปิดหัว — เดินทางสั้น งานเดินเร็ว' }
+    }
+  },
+  formation8: {
+    label: 'ค่ายกล 8 ทิศ',
+    principle: '<b>จังหวะที่ 2 — จัดกลยุทธ์ทั้งไร่แบบค่ายกลจูกัดเหลียง:</b> ศูนย์กลางหนึบ (บ่อหลักกลางไร่) แปดประตูรับ-ระบาย รางแม่เดินครบสี่แกน มุมสี่ทิศวางพืชต่างความต้องการน้ำ — ทุกแปลงใกล้น้ำ ทุกทิศมีทางรับและทางระบายของตัวเอง',
+    checks: [
+      'ศูนย์กลางต้องหนึบ — บ่อหลักคือหัวใจ ห้ามแบ่งขายหรือยกให้ใครคนเดียว',
+      'ประตูรับน้ำกับประตูระบายอยู่ตรงข้ามกัน — น้ำเข้าทางหนึ่ง ออกอีกทาง ไม่ย้อนท่วม',
+      'รางแม่เดินทุกแกนแต่ให้น้ำแปลงสลับกัน — แปลงไหนรับวันนี้ แปลงไหนพักพรุ่งนี้',
+      'มุมสี่ทิศ = พืชต่างความต้องการน้ำ วางให้ถูกคู่กับเส้นรางของตัวเอง'
+    ],
+    cells: {
+      n:  { tag: 'ประตูรับน้ำเหนือ', text: 'รับน้ำจากหัวน้ำ/ลำรางนอก มีประตูเปิด-ปิด + ตะแกรงกันตะกอนหนา — ปากน้ำเข้าของทั้งค่าย' },
+      ne: { tag: 'บ่อซ้อม-น้ำสำรอง', text: 'บ่อเล็กสำรองสำหรับฤดูแล้ง + น้ำสำหรับฝูงปศุสัตว์ แยกจากบ่อหลักกันโรคกันขาด' },
+      e:  { tag: 'รางแม่ตะวันออก', text: 'แตกสายจากบ่อหลักลาดเบา ๆ ลงใต้ — เลี้ยงแปลงฝั่งตะวันออกทั้งแนว' },
+      se: { tag: 'แปลงชุ่ม (พืชกินน้ำ)', text: 'ผัก ข้าว สมุนไพรชอบชื้น — อยู่ตีนราง เก็บความชื้นตกค้างจากเส้นบนได้' },
+      s:  { tag: 'ประตูระบายใต้', text: 'ระบายน้ำเกินออกช่วงหลาก กันท่วมย้อนเข้าไร่ — ปากทางออกของทั้งค่าย' },
+      sw: { tag: 'แปลงทนแล้ง', text: 'พืชกินน้ำน้อย ทนแดด — อยู่ยอดสูงสุดของลาน รดสลับวันพอ ไม่เปลือกน้ำ' },
+      w:  { tag: 'รางแม่ตะวันตก', text: 'คู่แฝดของฝั่งตะวันออก สลับให้น้ำเพื่อให้แปลงฝั่งนี้พักได้ตามรอบ' },
+      nw: { tag: 'แนวป่า 3 ชั้น', text: 'ไม้สูง-กลาง-เตี้ยขอบไร่ กันลม ร่มเงา เก็บความชื้นขอบพื้นที่ — กำแพงที่ปลูกเองได้' },
+      c:  { tag: 'บ่อหลักกลางไร่', text: 'หัวใจค่าย — กักน้ำใหญ่สุด อยู่กลางเพื่อให้ทุกแปลงใกล้น้ำที่สุด ทุกรางแม่เดินออกจากจุดนี้' }
+    }
+  },
+  patriarch: {
+    label: 'The Patriarch',
+    principle: '<b>จังหวะที่ 3 — ปกครองระบบน้ำ:</b> สิ่งก่อสร้างอยู่ได้ไม่นานถ้าไม่มีกติกา — แบ่งน้ำด้วยธรรมนูญ วัดด้วยมาตรวัด เก็บเป็นบัญชีที่ตรวจได้ทุกปี และสร้างคนรุ่นถัดไปให้ดูแลต่อได้',
+    checks: [
+      'กติกาเขียนลายลักษณ์ ไม่อาศัยความจำของใครคนใดคนหนึ่ง',
+      'วัดเป็นตัวเลขเดียวกันทุกฝ่าย ไม่เดา ไม่อ้างจากอารมณ์',
+      'เงินและน้ำตรวจสอบได้ทุกปี — เปิดบัญชีให้ทุกครัวเรือนดู',
+      'สร้างคนต่อ ไม่ใช่สร้างแต่สิ่งปลูกสร้าง — รุ่นถัดไปต้องใช้ระบบนี้เป็น'
+    ],
+    cells: {
+      n:  { tag: 'มาตรวัดร่วม', text: 'เส้นบอกระดับน้ำทุกบ่อทุกราง — ทุกฝ่ายเห็นตัวเลขเดียวกัน จบข้อพิพาทตั้งแต่ยังไม่เกิด' },
+      ne: { tag: 'สมุดบันทึกฤดู', text: 'ฝนมาเมื่อไร เท่าไร น้ำแล้งช่วงไหน — เก็บหลักฐานปีต่อปี ทำให้แผนปีหน้าไม่เริ่มจากศูนย์' },
+      e:  { tag: 'ลอกรางใหญ่ร่วมกัน', text: 'รอบวันขุดลอกรางแม่ หัวหมู่หมุนเวียน — รางที่ไม่มีวันลอกคือรางที่กำลังจบ' },
+      se: { tag: 'ค่าน้ำเป็นระบบ', text: 'ค่าซ่อมราง-ไฟปั๊ม แบ่งตามจำนวนไร่ที่ใช้จริง ไม่แบ่งตามหัว ไม่ตามเสียง' },
+      s:  { tag: 'กองทุนเผื่อแล้ง', text: 'กองทุนเล็กของค่าย ไว้เช่าปั๊ม-ซ่อมบ่อ-ซื้อรางฉุกเฉิน ปีแล้งจริงไม่ต้องกู้ใคร' },
+      sw: { tag: 'สอนรุ่นถัดไป', text: 'เด็กในค่ายลงแขกเรียนอ่านมาตรวัด รู้จักเส้นรางทุกเส้น — ระบบอยู่ต่อได้เพราะมีคนใช้เป็น' },
+      w:  { tag: 'สัญญาชัดทุกฉบับ', text: 'ยืมน้ำ ขายน้ำ แบ่งแปลง ทำสัญญาลายลักษณ์เสมอ — สายสัมพันธ์ดีเพราะกติกาชัด ไม่ใช่เพราะไม่พูดกัน' },
+      nw: { tag: 'ตรวจสอบทุกปี', text: 'สรุปบัญชีน้ำ-บัญชีเงิน เปิดให้ทุกครัวเรือนดู — ความน่าเชื่อถือของระบบคือสินทรัพย์จริง' },
+      c:  { tag: 'ธรรมนูญน้ำของไร่', text: 'กติกาแบ่งน้ำเขียนไว้เป็นหลัก — ใครได้ก่อน ได้เท่าไร ช่วงไหน และใครออกค่าใช้จ่ายอะไร' }
+    }
+  }
+};
+
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+var modeKeys = Object.keys(MODES);
+var currentMode = modeKeys[0];
+var currentCell = 'c';
+
+var pillsEl = document.getElementById('modePills');
+var boardEl = document.getElementById('waterBoard');
+var principleEl = document.getElementById('waterPrinciple');
+var detailEl = document.getElementById('cellDetail');
+var checksEl = document.getElementById('waterChecks');
+
+function buildPills(){
+  modeKeys.forEach(function(k){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fbtn';
+    b.dataset.mode = k;
+    b.innerHTML = esc(MODES[k].label);
+    b.addEventListener('click', function(){ selectMode(k); });
+    pillsEl.appendChild(b);
+  });
+}
+function buildBoard(){
+  boardEl.replaceChildren();
+  ORDER.forEach(function(key, i){
+    var c = document.createElement('div');
+    c.className = 'cell' + (key === 'c' ? ' center' : '');
+    c.dataset.idx = String(i);
+    c.dataset.key = key;
+    c.setAttribute('aria-pressed', 'false');
+    c.innerHTML = '<span class="no"></span><span class="dir">' + esc(DIR_TH[key]) + '</span><p class="tg"></p>';
+    c.addEventListener('click', function(){ currentCell = key; render(); });
+    boardEl.appendChild(c);
+  });
+}
+function render(){
+  var M = MODES[currentMode];
+  pillsEl.querySelectorAll('.fbtn').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.mode === currentMode)); });
+  principleEl.innerHTML = M.principle; /* ควบคุมเนื้อหาเอง — ข้อมูลในไฟล์ ไม่มี input ภายนอก */
+  var items = ORDER.map(function(k){ return M.cells[k]; });
+  boardEl.querySelectorAll('.cell').forEach(function(c, i){
+    var it = items[i];
+    c.querySelector('.no').textContent = 'จุดที่ ' + (i + 1);
+    c.querySelector('.tg').textContent = it ? it.tag : '';
+    c.setAttribute('aria-pressed', String(c.dataset.key === currentCell));
+  });
+  var sel = M.cells[currentCell] || items[4];
+  detailEl.innerHTML = '<b>' + esc(MODES[currentMode].label) + ' · ' + esc(DIR_TH[currentCell]) + '</b> — ' + (sel ? esc(sel.text) : '');
+  checksEl.replaceChildren();
+  M.checks.forEach(function(t){
+    var li = document.createElement('li');
+    li.innerHTML = '<b>·</b> ' + esc(t);
+    checksEl.appendChild(li);
+  });
+}
+function selectMode(k){
+  if (modeKeys.indexOf(k) < 0) return;
+  currentMode = k;
+  if (ORDER.indexOf(currentCell) < 0) currentCell = 'c';
+  render();
+}
+buildPills();
+buildBoard();
+render();
+
+/* console API (เล่น/ทดสอบ): window.__water__ */
+window.__water__ = {
+  ORDER: ORDER,
+  DIR_TH: DIR_TH,
+  MODES: MODES,
+  selectMode: selectMode,
+  selectCell: function(key){ currentCell = key; render(); },
+  current: function(){ return { mode: currentMode, cell: currentCell }; }
+};
+</script>
+
+</body>
+</html>

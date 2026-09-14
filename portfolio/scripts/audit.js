@@ -47,7 +47,7 @@ for (const page of pages) {
   }
 }
 
-report(pages.length >= 8, `all ${pages.length} pages read`, pages.join(', '));
+report(pages.length >= 9, `all ${pages.length} pages read`, pages.join(', '));
 
 const seen = new Set();
 for (const row of linkRows) {
@@ -210,6 +210,26 @@ async function main() {
   const titlesOld = await p.locator('#readShelf .bk-title').allInnerTexts();
   report(titlesOld[0] === 'ศิลปะสงคราม' && titlesOld[titlesOld.length - 1] === 'เล่มไม่มีปี', 'widget books: read shelf sorted old→new', JSON.stringify(titlesOld));
   await p.evaluate(() => { const B = window.__books__; B.published.length = 0; B.read.length = 0; B.rebuildAll(); });
+
+  // water: formation board — 3 modes, 9 cells, detail/checks react
+  await goto('water.html');
+  const wApi = await p.evaluate(() => {
+    const W = window.__water__ || {};
+    return W.MODES && Object.keys(W.MODES).length === 3 && Array.isArray(W.ORDER) && W.ORDER.length === 9 && typeof W.selectMode === 'function';
+  });
+  report(wApi, 'widget water: __water__ API (3 modes, 9 cells)');
+  const wPills = await p.locator('#modePills .fbtn').count();
+  const wCells = await p.locator('#waterBoard .cell').count();
+  report(wPills === 3 && wCells === 9, 'widget water: board renders 3 mode pills + 9 cells', `pills=${wPills} cells=${wCells}`);
+  await p.locator('#modePills .fbtn[data-mode="formation8"]').click();
+  await p.waitForTimeout(200);
+  await p.locator('#waterBoard .cell[data-key="c"]').click();
+  await p.waitForTimeout(200);
+  const detailC = await p.locator('#cellDetail').innerText();
+  const modeOk = await p.evaluate(() => window.__water__.current().mode === 'formation8');
+  report(modeOk && detailC.includes('หัวใจค่าย'), 'widget water: mode switch + center-cell detail updates');
+  const checksN = await p.locator('#waterChecks li').count();
+  report(checksN === 4, 'widget water: mode checks render 4 rules');
 
   // projects: contact form validation without navigation
   await goto('projects.html');
