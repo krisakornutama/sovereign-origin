@@ -1,0 +1,13 @@
+{
+  "name": "project-sovereign-portfolio",
+  "private": true,
+  "description": "Static showcase for Project Sovereign — dev tooling (audit before Pages deploy)",
+  "type": "commonjs",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "audit": "node scripts/audit.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}
