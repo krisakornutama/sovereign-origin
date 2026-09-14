@@ -169,3 +169,6 @@ health.json
 
 # ── Build artifacts ใหญ่ที่ root (สร้างใหม่ได้จาก electron:build) ──
 /Sovereign-OS-Desktop-*.zip
+
+# playwright e2e creds (local only)
+.env.playwright
