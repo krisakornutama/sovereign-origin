@@ -64,10 +64,20 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 ## ๕. สำรอง / กู้คืนฐานข้อมูล
 
 - **สำรองอัตโนมัติ:** Scheduled Task `Sovereign DB Backup` ทุกวัน 03:00 → `backups\postgres\sovereign_v2_YYYYMMDD_*.dump` (เก็บหลายวันย้อนหลัง)
-- **กู้คืน** (ทดสอบก่อนใช้จริงเสมอ):
+- **กู้คืน** (ทดสอบก่อนใช้จริงเสมอ) — ต้องใช้โหมด restore ของ TimescaleDB ด้วย ไม่งั้น `pg_restore` ตรง ๆ จะล้มเหลวที่ chunk catalog (ซ้อมจริงแล้ว 14 ก.ย. 2026):
   ```bash
-  docker exec -i sovereign-db pg_restore -U sovereign -d sovereign_v2 --clean \
-    < backups/postgres/sovereign_v2_YYYYMMDD_HHMMSS.dump
+  # 1) ฐานปลายทาง + ปลดล็อก TimescaleDB
+  docker exec sovereign-db psql -U sovereign -d postgres -c "CREATE DATABASE sovereign_restore"
+  docker exec sovereign-db psql -U sovereign -d sovereign_restore \
+    -c "CREATE EXTENSION IF NOT EXISTS timescaledb" \
+    -Atc "SELECT timescaledb_pre_restore()"
+
+  # 2) restore
+  docker exec -i sovereign-db pg_restore -U sovereign -d sovereign_restore --clean --if-exists \
+    < backups/postgres/sovereign_v2_YYYYMMDD_*.dump
+
+  # 3) ปิดโหมด restore
+  docker exec sovereign-db psql -U sovereign -d sovereign_restore -Atc "SELECT timescaledb_post_restore()"
   ```
 
 ## ๖. เส้นตายก่อนเปิดสู่อินเทอร์เน็ต
