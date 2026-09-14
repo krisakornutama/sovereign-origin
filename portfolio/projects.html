@@ -152,6 +152,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="livestock.html">ปศุสัตว์</a>
     <a href="fishery.html">ประมง</a>
     <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="iot.html">บ้าน IoT</a>
     <a href="index.html#fit">ใครใช้ได้</a>
     <a href="index.html#all">ทั้งระบบ</a>
     <a href="education.html">AI สอนลูก</a>
@@ -232,9 +233,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <p class="idea">อุปกรณ์ในบ้านไม่ควรกระจัดกระจายเป็นแอปแยก 8 ตัว: <b>เซ็นเซอร์ รีเลย์ ตาชั่ง ตู้เย็น พลังงาน กล้อง</b> รวมกันในระบบเดียวที่มีกฎอัตโนมัติ มีประวัติย้อนหลัง และมีพยากรณ์ (เช่น แบตเตอรี่โซลาร์จะพอถึงเช้าไหม) — และหน่วยความจำของบ้านทั้งหมดอยู่ในเครื่องเราเอง</p>
       <div class="cols">
         <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
-          <li>เซิร์ฟเวอร์ MQTT (EMQX) วิ่งจริงบนเครื่อง</li>
-          <li>8 หน้าจอจัดการ: อุปกรณ์/รีเลย์/กฎอัตโนมัติ/พลังงาน/OTA/โครงสร้างพื้นฐาน</li>
-          <li>โมเดล Device + readings ทุกชนิด (ดิน น้ำ อากาศ สุขภาพ)</li>
+          <li>6 subsystems จริง: devices · actuation+RelaySchedule · automation · energy · OTA · infrastructure</li>
+          <li>MQTT (EMQX) วิ่งจริงในบ้าน + 6 หน้าจอจัดการ + เทเลเมทรีเก็บประวัติทุกเซ็นเซอร์</li>
+          <li>โมเดลครบ: Device · Relay · SensorTelemetry · AutomationRule+Alert · OtaEvent</li>
         </ul></div>
         <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
           <li>กฎอัตโนมัติข้ามโดเมน (ตัวอย่าง: สต็อกวัตถุดิบครัวต่ำ → สั่งซื้อเสนอราคา)</li>
@@ -245,7 +246,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
           <li>คนที่มีฮาร์ดแวร์จริงหลากชนิดมาทดสอบร่วม</li>
         </ul></div>
       </div>
-      <div class="links"><a href="index.html#all">ดูรายการทั้งระบบ ↗</a></div>
+      <div class="links"><a href="iot.html">ดูหน้าโชว์โมดูลนี้ + จำลองกฎอัตโนมัติ ↗</a></div>
     </article>
 
     <article class="proj" id="p-farm">
@@ -270,7 +271,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div class="links"><a href="index.html#fit">ดูการ์ดผู้ใช้ 3 กลุ่ม ↗</a></div>
     </article>
 
-    <article class="proj" id="p-farm">
+    <article class="proj" id="p-agri">
       <div class="proj-head"><span class="ic">🌱</span><h3>เกษตร &amp; สมุนไพร · แปลงที่วาดแผนผังให้เอง</h3><span class="no">ชิ้นที่ ๗</span></div>
       <span class="visa r2">● มีระบบจริง · แผนผัง+ฐานสมุนไพรในตัว</span>
       <p class="idea">แปลงไม่ควรเป็นแค่ชื่อในสมุด: <b>ระบบเก็บขนาด-ขอบเขต-วันปลูกของทุกแปลง แล้ววาดแผนผัง SVG ให้เอง</b> ค่าดินรายแปลง เก็บเกี่ยวบันทึกจริง และฐานสมุนไพรไทยที่มีข้อห้ามข้อควรระวังในตัว — ปิดท้ายด้วยวงจรเศษครัว→ปุ๋ยหมัก→ใส่แปลงที่วัดได้ทุกกิโล</p>

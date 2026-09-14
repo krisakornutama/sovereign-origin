@@ -123,6 +123,14 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .rcard p{font-size:.76rem;color:var(--dim);margin:7px 0 0;line-height:1.65}
 
 /* ── honest / footer ── */
+.parents{max-width:760px}
+.parents details{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px}
+.parents summary{cursor:pointer;padding:13px 17px;font-weight:600;font-size:.9rem;color:#ecfdf5;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.parents summary::after{content:'+';font-family:var(--mono);color:var(--green);font-size:1.1rem}
+.parents details[open] summary::after{content:'−'}
+.parents details p{margin:0;padding:0 17px 15px;font-size:.85rem;color:var(--dim);line-height:1.8}
+.parents details p b{color:#ecfdf5}
+
 .honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
 .honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
 .honest ul{margin:0;padding-left:20px}
@@ -169,6 +177,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="index.html#tax">ภาษี</a>
     <a href="projects.html">ผลงาน</a>
     <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="iot.html">บ้าน IoT</a>
     <a href="education.html" aria-current="page">AI สอนลูก</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
     <a href="index.html#run">รันเองฟรี</a>
@@ -284,6 +293,35 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     </div>
   </section>
 
+  <!-- ═══ PARENTS ═══ -->
+  <section id="parents">
+    <p class="k-ch">// ก่อนใช้จริง · <b>คำถามผู้ปกครอง</b></p>
+    <h2>เรื่องที่ผู้ปกครองถามจริง</h2>
+    <p class="sub">ตอบตรง ๆ ก่อนตัดสินใจใช้กับลูก</p>
+    <div class="parents">
+      <details>
+        <summary>หน้าที่ของผมในฐานะผู้ปกครองคืออะไร ระบบสอนแทนได้ไหม</summary>
+        <p>หน้าที่คุณ: เลือกหัวข้อ อ่านแบบร่างบทเรียนที่ AI สรุปจากคลังความรู้ของครอบครัว ปรับให้เข้ากับลูก แล้ว<b>สอนเอง</b>โดยมีระบบเป็นผู้ช่วยเตรียมอุปกรณ์ — ระบบไม่ได้ตั้งใจให้สอนแทน และเฉลยแบบทดสอบอยู่ฝั่งผู้ปกครองเสมอ</p>
+      </details>
+      <details>
+        <summary>มีวิชาอะไรบ้าง นอกจากเรื่องเงิน?</summary>
+        <p>หัวข้อไม่จำกัดวิชา — เริ่มจากคลังความรู้ของครอบครัว: ทักษะชีวิต งานบ้าน อาหาร สุขภาพ สมุนไพร พื้นฐานเกษตร หรือวิชาการทั่วไป สิ่งที่ระบบมีเป็นระบบจริงวันนี้คือหลักสูตร (CurriculumTrack) + ความคืบหน้ารายบทเรียน — ข้อควรระวัง: เนื้อหาวิชาการลึก ๆ ขึ้นกับคุณภาพของคลังความรู้ที่คุณเก็บสะสม</p>
+      </details>
+      <details>
+        <summary>ข้อมูลของลูกเก็บไว้ที่ไหน ใครเห็น?</summary>
+        <p>ทุกอย่างอยู่ในเครื่องของครอบครัวเท่านั้น — โปรไฟล์ลูก ความคืบหน้า กระปุก คูปอง ไม่มีการส่งออกอินเทอร์เน็ต และไม่มีบริการภายนอกอ่าน การลงมือทุกอย่างมี audit log ที่ผู้ปกครองตรวจได้ทุกรายการ</p>
+      </details>
+      <details>
+        <summary>AI สร้างบทเรียน — ความถูกต้องใครรับผิดชอบ?</summary>
+        <p>ผู้ปกครองครับ — AI ยึดจากคลังความรู้ที่คุณใส่ไว้ ไม่ไปหาจากอินเทอร์เน็ต ดังนั้นความถูกต้องของต้นทางอยู่ที่คุณเลือกใช้แหล่งไหน และขั้นสุดท้ายคุณอ่าน+ปรับก่อนสอนเสมอ</p>
+      </details>
+      <details>
+        <summary>ลูกหลายคนต่างวัย ใช้พร้อมกันได้ไหม?</summary>
+        <p>ได้ — แต่ละคนมีโปรไฟล์แยก แยกกระปุก แยกงานบ้าน แยกความคืบหน้า และรายงานสัปดาห์ออกรายคน</p>
+      </details>
+    </div>
+  </section>
+
   <!-- ═══ HONEST ═══ -->
   <section id="honest">
     <p class="k-ch">// ตรงไปตรงมา</p>
@@ -294,6 +332,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
         <li><b>การสร้างบทเรียนใหม่ต้องมี AI</b> — ติดตั้ง Ollama เมื่อพร้อม ระหว่างนั้นใช้บทเรียนที่สร้างไว้แล้วได้ครบ</li>
         <li><b>AI ไม่แทนผู้ปกครอง</b> — บทเรียนเป็นแบบร่างให้คุณเลือก ปรับ และสอนเอง เฉลยแบบทดสอบอยู่ฝั่งผู้ปกครองเสมอ</li>
         <li><b>เงินในระบบคือบทเรียน</b> — กระปุก/หุ้นในระบบเป็นบัญชีฝึกของครอบครัว ไม่ใช่บัญชีธนาคารจริง</li>
+        <li><b>ความรู้ลึกขึ้นกับคลังของครอบครัว</b> — บทเรียนดีเท่ากับคลังความรู้ที่คุณสะสม ระบบไม่เดาเนื้อหาจากอินเทอร์เน็ต</li>
       </ul>
     </div>
   </section>

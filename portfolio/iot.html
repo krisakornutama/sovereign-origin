@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บ้าน IoT — Project Sovereign</title>
+<meta name="description" content="โมดูลบ้าน IoT ใน Project Sovereign: อุปกรณ์ ESP32 ทั้งบ้าน รีเลย์ควบคุมจริง กฎอัตโนมัติถ้า-แล้ว เซ็นเซอร์วัดทุกจุด พลังงาน อัปเดตเฟิร์มแวร์ OTA และเฝ้าโครงสร้างพื้นฐาน — จากกฎหนึ่งข้อถึงการลงมือจริง ภายในไม่กี่วินาที">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Crect x='5' y='5' width='6' height='6' rx='1' fill='%2334d399'/%3E%3Cpath d='M8 2v3M8 11v3M2 8h3M11 8h3' stroke='%2322d3ee' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--green);border-bottom:1px solid var(--green)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:800px}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--green);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(52,211,153,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.mods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px}
+.mod{border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:14px 16px;background:rgba(52,211,153,.04)}
+.mod .t{font-weight:600;font-size:.9rem;color:#ecfdf5}
+.mod .d{font-family:var(--mono);font-size:.62rem;color:var(--faint);margin-top:4px}
+
+/* rule → relay → alert live demo */
+.simgrid{display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:start}
+.rulebox{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:20px 22px}
+.rulebox label{display:block;font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:12px 0 5px}
+.rulebox select,.rulebox input{width:100%;font-family:var(--mono);font-size:.85rem;color:#a7f3d0;background:#0b1220;
+  border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:9px 12px}
+.rulebox .if{font-family:var(--mono);font-size:.78rem;color:var(--dim);margin:0 0 2px}
+.rulebox .if b{color:var(--green)}
+.stagebox{background:rgba(3,7,12,.7);border:1px solid rgba(52,211,153,.25);border-radius:12px;padding:22px 24px;
+  font-family:var(--mono);font-size:.78rem;line-height:2;min-height:260px}
+.stagebox .t{font-size:.64rem;letter-spacing:.12em;color:var(--green);margin-bottom:10px}
+.ev{opacity:0;transition:opacity .2s ease}
+.ev.on{opacity:1}
+.ev .tm{color:var(--faint);margin-right:8px}
+.ev.act{color:#a7f3d0}
+.ev.alert{color:#fbbf24}
+.ev.done{color:var(--green)}
+.relays{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.relay{border:1px solid rgba(52,211,153,.25);border-radius:8px;padding:9px 10px;text-align:center;font-size:.7rem;color:var(--faint)}
+.relay.on{border-color:var(--green);color:#a7f3d0;background:rgba(52,211,153,.12);box-shadow:0 0 14px rgba(52,211,153,.2)}
+.relay .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#374151;margin-right:6px;vertical-align:middle}
+.relay.on .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+
+.loopgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.loop{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel)}
+.loop .ic{font-size:1.2rem}
+.loop h3{font-size:.86rem;font-weight:600;color:#ecfdf5;margin:8px 0 4px}
+.loop p{font-size:.74rem;color:var(--dim);margin:0;line-height:1.7}
+.loop .ep{font-family:var(--mono);font-size:.58rem;color:var(--cyan);display:block;margin-top:8px}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .simgrid{grid-template-columns:1fr;gap:30px}
+  .mods{grid-template-columns:repeat(2,1fr)}
+  .loopgrid{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .mods,.loopgrid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="iot.html" aria-current="page">บ้าน IoT</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="education.html">AI สอนลูก</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · HOME IOT MODULE</p>
+    <h1>บ้านที่จดจำทุกเซ็นเซอร์<br>และ<em>ลงมือเองเมื่อถึงเงื่อนไข</em></h1>
+    <p class="lede">โมดูล IoT จริงในระบบ: ลงทะเบียนอุปกรณ์ ESP32 ทั้งบ้าน ควบคุมรีเลย์ตามตารางหรือสั่งสด เก็บเทเลเมทรีทุกเซ็นเซอร์ สั่งงานด้วยกฎถ้า-แล้ว เฝ้าพลังงาน อัปเดตเฟิร์มแวร์ OTA และดูแลโครงสร้างพื้นฐาน (เน็ตเวิร์ก/กล้อง/น้ำ) — บน MQTT broker ที่วิ่งจริงในบ้าน</p>
+    <p class="meta-line">ชื่อ endpoint และโมเดลอ้างอิงโค้ดจริงที่ deploy · ตัวอย่างการทำงานเป็นข้อมูลสาธิต</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#sim">ลองกฎอัตโนมัติ →</a>
+      <a class="btn btn-ghost" href="projects.html">กลับหน้าผลงาน</a>
+    </div>
+  </section>
+
+  <!-- ═══ MODULES ═══ -->
+  <section id="modules">
+    <p class="k-ch">// โมดูลจริง · <b>6 subsystems</b></p>
+    <h2>สมองของบ้าน ครบทั้งหกส่วน</h2>
+    <p class="sub">ทุกส่วนอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็ก — และทุกอย่างวิ่งในเครื่องของบ้าน ไม่พึ่งคลาวด์</p>
+    <div class="mods">
+      <div class="mod"><div class="t">📟 อุปกรณ์+เซ็นเซอร์</div><div class="d">/api/devices · Device + SensorTelemetry</div></div>
+      <div class="mod"><div class="t">🔌 รีเลย์+ตาราง</div><div class="d">/api/actuation · RelaySchedule</div></div>
+      <div class="mod"><div class="t">📜 กฎอัตโนมัติ</div><div class="d">/api/automation · AutomationRule</div></div>
+      <div class="mod"><div class="t">⚡ พลังงาน</div><div class="d">/api/energy · ค่าไฟรายวัน</div></div>
+      <div class="mod"><div class="t">⬆️ อัปเดต OTA</div><div class="d">/api/ota · OtaEvent</div></div>
+      <div class="mod"><div class="t">🏗️ โครงสร้างพื้นฐาน</div><div class="d">/api/infrastructure · เน็ต/กล้อง/น้ำ</div></div>
+    </div>
+    <ul class="bullet">
+      <li><b>MQTT วิ่งจริงในบ้าน</b> — อุปกรณ์พูดกับเซิร์ฟเวอร์ตรง ๆ ไม่ผ่านบริการภายนอก</li>
+      <li><b>เทเลเมทรีไม่หาย</b> — ทุกค่าวัดเก็บประวัติ (SensorTelemetry) ดูย้อนหลังเป็นกราฟได้</li>
+      <li><b>เชื่อมข้ามโดเมน</b> — ออกซิเจนในบ่อต่ำ เตือน+เปิดปั๊มได้ เพราะฟาร์ม/บ้านใช้ระบบเดียวกัน</li>
+    </ul>
+  </section>
+
+  <!-- ═══ LIVE RULE DEMO ═══ -->
+  <section id="sim">
+    <p class="k-ch">// จำลองกฎอัตโนมัติ · <b>สาธิต</b></p>
+    <h2>จากกฎหนึ่งข้อ ถึงการลงมือจริง</h2>
+    <p class="sub">เลือกเงื่อนไขและอุปกรณ์ แล้วดูทางเดินของกฎในระบบจริง: ค่าเซ็นเซอร์ → ตรวจกฎ → สั่งรีเลย์ → ยืนยันผล → จด alert (ข้อมูลสาธิต)</p>
+    <div class="simgrid">
+      <div class="rulebox">
+        <p class="if"><b>ถ้า</b> <span id="condText">อุณหภูมิโรงเรือน &gt; 35°C</span> <b>แล้ว</b> สั่งงาน:</p>
+        <label for="ruleSel">เงื่อนไข (ค่าจากเซ็นเซอร์)</label>
+        <select id="ruleSel">
+          <option value="temp">อุณหภูมิโรงเรือน &gt; 35°C (sensor.farm-temp-01)</option>
+          <option value="oxygen">ออกซิเจนน้ำในบ่อ &lt; 3.5 mg/L (sensor.pond-o2)</option>
+          <option value="soil">ความชื้นดินแปลงผัก &lt; 40% (sensor.soil-a1)</option>
+          <option value="smoke">ควันห้องครัว &gt; เกณฑ์ (sensor.kitchen-mq2)</option>
+        </select>
+        <label for="actSel">อุปกรณ์ที่สั่ง</label>
+        <select id="actSel">
+          <option value="fan">รีเลย์: พัดลมโรงเรือน (relay.fan-01)</option>
+          <option value="pump">รีเลย์: ปั๊มอากาศบ่อ 1 (relay.pump-pond1)</option>
+          <option value="water">รีเลย์: วาล์วน้ำแปลงผัก (relay.valve-a)</option>
+          <option value="exhaust">รีเลย์: พัดลมดูดครัว (relay.exhaust-k)</option>
+        </select>
+        <label for="delaySel">ดีเลย์กันแกว่ง (debounce)</label>
+        <input id="delaySel" type="number" value="5" min="0" max="60">
+      </div>
+      <div class="stagebox" role="img" aria-label="จำลองการทำงานของกฎอัตโนมัติ: เซ็นเซอร์ กฎ รีเลย์ และการแจ้งเตือน">
+        <div class="t">กำลังเดินกฎ · แสดงสด</div>
+        <div id="stage"></div>
+        <div class="relays">
+          <div class="relay" id="r-fan"><span class="dot"></span>พัดลมโรงเรือน</div>
+          <div class="relay" id="r-pump"><span class="dot"></span>ปั๊มอากาศบ่อ</div>
+          <div class="relay" id="r-water"><span class="dot"></span>วาล์วน้ำแปลง</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ WHAT IT UNLOCKS ═══ -->
+  <section id="unlock">
+    <p class="k-ch">// สิ่งที่ได้เพิ่ม</p>
+    <h2>ไม่ใช่แค่สวิตช์ผ่านเน็ต</h2>
+    <p class="sub">สี่ความสามารถที่ทำให้บ้านดูแลตัวเองได้ ไม่ใช่แค่รับสั่ง</p>
+    <div class="loopgrid">
+      <div class="loop"><div class="ic">📜</div><h3>กฎถ้า-แล้ว</h3><p>เขียนกฎครั้งเดียว ระบบเฝ้าทุกค่าและลงมือเองเมื่อเงื่อนไขจริง — พร้อม debounce กันอุปกรณ์สั่น</p><span class="ep">AutomationRule</span></div>
+      <div class="loop"><div class="ic">🔔</div><h3>เตือนที่มีบริบท</h3><p>อะไรผิดปกติ ผิดที่ไหน ค่าเท่าไร — แจ้งเข้า Telegram ของบ้าน ไม่ใช่แค่กะพริบหน้าจอ</p><span class="ep">AutomationAlert</span></div>
+      <div class="loop"><div class="ic">⚡</div><h3>พลังงานเป็นบาท</h3><p>ตามการใช้ไฟรายวันและต้นทุนจริง — รู้ว่าอุปกรณ์ไหนกินค่าไฟ</p><span class="ep">/api/energy</span></div>
+      <div class="loop"><div class="ic">⬆️</div><h3>อัปเดตจากที่เดียว</h3><p>อัปเดตเฟิร์มแวร์ ESP32 ทั้งบ้านจากหน้าเดียว มีประวัติ OtaEvent ทุกครั้ง กันแบรนด์อุปกรณ์ครึ่งทาง</p><span class="ep">/api/ota</span></div>
+    </div>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>ข้อจำกัดที่ควรรู้ก่อนใช้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>ต้องมีอุปกรณ์จริงก่อนถึงเห็นผล</b> — ระบบรองรับ ESP32/MQTT ครบ แต่จำนวนอุปกรณ์ที่ต่อจริงอยู่ที่การลงทุนของแต่ละบ้าน</li>
+        <li><b>กฎอัตโนมัติต้องทดสอบก่อนปล่อยจริง</b> — ปั๊มน้ำ/วาล์วเป็นอุปกรณ์ที่พลาดแล้วกระทบจริง ระบบมี debounce แต่ควรทดลองเปิด-ปิดก่อนใช้ประจำ</li>
+        <li><b>ระบบเชื่อมต่ออุปกรณ์ผ่านเครือข่ายบ้าน</b> — ก่อนเปิดควบคุมจากภายนอกต้องมี VPN/domain+HTTPS ตามมาตรฐานความปลอดภัยของโปรเจ็ก</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  /* ── rule → actuation live demo (mirrors AutomationRule → actuation → AutomationAlert) ── */
+  var RULES = {
+    temp:  { cond: 'อุณหภูมิโรงเรือน > 35°C', reading: 'sensor.farm-temp-01 → 36.8°C', relay: 'relay.fan-01', dev: 'พัดลมโรงเรือน', box: 'r-fan', after: 'อุณหภูมิลงเหลือ 33.2°C ใน 4 นาที' },
+    oxygen:{ cond: 'ออกซิเจนน้ำในบ่อ < 3.5 mg/L', reading: 'sensor.pond-o2 → 3.1 mg/L', relay: 'relay.pump-pond1', dev: 'ปั๊มอากาศบ่อ 1', box: 'r-pump', after: 'ออกซิเจนกลับขึ้น 5.4 mg/L ใน 12 นาที' },
+    soil:  { cond: 'ความชื้นดินแปลงผัก < 40%', reading: 'sensor.soil-a1 → 36%', relay: 'relay.valve-a', dev: 'วาล์วน้ำแปลงผัก', box: 'r-water', after: 'ความชื้นกลับ 58% ใน 6 นาที' },
+    smoke: { cond: 'ควันห้องครัว > เกณฑ์', reading: 'sensor.kitchen-mq2 → 142 ppm', relay: 'relay.exhaust-k', dev: 'พัดลมดูดครัว', box: 'r-fan', after: 'ค่าควันลง 18 ppm ใน 2 นาที' }
+  };
+  var sel = document.getElementById('ruleSel'), act = document.getElementById('actSel');
+  var stage = document.getElementById('stage'), timer = null;
+  function el(cls, html){
+    var d = document.createElement('div');
+    d.className = 'ev ' + cls;
+    d.innerHTML = html;
+    stage.appendChild(d);
+    requestAnimationFrame(function(){ d.classList.add('on'); });
+    return d;
+  }
+  function clearRelays(){ ['r-fan','r-pump','r-water'].forEach(function(id){ document.getElementById(id).classList.remove('on'); }); }
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function run(){
+    if (timer) { clearTimeout(timer); timer = null; }
+    stage.innerHTML = ''; clearRelays();
+    var r = RULES[sel.value];
+    document.getElementById('condText').textContent = r.cond;
+    var base = Date.now();
+    var seq = [
+      { d: 0,   cls: '',     html: '<span class="tm">' + pad(new Date(base).getHours()) + ':' + pad(new Date(base).getMinutes()) + ':' + pad(new Date(base).getSeconds()) + '</span>เซ็นเซอร์รายงาน · ' + r.reading },
+      { d: 900, cls: '',     html: '<span class="tm">+1s</span>ตรวจกฎทั้งหมด · ตรงเงื่อนไข 1 ข้อ · debounce ' + document.getElementById('delaySel').value + ' วิ' },
+      { d: 1800,cls: 'act',  html: '<span class="tm">+2s</span>สั่ง ' + r.relay + ' → ON' },
+      { d: 2800,cls: 'act',  html: '<span class="tm">+3s</span>' + r.dev + ' ตอบรับผ่าน MQTT', isOn: true },
+      { d: 4200,cls: 'alert',html: '<span class="tm">+4s</span>AutomationAlert จดเหตุการณ์ + แจ้ง Telegram บ้าน' },
+      { d: 5600,cls: 'done', html: '<span class="tm">ผล</span>' + r.after + ' · ระบบปิดเองเมื่อค่ากลับปกติ' }
+    ];
+    seq.forEach(function(s){
+      timer = setTimeout(function(){
+        el(s.cls, s.html);
+        if (s.isOn) document.getElementById(r.box).classList.add('on');
+      }, s.d);
+    });
+  }
+  sel.addEventListener('change', function(){
+    /* จับคู่เงื่อนไขกับอุปกรณ์ที่เหมาะสมให้อัตโนมัติ (ผู้ใช้ยังเปลี่ยนเองได้) */
+    var map = { temp: 'fan', oxygen: 'pump', soil: 'water', smoke: 'exhaust' };
+    act.value = map[sel.value];
+    run();
+  });
+  act.addEventListener('change', run);
+  document.getElementById('delaySel').addEventListener('input', run);
+  run();
+})();
+</script>
+</body>
+</html>
