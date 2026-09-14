@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เกษตร &amp; สมุนไพร — Project Sovereign</title>
+<meta name="description" content="โมดูลเกษตรและสมุนไพรใน Project Sovereign: แผนผังแปลงที่ระบบวาดให้ ค่าดินรายแปลง เก็บเกี่ยวบันทึกจริง ฐานสมุนไพรไทยพร้อมข้อห้าม-ข้อควรระวัง และวงจรเศษวัสดุ→ปุ๋ยหมัก→ใส่แปลง ครบในระบบเดียว">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M8 13V6' stroke='%2334d399' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M8 8C8 5 6 4 3.5 4 3.5 7 5.5 8 8 8zm0-1c0-2.6 2-3.6 4.5-3.6C12.5 6 10.5 7 8 7z' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+  --sarabun:'Sarabun',var(--thai);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--green);border-bottom:1px solid var(--green)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:800px}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--green);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(52,211,153,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.mod{border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:14px 16px;background:rgba(52,211,153,.04)}
+.mod .t{font-weight:600;font-size:.9rem;color:#ecfdf5}
+.mod .d{font-family:var(--mono);font-size:.62rem;color:var(--faint);margin-top:4px}
+
+/* plot map */
+.mapgrid{display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:start}
+.plotmap{border:1px solid var(--line);border-radius:12px;background:rgba(3,7,12,.6);padding:20px}
+.plotmap .title{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin-bottom:12px}
+.plots{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:64px;gap:8px}
+.plot{border-radius:8px;border:1px solid rgba(52,211,153,.3);padding:8px 9px;font-size:.66rem;line-height:1.35;color:#a7f3d0;background:rgba(52,211,153,.06)}
+.plot .nm{font-weight:600;font-size:.72rem;color:#ecfdf5}
+.plot .ar{font-family:var(--mono);font-size:.58rem;color:var(--faint)}
+.plot.growing{background:rgba(52,211,153,.16);border-color:var(--green)}
+.plot.harvested{background:rgba(34,211,238,.10);border-color:rgba(34,211,238,.4);color:#a5f3fc}
+.plot.harvested .nm{color:#a5f3fc}
+.plot.fallow{border-style:dashed;color:var(--faint);background:transparent}
+.plot.fallow .nm{color:var(--faint)}
+.plot.herb{background:rgba(163,230,53,.10);border-color:rgba(163,230,53,.45)}
+.plot.herb .nm{color:#d9f99d}
+.mapkey{font-family:var(--mono);font-size:.6rem;color:var(--faint);margin-top:12px}
+.mapkey b{color:var(--green);font-weight:500}
+
+/* herb picker card */
+.herbsel{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.herbsel label{font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+.herbsel select{font-family:var(--mono);font-size:.8rem;color:#a7f3d0;background:#0b1220;
+  border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:8px 10px;cursor:pointer}
+.herbcard{background:#F2F7E8;color:#22301b;border:1px solid #c9d6ae;border-radius:3px;padding:24px 26px;
+  font-family:var(--sarabun);box-shadow:0 18px 44px rgba(0,0,0,.55);position:relative}
+.herbcard .tag{position:absolute;top:14px;right:16px;transform:rotate(2deg);border:2px solid #4d7c0f;color:#4d7c0f;
+  font-weight:700;font-size:.66rem;padding:2px 9px;border-radius:3px;letter-spacing:.06em;filter:url(#grunge)}
+.hc-name{font-size:1.12rem;font-weight:700}
+.hc-latin{font-size:.72rem;color:#5a6b45;font-style:italic;font-family:var(--mono)}
+.hc-sec{margin-top:12px;font-size:.8rem;line-height:1.7}
+.hc-sec b{display:block;font-size:.64rem;letter-spacing:.1em;color:#4d7c0f;font-family:var(--mono);font-weight:600;margin-bottom:2px}
+.hc-sec.warn b{color:#b45309}
+.hc-sec.stop b{color:#b91c1c}
+.hc-meta{display:flex;gap:18px;margin-top:14px;font-family:var(--mono);font-size:.68rem;color:#4b5c38;border-top:1.5px dotted #a8b98c;padding-top:10px}
+.herbcard .demo{margin-top:12px;font-size:.62rem;color:#7a8a65}
+.stampwrap{position:absolute;top:-10px;right:14px;transform:rotate(3deg)}
+.stampwrap.reink{animation:inkstamp .38s ease-out}
+@keyframes inkstamp{from{transform:rotate(3deg) scale(1.3);opacity:0}}
+
+/* compost loop */
+.loop{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px}
+.step{border:1px solid var(--line);border-radius:10px;padding:15px 16px;background:var(--panel)}
+.step .ic{font-size:1.25rem}
+.step h3{font-size:.86rem;font-weight:600;color:#ecfdf5;margin:8px 0 4px}
+.step p{font-size:.74rem;color:var(--dim);margin:0;line-height:1.7}
+.step .ep{font-family:var(--mono);font-size:.58rem;color:var(--cyan);display:block;margin-top:8px}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .mapgrid{grid-template-columns:1fr;gap:30px}
+  .mods{grid-template-columns:repeat(2,1fr)}
+  .loop{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .mods,.loop{grid-template-columns:1fr}
+  .plots{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="grunge">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4"/>
+  </filter>
+</svg>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html">ประมง</a>
+    <a href="farm.html" aria-current="page">เกษตร&สมุนไพร</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · AGRICULTURE &amp; HERBS</p>
+    <h1>แปลงที่<em>วาดแผนผังให้เอง</em><br>สมุนไพรที่บอกข้อห้ามเอง</h1>
+    <p class="lede">โมดูลเกษตรจริงในระบบ: แปลงพร้อมขนาด-ขอบเขต-วันปลูก-วันคาดเก็บ ค่าดินรายแปลง เก็บเกี่ยวบันทึกจริง ฐานสมุนไพรไทย (ชื่อวิทยาศาสตร์ สรรพคุณ ข้อห้าม วันเก็บเกี่ยว ดินที่ชอบ) และวงจรเศษครัว→ปุ๋ยหมัก→ใส่แปลง — จบด้วยกำไรต่อแปลงในสมุดบัญชีเดียวกับทั้งบ้าน</p>
+    <p class="meta-line">ชื่อ endpoint อ้างอิงโค้ดจริงที่ deploy · ตัวเลข/ข้อมูลสมุนไพรเป็นข้อมูลสาธิต</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#herbs">ลองการ์ดสมุนไพร →</a>
+      <a class="btn btn-ghost" href="projects.html">กลับหน้าผลงาน</a>
+    </div>
+  </section>
+
+  <!-- ═══ MODULES ═══ -->
+  <section id="modules">
+    <p class="k-ch">// โมดูลจริง · <b>14 endpoints</b></p>
+    <h2>จากแปลงถึงปุ๋ย ครบในระบบเดียว</h2>
+    <p class="sub">ทุกโมดูลอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็ก</p>
+    <div class="mods">
+      <div class="mod"><div class="t">🗺️ แผนผังแปลง</div><div class="d">/api/farm/map.svg</div></div>
+      <div class="mod"><div class="t">🧪 ค่าดินรายแปลง</div><div class="d">/api/farm/:id/soil-readings</div></div>
+      <div class="mod"><div class="t">🌾 เก็บเกี่ยว</div><div class="d">/api/farm/:id/harvest</div></div>
+      <div class="mod"><div class="t">🌿 เก็บสมุนไพร</div><div class="d">/api/farm/:id/herb-harvest</div></div>
+      <div class="mod"><div class="t">📈 วิเคราะห์รายแปลง</div><div class="d">/api/farm/:id/analysis</div></div>
+      <div class="mod"><div class="t">♻️ ปุ๋ยหมัก</div><div class="d">/api/compost/batches</div></div>
+      <div class="mod"><div class="t">🌱 ใส่ปุ๋ย</div><div class="d">/api/farm/:id/apply-fertilizer</div></div>
+      <div class="mod"><div class="t">🧘 สมุนไพร+ข้อห้ามยา</div><div class="d">/api/healing/herbs</div></div>
+    </div>
+    <ul class="bullet">
+      <li><b>แปลงมีมิติจริง</b> — กว้าง/ยาว/ตารางเมตร/ขอบเขต polygon ระบบวาดแผนผัง SVG ให้เอง</li>
+      <li><b>สมุนไพรแต่ละชนิดมีข้อมูลครบ</b> — สรรพคุณ ข้อควรระวัง ข้อห้าม (ตั้งครรภ์ ความดันต่ำ) จำนวนวันปลูก ค่าดิน-ความชื้นที่เหมาะ</li>
+      <li><b>เช็คสมุนไพรกับยาที่กินอยู่</b> — ระบบธรรมะบำบัดมีตัวตรวจปฏิกิริยาสมุนไพร×ยา</li>
+      <li><b>โมเดลข้อมูลจริง</b> — FarmPlot (แปลง+ขอบเขต) · HerbBed (วงสมุนไพร) · HerbCatalog (ฐานสมุนไพร) · CompostBatch (กองหมัก) · FertilizerApplication (การใส่ปุ๋ย)</li>
+    </ul>
+  </section>
+
+  <!-- ═══ PLOT MAP ═══ -->
+  <section id="map">
+    <p class="k-ch">// แผนผังแปลง · <b>สาธิต</b></p>
+    <h2>ทั้งไร่ในหน้าจอเดียว</h2>
+    <p class="sub">แบบที่ /api/farm/map.svg วาดจากข้อมูลแปลงจริง — สีตามสถานะ: กำลังปลูก เก็บแล้ว พักแปลง และแปลงสมุนไพร (ข้อมูลสาธิต)</p>
+    <div class="mapgrid">
+      <div class="plotmap" role="img" aria-label="แผนผังแปลงตัวอย่าง 6 แปลง แยกสีตามสถานะ">
+        <div class="title">แผนผังแปลง · สถานะอัปเดตจากการเก็บเกี่ยวจริง</div>
+        <div class="plots">
+          <div class="plot growing" style="grid-column:span 3"><div class="nm">แปลงผักหลังบ้าน</div><div class="ar">32 ตร.ม. · มะเขือเทศ</div></div>
+          <div class="plot herb" style="grid-column:span 3"><div class="nm">แปลงสมุนไพร</div><div class="ar">18 ตร.ม. · 4 วงสมุนไพร</div></div>
+          <div class="plot growing" style="grid-column:span 2"><div class="nm">โซน A · ถั่วฝักยาว</div><div class="ar">12 ตร.ม.</div></div>
+          <div class="plot harvested" style="grid-column:span 2"><div class="nm">โซน B · ข้าวโพด</div><div class="ar">20 ตร.ม. · เก็บแล้ว</div></div>
+          <div class="plot fallow" style="grid-column:span 2"><div class="nm">โซน C · พักแปลง</div><div class="ar">15 ตร.ม.</div></div>
+        </div>
+        <div class="mapkey"><b>กำลังปลูก</b> เขียวเข้ม · <b>เก็บแล้ว</b> ฟ้า · <b>พักแปลง</b> เส้นประ · <b>แปลงสมุนไพร</b> เขียวอ่อน</div>
+      </div>
+      <div>
+        <ul class="bullet">
+          <li><b>แต่ละแปลงมีประวัติครบ</b> — วันปลูก วันคาดเก็บเกี่ยว ค่าดิน ปุ๋ยที่ใส่ ผลผลิตที่เก็บได้</li>
+          <li><b>วิเคราะห์รายแปลง</b> — ต้นทุน/รายได้/กำไรต่อแปลงจากการเก็บเกี่ยวจริง (endpoint analysis)</li>
+          <li><b>วงจรปุ๋ยปิดสนิท</b> — เศษจากครัวและฟาร์มเข้ากองหมัก แล้วกลับมาเป็นปุ๋ยใส่แปลง ลดต้นทุนจริง</li>
+          <li><b>แปลงสมุนไพรแยกระบบ</b> — วงสมุนไพรในแปลง ผูกกับฐานข้อมูลสมุนไพรกลาง</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ HERB CARD ═══ -->
+  <section id="herbs">
+    <p class="k-ch">// ฐานสมุนไพรไทย · <b>สาธิต</b></p>
+    <h2>สมุนไพรที่บอกข้อห้ามให้ก่อน</h2>
+    <p class="sub">โครงสร้างตรงกับ HerbCatalog ในระบบ: สรรพคุณ ข้อควรระวัง ข้อห้าม จำนวนวันปลูก และดินที่เหมาะ — เลือกชนิดแล้วการ์ดพิมพ์ใหม่ (ข้อมูลสาธิต ไม่ใช่คำแนะนำทางการแพทย์)</p>
+    <div class="mapgrid">
+      <div>
+        <div class="herbsel">
+          <label for="herbSel">เลือกสมุนไพร:</label>
+          <select id="herbSel">
+            <option value="andro" selected>ฟ้าทะลายโจร</option>
+            <option value="turmeric">ขมิ้นชัน</option>
+            <option value="hibiscus">กระเจี๊ยบแดง</option>
+          </select>
+        </div>
+        <ul class="bullet">
+          <li><b>ปลูกพร้อมรู้วันเก็บ</b> — ทุกชนิดมี growthDays ระบบนับถอยหลังจากวันปลูกในแปลง</li>
+          <li><b>ดินที่เหมาะตรวจกับค่าดินจริง</b> — ค่า pH/ความชื้นที่ชอบ เทียบกับ soil-readings ของแปลง</li>
+          <li><b>ข้อห้ามติดไปถึงผู้ใช้</b> — ใช้คู่กับโมดูลสุขภาพ: เช็คสมุนไพร×ยาที่กินอยู่ก่อนดื่ม/ทาน</li>
+          <li><b>เก็บแล้วเข้าบัญชี</b> — ผลผลิตสมุนไพรจาก herb-harvest ลงรายได้/สต็อกของบ้านได้</li>
+        </ul>
+      </div>
+      <div>
+        <div class="herbcard" id="herbCard" aria-label="การ์ดข้อมูลสมุนไพร (ข้อมูลสาธิต)">
+          <div class="stampwrap" id="stampWrap"><span class="tag" id="stampDays">~110 วัน</span></div>
+          <div class="hc-name" id="hName">ฟ้าทะลายโจร</div>
+          <div class="hc-latin" id="hLatin">Andrographis paniculata</div>
+          <div class="hc-sec"><b>สรรพคุณ</b><span id="hUse">บรรเทาไข้ หวัด เจ็บคอ — ดื่มเป็นชาเมื่อเริ่มเป็นหวัด</span></div>
+          <div class="hc-sec warn"><b>ข้อควรระวัง</b><span id="hWarn">ขมจัด อาจจุกเสียดแน่นท้องถ้าทานตอนท้องว่าง</span></div>
+          <div class="hc-sec stop"><b>ข้อห้าม</b><span id="hStop">ตั้งครรภ์ · วางแผนมีบุตร</span></div>
+          <div class="hc-meta"><span>ดิน: <span id="hSoil">pH 6–7 · ชื้น 60–80%</span></span><span>เก็บ: <span id="hHarvest">ทั้งต้น</span></span></div>
+          <div class="demo">* ข้อมูลสาธิตเพื่อโชว์โครงสร้าง — ใช้จริงต้องอ้างอิงฐานข้อมูลที่ตรวจสอบแล้ว ไม่ใช่คำแนะนำทางการแพทย์</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ COMPOST LOOP ═══ -->
+  <section id="compost">
+    <p class="k-ch">// วงจรปุ๋ย · <b>ของจริงในระบบ</b></p>
+    <h2>เศษจากครัว กลับมาเป็นผลผลิต</h2>
+    <p class="sub">จุดที่ระบบเกษตรต่างจากสมุดจดทั่วไป: ขยะอินทรีย์ของบ้านถูกนับเป็นทรัพยากรที่วัดได้ — CompostBatch รู้วิธีหมัก ปริมาณเข้า-ออก ค่า NPK โดยประมาณ และแปลงที่ใส่</p>
+    <div class="loop" aria-label="วงจรเศษวัสดุเป็นปุ๋ยสี่ขั้น">
+      <div class="step"><div class="ic">🥬</div><h3>เศษเข้ากอง</h3><p>เศษครัว/ฟาร์มชั่งเข้ากองหมัก — วิธีเลือกได้: ร้อน · ไส้เดือน · โบคาชิ · ถ่านชีวภาพ</p><span class="ep">/api/compost/batches + /waste</span></div>
+      <div class="step"><div class="ic">⏳</div><h3>หมัก-พัก</h3><p>ติดตามสถานะ active → curing → ready พร้อมวันคาดพร้อมใช้ และน้ำหนักที่ลด (ย่อย ~50%)</p><span class="ep">CompostBatch.outputKg</span></div>
+      <div class="step"><div class="ic">🧺</div><h3>ได้ปุ๋ย</h3><p>เก็บปุ๋ยหมักพร้อมค่า NPK โดยประมาณของแต่ละกอง — รู้ว่ากองไหนโปรตีนดี</p><span class="ep">/api/compost/:id/harvest</span></div>
+      <div class="step"><div class="ic">🌱</div><h3>ใส่แปลง</h3><p>บันทึกใส่ปุ๋ยรายแปลงรายกิโล — ต้นทุนปุ๋ยจริงลดลงเห็นในกำไรต่อแปลง</p><span class="ep">/api/farm/:id/apply-fertilizer</span></div>
+    </div>
+    <ul class="bullet">
+      <li><b>เชื่อมสามโดเมน</b> — ครัวร้านอาหาร (เศษอาหาร) + ฟาร์ม + แปลงเกษตร ใช้วงจรนี้ร่วมกัน</li>
+      <li><b>ทุกกิโลวัดได้</b> — เข้ากี่ กก. ออกกี่ กก. ใส่แปลงไหน เมื่อไร — audit ได้ทั้งสาย</li>
+    </ul>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>ข้อจำกัดที่ควรรู้ก่อนใช้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>ข้อมูลสมุนไพรในระบบต้องเติมจากแหล่งที่ตรวจสอบแล้ว</b> — โครงสร้าง (สรรพคุณ/ข้อห้าม/วันเก็บ) พร้อม แต่เนื้อหาต้องมาจากตำราที่เชื่อถือได้ ไม่ใช่คำแนะนำทางการแพทย์</li>
+        <li><b>ค่าดินวันนี้กรอกมือก่อน</b> — โมเดลรับค่าจากเซ็นเซอร์ได้ แต่อุปกรณ์วัดดินจริงยังต้องเพิ่ม</li>
+        <li><b>ยังไม่มีแปลงนำร่องบันทึกครบรอบ</b> — สูตรกำไรต่อแปลงพร้อม แต่ต้องการการปลูกจริง 1 รอบเพื่อปรับสูตร</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  /* ── herb picker → card re-render (mirrors the real HerbCatalog fields) ── */
+  var HERBS = {
+    'andro':    { name: 'ฟ้าทะลายโจร', latin: 'Andrographis paniculata', days: '~110 วัน',
+                  use: 'บรรเทาไข้ หวัด เจ็บคอ — ดื่มเป็นชาเมื่อเริ่มเป็นหวัด',
+                  warn: 'ขมจัด อาจจุกเสียดแน่นท้องถ้าทานตอนท้องว่าง',
+                  stop: 'ตั้งครรภ์ · วางแผนมีบุตร',
+                  soil: 'pH 6–7 · ชื้น 60–80%', harvest: 'ทั้งต้น (ก่อนออกดอก)' },
+    'turmeric': { name: 'ขมิ้นชัน', latin: 'Curcuma longa', days: '~270 วัน',
+                  use: 'บำรุงสุขภาพ ลดการอักเสบ — ใช้เหง้าสด/แป้งขมิ้นในครัวได้',
+                  warn: 'อาจระคายเคืองกระเพาะถ้าทานมากตอนท้องว่าง',
+                  stop: 'นิ่วในถุงน้ำดี · ตั้งครรภ์ (ปริมาณมาก)',
+                  soil: 'pH 6–7.5 · ร่วน ระบายน้ำดี', harvest: 'เหง้า (ขุดปลายฤดู)' },
+    'hibiscus': { name: 'กระเจี๊ยบแดง', latin: 'Hibiscus sabdariffa', days: '~100 วัน',
+                  use: 'ชาเปรี้ยว บรรเทากระหาย — ช่วยเรื่องความดัน (ตามงานวิจัยภายนอก)',
+                  warn: 'เปรี้ยวจัด ทานกับอาหารที่มีแคลเซียมสูงได้',
+                  stop: 'ความดันต่ำ · ผู้ที่ทานยาลดความดันอยู่ (ปรึกษาแพทย์)',
+                  soil: 'pH 6–6.8 · แดดจัด ระบายน้ำดี', harvest: 'กลีบเลี้ยง (หลังดอกบาน 3–4 สัปดาห์)' }
+  };
+  var sel = document.getElementById('herbSel');
+  var stampWrap = document.getElementById('stampWrap');
+  function set(id, v){ document.getElementById(id).textContent = v; }
+  sel.addEventListener('change', function(){
+    var d = HERBS[sel.value];
+    if (!d) return;
+    set('hName', d.name); set('hLatin', d.latin); set('hUse', d.use);
+    set('hWarn', d.warn); set('hStop', d.stop); set('hSoil', d.soil); set('hHarvest', d.harvest);
+    set('stampDays', d.days);
+    stampWrap.classList.remove('reink');
+    void stampWrap.offsetWidth; /* restart stamp animation */
+    stampWrap.classList.add('reink');
+  });
+})();
+</script>
+</body>
+</html>
