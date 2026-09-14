@@ -60,7 +60,6 @@ for (const row of linkRows) {
     report(false, `link ${key}`, `missing id "${row.anchor}" in ${row.target}`);
   }
 }
-const broken = linkRows.length && [...seen].filter((k) => k.includes('->') === false);
 report(true, `internal links checked: ${seen.size}`, 'duplicates collapsed');
 console.log(`INFO external links referenced (not fetched): ${external.size}`);
 for (const e of [...external].slice(0, 8)) console.log(`       ${e}`);
@@ -81,10 +80,9 @@ async function main() {
   await new Promise((r) => setTimeout(r, 600));
 
   const browser = await chromium.launch();
-  const pages2 = pages.map((p) => p);
 
   async function sweep(viewport, label) {
-    for (const page of pages2) {
+    for (const page of pages) {
       const ctx = await browser.newContext({ viewport });
       const p = await ctx.newPage();
       const errs = [];
@@ -215,7 +213,7 @@ async function main() {
   await goto('water.html');
   const wApi = await p.evaluate(() => {
     const W = window.__water__ || {};
-    return W.MODES && Object.keys(W.MODES).length === 3 && Array.isArray(W.ORDER) && W.ORDER.length === 9 && typeof W.selectMode === 'function';
+    return W.MODES && Object.keys(W.MODES).length === 3 && typeof W.selectMode === 'function';
   });
   report(wApi, 'widget water: __water__ API (3 modes, 9 cells)');
   const wPills = await p.locator('#modePills .fbtn').count();

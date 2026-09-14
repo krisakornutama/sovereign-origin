@@ -144,38 +144,54 @@ var PAGES = [
   { file: 'books.html',     type: 'books',    label: 'คลังหนังสือ' },
   { file: 'en.html',        type: 'system',   label: 'English' }
 ];
+var PAGES_BOOKS = PAGES.filter(function (p) { return p.file === 'books.html'; })[0];
+var PAGES_WATER = PAGES.filter(function (p) { return p.file === 'water.html'; })[0];
 var TYPE_TH = { system: 'ระบบ', project: 'ผลงาน', farm: 'ฟาร์ม', concept: 'แนวคิด', edu: 'การศึกษา', books: 'หนังสือ', en: 'English' };
 var TYPE_ORDER = ['system', 'project', 'farm', 'concept', 'edu', 'books', 'en'];
 
 function stripTags(s){ return s.replace(/<[^>]*>/g, ' '); }
-function norm(s){ return String(s).toLowerCase(); }
 
-/* ตัด <script>/<style> ก่อน แล้วจับ (id, h2/h3, ย่อหน้าแรก) เป็นหัวข้อค้นได้ */
+/* รายการค้นหาหนึ่งชิ้น — p คือข้อมูลหน้า (PAGES) หรือ object คงที่ */
+function hit(p, title, desc){
+  var h = Object.assign({}, p);
+  h.title = title; h.desc = desc;
+  h.href = h.href || h.file;
+  h.pageLabel = h.pageLabel || h.label;
+  return h;
+}
+
+/* ตัด <script>/<style> ก่อน แล้วจับ h2/h3 เป็นหัวข้อค้นได้ */
 function sectionHits(p, html){
   var body = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
   var out = [];
   var re = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/g, m;
   while ((m = re.exec(body))) {
     var t = stripTags(m[1]).replace(/\s+/g, ' ').trim();
-    if (t.length > 1) out.push({ page: p.file, type: p.type, pageLabel: p.label, title: t, desc: '', href: p.file });
+    if (t.length > 1) out.push(hit(p, t, ''));
   }
   var desc = body.match(/<meta\s+name="description"\s+content="([^"]+)"/i);
-  out.push({ page: p.file, type: p.type, pageLabel: p.label, title: p.label, desc: desc ? desc[1] : '', href: p.file, isPage: true });
+  out.push(hit(p, p.label, desc ? desc[1] : ''));
   return out;
+}
+
+/* ดึงค่า field 'x' จากข้อความ object ตัวเดียว */
+function field(obj, name){ return (obj.match(new RegExp(name + "\\s*:\\s*'([^']+)")) || [])[1]; }
+
+/* หาอาร์เรย์ var NAME = [ ... ] แล้วส่งทุก object { ... } ให้ fn */
+function arrayObjects(html, name, fn){
+  var m = html.match(new RegExp('var\\s+' + name + '\\s*=\\s*\\[([\\s\\S]*?)\\n\\];'));
+  if (m) m[1].replace(/\{[^}]*\}/g, fn);
 }
 
 function booksHits(html){
   var out = [];
-  var m = html.match(/var\s+BOOKS_PUBLISHED\s*=\s*\[([\s\S]*?)\n\];/);
-  var r = html.match(/var\s+BOOKS_READ\s*=\s*\[([\s\S]*?)\n\];/);
-  [m && { arr: m[1], shelf: 'ผลงานที่ลงพิมพ์' }, r && { arr: r[1], shelf: 'ชั้นหนังสือที่อ่าน' }].forEach(function (g) {
-    if (!g) return;
-    g.arr.replace(/\{[^}]*\}/g, function (obj) {
-      var t = (obj.match(/title\s*:\s*'([^']+)'/) || [])[1];
+  [['BOOKS_PUBLISHED', 'ผลงานที่ลงพิมพ์'], ['BOOKS_READ', 'ชั้นหนังสือที่อ่าน']].forEach(function (pair) {
+    arrayObjects(html, pair[0], function (obj) {
+      var t = field(obj, 'title');
       if (!t) return obj;
-      var a = (obj.match(/author\s*:\s*'([^']+)'/) || [])[1];
-      var c = (obj.match(/category\s*:\s*'([^']+)'/) || [])[1];
-      out.push({ page: 'books.html', type: 'books', pageLabel: 'คลังหนังสือ', title: t, desc: g.shelf + (a ? ' · ' + a : '') + (c ? ' · ' + c : ''), href: 'books.html' });
+      var a = field(obj, 'author');
+      var c = field(obj, 'category');
+      out.push(hit(PAGES_BOOKS, t, pair[1] + (a ? ' · ' + a : '') + (c ? ' · ' + c : '')));
       return obj;
     });
   });
@@ -185,22 +201,18 @@ function booksHits(html){
 function waterHits(html){
   var out = [];
   ['pioneer', 'formation8', 'patriarch'].forEach(function (key) {
-    var re = new RegExp(key + '\\s*:\\s*\\{[\\s\\S]*?cells\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\}\\n\\s*\\}');
-    var g = html.match(re);
-    if (!g) return;
-    var modeName = (html.match(new RegExp(key + ':\\s*\\{\\s*label:\\s*\'([^\']+)\'')) || [])[1] || key;
-    g[1].replace(/\{[^{}]*\}/g, function (obj) {
-      var tag = (obj.match(/tag\s*:\s*'([^']+)'/) || [])[1];
-      if (!tag) return obj;
-      out.push({ page: 'water.html', type: 'concept', pageLabel: 'ชัยภูมิน้ำ', title: tag, desc: 'โหมด ' + modeName, href: 'water.html' });
+    var cells = html.match(new RegExp(key + '\\s*:\\s*\\{[\\s\\S]*?cells\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\}\\n\\s*\\}'));
+    if (!cells) return;
+    var modeName = (html.match(new RegExp(key + ":\\s*\\{\\s*label:\\s*'([^']+)'")) || [])[1] || key;
+    cells[1].replace(/\{[^{}]*\}/g, function (obj) {
+      var tag = field(obj, 'tag');
+      if (tag) out.push(hit(PAGES_WATER, tag, 'โหมด ' + modeName));
       return obj;
     });
   });
-  var tr = html.match(/var\s+TERRAIN\s*=\s*\[([\s\S]*?)\n\];/);
-  if (tr) tr[1].replace(/\{[^}]*\}/g, function (obj) {
-    var n = (obj.match(/name\s*:\s*'([^']+)'/) || [])[1];
-    if (!n) return obj;
-    out.push({ page: 'water.html', type: 'concept', pageLabel: 'ชัยภูมิน้ำ', title: n, desc: 'ข้อมูลแปลง/บ่อ/รางบนกระดาน', href: 'water.html' });
+  arrayObjects(html, 'TERRAIN', function (obj) {
+    var n = field(obj, 'name');
+    if (n) out.push(hit(PAGES_WATER, n, 'ข้อมูลแปลง/บ่อ/รางบนกระดาน'));
     return obj;
   });
   return out;
@@ -261,7 +273,7 @@ function run(){
   var terms = q.split(/\s+/);
   var hits = INDEX.filter(function (it) {
     if (currentType && it.type !== currentType) return false;
-    var hay = norm(it.title + ' ' + (it.desc || '') + ' ' + (it.pageLabel || ''));
+    var hay = (it.title + ' ' + (it.desc || '') + ' ' + (it.pageLabel || '')).toLowerCase();
     return terms.every(function (t) { return hay.indexOf(t) >= 0; });
   }).slice(0, 40);
   if (!hits.length) { resultsEl.innerHTML = '<div class="empty">ไม่พบผลสำหรับ "<b>' + q.replace(/[<>&"]/g, '') + '</b>" — ลองคำสั้นลงหรืออีกคำหนึ่ง</div>'; return; }
@@ -279,8 +291,7 @@ buildIndex();
 /* console API (เล่น/ทดสอบ): window.__search__ */
 window.__search__ = {
   ready: function(){ return INDEX.length; },
-  find: function(q){ var old = input.value; input.value = q; run(); var n = resultsEl.querySelectorAll('.hit').length; input.value = old; run(); return n; },
-  PAGES: PAGES
+  find: function(q){ var old = input.value; input.value = q; run(); var n = resultsEl.querySelectorAll('.hit').length; input.value = old; run(); return n; }
 };
 </script>
 
