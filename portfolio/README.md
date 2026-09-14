@@ -1,6 +1,6 @@
 # Portfolio — Project Sovereign
 
-เว็บโชว์ผลงานแบบ static หลายหน้า (`index.html` = ทัวร์ทั้งระบบ + `projects.html` = ผลงานทีละชิ้น + `livestock.html` = ปศุสัตว์ + `fishery.html` = แบบแปลนการประมง + `farm.html` = เกษตร&สมุนไพร + `education.html` = โมดูล AI สอนลูก) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
+เว็บโชว์ผลงานแบบ static หลายหน้า (`index.html` = ทัวร์ทั้งระบบ + `projects.html` = ผลงานทีละชิ้น + ฟอร์มติดต่อ + `livestock.html` = ปศุสัตว์ + `fishery.html` = แบบแปลนการประมง + `farm.html` = เกษตร&สมุนไพร + `education.html` = โมดูล AI สอนลูก) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
 
 ## วิธีขึ้น GitHub Pages (เลือกทางใดทางหนึ่ง)
 
@@ -32,6 +32,16 @@ git push -u origin main
 ## อัปเดตหน้าเว็บภายหลัง
 
 แก้ไฟล์ `index.html` แล้ว commit+push ใหม่ (หรืออัปโหลดทับ) — Pages จะ deploy เองใน 1–2 นาที
+
+## ตั้งค่าฟอร์มติดต่อให้ส่งเข้าอีเมลจริง (สมัครฟรี 1 ครั้ง ~3 นาที)
+
+ฟอร์มใน `projects.html` ทำงานได้ทันทีแม้ไม่ตั้งค่า (กดส่ง = เปิดแอปอีเมลของผู้ใช้) แต่ถ้าอยากให้ส่งเข้าอีเมลคุณตรง ๆ:
+
+1. สมัครฟรีที่ [formspree.io](https://formspree.io) → สร้าง **New form** → ตั้งชื่อว่า Project Sovereign
+2. คัดลอก **endpoint** ที่ได้ (หน้าตาแบบนี้: `https://formspree.io/f/abcd1234`)
+3. เปิดไฟล์ `projects.html` หาบรรทัด `var FORM_ENDPOINT = '';` แล้วใส่ endpoint ไว้ในเครื่องหมายคำพูด
+4. ใน Formspree → Settings → ใส่อีเมลคุณเป็นปลายทางรับ
+5. อัปโหลดไฟล์ทับขึ้น GitHub — เสร็จ ฟอร์มจะส่งเข้าอีเมลคุณจริง (ฟรี 50 ข้อความ/เดือน พอสำหรับเว็บโชว์)
 
 ## หมายเหตุ
 
