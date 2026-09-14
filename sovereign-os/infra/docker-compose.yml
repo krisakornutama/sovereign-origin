@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # -------------------- DATABASE --------------------
   timescaledb:
@@ -186,6 +184,7 @@ services:
         condition: service_started
     networks:
       - internal
+
 networks:
   internal:
     driver: bridge
