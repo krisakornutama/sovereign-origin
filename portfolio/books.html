@@ -80,6 +80,14 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .tag{display:inline-block;font-family:var(--mono);font-size:.6rem;border-radius:999px;padding:3px 10px;align-self:flex-start}
 .tag.pub{color:var(--green);border:1px solid rgba(52,211,153,.4)}
 .tag.read{color:var(--cyan);border:1px solid rgba(34,211,238,.35)}
+.tag.cat{color:var(--dim);border:1px solid rgba(156,163,175,.35)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+.fbtn{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--dim);background:transparent;
+  border:1px solid rgba(156,163,175,.3);border-radius:999px;padding:6px 14px;cursor:pointer;transition:color .15s ease,border-color .15s ease,background .15s ease}
+.fbtn:hover{color:#ecfdf5;border-color:rgba(52,211,153,.5)}
+.fbtn[aria-pressed="true"]{color:#030712;background:var(--cyan);border-color:var(--cyan);font-weight:700}
+.fbtn .n{color:inherit;opacity:.6;margin-left:5px}
+.fbtn[aria-pressed="true"] .n{opacity:.75}
 .empty{border:1px dashed rgba(52,211,153,.35);border-radius:12px;padding:26px 22px;text-align:center;color:var(--dim);font-size:.85rem}
 .empty b{color:#ecfdf5}
 .shelfnote{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:14px 0 0}
@@ -140,6 +148,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <p class="k-ch">// หนังสือที่ลงพิมพ์ · <b><span id="pubCount">0</span> เล่ม</b></p>
     <h2>ผลงานที่เผยแพร่</h2>
     <p class="sub">ทุกเล่มมีลิงก์กลับไปหาแหล่งเดิม — ไม่โฮสต์ซ้ำ ไม่ลอกเนื้อหา แค่จุดรวมให้คนหาเจอง่าย</p>
+    <div class="filters" id="pubFilters" role="group" aria-label="กรองตามหมวด — หนังสือที่ลงพิมพ์"></div>
     <div class="shelfgrid" id="pubShelf" aria-live="polite"></div>
   </section>
 
@@ -148,6 +157,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <p class="k-ch">// หนังสือที่อ่าน · <b><span id="readCount">0</span> เล่ม</b></p>
     <h2>ชั้นหนังสือที่อ่านแล้ว</h2>
     <p class="sub">หนังสือที่ผ่านมือคนเขียน — รากของแนวคิด และรสนิยมที่ผลิตงานชุดนี้ออกมา</p>
+    <div class="filters" id="readFilters" role="group" aria-label="กรองตามหมวด — หนังสือที่อ่าน"></div>
     <div class="shelfgrid" id="readShelf" aria-live="polite"></div>
   </section>
 
@@ -159,7 +169,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <h3>วิธีเติมชั้นหนังสือ</h3>
       <ul>
         <li><b>เปิดไฟล์ <code>books.html</code></b> — ขึ้นหัวไฟล์มีบล็อก <code>BOOKS_PUBLISHED</code> กับ <code>BOOKS_READ</code> เขียนด้วย JavaScript ธรรมดา แถวเดียวต่อเล่ม</li>
-        <li><b>เพิ่มบรรทัดแบบนี้</b> — <code>{ title:'ชื่อหนังสือ', author:'ผู้เขียน', url:'ลิงก์ (ใส่หรือไม่ก็ได้)', note:'คำโปรยสั้น ๆ' }</code> แล้ว push — หน้าเว็บจัดการ์ดให้เอง</li>
+        <li><b>เพิ่มบรรทัดแบบนี้</b> — <code>{ title:'ชื่อหนังสือ', author:'ผู้เขียน', url:'ลิงก์ (ใส่หรือไม่ก็ได้)', note:'คำโปรยสั้น ๆ', category:'กลยุทธ์' }</code> — หมวดใช้ได้ 6 แบบ: <code>กลยุทธ์</code> · <code>การแพทย์</code> · <code>สงคราม</code> · <code>การเมืองการปกครอง</code> · <code>ชีวประวัติ</code> · <code>อื่น ๆ</code> (เว้นว่าง = อื่น ๆ) แล้ว push — หน้าเว็บจัดการ์ด + ปุ่มกรองให้เอง</li>
         <li><b>ยังว่างอยู่ตอนนี้ = จริง</b> — หน้านี้ไม่แต่งข้อมูลปลอม ชั้นไหนยังไม่ใส่จะขึ้นตัวอักษรว่างตามจริงจนกว่าจะเติม</li>
       </ul>
     </div>
@@ -175,13 +185,15 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 /* ═══════════════════════════════════════════════════════════════
    BOOKS — ข้อมูลคลังหนังสือทั้งหมดอยู่ตรงนี้ไฟล์เดียว
    เพิ่มเล่มใหม่ = เพิ่มบรรทัดในอาร์เรย์ แล้ว push
-   ฟิลด์: title (บังคับ) · author (แนะนำ) · url (ใส่หรือไม่ก็ได้) · note (สั้น ๆ)
+   ฟิลด์: title (บังคับ) · author (แนะนำ) · url (เลือกได้) · note (สั้น ๆ) ·
+         category: 'กลยุทธ์' | 'การแพทย์' | 'สงคราม' | 'การเมืองการปกครอง' | 'ชีวประวัติ' | 'อื่น ๆ' (เว้นว่าง = อื่น ๆ)
    ═══════════════════════════════════════════════════════════════ */
+var CATEGORIES = ['กลยุทธ์', 'การแพทย์', 'สงคราม', 'การเมืองการปกครอง', 'ชีวประวัติ', 'อื่น ๆ'];
 var BOOKS_PUBLISHED = [
-  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'คำโปรยหนึ่งประโยค' },
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'คำโปรยหนึ่งประโยค', category:'กลยุทธ์' },
 ];
 var BOOKS_READ = [
-  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'ทำไมเล่มนี้จึงอยู่บนชั้น' },
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'ทำไมเล่มนี้จึงอยู่บนชั้น', category:'สงคราม' },
 ];
 
 /* ─── ต่อจากนี้คือตัวเรนเดอร์ — ปกติไม่ต้องแก้อะไรข้ามเส้นนี้ ─── */
@@ -190,7 +202,8 @@ function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'
 function bookCard(b){
   var cover = '<div class="cover"><p class="cv-t">' + esc(b.title) + '</p>' + (b.author ? '<p class="cv-a">' + esc(b.author) + '</p>' : '') + '</div>';
   var link = b.url ? '<a class="bk-link" href="' + esc(b.url) + '" target="_blank" rel="noopener">เปิดแหล่งเดิม ↗</a>' : '';
-  return '<article class="book">' + cover +
+  var cat = '<span class="tag cat">' + esc(b.category || 'อื่น ๆ') + '</span>';
+  return '<article class="book">' + cover + cat +
     '<p class="bk-title">' + esc(b.title) + '</p>' +
     (b.author ? '<p class="bk-meta">' + esc(b.author) + '</p>' : '') +
     (b.note ? '<p class="bk-meta">' + esc(b.note) + '</p>' : '') +
@@ -206,11 +219,53 @@ function renderShelf(list, el, emptyHtml){
 var EMPTY_PUB = '<div class="empty"><b>ชั้นนี้ยังว่าง</b> — เพิ่มเล่มแรกได้ในบล็อก BOOKS_PUBLISHED ที่ต้นไฟล์ แล้ว push</div>';
 var EMPTY_READ = '<div class="empty"><b>ยังไม่มีรายการ</b> — เพิ่มเล่มที่อ่านแล้วในบล็อก BOOKS_READ ที่ต้นไฟล์ แล้ว push</div>';
 
-renderShelf(BOOKS_PUBLISHED, document.getElementById('pubShelf'), EMPTY_PUB);
-renderShelf(BOOKS_READ, document.getElementById('readShelf'), EMPTY_READ);
+/* แผ่นเปล่าของหมวดที่ถูกกรองไว้ (ต่างจากชั้นว่างทั้งชั้น) */
+function emptyFiltered(){
+  return '<div class="empty">ยังไม่มีเล่มในหมวดนี้บนชั้นนี้ — กด "ทั้งหมด" เพื่อกลับไปดูทุกเล่ม</div>';
+}
+
+/* ปุ่มกรองหมวด: สร้างจากข้อมูลจริงเสมอ (หมวดที่ไม่มีเล่มไม่โผล่) */
+function buildFilters(list, bar, shelf, emptyHtml){
+  if (!list.length) { bar.remove(); renderShelf(list, shelf, emptyHtml); return { apply: function(){} }; }
+  var counts = {};
+  list.forEach(function(b){ counts[b.category || 'อื่น ๆ'] = (counts[b.category || 'อื่น ๆ'] || 0) + 1; });
+  var cats = CATEGORIES.filter(function(c){ return counts[c]; });
+  var unknown = Object.keys(counts).filter(function(c){ return CATEGORIES.indexOf(c) < 0; });
+  cats = cats.concat(unknown);
+  var current = 'all';
+  function apply(){
+    renderShelf(current === 'all' ? list : list.filter(function(b){ return (b.category || 'อื่น ๆ') === current; }), shelf, current === 'all' ? emptyHtml : emptyFiltered());
+    bar.querySelectorAll('.fbtn').forEach(function(btn){ btn.setAttribute('aria-pressed', String(btn.dataset.cat === current)); });
+  }
+  var allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'fbtn';
+  allBtn.dataset.cat = 'all';
+  allBtn.setAttribute('aria-pressed', 'true');
+  allBtn.innerHTML = 'ทั้งหมด <span class="n">' + list.length + '</span>';
+  allBtn.addEventListener('click', function(){ current = 'all'; apply(); });
+  bar.appendChild(allBtn);
+  cats.forEach(function(c){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fbtn';
+    btn.dataset.cat = c;
+    btn.innerHTML = esc(c) + ' <span class="n">' + counts[c] + '</span>';
+    btn.addEventListener('click', function(){ current = c; apply(); });
+    bar.appendChild(btn);
+  });
+  apply();
+  return { apply: apply };
+}
+
+buildFilters(BOOKS_PUBLISHED, document.getElementById('pubFilters'), document.getElementById('pubShelf'), EMPTY_PUB);
+buildFilters(BOOKS_READ, document.getElementById('readFilters'), document.getElementById('readShelf'), EMPTY_READ);
 document.getElementById('pubCount').textContent = BOOKS_PUBLISHED.length;
 document.getElementById('readCount').textContent = BOOKS_READ.length;
 document.title = 'คลังหนังสือ (' + (BOOKS_PUBLISHED.length + BOOKS_READ.length) + ' เล่ม) — Project Sovereign';
+
+/* console API (ใช้เล่น/ทดสอบได้): window.__books__ */
+window.__books__ = { CATEGORIES: CATEGORIES, published: BOOKS_PUBLISHED, read: BOOKS_READ, buildFilters: buildFilters, EMPTY_PUB: EMPTY_PUB, EMPTY_READ: EMPTY_READ };
 </script>
 
 </body>
