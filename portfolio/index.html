@@ -86,7 +86,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .node.hero-node{border-color:var(--green);background:rgba(52,211,153,.1);box-shadow:0 0 18px rgba(52,211,153,.15)}
 .map-key{font-family:var(--mono);font-size:.68rem;color:var(--faint);margin-top:14px}
 .map-key b{color:var(--green);font-weight:500}
-.toc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.toc{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .toc a{display:block;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel)}
 .toc a:hover{border-color:rgba(52,211,153,.5)}
 .toc .n{font-family:var(--mono);font-size:.66rem;color:var(--cyan)}
@@ -189,6 +189,18 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .vert .fit{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:.64rem;color:var(--green);border:1px solid rgba(52,211,153,.3);border-radius:999px;padding:3px 10px}
 .vert-note{font-size:.78rem;color:var(--faint);margin:16px 0 0;line-height:1.8}
 
+/* ── full catalog ── */
+.catalog-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cat{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:20px 22px}
+.cat .h{display:flex;align-items:center;gap:10px}
+.cat .ic{font-size:1.3rem}
+.cat h3{font-size:.98rem;font-weight:600;color:#ecfdf5;margin:0}
+.cat .count{margin-left:auto;font-family:var(--mono);font-size:.62rem;color:var(--cyan);white-space:nowrap}
+.cat ul{list-style:none;margin:10px 0 0;padding:0}
+.cat li{font-size:.78rem;color:var(--dim);padding:5px 0;border-bottom:1px dashed rgba(52,211,153,.09);line-height:1.6}
+.cat li:last-child{border-bottom:none}
+.cat li b{color:#d1fae5;font-weight:500}
+
 /* ── engineering ── */
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
 .chip{font-family:var(--mono);font-size:.7rem;color:#a7f3d0;background:rgba(52,211,153,.06);
@@ -224,6 +236,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 /* ── responsive + motion floor ── */  @media (max-width:900px){
   .taxgrid{grid-template-columns:1fr;gap:30px}
   .steps,.split,.opsgrid,.verts{grid-template-columns:1fr}
+  .catalog-grid{grid-template-columns:1fr}
   .map-row,.toc{grid-template-columns:repeat(2,1fr)}
   .agents{grid-template-columns:repeat(3,1fr)}
   .hero{padding:60px 20px 52px}
@@ -256,6 +269,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <nav class="topnav">
     <a href="#map">ภาพรวม</a>
     <a href="#fit">ใครใช้ได้</a>
+    <a href="#all">ทั้งระบบ</a>
     <a href="#sell">๑ ขาย</a>
     <a href="#fulfil">๒ ส่ง</a>
     <a href="#money">๓ เงิน</a>
@@ -273,9 +287,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <!-- ═══ HERO ═══ -->
   <section class="hero" id="top">
     <div class="boot" id="boot" aria-hidden="true"></div>
-    <p class="eyebrow">PROJECT SOVEREIGN · SELF-HOSTED COMMERCE OS</p>
+    <p class="eyebrow">PROJECT SOVEREIGN · SELF-HOSTED LIFE & BUSINESS OS</p>
     <h1>ระบบหลังบ้าน ร้านค้า ร้านอาหาร ฟาร์ม<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
-    <p class="lede">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 พร้อมยื่น และตัวเตือนก่อนกำหนดส่ง</p>
+    <p class="lede">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 พร้อมยื่น และตัวเตือนก่อนกำหนดส่ง — และนั่นยังเป็นแค่ฝั่งธุรกิจ ด้านล่างคือทั้งหมดที่ระบบทำได้</p>
     <p class="meta-line">เดินครบทั้งทัวร์ ~4 นาที · หรือกระโดดเฉพาะส่วนที่สนใจจากสารบัญด้านล่าง</p>
     <div class="cta">
       <a class="btn btn-primary" href="#map">ดูภาพรวมทั้งระบบ →</a>
@@ -318,6 +332,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     </div>
     <div class="toc">
       <a href="#fit"><span class="n">☰ · ใครใช้ได้</span><div class="t">ร้านค้า · ร้านอาหาร · ฟาร์ม</div></a>
+      <a href="#all"><span class="n">▦ · ทั้งระบบ</span><div class="t">45+ หน้าจอ ครบทุกโดเมน</div></a>
       <a href="#sell"><span class="n">๑ · ขาย</span><div class="t">ลูกค้าสั่ง + จ่ายเอง</div></a>
       <a href="#fulfil"><span class="n">๒ · ส่ง</span><div class="t">ยืนยัน ส่ง ใบกำกับ</div></a>
       <a href="#money"><span class="n">๓ · เงิน</span><div class="t">สมุด + Treasury</div></a>
@@ -327,6 +342,81 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <a href="#ops"><span class="n">๗ · เฝ้าระบบ</span><div class="t">backup + ฟื้นเอง</div></a>
       <a href="#eng"><span class="n">+</span><div class="t">วิศวกรรมเบื้องหลัง</div></a>
     </div>
+  </section>
+
+  <!-- ═══ FULL CATALOG ═══ -->
+  <section id="all">
+    <p class="k-ch">// ทั้งระบบ · <b>45+ หน้าจอ</b></p>
+    <h2>ทุกอย่างที่ระบบทำได้</h2>
+    <p class="sub">สรุปจากเมนูจริงของแอปทั้งหมด — ธุรกิจ ฟาร์ม บ้าน สุขภาพ ความปลอดภัย AI และระบบหลังบ้าน อยู่ในเครื่องเดียว</p>
+    <div class="catalog-grid">
+      <div class="cat"><div class="h"><span class="ic">🛒</span><h3>ธุรกิจ &amp; ขายของ</h3><span class="count">8 หน้าจอ + /shop</span></div>
+        <ul>
+          <li><b>ขายของ (POS)</b> — ออเดอร์ สต็อก ทีม ใบเสนอราคา</li>
+          <li><b>ธุรกิจของฉัน</b> — ลูกค้า B2B ทีม ผู้ติดตั้ง สมุดบัญชี ภาษี ผู้ช่วย AI 5 ตำแหน่ง</li>
+          <li><b>หน้าร้านสาธารณะ /shop</b> — ลูกค้าสั่งเอง + PromptPay QR</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🍜</span><h3>ร้านอาหาร</h3><span class="count">5 หน้าจอ</span></div>
+        <ul>
+          <li><b>จัดการเมนู &amp; สูตร</b> — รู้ทุนต่อจานจากวัตถุดิบ</li>
+          <li><b>จอครัว KDS</b> — คิวออเดอร์หน้าเตาเรียลไทม์</li>
+          <li><b>ครัว IoT</b> — ตาชั่งน้ำหนัก + ตู้เย็นเชื่อมระบบ</li>
+          <li><b>รายงานร้าน</b> — รายรับ รายจ่าย กำไรรายวัน</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🌾</span><h3>ฟาร์ม &amp; ปศุสัตว์</h3><span class="count">4 โดเมน</span></div>
+        <ul>
+          <li><b>แปลงเกษตร</b> — แผนที่แปลง ดิน ปลูก เก็บเกี่ยว</li>
+          <li><b>ปศุสัตว์</b> — ฝูง สุขภาพ วัคซีน ผลผลิต กำไรต่อรอบ</li>
+          <li><b>วิจัยพันธุ์ข้าว</b> — ข้อมูลดิน NPK ผลผลิต</li>
+          <li><b>เสบียง &amp; ทรัพยากร</b> — คลังน้ำ อาหาร เมล็ด ยา</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🏠</span><h3>บ้าน &amp; IoT</h3><span class="count">8 หน้าจอ</span></div>
+        <ul>
+          <li><b>อุปกรณ์ &amp; เซ็นเซอร์</b> — จัดการ ESP32 ทั้งบ้าน</li>
+          <li><b>ควบคุมรีเลย์</b> — ปั๊มน้ำ ไฟ สวิตช์ทุกจุด</li>
+          <li><b>ระบบอัตโนมัติ</b> — กฎถ้า-แล้วทำงานเอง</li>
+          <li><b>พลังงาน · OTA · โครงสร้างพื้นฐาน</b> — โซลาร์ อัปเดตเฟิร์มแวร์ เน็ตเวิร์ก/กล้อง/น้ำ</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">💰</span><h3>การเงินส่วนตัว</h3><span class="count">3 มุมมอง</span></div>
+        <ul>
+          <li><b>ทรัพย์สิน &amp; เงินสด</b> — net worth รวมทุกบัญชี</li>
+          <li><b>Survival Runway</b> — อยู่รอดได้อีกกี่เดือน</li>
+          <li><b>กลยุทธ์ลงทุน</b> — แผน 5 ตระกูลพร้อมปันผล</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🧘</span><h3>สุขภาพ &amp; จิตใจ</h3><span class="count">6 หน้าจอ</span></div>
+        <ul>
+          <li><b>ตรวจสุขภาพ + Self-Check 32 ข้อ</b> — คัดกรองตัวเอง</li>
+          <li><b>ธรรมะบำบัด</b> — สมาธิ สมุนไพร เยียวยา</li>
+          <li><b>วิถีชีวิต</b> — จังหวะการใช้ชีวิตตามแสง/อากาศ</li>
+          <li><b>โหมดวิกฤต</b> — แผนฉุกเฉินน้ำท่วม/ดับไฟ</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🛡️</span><h3>ความปลอดภัย</h3><span class="count">6 หน้าจอ</span></div>
+        <ul>
+          <li><b>ไฟร์วอลล์ &amp; ไซเบอร์</b> — กันภัยระดับบ้าน</li>
+          <li><b>Vision AI</b> — กล้องตรวจจับคนแปลกหน้า</li>
+          <li><b>แผนที่ทรัพย์สิน 3D</b> — ที่ดิน บ้าน จุดยุทธศาสตร์</li>
+          <li><b>เฝ้าระวังความเสี่ยง + แจ้งเตือน</b> — ข่าว/ภัยรอบตัว</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🤖</span><h3>AI &amp; ความรู้</h3><span class="count">5 หน้าจอ</span></div>
+        <ul>
+          <li><b>ศูนย์บัญชาการ AI</b> — สั่งงาน/สนทนา</li>
+          <li><b>AI Agent + เรียนรู้เอง</b> — ทำงานแทน + เก็บข้อมูลต่อ</li>
+          <li><b>พยากรณ์</b> — คาดการณ์แบต/ทรัพยากรล่วงหน้า</li>
+          <li><b>คลังความรู้</b> — บทเรียน งานวิจัย ค้นเชิงความหมาย</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">⚙️</span><h3>ระบบหลังบ้าน</h3><span class="count">6 หน้าจอ</span></div>
+        <ul>
+          <li><b>สุขภาพระบบ + ประวัติข้อมูล</b> — เฝ้าเซิร์ฟเวอร์/กราฟย้อนหลัง</li>
+          <li><b>สำรองข้อมูล</b> — backup + ซ้อมกู้จริง</li>
+          <li><b>ผู้ใช้ · ตรวจสอบ · ตั้งค่า</b> — สิทธิ์ audit log ทุกการเปลี่ยน</li>
+        </ul></div>
+      <div class="cat"><div class="h"><span class="ic">🧪</span><h3>งานวิจัย &amp; จำลอง</h3><span class="count">2 หน้าจอ</span></div>
+        <ul>
+          <li><b>จำลองการปกครอง</b> — war room จำลองสังคม</li>
+          <li><b>ทักษะคน + วันรอด</b> — ประเมินความพร้อมครอบครัว</li>
+        </ul></div>
+    </div>
+    <p class="vert-note">ตัวเลข “หน้าจอ” นับจากเมนูใช้งานจริงของแอป · ทุกโดเมนแชร์ผู้ใช้/สิทธิ์/audit log/backup ชุดเดียวกัน — เรียนรู้จุดเดียว ใช้ได้ทั้งระบบ</p>
   </section>
 
   <!-- ═══ CH.1 SELL ═══ -->
