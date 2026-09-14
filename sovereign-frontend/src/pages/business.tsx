@@ -5,6 +5,7 @@ import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import { authFetch } from '../lib/apiFetch';
 import { getApiUrl } from '../lib/config';
+import { useAuthStore } from '../stores/useAuthStore';
 import BusinessWorkspace from '../components/business/BusinessWorkspace';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -43,7 +44,9 @@ export default function BusinessPage() {
     } catch { /* ยัง login ไม่ผ่าน — ให้ layout จัดการ */ }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  // โหลดหลัง store rehydrate เท่านั้น — ไม่งั้น request แรกไร้ token → 401 → ลิสต์ว่างเป็นเปล่า
+  useEffect(() => { if (isHydrated) void load(); }, [isHydrated, load]);
 
   async function createBusiness() {
     if (!form.name.trim()) { setNotice({ ok: false, text: 'ตั้งชื่อธุรกิจก่อน' }); return; }
