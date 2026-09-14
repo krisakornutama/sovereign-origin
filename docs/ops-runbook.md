@@ -35,19 +35,25 @@ docker restart sovereign-core-api    # API :3001
 docker restart sovereign-db          # ฐานข้อมูล (API reconnect เอง)
 docker restart sovereign-emqx        # MQTT
 
-# เว็บ :3000 ค้าง → เคาะแล้วให้ watchdog ชุบใหม่
-taskkill //F //IM node.exe //FI "WINDOWTITLE eq *next*"   # หรือปิด pid ที่ฟัง 3000
-node ../../frontend-watchdog.mjs
 ```
 
 ทั้งระบบพร้อมกันคำสั่งเดียว: **`start-sovereign.bat`** (ดับเบิลคลิกก็ได้)
 
-## ๔. เช็คสุขภาพ 1 นาที (วางใน Git Bash ได้เลย)
+### เว็บ :3000 ค้าง
+
+```bash
+cd "E:\My work\Project Sovereign Origin"
+netstat -ano | grep ":3000" | grep -i LISTENING   # อ่าน PID จากคอลัมน์สุดท้าย
+taskkill //F //PID <PID> //T
+node frontend-watchdog.mjs                        # idempotent — เช็คและชุบเอง
+```
+
+## ๔. เช็คสุขภาพ 1 นาที (Git Bash / PowerShell)
 
 ```bash
 cd "/e/My work/Project Sovereign Origin"
 curl -s -o /dev/null -w "web     : %{http_code}\n"  http://localhost:3000
-curl -s http://localhost:3001/healthz | grep -o '"ok":true' && echo "API    : OK"
+curl -s http://localhost:3001/healthz | grep -o '"ok":true' && echo "API     : OK"
 docker ps --filter name=sovereign --format "{{.Names}}: {{.Status}}"
 ls -t backups/postgres/sovereign_v2_*.dump | head -1
 tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
@@ -57,7 +63,7 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 ## ๕. สำรอง / กู้คืนฐานข้อมูล
 
-- **สำรองอัตโนมัติ:** Scheduled Task `Sovereign DB Backup` ทุกวัน 03:00 → `backups\postgres\sovereign_v2_YYYYMMDD_HHMMSS.dump` (เก็บหลายวันย้อนหลัง)
+- **สำรองอัตโนมัติ:** Scheduled Task `Sovereign DB Backup` ทุกวัน 03:00 → `backups\postgres\sovereign_v2_YYYYMMDD_*.dump` (เก็บหลายวันย้อนหลัง)
 - **กู้คืน** (ทดสอบก่อนใช้จริงเสมอ):
   ```bash
   docker exec -i sovereign-db pg_restore -U sovereign -d sovereign_v2 --clean \
