@@ -435,3 +435,96 @@ html[data-theme='light'] ::selection {
 .pulse-soft {
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   แท็บภาษี — แผ่น ภ.พ.30 (กระดาษชมพูแบบสรรพากรจริง วางบนคอนโซล)
+   หมึกแม่พิมพ์ + เส้นช่องกรอก + ตราประทับงวด — กระดาษไม่เรืองแสง
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --tax-paper: #f2d8d8;      /* ชมพู ภ.พ.30 */
+  --tax-paper-edge: #d9b2b0; /* ขอบกระดาษ */
+  --tax-ink: #2b2320;        /* หมึกแม่พิมพ์ */
+  --tax-stamp: #b3352c;      /* หมึกตราประทับ */
+  --tax-safe: #0f5132;       /* เขียวกระดาษตรวจสอบ (ใช้เน้นคำเฉพาะจุด) */
+}
+
+.tax-paper {
+  position: relative;
+  border-radius: 6px;
+  color: var(--tax-ink);
+  border: 1px solid var(--tax-paper-edge);
+  /* เส้นขอบแดงซ้ายแบบฟอร์ม + เนื้อกระดาษชมพู */
+  background:
+    linear-gradient(90deg, transparent 0 40px, rgba(179, 53, 44, 0.4) 40px 41.5px, transparent 41.5px),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%),
+    var(--tax-paper);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+/* หัวแบบฟอร์ม — เสียงเอกสารราชการ (Sarabun) */
+.tax-form-head {
+  font-family: 'Sarabun', var(--font-thai);
+  font-weight: 500;
+}
+
+/* ช่องกรอกจุดไข่ปลา (ฟอร์มที่ยังไม่กรอก) */
+.tax-blank {
+  border-bottom: 1px dotted rgba(43, 35, 32, 0.45);
+}
+
+/* บรรทัดตัวเลขของฟอร์ม — เส้นประใต้ฐาน เหมือนช่องบันทึกจริง */
+.tax-line {
+  border-bottom: 1px dashed rgba(43, 35, 32, 0.3);
+}
+
+/* เลขลำดับช่องแบบฟอร์ม (๑ ๒ ๓ ๔) — เลขไทยเหมือนแบบจริง */
+.tax-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgba(43, 35, 32, 0.4);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ตัวเลขเงิน — โมโนแทบูลาร์ ให้คอลัมน์ตรงกัน */
+.tax-amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ตราประทับงวด — สีแดง เอียงเล็กน้อย เนื้อหมึกไม่เต็มเหมือนเอาจริง */
+.tax-stamp {
+  color: var(--tax-stamp);
+  border: 2.5px solid currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+  border-radius: 4px;
+  transform: rotate(-3.5deg);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0.08'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0.08'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+}
+
+/* กระดาษป้อนเข้าเครื่องครั้งเดียวตอนเปิดแท็บ — เคลื่อนไหวเดียวของแท็บนี้ */
+@keyframes tax-feed {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(-8px);
+    opacity: 0.35;
+  }
+  to {
+    clip-path: inset(0 0 0% 0);
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tax-paper {
+    animation: tax-feed 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
