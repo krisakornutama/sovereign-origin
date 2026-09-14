@@ -388,11 +388,8 @@ render();
 
 /* console API (เล่น/ทดสอบ): window.__water__ */
 window.__water__ = {
-  ORDER: ORDER,
-  DIR_TH: DIR_TH,
   MODES: MODES,
   TERRAIN: TERRAIN,
-  setData: function(arr){ TERRAIN.length = 0; arr.forEach(function(t){ TERRAIN.push(t); }); render(); },
   selectMode: selectMode,
   selectCell: function(key){ currentCell = key; render(); },
   current: function(){ return { mode: currentMode, cell: currentCell }; }
