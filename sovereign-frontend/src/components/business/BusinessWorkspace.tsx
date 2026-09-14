@@ -276,7 +276,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
                   <>
                     <input type="number" min={0} step="0.01" value={whtInput[o.id] ?? ''} onChange={(e) => setWhtInput((s) => ({ ...s, [o.id]: e.target.value }))}
                       placeholder="WHT ฿" aria-label={`ภาษีหัก ณ ที่จ่าย ออเดอร์ ${o.orderNo}`}
-                      title="ภาษีหัก ณ ที่จ่ายที่ลูกค้าหัก (ท.ป.4) — เงินโอนเข้า = ยอดค้าง − WHT; ว่าง = ไม่มี"
+                      title="ภาษีหัก ณ ที่จ่ายที่ลูกค้าหัก (ท.ป.4) — เงินโอนเข้า = ยอดค้าง − WHT; ว่าง = ไม่มี · อัตราร่วม: ค่าจ้างทั่วไป 3% · เช่า 5% · ขนส่ง 1%"
                       className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right text-xs" />
                     <button onClick={() => markPaid(o)} className="px-3 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">รับชำระ {baht(Math.max(0, o.total - o.paidAmount))}</button>
                   </>
@@ -312,12 +312,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
             <div className="space-y-1 max-h-72 overflow-auto">
               {ledger.length === 0 && <div className="text-sm text-slate-500">ยังไม่มีรายการ</div>}
               {ledger.map((l) => (
-                <div key={l.id} className="flex items-center gap-2 text-sm border-b border-slate-800 pb-1">
-                  <span className={`px-1.5 rounded text-[10px] ${l.type === 'INCOME' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>{l.type === 'INCOME' ? 'รับ' : 'จ่าย'}</span>
-                  <span className="text-slate-400 text-xs">{l.category}</span>
-                  <span className="text-slate-300 flex-1 truncate">{l.note ?? ''}</span>
-                  <span className={l.type === 'INCOME' ? 'text-emerald-300' : 'text-rose-300'}>{l.type === 'INCOME' ? '+' : '−'}{baht(l.amount)}</span>
-                </div>
+                <LedgerRow key={l.id} entry={l} canManage={can('MANAGER')} base={base} reload={load} setNotice={setNotice} />
               ))}
             </div>
           </div>
@@ -415,12 +410,18 @@ function TaxTab({ base }: { base: string }) {
   const [err, setErr] = useState('');
   // ทุนจดทะเบียนปรับการทดสอบ SME (ทุน > 5M = ไม่ SME แม้รายได้ต่ำ) — uncontrolled, apply เมื่อ blur
   const [capitalQ, setCapitalQ] = useState('');
+  // เลือกงวด VAT ย้อนหลัง (YYYY-MM — ว่าง = เดือนนี้)
+  const [monthQ, setMonthQ] = useState('');
 
   useEffect(() => {
-    void fetchJsonObject<TaxData>(`${base}/tax${capitalQ ? `?capital=${encodeURIComponent(capitalQ)}` : ''}`)
+    const q = [
+      ...(capitalQ ? [`capital=${encodeURIComponent(capitalQ)}`] : []),
+      ...(monthQ ? [`month=${monthQ}`] : []),
+    ].join('&');
+    void fetchJsonObject<TaxData>(`${base}/tax${q ? `?${q}` : ''}`)
       .then(setData)
       .catch((e: any) => setErr(e.message));
-  }, [base, capitalQ]);
+  }, [base, capitalQ, monthQ]);
 
   if (err) return <div className="card p-4 text-sm text-slate-400">{err}</div>;
   if (!data) return <div className="card p-4 text-sm text-slate-400">กำลังโหลดตัวเลขภาษี…</div>;
@@ -428,6 +429,13 @@ function TaxTab({ base }: { base: string }) {
   const y = data.year;
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={monthQ} onChange={(e) => setMonthQ(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="เลือกงวด VAT">
+          <option value="">งวดนี้ (เดือนปัจจุบัน)</option>
+          {last12Months().map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <span className="text-[11px] text-slate-500">ตัวเลข VAT ด้านล่างเป็นของงวดที่เลือก — กำไร/ภาษีปี และปฏิทินยื่นยังยึดวันนี้</span>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'ภาษีขาย (งวดนี้)', value: baht(v.outputVat), cls: 'text-amber-300' },
@@ -492,6 +500,78 @@ function TaxTab({ base }: { base: string }) {
       </div>
     </div>
   );
+}
+
+/** แถวบัญชี — รายการมือ (ไม่มี refOrderId) แก้/ลบได้เมื่อเป็น MANAGER ขึ้นไป; รายการจากออเดอร์อ่านอย่างเดียว */
+function LedgerRow({ entry, canManage, base, reload, setNotice }: { entry: any; canManage: boolean; base: string; reload: () => Promise<void>; setNotice: (n: { ok: boolean; text: string } | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const editable = canManage && !entry.refOrderId;
+
+  async function saveEdit() {
+    const n = Number(amount);
+    if (!n || n <= 0) { setNotice({ ok: false, text: 'ยอดเงินต้องมากกว่า 0' }); return; }
+    setBusy(true);
+    try {
+      const r = await authFetch(`${base}/ledger/${entry.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: n }) });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(data?.error ?? 'แก้ไขไม่สำเร็จ');
+      setEditing(false);
+      setNotice({ ok: true, text: 'แก้ไขรายการแล้ว' });
+      await reload();
+    } catch (e: any) { setNotice({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  }
+
+  async function remove() {
+    setBusy(true);
+    try {
+      const r = await authFetch(`${base}/ledger/${entry.id}`, { method: 'DELETE' });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(data?.error ?? 'ลบไม่สำเร็จ');
+      setNotice({ ok: true, text: 'ลบรายการแล้ว' });
+      await reload();
+    } catch (e: any) { setNotice({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-sm border-b border-slate-800 pb-1">
+      <span className={`px-1.5 rounded text-[10px] ${entry.type === 'INCOME' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>{entry.type === 'INCOME' ? 'รับ' : 'จ่าย'}</span>
+      <span className="text-slate-400 text-xs">{entry.category}</span>
+      <span className="text-slate-300 flex-1 truncate">{editing ? (
+        <input type="number" min={0.01} step="0.01" value={amount} autoFocus disabled={busy} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+          className="w-32 bg-slate-800 border border-cyan-600 rounded px-2 py-0.5 text-sm" aria-label="ยอดเงินใหม่" />
+      ) : (entry.note ?? '')}</span>
+      {entry.whtAmount > 0 && <span className="text-[10px] text-slate-500">WHT {baht(entry.whtAmount)}</span>}
+      <span className={entry.type === 'INCOME' ? 'text-emerald-300' : 'text-rose-300'}>{entry.type === 'INCOME' ? '+' : '−'}{baht(entry.amount)}</span>
+      {editable && !editing && (
+        <>
+          <button onClick={() => { setEditing(true); setAmount(String(entry.amount)); }} className="text-cyan-400 text-xs hover:underline" aria-label="แก้ไขรายการ">แก้</button>
+          <button onClick={remove} disabled={busy} className="text-rose-400 text-xs hover:underline disabled:opacity-40" aria-label="ลบรายการ">ลบ</button>
+        </>
+      )}
+      {editing && (
+        <>
+          <button onClick={saveEdit} disabled={busy} className="px-2 py-0.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-xs disabled:opacity-40">บันทึก</button>
+          <button onClick={() => setEditing(false)} className="text-slate-400 text-xs hover:underline">ยกเลิก</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** 12 เดือนย้อนหลังสำหรับเลือกงวด VAT (YYYY-MM + ป้ายไทย) */
+function last12Months(): Array<{ value: string; label: string }> {
+  const out: Array<{ value: string; label: string }> = [];
+  const d = new Date();
+  for (let i = 1; i <= 12; i++) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const value = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+    out.push({ value, label: m.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) });
+  }
+  return out;
 }
 
 function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
@@ -764,7 +844,7 @@ function LedgerForm({ post, base, reload, setNotice }: any) {
       <div className="grid sm:grid-cols-3 gap-2">
         <input type="number" min={0} placeholder={form.type === 'EXPENSE' ? 'ภาษีซื้อ VAT (จากใบกำกับ)' : 'ภาษีขาย VAT (ว่าง = แยกให้เอง)'} value={vat} onChange={(e) => setVat(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="ยอด VAT" />
         <input type="number" min={0} placeholder="หัก ณ ที่จ่าย WHT (ถ้ามี)" value={wht} onChange={(e) => setWht(e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="ภาษีหัก ณ ที่จ่าย" />
-        <div className="text-[11px] text-slate-500 self-center">รายจ่าย: VAT จากใบกำกับซัพพลายเออร์ + WHT ที่เราหัก (ท.ป.4) · รายรับ: ว่าง = ระบบแยก VAT ตามอัตราร้าน</div>
+        <div className="text-[11px] text-slate-500 self-center">รายจ่าย: VAT จากใบกำกับซัพพลายเออร์ + WHT ที่เราหัก (ท.ป.4 · อัตราร่วม: ค่าจ้าง 3% · เช่า 5% · ขนส่ง 1%) · รายรับ: ว่าง = ระบบแยก VAT ตามอัตราร้าน</div>
       </div>
       <button onClick={async () => {
         const amount = Number(form.amount);

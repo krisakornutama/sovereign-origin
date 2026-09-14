@@ -12,7 +12,8 @@ import { prisma } from '../lib/prisma';
 import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
 import { creditLiquidCash } from './treasury.service';
-import { businessTaxOverview, splitVatFromGross } from './thai-tax.service';
+import { businessTaxOverview, splitVatFromGross, taxCalendar } from './thai-tax.service';
+import { AuditService } from './audit.service';
 
 // ── helpers ──
 function str(v: unknown, max: number): string {
@@ -393,6 +394,43 @@ export async function listLedger(businessId: string, take = 200): Promise<any[]>
   });
 }
 
+/** แก้ไขรายการบัญชี (ประเภท/หมวด/ยอด/VAT/WHT/หมายเหตุ) — MANAGER ขึ้นไป (ตาม POST ledger เดิม)
+ *  กันแก้รายการที่มาจากออเดอร์อัตโนมัติ (refOrderId) — ยอด/VAT ผูกกับเอกสารออเดอร์ แก้มือจะเพี้ยนกับใบกำกับ */
+export async function updateLedgerEntry(businessId: string, id: string, input: any): Promise<any> {
+  const entry = await prisma.businessLedgerEntry.findUnique({ where: { id } });
+  if (!entry || entry.businessId !== businessId) throw new Error('ledger entry not found');
+  if (entry.refOrderId) throw new Error('รายการจากออเดอร์แก้ไม่ได้ — ถ้าผิดให้ยกเลิก/แก้ออเดอร์แทน');
+  const type = input?.type !== undefined ? (str(input.type, 10) === 'INCOME' ? 'INCOME' : 'EXPENSE') : entry.type;
+  const amount = input?.amount !== undefined ? num(input.amount, 0.01, 10_000_000) : entry.amount;
+  let vatAmount = input?.vatAmount !== undefined ? Math.max(0, num(input.vatAmount, 0, 10_000_000)) : entry.vatAmount;
+  const whtAmount = Math.min(input?.whtAmount !== undefined ? Math.max(0, num(input.whtAmount, 0, 10_000_000)) : entry.whtAmount, amount);
+  // เดิมที่: INCOME ไม่ระบุ VAT → แยกอัตโนมัติ (กติกาเดียวกับ addLedgerEntry — ค่าว่างใน UI จะส่ง undefined มา)
+  if (type === 'INCOME' && input?.vatAmount === undefined) {
+    const biz = await prisma.business.findUnique({ where: { id: businessId } });
+    vatAmount = splitVatFromGross(amount, biz?.vatRate ?? 0).vat;
+  }
+  if (vatAmount > amount) throw new Error('VAT ห้ามเกินยอดรายการ');
+  return prisma.businessLedgerEntry.update({
+    where: { id },
+    data: {
+      type,
+      category: input?.category !== undefined ? (str(input.category, 30) || (type === 'INCOME' ? 'SALES' : 'OTHER')) : entry.category,
+      amount,
+      vatAmount,
+      whtAmount,
+      note: input?.note !== undefined ? (input.note ? str(input.note, 300) : null) : entry.note,
+    },
+  });
+}
+
+/** ลบรายการบัญชีมือ — MANAGER ขึ้นไป (รายการออเดอร์ห้ามลบ — ประวัติรายได้ต้องตรง PAID) */
+export async function deleteLedgerEntry(businessId: string, id: string): Promise<void> {
+  const entry = await prisma.businessLedgerEntry.findUnique({ where: { id } });
+  if (!entry || entry.businessId !== businessId) throw new Error('ledger entry not found');
+  if (entry.refOrderId) throw new Error('รายการจากออเดอร์ลบไม่ได้ — ประวัติรายได้ผูกกับออเดอร์ที่ชำระแล้ว');
+  await prisma.businessLedgerEntry.delete({ where: { id } });
+}
+
 export async function addLedgerEntry(businessId: string, input: any): Promise<any> {
   const type = str(input?.type, 10) === 'INCOME' ? 'INCOME' : 'EXPENSE';
   const amount = num(input?.amount, 0.01, 10_000_000);
@@ -470,7 +508,7 @@ export async function businessSummary(businessId: string): Promise<any> {
 }
 
 // ── ภาษีไทย — สรุป VAT/CIT/PIT/WHT + ปฏิทินยื่น (คำนวณจากข้อมูลจริงในระบบ) ──
-export async function businessTax(businessId: string, opts?: { capitalRegistered?: number; fiscalYearEnd?: string }): Promise<Record<string, unknown>> {
+export async function businessTax(businessId: string, opts?: { capitalRegistered?: number; fiscalYearEnd?: string; month?: string }): Promise<Record<string, unknown>> {
   const biz = await prisma.business.findUnique({ where: { id: businessId } });
   if (!biz) throw new Error('business not found');
   const [orders, ledger] = await Promise.all([
@@ -481,12 +519,14 @@ export async function businessTax(businessId: string, opts?: { capitalRegistered
     prisma.businessLedgerEntry.findMany({ where: { businessId } }),
   ]);
   // ยอดขายนับเมื่อ "เก็บเงินได้" (เกิดหนี้ VAT ตอนรับเงิน/แจ้งชำระ — ไม่ใช่ตอนส่งของ)
+  // ?month=YYYY-MM เลือกงวด VAT ย้อนหลัง — businessTaxOverview จัดกลุ่มตามเดือนของ payment เอง
   return businessTaxOverview({
     vatRate: biz.vatRate,
     salesPayments: orders.flatMap((o: any) => o.payments.map((p: any) => ({ amount: p.amount, vatRate: biz.vatRate, paidAt: p.paidAt }))),
     ledger,
     capitalRegistered: opts?.capitalRegistered,
     fiscalYearEnd: opts?.fiscalYearEnd,
+    month: opts?.month,
   });
 }
 
@@ -721,4 +761,48 @@ export async function notifyLowStock(): Promise<number> {
     }).catch(() => {});
   }
   return low.length;
+}
+
+// ── เตือนกำหนดยื่นภาษี (เรียกจาก worker ทุกชม. — Telegram ผ่าน dispatcher เกรด production) ──
+// ทุกธุรกิจในระบบได้ปฏิทินยื่นเดียวกัน (ภ.พ.30 / ภ.ง.ด.3 / ภ.ง.ด.50 / ภ.ง.ด.51 / ภ.ง.ด.90)
+// ตั้งค่าล่วงหน้า (วัน) ได้ที่ SystemSetting 'business.taxRemindDays' เช่น "7,3,1" (default)
+const TAX_REMIND_KEY = 'business.taxRemindDays';
+
+/** วันครบกำหนดที่ควรเตือนวันนี้ — pure (เทสได้ตรง) — daysLeft = จำนวนวันที่เหลือแบบปฏิทิน (0 = วันครบกำหนด) */
+export function dueFilingsToday(
+  calendar: Array<{ key: string; label: string; due: string; periodLabel: string }>,
+  today: Date,
+  remindDays: number[] = [7, 3, 1],
+): Array<{ key: string; label: string; due: string; periodLabel: string; daysLeft: number }> {
+  const out: Array<{ key: string; label: string; due: string; periodLabel: string; daysLeft: number }> = [];
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  for (const c of calendar) {
+    const daysLeft = Math.round((new Date(`${c.due}T00:00:00Z`).getTime() - todayUtc) / 86_400_000);
+    if (daysLeft >= 0 && remindDays.includes(daysLeft)) out.push({ ...c, daysLeft });
+  }
+  return out;
+}
+
+/** ตรวจกำหนดยื่นของทุกธุรกิจ → Telegram รายธุรกิจ (คืนจำนวนธุรกิจที่มีกำหนดถึงวันนี้; sender inject ได้เพื่อเทส) */
+export async function notifyTaxDeadlines(
+  now: Date = new Date(),
+  sender: (payload: { text: string; severity: 'warn'; eventKey: string }) => Promise<unknown> = sendTelegramAlert,
+): Promise<number> {
+  let sent = 0;
+  const row = await prisma.systemSetting.findUnique({ where: { key: TAX_REMIND_KEY } }).catch(() => null);
+  const remindDays = String(row?.value ?? '7,3,1')
+    .split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n >= 0 && n <= 60);
+  const businesses = await prisma.business.findMany({ select: { id: true, name: true } });
+  for (const biz of businesses) {
+    const calendar = taxCalendar(now) as Array<{ key: string; label: string; due: string; periodLabel: string }>;
+    const due = dueFilingsToday(calendar, now, remindDays);
+    if (due.length === 0) continue;
+    await sender({
+      text: `⏰ ใกล้กำหนดยื่นภาษี — ธุรกิจ "${biz.name}"\n${due.map((d) => `${d.label}\n  งวด ${d.periodLabel} · ยื่นภายใน ${d.due} (อีก ${d.daysLeft} วัน)`).join('\n')}`,
+      severity: 'warn',
+      eventKey: `business-taxdue-${biz.id}-${due.map((d) => d.key).sort().join('+')}-${due[0].daysLeft}`,
+    }).catch(() => {});
+    sent += 1;
+  }
+  return sent;
 }

@@ -7,6 +7,8 @@ import {
   splitVatFromGross, computeVatMonthly, computeCit, computePit,
   taxCalendar, businessTaxOverview, currentVatRate, isSme,
 } from '../src/services/thai-tax.service';
+import { dueFilingsToday, notifyTaxDeadlines } from '../src/services/business.service';
+import { endOfMonth } from '../src/services/thai-tax.service';
 import { createTestServer, makeToken, TestServer } from './helpers';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -64,6 +66,10 @@ before(async () => {
   // ── prisma delegates ──
   (prisma as any).business = {
     findUnique: async ({ where }: any) => businesses.get(where.id) ?? null,
+    findMany: async () => [...businesses.values()],
+  };
+  (prisma as any).systemSetting = {
+    findUnique: async () => null, // ไม่มี override → เตือนตาม default 7,3,1
   };
   (prisma as any).businessMember = {
     findUnique: async ({ where }: any) => {
@@ -97,6 +103,7 @@ before(async () => {
   };
   (prisma as any).businessLedgerEntry = {
     findFirst: async ({ where }: any) => (ledger.get(where.refOrderId ? BIZ_ID : BIZ_ID) ?? []).find((l) => l.refOrderId === where.refOrderId && l.type === where.type && l.category === where.category) ?? null,
+    findUnique: async ({ where }: any) => [...ledger.values()].flat().find((l) => l.id === where.id) ?? null,
     findMany: async ({ where }: any) => (ledger.get(where.businessId) ?? []),
     create: async ({ data }: any) => {
       const list = ledger.get(data.businessId) ?? [];
@@ -104,6 +111,18 @@ before(async () => {
       list.push(entry);
       ledger.set(data.businessId, list);
       return entry;
+    },
+    update: async ({ where, data }: any) => {
+      const entry = [...ledger.values()].flat().find((l) => l.id === where.id);
+      if (!entry) throw new Error('record not found');
+      return Object.assign(entry, data);
+    },
+    delete: async ({ where }: any) => {
+      for (const [bizId, list] of ledger) {
+        const i = list.findIndex((l) => l.id === where.id);
+        if (i >= 0) return list.splice(i, 1)[0];
+      }
+      throw new Error('record not found');
     },
   };
 
@@ -161,6 +180,16 @@ function post(path: string, body: unknown, token?: string) {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body),
   });
+}
+function patch(path: string, body: unknown, token?: string) {
+  return fetch(server.baseUrl + path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+function del(path: string, token?: string) {
+  return fetch(server.baseUrl + path, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
 }
 const tok = (userId: string) => makeToken('OPERATOR', { userId });
 
@@ -346,4 +375,90 @@ test('mark-paid (ทางลัดไม่ผ่าน payments) — ledger �
   const entry = (ledger.get(BIZ_ID) ?? []).find((l) => l.refOrderId === id)!;
   assert.ok(Math.abs(entry.vatAmount - 70) < 0.001);
   assert.equal(entry.whtAmount, 0);
+});
+
+// ══ Ledger แก้/ลบ — รายการมือแก้ได้, รายการออเดอร์ (refOrderId) ห้ามแตะ ══
+test('PATCH/DELETE /ledger — SALES 403 · แก้ยอด/WHT ได้ · รายการออเดอร์บล็อก · ลบรายการมือได้', async () => {
+  // รายการมือ (จากเทส POST /ledger ก่อนหน้า — id led-*) สร้างใหม่ให้ชัวร์
+  const created = await post(`${API}/${BIZ_ID}/ledger`, { type: 'EXPENSE', category: 'ADS', amount: 500, vatAmount: 35, whtAmount: 15, note: 'ค่าโฆษณา' }, tok(OWNER_ID));
+  assert.equal(created.status, 201);
+  const manual = await created.json();
+
+  // SALES ต่ำกว่า MANAGER → 403
+  assert.equal((await patch(`${API}/${BIZ_ID}/ledger/${manual.id}`, { amount: 1 }, tok(SALES_ID))).status, 403);
+
+  // แก้ยอด + WHT → ตรงตามส่ง (รายจ่ายไม่แตะ VAT อัตโนมัติ) — เขียน ledger = MANAGER ขึ้นไปเท่านั้น (ACCOUNTANT อ่านอย่างเดียว)
+  const upd = await patch(`${API}/${BIZ_ID}/ledger/${manual.id}`, { amount: 320, whtAmount: 9.6 }, tok(OWNER_ID));
+  assert.equal(upd.status, 200);
+  const u = await upd.json();
+  assert.equal(u.amount, 320);
+  assert.equal(u.whtAmount, 9.6);
+  assert.equal(u.vatAmount, 35);
+
+  // รายการจากออเดอร์ (refOrderId) — ห้ามแก้ ห้ามลบ (ยอดผูกกับเอกสารออเดอร์)
+  const orderEntry = (ledger.get(BIZ_ID) ?? []).find((l) => l.refOrderId === ORDER_PAID_ID)!;
+  assert.equal((await patch(`${API}/${BIZ_ID}/ledger/${orderEntry.id}`, { amount: 1 }, tok(OWNER_ID))).status, 400);
+  assert.equal((await del(`${API}/${BIZ_ID}/ledger/${orderEntry.id}`, tok(OWNER_ID))).status, 400);
+
+  // ลบรายการมือได้ → list หายจริง (เขียน ledger = MANAGER ขึ้นไป)
+  assert.equal((await del(`${API}/${BIZ_ID}/ledger/${manual.id}`, tok(OWNER_ID))).status, 200);
+  assert.ok(!(ledger.get(BIZ_ID) ?? []).some((l) => l.id === manual.id));
+});
+
+// ══ เลือกงวด VAT ย้อนหลัง (?month=YYYY-MM) ══
+test('businessTaxOverview ?month= — VAT งวดที่เลือก (และเดือนก่อนหน้า) ส่วนปี/กำไรยังยึดวันนี้', () => {
+  // payments: ก.ค. 10700 (VAT 700), ส.ค. 5350 (VAT 350), ก.ย. 2140 (VAT 140) — ledger INCOME ตรงกัน + รายจ่าย VAT 35 ในเดือน ส.ค.
+  const payments = [
+    { amount: 10700, vatRate: 0.07, paidAt: new Date('2026-07-20T04:00:00Z') },
+    { amount: 5350, vatRate: 0.07, paidAt: new Date('2026-08-20T04:00:00Z') },
+    { amount: 2140, vatRate: 0.07, paidAt: new Date('2026-09-10T04:00:00Z') },
+  ];
+  const ledger = [
+    { type: 'INCOME', category: 'SALES', amount: 10700, vatAmount: 700, whtAmount: 0, createdAt: new Date('2026-07-20T04:00:00Z') },
+    { type: 'INCOME', category: 'SALES', amount: 5350, vatAmount: 350, whtAmount: 0, createdAt: new Date('2026-08-20T04:00:00Z') },
+    { type: 'INCOME', category: 'SALES', amount: 2140, vatAmount: 140, whtAmount: 0, createdAt: new Date('2026-09-10T04:00:00Z') },
+    { type: 'EXPENSE', category: 'SERVICE', amount: 535, vatAmount: 35, whtAmount: 0, createdAt: new Date('2026-08-11T04:00:00Z') },
+  ];
+  const now = new Date('2026-09-14T04:00:00Z');
+
+  const aug = businessTaxOverview({ vatRate: 0.07, salesPayments: payments, ledger, month: '2026-08', now }) as any;
+  assert.equal(aug.vat.thisMonth.outputVat, 350); // งวด ส.ค.
+  assert.equal(aug.vat.thisMonth.inputVat, 35);
+  assert.equal(aug.vat.lastMonth.outputVat, 700); // งวด ก.ค.
+  assert.equal(aug.year.income, 18190); // ปียังยึดวันนี้ (รวมทุกเดือน)
+
+  const sep = businessTaxOverview({ vatRate: 0.07, salesPayments: payments, ledger, now }) as any;
+  assert.equal(sep.vat.thisMonth.outputVat, 140); // ไม่ส่ง month = งวดเดือนปัจจุบันตามเดิม
+});
+
+test('endOfMonth — ปลายเดือน UTC (ก.ค. 31 ลงท้าย 23:59:59.999)', () => {
+  assert.equal(endOfMonth('2026-07').toISOString(), '2026-07-31T23:59:59.999Z');
+  assert.equal(endOfMonth('2026-02').toISOString(), '2026-02-28T23:59:59.999Z');
+});
+
+// ══ เตือนกำหนดยื่นภาษี (Telegram worker) ══
+test('dueFilingsToday — เตือนเฉพาะวันที่ตรงลิสต์ล่วงหน้า · 0 = วันครบกำหนด · ผ่านแล้วไม่เตือน', () => {
+  const calendar = [
+    { key: 'PP30', label: 'ภ.พ.30', due: '2026-09-15', periodLabel: 'ส.ค.' },
+    { key: 'PND3', label: 'ภ.ง.ด.3', due: '2026-09-07', periodLabel: 'ส.ค.' },
+  ];
+  const today = new Date('2026-09-08T10:00:00Z');
+  assert.deepEqual(dueFilingsToday(calendar, today, [7]).map((d) => d.key), ['PP30']); // เหลือ 7 วัน
+  assert.deepEqual(dueFilingsToday(calendar, new Date('2026-09-06T10:00:00Z'), [3, 1]).map((d) => d.key), ['PND3']); // เหลือ 1 วัน
+  assert.deepEqual(dueFilingsToday(calendar, today, [30]), []); // ไม่ตรงลิสต์ = เงียบ
+  assert.deepEqual(dueFilingsToday(calendar, new Date('2026-09-15T10:00:00Z'), [0]).map((d) => d.key), ['PP30']); // วันครบกำหนด
+  assert.deepEqual(dueFilingsToday(calendar, new Date('2026-09-16T10:00:00Z'), [0, 1, 7]), []); // ผ่านแล้ว
+});
+
+test('notifyTaxDeadlines — ส่งรายธุรกิจเมื่อมีกำหนดถึงวันเตือน · ไม่มีธุรกิจ = 0', async () => {
+  const sent: any[] = [];
+  const n = await notifyTaxDeadlines(new Date('2026-09-08T10:00:00Z'), async (p) => { sent.push(p); });
+  assert.equal(n, 1); // BIZ_ID เดียวใน store
+  assert.match(sent[0].text, /ร้านภาษีทดสอบ/);
+  assert.match(sent[0].text, /ภ\.พ\.30/);
+  assert.equal(sent[0].severity, 'warn');
+  assert.ok(sent[0].eventKey.startsWith('business-taxdue-'));
+
+  const none = await notifyTaxDeadlines(new Date('2026-09-16T10:00:00Z'), async (p) => { sent.push(p); });
+  assert.equal(none, 0); // 16 ก.ย. ไม่ตรง 7/3/1 ของกำหนดไหน
 });

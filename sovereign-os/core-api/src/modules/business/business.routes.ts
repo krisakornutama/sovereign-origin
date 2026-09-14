@@ -7,6 +7,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hasBusinessAccess, BUSINESS_POSITIONS } from '../../lib/business';
 import * as svc from '../../services/business.service';
+import { AuditService } from '../../services/audit.service';
 
 const router = Router();
 
@@ -235,6 +236,30 @@ router.post('/:businessId/ledger', authenticate, async (req, res) => {
   }
 });
 
+// แก้ไขรายการบัญชีมือ — MANAGER ขึ้นไป (รายการจากออเดอร์ถูกปิดกั้นใน service)
+router.patch('/:businessId/ledger/:id', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'MANAGER'))) return;
+  try {
+    const entry = await svc.updateLedgerEntry(req.params.businessId, req.params.id, req.body);
+    void AuditService.logAction({ userId: (req as any).user.id, actionType: 'BUSINESS_LEDGER_UPDATE', payload: { businessId: req.params.businessId, entryId: req.params.id, changes: req.body ?? {} } });
+    res.json(entry);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ลบรายการบัญชีมือ — MANAGER ขึ้นไป (รายการจากออเดอร์ถูกปิดกั้นใน service)
+router.delete('/:businessId/ledger/:id', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'MANAGER'))) return;
+  try {
+    await svc.deleteLedgerEntry(req.params.businessId, req.params.id);
+    void AuditService.logAction({ userId: (req as any).user.id, actionType: 'BUSINESS_LEDGER_DELETE', payload: { businessId: req.params.businessId, entryId: req.params.id } });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // สรุปการเงิน — ACCOUNTANT ขึ้นไป (เห็นตัวเลขเงิน)
 router.get('/:businessId/summary', authenticate, async (req, res) => {
   if (!(await guard(req, res, 'ACCOUNTANT'))) return;
@@ -246,12 +271,15 @@ router.get('/:businessId/summary', authenticate, async (req, res) => {
 });
 
 // ── ภาษีไทย — VAT/CIT/PIT/WHT คำนวณจากข้อมูลจริง (ACCOUNTANT ขึ้นไป — ตัวเลขเงิน) ──
+// ?month=YYYY-MM เลือกงวด VAT ย้อนหลัง (ค่าเริ่ม = เดือนนี้)
 router.get('/:businessId/tax', authenticate, async (req, res) => {
   if (!(await guard(req, res, 'ACCOUNTANT'))) return;
   try {
+    const month = typeof req.query.month === 'string' && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : undefined;
     res.json(await svc.businessTax(req.params.businessId, {
       capitalRegistered: req.query.capital ? Number(req.query.capital) : undefined,
       fiscalYearEnd: (req.query.fyEnd as string | undefined) || undefined,
+      month,
     }));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
