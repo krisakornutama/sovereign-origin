@@ -1850,6 +1850,8 @@ model Business {
   shopName  String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)
   shopOpen  Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
   shopPromptPay String? // เบอร์ PromptPay (08x…) หรือเลขบัตร 13 หลัก สำหรับรับชำระหน้าร้าน
+  taxId     String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
+  address   String? // ที่อยู่ร้าน — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
   ownerId   String   @db.Uuid // ผู้สร้างธุรกิจ (User)
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz

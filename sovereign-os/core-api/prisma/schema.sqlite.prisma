@@ -1809,6 +1809,8 @@ model Business {
   shopName     String?
   shopOpen     Boolean  @default(false)
   shopPromptPay String?
+  taxId       String?
+  address     String?
   ownerId      String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
