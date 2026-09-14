@@ -5,8 +5,8 @@ import { test as setup, expect } from '@playwright/test';
 
 setup('authenticate as e2e-bot', async ({ page }) => {
   await page.goto('/', { timeout: 60_000 });
-  await page.locator('input[autocomplete="username"]').fill('e2e-bot');
-  await page.locator('input[autocomplete="current-password"]').fill('E2E-Sovereign-Run-2026!');
+  await page.locator('input[autocomplete="username"]').fill(process.env.E2E_BOT_USER ?? 'e2e-bot');
+  await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_BOT_PASS ?? '');
   await page.locator('button[type="submit"]').click();
   // รอ redirect ไป dashboard - เพิ่ม timeout ให้พอ
   await page.waitForURL('**/dashboard', { timeout: 120_000 });

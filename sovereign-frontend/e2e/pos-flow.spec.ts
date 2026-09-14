@@ -47,7 +47,7 @@ test.beforeAll(async () => {
   cleanupByName();
   const ctx = await request.newContext({ baseURL: API });
   const login = await ctx.post('/api/auth/login', {
-    data: { username: 'e2e-bot', password: 'E2E-Sovereign-Run-2026!' },
+    data: { username: process.env.E2E_BOT_USER ?? 'e2e-bot', password: process.env.E2E_BOT_PASS ?? '' },
   });
   const token = (await login.json()).token;
   const H = { Authorization: `Bearer ${token}` };
