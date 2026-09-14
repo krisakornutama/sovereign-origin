@@ -425,7 +425,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   /* ── static contact form ──
      โหมดตั้งค่า: ใส่ endpoint ฟรีของ Formspree ที่บรรทัด FORM_ENDPOINT (เช่น 'https://formspree.io/f/abcd1234')
      ถ้ายังไม่ตั้งค่า: กดส่ง = เปิดอีเมลในเครื่องผู้ใช้ (mailto) พร้อมข้อความที่จัดรูปแบบไว้ — ทำงานได้ทันทีไม่ต้องมีเซิร์ฟเวอร์ */
-  var FORM_ENDPOINT = ''; /* ← วาง Formspree endpoint ที่นี่เมื่อสมัครฟรี */
+  var FORM_ENDPOINT = 'https://formspree.io/f/mzebnava'; /* ← วาง Formspree endpoint ที่นี่เมื่อสมัครฟรี */
   var form = document.getElementById('contactForm');
   var msg = document.getElementById('formMsg');
   function show(cls, html){ msg.className = 'formmsg ' + cls; msg.innerHTML = html; }
@@ -453,8 +453,8 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       }).finally(function(){ btn.disabled = false; btn.textContent = 'ส่งข้อความ'; });
     } else {
       var text = 'ชื่อ: ' + name + '\nอีเมล: ' + email + '\nสนใจชิ้นงาน: ' + topic + '\nเข้ามาแบบ: ' + role + '\n\n' + body;
-      window.location.href = 'mailto:you@example.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
-      show('ok', 'กำลังเปิดแอปอีเมลพร้อมข้อความที่จัดไว้ให้ — กดส่งในอีเมลอีกที หรือ <a href="mailto:you@example.com">คลิกที่นี่ถ้าไม่เปิดเอง</a>');
+      window.location.href = 'mailto:owenhoper@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+      show('ok', 'กำลังเปิดแอปอีเมลพร้อมข้อความที่จัดไว้ให้ — กดส่งในอีเมลอีกที หรือ <a href="mailto:owenhoper@gmail.com">คลิกที่นี่ถ้าไม่เปิดเอง</a>');
     }
   });
 })();
