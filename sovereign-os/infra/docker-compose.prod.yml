@@ -123,21 +123,6 @@ services:
         condition: service_started
     networks: [internal]
 
-  frontend:
-    build:
-      context: ../../sovereign-frontend
-      dockerfile: Dockerfile.prod
-    container_name: sovereign-frontend
-    restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    depends_on:
-      core-api:
-        condition: service_healthy
-    networks: [internal]
-
   # ── AI Engine (optional — เปิดด้วย: docker compose --profile ai up -d) ──
   # โมเดลเก็บใน volume ของเรา — offline 100% ไม่ส่งข้อมูลออก
   # เปิด: docker compose --profile ai up -d ollama
