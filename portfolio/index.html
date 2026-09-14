@@ -40,7 +40,10 @@ a{color:var(--green)}
   padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
 .wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5}
 .wordmark span{color:var(--green)}
-.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;flex-wrap:wrap}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.progress{position:absolute;left:0;right:0;bottom:-1px;height:2px}
+#progressBar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
 .topnav a{color:var(--dim);text-decoration:none}
 .topnav a:hover{color:var(--green)}
 
@@ -56,7 +59,8 @@ a{color:var(--green)}
 .eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
 h1{font-size:clamp(2.1rem,5.6vw,3.7rem);font-weight:700;line-height:1.18;margin:0 0 18px;max-width:780px}
 h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
-.lede{color:var(--dim);font-size:1.02rem;max-width:660px;margin:0 0 30px}
+.lede{color:var(--dim);font-size:1.02rem;max-width:660px;margin:0 0 14px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
 .cta{display:flex;gap:12px;flex-wrap:wrap}
 .btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
 .btn-primary{background:var(--green);color:#030712}
@@ -65,7 +69,8 @@ h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,
 .btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
 
 /* ── chapter frame ── */
-section{max-width:1080px;margin:0 auto;padding:70px 24px}
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:70px 24px;scroll-margin-top:70px}
 .k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
 .k-ch b{color:var(--green)}
 h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
@@ -198,6 +203,12 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .honest ul{margin:0;padding-left:20px}
 .honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
 
+.faq details{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px}
+.faq summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:.92rem;color:#ecfdf5;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq summary::after{content:'+';font-family:var(--mono);color:var(--green);font-size:1.1rem}
+.faq details[open] summary::after{content:'−'}
+.faq details p{margin:0;padding:0 18px 16px;font-size:.86rem;color:var(--dim);line-height:1.8}
+
 footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
   font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
 
@@ -243,8 +254,10 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="#remind">๕ เตือน</a>
     <a href="#ai">๖ AI</a>
     <a href="#ops">๗ เฝ้าระบบ</a>
+    <a href="#faq">ถาม-ตอบ</a>
     <a href="#run">รันเองฟรี</a>
   </nav>
+  <div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
 </header>
 
 <main>
@@ -254,6 +267,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <p class="eyebrow">PROJECT SOVEREIGN · SELF-HOSTED COMMERCE OS</p>
     <h1>ระบบหลังบ้านร้านค้า<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
     <p class="lede">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 พร้อมยื่น และตัวเตือนก่อนกำหนดส่ง</p>
+    <p class="meta-line">เดินครบทั้งทัวร์ ~4 นาที · หรือกระโดดเฉพาะส่วนที่สนใจจากสารบัญด้านล่าง</p>
     <div class="cta">
       <a class="btn btn-primary" href="#map">ดูภาพรวมทั้งระบบ →</a>
       <a class="btn btn-ghost" href="#run">รันเองฟรี</a>
@@ -507,6 +521,37 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       </ul>
     </div>
   </section>
+
+  <!-- ═══ FAQ ═══ -->
+  <section class="faq" id="faq">
+    <p class="k-ch">// คำถามที่คนถามจริง</p>
+    <h2>ถาม-ตอบสั้น ๆ</h2>
+    <p class="sub">คำถามที่คนแวะมาดูถามบ่อยที่สุด — กดคำถามเพื่อเปิดคำตอบ</p>
+    <details>
+      <summary>ฟรีจริงไหม ต้องจ่ายอะไรอีกไหม</summary>
+      <p>ฟรีทั้งระบบ — ไม่มีค่ารายเดือน ไม่มีค่า cloud เครื่องของคุณคือเซิร์ฟเวอร์ ค่าใช้จ่ายเดียวคือไฟและเน็ตที่จ่ายอยู่แล้ว ถ้าวันหนึ่งอยากขึ้นเว็บสาธารณะ ค่าใหม่เดียวคือ VPS ราวเดือนละหลักร้อย</p>
+    </details>
+    <details>
+      <summary>ผมขายอยู่บน Shopee / Lazada แล้ว ระบบนี้ช่วยอะไร</summary>
+      <p>ใช้คู่กันได้เลย — บันทึกยอดขายและค่าธรรมเนียมแพลตฟอร์มเข้าสมุดบัญชี (ค่าธรรมเนียมมี VAT = ภาษีซื้อ) ระบบแยกภาษีให้เหมือนออเดอร์ในร้าน ตัวเลข ภ.พ.30 ก็ยังครบ</p>
+    </details>
+    <details>
+      <summary>ไฟดับ / เครื่องดับ ข้อมูลจะหายไหม</summary>
+      <p>ไม่หาย — ฐานข้อมูลถูกสำรองทุกวันตีสาม และเคยซ้อมกู้คืนจริงจนนับแถวตรงทุกตาราง เปิดเครื่องใหม่ระบบบูตกลับมาเอง watchdog ปลุกหน้าเว็บถ้าล้ม</p>
+    </details>
+    <details>
+      <summary>ใครมองเห็นข้อมูลของฉันบ้าง</summary>
+      <p>ข้อมูลทั้งหมดอยู่ในเครื่องของคุณ ไม่มีบริการภายนอกอ่าน ลูกค้าบนหน้าร้านเห็นเฉพาะสินค้าที่ขาย — ราคาทุน สต็อก และบัญชีปิดจากหน้าร้านเสมอ</p>
+    </details>
+    <details>
+      <summary>ต้องมีความรู้เรื่องภาษีไหม</summary>
+      <p>ไม่ต้อง — ระบบแยก VAT อัตโนมัติตอนรับเงิน จดภาษีหัก ณ ที่จ่ายทั้งสองฝั่ง ทำปฏิทินยื่นพร้อมนับวันถอยหลัง สิ่งเดียวที่ต้องทำคือกรอกยอดจากใบกำกับซัพพลายเออร์เมื่อมีรายจ่าย</p>
+    </details>
+    <details>
+      <summary>เดี๋ยวอยากใช้ AI ต้องตั้งค่าเพิ่มไหม</summary>
+      <p>ไม่ต้อง — ระบบตั้งค่าที่อยู่ของ Ollama ไว้ถูกต้องแล้ว พอติดตั้ง Ollama ในเครื่อง ผู้ช่วยทั้ง 5 ตำแหน่งใช้ได้ทันที และช่วงที่ยังไม่มี AI ทุกฟีเจอร์อื่นก็เดินครบ</p>
+    </details>
+  </section>
 </main>
 
 <footer>
@@ -553,6 +598,16 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   var sel = document.getElementById('periodSel');
   var stampWrap = document.getElementById('stampWrap');
   var stampPeriod = document.getElementById('stampPeriod');
+  /* ── แถบความคืบหน้าการอ่าน ── */
+  var bar = document.getElementById('progressBar');
+  function paintProgress(){
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', paintProgress, {passive:true});
+  window.addEventListener('resize', paintProgress);
+  paintProgress();
+
   sel.addEventListener('change', function(){
     var d = PERIODS[sel.value];
     if (!d) return;
