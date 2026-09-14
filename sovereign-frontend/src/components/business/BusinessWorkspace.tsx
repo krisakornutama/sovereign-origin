@@ -532,6 +532,7 @@ function TaxFormPaper({ bizName, data, monthQ }: { bizName: string; data: TaxDat
 
         <div className="mt-4 text-[10.5px] leading-relaxed opacity-65">
           อัตราของร้าน {pct(data.vatRate)} · อัตราลดพิเศษปัจจุบัน {pct(data.currentVatRate)} (ถึง 30 ก.ย. 2027) · ตัวเลขเป็นของงวดที่เลือก
+          <div className="mt-1 text-amber-700/80">⚠ ช่อง ๑ นับเฉพาะยอดจากออเดอร์ในระบบ — รายรับมือ (ขายนอกระบบ/เพจ/มาร์เก็ตเพลส) ต้องสร้างออเดอร์รับชำระให้ครบ ไม่งั้นภาษีขายจะต่ำกว่าจริง</div>
         </div>
       </div>
     </div>
