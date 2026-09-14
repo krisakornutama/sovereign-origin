@@ -164,3 +164,4 @@
   - **ทดสอบแล้ว:** เปิด exe → log `boot: {frontend:true, launcher:true, api:true}` → เข้า Dashboard ทันที (window "Sovereign OS" ขึ้นจริง)
   - exe + asar เดิม backup ไว้ที่ `dist-portable/_backup/`
 - **วิธีใช้:** ดับเบิลคลิก **Sovereign OS** บนเดสก์ท็อป (หรือ `dist-portable\Sovereign OS.exe`) — ระบบดับจะเริ่มให้เองแล้วพาเข้า Dashboard
+- **2026-09-14 — housekeeping:** ลบ Sovereign OS ตัวเก่าบน C: แล้ว (โฟลเดอร์ `C:\Users\com\Sovereign OS` + Run key) — เหลือ E: เป็นตัวเดียว · ตัด service `frontend` ออกจาก compose ทั้ง dev+prod และลบ `sovereign-frontend/docker-compose.yml` + container `sovereign-frontend` (status Created ไม่เคยรัน) — เว็บ :3000 รัน bare-metal เป็น single source of truth (boot scripts เริ่มแค่ `timescaledb emqx core-api` อยู่แล้ว) · ตรวจแล้ว: `docker compose config` ผ่านทั้งสองไฟล์ (เหลือ 3 services) และ `compose up -d` ไม่ recreate อะไรเลย
