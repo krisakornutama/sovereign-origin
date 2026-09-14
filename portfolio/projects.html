@@ -106,6 +106,21 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .role .t{font-weight:600;font-size:.84rem;color:#a7f3d0}
 .role .d{font-size:.72rem;color:var(--dim);margin-top:3px;line-height:1.6}
 
+/* ── contact form ── */
+.contact{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:28px 30px}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field label{display:block;font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:0 0 5px;letter-spacing:.06em}
+.field input,.field select,.field textarea{width:100%;font-family:var(--thai);font-size:.88rem;color:#e5e7eb;background:#0b1220;
+  border:1px solid rgba(34,211,153,.3);border-radius:8px;padding:10px 12px}
+.field textarea{min-height:110px;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
+.contact-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.contact-note{font-family:var(--mono);font-size:.64rem;color:var(--faint)}
+.formmsg{display:none;margin-top:12px;font-size:.84rem;border-radius:8px;padding:11px 14px}
+.formmsg.ok{display:block;color:#a7f3d0;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.35)}
+.formmsg.err{display:block;color:#fecaca;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.4)}
+.formmsg a{font-weight:600}
+
 footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
   font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
 
@@ -113,6 +128,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 @media (max-width:900px){
   .cols{grid-template-columns:1fr}
   .roles{grid-template-columns:repeat(2,1fr)}
+  .contact-grid{grid-template-columns:1fr}
   .hero{padding:56px 20px 46px}
   section{padding:52px 20px}
 }
@@ -216,7 +232,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <p class="idea">อุปกรณ์ในบ้านไม่ควรกระจัดกระจายเป็นแอปแยก 8 ตัว: <b>เซ็นเซอร์ รีเลย์ ตาชั่ง ตู้เย็น พลังงาน กล้อง</b> รวมกันในระบบเดียวที่มีกฎอัตโนมัติ มีประวัติย้อนหลัง และมีพยากรณ์ (เช่น แบตเตอรี่โซลาร์จะพอถึงเช้าไหม) — และหน่วยความจำของบ้านทั้งหมดอยู่ในเครื่องเราเอง</p>
       <div class="cols">
         <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
-          <li>เซิร์ฟเวอร์ MQTT (EMX) วิ่งจริงบนเครื่อง</li>
+          <li>เซิร์ฟเวอร์ MQTT (EMQX) วิ่งจริงบนเครื่อง</li>
           <li>8 หน้าจอจัดการ: อุปกรณ์/รีเลย์/กฎอัตโนมัติ/พลังงาน/OTA/โครงสร้างพื้นฐาน</li>
           <li>โมเดล Device + readings ทุกชนิด (ดิน น้ำ อากาศ สุขภาพ)</li>
         </ul></div>
@@ -301,23 +317,23 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <article class="proj" id="p-market">
       <div class="proj-head"><span class="ic">🤖</span><h3>ตลาดอัจฉริยะ · ผู้ช่วย AI ที่มีบริบทธุรกิจจริง</h3><span class="no">ชิ้นที่ ๕</span></div>
       <span class="visa r1">○ รากวางไว้แล้ว · รอโมเดล</span>
-      <p class="idea">ผู้ช่วย AI ส่วนใหญ่ไม่รู้จักร้านของคุณ — แนวคิดนี้คือ AI ที่<b>อ่านข้อมูลจริงของบ้าน/ร้านได้</b> (สินค้า ยอดขาย สต็อก สุขภาพระบบ) มีสิทธิ์แบบมีเงื่อนไข มี policy ก่อนลงมือ และทำงาน offline ในเครื่องเรา — ตัวอย่างใกล้สุดคือ "AI สอนลูก" ที่ใช้สถาปัตยกรรมเดียวกันไปแล้ว</p>
+      <p class="idea">ผู้ช่วย AI ส่วนใหญ่ไม่รู้จักร้านของคุณ — แนวคิดนี้คือ AI ที่<b>อ่านข้อมูลจริงของบ้าน/ร้านได้</b> (สินค้า ยอดขาย สต็อก สุขภาพระบบ) ทำงาน offline ในเครื่องเรา และ<b>ลงมือได้จริง ไม่ใช่แค่พูด</b>: ทุกคำสั่งผ่าน policy ตรวจสิทธิ์ก่อน และทุกการกระทำถูกจด audit log — ตัวอย่างที่พิสูจน์สถาปัตยกรรมเดียวกันแล้วคือ "AI สอนลูก" ที่สร้างบทเรียนจากคลังความรู้ของครอบครัวได้จริง</p>
       <div class="cols">
         <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
-          <li>โมดูล agent: routes + policy + team + workspace + executor</li>
-          <li>โหมดไร้ AI ตอบสุภาพใน ~3 วินาที ไม่ค้าง — รายงาน fallback จากข้อมูลดิบ</li>
-          <li>พยานที่ว่าสถาปัตยกรรมเดินได้: RAG คลังความรู้ + teach-kids</li>
+          <li>5 โมดูลจริง: agent routes · policy · team · workspace · executor ที่ลงมือทำได้</li>
+          <li>โหมดไร้ AI ตอบสุภาพใน ~3 วินาที ไม่ค้าง — รายงาน fallback จากข้อมูลดิบให้อัตโนมัติ</li>
+          <li>พยานที่สถาปัตยกรรมเดินได้จริง: "AI สอนลูก" ใช้ RAG เดียวกันสร้างบทเรียน+แบบทดสอบได้จริง (~20 endpoints)</li>
         </ul></div>
         <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
-          <li>ผู้ช่วย 5 ตำแหน่ง (ขาย/สต็อก/ลูกค้า/การตลาด/บัญชี) ใช้ข้อมูลจริงในเครื่อง</li>
-          <li>สรุปภาษีรายงวดเป็นภาษาคน พร้อมเช็กความเสี่ยงก่อนยื่น</li>
+          <li>เปิดผู้ช่วย 5 ตำแหน่งทีละตำแหน่ง — เริ่มที่ "บัญชี": สรุปภาษีรายงวดเป็นภาษาคน พร้อมเช็กความเสี่ยงก่อนยื่น</li>
+          <li>ผู้ช่วยแนะนำสต็อก: ใช้ยอดขายจริงตั้งจุดสั่งซื้อให้เอง</li>
         </ul></div>
         <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
-          <li>โมเดลภาษาไทยที่วิ่งไหวบนเครื่องธรรมดา (หรือ GPU เล็ก)</li>
-          <li>การออกแบบสิทธิ์+ขอบเขต AI ร่วมกับคนที่คิดเรื่อง safety</li>
+          <li>โมเดลภาษาไทยที่วิ่งไหวบนเครื่องธรรมดา (หรือ GPU เล็ก) — โครงสร้างพร้อม เสียบแล้วใช้ได้</li>
+          <li>คนคิดเรื่อง safety ร่วมออกแบบขอบเขตสิทธิ์ AI ให้ลงมือได้อย่างปลอดภัย</li>
         </ul></div>
       </div>
-      <div class="links"><a href="index.html#ai">ดูผู้ช่วย 5 ตำแหน่ง ↗</a></div>
+      <div class="links"><a href="index.html#ai">ดูผู้ช่วย 5 ตำแหน่ง ↗</a><a href="education.html">ดูพยานสถาปัตยกรรม: AI สอนลูก ↗</a></div>
     </article>
   </section>
 
@@ -350,12 +366,98 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       </div>
       <p>ทางเดียวที่ต้องตกลงร่วมกัน: ระบบยัง self-hosted และโอเพนในบ้าน — ข้อมูลของผู้ใช้ไม่ออกจากเครื่องผู้ใช้</p>
       <div class="cta">
-        <a class="btn btn-primary" href="index.html#run">ดูวิธีรันเองฟรี 3 ขั้น</a>
+        <a class="btn btn-primary" href="#contact">กรอกฟอร์มติดต่อ ↓</a>
         <a class="btn btn-ghost" href="index.html">กลับหน้าภาพรวม</a>
       </div>
     </div>
   </section>
+
+  <!-- ═══ CONTACT ═══ -->
+  <section id="contact">
+    <p class="k-ch">// ติดต่อ</p>
+    <h2>ชิ้นไหนใช่ — ส่งข้อความมาได้เลย</h2>
+    <p class="sub">บอกมาได้เลยว่าสนใจชิ้นไหนและอยากเข้ามาแบบไหน — ฟอร์มนี้ส่งตรงถึงเจ้าของโปรเจ็ก โดยไม่ต้องมีเซิร์ฟเวอร์ของเว็บนี้เลย</p>
+    <div class="contact">
+      <form id="contactForm" novalidate>
+        <div class="contact-grid">
+          <div class="field"><label for="cName">ชื่อ / ชื่อเล่น</label><input id="cName" name="name" type="text" autocomplete="name" placeholder="เช่น พี่บอย"></div>
+          <div class="field"><label for="cEmail">อีเมลตอบกลับ</label><input id="cEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        </div>
+        <div class="contact-grid" style="margin-top:14px">
+          <div class="field"><label for="cTopic">ชิ้นงานที่สนใจ</label>
+            <select id="cTopic" name="topic">
+              <option value="ธุรกิจ+ภาษี">🛒 ระบบหลังบ้านธุรกิจ · คิดภาษีไทยเอง</option>
+              <option value="โรงเรียนในบ้าน">🎓 โรงเรียนในบ้าน · AI สอนลูก</option>
+              <option value="บ้าน IoT">🏠 ระบบนิเวศบ้าน · IoT</option>
+              <option value="ฟาร์มข้อมูล">🌾 ฟาร์มข้อมูล · ปศุสัตว์</option>
+              <option value="เกษตร+สมุนไพร">🌱 เกษตร &amp; สมุนไพร</option>
+              <option value="การประมง">🐟 การประมง (แบบแปลน)</option>
+              <option value="ตลาดอัจฉริยะ">🤖 ตลาดอัจฉริยะ · ผู้ช่วย AI</option>
+              <option value="อื่น ๆ">💬 อื่น ๆ / ทั่วไป</option>
+            </select>
+          </div>
+          <div class="field"><label for="cRole">เข้ามาแบบไหน</label>
+            <select id="cRole" name="role">
+              <option value="นักพัฒนา">👨‍💻 นักพัฒนา</option>
+              <option value="เจ้าของธุรกิจ/ฟาร์ม">🏪 เจ้าของธุรกิจ/ฟาร์ม (ผู้ใช้นำร่วม)</option>
+              <option value="สายฮาร์ดแวร์">🔌 สายฮาร์ดแวร์</option>
+              <option value="สาย AI/ภาษาไทย">🧠 สาย AI/ภาษาไทย</option>
+              <option value="สายฟาร์ม/ประมง">🐟 สายฟาร์ม/ประมง</option>
+              <option value="อื่น ๆ">💬 อื่น ๆ</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px"><label for="cMsg">ข้อความ</label><textarea id="cMsg" name="message" placeholder="เล่าสั้น ๆ ว่าสนใจตรงไหน อยากช่วยอะไร หรืออยากรู้อะไรเพิ่ม"></textarea></div>
+        <div class="contact-actions">
+          <button class="btn btn-primary" type="submit">ส่งข้อความ</button>
+          <span class="contact-note">* ฟอร์ม static — ตอนตั้งค่าปลายทางแล้วจะส่งเข้าอีเมลจริง (ดู README)</span>
+        </div>
+        <div class="formmsg" id="formMsg" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </section>
 </main>
+
+<script>
+(function(){
+  'use strict';
+  /* ── static contact form ──
+     โหมดตั้งค่า: ใส่ endpoint ฟรีของ Formspree ที่บรรทัด FORM_ENDPOINT (เช่น 'https://formspree.io/f/abcd1234')
+     ถ้ายังไม่ตั้งค่า: กดส่ง = เปิดอีเมลในเครื่องผู้ใช้ (mailto) พร้อมข้อความที่จัดรูปแบบไว้ — ทำงานได้ทันทีไม่ต้องมีเซิร์ฟเวอร์ */
+  var FORM_ENDPOINT = ''; /* ← วาง Formspree endpoint ที่นี่เมื่อสมัครฟรี */
+  var form = document.getElementById('contactForm');
+  var msg = document.getElementById('formMsg');
+  function show(cls, html){ msg.className = 'formmsg ' + cls; msg.innerHTML = html; }
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var name = document.getElementById('cName').value.trim();
+    var email = document.getElementById('cEmail').value.trim();
+    var body = document.getElementById('cMsg').value.trim();
+    if (!name || !email || !body) { show('err', 'กรอกให้ครบก่อนนะ: ชื่อ อีเมล และข้อความ'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { show('err', 'รูปแบบอีเมลยังไม่ถูกต้อง'); return; }
+    var topic = document.getElementById('cTopic').value;
+    var role = document.getElementById('cRole').value;
+    var subject = '[Project Sovereign] ' + topic + ' — ' + role;
+    if (FORM_ENDPOINT) {
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+      fetch(FORM_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ name: name, email: email, topic: topic, role: role, message: body })
+      }).then(function(res){
+        if (res.ok) { show('ok', 'ส่งแล้ว — ขอบคุณมากครับ จะตอบกลับทางอีเมลที่ให้ไว้'); form.reset(); }
+        else { show('err', 'ระบบส่งขัดข้องชั่วคราว — ลองใหม่อีกครั้ง'); }
+      }).catch(function(){
+        show('err', 'เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วลองใหม่');
+      }).finally(function(){ btn.disabled = false; btn.textContent = 'ส่งข้อความ'; });
+    } else {
+      var text = 'ชื่อ: ' + name + '\nอีเมล: ' + email + '\nสนใจชิ้นงาน: ' + topic + '\nเข้ามาแบบ: ' + role + '\n\n' + body;
+      window.location.href = 'mailto:you@example.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+      show('ok', 'กำลังเปิดแอปอีเมลพร้อมข้อความที่จัดไว้ให้ — กดส่งในอีเมลอีกที หรือ <a href="mailto:you@example.com">คลิกที่นี่ถ้าไม่เปิดเอง</a>');
+    }
+  });
+})();
+</script>
 
 <footer>
   PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
