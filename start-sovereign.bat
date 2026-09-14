@@ -55,7 +55,7 @@ if %errorlevel% neq 0 (
         goto :compose_retry
     )
     call :note "[ERROR] เริ่ม container ไม่สำเร็จหลัง 3 ครั้ง — ดู: docker compose logs"
-    pause
+    echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
     exit /b 1
 )
 call :note "  - containers พร้อมแล้ว"
@@ -109,7 +109,7 @@ set /a count+=3
 title Sovereign OS - กำลังเริ่ม... ผ่านไป !count! วินาที
 if %count% geq 240 (
     call :note "[ERROR] Backend ไม่พร้อมใน 240 วินาที — ดู: docker logs sovereign-core-api"
-    pause
+    echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
     exit /b 1
 )
 echo   ยังรออยู่... ผ่านไป !count! วินาที
@@ -148,7 +148,9 @@ echo.
 echo ปิดหน้าต่างนี้ได้เลย - Hot Reload ทำงานทั้ง frontend และ backend
 echo.
 >> "%LOG%" echo ==== Sovereign OS ready %date% %time% ====
-pause
+:: ถ้ารันแบบมีคนดู (double-click / interactive) ให้ค้างรอกดคีย์ — แต่ถ้ารันจาก agent/CI
+:: (ไม่มี stdin) ห้ามรอ: pause จะบล็อกตลอดไป = "hang" ที่เคยเจอซ้ำ ๆ
+echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
 exit /b 0
 
 :: ============ subroutine ============
