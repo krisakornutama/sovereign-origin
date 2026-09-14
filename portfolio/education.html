@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI สอนลูก — Project Sovereign</title>
+<meta name="description" content="โมดูลการเรียนการสอนใน Project Sovereign: AI สร้างบทเรียนจากคลังความรู้ของครอบครัว (RAG + Ollama, offline 100%) พร้อมหลักสูตร แบบทดสอบ รายงานประจำสัปดาห์ และโรงเรียนการเงินจริง — งานบ้าน กระปุกออมสิน เงินค่าขนม หุ้นจำลอง คูปอง">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M8 3L14 6.2 8 9.4 2 6.2z' fill='%2334d399'/%3E%3Crect x='4' y='9' width='8' height='3.4' rx='.8' fill='%23F2D8D8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --paper:#F2D8D8; --paper-edge:#D9B2B0; --ink:#2B2320; --stamp:#B3352C;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+  --sarabun:'Sarabun',var(--thai);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--mono)}
+a{color:var(--green)}
+
+/* ── topbar ── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--green);border-bottom:1px solid var(--green)}
+
+/* ── hero ── */
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:780px}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--green);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(52,211,153,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+/* ── sections ── */
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+/* ── module map ── */
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.mod{border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:14px 16px;background:rgba(52,211,153,.04)}
+.mod .t{font-weight:600;font-size:.9rem;color:#ecfdf5}
+.mod .d{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin-top:4px}
+
+/* ── lesson sheet ── */
+.lesson-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:start}
+.sheet{position:relative;background:var(--paper);color:var(--ink);font-family:var(--sarabun);
+  border:1px solid var(--paper-edge);border-radius:3px;padding:26px 28px 30px 48px;
+  box-shadow:0 18px 44px rgba(0,0,0,.55)}
+.sheet::before{content:'';position:absolute;top:0;bottom:0;left:26px;width:1.5px;background:var(--stamp);opacity:.75}
+.sh-kicker{font-size:.68rem;letter-spacing:.08em;color:rgba(43,35,32,.65)}
+.sh-title{font-size:1.14rem;font-weight:700;margin:2px 0 2px}
+.sh-legal{font-size:.72rem;color:rgba(43,35,32,.75);margin:0 0 14px}
+.sh-line{border-bottom:1.5px dotted rgba(43,35,32,.4);padding:8px 2px;font-size:.86rem}
+.sh-line b{float:right;font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.sh-quiz{margin:12px 0 0;font-size:.8rem;line-height:1.7}
+.sh-quiz ol{margin:4px 0 0;padding-left:20px}
+.sh-quiz .ans{margin-top:10px;font-size:.7rem;color:rgba(43,35,32,.55);border-top:1.5px dotted rgba(43,35,32,.4);padding-top:8px}
+.sh-demo{margin:14px 0 0;font-size:.68rem;color:rgba(43,35,32,.55)}
+.stampwrap{position:absolute;top:16px;right:20px;transform:rotate(-3.5deg);pointer-events:none}
+.stampinner{border:3px double var(--stamp);border-radius:4px;padding:6px 14px;text-align:center;color:var(--stamp);
+  font-weight:700;line-height:1.3;letter-spacing:.05em;opacity:.92;filter:url(#grunge)}
+.stampinner small{display:block;font-size:.62rem;font-weight:600;letter-spacing:.14em}
+.stampinner span{font-size:.92rem}
+.stampwrap.reink{animation:inkstamp .38s ease-out}
+@keyframes inkstamp{from{transform:rotate(-3.5deg) scale(1.3);opacity:0}}
+.agepicker{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.agepicker label{font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+.agepicker select{font-family:var(--mono);font-size:.8rem;color:#a7f3d0;background:#0b1220;
+  border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:8px 10px;cursor:pointer}
+
+/* ── money school pipeline ── */
+.pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 20px}
+.stage{font-family:var(--mono);font-size:.74rem;border:1px solid rgba(34,211,153,.3);border-radius:8px;padding:7px 13px;color:#a7f3d0;background:rgba(52,211,153,.05)}
+.arrow{color:var(--faint);font-family:var(--mono)}
+.loopgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.loop{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel)}
+.loop .ic{font-size:1.2rem}
+.loop h3{font-size:.86rem;font-weight:600;color:#ecfdf5;margin:8px 0 4px}
+.loop p{font-size:.74rem;color:var(--dim);margin:0;line-height:1.7}
+.loop .ep{font-family:var(--mono);font-size:.6rem;color:var(--cyan);display:block;margin-top:8px}
+
+/* ── progress report ── */
+.rep{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rcard{border:1px solid var(--line);border-radius:10px;padding:15px 17px;background:var(--panel)}
+.rcard .h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.rcard .t{font-weight:600;font-size:.88rem;color:#ecfdf5}
+.rcard .st{font-family:var(--mono);font-size:.62rem;color:var(--green)}
+.rcard p{font-size:.76rem;color:var(--dim);margin:7px 0 0;line-height:1.65}
+
+/* ── honest / footer ── */
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+/* ── responsive + motion floor ── */
+@media (max-width:900px){
+  .lesson-grid{grid-template-columns:1fr;gap:30px}
+  .mods{grid-template-columns:repeat(2,1fr)}
+  .loopgrid{grid-template-columns:repeat(2,1fr)}
+  .rep{grid-template-columns:1fr}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .mods,.loopgrid{grid-template-columns:1fr}
+  .sheet{padding:22px 18px 26px 38px}
+  .sheet::before{left:18px}
+  .stampwrap{top:10px;right:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="grunge">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4"/>
+  </filter>
+</svg>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html" style="text-decoration:none">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html#map">ภาพรวม</a>
+    <a href="index.html#fit">ใครใช้ได้</a>
+    <a href="index.html#all">ทั้งระบบ</a>
+    <a href="index.html#tax">ภาษี</a>
+    <a href="education.html" aria-current="page">AI สอนลูก</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+    <a href="index.html#run">รันเองฟรี</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · EDUCATION MODULE</p>
+    <h1>โรงเรียนในบ้านที่ <em>AI ออกแบบบทเรียนเอง</em><br>จากความรู้ของครอบครัวคุณ</h1>
+    <p class="lede">โมดูล "AI สอนลูก" ในคลังความรู้: เลือกหัวข้อและช่วงอายุ — AI สร้างบทเรียนพร้อมแบบทดสอบจากบทเรียนที่คุณสะสมไว้ (RAG + โมเดลในเครื่อง) แล้วเก็บกลับเป็นบทเรียนถาวร พร้อมโรงเรียนการเงินที่ลูกได้ลงมือทำจริงตั้งแต่งานบ้านจนถึงพอร์ตหุ้นจำลอง</p>
+    <p class="meta-line">ตัวเลขทั้งหมดเป็นข้อมูลสาธิต · ระบบจริงปิดจากอินเทอร์เน็ตสาธารณะ</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#lesson">ดูตัวอย่างบทเรียน →</a>
+      <a class="btn btn-ghost" href="index.html">กลับหน้าภาพรวม</a>
+    </div>
+  </section>
+
+  <!-- ═══ MODULES ═══ -->
+  <section id="modules">
+    <p class="k-ch">// ภาพรวมโมดูล · <b>~20 endpoints</b></p>
+    <h2>สอน วัด รายงาน ครบในตัว</h2>
+    <p class="sub">ทุกส่วนอยู่หลังระบบล็อกอินเดียวกัน มี audit log รายคน และทำงาน offline ทั้งหมด</p>
+    <div class="mods">
+      <div class="mod"><div class="t">🎓 สร้างบทเรียน</div><div class="d">/teach/generate · /teach/save</div></div>
+      <div class="mod"><div class="t">👥 โปรไฟล์ลูกแต่ละคน</div><div class="d">/teach/kids · /teach/dashboard</div></div>
+      <div class="mod"><div class="t">🗓️ หลักสูตร + ความคืบหน้า</div><div class="d">CurriculumTrack · KidLessonProgress</div></div>
+      <div class="mod"><div class="t">📊 รายงานประจำสัปดาห์</div><div class="d">/teach/report/weekly · /teach/daily-summary</div></div>
+    </div>
+    <ul class="bullet">
+      <li>บทเรียนถูกสร้างจาก<b>คลังความรู้ของครอบครัวเอง</b> (ค้นแบบความหมาย) — ไม่ใช่การเดาจากอินเทอร์เน็ต</li>
+      <li>เลือกช่วงอายุได้ — เนื้อหาและคำถามปรับตามช่วงวัย</li>
+      <li>บันทึกบทเรียนกลับเป็นบทเรียนถาวรในคลัง — ยิ่งใช้ ยิ่งรู้จักครอบครัวมากขึ้น</li>
+    </ul>
+  </section>
+
+  <!-- ═══ LESSON DEMO ═══ -->
+  <section id="lesson">
+    <p class="k-ch">// บทเรียนตัวอย่าง · <b>สาธิต</b></p>
+    <h2>แบบนี้คือหน้าตาของบทเรียนที่ AI สร้าง</h2>
+    <p class="sub">เลือกช่วงอายุแล้วแผ่นบทเรียนพิมพ์ใหม่ — หัวข้อ จุดประสงค์ และระดับคำถามเปลี่ยนตามวัย (ข้อมูลสาธิต)</p>
+    <div class="lesson-grid">
+      <div>
+        <div class="agepicker">
+          <label for="ageSel">ช่วงอายุ:</label>
+          <select id="ageSel">
+            <option value="6-8" selected>6–8 ปี</option>
+            <option value="9-12">9–12 ปี</option>
+            <option value="13-15">13–15 ปี</option>
+          </select>
+        </div>
+        <ul class="bullet">
+          <li><b>เนื้อหายึดจากคลังความรู้จริง</b> — AI อ้างอิงบทเรียน/เอกสารที่คุณเก็บไว้ ไม่แต่งเอง</li>
+          <li><b>แบบทดสอบในตัว</b> — ทุกบทเรียนจบด้วยคำถามพร้อมเฉลยสำหรับผู้ปกครอง</li>
+          <li><b>เสร็จแล้วบันทึกความคืบหน้า</b> — ผูกกับโปรไฟล์ลูกแต่ละคน ไปโผล่ในรายงานสัปดาห์</li>
+          <li><b>เมื่อยังไม่ติดตั้ง AI</b> — ใช้บทเรียนในคลังที่สร้างไว้ได้เต็มรูปแบบ ส่วนการสร้างใหม่จะรอ Ollama</li>
+        </ul>
+      </div>
+      <div>
+        <div class="sheet" aria-label="ตัวอย่างแผ่นบทเรียน AI สอนลูก (ข้อมูลสาธิต)">
+          <div class="stampwrap" id="stampWrap"><div class="stampinner"><small>ช่วงอายุ</small><span id="stampAge">6–8 ปี</span></div></div>
+          <div class="sh-kicker">แผ่นบทเรียน · สร้างโดย AI จากคลังความรู้</div>
+          <div class="sh-title" id="lTitle">เงินคืออะไร — ทำไมต้องออม</div>
+          <p class="sh-legal" id="lGoal">จุดประสงค์: รู้จักการแลกเปลี่ยน แยก "อยากได้" กับ "จำเป็น" และเริ่มเก็บเงินกระปุก</p>
+          <div class="sh-line">ระยะเวลา <b id="lLen">15 นาที</b></div>
+          <div class="sh-line">กิจกรรม <b id="lAct">เกมแลกของ 3 รอบ</b></div>
+          <div class="sh-line">เชื่อมโรงเรียนการเงิน <b id="lLink">งานบ้าน 1 ชิ้น</b></div>
+          <div class="sh-quiz">
+            แบบทดสอบท้ายบท (ยกตัวอย่าง 1 ข้อ)
+            <ol>
+              <li id="lQ">แม่ให้เงิน 10 บาท มีขนม 5 บาทกับสมุด 8 บาท — ซื้อได้กี่อย่าง เพราะอะไร?</li>
+            </ol>
+            <div class="ans">เฉลยสำหรับผู้ปกครอง: ขนมอย่างเดียว (รวม 5 บาท) — ฝึกเปรียบเทียบราคากับเงินที่มี</div>
+          </div>
+          <p class="sh-demo">* ข้อมูลสาธิต — เลือกช่วงอายุด้านบนแล้วแผ่นพิมพ์ใหม่</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ MONEY SCHOOL ═══ -->
+  <section id="money-school">
+    <p class="k-ch">// โรงเรียนการเงิน · <b>ทำจริงในระบบ</b></p>
+    <h2>เรียนเรื่องเงินด้วยเงินจริงในบ้าน</h2>
+    <p class="sub">ห่วงโซ่ที่ระบบต่อไว้ให้ — ลูกทำงานบ้าน ได้เงินเข้ากระปุก รับค่าขนม ลงทุนหุ้นจำลอง แลกคูปอง ทุกขั้นมี audit log ที่ผู้ปกครองเห็นหมด</p>
+    <div class="pipe" aria-label="วงจรโรงเรียนการเงิน">
+      <span class="stage">งานบ้าน</span><span class="arrow">→</span>
+      <span class="stage">กระปุกออมสิน</span><span class="arrow">→</span>
+      <span class="stage">ค่าขนม</span><span class="arrow">→</span>
+      <span class="stage">พอร์ตหุ้นจำลอง</span><span class="arrow">→</span>
+      <span class="stage">คูปองแลกของ</span>
+    </div>
+    <div class="loopgrid">
+      <div class="loop"><div class="ic">🧹</div><h3>งานบ้าน</h3><p>กำหนดงาน ปิดงาน เปิดงานใหม่ ราคาจ่ายต่อชิ้น</p><span class="ep">/teach/kids/:id/chores</span></div>
+      <div class="loop"><div class="ic">🐷</div><h3>กระปุกออมสิน</h3><p>เงินเข้า-ออกกระปุกของแต่ละคน เห็นยอดสะสม</p><span class="ep">/teach/kids/:id/piggy</span></div>
+      <div class="loop"><div class="ic">💵</div><h3>ค่าขนม</h3><p>ตั้งจ่ายอัตโนมัติตามรอบ + ประวัติจ่ายย้อนหลัง</p><span class="ep">/teach/allowance/history</span></div>
+      <div class="loop"><div class="ic">📈</div><h3>พอร์ตหุ้นจำลอง</h3><p>ซื้อ-ขายหุ้นฝึก รู้กำไรขาดทุนด้วยตัวเลขจริง</p><span class="ep">/teach/kids/:id/stocks</span></div>
+      <div class="loop"><div class="ic">🎟️</div><h3>คูปองรางวัล</h3><p>สะสมแล้วแลกเป็นสิทธิพิเศษที่ครอบครัวกำหนด</p><span class="ep">/teach/kids/:id/coupons</span></div>
+    </div>
+  </section>
+
+  <!-- ═══ REPORT ═══ -->
+  <section id="report">
+    <p class="k-ch">// ผู้ปกครองเห็นอะไร · <b>รายงานจริง</b></p>
+    <h2>ไม่ต้องถาม "วันนี้เรียนอะไร"</h2>
+    <p class="sub">ระบบสรุปให้เองทั้งความคืบหน้าบทเรียน งานบ้าน และกระเป๋าเงิน — ทุกการเปลี่ยนแปลงมี audit log ตรวจย้อนหลังได้รายคน</p>
+    <div class="rep">
+      <div class="rcard"><div class="h"><span class="t">📈 รายงานประจำสัปดาห์</span><span class="st">/teach/report/weekly</span></div><p>สรุปบทเรียนที่ผ่าน คะแนนแบบทดสอบ และแนวโน้มของแต่ละคน — พร้อมจุดที่ควรช่วยเสริมสัปดาห์หน้า</p></div>
+      <div class="rcard"><div class="h"><span class="t">🌅 สรุปรายวัน</span><span class="st">/teach/daily-summary</span></div><p>วันนี้เรียนอะไร ทำงานบ้านกี่ชิ้น เงินขยับเท่าไร — ข้อความสั้น อ่านจบในหน้าเดียว</p></div>
+      <div class="rcard"><div class="h"><span class="t">🧾 Audit log รายลูก</span><span class="st">/teach/kids/:id/audit</span></div><p>ทุกการเข้าเงิน แลกคูปอง ซื้อหุ้น — ใครทำ ทำเมื่อไร ตรวจได้ทุกรายการ</p></div>
+      <div class="rcard"><div class="h"><span class="t">🧠 พยากรณ์การเรียนรู้</span><span class="st">LearningPrediction</span></div><p>โมดูลเรียนรู้เองของระบบจดรูปแบบ แล้วชี้ว่าลูกกำลังแข็งด้านไหน อ่อนด้านไหน</p></div>
+    </div>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>ข้อจำกัดที่ควรรู้ก่อนใช้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>การสร้างบทเรียนใหม่ต้องมี AI</b> — ติดตั้ง Ollama เมื่อพร้อม ระหว่างนั้นใช้บทเรียนที่สร้างไว้แล้วได้ครบ</li>
+        <li><b>AI ไม่แทนผู้ปกครอง</b> — บทเรียนเป็นแบบร่างให้คุณเลือก ปรับ และสอนเอง เฉลยแบบทดสอบอยู่ฝั่งผู้ปกครองเสมอ</li>
+        <li><b>เงินในระบบคือบทเรียน</b> — กระปุก/หุ้นในระบบเป็นบัญชีฝึกของครอบครัว ไม่ใช่บัญชีธนาคารจริง</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  /* ── age picker → lesson sheet re-ink (same stamp contract as the ภ.พ.30 sheet) ── */
+  var AGES = {
+    '6-8':   { label: '6–8 ปี',   title: 'เงินคืออะไร — ทำไมต้องออม',
+               goal: 'จุดประสงค์: รู้จักการแลกเปลี่ยน แยก "อยากได้" กับ "จำเป็น" และเริ่มเก็บเงินกระปุก',
+               len: '15 นาที', act: 'เกมแลกของ 3 รอบ', link: 'งานบ้าน 1 ชิ้น',
+               q: 'แม่ให้เงิน 10 บาท มีขนม 5 บาทกับสมุด 8 บาท — ซื้อได้กี่อย่าง เพราะอะไร?' },
+    '9-12':  { label: '9–12 ปี',  title: 'กระปุกกับดอกเบี้ย — เงินงอกเองได้ไหม',
+               goal: 'จุดประสงค์: เข้าใจดอกเบี้ยเล็ก ๆ ที่สะสม และฝึกตัดสินใจหนี้-ออมด้วยตัวอย่างจริงในบ้าน',
+               len: '25 นาที', act: 'คำนวณดอกเบี้ยกระปุกจริง 1 สัปดาห์', link: 'คูปองสะสม 2 ดวง',
+               q: 'กระปุกมี 100 บาท ถ้าบ้านให้ดอกเบี้ย 2% ต่อเดือน — เดือนหน้ามีเท่าไร แล้ว 6 เดือนล่ะ?' },
+    '13-15': { label: '13–15 ปี', title: 'หุ้นจำลอง — ราคาขึ้นลงเพราะอะไร',
+               goal: 'จุดประสงค์: อ่านเหตุผลของราคา (ข่าว กำไร อุปสงค์) และฝึกบันทึกเหตุผลก่อนซื้อ-ขายทุกครั้ง',
+               len: '40 นาที', act: 'เปิดพอร์ตจำลอง + ซื้อหุ้นฝึก 1 ตัว', link: 'พอร์ตหุ้นจำลอง',
+               q: 'หุ้นที่ซื้อ 50 บาท ขึ้นเป็น 55 บาทจากข่าวกำไรดี — ควรขายเลยไหม ให้เหตุผล 2 ข้อ' }
+  };
+  var sel = document.getElementById('ageSel');
+  var stampWrap = document.getElementById('stampWrap');
+  function setText(id, v){ document.getElementById(id).textContent = v; }
+  sel.addEventListener('change', function(){
+    var d = AGES[sel.value];
+    if (!d) return;
+    setText('stampAge', d.label);
+    setText('lTitle', d.title);
+    setText('lGoal', d.goal);
+    setText('lLen', d.len);
+    setText('lAct', d.act);
+    setText('lLink', d.link);
+    setText('lQ', d.q);
+    stampWrap.classList.remove('reink');
+    void stampWrap.offsetWidth; /* restart stamp animation */
+    stampWrap.classList.add('reink');
+  });
+})();
+</script>
+</body>
+</html>

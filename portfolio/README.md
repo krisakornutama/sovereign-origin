@@ -1,13 +1,13 @@
 # Portfolio — Project Sovereign
 
-เว็บโชว์ผลงานแบบ static ไฟล์เดียว (`index.html`) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
+เว็บโชว์ผลงานแบบ static หลายหน้า (`index.html` = ทัวร์ทั้งระบบ + `education.html` = โมดูล AI สอนลูก) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
 
 ## วิธีขึ้น GitHub Pages (เลือกทางใดทางหนึ่ง)
 
 ### ทางที่ 1 — อัปโหลดผ่านหน้าเว็บ GitHub (ง่ายสุด ไม่ต้องใช้ git)
 
 1. สมัคร/ล็อกอิน GitHub แล้วสร้าง repository ใหม่ ตั้งชื่อเช่น `project-sovereign` → **Public**
-2. กด **uploading an existing file** แล้วลากไฟล์จากโฟลเดอร์ `portfolio/` **ทั้ง 3 ไฟล์** ขึ้นไป (`index.html`, `.nojekyll`, `README.md`)
+2. กด **uploading an existing file** แล้วลากไฟล์จากโฟลเดอร์ `portfolio/` **ทั้ง 4 ไฟล์** ขึ้นไป (`index.html`, `education.html`, `.nojekyll`, `README.md`)
    - ถ้าหาไฟล์ `.nojekyll` ไม่เจอใน Explorer (เป็นไฟล์ที่ขึ้นต้นจุด) ให้ข้ามก่อน — ดูขั้น 4
 3. กด **Commit changes**
 4. ถ้ายังไม่ได้ใส่ `.nojekyll`: ใน repo กด **Add file → Create new file** ตั้งชื่อว่า `.nojekyll` (เนื้อหาว่าง) → Commit
@@ -19,8 +19,8 @@
 ```bash
 # ในโฟลเดอร์ portfolio/
 git init
-git add index.html .nojekyll README.md
-git commit -m "portfolio: Project Sovereign showcase — self-hosted commerce OS with Thai tax engine"
+git add index.html education.html .nojekyll README.md
+git commit -m "portfolio: Project Sovereign showcase — self-hosted commerce OS with Thai tax engine + AI kids education"
 git branch -M main
 # สร้าง repo เปล่าบน GitHub ก่อน (ชื่อ project-sovereign) แล้วแก้ชื่อผู้ใช้ด้านล่าง:
 git remote add origin https://github.com/<ชื่อผู้ใช้>/project-sovereign.git

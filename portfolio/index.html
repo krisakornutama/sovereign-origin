@@ -92,6 +92,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .toc a:hover{border-color:rgba(52,211,153,.5)}
 .toc .n{font-family:var(--mono);font-size:.66rem;color:var(--cyan)}
 .toc .t{font-size:.82rem;font-weight:600;color:#ecfdf5;margin-top:2px}
+.toc a.subpage::after{content:'↗';font-family:var(--mono);font-size:.66rem;color:var(--cyan);float:right;margin-top:2px}
 
 /* ── ledger visual ── */
 .ledger{font-family:var(--mono);font-size:.78rem;border:1px solid var(--line);border-radius:10px;
@@ -201,6 +202,9 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .cat li{font-size:.78rem;color:var(--dim);padding:5px 0;border-bottom:1px dashed rgba(52,211,153,.09);line-height:1.6}
 .cat li:last-child{border-bottom:none}
 .cat li b{color:#d1fae5;font-weight:500}
+.cat li a{color:inherit;text-decoration:none}
+.cat li a b::after{content:' ↗';font-size:.72em;color:var(--cyan)}
+.cat li a:hover b::after{color:var(--green)}
 
 /* ── engineering ── */
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
@@ -278,6 +282,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="#remind">๕ เตือน</a>
     <a href="#ai">๖ AI</a>
     <a href="#ops">๗ เฝ้าระบบ</a>
+    <a href="education.html">AI สอนลูก</a>
     <a href="#faq">ถาม-ตอบ</a>
     <a href="#run">รันเองฟรี</a>
   </nav>
@@ -341,6 +346,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <a href="#remind"><span class="n">๕ · เตือน</span><div class="t">Telegram 7/3/1 วัน</div></a>
       <a href="#ai"><span class="n">๖ · AI</span><div class="t">พร้อมเมื่อคุณพร้อม</div></a>
       <a href="#ops"><span class="n">๗ · เฝ้าระบบ</span><div class="t">backup + ฟื้นเอง</div></a>
+      <a href="education.html" class="subpage"><span class="n">🎓</span><div class="t">AI สอนลูก · หน้าย่อย</div></a>
       <a href="#eng"><span class="n">+</span><div class="t">วิศวกรรมเบื้องหลัง</div></a>
     </div>
   </section>
@@ -403,7 +409,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
           <li><b>ศูนย์บัญชาการ AI</b> — สั่งงาน/สนทนา</li>
           <li><b>AI Agent + เรียนรู้เอง</b> — ทำงานแทน + เก็บข้อมูลต่อ</li>
           <li><b>พยากรณ์</b> — คาดการณ์แบต/ทรัพยากรล่วงหน้า</li>
-          <li><b>คลังความรู้</b> — บทเรียน งานวิจัย ค้นเชิงความหมาย</li>
+          <li><a href="education.html"><b>คลังความรู้ + AI สอนลูก</b></a> — บทเรียน งานวิจัย ค้นเชิงความหมาย · <a href="education.html" style="color:var(--cyan)">หน้าโชว์โมดูลนี้ ↗</a></li>
         </ul></div>
       <div class="cat"><div class="h"><span class="ic">⚙️</span><h3>ระบบหลังบ้าน</h3><span class="count">6 หน้าจอ</span></div>
         <ul>
