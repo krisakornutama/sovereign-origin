@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คลังหนังสือ — Project Sovereign</title>
+<meta name="description" content="คลังเก็บหนังสือของนักเขียน: หนังสือที่ลงพิมพ์พร้อมลิงก์อ่านต่อ และชั้นหนังสือที่อ่าน — ทุกเล่มอยู่ที่เดียว ข้อมูลอยู่ในไฟล์เดียว แก้ง่าย โฮสต์ฟรี">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M4 3h6.5c1 0 1.5.6 1.5 1.5V13H5.5C4.7 13 4 12.3 4 11.5V3z' fill='%2334d399'/%3E%3Cpath d='M4 3v8.5C4 10.6 4.7 11 5.5 11H12v2H5.5C4.7 13 4 12.3 4 11.5' fill='none' stroke='%23030712' stroke-width='.9'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:800px}
+h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--cyan);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(34,211,238,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.shelfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.book{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px;display:flex;flex-direction:column;gap:10px}
+.cover{aspect-ratio:3/4;border-radius:8px;border:1px solid rgba(52,211,153,.25);
+  background:linear-gradient(160deg,rgba(52,211,153,.16),rgba(34,211,238,.07) 55%,rgba(3,7,18,.4));
+  position:relative;display:flex;align-items:flex-end;padding:14px;overflow:hidden}
+.cover::before{content:'';position:absolute;top:0;bottom:0;left:10px;width:3px;border-radius:2px;
+  background:linear-gradient(180deg,rgba(52,211,153,.65),rgba(34,211,238,.35))}
+.cover .cv-t{font-family:'Sarabun',var(--thai);font-weight:600;font-size:.95rem;color:#ecfdf5;line-height:1.45;margin:0}
+.cover .cv-a{font-family:var(--mono);font-size:.62rem;color:var(--dim);margin:4px 0 0}
+.bk-title{font-family:'Sarabun',var(--thai);font-weight:600;font-size:.95rem;color:#ecfdf5;line-height:1.5;margin:0}
+.bk-meta{font-size:.78rem;color:var(--dim);margin:0}
+.bk-link{font-family:var(--mono);font-size:.68rem;color:var(--green);text-decoration:none;margin-top:auto;word-break:break-all}
+.bk-link:hover{color:var(--cyan)}
+.tag{display:inline-block;font-family:var(--mono);font-size:.6rem;border-radius:999px;padding:3px 10px;align-self:flex-start}
+.tag.pub{color:var(--green);border:1px solid rgba(52,211,153,.4)}
+.tag.read{color:var(--cyan);border:1px solid rgba(34,211,238,.35)}
+.empty{border:1px dashed rgba(52,211,153,.35);border-radius:12px;padding:26px 22px;text-align:center;color:var(--dim);font-size:.85rem}
+.empty b{color:#ecfdf5}
+.shelfnote{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:14px 0 0}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+.honest code{font-family:var(--mono);font-size:.74rem;color:#a5f3fc;background:rgba(34,211,238,.07);padding:1px 6px;border-radius:5px}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .shelfgrid{grid-template-columns:repeat(2,1fr);gap:10px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html">การประมง</a>
+    <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="iot.html">บ้าน IoT</a>
+    <a href="books.html" aria-current="page">คลังหนังสือ</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · SHELF ของนักเขียน</p>
+    <h1>คลังหนังสือ — <em>เขียนเอง</em> อ่านเอง<br>เก็บไว้ที่เดียว</h1>
+    <p class="lede">สองชั้นวางคู่กัน: หนังสือที่ลงพิมพ์พร้อมลิงก์เข้าแหล่งเดิมทุกเล่ม และชั้นหนังสือที่อ่านแล้วที่เล่ารสนิยมของคนเขียน — ไม่มีระบบหลังบ้าน ไม่มี database ข้อมูลอยู่ในไฟล์นี้ไฟล์เดียว เพิ่มเล่มใหม่ได้ทุกเมื่อ</p>
+    <p class="meta-line">ข้อมูลจริงอยู่ในบล็อก BOOKS ที่ต้นไฟล์ · แก้แล้ว push = ขึ้นเว็บใน 1–2 นาที</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#published">หนังสือที่ลงพิมพ์ →</a>
+      <a class="btn btn-ghost" href="#read">หนังสือที่อ่าน</a>
+    </div>
+  </section>
+
+  <!-- ═══ PUBLISHED ═══ -->
+  <section id="published">
+    <p class="k-ch">// หนังสือที่ลงพิมพ์ · <b><span id="pubCount">0</span> เล่ม</b></p>
+    <h2>ผลงานที่เผยแพร่</h2>
+    <p class="sub">ทุกเล่มมีลิงก์กลับไปหาแหล่งเดิม — ไม่โฮสต์ซ้ำ ไม่ลอกเนื้อหา แค่จุดรวมให้คนหาเจอง่าย</p>
+    <div class="shelfgrid" id="pubShelf" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ READ ═══ -->
+  <section id="read">
+    <p class="k-ch">// หนังสือที่อ่าน · <b><span id="readCount">0</span> เล่ม</b></p>
+    <h2>ชั้นหนังสือที่อ่านแล้ว</h2>
+    <p class="sub">หนังสือที่ผ่านมือคนเขียน — รากของแนวคิด และรสนิยมที่ผลิตงานชุดนี้ออกมา</p>
+    <div class="shelfgrid" id="readShelf" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ HOW TO FILL ═══ -->
+  <section id="how">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>เพิ่มหนังสือเองได้ใน 1 นาที</h2>
+    <div class="honest">
+      <h3>วิธีเติมชั้นหนังสือ</h3>
+      <ul>
+        <li><b>เปิดไฟล์ <code>books.html</code></b> — ขึ้นหัวไฟล์มีบล็อก <code>BOOKS_PUBLISHED</code> กับ <code>BOOKS_READ</code> เขียนด้วย JavaScript ธรรมดา แถวเดียวต่อเล่ม</li>
+        <li><b>เพิ่มบรรทัดแบบนี้</b> — <code>{ title:'ชื่อหนังสือ', author:'ผู้เขียน', url:'ลิงก์ (ใส่หรือไม่ก็ได้)', note:'คำโปรยสั้น ๆ' }</code> แล้ว push — หน้าเว็บจัดการ์ดให้เอง</li>
+        <li><b>ยังว่างอยู่ตอนนี้ = จริง</b> — หน้านี้ไม่แต่งข้อมูลปลอม ชั้นไหนยังไม่ใส่จะขึ้นตัวอักษรว่างตามจริงจนกว่าจะเติม</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ลิงก์ทุกเล่มชี้ไปแหล่งเดิมของหนังสือ · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   BOOKS — ข้อมูลคลังหนังสือทั้งหมดอยู่ตรงนี้ไฟล์เดียว
+   เพิ่มเล่มใหม่ = เพิ่มบรรทัดในอาร์เรย์ แล้ว push
+   ฟิลด์: title (บังคับ) · author (แนะนำ) · url (ใส่หรือไม่ก็ได้) · note (สั้น ๆ)
+   ═══════════════════════════════════════════════════════════════ */
+var BOOKS_PUBLISHED = [
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'คำโปรยหนึ่งประโยค' },
+];
+var BOOKS_READ = [
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'ทำไมเล่มนี้จึงอยู่บนชั้น' },
+];
+
+/* ─── ต่อจากนี้คือตัวเรนเดอร์ — ปกติไม่ต้องแก้อะไรข้ามเส้นนี้ ─── */
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function bookCard(b){
+  var cover = '<div class="cover"><p class="cv-t">' + esc(b.title) + '</p>' + (b.author ? '<p class="cv-a">' + esc(b.author) + '</p>' : '') + '</div>';
+  var link = b.url ? '<a class="bk-link" href="' + esc(b.url) + '" target="_blank" rel="noopener">เปิดแหล่งเดิม ↗</a>' : '';
+  return '<article class="book">' + cover +
+    '<p class="bk-title">' + esc(b.title) + '</p>' +
+    (b.author ? '<p class="bk-meta">' + esc(b.author) + '</p>' : '') +
+    (b.note ? '<p class="bk-meta">' + esc(b.note) + '</p>' : '') +
+    link + '</article>';
+}
+
+function renderShelf(list, el, emptyHtml){
+  el.innerHTML = list.length
+    ? list.map(bookCard).join('')
+    : emptyHtml;
+}
+
+var EMPTY_PUB = '<div class="empty"><b>ชั้นนี้ยังว่าง</b> — เพิ่มเล่มแรกได้ในบล็อก BOOKS_PUBLISHED ที่ต้นไฟล์ แล้ว push</div>';
+var EMPTY_READ = '<div class="empty"><b>ยังไม่มีรายการ</b> — เพิ่มเล่มที่อ่านแล้วในบล็อก BOOKS_READ ที่ต้นไฟล์ แล้ว push</div>';
+
+renderShelf(BOOKS_PUBLISHED, document.getElementById('pubShelf'), EMPTY_PUB);
+renderShelf(BOOKS_READ, document.getElementById('readShelf'), EMPTY_READ);
+document.getElementById('pubCount').textContent = BOOKS_PUBLISHED.length;
+document.getElementById('readCount').textContent = BOOKS_READ.length;
+document.title = 'คลังหนังสือ (' + (BOOKS_PUBLISHED.length + BOOKS_READ.length) + ' เล่ม) — Project Sovereign';
+</script>
+
+</body>
+</html>
