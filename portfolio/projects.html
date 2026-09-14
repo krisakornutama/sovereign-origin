@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>งานแต่ละชิ้น — Project Sovereign</title>
+<meta name="description" content="ผลงานทีละชิ้นของ Project Sovereign: ระบบหลังบ้านธุรกิจคิดภาษีไทยเอง, โรงเรียนในบ้าน AI สอนลูก, ระบบนิเวศบ้าน IoT, ตลาดอัจฉริยะ — แต่ละชิ้นเล่าแนวคิด สิ่งที่มีจริงวันนี้ และสิ่งที่ต้องการเพื่อร่วมมือกันทำให้ใช้งานจริงระดับมืออาชีพ">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Crect x='3' y='3' width='4.4' height='4.4' rx='1' fill='%2334d399'/%3E%3Crect x='8.6' y='3' width='4.4' height='4.4' rx='1' fill='none' stroke='%2334d399' stroke-width='1.1'/%3E%3Crect x='3' y='8.6' width='4.4' height='4.4' rx='1' fill='none' stroke='%2334d399' stroke-width='1.1'/%3E%3Crect x='8.6' y='8.6' width='4.4' height='4.4' rx='1' fill='%2322d3ee'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --paper:#F2D8D8; --paper-edge:#D9B2B0; --ink:#2B2320; --stamp:#B3352C;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+  --sarabun:'Sarabun',var(--thai);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+/* ── topbar ── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--green);border-bottom:1px solid var(--green)}
+
+/* ── hero ── */
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:820px}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:700px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--green);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(52,211,153,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+/* ── sections ── */
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+/* ── project dossiers ── */
+.proj{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:26px 28px;margin-bottom:22px}
+.proj-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:6px}
+.proj .ic{font-size:1.5rem}
+.proj h3{font-size:1.15rem;font-weight:600;color:#ecfdf5;margin:0}
+.proj .no{margin-left:auto;font-family:var(--mono);font-size:.66rem;color:var(--faint)}
+.visa{display:inline-flex;gap:6px;align-items:center;font-family:var(--mono);font-size:.62rem;border-radius:999px;padding:4px 12px;margin:2px 0 14px}
+.visa.r3{color:var(--green);border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.07)}
+.visa.r2{color:var(--cyan);border:1px solid rgba(34,211,238,.4);background:rgba(34,211,238,.06)}
+.visa.r1{color:#fbbf24;border:1px dashed rgba(245,158,11,.45);background:rgba(245,158,11,.05)}
+.proj .idea{font-size:.95rem;color:var(--dim);margin:0 0 16px;line-height:1.8}
+.proj .idea b{color:#ecfdf5;font-weight:600}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.col{border:1px solid rgba(52,211,153,.14);border-radius:10px;padding:14px 16px;background:rgba(3,7,12,.4)}
+.col h4{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;margin:0 0 10px;font-weight:500}
+.col.now h4{color:var(--green)}
+.col.next h4{color:var(--cyan)}
+.col.need h4{color:#fbbf24}
+.col ul{margin:0;padding:0;list-style:none}
+.col li{font-size:.78rem;color:var(--dim);padding:4px 0 4px 18px;position:relative;line-height:1.6}
+.col li::before{content:'·';position:absolute;left:6px;color:var(--faint)}
+.col.now li::before{color:var(--green)}
+.col.need li::before{color:#fbbf24}
+.col b{color:#d1fae5;font-weight:500}
+.proj .links{margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem}
+.proj .links a{text-decoration:none}
+.proj .links a:hover{text-decoration:underline}
+
+/* ── invite ── */
+.invite{border:1px solid rgba(52,211,153,.35);border-radius:14px;background:rgba(52,211,153,.05);padding:28px 30px}
+.invite h3{margin:0 0 10px;font-size:1.1rem;color:#ecfdf5}
+.invite p{margin:0 0 14px;font-size:.9rem;color:var(--dim);line-height:1.8}
+.roles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}
+.role{border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px 14px}
+.role .t{font-weight:600;font-size:.84rem;color:#a7f3d0}
+.role .d{font-size:.72rem;color:var(--dim);margin-top:3px;line-height:1.6}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+/* ── responsive + motion floor ── */
+@media (max-width:900px){
+  .cols{grid-template-columns:1fr}
+  .roles{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .roles{grid-template-columns:1fr}
+  .proj{padding:20px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html" aria-current="page">ผลงาน</a>
+    <a href="index.html#fit">ใครใช้ได้</a>
+    <a href="index.html#all">ทั้งระบบ</a>
+    <a href="education.html">AI สอนลูก</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+    <a href="#invite">ร่วมมือ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · ผลงานทีละชิ้น</p>
+    <h1>ระบบที่สร้างจริงในบ้าน<br>และ<em>สิ่งที่ต้องการเพื่อไปให้ถึงระดับมืออาชีพ</em></h1>
+    <p class="lede">แต่ละชิ้นงานเล่าสามอย่างตรง ๆ: แนวคิดที่ต้องการทำให้เป็น · สิ่งที่สร้างไว้จริงแล้ววันนี้ · สิ่งที่ขาดเพื่อให้ใช้งานได้จริงระดับมืออาชีพ ถ้าชิ้นไหนคุณอ่านแล้วสนใจ — ชิ้นนั้นอาจเป็นจุดเริ่มของการร่วมมือกัน</p>
+    <p class="meta-line">ตัวเลขระบุ "จริง" มาจากโค้ดและระบบที่ deploy อยู่ · ส่วนที่เป็นเป้าหมายระบุชัดว่ายังไม่มี</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#works">ดูผลงานทั้งหมด →</a>
+      <a class="btn btn-ghost" href="#invite">สนใจร่วมมือ?</a>
+    </div>
+  </section>
+
+  <!-- ═══ WORKS ═══ -->
+  <section id="works">
+    <p class="k-ch">// ผลงาน · <b>5 ชิ้น</b></p>
+    <h2>ชิ้นงานแต่ละชิ้น</h2>
+    <p class="sub">เรียงจากพร้อมใช้มากไปน้อย — ทุกชิ้นใช้รากเดียวกัน (ผู้ใช้/สิทธิ์/audit/backup ชุดเดียว) จึงต่อยอดร่วมกันได้เร็ว</p>
+
+    <article class="proj" id="p-commerce">
+      <div class="proj-head"><span class="ic">🛒</span><h3>ระบบหลังบ้านธุรกิจ · คิดภาษีไทยเอง</h3><span class="no">ชิ้นที่ ๑</span></div>
+      <span class="visa r3">● พร้อมใช้จริงวันนี้</span>
+      <p class="idea">ร้านค้าควรมีระบบหลังบ้านของตัวเอง: ลูกค้าสั่ง-จ่ายเองผ่าน QR ที่ฝังยอด ระบบตัดสต็อก ออกใบกำกับ <b>และแยกภาษีทุกบาทตั้งแต่วินาทีที่เงินเข้า</b> จนจบที่แผ่น ภ.พ.30 พร้อมยื่น — เจ้าของร้านไม่ต้องเป็นนักบัญชี และไม่ต้องจ่ายค่าระบบรายเดือน เพราะเครื่องของตัวเองคือเซิร์ฟเวอร์</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>หน้าร้าน + PromptPay QR ฝังยอด + flow แจ้งชำระ</li>
+          <li>ตัดสต็อกใน transaction เดียว กันขายเกิน + auto-restock</li>
+          <li>ใบกำกับภาษี, สมุดบัญชี, Treasury, ภ.พ.30/ภ.ง.ด./WHT</li>
+          <li>เตือนยื่นผ่าน Telegram 7/3/1 วัน · backup รายวัน + ซ้อม restore จริง</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>รับขายจาก Shopee/Lazada เข้าสมุดเดียวกัน พร้อมกระทบยอดรายเดือน</li>
+          <li>ขายแบบน้ำหนัก/หน่วยวัด (กิโลกรัม, จาน)</li>
+          <li>ผู้ช่วย AI 5 ตำแหน่งเมื่อติดตั้งโมเดลในเครื่อง</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>Domain + HTTPS + hardening ก่อนเปิดสู่อินเทอร์เน็ต</li>
+          <li>ชุดทดสอบ e2e ครอบ flow ร้านค้าแบบ real payment</li>
+          <li>คนใช้จริงตัวแรก ๆ เพื่อฝน edge case หน้างาน</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="index.html#map">ดูทัวร์เงิน→ภาษี ↗</a><a href="index.html#tax">แผ่น ภ.พ.30 จำลอง ↗</a></div>
+    </article>
+
+    <article class="proj" id="p-education">
+      <div class="proj-head"><span class="ic">🎓</span><h3>โรงเรียนในบ้าน · AI สอนลูก + โรงเรียนการเงิน</h3><span class="no">ชิ้นที่ ๒</span></div>
+      <span class="visa r2">● มีระบบจริง · ฟีเจอร์ AI รอโมเดล</span>
+      <p class="idea">การเรียนในบ้านควรใช้<b>ความรู้ของครอบครัวเองเป็นหลักสูตร</b>: AI อ่านคลังความรู้ที่คุณสะสมแล้วออกแบบบทเรียนตามช่วงวัย ส่วนเรื่องเงินไม่สอนด้วยกระดาษ — ลูกได้ลงมือทำจริงในระบบ ตั้งแต่รับงานบ้าน ออมกระปุก รับค่าขนม ซื้อหุ้นจำลอง จนแลกคูปอง</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>~20 API จริง: บทเรียน/โปรไฟล์ลูก/หลักสูตร/ความคืบหน้า/รายงานสัปดาห์</li>
+          <li>วงจรเงินครบ: งานบ้าน → กระปุก → ค่าขนม → หุ้นจำลอง → คูปอง (+ audit รายคน)</li>
+          <li>โมเดลข้อมูล CurriculumTrack · KidLessonProgress · SkillMatrix</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>สร้างบทเรียนอัตโนมัติจากคลังความรู้ (โค้ดรออยู่ — ต้องมีโมเดลในเครื่อง)</li>
+          <li>รายงานผู้ปกครองพร้อมพยากรณ์จุดอ่อน-จุดแข็งรายคน</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>ครอบครัวนำร่องใช้จริง + ประเมินเนื้อหาบทเรียนตามวัย</li>
+          <li>โมเดลภาษาไทยขนาดพอเหมาะสำหรับเครื่องที่ไม่แรง</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="education.html">ดูหน้าโชว์โมดูลนี้ ↗</a></div>
+    </article>
+
+    <article class="proj" id="p-iot">
+      <div class="proj-head"><span class="ic">🏠</span><h3>ระบบนิเวศบ้าน · IoT ทั้งหลัง</h3><span class="no">ชิ้นที่ ๓</span></div>
+      <span class="visa r2">● มีระบบจริง · ขยายต่อได้</span>
+      <p class="idea">อุปกรณ์ในบ้านไม่ควรกระจัดกระจายเป็นแอปแยก 8 ตัว: <b>เซ็นเซอร์ รีเลย์ ตาชั่ง ตู้เย็น พลังงาน กล้อง</b> รวมกันในระบบเดียวที่มีกฎอัตโนมัติ มีประวัติย้อนหลัง และมีพยากรณ์ (เช่น แบตเตอรี่โซลาร์จะพอถึงเช้าไหม) — และหน่วยความจำของบ้านทั้งหมดอยู่ในเครื่องเราเอง</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>เซิร์ฟเวอร์ MQTT (EMX) วิ่งจริงบนเครื่อง</li>
+          <li>8 หน้าจอจัดการ: อุปกรณ์/รีเลย์/กฎอัตโนมัติ/พลังงาน/OTA/โครงสร้างพื้นฐาน</li>
+          <li>โมเดล Device + readings ทุกชนิด (ดิน น้ำ อากาศ สุขภาพ)</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>กฎอัตโนมัติข้ามโดเมน (ตัวอย่าง: สต็อกวัตถุดิบครัวต่ำ → สั่งซื้อเสนอราคา)</li>
+          <li>แดชบอร์ดพลังงานแบบต้นทุน-บาทจริง</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>ไลบรารีอุปกรณ์มาตรฐาน (zigbee/MQTT) ให้ต่อของใหม่ได้ใน 5 นาที</li>
+          <li>คนที่มีฮาร์ดแวร์จริงหลากชนิดมาทดสอบร่วม</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="index.html#all">ดูรายการทั้งระบบ ↗</a></div>
+    </article>
+
+    <article class="proj" id="p-farm">
+      <div class="proj-head"><span class="ic">🌾</span><h3>ฟาร์มข้อมูล · ปศุสัตว์-เกษตร-อาหาร</h3><span class="no">ชิ้นที่ ๔</span></div>
+      <span class="visa r2">● มีระบบจริง · จากคอกถึงกำไร</span>
+      <p class="idea">ฟาร์มเลี้ยงสัตว์ไม่ควรจดแจ้นสมุดเล่ม: <b>ทะเบียนฝูง สุขภาพ วัคซีน ผลผลิตรายวัน อากาศโรงเรือน</b> อยู่ในฐานข้อมูลเดียว จบที่ต้นทุน-กำไรต่อรอบการเลี้ยง — และเศษอาหารจากร้าน/ครัวกลับเข้าระบบปุ๋ย-คอมโพสต์ของแปลงเกษตร เป็นวงจรเดียวกัน</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>11 route modules ปศุสัตว์ + Vision AI กล้องตรวจกลุ่มสัตว์ + vet-AI</li>
+          <li>ร้านอาหาร: เมนู&สูตร (ทุนต่อจาน) จอครัว KDS ครัว IoT รายงานกำไร</li>
+          <li>แปลงเกษตร วิจัยพันธุ์ข้าว เสบียง — และวงจรเศษอาหาร→คอมโพสต์</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>ผลผลิตต่อหัว/ต่อแปลงเชื่อมเข้าสมุดบัญชีเดียวกับฝั่งขาย</li>
+          <li>กล้อง AI จับพฤติกรรมสัตว์แบบเรียลไทม์บนอุปกรณ์ท้องถิ่น</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>ฟาร์มจริงมาทดลอง 1 รอบการเลี้ยงเต็ม ๆ เพื่อปรับสูตรต้นทุน</li>
+          <li>ข้อมูลอ้างอิงอัตราวัคซีน/อาหารต่อสายพันธุ์</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="index.html#fit">ดูการ์ดผู้ใช้ 3 กลุ่ม ↗</a></div>
+    </article>
+
+    <article class="proj" id="p-market">
+      <div class="proj-head"><span class="ic">🤖</span><h3>ตลาดอัจฉริยะ · ผู้ช่วย AI ที่มีบริบทธุรกิจจริง</h3><span class="no">ชิ้นที่ ๕</span></div>
+      <span class="visa r1">○ รากวางไว้แล้ว · รอโมเดล</span>
+      <p class="idea">ผู้ช่วย AI ส่วนใหญ่ไม่รู้จักร้านของคุณ — แนวคิดนี้คือ AI ที่<b>อ่านข้อมูลจริงของบ้าน/ร้านได้</b> (สินค้า ยอดขาย สต็อก สุขภาพระบบ) มีสิทธิ์แบบมีเงื่อนไข มี policy ก่อนลงมือ และทำงาน offline ในเครื่องเรา — ตัวอย่างใกล้สุดคือ "AI สอนลูก" ที่ใช้สถาปัตยกรรมเดียวกันไปแล้ว</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>โมดูล agent: routes + policy + team + workspace + executor</li>
+          <li>โหมดไร้ AI ตอบสุภาพใน ~3 วินาที ไม่ค้าง — รายงาน fallback จากข้อมูลดิบ</li>
+          <li>พยานที่ว่าสถาปัตยกรรมเดินได้: RAG คลังความรู้ + teach-kids</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>ผู้ช่วย 5 ตำแหน่ง (ขาย/สต็อก/ลูกค้า/การตลาด/บัญชี) ใช้ข้อมูลจริงในเครื่อง</li>
+          <li>สรุปภาษีรายงวดเป็นภาษาคน พร้อมเช็กความเสี่ยงก่อนยื่น</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>โมเดลภาษาไทยที่วิ่งไหวบนเครื่องธรรมดา (หรือ GPU เล็ก)</li>
+          <li>การออกแบบสิทธิ์+ขอบเขต AI ร่วมกับคนที่คิดเรื่อง safety</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="index.html#ai">ดูผู้ช่วย 5 ตำแหน่ง ↗</a></div>
+    </article>
+  </section>
+
+  <!-- ═══ HOW THE PIECES FIT ═══ -->
+  <section id="fit-together">
+    <p class="k-ch">// ภาพใหญ่</p>
+    <h2>ทำไมหลายชิ้นถึงเร็วกว่าทำแยก</h2>
+    <p class="sub">ทุกชิ้นยืนบนพื้นเดียวกัน — ทำชิ้นหนึ่งให้ดี ชิ้นอื่นได้ประโยชน์ทันที</p>
+    <ul class="bullet">
+      <li><b>ผู้ใช้/สิทธิ์/audit/backup ชุดเดียว</b> — เพิ่มโมดูลใหม่ไม่ต้องสร้างระบบสมาชิกใหม่</li>
+      <li><b>ข้อมูลไหลข้ามชิ้น</b> — เศษอาหาร→ปุ๋ย, การสอนเงิน→สมุดบัญชี, กล้อง→แจ้งเตือน</li>
+      <li><b>มาตรฐานโค้ดเดียว</b> — เทสนำ, e2e, typecheck สองฝั่ง ทุก PR เดียวกัน</li>
+      <li><b>self-hosted ตลอด</b> — ข้อมูลไม่ออกจากเครื่อง ไม่มีค่ารายเดือน ไม่มีเจ้าของคนอื่น</li>
+    </ul>
+  </section>
+
+  <!-- ═══ INVITE ═══ -->
+  <section id="invite">
+    <p class="k-ch">// ชวนร่วมมือ</p>
+    <h2>ถ้าชิ้นไหนอ่านแล้วอยากทำต่อด้วยกัน</h2>
+    <p class="sub">เป้าหมายไม่ใช่โปรเจ็กเดี่ยวตลอดไป — ทุกชิ้นถูกออกแบบให้คนอื่นเข้ามาต่อได้ ไม่ว่าจะเป็นร่วมเขียนโค้ด ทดสอบหน้างาน หรือนำไปใช้จริงในธุรกิจของคุณ</p>
+    <div class="invite">
+      <h3>ร่วมมือได้หลายแบบ</h3>
+      <div class="roles">
+        <div class="role"><div class="t">👨‍💻 นักพัฒนา</div><div class="d">เลือกชิ้นที่ถูกใจ ดู "ต้องการอะไร" ของชิ้นนั้น — โค้ดมาตรฐาน TypeScript เต็มรูปแบบ</div></div>
+        <div class="role"><div class="t">🏪 เจ้าของธุรกิจ/ฟาร์ม</div><div class="d">เป็นผู้ใช้นำร่วม ใช้จริง ให้ feedback หน้างาน — ระบบจะเกิดจากของจริง ไม่ใช่ห้องแล็บ</div></div>
+        <div class="role"><div class="t">🔌 สายฮาร์ดแวร์</div><div class="d">เชื่อมเซ็นเซอร์/อุปกรณ์ใหม่ให้ระบบบ้าน — ทุกอย่างที่พูด MQTT ได้คือพาร์ตเนอร์</div></div>
+        <div class="role"><div class="t">🧠 สาย AI/ภาษาไทย</div><div class="d">โมเดลขนาดพอเหมาะสำหรับภาษาไทย + คิดเรื่องขอบเขตสิทธิ์ AI ให้ปลอดภัย</div></div>
+      </div>
+      <p>ทางเดียวที่ต้องตกลงร่วมกัน: ระบบยัง self-hosted และโอเพนในบ้าน — ข้อมูลของผู้ใช้ไม่ออกจากเครื่องผู้ใช้</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="index.html#run">ดูวิธีรันเองฟรี 3 ขั้น</a>
+        <a class="btn btn-ghost" href="index.html">กลับหน้าภาพรวม</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ข้อความ "สิ่งที่มีจริง" อ้างอิงโค้ดที่ deploy อยู่จริง · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+</body>
+</html>
