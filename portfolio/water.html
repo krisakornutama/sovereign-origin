@@ -86,6 +86,10 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .principle b{color:#ecfdf5}
 .detail{border:1px dashed rgba(34,211,238,.35);border-radius:12px;padding:14px 18px;color:var(--dim);font-size:.86rem;min-height:76px}
 .detail b{color:#a5f3fc}
+.tr{font-size:.8rem;color:var(--dim);margin:8px 0 0}
+.tr b{color:#a5f3fc}
+.tp{font-family:var(--mono);font-size:.56rem;color:var(--cyan);margin:2px 0 0;word-break:break-all}
+.srcline{font-family:var(--mono);font-size:.64rem;color:var(--faint);margin:14px 0 0}
 .checks li{margin:6px 0}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 26px}
@@ -134,6 +138,8 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="water.html" aria-current="page">ชัยภูมิน้ำ</a>
     <a href="iot.html">บ้าน IoT</a>
     <a href="books.html">คลังหนังสือ</a>
+    <a href="search.html">ค้นหา</a>
+    <a href="en.html">EN</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
   </nav>
 </header>
@@ -166,6 +172,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div>
         <p class="principle" id="waterPrinciple" aria-live="polite"></p>
         <div class="detail" id="cellDetail" aria-live="polite"></div>
+        <p class="srcline" id="dataLine" aria-live="polite"></p>
         <p class="k-ch" style="margin:18px 0 8px">// หลักตรวจของโหมดนี้</p>
         <ul class="bullet checks" id="waterChecks"></ul>
       </div>
@@ -291,6 +298,19 @@ var MODES = {
 
 function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
+/* ─── TERRAIN — ข้อมูลแปลง/บ่อ/รางบนกระดาน (โครงสร้างฟิลด์ตรง model FarmPlot ของระบบ)
+   role: plot | pond | channel | windbreak · status: active | growing | harvested | fallow
+   เติมรายการจริงได้ในบล็อกเดียว เช่น { cell:'se', name:'แปลงจริง', crop:'ข้าว', area_sqm:400, status:'growing', role:'plot' } ─── */
+var STATUS_TH = { growing: 'กำลังปลูก', harvested: 'เก็บแล้ว', fallow: 'พักแปลง', active: '' };
+var TERRAIN = [
+  { cell: 'c',  name: 'บ่อหลักกลางไร่ (วางแผน)', role: 'pond' },
+  { cell: 'se', name: 'แปลงผักหลังบ้าน', crop: 'มะเขือเทศ', area_sqm: 32, status: 'growing', role: 'plot' },
+  { cell: 'se', name: 'แปลงสมุนไพร', area_sqm: 18, status: 'growing', role: 'plot' },
+  { cell: 'e',  name: 'โซน A · ถั่วฝักยาว', area_sqm: 12, status: 'growing', role: 'plot' },
+  { cell: 'sw', name: 'โซน B · ข้าวโพด', area_sqm: 20, status: 'harvested', role: 'plot' },
+  { cell: 'sw', name: 'โซน C · พักแปลง', area_sqm: 15, status: 'fallow', role: 'plot' }
+];
+
 var modeKeys = Object.keys(MODES);
 var currentMode = modeKeys[0];
 var currentCell = 'c';
@@ -320,7 +340,7 @@ function buildBoard(){
     c.dataset.idx = String(i);
     c.dataset.key = key;
     c.setAttribute('aria-pressed', 'false');
-    c.innerHTML = '<span class="no"></span><span class="dir">' + esc(DIR_TH[key]) + '</span><p class="tg"></p>';
+    c.innerHTML = '<span class="no"></span><span class="dir">' + esc(DIR_TH[key]) + '</span><p class="tg"></p><p class="tp" hidden></p>';
     c.addEventListener('click', function(){ currentCell = key; render(); });
     boardEl.appendChild(c);
   });
@@ -334,16 +354,27 @@ function render(){
     var it = items[i];
     c.querySelector('.no').textContent = 'จุดที่ ' + (i + 1);
     c.querySelector('.tg').textContent = it ? it.tag : '';
+    var here = TERRAIN.filter(function(t){ return t.cell === c.dataset.key; });
+    var tp = c.querySelector('.tp');
+    tp.hidden = here.length === 0;
+    if (here.length) tp.textContent = here[0].name + (here.length > 1 ? ' +' + (here.length - 1) : '');
     c.setAttribute('aria-pressed', String(c.dataset.key === currentCell));
   });
   var sel = M.cells[currentCell] || items[4];
-  detailEl.innerHTML = '<b>' + esc(MODES[currentMode].label) + ' · ' + esc(DIR_TH[currentCell]) + '</b> — ' + (sel ? esc(sel.text) : '');
+  var html = '<b>' + esc(MODES[currentMode].label) + ' · ' + esc(DIR_TH[currentCell]) + '</b> — ' + (sel ? esc(sel.text) : '');
+  TERRAIN.filter(function(t){ return t.cell === currentCell; }).forEach(function(t){
+    html += '<p class="tr"><b>' + esc(t.name) + '</b>' + (t.crop ? ' · ' + esc(t.crop) : '') + (t.area_sqm ? ' · ' + esc(t.area_sqm) + ' ตร.ม.' : '') + (STATUS_TH[t.status] ? ' · ' + esc(STATUS_TH[t.status]) : '') + '</p>';
+  });
+  detailEl.innerHTML = html;
   checksEl.replaceChildren();
   M.checks.forEach(function(t){
     var li = document.createElement('li');
     li.innerHTML = '<b>·</b> ' + esc(t);
     checksEl.appendChild(li);
   });
+  document.getElementById('dataLine').textContent = TERRAIN.length
+    ? 'แหล่งข้อมูล: บล็อก TERRAIN · ' + TERRAIN.length + ' รายการ (โครงสร้างตรง FarmPlot — ข้อมูลสาธิตจับคู่หน้าเกษตร)'
+    : 'ยังไม่มีข้อมูลแปลง — กระดานแสดงข้อความโหมดล้วน';
 }
 function selectMode(k){
   if (modeKeys.indexOf(k) < 0) return;
@@ -360,6 +391,8 @@ window.__water__ = {
   ORDER: ORDER,
   DIR_TH: DIR_TH,
   MODES: MODES,
+  TERRAIN: TERRAIN,
+  setData: function(arr){ TERRAIN.length = 0; arr.forEach(function(t){ TERRAIN.push(t); }); render(); },
   selectMode: selectMode,
   selectCell: function(key){ currentCell = key; render(); },
   current: function(){ return { mode: currentMode, cell: currentCell }; }

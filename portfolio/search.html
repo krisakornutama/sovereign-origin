@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ค้นหาทั้งเว็บ — Project Sovereign</title>
+<meta name="description" content="ค้นหาทุกหน้าของ Project Sovereign จากช่องเดียว: ผลงาน ปศุสัตว์ ประมง เกษตร บ้าน IoT คลังหนังสือ และหน้าแนวคิด — กรองตามหมวด พร้อมลิงก์ลึกถึงหัวข้อย่อย">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='7' cy='7' r='3.6' fill='none' stroke='%2322d3ee' stroke-width='1.4'/%3E%3Cpath d='M10 10l3.4 3.4' stroke='%2334d399' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+
+.hero{max-width:860px;margin:0 auto;padding:70px 24px 40px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.8rem,4.5vw,2.8rem);font-weight:700;line-height:1.25;margin:0 0 16px}
+h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.35)}
+.lede{color:var(--dim);font-size:1rem;margin:0 0 24px}
+.searchbox{position:relative;max-width:560px}
+.searchbox input{width:100%;background:rgba(17,24,39,.7);border:1px solid rgba(52,211,153,.35);border-radius:10px;
+  color:#ecfdf5;font-family:var(--thai);font-size:1rem;padding:13px 44px 13px 16px;outline:none}
+.searchbox input::placeholder{color:var(--faint)}
+.searchbox input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+.searchbox button{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:0;
+  color:var(--dim);font-size:.95rem;cursor:pointer;padding:4px 8px;border-radius:6px}
+.searchbox button:hover{color:#ecfdf5;background:rgba(156,163,175,.15)}
+.searchhint{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:10px 0 0}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.fbtn{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;color:var(--dim);background:transparent;
+  border:1px solid rgba(156,163,175,.3);border-radius:999px;padding:6px 14px;cursor:pointer;transition:color .15s ease,border-color .15s ease,background .15s ease}
+.fbtn:hover{color:#ecfdf5;border-color:rgba(52,211,153,.5)}
+.fbtn[aria-pressed="true"]{color:#030712;background:var(--cyan);border-color:var(--cyan);font-weight:700}
+
+main{max-width:860px;margin:0 auto;padding:26px 24px 70px}
+.status{font-family:var(--mono);font-size:.68rem;color:var(--faint);margin:0 0 18px}
+.results{display:flex;flex-direction:column;gap:10px}
+.hit{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;display:block;text-decoration:none;transition:border-color .15s ease}
+.hit:hover{border-color:rgba(34,211,238,.5)}
+.hit .crumb{font-family:var(--mono);font-size:.62rem;color:var(--cyan);letter-spacing:.06em;margin:0 0 4px}
+.hit .t{font-weight:600;font-size:.94rem;color:#ecfdf5;margin:0}
+.hit .d{font-size:.82rem;color:var(--dim);margin:4px 0 0}
+.empty{border:1px dashed rgba(52,211,153,.35);border-radius:12px;padding:26px 22px;text-align:center;color:var(--dim);font-size:.86rem}
+.empty b{color:#ecfdf5}
+.startup{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:18px 22px;color:var(--dim);font-size:.85rem}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .hero{padding:52px 20px 32px}
+  main{padding:22px 20px 60px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html">ประมง</a>
+    <a href="farm.html">เกษตร&สมุนไพร</a>
+    <a href="water.html">ชัยภูมิน้ำ</a>
+    <a href="iot.html">บ้าน IoT</a>
+    <a href="books.html">คลังหนังสือ</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+    <a href="search.html" aria-current="page">ค้นหา</a>
+    <a href="en.html">EN</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <p class="eyebrow">PROJECT SOVEREIGN · SEARCH</p>
+  <h1>ค้นหาทั้งเว็บจาก<em>ช่องเดียว</em></h1>
+  <p class="lede">ทุกหน้า ทุกหัวข้อ ทุกเล่มหนังสือ ทุกจุดบนกระดานชัยภูมิน้ำ — ดัชนีสร้างสดจากหน้าจริงตอนเปิด จึงไม่มีวันล้าสมัย</p>
+  <div class="searchbox">
+    <input id="q" type="search" placeholder="ลองพิมพ์: ภาษี, ปลานิล, บ่อหลัก, สมุนไพร…" aria-label="ค้นหาทั้งเว็บ" autocomplete="off">
+    <button id="clear" type="button" hidden aria-label="ล้างคำค้นหา">✕</button>
+  </div>
+  <div class="filters" id="typeFilters" role="group" aria-label="กรองตามหมวด" hidden></div>
+  <p class="searchhint" id="hint">พิมพ์อย่างน้อย 2 ตัวอักษร · ใช้ได้ทั้งภาษาไทยและอังกฤษ</p>
+</section>
+
+<main>
+  <p class="status" id="status">กำลังสร้างดัชนีจากหน้าเว็บจริง…</p>
+  <div class="results" id="results" aria-live="polite"></div>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ดัชนีค้นหาสร้างสดในเบราว์เซอร์ · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   SITE SEARCH — ดัชนีสร้างสดจากหน้าจริงทุกหน้า (fetch ตอนเปิด)
+   รายการลึก (ลิงก์ตรงถึงหัวข้อ) ดึงจากข้อมูลจริงของหน้านั้น:
+   - books.html  → ชื่อเล่มจาก BOOKS_PUBLISHED/BOOKS_READ
+   - water.html  → จุดทั้ง 9 ของทั้ง 3 โหมด + ข้อมูล TERRAIN
+   หน้าอื่น      → หัวข้อ section (h2) + คำอธิบายของหน้า
+   เพิ่มหน้าใหม่ใน PAGES เท่านั้น — ตัวดัชนีไม่ต้องแก้
+   ═══════════════════════════════════════════════════════════════ */
+var PAGES = [
+  { file: 'index.html',     type: 'system',   label: 'ภาพรวม' },
+  { file: 'projects.html',  type: 'project',  label: 'ผลงาน' },
+  { file: 'livestock.html', type: 'farm',     label: 'ปศุสัตว์' },
+  { file: 'fishery.html',   type: 'farm',     label: 'ประมง' },
+  { file: 'farm.html',      type: 'farm',     label: 'เกษตร&สมุนไพร' },
+  { file: 'water.html',     type: 'concept',  label: 'ชัยภูมิน้ำ' },
+  { file: 'iot.html',       type: 'system',   label: 'บ้าน IoT' },
+  { file: 'education.html', type: 'edu',      label: 'AI สอนลูก' },
+  { file: 'books.html',     type: 'books',    label: 'คลังหนังสือ' },
+  { file: 'en.html',        type: 'system',   label: 'English' }
+];
+var TYPE_TH = { system: 'ระบบ', project: 'ผลงาน', farm: 'ฟาร์ม', concept: 'แนวคิด', edu: 'การศึกษา', books: 'หนังสือ', en: 'English' };
+var TYPE_ORDER = ['system', 'project', 'farm', 'concept', 'edu', 'books', 'en'];
+
+function stripTags(s){ return s.replace(/<[^>]*>/g, ' '); }
+function norm(s){ return String(s).toLowerCase(); }
+
+/* ตัด <script>/<style> ก่อน แล้วจับ (id, h2/h3, ย่อหน้าแรก) เป็นหัวข้อค้นได้ */
+function sectionHits(p, html){
+  var body = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  var out = [];
+  var re = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/g, m;
+  while ((m = re.exec(body))) {
+    var t = stripTags(m[1]).replace(/\s+/g, ' ').trim();
+    if (t.length > 1) out.push({ page: p.file, type: p.type, pageLabel: p.label, title: t, desc: '', href: p.file });
+  }
+  var desc = body.match(/<meta\s+name="description"\s+content="([^"]+)"/i);
+  out.push({ page: p.file, type: p.type, pageLabel: p.label, title: p.label, desc: desc ? desc[1] : '', href: p.file, isPage: true });
+  return out;
+}
+
+function booksHits(html){
+  var out = [];
+  var m = html.match(/var\s+BOOKS_PUBLISHED\s*=\s*\[([\s\S]*?)\n\];/);
+  var r = html.match(/var\s+BOOKS_READ\s*=\s*\[([\s\S]*?)\n\];/);
+  [m && { arr: m[1], shelf: 'ผลงานที่ลงพิมพ์' }, r && { arr: r[1], shelf: 'ชั้นหนังสือที่อ่าน' }].forEach(function (g) {
+    if (!g) return;
+    g.arr.replace(/\{[^}]*\}/g, function (obj) {
+      var t = (obj.match(/title\s*:\s*'([^']+)'/) || [])[1];
+      if (!t) return obj;
+      var a = (obj.match(/author\s*:\s*'([^']+)'/) || [])[1];
+      var c = (obj.match(/category\s*:\s*'([^']+)'/) || [])[1];
+      out.push({ page: 'books.html', type: 'books', pageLabel: 'คลังหนังสือ', title: t, desc: g.shelf + (a ? ' · ' + a : '') + (c ? ' · ' + c : ''), href: 'books.html' });
+      return obj;
+    });
+  });
+  return out;
+}
+
+function waterHits(html){
+  var out = [];
+  ['pioneer', 'formation8', 'patriarch'].forEach(function (key) {
+    var re = new RegExp(key + '\\s*:\\s*\\{[\\s\\S]*?cells\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\}\\n\\s*\\}');
+    var g = html.match(re);
+    if (!g) return;
+    var modeName = (html.match(new RegExp(key + ':\\s*\\{\\s*label:\\s*\'([^\']+)\'')) || [])[1] || key;
+    g[1].replace(/\{[^{}]*\}/g, function (obj) {
+      var tag = (obj.match(/tag\s*:\s*'([^']+)'/) || [])[1];
+      if (!tag) return obj;
+      out.push({ page: 'water.html', type: 'concept', pageLabel: 'ชัยภูมิน้ำ', title: tag, desc: 'โหมด ' + modeName, href: 'water.html' });
+      return obj;
+    });
+  });
+  var tr = html.match(/var\s+TERRAIN\s*=\s*\[([\s\S]*?)\n\];/);
+  if (tr) tr[1].replace(/\{[^}]*\}/g, function (obj) {
+    var n = (obj.match(/name\s*:\s*'([^']+)'/) || [])[1];
+    if (!n) return obj;
+    out.push({ page: 'water.html', type: 'concept', pageLabel: 'ชัยภูมิน้ำ', title: n, desc: 'ข้อมูลแปลง/บ่อ/รางบนกระดาน', href: 'water.html' });
+    return obj;
+  });
+  return out;
+}
+
+var INDEX = [];
+function renderStatus(){
+  document.getElementById('status').textContent = 'ดัชนี: ' + PAGES.length + ' หน้า · ' + INDEX.length + ' รายการค้นได้';
+}
+function buildTypeFilters(){
+  var types = TYPE_ORDER.filter(function (t) { return INDEX.some(function (it) { return it.type === t; }); });
+  var bar = document.getElementById('typeFilters');
+  bar.hidden = types.length === 0;
+  bar.replaceChildren();
+  function btn(key, label){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'fbtn'; b.dataset.type = key;
+    b.innerHTML = label + ' <span style="opacity:.6">' + INDEX.filter(function (it) { return it.type === key; }).length + '</span>';
+    b.addEventListener('click', function () {
+      currentType = (currentType === key ? '' : key);
+      bar.querySelectorAll('.fbtn').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.type === currentType)); });
+      run();
+    });
+    bar.appendChild(b);
+  }
+  btn('', 'ทั้งหมด');
+  types.forEach(function (t) { btn(t, TYPE_TH[t] || t); });
+}
+var currentType = '';
+
+async function buildIndex(){
+  var parts = await Promise.all(PAGES.map(async function (p) {
+    try {
+      var res = await fetch(p.file, { cache: 'no-cache' });
+      if (!res.ok) return [];
+      var html = await res.text();
+      var hits = sectionHits(p, html);
+      if (p.file === 'books.html') hits = hits.concat(booksHits(html));
+      if (p.file === 'water.html') hits = hits.concat(waterHits(html));
+      return hits;
+    } catch (e) { return []; }
+  }));
+  INDEX = [].concat.apply([], parts);
+  renderStatus();
+  buildTypeFilters();
+  if (input.value.trim().length >= 2) run();
+}
+
+var input = document.getElementById('q');
+var clearBtn = document.getElementById('clear');
+var resultsEl = document.getElementById('results');
+var EMPTY_START = '<div class="empty"><b>เริ่มพิมพ์เพื่อค้นหา</b> — ตัวอย่าง: "ภาษี", "ปลานิล", "บ่อหลัก", "สมุนไพร"</div>';
+
+function run(){
+  var q = input.value.trim().toLowerCase();
+  clearBtn.hidden = !input.value;
+  if (q.length < 2) { resultsEl.innerHTML = EMPTY_START; return; }
+  var terms = q.split(/\s+/);
+  var hits = INDEX.filter(function (it) {
+    if (currentType && it.type !== currentType) return false;
+    var hay = norm(it.title + ' ' + (it.desc || '') + ' ' + (it.pageLabel || ''));
+    return terms.every(function (t) { return hay.indexOf(t) >= 0; });
+  }).slice(0, 40);
+  if (!hits.length) { resultsEl.innerHTML = '<div class="empty">ไม่พบผลสำหรับ "<b>' + q.replace(/[<>&"]/g, '') + '</b>" — ลองคำสั้นลงหรืออีกคำหนึ่ง</div>'; return; }
+  resultsEl.innerHTML = hits.map(function (it) {
+    return '<a class="hit" href="' + it.href + '"><p class="crumb">' + (TYPE_TH[it.type] || it.type) + ' · ' + it.pageLabel + '</p>' +
+      '<p class="t">' + it.title.replace(/[<>&]/g, '') + '</p>' + (it.desc ? '<p class="d">' + it.desc.replace(/[<>&]/g, '') + '</p>' : '') + '</a>';
+  }).join('');
+}
+input.addEventListener('input', run);
+clearBtn.addEventListener('click', function () { input.value = ''; input.dispatchEvent(new Event('input')); input.focus(); });
+resultsEl.innerHTML = EMPTY_START;
+
+buildIndex();
+
+/* console API (เล่น/ทดสอบ): window.__search__ */
+window.__search__ = {
+  ready: function(){ return INDEX.length; },
+  find: function(q){ var old = input.value; input.value = q; run(); var n = resultsEl.querySelectorAll('.hit').length; input.value = old; run(); return n; },
+  PAGES: PAGES
+};
+</script>
+
+</body>
+</html>

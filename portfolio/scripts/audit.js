@@ -47,7 +47,7 @@ for (const page of pages) {
   }
 }
 
-report(pages.length >= 9, `all ${pages.length} pages read`, pages.join(', '));
+report(pages.length >= 11, `all ${pages.length} pages read`, pages.join(', '));
 
 const seen = new Set();
 for (const row of linkRows) {
@@ -230,6 +230,26 @@ async function main() {
   report(modeOk && detailC.includes('หัวใจค่าย'), 'widget water: mode switch + center-cell detail updates');
   const checksN = await p.locator('#waterChecks li').count();
   report(checksN === 4, 'widget water: mode checks render 4 rules');
+
+  // search: runtime index builds, query returns hits, type filter works
+  await goto('search.html');
+  await p.waitForFunction(() => window.__search__ && window.__search__.ready() > 50, null, { timeout: 15000 });
+  const idxN = await p.evaluate(() => window.__search__.ready());
+  report(idxN > 50, 'widget search: runtime index built from all pages', `entries=${idxN}`);
+  const findBooks = await p.evaluate(() => window.__search__.find('คลังหนังสือ'));
+  const findWater = await p.evaluate(() => window.__search__.find('บ่อหลัก'));
+  const findEn = await p.evaluate(() => window.__search__.find('livestock'));
+  report(findBooks >= 1 && findWater >= 1 && findEn >= 1, 'widget search: finds books + water + english entries', `books=${findBooks} water=${findWater} en=${findEn}`);
+  await p.fill('#q', 'ภาษี');
+  await p.waitForTimeout(250);
+  const taxHits = await p.locator('.hit').count();
+  report(taxHits >= 1, 'widget search: typing in the box renders hits', `hits=${taxHits}`);
+
+  // en: english landing renders the full tour
+  await goto('en.html');
+  const stops = await p.locator('.tour .stop').count();
+  const langEn = await p.evaluate(() => document.documentElement.lang === 'en');
+  report(stops === 8 && langEn, 'widget en: landing renders 8 tour stops in english');
 
   // projects: contact form validation without navigation
   await goto('projects.html');

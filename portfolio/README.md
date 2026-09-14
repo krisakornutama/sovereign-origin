@@ -1,13 +1,13 @@
 # Portfolio — Project Sovereign
 
-เว็บโชว์ผลงานแบบ static หลายหน้า (`index.html` = ทัวร์ทั้งระบบ + `projects.html` = ผลงานทีละชิ้น + ฟอร์มติดต่อ + `livestock.html` = ปศุสัตว์ + `fishery.html` = แบบแปลนการประมง + `farm.html` = เกษตร&สมุนไพร + `iot.html` = บ้าน IoT + `education.html` = โมดูล AI สอนลูก + `water.html` = ชัยภูมิน้ำ (แนวคิดรางน้ำ-บ่อ-พื้นที่เพาะปลูกแบบค่ายกล 8 ทิศ) + `books.html` = คลังหนังสือของนักเขียน: ผลงานที่ลงพิมพ์+ลิงก์แหล่งเดิม และชั้นหนังสือที่อ่าน) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
+เว็บโชว์ผลงานแบบ static หลายหน้า (`index.html` = ทัวร์ทั้งระบบ + `projects.html` = ผลงานทีละชิ้น + ฟอร์มติดต่อ + `livestock.html` = ปศุสัตว์ + `fishery.html` = แบบแปลนการประมง + `farm.html` = เกษตร&สมุนไพร + `iot.html` = บ้าน IoT + `education.html` = โมดูล AI สอนลูก + `water.html` = ชัยภูมิน้ำ (แนวคิดรางน้ำ-บ่อ-พื้นที่เพาะปลูกแบบค่ายกล 8 ทิศ) + `books.html` = คลังหนังสือของนักเขียน: ผลงานที่ลงพิมพ์+ลิงก์แหล่งเดิม และชั้นหนังสือที่อ่าน + `search.html` = ค้นหาทั้งเว็บจากช่องเดียว + `en.html` = หน้าแรกภาษาอังกฤษ) — ไม่มี build step ไม่มี dependency โฮสต์ฟรีด้วย GitHub Pages
 
 ## วิธีขึ้น GitHub Pages (เลือกทางใดทางหนึ่ง)
 
 ### ทางที่ 1 — อัปโหลดผ่านหน้าเว็บ GitHub (ง่ายสุด ไม่ต้องใช้ git)
 
 1. สมัคร/ล็อกอิน GitHub แล้วสร้าง repository ใหม่ ตั้งชื่อเช่น `project-sovereign` → **Public**
-2. กด **uploading an existing file** แล้วลากไฟล์จากโฟลเดอร์ `portfolio/` **ทั้ง 11 ไฟล์** ขึ้นไป (`index.html`, `projects.html`, `livestock.html`, `fishery.html`, `farm.html`, `iot.html`, `education.html`, `water.html`, `books.html`, `.nojekyll`, `README.md`)
+2. กด **uploading an existing file** แล้วลากไฟล์จากโฟลเดอร์ `portfolio/` **ทั้ง 13 ไฟล์** ขึ้นไป (`index.html`, `projects.html`, `livestock.html`, `fishery.html`, `farm.html`, `iot.html`, `education.html`, `water.html`, `books.html`, `search.html`, `en.html`, `.nojekyll`, `README.md`)
    - ถ้าหาไฟล์ `.nojekyll` ไม่เจอใน Explorer (เป็นไฟล์ที่ขึ้นต้นจุด) ให้ข้ามก่อน — ดูขั้น 4
 3. กด **Commit changes**
 4. ถ้ายังไม่ได้ใส่ `.nojekyll`: ใน repo กด **Add file → Create new file** ตั้งชื่อว่า `.nojekyll` (เนื้อหาว่าง) → Commit
@@ -19,7 +19,7 @@
 ```bash
 # ในโฟลเดอร์ portfolio/
 git init
-git add index.html projects.html livestock.html fishery.html farm.html iot.html education.html books.html water.html .nojekyll README.md
+git add index.html projects.html livestock.html fishery.html farm.html iot.html education.html books.html water.html search.html en.html .nojekyll README.md
 git commit -m "portfolio: Project Sovereign showcase — self-hosted commerce OS with Thai tax engine + AI kids education"
 git branch -M main
 # สร้าง repo เปล่าบน GitHub ก่อน (ชื่อ project-sovereign) แล้วแก้ชื่อผู้ใช้ด้านล่าง:
