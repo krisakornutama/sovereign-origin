@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>คลังหนังสือ — Project Sovereign</title>
-<meta name="description" content="คลังเก็บหนังสือของนักเขียน: หนังสือที่ลงพิมพ์พร้อมลิงก์อ่านต่อ และชั้นหนังสือที่อ่าน — ค้นหาได้ กรองตามหมวดได้ เรียงตามปีได้ ข้อมูลอยู่ในไฟล์เดียว โฮสต์ฟรี">
+<meta name="description" content="คลังเก็บหนังสือของนักเขียน: หนังสือที่ลงพิมพ์พร้อมลิงก์อ่านต่อ และชั้นหนังสือที่อ่าน — ค้นหา กรองชั้น/หมวด/ผู้เขียน/ปี เรียงตามปี สั่งลำดับเองได้ ข้อมูลอยู่ในไฟล์เดียว โฮสต์ฟรี">
 <meta name="theme-color" content="#030712">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M4 3h6.5c1 0 1.5.6 1.5 1.5V13H5.5C4.7 13 4 12.3 4 11.5V3z' fill='%2334d399'/%3E%3Cpath d='M4 3v8.5C4 10.6 4.7 11 5.5 11H12v2H5.5C4.7 13 4 12.3 4 11.5' fill='none' stroke='%23030712' stroke-width='.9'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,6 +18,7 @@
   --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
   radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
@@ -64,6 +65,11 @@ h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.
   color:var(--dim);font-size:.9rem;cursor:pointer;padding:4px 8px;border-radius:6px}
 .searchbox button:hover{color:#ecfdf5;background:rgba(156,163,175,.15)}
 .searchhint{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:0}
+.globalfilters{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0 0}
+.globalfilters .filters{margin:0}
+.sortsel{font-family:var(--mono);font-size:.7rem;color:var(--dim);display:inline-flex;align-items:center;gap:8px}
+.sortsel select{background:rgba(17,24,39,.7);border:1px solid rgba(34,211,238,.3);border-radius:8px;color:#a5f3fc;
+  font-family:var(--mono);font-size:.72rem;padding:6px 10px;cursor:pointer;max-width:190px}
 
 html{scroll-padding-top:70px}
 section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
@@ -101,12 +107,9 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .fbtn[aria-pressed="true"] .n{opacity:.75}
 .toolrow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 22px}
 .toolrow .filters{margin:0}
-.sortsel{font-family:var(--mono);font-size:.7rem;color:var(--dim);display:inline-flex;align-items:center;gap:8px;margin-left:auto}
-.sortsel select{background:rgba(17,24,39,.7);border:1px solid rgba(34,211,238,.3);border-radius:8px;color:#a5f3fc;
-  font-family:var(--mono);font-size:.72rem;padding:6px 10px;cursor:pointer}
+.toolrow .sortsel{margin-left:auto}
 .empty{border:1px dashed rgba(52,211,153,.35);border-radius:12px;padding:26px 22px;text-align:center;color:var(--dim);font-size:.85rem}
 .empty b{color:#ecfdf5}
-.shelfnote{font-family:var(--mono);font-size:.66rem;color:var(--faint);margin:14px 0 0}
 
 .honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
 .honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
@@ -125,7 +128,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   .topnav{gap:10px;font-size:.64rem}
   .shelfgrid{grid-template-columns:repeat(2,1fr);gap:10px}
   .searchbox{max-width:100%}
-  .sortsel{margin-left:0}
+  .toolrow .sortsel{margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
@@ -153,17 +156,26 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <section class="hero">
     <p class="eyebrow">PROJECT SOVEREIGN · SHELF ของนักเขียน</p>
     <h1>คลังหนังสือ — <em>เขียนเอง</em> อ่านเอง<br>เก็บไว้ที่เดียว</h1>
-    <p class="lede">สองชั้นวางคู่กัน: หนังสือที่ลงพิมพ์พร้อมลิงก์เข้าแหล่งเดิมทุกเล่ม และชั้นหนังสือที่อ่านแล้วที่เล่ารสนิยมของคนเขียน — ค้นหา กรองหมวด เรียงตามปีได้ในหน้าเดียว</p>
+    <p class="lede">สองชั้นวางคู่กัน: หนังสือที่ลงพิมพ์พร้อมลิงก์เข้าแหล่งเดิมทุกเล่ม และชั้นหนังสือที่อ่านแล้วที่เล่ารสนิยมของคนเขียน — ค้นหา กรองชั้น/หมวด/ผู้เขียน/ปี และเรียงลำดับได้ในหน้าเดียว</p>
     <p class="meta-line">ข้อมูลจริงอยู่ในบล็อก BOOKS ที่ต้นไฟล์ · แก้แล้ว push = ขึ้นเว็บใน 1–2 นาที</p>
     <div class="cta">
       <a class="btn btn-primary" href="#published">หนังสือที่ลงพิมพ์ →</a>
       <a class="btn btn-ghost" href="#read">หนังสือที่อ่าน</a>
     </div>
     <div class="searchbox">
-      <input id="searchIn" type="search" placeholder="ค้นหาชื่อเล่ม ผู้เขียน หรือโน้ต…" aria-label="ค้นหาหนังสือทั้งสองชั้น" autocomplete="off">
+      <input id="searchIn" type="search" placeholder="ค้นหาชื่อเล่ม ผู้เขียน สำนักพิมพ์ ปี หรือโน้ต…" aria-label="ค้นหาหนังสือทั้งสองชั้น" autocomplete="off">
       <button id="searchClear" type="button" hidden aria-label="ล้างคำค้นหา">✕</button>
     </div>
-    <p class="searchhint">ค้นหาได้พร้อมกันทั้งสองชั้น · ใช้คู่กับปุ่มกรองหมวดได้</p>
+    <p class="searchhint">ค้นหาได้พร้อมกันทั้งสองชั้น · ใช้คู่กับปุ่มกรองได้ทุกชุด</p>
+    <div class="globalfilters" id="globalFilters" hidden>
+      <div class="filters" id="shelfFilters" role="group" aria-label="เลือกชั้นที่จะดู"></div>
+      <label class="sortsel">ผู้เขียน
+        <select id="authorSel" aria-label="กรองตามผู้เขียน"><option value="">ทั้งหมด</option></select>
+      </label>
+      <label class="sortsel">ปี
+        <select id="yearSel" aria-label="กรองตามปี"><option value="">ทั้งหมด</option></select>
+      </label>
+    </div>
   </section>
 
   <!-- ═══ PUBLISHED ═══ -->
@@ -180,7 +192,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <p class="k-ch">// หนังสือที่อ่าน · <b><span id="readCount">0</span> เล่ม</b></p>
     <h2>ชั้นหนังสือที่อ่านแล้ว</h2>
     <p class="sub">หนังสือที่ผ่านมือคนเขียน — รากของแนวคิด และรสนิยมที่ผลิตงานชุดนี้ออกมา</p>
-    <div class="toolrow" id="readTools" hidden>
+    <div class="toolrow" id="readTools">
       <div class="filters" id="readFilters" role="group" aria-label="กรองตามหมวด — หนังสือที่อ่าน"></div>
       <label class="sortsel">เรียงตามปี
         <select id="readSort" aria-label="เรียงชั้นหนังสือที่อ่านตามปี">
@@ -201,8 +213,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <h3>วิธีเติมชั้นหนังสือ</h3>
       <ul>
         <li><b>เปิดไฟล์ <code>books.html</code></b> — ขึ้นหัวไฟล์มีบล็อก <code>BOOKS_PUBLISHED</code> กับ <code>BOOKS_READ</code> แถวเดียวต่อเล่ม</li>
-        <li><b>เพิ่มบรรทัดแบบนี้</b> — <code>{ title:'ชื่อ', author:'ผู้เขียน', url:'ลิงก์', note:'โน้ตสั้น', category:'กลยุทธ์', year:2568, publisher:'สำนักพิมพ์' }</code> — ทุกฟิลด์ยกเว้น title ใส่หรือไม่ใส่ก็ได้ · หมวดมี 6 แบบ: <code>กลยุทธ์</code> · <code>การแพทย์</code> · <code>สงคราม</code> · <code>การเมืองการปกครอง</code> · <code>ชีวประวัติ</code> · <code>อื่น ๆ</code> (เว้นว่าง = อื่น ๆ) · ปีใช้ พ.ศ. หรือ ค.ศ. ก็ได้ ขอให้ชุดเดียวกันทั้งคลัง</li>
-        <li><b>แล้ว push</b> — หน้าเว็บจัดการ์ด ปุ่มกรอง ช่องค้นหา และการเรียงปีให้เอง (ชั้นอ่าน)</li>
+        <li><b>เพิ่มบรรทัดแบบนี้</b> — <code>{ title:'ชื่อ', author:'ผู้เขียน', url:'ลิงก์', note:'โน้ตสั้น', category:'กลยุทธ์', year:2568, publisher:'สำนักพิมพ์', order:1 }</code> — ทุกฟิลด์ยกเว้น title ใส่หรือไม่ใส่ก็ได้ · หมวดมี 6 แบบ: <code>กลยุทธ์</code> · <code>การแพทย์</code> · <code>สงคราม</code> · <code>การเมืองการปกครอง</code> · <code>ชีวประวัติ</code> · <code>อื่น ๆ</code></li>
+        <li><b>สั่งลำดับการ์ดเอง</b> — ใส่ <code>order: 1, 2, 3…</code> (เลขน้อยมาก่อน เล่มไม่ใส่ order ไปต่อท้าย) หรือจะสลับตำแหน่งบรรทัดในอาร์เรย์ก็ได้ — ไม่ต้องแก้ตัวเรนเดอร์เลยสักบรรทัด</li>
+        <li><b>แล้ว push</b> — ช่องค้นหา ปุ่มกรองชั้น/หมวด/ผู้เขียน/ปี และการเรียงปีจัดการให้เอง</li>
         <li><b>ยังว่างอยู่ตอนนี้ = จริง</b> — หน้านี้ไม่แต่งข้อมูลปลอม ชั้นไหนยังไม่ใส่จะขึ้นตัวอักษรว่างตามจริงจนกว่าจะเติม</li>
       </ul>
     </div>
@@ -220,14 +233,14 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
    เพิ่มเล่มใหม่ = เพิ่มบรรทัดในอาร์เรย์ แล้ว push
    ฟิลด์: title (บังคับ) · author · url · note ·
          category: 'กลยุทธ์' | 'การแพทย์' | 'สงคราม' | 'การเมืองการปกครอง' | 'ชีวประวัติ' | 'อื่น ๆ' (เว้นว่าง = อื่น ๆ) ·
-         year (ตัวเลข พ.ศ./ค.ศ.) · publisher (ชื่อสำนักพิมพ์)
+         year (ตัวเลข พ.ศ./ค.ศ.) · publisher · order (เลขน้อยมาก่อน — สั่งลำดับการ์ดเอง)
    ═══════════════════════════════════════════════════════════════ */
 var CATEGORIES = ['กลยุทธ์', 'การแพทย์', 'สงคราม', 'การเมืองการปกครอง', 'ชีวประวัติ', 'อื่น ๆ'];
 var BOOKS_PUBLISHED = [
-  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'คำโปรยหนึ่งประโยค', category:'กลยุทธ์', year:2568, publisher:'สำนักพิมพ์' },
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'คำโปรยหนึ่งประโยค', category:'กลยุทธ์', year:2568, publisher:'สำนักพิมพ์', order:1 },
 ];
 var BOOKS_READ = [
-  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'ทำไมเล่มนี้จึงอยู่บนชั้น', category:'สงคราม', year:2567, publisher:'สำนักพิมพ์' },
+  // { title:'ชื่อหนังสือ', author:'ชื่อผู้เขียน', url:'https://...', note:'ทำไมเล่มนี้จึงอยู่บนชั้น', category:'สงคราม', year:2567, publisher:'สำนักพิมพ์', order:2 },
 ];
 
 /* ─── ต่อจากนี้คือตัวเรนเดอร์ — ปกติไม่ต้องแก้อะไรข้ามเส้นนี้ ─── */
@@ -236,11 +249,35 @@ function catOf(b){ return b.category || 'อื่น ๆ'; }
 
 var searchIn = document.getElementById('searchIn');
 var searchClear = document.getElementById('searchClear');
+var authorSel = document.getElementById('authorSel');
+var yearSel = document.getElementById('yearSel');
 var query = '';
+var gAuthor = '';
+var gYear = '';
+var shelfView = 'all'; /* all | pub | read */
 
 function matchQuery(b){
   if (!query) return true;
-  return ((b.title || '') + ' ' + (b.author || '') + ' ' + (b.note || '')).toLowerCase().indexOf(query) >= 0;
+  var hay = (b.title || '') + ' ' + (b.author || '') + ' ' + (b.note || '') + ' ' + (b.publisher || '') + ' ' + (b.year || '');
+  return hay.toLowerCase().indexOf(query) >= 0;
+}
+function matchGlobal(b){
+  if (gAuthor && (b.author || '') !== gAuthor) return false;
+  if (gYear && String(b.year || '') !== gYear) return false;
+  return true;
+}
+
+/* ลำดับการ์ด: order น้อยมาก่อน (เสถียร), เล่มไม่ใส่ order ไปต่อท้ายตามลำดับที่เขียน */
+function ordered(arr){
+  return arr.map(function(b, i){ return [b, i]; })
+    .sort(function(x, y){
+      var ox = x[0].order, oy = y[0].order;
+      if (ox == null && oy == null) return x[1] - y[1];
+      if (ox == null) return 1;
+      if (oy == null) return -1;
+      return (ox - oy) || (x[1] - y[1]);
+    })
+    .map(function(p){ return p[0]; });
 }
 
 function bookCard(b){
@@ -266,7 +303,7 @@ function renderShelf(list, el, emptyHtml){
 var EMPTY_PUB = '<div class="empty"><b>ชั้นนี้ยังว่าง</b> — เพิ่มเล่มแรกได้ในบล็อก BOOKS_PUBLISHED ที่ต้นไฟล์ แล้ว push</div>';
 var EMPTY_READ = '<div class="empty"><b>ยังไม่มีรายการ</b> — เพิ่มเล่มที่อ่านแล้วในบล็อก BOOKS_READ ที่ต้นไฟล์ แล้ว push</div>';
 
-/* ชั้นหนึ่งชั้น: ปุ่มกรองหมวด (สร้างจากข้อมูลจริง) + รวมกับช่องค้นหา + เรียงได้ผ่าน opts.sort */
+/* ชั้นหนึ่งชั้น: ปุ่มหมวด + ช่องค้นหา + กรองผู้เขียน/ปี + order + (ชั้นอ่าน) เรียงปี */
 function buildShelf(list, bar, shelf, emptyHtml, opts){
   opts = opts || {};
   if (!list.length) { if (bar.parentNode) bar.remove(); renderShelf(list, shelf, emptyHtml); return { apply: function(){} }; }
@@ -278,15 +315,15 @@ function buildShelf(list, bar, shelf, emptyHtml, opts){
   var current = 'all';
 
   function visible(){
-    var out = list.filter(function(b){
-      return (current === 'all' || catOf(b) === current) && matchQuery(b);
-    });
+    var out = ordered(list.filter(function(b){
+      return (current === 'all' || catOf(b) === current) && matchQuery(b) && matchGlobal(b);
+    }));
     return opts.sort ? opts.sort(out) : out;
   }
   function emptyMsg(){
     var anyInCat = list.some(function(b){ return current === 'all' || catOf(b) === current; });
     if (!anyInCat) return '<div class="empty">ยังไม่มีเล่มในหมวดนี้บนชั้นนี้ — กด "ทั้งหมด" เพื่อกลับไปดูทุกเล่ม</div>';
-    return '<div class="empty">ไม่พบเล่มที่ตรงกับคำค้นบนชั้นนี้ — ล้างช่องค้นหาด้านบน หรือกด "ทั้งหมด"</div>';
+    return '<div class="empty">ไม่พบเล่มที่ตรงกับคำค้น/ตัวกรองบนชั้นนี้ — ล้างช่องค้นหาหรือตัวกรองด้านบน แล้วกด "ทั้งหมด"</div>';
   }
   function apply(){
     renderShelf(visible(), shelf, emptyMsg());
@@ -318,29 +355,81 @@ function sortRead(out){
   return withYear.concat(noYear);
 }
 
+var pubSection = document.getElementById('published');
+var readSection = document.getElementById('read');
 var pubShelfEl = document.getElementById('pubShelf');
 var readShelfEl = document.getElementById('readShelf');
 var pubCtrl = null, readCtrl = null;
 
-function rebuildAll(){
-  function ensureBar(id, shelf, label){
-    var bar = document.getElementById(id);
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.className = 'filters';
-      bar.id = id;
-      bar.setAttribute('role', 'group');
-      bar.setAttribute('aria-label', label);
-      shelf.parentNode.insertBefore(bar, shelf);
-    } else { bar.replaceChildren(); }
-    return bar;
+function ensureBar(id, shelf, label){
+  var bar = document.getElementById(id);
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'filters';
+    bar.id = id;
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', label);
+    shelf.parentNode.insertBefore(bar, shelf);
+  } else { bar.replaceChildren(); }
+  return bar;
+}
+
+/* แถวกรองกลาง: ชั้น (ทั้งหมด/ลงพิมพ์/อ่านแล้ว) + ผู้เขียน + ปี — สร้างจากข้อมูลจริง */
+function rebuildGlobal(){
+  var gf = document.getElementById('globalFilters');
+  var all = BOOKS_PUBLISHED.concat(BOOKS_READ);
+  gf.hidden = all.length === 0;
+  if (!all.length) return;
+
+  var bar = ensureBar('shelfFilters', pubSection.querySelector('.k-ch'), 'เลือกชั้นที่จะดู');
+  bar.parentNode = bar.parentNode; /* no-op, keep placement */
+  var shelfBar = document.getElementById('shelfFilters');
+  shelfBar.className = 'filters';
+  shelfBar.style.margin = '0';
+  shelfBar.replaceChildren();
+  function addShelfBtn(key, label, n){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fbtn';
+    btn.dataset.shelf = key;
+    btn.innerHTML = esc(label) + ' <span class="n">' + n + '</span>';
+    btn.addEventListener('click', function(){ shelfView = key; applyShelfView(); });
+    shelfBar.appendChild(btn);
   }
+  addShelfBtn('all', 'ทุกชั้น', all.length);
+  addShelfBtn('pub', 'ลงพิมพ์', BOOKS_PUBLISHED.length);
+  addShelfBtn('read', 'อ่านแล้ว', BOOKS_READ.length);
+  applyShelfView();
+
+  var authors = {};
+  all.forEach(function(b){ if (b.author) authors[b.author] = true; });
+  var years = {};
+  all.forEach(function(b){ if (typeof b.year === 'number' && !isNaN(b.year)) years[b.year] = true; });
+  fillSelect(authorSel, Object.keys(authors).sort(function(a, b){ return a.localeCompare(b, 'th'); }), gAuthor);
+  fillSelect(yearSel, Object.keys(years).map(Number).sort(function(a, b){ return b - a; }).map(String), gYear);
+}
+function fillSelect(sel, values, current){
+  sel.replaceChildren(new Option('ทั้งหมด', ''));
+  values.forEach(function(v){ sel.add(new Option(v, v)); });
+  sel.value = values.indexOf(current) >= 0 ? current : '';
+  if (sel.value !== current) { if (sel === authorSel) gAuthor = ''; else gYear = ''; }
+}
+function applyShelfView(){
+  pubSection.style.display = shelfView === 'read' ? 'none' : '';
+  readSection.style.display = shelfView === 'pub' ? 'none' : '';
+  document.querySelectorAll('#shelfFilters .fbtn').forEach(function(btn){
+    btn.setAttribute('aria-pressed', String(btn.dataset.shelf === shelfView));
+  });
+}
+
+function rebuildAll(){
   pubCtrl = buildShelf(BOOKS_PUBLISHED, ensureBar('pubFilters', pubShelfEl, 'กรองตามหมวด — หนังสือที่ลงพิมพ์'), pubShelfEl, EMPTY_PUB);
   readCtrl = buildShelf(BOOKS_READ, ensureBar('readFilters', readShelfEl, 'กรองตามหมวด — หนังสือที่อ่าน'), readShelfEl, EMPTY_READ, { sort: sortRead });
   document.getElementById('readTools').hidden = BOOKS_READ.length === 0;
   document.getElementById('pubCount').textContent = BOOKS_PUBLISHED.length;
   document.getElementById('readCount').textContent = BOOKS_READ.length;
   document.title = 'คลังหนังสือ (' + (BOOKS_PUBLISHED.length + BOOKS_READ.length) + ' เล่ม) — Project Sovereign';
+  rebuildGlobal();
 }
 
 searchIn.addEventListener('input', function(){
@@ -353,6 +442,16 @@ searchClear.addEventListener('click', function(){
   searchIn.value = '';
   searchIn.dispatchEvent(new Event('input'));
   searchIn.focus();
+});
+authorSel.addEventListener('change', function(){
+  gAuthor = this.value;
+  pubCtrl.apply();
+  readCtrl.apply();
+});
+yearSel.addEventListener('change', function(){
+  gYear = this.value;
+  pubCtrl.apply();
+  readCtrl.apply();
 });
 document.getElementById('readSort').addEventListener('change', function(){
   sortMode = this.value;

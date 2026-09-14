@@ -144,15 +144,18 @@ async function main() {
     return Array.isArray(B.CATEGORIES) && B.CATEGORIES.length === 6 && Array.isArray(B.published) && Array.isArray(B.read) && typeof B.rebuildAll === 'function';
   });
   report(apiOk, 'widget books: __books__ API (categories, shelves, rebuild)');
-  const bars0 = await p.locator('.filters').count();
-  const empties0 = await p.locator('.empty').count();
-  report(bars0 === 0 && (empties0 === 2 || empties0 === 0), 'widget books: empty state honest (bars hidden, empty cards or filled)');
+  const fbtns0 = await p.locator('.fbtn').count();
+  const gfHidden0 = await p.locator('#globalFilters').isHidden();
+  report(fbtns0 === 0 && gfHidden0, 'widget books: empty state honest (no filter buttons, global filters hidden)');
 
   // inject data via the console API and exercise search + publisher/year + sort
   await p.evaluate(() => {
     const B = window.__books__;
     B.published.length = 0;
-    B.published.push({ title: 'ตำรากลยุทธ์', author: 'ผู้เขียน ก', url: 'https://example.com/p1', note: 'โน้ต', category: 'กลยุทธ์', year: 2568, publisher: 'สำนักพิมพ์ ก' });
+    B.published.push(
+      { title: 'ตำรากลยุทธ์', author: 'ผู้เขียน ก', url: 'https://example.com/p1', note: 'โน้ต', category: 'กลยุทธ์', year: 2568, publisher: 'สำนักพิมพ์ ก', order: 2 },
+      { title: 'หนังสือก่อน', author: 'ผู้เขียน ข', url: 'https://example.com/p2', category: 'อื่น ๆ', year: 2560, order: 1 }
+    );
     B.read.length = 0;
     B.read.push(
       { title: 'ศิลปะสงคราม', author: 'ซุนจื่อ', category: 'สงคราม', year: 2550, publisher: 'สำนักพิมพ์ ส' },
@@ -163,8 +166,10 @@ async function main() {
   });
   const cards = await p.locator('.book').count();
   const pubLines = await p.locator('#pubShelf .bk-pub').allInnerTexts();
-  const injectOk = cards === 4 && pubLines.length === 1 && pubLines[0].includes('สำนักพิมพ์ ก') && pubLines[0].includes('2568');
+  const injectOk = cards === 5 && pubLines.length === 2 && pubLines.some((l) => l.includes('สำนักพิมพ์ ก') && l.includes('2568'));
   report(injectOk, 'widget books: cards + publisher·year line', JSON.stringify({ cards, pubLines }));
+  const pubTitles = await p.locator('#pubShelf .bk-title').allInnerTexts();
+  report(pubTitles[0] === 'หนังสือก่อน' && pubTitles[1] === 'ตำรากลยุทธ์', 'widget books: order field reorders cards, renderer untouched', JSON.stringify(pubTitles));
   await p.fill('#searchIn', 'ซุนจื่อ');
   await p.waitForTimeout(200);
   const sPub = await p.locator('#pubShelf .book').count();
@@ -176,6 +181,26 @@ async function main() {
   report(zPubEmpty.includes('คำค้น'), 'widget books: no-result message distinct', JSON.stringify(zPubEmpty.slice(0, 70)));
   await p.fill('#searchIn', '');
   await p.waitForTimeout(200);
+  await p.selectOption('#authorSel', 'ผู้เขียน ก');
+  await p.waitForTimeout(200);
+  const aPub = await p.locator('#pubShelf .book').count();
+  const aRead = await p.locator('#readShelf .book').count();
+  report(aPub === 1 && aRead === 0, 'widget books: author filter narrows both shelves', `pub=${aPub} read=${aRead}`);
+  await p.selectOption('#authorSel', '');
+  await p.selectOption('#yearSel', '2568');
+  await p.waitForTimeout(200);
+  const yPub = await p.locator('#pubShelf .book').count();
+  const yRead = await p.locator('#readShelf .book').count();
+  report(yPub === 1 && yRead === 1, 'widget books: year filter narrows both shelves', `pub=${yPub} read=${yRead}`);
+  await p.selectOption('#yearSel', '');
+  await p.waitForTimeout(200);
+  await p.locator('#shelfFilters .fbtn[data-shelf="read"]').click();
+  await p.waitForTimeout(200);
+  const pubHidden = await p.locator('#published').isHidden();
+  await p.locator('#shelfFilters .fbtn[data-shelf="all"]').click();
+  await p.waitForTimeout(200);
+  const pubBack = await p.locator('#published').isVisible();
+  report(pubHidden && pubBack, 'widget books: shelf toggle hides/shows sections');
   await p.selectOption('#readSort', 'new');
   await p.waitForTimeout(200);
   const titlesNew = await p.locator('#readShelf .bk-title').allInnerTexts();
