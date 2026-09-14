@@ -14,7 +14,7 @@ import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySumma
 import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
-import { notifyLowStock } from '../services/business.service';
+import { notifyLowStock, notifyTaxDeadlines } from '../services/business.service';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
 import { warRoomActive } from '../services/war-room.service';
@@ -269,6 +269,18 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runBusinessLowStockCheck();
   setInterval(runBusinessLowStockCheck, 6 * 60 * 60 * 1000);
+
+  // ── BUSINESS PLATFORM: เตือนกำหนดยื่นภาษี ภ.พ.30/ภ.ง.ด.3/50/51/90 (ทุก 6 ชม. — ตัว dispatcher กันส่งซ้ำเอง) ──
+  async function runBusinessTaxDeadlineCheck() {
+    try {
+      const n = await notifyTaxDeadlines();
+      if (n > 0) console.log(`⏰ Business tax deadlines: เตือน ${n} ธุรกิจ`);
+    } catch (err) {
+      console.error('Business tax-deadline error:', err instanceof Error ? err.message : err);
+    }
+  }
+  runBusinessTaxDeadlineCheck();
+  setInterval(runBusinessTaxDeadlineCheck, 6 * 60 * 60 * 1000);
 
   // ── Vision AI คนแปลกหน้า: ตรวจตามกฎ (ทุก 60 วิ — ตัวกฎกันการตรวจซ้ำด้วย interval_min) ──
   async function runVisionCheckWorker() {

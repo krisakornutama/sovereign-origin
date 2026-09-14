@@ -57,6 +57,13 @@ export const RATES = {
 
 const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/** ms สุดท้ายของเดือน YYYY-MM — ใช้เป็นจุด anchor ของงวด VAT ที่เลือกย้อนหลัง */
+export function endOfMonth(month: string): Date {
+  const m = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!m) throw new Error('month must be YYYY-MM');
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]), 1) - 1);
+}
+
 /** ยอดรวมในใบเสร็จ (รวม VAT) → { base, vat } — ทางร้านตั้งราคารวม VAT เสมอ จึงต้องแยกย้อนหลัง */
 export function splitVatFromGross(gross: number, vatRate: number): { base: number; vat: number } {
   if (!Number.isFinite(gross) || gross < 0) return { base: 0, vat: 0 };
@@ -310,6 +317,8 @@ export interface BusinessTaxOverviewInput {
   ledger: Array<{ type: string; category: string; amount: number; vatAmount: number; whtAmount: number; createdAt: Date }>;
   capitalRegistered?: number;
   fiscalYearEnd?: string;
+  /** งวด VAT ที่จะแสดง (YYYY-MM) — เลือกย้อนหลังได้; ส่วนปี/CIT/PIT/ปฏิทินยังยึดวันนี้ */
+  month?: string;
   /** inject ได้เพื่อเทส deterministic (default = วันนี้) */
   now?: Date;
 }
@@ -321,9 +330,6 @@ export function businessTaxOverview(input: BusinessTaxOverviewInput): Record<str
 
   // VAT งวดเดือนนี้ + เดือนก่อน (จาก payments — ยอด "รวม VAT" แยกเป็น base + VAT ด้วยอัตราของแต่ละรายการ)
   const monthKey = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  const thisMonth = monthKey(now);
-  const prevDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  const prevMonth = monthKey(prevDate);
 
   const grossByRate = (month: string) => {
     const acc: Record<string, number> = {};
@@ -336,6 +342,11 @@ export function businessTaxOverview(input: BusinessTaxOverviewInput): Record<str
   // ภาษีซื้อของเดือนนี้ = VAT จากรายจ่ายใน ledger ที่บันทึก vatAmount ไว้
   const monthLedger = (month: string) => input.ledger.filter((l) => monthKey(l.createdAt) === month);
   const inputVat = (month: string) => round2(monthLedger(month).filter((l) => l.type === 'EXPENSE').reduce((s, l) => s + (l.vatAmount || 0), 0));
+
+  // เลือกงวดย้อนหลัง: anchor ของภาษีขาย/ซื้อ = ปลายเดือนที่เลือก (ค่าเริ่ม = วันนี้)
+  const vatAnchor = input.month ? endOfMonth(input.month) : now;
+  const thisMonth = monthKey(vatAnchor);
+  const prevMonth = monthKey(new Date(Date.UTC(vatAnchor.getUTCFullYear(), vatAnchor.getUTCMonth() - 1, 1)));
 
   const vatThis = computeVatMonthly({ vatRate: input.vatRate, salesGrossByRate: grossByRate(thisMonth) });
   const vatPrev = computeVatMonthly({ vatRate: input.vatRate, salesGrossByRate: grossByRate(prevMonth) });
