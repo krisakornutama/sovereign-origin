@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Sovereign — ระบบหลังบ้านร้านค้า ที่คิดภาษีไทยให้เอง</title>
-<meta name="description" content="เดินตามเงินบาทเดียวผ่านทั้งระบบ: ลูกค้าสั่ง จ่าย PromptPay แยก VAT ออกใบกำกับ ลงบัญชี ถึง ภ.พ.30 พร้อมยื่น — self-hosted ทั้งหมด ฟรี">
+<meta name="description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี ถึง ภ.พ.30 พร้อมยื่น — self-hosted ทั้งหมด ฟรี">
 <meta name="theme-color" content="#030712">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Crect x='4' y='3' width='8' height='10' rx='1' fill='%23F2D8D8'/%3E%3Crect x='4' y='3' width='1.2' height='10' fill='%23B3352C'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,7 +86,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .node.hero-node{border-color:var(--green);background:rgba(52,211,153,.1);box-shadow:0 0 18px rgba(52,211,153,.15)}
 .map-key{font-family:var(--mono);font-size:.68rem;color:var(--faint);margin-top:14px}
 .map-key b{color:var(--green);font-weight:500}
-.toc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.toc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .toc a{display:block;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel)}
 .toc a:hover{border-color:rgba(52,211,153,.5)}
 .toc .n{font-family:var(--mono);font-size:.66rem;color:var(--cyan)}
@@ -180,6 +180,15 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .opcard .st{font-family:var(--mono);font-size:.62rem;color:var(--green)}
 .opcard p{font-size:.76rem;color:var(--dim);margin:7px 0 0;line-height:1.65}
 
+/* ── verticals ── */
+.verts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.vert{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:22px}
+.vert .ic{font-size:1.5rem}
+.vert h3{font-size:1rem;font-weight:600;color:#ecfdf5;margin:10px 0 8px}
+.vert p{font-size:.84rem;color:var(--dim);margin:0;line-height:1.75}
+.vert .fit{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:.64rem;color:var(--green);border:1px solid rgba(52,211,153,.3);border-radius:999px;padding:3px 10px}
+.vert-note{font-size:.78rem;color:var(--faint);margin:16px 0 0;line-height:1.8}
+
 /* ── engineering ── */
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
 .chip{font-family:var(--mono);font-size:.7rem;color:#a7f3d0;background:rgba(52,211,153,.06);
@@ -212,10 +221,9 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
   font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
 
-/* ── responsive + motion floor ── */
-@media (max-width:900px){
+/* ── responsive + motion floor ── */  @media (max-width:900px){
   .taxgrid{grid-template-columns:1fr;gap:30px}
-  .steps,.split,.opsgrid{grid-template-columns:1fr}
+  .steps,.split,.opsgrid,.verts{grid-template-columns:1fr}
   .map-row,.toc{grid-template-columns:repeat(2,1fr)}
   .agents{grid-template-columns:repeat(3,1fr)}
   .hero{padding:60px 20px 52px}
@@ -247,6 +255,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <div class="wordmark">PROJECT<span> SOVEREIGN</span></div>
   <nav class="topnav">
     <a href="#map">ภาพรวม</a>
+    <a href="#fit">ใครใช้ได้</a>
     <a href="#sell">๑ ขาย</a>
     <a href="#fulfil">๒ ส่ง</a>
     <a href="#money">๓ เงิน</a>
@@ -265,13 +274,26 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <section class="hero" id="top">
     <div class="boot" id="boot" aria-hidden="true"></div>
     <p class="eyebrow">PROJECT SOVEREIGN · SELF-HOSTED COMMERCE OS</p>
-    <h1>ระบบหลังบ้านร้านค้า<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
+    <h1>ระบบหลังบ้าน ร้านค้า ร้านอาหาร ฟาร์ม<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
     <p class="lede">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 พร้อมยื่น และตัวเตือนก่อนกำหนดส่ง</p>
     <p class="meta-line">เดินครบทั้งทัวร์ ~4 นาที · หรือกระโดดเฉพาะส่วนที่สนใจจากสารบัญด้านล่าง</p>
     <div class="cta">
       <a class="btn btn-primary" href="#map">ดูภาพรวมทั้งระบบ →</a>
       <a class="btn btn-ghost" href="#run">รันเองฟรี</a>
     </div>
+  </section>
+
+  <!-- ═══ CH.0a WHO ═══ -->
+  <section id="fit">
+    <p class="k-ch">// ใครใช้ได้บ้าง</p>
+    <h2>ไม่ใช่แค่ร้านค้า — ครัวและคอกก็ใช่</h2>
+    <p class="sub">คนละอาชีพ ใช้ระบบเงิน บัญชี และภาษีชุดเดียวกัน — ส่วนเครื่องมือหน้างานต่างกันตามงาน</p>
+    <div class="verts">
+      <div class="vert"><div class="ic">🛒</div><h3>ร้านค้า / ขายออนไลน์</h3><p>ลิงก์ร้านสั่งเอง จ่าย QR PromptPay สต็อกตัดจริง ออกใบกำกับ แยก VAT อัตโนมัติ — ใช้ได้ทั้งของชิ้น บริการ และรับจ้างที่คิดราคาหน้างาน</p><span class="fit">ครบวงจร · พร้อมใช้</span></div>
+      <div class="vert"><div class="ic">🍜</div><h3>ร้านอาหาร / ครัว</h3><p>เมนูพร้อมสูตร (รู้ทุนต่อจาน) จอครัว KDS ตามออเดอร์แบบเรียลไทม์ ตาชั่งน้ำหนัก+ตู้เย็นเชื่อม IoT รายงานรายรับ-รายจ่าย-กำไรรายวัน และเศษอาหารกลายเป็นปุ๋ยในระบบเดียวกัน</p><span class="fit">หน้าจอครบ · มี KDS + ครัว IoT</span></div>
+      <div class="vert"><div class="ic">🐄</div><h3>ปศุสัตว์ / ฟาร์ม</h3><p>ทะเบียนกลุ่มสัตว์ สุขภาพ+วัคซีน ผลผลิตรายวัน (นม/ไข่/น้ำหนัก) ต้นทุน-กำไรต่อรอบการเลี้ยง อากาศโรงเรือน กักโรค และกล้อง AI ตรวจกลุ่มสัตว์</p><span class="fit">11 โมดูล · จากคอกถึงกำไร</span></div>
+    </div>
+    <p class="vert-note">+ แปลงเกษตร สมุนไพร และโรงเรือน อยู่ในระบบเดียวกัน (แผนที่แปลง การปลูก ปุ๋ย) · อาชีพอื่นก็เริ่มได้ทันทีจากชุดเดียวกัน: <b style="color:var(--green)">ขาย → เงินเข้า → ภาษี</b> — ตัวเลขภาษีถูกต้องไม่ว่าขายอะไร</p>
   </section>
 
   <!-- ═══ CH.0 MAP ═══ -->
@@ -295,6 +317,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div class="map-key">เส้นทางเงิน: <b>หน้าร้าน → ออเดอร์ → สมุดบัญชี → ภาษี + Treasury</b> — ทุกด่านทำเองอัตโนมัติหลังรับชำระเงิน</div>
     </div>
     <div class="toc">
+      <a href="#fit"><span class="n">☰ · ใครใช้ได้</span><div class="t">ร้านค้า · ร้านอาหาร · ฟาร์ม</div></a>
       <a href="#sell"><span class="n">๑ · ขาย</span><div class="t">ลูกค้าสั่ง + จ่ายเอง</div></a>
       <a href="#fulfil"><span class="n">๒ · ส่ง</span><div class="t">ยืนยัน ส่ง ใบกำกับ</div></a>
       <a href="#money"><span class="n">๓ · เงิน</span><div class="t">สมุด + Treasury</div></a>
@@ -546,6 +569,10 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <details>
       <summary>ต้องมีความรู้เรื่องภาษีไหม</summary>
       <p>ไม่ต้อง — ระบบแยก VAT อัตโนมัติตอนรับเงิน จดภาษีหัก ณ ที่จ่ายทั้งสองฝั่ง ทำปฏิทินยื่นพร้อมนับวันถอยหลัง สิ่งเดียวที่ต้องทำคือกรอกยอดจากใบกำกับซัพพลายเออร์เมื่อมีรายจ่าย</p>
+    </details>
+    <details>
+      <summary>กับร้านอาหารหรือฟาร์มปศุสัตว์ ใช้ได้จริงไหม</summary>
+      <p>ได้ — มีโมดูลเฉพาะทางแล้ว: ร้านอาหารได้เมนู+สูตรคิดทุนต่อจาน จอครัว KDS น้ำหนักครัว/ตู้เย็น IoT และรายงานกำไรรายวัน ส่วนปศุสัตว์ได้ทะเบียนฝูง สุขภาพ+วัคซีน ผลผลิตรายวัน และกำไรต่อรอบการเลี้ยง — และทุกอาชีพใช้บัญชี + ภาษีชุดเดียวกัน</p>
     </details>
     <details>
       <summary>เดี๋ยวอยากใช้ AI ต้องตั้งค่าเพิ่มไหม</summary>
