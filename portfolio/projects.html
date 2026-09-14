@@ -101,7 +101,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .invite{border:1px solid rgba(52,211,153,.35);border-radius:14px;background:rgba(52,211,153,.05);padding:28px 30px}
 .invite h3{margin:0 0 10px;font-size:1.1rem;color:#ecfdf5}
 .invite p{margin:0 0 14px;font-size:.9rem;color:var(--dim);line-height:1.8}
-.roles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 18px}
+.roles{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0 0 18px}
 .role{border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px 14px}
 .role .t{font-weight:600;font-size:.84rem;color:#a7f3d0}
 .role .d{font-size:.72rem;color:var(--dim);margin-top:3px;line-height:1.6}
@@ -133,6 +133,8 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <nav class="topnav" aria-label="เมนูหลัก">
     <a href="index.html">ภาพรวม</a>
     <a href="projects.html" aria-current="page">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html">ประมง</a>
     <a href="index.html#fit">ใครใช้ได้</a>
     <a href="index.html#all">ทั้งระบบ</a>
     <a href="education.html">AI สอนลูก</a>
@@ -156,7 +158,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 
   <!-- ═══ WORKS ═══ -->
   <section id="works">
-    <p class="k-ch">// ผลงาน · <b>5 ชิ้น</b></p>
+    <p class="k-ch">// ผลงาน · <b>6 ชิ้น</b></p>
     <h2>ชิ้นงานแต่ละชิ้น</h2>
     <p class="sub">เรียงจากพร้อมใช้มากไปน้อย — ทุกชิ้นใช้รากเดียวกัน (ผู้ใช้/สิทธิ์/audit/backup ชุดเดียว) จึงต่อยอดร่วมกันได้เร็ว</p>
 
@@ -251,6 +253,28 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div class="links"><a href="index.html#fit">ดูการ์ดผู้ใช้ 3 กลุ่ม ↗</a></div>
     </article>
 
+    <article class="proj" id="p-fishery">
+      <div class="proj-head"><span class="ic">🐟</span><h3>การประมง · บ่อเลี้ยงตามรอบ</h3><span class="no">ชิ้นที่ ๖</span></div>
+      <span class="visa r1">○ รากวางไว้แล้ว · ออกแบบจริง — รอสร้างโมดูล</span>
+      <p class="idea">เลี้ยงปลา/กุ้งควรจบรอบด้วยกำไรที่รู้ตั้งแต่ต้น: <b>คุณภาพน้ำจากเซ็นเซอร์ IoT</b> (โมเดล WaterQualityReading มีจริงในระบบ — TDS/pH/ความขุ่น) กฎอัตโนมัติเปิดปั๊มเมื่อออกซิเจนต่ำ บันทึกอาหาร-ผลผลิตรายวัน และสรุปกำไรต่อรอบแบบเดียวกับปศุสัตว์</p>
+      <div class="cols">
+        <div class="col now"><h4>สิ่งที่มีจริงวันนี้</h4><ul>
+          <li>โมเดล WaterQualityReading + กราฟย้อนหลัง</li>
+          <li>MQTT + กฎอัตโนมัติ + ระบบเตือนของบ้าน</li>
+          <li>ต้นแบบรอบการเลี้ยงจากปศุสัตว์ (กลุ่ม→ผลผลิต→กำไร)</li>
+        </ul></div>
+        <div class="col next"><h4>กำลังไปทางไหน</h4><ul>
+          <li>โมดูลบ่อ/กระชัง: ลงลูกปลา อัตราป้อน อัตรารอด วันเก็บเกี่ยว</li>
+          <li>บอร์ดเฝ้าน้ำรายบ่อพร้อมเกณฑ์แจ้งเตือน</li>
+        </ul></div>
+        <div class="col need"><h4>ต้องการอะไรเพื่อระดับมืออาชีพ</h4><ul>
+          <li>เซ็นเซอร์น้ำจริง (หรือเริ่มจากกรอกมือก็ทำงานได้)</li>
+          <li>บ่อนำร่อง 1 รอบการเลี้ยงเต็ม เพื่อกำหนดเกณฑ์จริง</li>
+        </ul></div>
+      </div>
+      <div class="links"><a href="fishery.html">ดูหน้าแบบแปลนโมดูลนี้ ↗</a></div>
+    </article>
+
     <article class="proj" id="p-market">
       <div class="proj-head"><span class="ic">🤖</span><h3>ตลาดอัจฉริยะ · ผู้ช่วย AI ที่มีบริบทธุรกิจจริง</h3><span class="no">ชิ้นที่ ๕</span></div>
       <span class="visa r1">○ รากวางไว้แล้ว · รอโมเดล</span>
@@ -299,6 +323,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
         <div class="role"><div class="t">🏪 เจ้าของธุรกิจ/ฟาร์ม</div><div class="d">เป็นผู้ใช้นำร่วม ใช้จริง ให้ feedback หน้างาน — ระบบจะเกิดจากของจริง ไม่ใช่ห้องแล็บ</div></div>
         <div class="role"><div class="t">🔌 สายฮาร์ดแวร์</div><div class="d">เชื่อมเซ็นเซอร์/อุปกรณ์ใหม่ให้ระบบบ้าน — ทุกอย่างที่พูด MQTT ได้คือพาร์ตเนอร์</div></div>
         <div class="role"><div class="t">🧠 สาย AI/ภาษาไทย</div><div class="d">โมเดลขนาดพอเหมาะสำหรับภาษาไทย + คิดเรื่องขอบเขตสิทธิ์ AI ให้ปลอดภัย</div></div>
+        <div class="role"><div class="t">🐟 สายฟาร์ม/ประมง</div><div class="d">มีบ่อหรือฟาร์มจริงมาทดลองรอบแรก — ข้อมูลหน้างานคือสิ่งที่ทำให้สูตรกำไรจริง</div></div>
       </div>
       <p>ทางเดียวที่ต้องตกลงร่วมกัน: ระบบยัง self-hosted และโอเพนในบ้าน — ข้อมูลของผู้ใช้ไม่ออกจากเครื่องผู้ใช้</p>
       <div class="cta">
