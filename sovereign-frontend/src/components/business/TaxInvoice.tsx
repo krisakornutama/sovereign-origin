@@ -104,7 +104,8 @@ export default function TaxInvoice({ order, business, onClose }: {
                 {business?.shopName || business?.name || '—'}
               </div>
               <div className="font-script" style={{ fontSize: 11, color: COPYGRAY, marginTop: 4 }}>
-                ผู้เสียภาษีอากรเลขที่ <Dotted /> &nbsp; ที่อยู่ <Dotted /> &nbsp; โทร. <Dotted />
+                ผู้เสียภาษีอากรเลขที่ {business?.taxId ? <b className="mono" style={{ color: INK }}>{business.taxId}</b> : <Dotted />}
+                &nbsp; ที่อยู่ {business?.address || <Dotted />} &nbsp; โทร. <Dotted />
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>

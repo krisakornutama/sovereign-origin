@@ -84,7 +84,7 @@ export default function BusinessPage() {
           )}
 
           {current ? (
-            <BusinessWorkspace biz={current} onExit={() => { setSelected(null); void load(); }} />
+            <BusinessWorkspace biz={current} onExit={() => { setSelected(null); void load(); }} refreshBiz={load} />
           ) : (
             <div className="space-y-4">
               {/* ปุ่มสร้างธุรกิจ */}

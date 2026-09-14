@@ -373,7 +373,7 @@ router.get('/:businessId/agent-jobs', authenticate, async (req, res) => {
   }
 });
 
-// ── Public Shop settings — เปิด/ปิดหน้าร้านสาธารณะ + PromptPay (MANAGER ขึ้นไป) ──
+// ── Public Shop settings — เปิด/ปิดหน้าร้านสาธารณะ + PromptPay + ข้อมูลบนใบกำกับภาษี (MANAGER ขึ้นไป) ──
 router.get('/:businessId/shop', authenticate, async (req, res) => {
   if (!(await guard(req, res, 'MANAGER'))) return;
   try {

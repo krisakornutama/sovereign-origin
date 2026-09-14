@@ -54,7 +54,7 @@ interface Installation { id: string; title: string; status: string; scheduledAt?
 interface LedgerEntry { id: string; type: string; category: string; amount: number; note?: string; createdAt: string; }
 interface Summary { income: number; expense: number; profit: number; revenue: number; cost: number; grossProfit: number; topProducts: Array<{ name: string; qty: number; profit: number }>; lowStock: Product[]; openOrders: number; todayInstallations: number; }
 interface Agent { id: string; key: string; name: string; emoji: string; enabled: boolean; latestJob?: { id: string; status: string; prompt: string; result?: string; error?: string } | null; }
-interface ShopSettings { shopOpen: boolean; shopName: string; promptPayMasked: string; promptPaySet: boolean; }
+interface ShopSettings { shopOpen: boolean; shopName: string; promptPayMasked: string; promptPaySet: boolean; taxId: string; address: string; }
 
 const baht = (n: number) => `${Number(n ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} ฿`;
 const STATUS_TH: Record<string, string> = { QUOTE: 'ใบเสนอราคา', ORDERED: 'รอชำระ', PAID: 'ชำระแล้ว', DELIVERED: 'ส่งแล้ว', CANCELLED: 'ยกเลิก', TODO: 'รอทำ', IN_PROGRESS: 'กำลังทำ', DONE: 'เสร็จ' };
@@ -64,7 +64,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-full text-[11px] border ${STATUS_CLS[status] ?? 'bg-slate-500/15 text-slate-300 border-slate-500/30'}`}>{STATUS_TH[status] ?? status}</span>;
 }
 
-export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onExit: () => void }) {
+export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Business; onExit: () => void; refreshBiz?: () => void }) {
   const user = useAuthStore((s) => s.user);
   const myPosition = biz.members.find((m) => m.userId === user?.id)?.position ?? 'VIEWER';
   const can = (min: string) => (POSITION_RANK[myPosition] ?? 6) <= (POSITION_RANK[min] ?? 6);
@@ -365,7 +365,7 @@ export default function BusinessWorkspace({ biz, onExit }: { biz: Business; onEx
 
       {/* ── หน้าร้าน (settings ร้านสาธารณะ) ── */}
       {tab === 'shop' && (
-        <ShopTab bizId={biz.id} bizName={biz.name} canManage={can('MANAGER')} base={base} setNotice={setNotice} />
+        <ShopTab bizId={biz.id} bizName={biz.name} canManage={can('MANAGER')} base={base} setNotice={setNotice} refreshBiz={refreshBiz} />
       )}
 
       {/* ── ทีม ── */}
@@ -502,10 +502,12 @@ function TaxRow({ label, value, strong }: { label: string; value: string; strong
   return <div className="flex justify-between text-sm"><span className="text-slate-400">{label}</span><span className={strong ? 'font-bold text-slate-200' : 'text-slate-300'}>{value}</span></div>;
 }
 
-function ShopTab({ bizId, bizName, canManage, base, setNotice }: { bizId: string; bizName: string; canManage: boolean; base: string; setNotice: (n: { ok: boolean; text: string } | null) => void }) {
+function ShopTab({ bizId, bizName, canManage, base, setNotice, refreshBiz }: { bizId: string; bizName: string; canManage: boolean; base: string; setNotice: (n: { ok: boolean; text: string } | null) => void; refreshBiz?: () => void }) {
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [shopName, setShopName] = useState('');
   const [promptPay, setPromptPay] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -513,6 +515,8 @@ function ShopTab({ bizId, bizName, canManage, base, setNotice }: { bizId: string
     if (s) {
       setSettings(s);
       setShopName(s.shopName ?? '');
+      setTaxId(s.taxId ?? '');
+      setAddress(s.address ?? '');
     }
   }, [base]);
   useEffect(() => { void load(); }, [load]);
@@ -529,6 +533,9 @@ function ShopTab({ bizId, bizName, canManage, base, setNotice }: { bizId: string
       setSettings(data);
       setShopName(data.shopName ?? '');
       setPromptPay('');
+      setTaxId(data.taxId ?? '');
+      setAddress(data.address ?? '');
+      refreshBiz?.();
       setNotice({ ok: true, text: okText });
     } catch (e: any) {
       setNotice({ ok: false, text: e.message });
@@ -575,9 +582,19 @@ function ShopTab({ bizId, bizName, canManage, base, setNotice }: { bizId: string
                 <input id="shop-pp-input" value={promptPay} onChange={(e) => setPromptPay(e.target.value)} placeholder="08XXXXXXXX"
                   className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" />
               </div>
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1" htmlFor="shop-taxid-input">เลขประจำตัวผู้เสียภาษี 13 หลัก (พิมพ์บนใบกำกับภาษี)</label>
+                <input id="shop-taxid-input" value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="ไม่กรอก = ช่องว่างบนเอกสาร"
+                  className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] text-slate-500 mb-1" htmlFor="shop-address-input">ที่อยู่ร้าน (พิมพ์บนใบกำกับภาษี)</label>
+              <input id="shop-address-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="เลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด"
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm" />
             </div>
             <div className="flex gap-2">
-              <button onClick={() => save({ shopName: shopName.trim(), ...(promptPay.trim() ? { shopPromptPay: promptPay.trim() } : {}) }, 'บันทึกการตั้งค่าร้านแล้ว')}
+              <button onClick={() => save({ shopName: shopName.trim(), taxId: taxId.trim(), address: address.trim(), ...(promptPay.trim() ? { shopPromptPay: promptPay.trim() } : {}) }, 'บันทึกการตั้งค่าร้านแล้ว')}
                 disabled={busy} className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-sm font-medium disabled:opacity-40">บันทึก</button>
               {settings?.promptPaySet && (
                 <button onClick={() => save({ shopPromptPay: '' }, 'ลบ PromptPay แล้ว — QR จะถูกปิด')}

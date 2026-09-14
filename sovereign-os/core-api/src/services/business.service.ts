@@ -556,6 +556,8 @@ export async function getShopSettings(businessId: string): Promise<any> {
     shopName: biz.shopName ?? '',
     promptPayMasked: target ? `••• ${target.slice(-4)}` : '',
     promptPaySet: Boolean(biz.shopPromptPay),
+    taxId: biz.taxId ?? '',
+    address: biz.address ?? '',
   };
 }
 
@@ -564,6 +566,13 @@ export async function updateShopSettings(businessId: string, input: any): Promis
   if (!biz) throw new Error('business not found');
   const data: any = {};
   if (input?.shopName !== undefined) data.shopName = input.shopName ? str(input.shopName, 120) : null;
+  if (input?.taxId !== undefined) {
+    const digits = str(input.taxId, 20).replace(/\D/g, '');
+    // เลขประจำตัวผู้เสียภาษี 13 หลักเท่านั้น (ว่าง = เคลียร์ — เอกสารจะพิมพ์เป็นช่องกรอกแทน)
+    if (digits && digits.length !== 13) throw new Error('เลขประจำตัวผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก');
+    data.taxId = digits || null;
+  }
+  if (input?.address !== undefined) data.address = input.address ? str(input.address, 200) : null;
   if (input?.shopOpen !== undefined) data.shopOpen = Boolean(input.shopOpen);
   if (input?.shopPromptPay !== undefined) {
     const target = str(input.shopPromptPay, 20);
