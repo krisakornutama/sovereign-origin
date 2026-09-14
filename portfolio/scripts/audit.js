@@ -137,13 +137,54 @@ async function main() {
     report(after !== before && after.trim().length > 0, 'widget iot: rule sim renders stage');
   } else report(false, 'widget iot: #ruleSel missing');
 
-  // books: console API + honest empty states
+  // books: console API, honest empty states, search, publisher·year line, sorting
   await goto('books.html');
-  const api = await p.evaluate(() => Array.isArray((window.__books__ || {}).CATEGORIES) && window.__books__.CATEGORIES.length === 6);
-  report(api, 'widget books: __books__ API with 6 categories');
-  const empties = await p.locator('.empty').count();
-  const bars = await p.locator('.filters').count();
-  report(bars === 0 && (empties === 2 || empties === 0), 'widget books: empty state honest (bars hidden, empty cards or filled)');
+  const apiOk = await p.evaluate(() => {
+    const B = window.__books__ || {};
+    return Array.isArray(B.CATEGORIES) && B.CATEGORIES.length === 6 && Array.isArray(B.published) && Array.isArray(B.read) && typeof B.rebuildAll === 'function';
+  });
+  report(apiOk, 'widget books: __books__ API (categories, shelves, rebuild)');
+  const bars0 = await p.locator('.filters').count();
+  const empties0 = await p.locator('.empty').count();
+  report(bars0 === 0 && (empties0 === 2 || empties0 === 0), 'widget books: empty state honest (bars hidden, empty cards or filled)');
+
+  // inject data via the console API and exercise search + publisher/year + sort
+  await p.evaluate(() => {
+    const B = window.__books__;
+    B.published.length = 0;
+    B.published.push({ title: 'ตำรากลยุทธ์', author: 'ผู้เขียน ก', url: 'https://example.com/p1', note: 'โน้ต', category: 'กลยุทธ์', year: 2568, publisher: 'สำนักพิมพ์ ก' });
+    B.read.length = 0;
+    B.read.push(
+      { title: 'ศิลปะสงคราม', author: 'ซุนจื่อ', category: 'สงคราม', year: 2550, publisher: 'สำนักพิมพ์ ส' },
+      { title: 'ชีวประวัติ ยาว', author: 'ผู้เขียน ช', category: 'ชีวประวัติ', year: 2568 },
+      { title: 'เล่มไม่มีปี', author: 'ผู้เขียน อ', category: 'อื่น ๆ' }
+    );
+    B.rebuildAll();
+  });
+  const cards = await p.locator('.book').count();
+  const pubLines = await p.locator('#pubShelf .bk-pub').allInnerTexts();
+  const injectOk = cards === 4 && pubLines.length === 1 && pubLines[0].includes('สำนักพิมพ์ ก') && pubLines[0].includes('2568');
+  report(injectOk, 'widget books: cards + publisher·year line', JSON.stringify({ cards, pubLines }));
+  await p.fill('#searchIn', 'ซุนจื่อ');
+  await p.waitForTimeout(200);
+  const sPub = await p.locator('#pubShelf .book').count();
+  const sRead = await p.locator('#readShelf .book').count();
+  report(sPub === 0 && sRead === 1, 'widget books: search filters both shelves', `pub=${sPub} read=${sRead}`);
+  await p.fill('#searchIn', 'zzz-not-found');
+  await p.waitForTimeout(200);
+  const zPubEmpty = await p.locator('#pubShelf .empty').innerText().catch(() => '');
+  report(zPubEmpty.includes('คำค้น'), 'widget books: no-result message distinct', JSON.stringify(zPubEmpty.slice(0, 70)));
+  await p.fill('#searchIn', '');
+  await p.waitForTimeout(200);
+  await p.selectOption('#readSort', 'new');
+  await p.waitForTimeout(200);
+  const titlesNew = await p.locator('#readShelf .bk-title').allInnerTexts();
+  report(titlesNew[0] === 'ชีวประวัติ ยาว' && titlesNew[titlesNew.length - 1] === 'เล่มไม่มีปี', 'widget books: read shelf sorted new→old, no-year last', JSON.stringify(titlesNew));
+  await p.selectOption('#readSort', 'old');
+  await p.waitForTimeout(200);
+  const titlesOld = await p.locator('#readShelf .bk-title').allInnerTexts();
+  report(titlesOld[0] === 'ศิลปะสงคราม' && titlesOld[titlesOld.length - 1] === 'เล่มไม่มีปี', 'widget books: read shelf sorted old→new', JSON.stringify(titlesOld));
+  await p.evaluate(() => { const B = window.__books__; B.published.length = 0; B.read.length = 0; B.rebuildAll(); });
 
   // projects: contact form validation without navigation
   await goto('projects.html');
