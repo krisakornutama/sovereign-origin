@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ปศุสัตว์ — Project Sovereign</title>
+<meta name="description" content="โมดูลปศุสัตว์ใน Project Sovereign: ทะเบียนฝูง สุขภาพ+วัคซีน ผลผลิตรายวัน ต้นทุน-กำไรต่อรอบการเลี้ยง อากาศโรงเรือน กักโรค และกล้อง AI ตรวจกลุ่มสัตว์ — 11 โมดูลจริงในระบบ พร้อมเครื่องคำนวณกำไรต่อรอบ">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='6.5' cy='6' r='3.2' fill='%2334d399'/%3E%3Ccircle cx='11' cy='10' r='2.6' fill='%2322d3ee'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--green);border-bottom:1px solid var(--green)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:780px}
+h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--green);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(52,211,153,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.mod{border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:14px 16px;background:rgba(52,211,153,.04)}
+.mod .t{font-weight:600;font-size:.9rem;color:#ecfdf5}
+.mod .d{font-family:var(--mono);font-size:.62rem;color:var(--faint);margin-top:4px}
+
+.calc{display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:start}
+.calcform{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:20px 22px}
+.calcform label{display:block;font-family:var(--mono);font-size:.68rem;color:var(--faint);margin:12px 0 4px}
+.calcform input{width:100%;font-family:var(--mono);font-size:.9rem;color:#a7f3d0;background:#0b1220;
+  border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:9px 12px}
+.calcform .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sheet{background:#151b12;color:#d9e7d4;border:1px solid rgba(52,211,153,.3);border-radius:12px;
+  padding:24px 26px;font-family:var(--mono);box-shadow:0 18px 44px rgba(0,0,0,.55)}
+.sheet .h{font-size:.68rem;letter-spacing:.1em;color:var(--green);margin-bottom:14px}
+.sl{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dotted rgba(52,211,153,.25);padding:8px 2px;font-size:.82rem}
+.sl span:last-child{font-variant-numeric:tabular-nums}
+.sl.net{border-bottom:none;border-top:1.5px solid var(--green);margin-top:6px;padding-top:10px;font-weight:700;color:var(--green)}
+.sl.net span:last-child{font-size:1.1rem}
+.sl .neg{color:#f87171}
+.sheet .foot{font-size:.62rem;color:var(--faint);margin-top:12px}
+
+.pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 20px}
+.stage{font-family:var(--mono);font-size:.74rem;border:1px solid rgba(34,211,153,.3);border-radius:8px;padding:7px 13px;color:#a7f3d0;background:rgba(52,211,153,.05)}
+.arrow{color:var(--faint);font-family:var(--mono)}
+.loopgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.loop{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel)}
+.loop .ic{font-size:1.2rem}
+.loop h3{font-size:.86rem;font-weight:600;color:#ecfdf5;margin:8px 0 4px}
+.loop p{font-size:.74rem;color:var(--dim);margin:0;line-height:1.7}
+.loop .ep{font-family:var(--mono);font-size:.58rem;color:var(--cyan);display:block;margin-top:8px}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .calc{grid-template-columns:1fr;gap:30px}
+  .mods{grid-template-columns:repeat(2,1fr)}
+  .loopgrid{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .mods,.loopgrid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html" aria-current="page">ปศุสัตว์</a>
+    <a href="fishery.html">ประมง</a>
+    <a href="education.html">AI สอนลูก</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · LIVESTOCK MODULE</p>
+    <h1>เลี้ยงสัตว์ด้วยข้อมูล<br>จบรอบเมื่อไร <em>รู้กำไรทันที</em></h1>
+    <p class="lede">โมดูลปศุสัตว์จริงในระบบ 11 ส่วน: ทะเบียนฝูง สุขภาพ+วัคซีน ผลผลิตรายวัน ต้นทุน-กำไรต่อรอบการเลี้ยง อากาศโรงเรือน กักโรค การผสมพันธุ์ และกล้อง AI ตรวจกลุ่มสัตว์ — ทุกตัวเลขไหลเข้าสมุดบัญชีและภาษีชุดเดียวกับร้าน</p>
+    <p class="meta-line">ตัวเลขทั้งหมดเป็นข้อมูลสาธิต · ชื่อ endpoint อ้างอิงโค้ดจริงที่ deploy อยู่</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#calc">ลองเครื่องคิดกำไรต่อรอบ →</a>
+      <a class="btn btn-ghost" href="projects.html">กลับหน้าผลงาน</a>
+    </div>
+  </section>
+
+  <!-- ═══ MODULES ═══ -->
+  <section id="modules">
+    <p class="k-ch">// โมดูลจริง · <b>11 route files</b></p>
+    <h2>จากคอกถึงกำไร ครบในระบบเดียว</h2>
+    <p class="sub">ทุกโมดูลอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็ก</p>
+    <div class="mods">
+      <div class="mod"><div class="t">🐄 ทะเบียนฝูง</div><div class="d">/api/livestock/groups</div></div>
+      <div class="mod"><div class="t">💉 สุขภาพ+วัคซีน</div><div class="d">/api/livestock/medical</div></div>
+      <div class="mod"><div class="t">🥛 ผลผลิตรายวัน</div><div class="d">/api/livestock/production</div></div>
+      <div class="mod"><div class="t">📦 รอบการเลี้ยง</div><div class="d">/api/livestock/batches</div></div>
+      <div class="mod"><div class="t">🌡️ อากาศโรงเรือน</div><div class="d">/api/livestock/climate</div></div>
+      <div class="mod"><div class="t">🚧 กักโรค</div><div class="d">/api/livestock/biosecurity</div></div>
+      <div class="mod"><div class="t">❤️ ผสมพันธุ์</div><div class="d">/api/livestock/breeding</div></div>
+      <div class="mod"><div class="t">📷 กล้อง AI</div><div class="d">/api/livestock/vision + vet-AI</div></div>
+    </div>
+    <ul class="bullet">
+      <li><b>ต้นทุน-กำไรต่อรอบ</b> — อาหาร ยา ค่าเสื่อม ค่าแรง รวมของจริงจบรอบรู้เลย</li>
+      <li><b>ผลผลิตรายวัน</b> (นม/ไข่/น้ำหนัก) โยงเข้ารายได้ฝั่งขายอัตโนมัติ</li>
+      <li><b>กล้อง AI ตรวจกลุ่มสัตว์</b> + ผู้ช่วยสัตวแพทย์ AI ในระบบเดียวกัน</li>
+    </ul>
+  </section>
+
+  <!-- ═══ BATCH CALCULATOR ═══ -->
+  <section id="calc">
+    <p class="k-ch">// เครื่องคิดกำไรต่อรอบ · <b>สาธิต</b></p>
+    <h2>จบรอบแล้วกำไรจริงเท่าไร</h2>
+    <p class="sub">แบบเดียวกับที่ระบบคิดให้อัตโนมัติ: รายได้รวมผลผลิตทั้งรอบ ลบต้นทุนทุกประเภท — แก้ตัวเลขด้านซ้ายแล้วสรุปด้านขวาเปลี่ยนทันที (ข้อมูลสาธิต หน่วยบาท)</p>
+    <div class="calc">
+      <div class="calcform" aria-label="ฟอร์มตัวเลขต้นทุนและรายได้ของรอบการเลี้ยง">
+        <div class="row2">
+          <div><label for="fChicks">ค่าลูกสัตว์เริ่มรอบ (บาท)</label><input id="fChicks" type="number" value="45000" min="0"></div>
+          <div><label for="fFeed">ค่าอาหารทั้งรอบ (บาท)</label><input id="fFeed" type="number" value="62000" min="0"></div>
+        </div>
+        <div class="row2">
+          <div><label for="fMeds">ยา+วัคซีน (บาท)</label><input id="fMeds" type="number" value="7000" min="0"></div>
+          <div><label for="fUtil">ไฟฟ้า+น้ำ+เชื้อเพลิง (บาท)</label><input id="fUtil" type="number" value="9500" min="0"></div>
+        </div>
+        <div class="row2">
+          <div><label for="fLabor">ค่าแรง (บาท)</label><input id="fLabor" type="number" value="18000" min="0"></div>
+          <div><label for="fOther">อื่น ๆ (บาท)</label><input id="fOther" type="number" value="3000" min="0"></div>
+        </div>
+        <div class="row2">
+          <div><label for="fWeight">น้ำหนักรวมที่ขายได้ (กก.)</label><input id="fWeight" type="number" value="2400" min="0"></div>
+          <div><label for="fPrice">ราคาขายเฉลี่ย (บาท/กก.)</label><input id="fPrice" type="number" value="68" min="0"></div>
+        </div>
+      </div>
+      <div class="sheet" role="img" aria-label="ใบสรุปกำไรต่อรอบการเลี้ยง (คำนวณสด)">
+        <div class="h">สรุปรอบการเลี้ยง · ระบบคำนวณสด</div>
+        <div class="sl"><span>รายได้รวม (น้ำหนัก × ราคา)</span><span id="sRev">163,200.00</span></div>
+        <div class="sl"><span>ค่าลูกสัตว์</span><span id="sChicks">45,000.00</span></div>
+        <div class="sl"><span>ค่าอาหาร</span><span id="sFeed">62,000.00</span></div>
+        <div class="sl"><span>ยา+วัคซีน</span><span id="sMeds">7,000.00</span></div>
+        <div class="sl"><span>ไฟฟ้า+น้ำ</span><span id="sUtil">9,500.00</span></div>
+        <div class="sl"><span>ค่าแรง</span><span id="sLabor">18,000.00</span></div>
+        <div class="sl"><span>อื่น ๆ</span><span id="sOther">3,000.00</span></div>
+        <div class="sl"><span>ต้นทุนรวม</span><span id="sCost">144,500.00</span></div>
+        <div class="sl net"><span>กำไรสุทธิ</span><span id="sNet">18,700.00</span></div>
+        <div class="sl"><span>ต้นทุนต่อ กก.</span><span id="sCpp">60.21</span></div>
+        <div class="sl"><span>กำไรต่อ กก.</span><span id="sPpk">7.79</span></div>
+        <div class="foot">* ข้อมูลสาธิต — ระบบจริงดึงจากรายจ่ายจริงที่บันทึกทุกวันในสมุดบัญชีเดียวกัน</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ DAILY RHYTHM ═══ -->
+  <section id="rhythm">
+    <p class="k-ch">// หน้างานจริง</p>
+    <h2>วันทำงานของฟาร์มในระบบ</h2>
+    <p class="sub">จุดที่คนฟาร์มแตะระบบจริง ๆ มีแค่ไม่กี่จุด — ที่เหลือระบบรวบรวม คิด และเตือนเอง</p>
+    <div class="pipe" aria-label="จังหวะการทำงานรายวันของฟาร์มในระบบ">
+      <span class="stage">บันทึกผลผลิตเช้า</span><span class="arrow">→</span>
+      <span class="stage">เช็คอากาศโรงเรือน</span><span class="arrow">→</span>
+      <span class="stage">ระบบสรุปต้นทุนสะสม</span><span class="arrow">→</span>
+      <span class="stage">ปิดรอบ = สรุปกำไรทันที</span>
+    </div>
+    <div class="loopgrid">
+      <div class="loop"><div class="ic">🥚</div><h3>บันทึกผลผลิต</h3><p>นม/ไข่/น้ำหนัก รายวันรายกลุ่ม — เข้ากราฟย้อนหลังและรายได้อัตโนมัติ</p><span class="ep">/api/livestock/production</span></div>
+      <div class="loop"><div class="ic">🌡️</div><h3>เฝ้าอากาศ</h3><p>อุณหภูมิ/ความชื้นโรงเรือน ออกห่างเกินเกณฑ์ = เตือนทันที</p><span class="ep">/api/livestock/climate</span></div>
+      <div class="loop"><div class="ic">💉</div><h3>วัคซีนไม่ตกหล่น</h3><p>ตารางวัคซีนรายกลุ่ม พร้อมประวัติการรักษาทุกตัว</p><span class="ep">/api/livestock/medical</span></div>
+      <div class="loop"><div class="ic">🚧</div><h3>กักโรค</h3><p>ควบคุมเข้า-ออกโรงเรือน ลดความเสี่ยงระบาดทั้งฟาร์ม</p><span class="ep">/api/livestock/biosecurity</span></div>
+    </div>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>ข้อจำกัดที่ควรรู้ก่อนใช้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>ยังไม่มีฟาร์มนำร่องจริง</b> — สูตรต้นทุน/กำไรถูกออกแบบจากโครงสร้างจริงของฟาร์ม แต่ต้องการฟาร์มทดลอง 1 รอบเต็มเพื่อปรับสูตรให้ตรงหน้างาน</li>
+        <li><b>กล้อง AI รอฮาร์ดแวร์</b> — endpoint พร้อม แต่ต้องมีกล้อง+อุปกรณ์ประมวลผลท้องถิ่นจึงทำงานจริง</li>
+        <li><b>ขายน้ำหนักบนหน้าร้านสาธารณะยังไม่รองรับ</b> — ฝั่งฟาร์มคิดเป็นกิโลกรัมได้ครบ แต่หน้าร้าน e-commerce ยังขายเป็นชิ้น (อยู่ในแผนของชิ้นงานธุรกิจ)</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  /* ── batch P&L live calculator (mirrors the real per-batch formula) ── */
+  var ids = ['fChicks','fFeed','fMeds','fUtil','fLabor','fOther','fWeight','fPrice'];
+  var out = ['sChicks','sFeed','sMeds','sUtil','sLabor','sOther'];
+  function num(id){ var v = parseFloat(document.getElementById(id).value); return isNaN(v) || v < 0 ? 0 : v; }
+  function fmt(n){ return n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function paint(){
+    var costs = [num('fChicks'), num('fFeed'), num('fMeds'), num('fUtil'), num('fLabor'), num('fOther')];
+    var rev = num('fWeight') * num('fPrice');
+    var total = costs.reduce(function(a,b){ return a+b; }, 0);
+    var net = rev - total;
+    var w = num('fWeight');
+    document.getElementById('sRev').textContent = fmt(rev);
+    for (var i=0;i<out.length;i++) document.getElementById(out[i]).textContent = fmt(costs[i]);
+    document.getElementById('sCost').textContent = fmt(total);
+    var netEl = document.getElementById('sNet');
+    netEl.textContent = fmt(net);
+    netEl.classList.toggle('neg', net < 0);
+    document.getElementById('sCpp').textContent = w > 0 ? fmt(total / w) : '—';
+    document.getElementById('sPpk').textContent = w > 0 ? fmt(net / w) : '—';
+  }
+  ids.forEach(function(id){ document.getElementById(id).addEventListener('input', paint); });
+  paint();
+})();
+</script>
+</body>
+</html>

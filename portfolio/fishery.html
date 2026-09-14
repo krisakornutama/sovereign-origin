@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>การประมง — Project Sovereign</title>
+<meta name="description" content="ชิ้นงานการประมง (เลี้ยงปลา/กุ้ง) ใน Project Sovereign: แนวคิดบ่อเลี้ยงตามรอบ ตรวจคุณภาพน้ำจากเซ็นเซอร์ IoT ที่มีอยู่จริง บันทึกผลผลิตรายวัน และกำไรต่อรอบการเพาะเลี้ยง — รากโครงสร้างพร้อม ออกแบบไว้แล้ว รอสร้างโมดูลเฉพาะ">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M3 8c2-3 6-3.6 8.6-1.2L14 5v6l-2.4-1.8C9 11.6 5 11 3 8z' fill='%2322d3ee'/%3E%3Ccircle cx='5.2' cy='7.6' r='.7' fill='%23030712'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%),
+  radial-gradient(1200px 700px at 50% 115%,rgba(52,211,153,.06),transparent 62%)}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:
+  linear-gradient(rgba(52,211,153,.02) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(34,211,238,.015) 1px,transparent 1px);background-size:36px 36px;
+  -webkit-mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%);
+  mask-image:radial-gradient(1200px 700px at 50% 40%,#000 30%,transparent 100%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
+.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+
+.hero{max-width:1080px;margin:0 auto;padding:70px 24px 56px}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;color:var(--cyan);margin:0 0 14px}
+h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:700;line-height:1.2;margin:0 0 18px;max-width:800px}
+h1 em{font-style:normal;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.35)}
+.lede{color:var(--dim);font-size:1.02rem;max-width:680px;margin:0 0 26px}
+.meta-line{font-family:var(--mono);font-size:.72rem;color:var(--faint);margin:0 0 30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;font-weight:600;font-size:.9rem;text-decoration:none;padding:11px 22px;border-radius:9px;transition:box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn-primary{background:var(--cyan);color:#030712}
+.btn-primary:hover{box-shadow:0 0 26px rgba(34,211,238,.4)}
+.btn-ghost{border:1px solid rgba(52,211,153,.4);color:var(--green)}
+.btn-ghost:hover{border-color:var(--green);background:rgba(52,211,153,.08)}
+
+html{scroll-padding-top:70px}
+section{max-width:1080px;margin:0 auto;padding:64px 24px;scroll-margin-top:70px}
+.k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
+.k-ch b{color:var(--green)}
+h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.bullet b,.hl{color:#ecfdf5}
+
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+.pillar{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:20px}
+.pillar .ic{font-size:1.4rem}
+.pillar h3{font-size:.98rem;font-weight:600;color:#ecfdf5;margin:10px 0 6px}
+.pillar p{font-size:.82rem;color:var(--dim);margin:0;line-height:1.75}
+.pillar .st{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:.62rem;border-radius:999px;padding:3px 10px}
+.pillar .ready{color:var(--green);border:1px solid rgba(52,211,153,.4)}
+.pillar .planned{color:#fbbf24;border:1px dashed rgba(245,158,11,.45)}
+
+.pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 20px}
+.stage{font-family:var(--mono);font-size:.74rem;border:1px solid rgba(34,211,238,.3);border-radius:8px;padding:7px 13px;color:#a5f3fc;background:rgba(34,211,238,.05)}
+.arrow{color:var(--faint);font-family:var(--mono)}
+.pipe .ghost-stage{border-style:dashed;color:var(--faint);background:transparent}
+
+.meas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.m{border:1px solid rgba(34,211,238,.22);border-radius:10px;padding:14px;background:rgba(34,211,238,.04)}
+.m .v{font-family:var(--mono);font-size:1.3rem;color:#a5f3fc}
+.m .l{font-size:.76rem;color:var(--dim);margin-top:2px}
+.m .ok{font-family:var(--mono);font-size:.6rem;color:var(--green);margin-top:6px}
+.m .warn{font-family:var(--mono);font-size:.6rem;color:#fbbf24;margin-top:6px}
+
+.honest{border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.05);border-radius:12px;padding:20px 24px}
+.honest h3{margin:0 0 10px;font-size:.95rem;color:#fbbf24}
+.honest ul{margin:0;padding-left:20px}
+.honest li{font-size:.85rem;color:var(--dim);margin:6px 0}
+
+footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px;
+  font-family:var(--mono);font-size:.7rem;color:var(--faint);line-height:2}
+
+@media (max-width:900px){
+  .pillars{grid-template-columns:1fr}
+  .meas{grid-template-columns:repeat(2,1fr)}
+  .hero{padding:56px 20px 46px}
+  section{padding:52px 20px}
+}
+@media (max-width:480px){
+  .topnav{gap:10px;font-size:.64rem}
+  .meas{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="livestock.html">ปศุสัตว์</a>
+    <a href="fishery.html" aria-current="page">การประมง</a>
+    <a href="index.html#faq">ถาม-ตอบ</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <p class="eyebrow">PROJECT SOVEREIGN · AQUACULTURE (กำลังออกแบบ)</p>
+    <h1>บ่อปลาที่<em>ดูแลตัวเองได้</em><br>ตามรอบ จบรอบรู้กำไร</h1>
+    <p class="lede">ชิ้นงานถัดไปของระบบฟาร์ม: เลี้ยงปลา/กุ้งตามรอบ ตรวจคุณภาพน้ำด้วยเซ็นเซอร์ IoT ที่โครงสร้างมีอยู่จริงแล้วในระบบบ้าน (ตาราง WaterQualityReading — TDS/pH/ความขุ่น) บันทึกผลผลิตรายวัน และสรุปกำไรต่อรอบแบบเดียวกับปศุสัตว์</p>
+    <p class="meta-line">หน้านี้คือแบบแปลนที่เปิดเผย · ตัวเลขเป็นข้อมูลสาธิต · โมดูลเฉพาะยังไม่ได้เขียน</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#plan">ดูแผนที่วางไว้ →</a>
+      <a class="btn btn-ghost" href="projects.html">กลับหน้าผลงาน</a>
+    </div>
+  </section>
+
+  <!-- ═══ PILLARS ═══ -->
+  <section id="plan">
+    <p class="k-ch">// รากที่มีอยู่จริง</p>
+    <h2>ทำไมชิ้นนี้ถึงอยู่ใกล้กว่าที่คิด</h2>
+    <p class="sub">การเพาะเลี้ยงสัตว์น้ำไม่ได้เริ่มจากศูนย์ — สามเสาหลักมีอยู่ในระบบแล้ว เหลือแค่ต่อเข้าด้วยกัน</p>
+    <div class="pillars">
+      <div class="pillar"><div class="ic">💧</div><h3>เซ็นเซอร์คุณภาพน้ำ</h3><p>โมเดล WaterQualityReading รับค่า TDS / pH / ความขุ่น จากเซ็นเซอร์หรือกรอกมือ พร้อมกราฟย้อนหลังรายถัง — ใช้ตรวจบ่อได้ทันที</p><span class="st ready">มีจริงในระบบ</span></div>
+      <div class="pillar"><div class="ic">📡</div><h3>โครงข่าย IoT ทั้งบ้าน</h3><p>MQTT broker วิ่งจริง + ระบบอุปกรณ์/กฎอัตโนมัติ/เตือน — ปั๊มอากาศ ปั๊มน้ำ ไฟในบ่อ ต่อเข้ากฎ "ถ้าออกซิเจนต่ำ → เปิดปั๊ม" ได้</p><span class="st ready">มีจริงในระบบ</span></div>
+      <div class="pillar"><div class="ic">🐟</div><h3>โมดูลรอบการเลี้ยงสัตว์น้ำ</h3><p>ต้นแบบจากปศุสัตว์: กลุ่ม→ผลผลิตรายวัน→ต้นทุน-กำไรต่อรอบ ปรับเป็นบ่อ/กระชัง จำนวนลูกปลา อัตราป้อน วันเก็บเกี่ยว</p><span class="st planned">ออกแบบไว้ — รอสร้าง</span></div>
+    </div>
+  </section>
+
+  <!-- ═══ CYCLE ═══ -->
+  <section id="cycle">
+    <p class="k-ch">// วงจรที่ออกแบบไว้</p>
+    <h2>หนึ่งรอบการเลี้ยงในระบบ</h2>
+    <p class="sub">ตั้งแต่ลงลูกปลาจนขาย — ระบบเก็บทุกจุด คิดกำไรให้จบรอบ</p>
+    <div class="pipe" aria-label="วงจรการเลี้ยงสัตว์น้ำที่ออกแบบไว้">
+      <span class="stage">ลงลูกปลา (เปิดรอบ)</span><span class="arrow">→</span>
+      <span class="stage">บันทึกอาหาร+คุณภาพน้ำรายวัน</span><span class="arrow">→</span>
+      <span class="stage">เช็คสุขภาพ/อัตรารอด</span><span class="arrow">→</span>
+      <span class="stage">เก็บเกี่ยว</span><span class="arrow">→</span>
+      <span class="stage">ขาย → กำไรรอบ</span>
+    </div>
+    <ul class="bullet">
+      <li><b>ต้นทุนเข้าอัตโนมัติ</b> — อาหาร ลูกปลา ไฟฟ้า บันทึกครั้งเดียว ระบบรวมเป็นต้นทุนรอบ</li>
+      <li><b>เตือนคุณภาพน้ำ</b> — ค่าออกนอกเกณฑ์ = แจ้งเตือน + กฎเปิดปั๊มอัตโนมัติ</li>
+      <li><b>ต่อยอดชุดขาย-ภาษี</b> — ขายปลาเข้าสมุดบัญชีเดียวกับร้าน ภาษีถูกต้องทันที</li>
+    </ul>
+  </section>
+
+  <!-- ═══ WATER BOARD ═══ -->
+  <section id="water">
+    <p class="k-ch">// ตัวอย่างหน้าจอเฝ้าน้ำ · <b>สาธิต</b></p>
+    <h2>บอร์ดคุณภาพน้ำรายบ่อ</h2>
+    <p class="sub">แบบที่จะทำจากโมเดลที่มีอยู่จริง — ค่าจากเซ็นเซอร์หรือกรอกมือ เทียบเกณฑ์ที่ตั้งได้ (ข้อมูลสาธิต)</p>
+    <div class="meas" role="img" aria-label="ตัวอย่างบอร์ดคุณภาพน้ำ 4 ตัวชี้วัด (ข้อมูลสาธิต)">
+      <div class="m"><div class="v">6.8</div><div class="l">pH · บ่อ 1</div><div class="ok">✓ อยู่ในเกณฑ์ 6.5–8.5</div></div>
+      <div class="m"><div class="v">142</div><div class="l">TDS (ppm) · บ่อ 1</div><div class="ok">✓ ปกติ</div></div>
+      <div class="m"><div class="v">3.1</div><div class="l">ออกซิเจน (mg/L) · บ่อ 2</div><div class="warn">⚠ ต่ำกว่าเกณฑ์ — เตือน + เปิดปั๊ม</div></div>
+      <div class="m"><div class="v">8</div><div class="l">ความขุ่น (NTU) · บ่อ 2</div><div class="ok">✓ ปกติ</div></div>
+    </div>
+    <ul class="bullet">
+      <li><b>เกณฑ์ตั้งเองได้รายบ่อ</b> — ปลานิล ปลาดุก กุ้ง ต้องการคนละค่า</li>
+      <li><b>ประวัติกราฟย้อนหลัง</b> — รู้ว่าน้ำเปลี่ยนช่วงไหนของรอบ</li>
+      <li><b>เชื่อมกฎอัตโนมัติของบ้าน</b> — เปิดปั๊ม/พ่นอากาศเองตามกฎถ้า-แล้ว</li>
+    </ul>
+  </section>
+
+  <!-- ═══ HONEST ═══ -->
+  <section id="honest">
+    <p class="k-ch">// ตรงไปตรงมา</p>
+    <h2>สถานะจริงของชิ้นนี้</h2>
+    <div class="honest">
+      <h3>ตรงไปตรงมา</h3>
+      <ul>
+        <li><b>โมดูลประมงยังไม่ได้เขียน</b> — หน้านี้คือแบบแปลน ไม่ใช่ฟีเจอร์ที่ใช้ได้วันนี้ (ต่างจากปศุสัตว์ที่มีโค้ดจริง 11 โมดูล)</li>
+        <li><b>เซ็นเซอร์ในบ่อต้องหา/ทำเพิ่ม</b> — ระบบรับค่าพร้อม (manual หรือ sensor) แต่อุปกรณ์จริงในบ่อยังไม่มี</li>
+        <li><b>ต้องการผู้ร่วมพัฒนา</b> — คนที่มีบ่อเลี้ยงจริงมากำหนดเกณฑ์+ทดลอง 1 รอบ จะทำให้ชิ้นนี้จริงได้เร็วมาก</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+</footer>
+
+</body>
+</html>
