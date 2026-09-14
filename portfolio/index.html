@@ -40,10 +40,9 @@ a{color:var(--green)}
   padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
 .wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5}
 .wordmark span{color:var(--green)}
-.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .topnav::-webkit-scrollbar{display:none}
-.progress{position:absolute;left:0;right:0;bottom:-1px;height:2px}
-#progressBar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
+#progressBar{position:absolute;left:0;right:0;bottom:-1px;height:2px;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
 .topnav a{color:var(--dim);text-decoration:none}
 .topnav a:hover{color:var(--green)}
 
@@ -70,11 +69,13 @@ h1 em{font-style:normal;color:var(--green);text-shadow:0 0 24px rgba(52,211,153,
 
 /* ── chapter frame ── */
 html{scroll-padding-top:70px}
-section{max-width:1080px;margin:0 auto;padding:70px 24px;scroll-margin-top:70px}
+section{max-width:1080px;margin:0 auto;padding:70px 24px}
 .k-ch{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--cyan);margin:0 0 10px}
 .k-ch b{color:var(--green)}
 h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .sub{color:var(--dim);font-size:.92rem;margin:0 0 34px;max-width:680px}
+.bullet{color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2}
+.hl{color:#ecfdf5}
 
 /* ── map ── */
 .map{border:1px solid var(--line);border-radius:14px;background:rgba(3,7,12,.6);padding:26px 26px 22px;margin-bottom:26px}
@@ -111,12 +112,11 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 /* ── pipeline ── */
 .pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
 .stage{font-family:var(--mono);font-size:.74rem;border:1px solid rgba(34,211,153,.3);border-radius:8px;padding:7px 13px;color:#a7f3d0;background:rgba(52,211,153,.05)}
-.stage.dark{border-style:dashed;color:var(--faint);background:transparent;text-decoration:line-through}
 .arrow{color:var(--faint);font-family:var(--mono)}
 
 /* ── pp30 paper (shared) ── */
 .taxgrid{display:grid;grid-template-columns:1.05fr .95fr;gap:38px;align-items:start}
-.period{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.period{display:flex;align-items:center;gap:10px;margin:18px 0 14px}
 .period label{font-family:var(--mono);font-size:.7rem;color:var(--faint)}
 .period select{font-family:var(--mono);font-size:.8rem;color:#a7f3d0;background:#0b1220;
   border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:8px 10px;cursor:pointer}
@@ -188,6 +188,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .vert p{font-size:.84rem;color:var(--dim);margin:0;line-height:1.75}
 .vert .fit{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:.64rem;color:var(--green);border:1px solid rgba(52,211,153,.3);border-radius:999px;padding:3px 10px}
 .vert-note{font-size:.78rem;color:var(--faint);margin:16px 0 0;line-height:1.8}
+.vert-note b{color:var(--green)}
 
 /* ── full catalog ── */
 .catalog-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -280,12 +281,12 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="#faq">ถาม-ตอบ</a>
     <a href="#run">รันเองฟรี</a>
   </nav>
-  <div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
+  <div id="progressBar" aria-hidden="true"></div>
 </header>
 
 <main>
   <!-- ═══ HERO ═══ -->
-  <section class="hero" id="top">
+  <section class="hero">
     <div class="boot" id="boot" aria-hidden="true"></div>
     <p class="eyebrow">PROJECT SOVEREIGN · SELF-HOSTED LIFE & BUSINESS OS</p>
     <h1>ระบบหลังบ้าน ร้านค้า ร้านอาหาร ฟาร์ม<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
@@ -307,7 +308,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div class="vert"><div class="ic">🍜</div><h3>ร้านอาหาร / ครัว</h3><p>เมนูพร้อมสูตร (รู้ทุนต่อจาน) จอครัว KDS ตามออเดอร์แบบเรียลไทม์ ตาชั่งน้ำหนัก+ตู้เย็นเชื่อม IoT รายงานรายรับ-รายจ่าย-กำไรรายวัน และเศษอาหารกลายเป็นปุ๋ยในระบบเดียวกัน</p><span class="fit">หน้าจอครบ · มี KDS + ครัว IoT</span></div>
       <div class="vert"><div class="ic">🐄</div><h3>ปศุสัตว์ / ฟาร์ม</h3><p>ทะเบียนกลุ่มสัตว์ สุขภาพ+วัคซีน ผลผลิตรายวัน (นม/ไข่/น้ำหนัก) ต้นทุน-กำไรต่อรอบการเลี้ยง อากาศโรงเรือน กักโรค และกล้อง AI ตรวจกลุ่มสัตว์</p><span class="fit">11 โมดูล · จากคอกถึงกำไร</span></div>
     </div>
-    <p class="vert-note">+ แปลงเกษตร สมุนไพร และโรงเรือน อยู่ในระบบเดียวกัน (แผนที่แปลง การปลูก ปุ๋ย) · อาชีพอื่นก็เริ่มได้ทันทีจากชุดเดียวกัน: <b style="color:var(--green)">ขาย → เงินเข้า → ภาษี</b> — ตัวเลขภาษีถูกต้องไม่ว่าขายอะไร</p>
+    <p class="vert-note">+ แปลงเกษตร สมุนไพร และโรงเรือน อยู่ในระบบเดียวกัน (แผนที่แปลง การปลูก ปุ๋ย) · อาชีพอื่นก็เริ่มได้ทันทีจากชุดเดียวกัน: <b>ขาย → เงินเข้า → ภาษี</b> — ตัวเลขภาษีถูกต้องไม่ว่าขายอะไร</p>
   </section>
 
   <!-- ═══ CH.0 MAP ═══ -->
@@ -432,9 +433,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
           <span class="stage">QR PromptPay</span><span class="arrow">→</span>
           <span class="stage">แจ้งชำระ</span>
         </div>
-        <ul style="color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2">
-          <li>QR ฝัง<b style="color:#ecfdf5">ยอดที่ต้องจ่าย</b>ไว้ในตัว — ลูกค้าสแกนแล้วโอนถูกจำนวนเอง</li>
-          <li>ลูกค้าเห็นเฉพาะของที่ขาย — <b style="color:#ecfdf5">ราคาทุน/สต็อกปิดบัง</b>จากหน้าร้าน</li>
+        <ul class="bullet">
+          <li>QR ฝัง<b class="hl">ยอดที่ต้องจ่าย</b>ไว้ในตัว — ลูกค้าสแกนแล้วโอนถูกจำนวนเอง</li>
+          <li>ลูกค้าเห็นเฉพาะของที่ขาย — <b class="hl">ราคาทุน/สต็อกปิดบัง</b>จากหน้าร้าน</li>
           <li>ร้านปิด = หน้าร้านเงียบไปเอง ไม่มีใครสั่งทะลุ</li>
           <li>โอนผิด/โอนแล้ว กด "แจ้งชำระ" — ร้านเห็นและตรวจเงินเข้าจริงก่อนรับ</li>
         </ul>
@@ -464,11 +465,11 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
           <span class="stage">ส่งของแล้ว</span>
         </div>
         <p class="eyebrow" style="margin:18px 0 8px">กันพลาดที่คนมักไม่คิดถึง</p>
-        <ul style="color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2">
-          <li>ของไม่พอ = <b style="color:#ecfdf5">ระบบบล็อก</b> ไม่ให้ยืนยัน (เช็คใน transaction เดียว)</li>
-          <li>ยกเลิกออเดอร์ = <b style="color:#ecfdf5">ของคืนคลังอัตโนมัติ</b></li>
+        <ul class="bullet">
+          <li>ของไม่พอ = <b class="hl">ระบบบล็อก</b> ไม่ให้ยืนยัน (เช็คใน transaction เดียว)</li>
+          <li>ยกเลิกออเดอร์ = <b class="hl">ของคืนคลังอัตโนมัติ</b></li>
           <li>สินค้าผูกคลังกลางแบบ mirror — ขยับที่เดียว อีกฝั่งตาม</li>
-          <li>B2B รับชำระพร้อม<b style="color:#ecfdf5">ภาษีหัก ณ ที่จ่าย (ท.ป.4)</b> ได้ — ระบบจดเครดิตให้</li>
+          <li>B2B รับชำระพร้อม<b class="hl">ภาษีหัก ณ ที่จ่าย (ท.ป.4)</b> ได้ — ระบบจดเครดิตให้</li>
         </ul>
       </div>
       <div>
@@ -511,10 +512,10 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <p class="sub">ภาษีขายจากทุกออเดอร์ ลบภาษีซื้อจากทุกรายจ่าย (ใส่เลขจากใบกำกับซัพพลายเออร์ได้ในฟอร์มเดียว) — สุทธิขึ้นบนแผ่น ภ.พ.30 เลือกงวดย้อนหลังได้ ครบด้วย ภ.ง.ด.3/50/90 และปฏิทินยื่นนับวันถอยหลัง</p>
     <div class="taxgrid">
       <div>
-        <ul style="color:var(--dim);font-size:.88rem;padding-left:20px;margin:0 0 18px;line-height:2">
-          <li><b style="color:#ecfdf5">ภาษีหัก ณ ที่จ่าย</b> ทั้งฝั่งที่เราโดนหัก (เครดิต ภ.ง.ด.50/90) และฝั่งที่เราหัก (ท.ป.4) — จดครบสองฝั่ง</li>
-          <li><b style="color:#ecfdf5">ภ.ง.ด.50</b> นิติบุคคล SME คิดตามทุนจดทะเบียนที่กรอก · <b style="color:#ecfdf5">ภ.ง.ด.90</b> บุคคลธรรมดาประมาณการ</li>
-          <li><b style="color:#ecfdf5">ปฏิทินยื่น</b> 5 แบบ นับวันถอยหลังอัตโนมัติ — เหลือ ≤14 วันเริ่มเตือน</li>
+        <ul class="bullet">
+          <li><b class="hl">ภาษีหัก ณ ที่จ่าย</b> ทั้งฝั่งที่เราโดนหัก (เครดิต ภ.ง.ด.50/90) และฝั่งที่เราหัก (ท.ป.4) — จดครบสองฝั่ง</li>
+          <li><b class="hl">ภ.ง.ด.50</b> นิติบุคคล SME คิดตามทุนจดทะเบียนที่กรอก · <b class="hl">ภ.ง.ด.90</b> บุคคลธรรมดาประมาณการ</li>
+          <li><b class="hl">ปฏิทินยื่น</b> 5 แบบ นับวันถอยหลังอัตโนมัติ — เหลือ ≤14 วันเริ่มเตือน</li>
           <li>อัตราตามกฎหมายจริง ณ ก.ย. 2569 (VAT 7% ถึง 30 ก.ย. 2569+1ปี แล้วขึ้น 10% เอง)</li>
         </ul>
         <div class="period">
@@ -558,11 +559,11 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
         </div>
       </div>
       <div>
-        <ul style="color:var(--dim);font-size:.88rem;padding-left:20px;margin:0;line-height:2">
-          <li>ครอบคลุม <b style="color:#ecfdf5">ภ.พ.30 · ภ.ง.ด.3 · ภ.ง.ด.50 · ภ.ง.ด.51 · ภ.ง.ด.90</b></li>
-          <li>แจ้ง<b style="color:#ecfdf5">รายธุรกิจ</b> พร้อมงวด วันครบกำหนด และจำนวนวันที่เหลือ</li>
+        <ul class="bullet">
+          <li>ครอบคลุม <b class="hl">ภ.พ.30 · ภ.ง.ด.3 · ภ.ง.ด.50 · ภ.ง.ด.51 · ภ.ง.ด.90</b></li>
+          <li>แจ้ง<b class="hl">รายธุรกิจ</b> พร้อมงวด วันครบกำหนด และจำนวนวันที่เหลือ</li>
           <li>ยื่นแล้ว/ผ่านไปแล้ว = เลื่อนงวดให้เอง ไม่เตือนซ้ำเดือนเก่า</li>
-          <li>ข้อความแนบ<b style="color:#ecfdf5">ยอดภาษีที่ระบบคำนวณไว้</b> — เห็นปุ๊บรู้ทันทีว่าต้องเตรียมเงินเท่าไร</li>
+          <li>ข้อความแนบ<b class="hl">ยอดภาษีที่ระบบคำนวณไว้</b> — เห็นปุ๊บรู้ทันทีว่าต้องเตรียมเงินเท่าไร</li>
         </ul>
       </div>
     </div>
@@ -589,7 +590,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <h2>อยู่รอดด้วยตัวเอง</h2>
     <p class="sub">ระบบเฝ้าตัวเอง กู้ตัวเอง และสำรองข้อมูลทุกวัน — ข้อมูลภาษีของคุณคือหลักฐาน ต้องกู้คืนได้จริง ไม่ใช่แค่ "มี backup ไว้"</p>
     <div class="opsgrid">
-      <div class="opcard"><div class="h"><span class="t">🗄️ Backup รายวัน</span><span class="st">03:00 ทุกวัน</span></div><p>dump ฐานข้อมูลอัตโนมัติทุกวันตีสาม — และ<b style="color:#ecfdf5">ซ้อม restore จริง</b>: กู้ลงฐานทดสอบ นับแถวตรงทุกตาราง แล้วจึงเชื่อว่ากู้ได้</p></div>
+      <div class="opcard"><div class="h"><span class="t">🗄️ Backup รายวัน</span><span class="st">03:00 ทุกวัน</span></div><p>dump ฐานข้อมูลอัตโนมัติทุกวันตีสาม — และ<b class="hl">ซ้อม restore จริง</b>: กู้ลงฐานทดสอบ นับแถวตรงทุกตาราง แล้วจึงเชื่อว่ากู้ได้</p></div>
       <div class="opcard"><div class="h"><span class="t">🩺 Watchdog</span><span class="st">เช็คทุก 30 วิ</span></div><p>เดินโปรดหน้าเว็บทุกครึ่งนาที เห็นล้มปลุกกลับมาเองภายในไม่ถึงนาที (ทดสอบจริง: kill เว็บ → ฟื้น &lt; 60 วิ)</p></div>
       <div class="opcard"><div class="h"><span class="t">🔌 บูตหลังไฟดับ</span><span class="st">auto-start</span></div><p>เปิดเครื่องใหม่ ระบบลุกเองครบทั้งกอง — ไม่ต้องจำว่าต้องกดอะไร</p></div>
       <div class="opcard"><div class="h"><span class="t">🔐 ความปลอดภัย</span><span class="st">offline-first</span></div><p>รหัสผ่านทดสอบที่เคยหลุดเข้า repo ถูกหมุนใหม่แล้ว · ข้อมูลอยู่ในเครื่องคุณ ไม่มีบริการภายนอกอ่าน — ก่อนเปิดสู่อินเทอร์เน็ตจริงต้องมี domain + HTTPS</p></div>
