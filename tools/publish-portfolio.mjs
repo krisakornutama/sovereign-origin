@@ -104,7 +104,7 @@ if (!CHECK) {
     const full = git(DEST, 'rev-parse', 'HEAD');
     process.stdout.write('waiting for CI');
     for (let i = 0; i < 40; i++) {
-      execFileSync(process.platform === 'win32' ? 'timeout' : 'sleep', process.platform === 'win32' ? ['/t', '15', '/nobreak'] : ['15'], { stdio: 'ignore', shell: true });
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 15000);
       process.stdout.write('.');
       let json = '';
       try { json = execFileSync('gh', ['run', 'list', '--commit', full, '--json', 'status,conclusion', '--limit', '1']).toString(); } catch { continue; }
