@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Copy gate (Thai spelling/markup, no browser needed)
+        run: node scripts/check-copy.mjs --self-test && node scripts/check-copy.mjs
+
       - name: Install audit tooling
         run: npm install --no-fund --no-audit
 

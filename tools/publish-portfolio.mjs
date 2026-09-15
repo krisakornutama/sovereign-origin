@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /* publish-portfolio — คำสั่งเดียวจบ: sync → commit → push → (watch CI)
    ที่มา: sync มือ + commit -c identity + จับ CI เอง — พลาดง่าย (ผิด dir, ลืม identity)
-   ใช้: node tools/publish-portfolio.mjs [--check] [--watch] [--message "เหตุผลสั้น ๆ"]
-   --check = ดูอย่างเดียว (dry-run) · --watch = รอ CI "Audit site" จนจบ */
+   ใช้: node tools/publish-portfolio.mjs [--check] [--watch] [--message "เหตุผลสั้น ๆ"] [--no-indexnow]
+   --check = ดูอย่างเดียว (dry-run) · --watch = รอ CI "Audit site" จนจบ · --no-indexnow = ข้ามยิง IndexNow ท้ายงาน */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,10 +12,28 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const CHECK = args.includes('--check');
 const WATCH = args.includes('--watch');
-const MSG = (args.find((a) => a.startsWith('--message=')) || '').slice('--message='.length) || 'site update';
+/* กันข้อความที่มี \(mirror of …\) ติดมาแล้ว → เคยออกซ้ำสองรอบในประวัติจริง */
+const MSG = ((args.find((a) => a.startsWith('--message=')) || '').slice('--message='.length) || 'site update')
+  .replace(/\s*\(mirror of [0-9a-f]{7,40}\)\s*$/i, '');
+const SKIP_INDEXNOW = args.includes('--no-indexnow'); // IndexNow = ping บอทค้นหาท้ายงาน (fail-safe — ล้มได้ ไม่กระทบ publish)
+const NOTIFIER = process.env.SOVEREIGN_NOTIFIER || path.join(ROOT, 'tools', 'indexnow-notify.mjs'); // override ได้เฉพาะเทสต์สัญญา
 
+const LOG_FILE = path.join(ROOT, 'publish-indexnow.log'); // ประวัติการยิงลงไฟล์ท้ายโปรเจกต์ (*.log ถูก gitignore อยู่แล้ว)
+const note = (kind, fields) => {
+  try {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const ts = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    const pairs = Object.entries(fields).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${k}=${String(v).replace(/\s+/g, ' ')}`).join(' ');
+    fs.appendFileSync(LOG_FILE, `${ts}  ${kind.padEnd(14)} ${pairs}\n`);
+  } catch { /* log เขียนไม่ได้ = ไม่สำคัญพอให้ publish ล้ม */ }
+};
 const sha = (dir, ref = 'HEAD') => execFileSync('git', ['-C', dir, 'rev-parse', '--short', ref]).toString().trim();
 const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a]).toString().trim();
+/* ห้าม trim ผลของ git status --porcelain: รูปแบบคือ "XY path" — ช่องว่างนำหน้ามีความหมาย
+   (เจอจริงผ่านเทสต์สัญญา: trim ทำให้ slice(3) ตัดชื่อไฟล์ขาด → fatal: pathspec 'EADME.md') */
+const gitRaw = (dir, ...a) => execFileSync('git', ['-C', dir, ...a]).toString().replace(/\r\n/g, '\n');
 const log = (s) => console.log(s);
 const norm = (p) => fs.readFileSync(p).toString().replace(/\r\n/g, '\n'); // EOL-noise (autocrlf) ไม่นับเป็นต่าง — ไม่งั้น commit แล้วไม่มีอะไร staged
 
@@ -55,7 +73,7 @@ for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: tr
 }
 
 /* 3. dirty guard — กันกลืนงานคนอื่น: diff เนื้อหาจริง = หยุด · EOL-noise (autocrlf) จัดการเองด้วย git add (git normalize เอง — noise แบบนี้เกิดจาก sync ตัวเองในรอบก่อนด้วย) */
-const dirty = git(DEST, 'status', '--porcelain').split('\n').filter(Boolean);
+const dirty = gitRaw(DEST, 'status', '--porcelain').split('\n').filter(Boolean);
 if (dirty.length && !pub.sameDir) {
   if (!CHECK) {
     git(DEST, 'add', '-A');
@@ -106,7 +124,27 @@ if (!CHECK) {
   log(`commit: ${pubSha} (${name})`);
   git(DEST, 'push', 'origin', 'main');
   log(`push: origin/main → ${pubSha}`);
-  log(`CI: https://github.com/${git(DEST, 'config', 'remote.origin.url').match(/[:/]([^/]+\/[^/.]+)\.git/)[1]}/actions`);
+  /* ลิงก์ CI เป็นของแถม — remote ที่ไม่ใช่ GitHub (เช่น host อื่น) ต้องไม่ทำ publish ล้ม */
+  const remoteUrl = git(DEST, 'config', 'remote.origin.url');
+  const gh = remoteUrl.match(/[:/]([^/]+\/[^/.]+?)(?:\.git)?$/);
+  log(gh && /github\.com/.test(remoteUrl) ? `CI: https://github.com/${gh[1]}/actions` : `remote: ${remoteUrl} (ไม่ใช่ GitHub — ไม่มีหน้าต่าง CI)`);
+  note('publish', { mirror: pubSha, mono: monorepoSha, files: changed.length, msg: MSG.slice(0, 90) });
+  log(`log: ${path.relative(ROOT, LOG_FILE)}`);
+
+  /* 5.5 IndexNow — ping เครื่องมือค้นหาให้บอทมา crawl หน้าใหม่ทันที (fail-safe ไม่มีวันทำ publish ล้ม)
+     ส่งไฟล์ที่เปลี่ยนไปให้ด้วย: ตัวยิงจะรอจน production เสิร์ฟเนื้อหาชุดนั้นจริงก่อนยิง (ไม่ยิงก่อน deploy เสร็จ) */
+  const verifyArgs = changed
+    .filter((f) => /\.(html|md|xml|png|txt)$/i.test(f) && !f.startsWith('.'))
+    .slice(0, 3)
+    .flatMap((f) => [`--verify-file=${f}`]);
+  if (!SKIP_INDEXNOW) {
+    try {
+      execFileSync('node', [NOTIFIER, '--wait', `--expect-sha=${pubSha}`, ...verifyArgs], { stdio: 'inherit' });
+    } catch (e) {
+      // ห้ามให้ตัวยิงที่พังลากงานหลักลง: publish สำเร็จแล้ว → เตือนแล้วไปต่อ
+      log(`indexnow: ⚠ เรียกตัวยิงไม่สำเร็จ (${e.status ?? String(e.message || e).split('\n')[0]}) — ข้าม แล้วไปต่อ (ต้องยิงเองทีหลังถ้าต้องการ)`);
+    }
+  } else log('skip: IndexNow (--no-indexnow)');
 
   /* 6. watch CI ถ้าสั่ง --watch */
   if (WATCH) {
@@ -120,6 +158,10 @@ if (!CHECK) {
       const run = JSON.parse(json)[0];
       if (run && run.status === 'completed') {
         log(`\nCI ${run.conclusion === 'success' ? '✓ success' : '✗ ' + run.conclusion}`);
+        if (run.conclusion === 'success' && !SKIP_INDEXNOW) {
+          try { execFileSync('node', [NOTIFIER, `--expect-sha=${pubSha}`, ...verifyArgs], { stdio: 'inherit' }); }
+          catch (e) { log(`indexnow: ⚠ เรียกตัวยิงไม่สำเร็จ (${e.status ?? String(e.message || e).split('\n')[0]}) — ข้าม แล้วไปต่อ`); }
+        }
         process.exit(run.conclusion === 'success' ? 0 : 1);
       }
     }
