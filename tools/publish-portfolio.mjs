@@ -54,14 +54,23 @@ for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: tr
   if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github')) walk(f.name, publishFiles);
 }
 
-/* 3. dirty guard — publish repo ต้องสะอาดก่อน sync (กันกลืนงานคนอื่น) เว้นแต่ sameDir (งานเราเองที่รอ commit) */
+/* 3. dirty guard — กันกลืนงานคนอื่น: diff เนื้อหาจริง = หยุด · EOL-noise (autocrlf) จัดการเองด้วย git add (git normalize เอง — noise แบบนี้เกิดจาก sync ตัวเองในรอบก่อนด้วย) */
 const dirty = git(DEST, 'status', '--porcelain').split('\n').filter(Boolean);
-if (dirty.length && !CHECK && !pub.sameDir) {
-  console.error('✗ publish repo มีไฟล์ค้างก่อนเริ่ม — จัดการก่อน (ไม่ยุ่งให้):');
-  dirty.slice(0, 10).forEach((d) => console.error('   ' + d));
-  process.exit(1);
+if (dirty.length && !pub.sameDir) {
+  if (!CHECK) {
+    git(DEST, 'add', '-A');
+    const real = git(DEST, 'diff', '--cached', '--name-only');
+    if (real) {
+      console.error('✗ publish repo มี diff เนื้อหาจริงค้างก่อนเริ่ม — จัดการก่อน (git reset เพื่อคืนสถานะเดิม):');
+      real.split('\n').filter(Boolean).slice(0, 10).forEach((r) => console.error('   ' + r));
+      process.exit(1);
+    }
+    log(`EOL-noise ${dirty.length} ไฟล์ — add แล้ว diff จริงเป็นศูนย์ เดินต่อได้`);
+  } else {
+    log(`publish repo มี ${dirty.length} ไฟล์ค้าง (dry-run — ไม่แตะ)`);
+  }
 }
-if (dirty.length) log(`publish repo มี ${dirty.length} ไฟล์ค้างอยู่แล้ว${pub.sameDir ? ' (sameDir — จะรวม commit ด้วย)' : ' — cross-worktree mode'}`);
+if (dirty.length && pub.sameDir) log(`publish repo มี ${dirty.length} ไฟล์ค้างอยู่แล้ว (sameDir — จะรวม commit ด้วย)`);
 
 /* 4. sync — copy เฉพาะตัวที่ต่างจริง ๆ (sameDir = ข้าม เพราะเป็นโฟลเดอร์เดียวกัน) */
 let changed = [];
