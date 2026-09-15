@@ -9,63 +9,104 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='7' cy='7' r='3.6' fill='none' stroke='%2322d3ee' stroke-width='1.4'/%3E%3Cpath d='M10 10l3.4 3.4' stroke='%2334d399' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Taviraj:ital,wght@0,300;0,400;0,500;1,400&family=Sarabun:wght@400;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
-  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
-  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --night:#030712; --paper:#F3EADB; --edge:#E0D2BA;
+  --ink:#2A2118; --ink-60:rgba(42,33,24,.6); --ink-38:rgba(42,33,24,.38);
+  --stamp:#B3352C; --focus:#22D3EE;
+  --thai:'Sarabun','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --book:'Taviraj','Sarabun',serif;
   --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
 }
 *{box-sizing:border-box}
-[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
-body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
-  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
-  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%)}
-::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
-:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
-a{color:var(--green)}
+body{margin:0;background:var(--night);color:#d7d3ca;font-family:var(--thai);line-height:1.65;
+  -webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(900px 640px at 50% 26%,rgba(243,234,219,.07),transparent 68%)}
+::selection{background:rgba(179,53,44,.35);color:#fdf6ec}
+:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:4px}
+a{color:inherit}
 
-.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
-  padding:10px 18px;background:rgba(3,7,18,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.wordmark{font-family:var(--mono);font-weight:700;letter-spacing:.14em;color:var(--txt);text-decoration:none;font-size:.82rem}
-.wordmark span{color:var(--green)}
-.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
-.topnav::-webkit-scrollbar{display:none}
-.topnav a{color:var(--dim);text-decoration:none}
-.topnav a:hover{color:var(--green)}
-.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+/* ── desk (outside the leaf) ── */
+.desk-head{display:flex;justify-content:space-between;align-items:center;gap:14px;
+  padding:14px 20px;max-width:860px;margin:0 auto}
+.wordmark{font-family:var(--mono);font-weight:700;font-size:.76rem;letter-spacing:.16em;
+  color:#e8e4da;text-decoration:none}
+.wordmark span{color:var(--stamp)}
+.desk-nav{display:flex;gap:14px;font-family:var(--mono);font-size:.7rem;white-space:nowrap;overflow-x:auto}
+.desk-nav a{color:rgba(216,211,202,.55);text-decoration:none}
+.desk-nav a:hover{color:#e8e4da}
+.desk-nav a[aria-current="page"]{color:var(--paper);border-bottom:1px solid var(--stamp)}
 
-.hero{max-width:680px;margin:0 auto;padding:56px 20px 10px;text-align:center}
-.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.22em;color:var(--green);text-transform:uppercase;margin:0 0 14px}
-h1{font-size:clamp(1.6rem,4.5vw,2.3rem);line-height:1.25;margin:0 0 10px;font-weight:700}
-h1 .en{display:block;font-size:.52em;font-family:var(--mono);color:var(--cyan);font-weight:500;margin-top:6px;letter-spacing:.06em}
-.lede{color:var(--dim);margin:0 auto 26px;max-width:560px}
+.desk{max-width:860px;margin:0 auto;padding:34px 20px 90px}
+.eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.26em;color:rgba(216,211,202,.45);
+  text-transform:uppercase;text-align:center;margin:0 0 26px}
 
-.links{max-width:560px;margin:0 auto;padding:0 20px 30px;display:flex;flex-direction:column;gap:12px}
-.linkcard{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--line);
-  background:var(--panel);border-radius:14px;text-decoration:none;color:var(--txt);transition:transform .12s ease,border-color .12s ease}
-.linkcard:hover{transform:translateY(-2px);border-color:var(--green)}
-.linkcard .ic{font-size:1.5rem;flex:0 0 auto}
-.linkcard .t{font-weight:600}
-.linkcard .d{color:var(--dim);font-size:.85rem;margin-top:2px}
-.linkcard .go{margin-left:auto;font-family:var(--mono);color:var(--faint);font-size:.8rem}
-.linkcard.slot{opacity:.55;border-style:dashed;cursor:default}
-.linkcard.slot:hover{transform:none;border-color:var(--line)}
+/* ── the leaf ── */
+.leaf{position:relative;max-width:560px;margin:0 auto;background:var(--paper);color:var(--ink);
+  border:1px solid var(--edge);border-radius:3px;
+  padding:54px 52px 46px;
+  box-shadow:0 1px 0 rgba(243,234,219,.06),0 24px 60px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.4)}
+.orn{text-align:center;color:var(--ink-38);font-family:var(--mono);font-size:.8rem;
+  letter-spacing:.9em;text-indent:.9em;margin:0 0 26px}
 
-.note{max-width:560px;margin:0 auto;padding:0 20px 40px}
-.honest{border:1px solid rgba(34,211,238,.25);background:rgba(34,211,238,.05);border-radius:12px;padding:14px 16px;color:var(--dim);font-size:.85rem}
-.honest b{color:var(--cyan)}
+h1{font-family:var(--book);font-weight:500;font-size:clamp(2rem,6vw,2.9rem);line-height:1.3;
+  text-align:center;margin:0 0 4px;letter-spacing:.01em}
+h1 .en{display:block;font-size:.42em;font-style:italic;font-weight:400;
+  color:var(--ink-60);letter-spacing:.06em;margin-top:6px}
+.role{text-align:center;font-size:.95rem;font-weight:600;color:var(--ink-60);
+  margin:14px 0 0;letter-spacing:.02em}
 
-footer{border-top:1px solid var(--line);padding:22px;text-align:center;color:var(--faint);font-size:.78rem;font-family:var(--mono)}
-@media (max-width:560px){ .hero{padding-top:40px} .linkcard{padding:14px 15px} }
+/* ── signature: the stamp ── */
+.stamp{position:absolute;top:30px;right:26px;width:124px;height:124px;
+  transform:rotate(-8deg);mix-blend-mode:multiply;opacity:.92;
+  animation:stampIn .55s cubic-bezier(.2,.85,.3,1) .35s backwards}
+@keyframes stampIn{
+  from{transform:rotate(-16deg) scale(1.55);opacity:0}
+  55%{opacity:.95}
+  to{transform:rotate(-8deg) scale(1);opacity:.92}}
+@media (prefers-reduced-motion:reduce){.stamp{animation:none}}
+
+.rule{border:0;border-top:1px solid var(--ink-38);width:64px;margin:34px auto 30px;position:relative}
+.rule::after{content:'· · ·';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);
+  background:var(--paper);padding:0 10px;color:var(--ink-38);font-family:var(--mono);font-size:.72rem;
+  letter-spacing:.3em;text-indent:.3em}
+
+/* ── channel list: dotted leaders ── */
+.ch{font-family:var(--mono);font-weight:500;font-size:.68rem;letter-spacing:.24em;
+  color:var(--ink-60);text-align:center;margin:0 0 18px}
+.chan{list-style:none;margin:0;padding:0}
+.chan li{border-bottom:0}
+.chan a,.chan .wait{display:flex;align-items:baseline;gap:10px;padding:9px 2px;
+  text-decoration:none;color:var(--ink)}
+.chan a:hover .l,.chan a:focus-visible .l{color:var(--stamp)}
+.chan .l{font-weight:600;font-size:.95rem;white-space:nowrap}
+.chan .dots{flex:1;border-bottom:1px dotted var(--ink-38);transform:translateY(-4px);min-width:16px}
+.chan .a{font-family:var(--mono);font-size:.74rem;color:var(--ink-60);white-space:nowrap}
+.chan .wait{color:var(--ink-60)}
+.chan .wait .a{color:var(--ink-38)}
+
+/* ── colophon ── */
+.colophon{border-top:1px solid var(--ink-38);margin:30px 0 0;padding:16px 2px 0;
+  font-size:.82rem;color:var(--ink-60)}
+.colophon b{color:var(--ink);font-weight:600}
+.colophon .ed{display:block;margin-top:6px;font-family:var(--mono);font-size:.64rem;
+  letter-spacing:.14em;color:var(--ink-38)}
+
+@media (max-width:600px){
+  .leaf{padding:44px 24px 36px}
+  .stamp{width:94px;height:94px;top:14px;right:14px}
+  .chan a,.chan .wait{flex-wrap:wrap;row-gap:2px}
+  .chan .l{white-space:normal}
+  .chan .a{white-space:normal;text-align:right;font-size:.68rem;max-width:64%}
+}
 </style>
 </head>
 <body>
-<header class="topbar">
+<header class="desk-head">
   <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
-  <nav class="topnav" aria-label="เมนูหลัก">
+  <nav class="desk-nav" aria-label="เมนูหลัก">
     <a href="index.html">ภาพรวม</a>
     <a href="projects.html">ผลงาน</a>
     <a href="books.html">คลังหนังสือ</a>
@@ -75,56 +116,58 @@ footer{border-top:1px solid var(--line);padding:22px;text-align:center;color:var
   </nav>
 </header>
 
-<section class="hero">
-  <p class="eyebrow">รวมทุกช่องทาง · ONE PAGE · ALL CHANNELS</p>
-  <h1>นายกฤษกรณ์ อุตมะ คือใคร?<span class="en">Krisakorn Utama — Freelance Writer &amp; Developer</span></h1>
-  <p class="lede">นักเขียนอิสระและนักพัฒนา — เขียนหนังสือลง MEB Market สร้างระบบบ้านอัจฉริยะ self-hosted ทั้งบ้านบน GitHub และเปิดผลงานทั้งหมดไว้ที่เว็บนี้ ฟรีทั้งหมด ไม่มีค่าใช้จ่ายสักบาท</p>
-</section>
+<main class="desk">
+  <p class="eyebrow">หน้าผู้เขียน · Author page</p>
+  <article class="leaf">
+    <svg class="stamp" viewBox="0 0 120 120" role="img" aria-label="ตรารับรอง: ผู้เขียน — กฤษกรณ์ อุตมะ">
+      <defs>
+        <path id="rim" d="M60,60 m-40,0 a40,40 0 1,1 80,0 a40,40 0 1,1 -80,0"/>
+      </defs>
+      <circle cx="60" cy="60" r="55" fill="none" stroke="var(--stamp)" stroke-width="2.6"/>
+      <circle cx="60" cy="60" r="33" fill="none" stroke="var(--stamp)" stroke-width="1.1"/>
+      <text font-family="JetBrains Mono, monospace" font-size="9.2" letter-spacing="2.6"
+            fill="var(--stamp)" font-weight="700">
+        <textPath href="#rim" startOffset="0">KRISAKORN UTAMA · กฤษกรณ์ อุตมะ ·</textPath>
+      </text>
+      <text x="60" y="55" text-anchor="middle" font-family="Taviraj, serif" font-size="15"
+            fill="var(--stamp)" font-weight="500">ผู้เขียน</text>
+      <text x="60" y="73" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7.4"
+            letter-spacing="1.8" fill="var(--stamp)" font-weight="700">ยืนยันแล้ว</text>
+    </svg>
 
-<main class="links">
-  <a class="linkcard" href="https://github.com/krisakornutama" rel="me">
-    <span class="ic">🧑‍💻</span>
-    <span><span class="t">GitHub — krisakornutama</span><br><span class="d">โค้ดทั้งหมด: ระบบบ้านอัจฉริยะ Sovereign OS, ฟาร์มข้อมูล, IoT</span></span>
-    <span class="go">github.com ↗</span>
-  </a>
-  <a class="linkcard" href="https://www.mebmarket.com/?store=publisher&amp;action=home_page&amp;publisher_id=3576000&amp;publisher_name=" rel="me">
-    <span class="ic">📚</span>
-    <span><span class="t">หนังสือบน MEB Market</span><br><span class="d">ผลงานเขียนที่ลงพิมพ์ — อ่านได้บนมือถือทุกเครื่อง</span></span>
-    <span class="go">mebmarket.com ↗</span>
-  </a>
-  <a class="linkcard" href="https://krisakornutama.github.io/project-sovereign/" rel="me">
-    <span class="ic">🌐</span>
-    <span><span class="t">Project Sovereign — เว็บโชว์ผลงาน</span><br><span class="d">ทัวร์ระบบบ้านอัจฉริยะที่สร้างเองทั้งระบบ หน้าแรกถึงเครื่องจักรหลังบ้าน</span></span>
-    <span class="go">github.io ↗</span>
-  </a>
-  <a class="linkcard" href="https://github.com/krisakornutama/project-sovereign" rel="me">
-    <span class="ic">🛠️</span>
-    <span><span class="t">ซอร์สโค้ดเว็บนี้ (เปิดให้ดู)</span><br><span class="d">repo สาธารณะของเว็บโชว์ผลงาน — static, ไม่มี dependency</span></span>
-    <span class="go">repo ↗</span>
-  </a>
+    <p class="orn" aria-hidden="true">· · ·</p>
+    <h1>กฤษกรณ์ อุตมะ<span class="en">Krisakorn Utama</span></h1>
+    <p class="role">นักเขียนอิสระ · นักพัฒนาระบบ self-hosted</p>
 
-  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
-    <span class="ic">📘</span>
-    <span><span class="t">Facebook Page</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
-    <span class="go">รอลิงก์</span>
-  </a>
-  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
-    <span class="ic">▶️</span>
-    <span><span class="t">YouTube</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
-    <span class="go">รอลิงก์</span>
-  </a>
-  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
-    <span class="ic">✕</span>
-    <span><span class="t">X (Twitter)</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
-    <span class="go">รอลิงก์</span>
-  </a>
+    <hr class="rule">
+    <h2 class="ch">ช่องทางทางการ</h2>
+    <ul class="chan">
+      <li><a href="https://github.com/krisakornutama" rel="me">
+        <span class="l">GitHub — โค้ดทั้งหมด</span><span class="dots"></span>
+        <span class="a">github.com/krisakornutama</span></a></li>
+      <li><a href="https://www.mebmarket.com/?store=publisher&amp;action=home_page&amp;publisher_id=3576000&amp;publisher_name=" rel="me">
+        <span class="l">หนังสือ — MEB Market</span><span class="dots"></span>
+        <span class="a">mebmarket.com · publisher 3576000</span></a></li>
+      <li><a href="https://krisakornutama.github.io/project-sovereign/" rel="me">
+        <span class="l">เว็บผลงาน — Project Sovereign</span><span class="dots"></span>
+        <span class="a">krisakornutama.github.io</span></a></li>
+      <li><a href="https://github.com/krisakornutama/project-sovereign" rel="me">
+        <span class="l">ซอร์สโค้ดเว็บนี้</span><span class="dots"></span>
+        <span class="a">github.com/project-sovereign</span></a></li>
+      <li class="wait" title="รอเพิ่มลิงก์จริงจากเจ้าของ">
+        <span class="l">Facebook</span><span class="dots"></span><span class="a">(รอลิงก์จริง)</span></li>
+      <li class="wait" title="รอเพิ่มลิงก์จริงจากเจ้าของ">
+        <span class="l">YouTube</span><span class="dots"></span><span class="a">(รอลิงก์จริง)</span></li>
+      <li class="wait" title="รอเพิ่มลิงก์จริงจากเจ้าของ">
+        <span class="l">X (Twitter)</span><span class="dots"></span><span class="a">(รอลิงก์จริง)</span></li>
+    </ul>
+
+    <p class="colophon">
+      <b>ตรงไปตรงมา:</b> ช่องทางที่พิมพ์ชัดคือช่องทางที่ยืนยันแล้วจริง ส่วนที่ขึ้น (รอลิงก์จริง) ยังรอเจ้าของเพิ่ม URL — หน้านี้ static ทั้งหมด ไม่มีสคริปต์ติดตาม ไม่มีคุกกี้
+      <span class="ed">พิมพ์ครั้งที่ 1 · โฮสต์ฟรีบน GitHub Pages · กันยายน 2569</span>
+    </p>
+  </article>
 </main>
-
-<section class="note">
-  <div class="honest">
-    <b>ตรงไปตรงมา:</b> ลิงก์ที่ขึ้นเต็ม ๆ คือช่องทางที่ยืนยันแล้วจริง ส่วนช่องเส้นประคือช่องทางที่ยังรอเจ้าของเพิ่ม URL จริง — หน้านี้ static 100% โฮสต์ฟรีบน GitHub Pages ไม่มีสคริปต์ติดตาม ไม่มีคุกกี้ ไม่มีค่าใช้จ่าย
-  </div>
-</section>
 
 <script type="application/ld+json">
 {
@@ -142,10 +185,5 @@ footer{border-top:1px solid var(--line);padding:22px;text-align:center;color:var
   ]
 }
 </script>
-
-<footer>
-  KRISAKORN UTAMA (กฤษกรณ์ อุตมะ) · หน้ารวมช่องทางอย่างเป็นทางการ<br>
-  static · free hosting · ตามหลัก data จริงเท่านั้น
-</footer>
 </body>
 </html>
