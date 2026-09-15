@@ -180,7 +180,9 @@ function field(obj, name){ return (obj.match(new RegExp(name + "\\s*:\\s*'([^']+
 /* หาอาร์เรย์ var NAME = [ ... ] แล้วส่งทุก object { ... } ให้ fn */
 function arrayObjects(html, name, fn){
   var m = html.match(new RegExp('var\\s+' + name + '\\s*=\\s*\\[([\\s\\S]*?)\\n\\];'));
-  if (m) m[1].replace(/\{[^}]*\}/g, fn);
+  if (!m) return;
+  /* ตัดบรรทัด // คอมเมนต์ตัวอย่างออกก่อน — ไม่งั้นแถวตัวอย่างในคอมเมนต์หลุดเข้าดัชนีเป็นรายการหลอก */
+  m[1].replace(/^\s*\/\/.*$/gm, '').replace(/\{[^}]*\}/g, fn);
 }
 
 function booksHits(html){
@@ -201,7 +203,8 @@ function booksHits(html){
 function waterHits(html){
   var out = [];
   ['pioneer', 'formation8', 'patriarch'].forEach(function (key) {
-    var cells = html.match(new RegExp(key + '\\s*:\\s*\\{[\\s\\S]*?cells\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\}\\n\\s*\\}'));
+    /* \r?\n = กันไฟล์ถูก checkout เป็น CRLF (core.autocrlf) — ปิดท้ายที่ \n หลัง } เฉย ๆ แล้วจับไม่เจอทั้ง 27 จุด */
+    var cells = html.match(new RegExp(key + '\\s*:\\s*\\{[\\s\\S]*?cells\\s*:\\s*\\{([\\s\\S]*?)\\r?\\n\\s*\\}\\r?\\n\\s*\\}'));
     if (!cells) return;
     var modeName = (html.match(new RegExp(key + ":\\s*\\{\\s*label:\\s*'([^']+)'")) || [])[1] || key;
     cells[1].replace(/\{[^{}]*\}/g, function (obj) {
@@ -291,6 +294,7 @@ buildIndex();
 /* console API (เล่น/ทดสอบ): window.__search__ */
 window.__search__ = {
   ready: function(){ return INDEX.length; },
+  count: function(q){ return INDEX.filter(function (it) { return String(it.desc || '').indexOf(q) === 0; }).length; },
   find: function(q){ var old = input.value; input.value = q; run(); var n = resultsEl.querySelectorAll('.hit').length; input.value = old; run(); return n; }
 };
 </script>

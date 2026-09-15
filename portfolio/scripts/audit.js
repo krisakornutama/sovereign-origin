@@ -208,6 +208,7 @@ async function main() {
   const titlesOld = await p.locator('#readShelf .bk-title').allInnerTexts();
   report(titlesOld[0] === 'ศิลปะสงคราม' && titlesOld[titlesOld.length - 1] === 'เล่มไม่มีปี', 'widget books: read shelf sorted old→new', JSON.stringify(titlesOld));
   await p.evaluate(() => { const B = window.__books__; B.published.length = 0; B.read.length = 0; B.rebuildAll(); });
+  const bookRows = await p.evaluate(() => window.__books__.published.length + window.__books__.read.length);
 
   // water: formation board — 3 modes, 9 cells, detail/checks react
   await goto('water.html');
@@ -228,16 +229,39 @@ async function main() {
   report(modeOk && detailC.includes('หัวใจค่าย'), 'widget water: mode switch + center-cell detail updates');
   const checksN = await p.locator('#waterChecks li').count();
   report(checksN === 4, 'widget water: mode checks render 4 rules');
+  // ground truth for the search-index consistency checks below
+  var wTruth = await p.evaluate(() => {
+    const W = window.__water__;
+    return {
+      taggedCells: Object.values(W.MODES).reduce((n, m) => n + Object.values(m.cells).filter((c) => c && c.tag).length, 0),
+      terrainRows: W.TERRAIN.length
+    };
+  });
 
   // search: runtime index builds, query returns hits, type filter works
   await goto('search.html');
   await p.waitForFunction(() => window.__search__ && window.__search__.ready() > 50, null, { timeout: 15000 });
   const idxN = await p.evaluate(() => window.__search__.ready());
   report(idxN > 50, 'widget search: runtime index built from all pages', `entries=${idxN}`);
-  const findBooks = await p.evaluate(() => window.__search__.find('คลังหนังสือ'));
-  const findWater = await p.evaluate(() => window.__search__.find('บ่อหลัก'));
+  // count-based consistency: the runtime index must mirror the live widget data —
+  // a line-ending-fragile extractor or comment-phantom rows can otherwise shift
+  // index contents silently while the old label-only checks keep passing.
+  const counts = await p.evaluate(() => {
+    const S = window.__search__;
+    return {
+      modeDesc: S.count('โหมด'),           // every tagged board cell indexes as desc 'โหมด <label>'
+      terrainHits: S.count('ข้อมูลแปลง/บ่อ/รางบนกระดาน'),
+      bookHits: S.count('ผลงานที่ลงพิมพ์') + S.count('ชั้นหนังสือที่อ่าน')
+    };
+  });
+  counts.taggedCells = wTruth.taggedCells;
+  counts.terrainRows = wTruth.terrainRows;
+  counts.bookRows = bookRows;
+  report(counts.modeDesc === counts.taggedCells && counts.taggedCells >= 27, 'widget search: water board cells fully indexed (9×3 modes)', JSON.stringify(counts));
+  report(counts.terrainHits === counts.terrainRows && counts.terrainRows >= 6, 'widget search: terrain rows indexed match __water__.TERRAIN', JSON.stringify(counts));
+  report(counts.bookHits === counts.bookRows, 'widget search: book rows indexed match __books__ shelves (no phantom rows)', JSON.stringify(counts));
   const findEn = await p.evaluate(() => window.__search__.find('livestock'));
-  report(findBooks >= 1 && findWater >= 1 && findEn >= 1, 'widget search: finds books + water + english entries', `books=${findBooks} water=${findWater} en=${findEn}`);
+  report(findEn >= 1, 'widget search: english entries indexed', `en=${findEn}`);
   await p.fill('#q', 'ภาษี');
   await p.waitForTimeout(250);
   const taxHits = await p.locator('.hit').count();
