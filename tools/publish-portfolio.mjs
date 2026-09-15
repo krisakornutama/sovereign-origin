@@ -12,9 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const CHECK = args.includes('--check');
 const WATCH = args.includes('--watch');
-const mi = args.indexOf('--message');
-const glued = args.find((a) => a.startsWith('--message='));
-const MSG = (glued ? glued.slice('--message='.length) : mi !== -1 && args[mi + 1] ? args[mi + 1] : '') || 'site update';
+const MSG = (args.find((a) => a.startsWith('--message=')) || '').slice('--message='.length) || 'site update';
 
 const sha = (dir, ref = 'HEAD') => execFileSync('git', ['-C', dir, 'rev-parse', '--short', ref]).toString().trim();
 const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a]).toString().trim();
