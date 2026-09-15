@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://krisakornutama.github.io/project-sovereign/sitemap.xml

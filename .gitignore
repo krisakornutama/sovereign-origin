@@ -78,6 +78,7 @@ Docker/
 tools/*
 !tools/build-desktop.mjs
 !tools/verify.mjs
+!tools/publish-portfolio.mjs
 !tools/portfolio-preview-server.mjs
 !tools/
 !tools/install/

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>กฤษกรณ์ อุตมะ (Krisakorn Utama) คือใคร — รวมทุกช่องทางผลงาน</title>
+<meta name="description" content="นายกฤษกรณ์ อุตมะ (Krisakorn Utama) — นักเขียนอิสระและนักพัฒนา: หนังสือบน MEB Market, โค้ดและระบบบ้านอัจฉริยะบน GitHub (krisakornutama), เว็บโชว์ผลงาน Project Sovereign — รวมทุกช่องทางไว้ที่เดียว">
+<meta name="theme-color" content="#030712">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='7' cy='7' r='3.6' fill='none' stroke='%2322d3ee' stroke-width='1.4'/%3E%3Cpath d='M10 10l3.4 3.4' stroke='%2334d399' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(1100px 620px at 10% -12%,rgba(52,211,153,.11),transparent 62%),
+  radial-gradient(980px 620px at 90% -8%,rgba(34,211,238,.10),transparent 64%)}
+::selection{background:rgba(52,211,153,.35);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+a{color:var(--green)}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:10px 18px;background:rgba(3,7,18,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.wordmark{font-family:var(--mono);font-weight:700;letter-spacing:.14em;color:var(--txt);text-decoration:none;font-size:.82rem}
+.wordmark span{color:var(--green)}
+.topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.topnav::-webkit-scrollbar{display:none}
+.topnav a{color:var(--dim);text-decoration:none}
+.topnav a:hover{color:var(--green)}
+.topnav a[aria-current="page"]{color:var(--cyan);border-bottom:1px solid var(--cyan)}
+
+.hero{max-width:680px;margin:0 auto;padding:56px 20px 10px;text-align:center}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.22em;color:var(--green);text-transform:uppercase;margin:0 0 14px}
+h1{font-size:clamp(1.6rem,4.5vw,2.3rem);line-height:1.25;margin:0 0 10px;font-weight:700}
+h1 .en{display:block;font-size:.52em;font-family:var(--mono);color:var(--cyan);font-weight:500;margin-top:6px;letter-spacing:.06em}
+.lede{color:var(--dim);margin:0 auto 26px;max-width:560px}
+
+.links{max-width:560px;margin:0 auto;padding:0 20px 30px;display:flex;flex-direction:column;gap:12px}
+.linkcard{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--line);
+  background:var(--panel);border-radius:14px;text-decoration:none;color:var(--txt);transition:transform .12s ease,border-color .12s ease}
+.linkcard:hover{transform:translateY(-2px);border-color:var(--green)}
+.linkcard .ic{font-size:1.5rem;flex:0 0 auto}
+.linkcard .t{font-weight:600}
+.linkcard .d{color:var(--dim);font-size:.85rem;margin-top:2px}
+.linkcard .go{margin-left:auto;font-family:var(--mono);color:var(--faint);font-size:.8rem}
+.linkcard.slot{opacity:.55;border-style:dashed;cursor:default}
+.linkcard.slot:hover{transform:none;border-color:var(--line)}
+
+.note{max-width:560px;margin:0 auto;padding:0 20px 40px}
+.honest{border:1px solid rgba(34,211,238,.25);background:rgba(34,211,238,.05);border-radius:12px;padding:14px 16px;color:var(--dim);font-size:.85rem}
+.honest b{color:var(--cyan)}
+
+footer{border-top:1px solid var(--line);padding:22px;text-align:center;color:var(--faint);font-size:.78rem;font-family:var(--mono)}
+@media (max-width:560px){ .hero{padding-top:40px} .linkcard{padding:14px 15px} }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
+  <nav class="topnav" aria-label="เมนูหลัก">
+    <a href="index.html">ภาพรวม</a>
+    <a href="projects.html">ผลงาน</a>
+    <a href="books.html">คลังหนังสือ</a>
+    <a href="search.html">ค้นหา</a>
+    <a href="me.html" aria-current="page">ผู้เขียน</a>
+    <a href="en.html">EN</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <p class="eyebrow">รวมทุกช่องทาง · ONE PAGE · ALL CHANNELS</p>
+  <h1>นายกฤษกรณ์ อุตมะ คือใคร?<span class="en">Krisakorn Utama — Freelance Writer &amp; Developer</span></h1>
+  <p class="lede">นักเขียนอิสระและนักพัฒนา — เขียนหนังสือลง MEB Market สร้างระบบบ้านอัจฉริยะ self-hosted ทั้งบ้านบน GitHub และเปิดผลงานทั้งหมดไว้ที่เว็บนี้ ฟรีทั้งหมด ไม่มีค่าใช้จ่ายสักบาท</p>
+</section>
+
+<main class="links">
+  <a class="linkcard" href="https://github.com/krisakornutama" rel="me">
+    <span class="ic">🧑‍💻</span>
+    <span><span class="t">GitHub — krisakornutama</span><br><span class="d">โค้ดทั้งหมด: ระบบบ้านอัจฉริยะ Sovereign OS, ฟาร์มข้อมูล, IoT</span></span>
+    <span class="go">github.com ↗</span>
+  </a>
+  <a class="linkcard" href="https://www.mebmarket.com/?store=publisher&amp;action=home_page&amp;publisher_id=3576000&amp;publisher_name=" rel="me">
+    <span class="ic">📚</span>
+    <span><span class="t">หนังสือบน MEB Market</span><br><span class="d">ผลงานเขียนที่ลงพิมพ์ — อ่านได้บนมือถือทุกเครื่อง</span></span>
+    <span class="go">mebmarket.com ↗</span>
+  </a>
+  <a class="linkcard" href="https://krisakornutama.github.io/project-sovereign/" rel="me">
+    <span class="ic">🌐</span>
+    <span><span class="t">Project Sovereign — เว็บโชว์ผลงาน</span><br><span class="d">ทัวร์ระบบบ้านอัจฉริยะที่สร้างเองทั้งระบบ หน้าแรกถึงเครื่องจักรหลังบ้าน</span></span>
+    <span class="go">github.io ↗</span>
+  </a>
+  <a class="linkcard" href="https://github.com/krisakornutama/project-sovereign" rel="me">
+    <span class="ic">🛠️</span>
+    <span><span class="t">ซอร์สโค้ดเว็บนี้ (เปิดให้ดู)</span><br><span class="d">repo สาธารณะของเว็บโชว์ผลงาน — static, ไม่มี dependency</span></span>
+    <span class="go">repo ↗</span>
+  </a>
+
+  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
+    <span class="ic">📘</span>
+    <span><span class="t">Facebook Page</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
+    <span class="go">รอลิงก์</span>
+  </a>
+  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
+    <span class="ic">▶️</span>
+    <span><span class="t">YouTube</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
+    <span class="go">รอลิงก์</span>
+  </a>
+  <a class="linkcard slot" href="#" aria-disabled="true" title="รอเพิ่มลิงก์จริง">
+    <span class="ic">✕</span>
+    <span><span class="t">X (Twitter)</span><br><span class="d">ช่องทางนี้รอลิงก์จริงจากเจ้าของ (ยังไม่เปิดเผย URL)</span></span>
+    <span class="go">รอลิงก์</span>
+  </a>
+</main>
+
+<section class="note">
+  <div class="honest">
+    <b>ตรงไปตรงมา:</b> ลิงก์ที่ขึ้นเต็ม ๆ คือช่องทางที่ยืนยันแล้วจริง ส่วนช่องเส้นประคือช่องทางที่ยังรอเจ้าของเพิ่ม URL จริง — หน้านี้ static 100% โฮสต์ฟรีบน GitHub Pages ไม่มีสคริปต์ติดตาม ไม่มีคุกกี้ ไม่มีค่าใช้จ่าย
+  </div>
+</section>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "กฤษกรณ์ อุตมะ",
+  "alternateName": ["Krisakorn Utama", "Krisakorn Utama(กฤษกรณ์ อุตมะ)"],
+  "jobTitle": "Freelance Writer & Developer",
+  "description": "นักเขียนอิสระและนักพัฒนา — หนังสือบน MEB Market, ระบบบ้านอัจฉริยะ self-hosted บน GitHub, เว็บโชว์ผลงาน Project Sovereign",
+  "knowsLanguage": ["th", "en"],
+  "url": "https://krisakornutama.github.io/project-sovereign/me.html",
+  "sameAs": [
+    "https://github.com/krisakornutama",
+    "https://www.mebmarket.com/?store=publisher&action=home_page&publisher_id=3576000&publisher_name=",
+    "https://krisakornutama.github.io/project-sovereign/"
+  ],
+  "mainEntityOfPage": "https://krisakornutama.github.io/project-sovereign/me.html"
+}
+</script>
+
+<footer>
+  KRISAKORN UTAMA (กฤษกรณ์ อุตมะ) · หน้ารวมช่องทางอย่างเป็นทางการ<br>
+  static · free hosting · ตามหลัก data จริงเท่านั้น
+</footer>
+</body>
+</html>
