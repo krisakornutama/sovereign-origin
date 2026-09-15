@@ -49,8 +49,8 @@ function walk(rel, out) {
 const publishFiles = [];
 for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: true })) {
   if (f.name === 'node_modules' || f.name === '.git') continue;
-  if (f.isFile() && (/\.html$/.test(f.name) || f.name === '.nojekyll' || f.name === 'README.md' ||
-      f.name === 'package.json' || f.name === 'package-lock.json' || f.name === 'sitemap.xml' || f.name === 'robots.txt')) publishFiles.push(f.name);
+  if (f.isFile() && (/\.html$/.test(f.name) || /\.(png|txt|xml)$/.test(f.name) || f.name === '.nojekyll' ||
+      f.name === 'README.md' || f.name === 'package.json' || f.name === 'package-lock.json')) publishFiles.push(f.name);
   if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github')) walk(f.name, publishFiles);
 }
 

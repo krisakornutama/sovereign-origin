@@ -142,9 +142,13 @@ async function main() {
     return Array.isArray(B.CATEGORIES) && B.CATEGORIES.length === 6 && Array.isArray(B.published) && Array.isArray(B.read) && typeof B.rebuildAll === 'function';
   });
   report(apiOk, 'widget books: __books__ API (categories, shelves, rebuild)');
-  const fbtns0 = await p.locator('.fbtn').count();
-  const gfHidden0 = await p.locator('#globalFilters').isHidden();
-  report(fbtns0 === 0 && gfHidden0, 'widget books: empty state honest (no filter buttons, global filters hidden)');
+  const pubCards0 = await p.locator('#pubShelf .book').count();
+  const cats0 = await p.locator('#pubFilters .fbtn').count();
+  const readEmpty0 = await p.locator('#readShelf .empty').innerText().catch(() => '');
+  const readCards0 = await p.locator('#readShelf .book').count();
+  report(pubCards0 === 8 && cats0 >= 4 && readEmpty0.includes('ยังไม่มีรายการ'),
+    'widget books: real shelf = 8 verified books + category buttons built from that data; read shelf honestly empty',
+    JSON.stringify({ pubCards0, cats0, readEmpty: readEmpty0.slice(0, 24) }));
 
   // inject data via the console API and exercise search + publisher/year + sort
   await p.evaluate(() => {
@@ -207,8 +211,9 @@ async function main() {
   await p.waitForTimeout(200);
   const titlesOld = await p.locator('#readShelf .bk-title').allInnerTexts();
   report(titlesOld[0] === 'ศิลปะสงคราม' && titlesOld[titlesOld.length - 1] === 'เล่มไม่มีปี', 'widget books: read shelf sorted old→new', JSON.stringify(titlesOld));
+  // ground truth for the search-index check = what the FILE renders (the inject/clear steps above only mutate this page)
+  const bookRows = pubCards0 + readCards0;
   await p.evaluate(() => { const B = window.__books__; B.published.length = 0; B.read.length = 0; B.rebuildAll(); });
-  const bookRows = await p.evaluate(() => window.__books__.published.length + window.__books__.read.length);
 
   // water: formation board — 3 modes, 9 cells, detail/checks react
   await goto('water.html');
