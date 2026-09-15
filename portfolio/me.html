@@ -83,9 +83,12 @@ h1 .en{display:block;font-size:.42em;font-style:italic;font-weight:400;
 .chan a:hover .l,.chan a:focus-visible .l{color:var(--stamp)}
 .chan .l{font-weight:600;font-size:.95rem;white-space:nowrap}
 .chan .dots{flex:1;border-bottom:1px dotted var(--ink-38);transform:translateY(-4px);min-width:16px}
-.chan .a{font-family:var(--mono);font-size:.74rem;color:var(--ink-60);white-space:nowrap}
+.chan .a{font-family:var(--mono);font-size:.74rem;color:var(--ink-60);white-space:nowrap;
+  max-width:60%;overflow:hidden;text-overflow:ellipsis}
 .chan .wait{color:var(--ink-60)}
 .chan .wait .a{color:var(--ink-38)}
+
+.chan+.ch{margin-top:26px}
 
 /* ── colophon ── */
 .colophon{border-top:1px solid var(--ink-38);margin:30px 0 0;padding:16px 2px 0;
@@ -99,7 +102,7 @@ h1 .en{display:block;font-size:.42em;font-style:italic;font-weight:400;
   .stamp{width:94px;height:94px;top:14px;right:14px}
   .chan a,.chan .wait{flex-wrap:wrap;row-gap:2px}
   .chan .l{white-space:normal}
-  .chan .a{white-space:normal;text-align:right;font-size:.68rem;max-width:64%}
+  .chan .a{white-space:normal;text-align:right;font-size:.68rem;max-width:64%;overflow:visible}
 }
 </style>
 </head>
@@ -162,6 +165,19 @@ h1 .en{display:block;font-size:.42em;font-style:italic;font-weight:400;
         <span class="l">X (Twitter)</span><span class="dots"></span><span class="a">(รอลิงก์จริง)</span></li>
     </ul>
 
+    <h2 class="ch">ผลงานที่สร้าง · Selected works</h2>
+    <ul class="chan">
+      <li><a href="https://krisakornutama.github.io/project-sovereign/">
+        <span class="l">Project Sovereign — ระบบบ้านอัจฉริยะ</span><span class="dots"></span>
+        <span class="a">self-hosted · ไม่พึ่งคลาวด์</span></a></li>
+      <li><a href="https://github.com/krisakornutama/project-sovereign">
+        <span class="l">เว็บโชว์ผลงาน (เว็บนี้)</span><span class="dots"></span>
+        <span class="a">12 หน้า static · ไม่มี dependency</span></a></li>
+      <li><a href="https://www.mebmarket.com/?store=publisher&amp;action=home_page&amp;publisher_id=3576000&amp;publisher_name=">
+        <span class="l">หนังสือที่ลงพิมพ์</span><span class="dots"></span>
+        <span class="a">MEB Market</span></a></li>
+    </ul>
+
     <p class="colophon">
       <b>ตรงไปตรงมา:</b> ช่องทางที่พิมพ์ชัดคือช่องทางที่ยืนยันแล้วจริง ส่วนที่ขึ้น (รอลิงก์จริง) ยังรอเจ้าของเพิ่ม URL — หน้านี้ static ทั้งหมด ไม่มีสคริปต์ติดตาม ไม่มีคุกกี้
       <span class="ed">พิมพ์ครั้งที่ 1 · โฮสต์ฟรีบน GitHub Pages · กันยายน 2569</span>
@@ -172,16 +188,42 @@ h1 .en{display:block;font-size:.42em;font-style:italic;font-weight:400;
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Person",
-  "name": "กฤษกรณ์ อุตมะ",
-  "alternateName": "Krisakorn Utama",
-  "jobTitle": "Freelance Writer & Developer",
-  "description": "นักเขียนอิสระและนักพัฒนา — หนังสือบน MEB Market, ระบบบ้านอัจฉริยะ self-hosted บน GitHub, เว็บโชว์ผลงาน Project Sovereign",
-  "url": "https://krisakornutama.github.io/project-sovereign/me.html",
-  "sameAs": [
-    "https://github.com/krisakornutama",
-    "https://www.mebmarket.com/?store=publisher&action=home_page&publisher_id=3576000&publisher_name=",
-    "https://krisakornutama.github.io/project-sovereign/"
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://krisakornutama.github.io/project-sovereign/me.html#person",
+      "name": "กฤษกรณ์ อุตมะ",
+      "alternateName": "Krisakorn Utama",
+      "jobTitle": "Freelance Writer & Developer",
+      "description": "นักเขียนอิสระและนักพัฒนา — หนังสือบน MEB Market, ระบบบ้านอัจฉริยะ self-hosted บน GitHub, เว็บโชว์ผลงาน Project Sovereign",
+      "url": "https://krisakornutama.github.io/project-sovereign/me.html",
+      "sameAs": [
+        "https://github.com/krisakornutama",
+        "https://www.mebmarket.com/?store=publisher&action=home_page&publisher_id=3576000&publisher_name=",
+        "https://krisakornutama.github.io/project-sovereign/"
+      ]
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Project Sovereign",
+      "description": "ระบบหลังบ้าน self-hosted ทั้งบ้าน: ขายหน้าร้าน บัญชี ภาษีไทย ฟาร์ม ปศุสัตว์ IoT และเครื่องมือสอนลูก",
+      "url": "https://krisakornutama.github.io/project-sovereign/",
+      "author": { "@id": "https://krisakornutama.github.io/project-sovereign/me.html#person" }
+    },
+    {
+      "@type": "CreativeWork",
+      "name": "Project Sovereign — เว็บโชว์ผลงาน",
+      "description": "เว็บ static หลายหน้า แสดงระบบทั้งหมดที่สร้างเอง โฮสต์ฟรีบน GitHub Pages",
+      "url": "https://github.com/krisakornutama/project-sovereign",
+      "author": { "@id": "https://krisakornutama.github.io/project-sovereign/me.html#person" }
+    },
+    {
+      "@type": "CreativeWork",
+      "name": "ผลงานเขียน — หนังสือบน MEB Market",
+      "description": "หนังสือที่ลงพิมพ์บน MEB Market (ดูรายชื่อเล่มที่หน้า publisher)",
+      "url": "https://www.mebmarket.com/?store=publisher&action=home_page&publisher_id=3576000&publisher_name=",
+      "author": { "@id": "https://krisakornutama.github.io/project-sovereign/me.html#person" }
+    }
   ]
 }
 </script>
