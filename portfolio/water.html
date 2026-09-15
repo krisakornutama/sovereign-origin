@@ -9,13 +9,13 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M3 10c2-3 8-3 10 0-2 3-8 3-10 0z' fill='%2322d3ee'/%3E%3Cpath d='M8 4c1.2 1.4 1.2 2.6 0 4-1.2-1.4-1.2-2.6 0-4z' fill='%2334d399'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
   --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
-  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
-  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+  --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Noto Sans Thai Looped','Cascadia Code','Courier New',monospace;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -35,8 +35,6 @@ a{color:var(--cyan)}
 
 .topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
-.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
-.wordmark span{color:var(--green)}
 .topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .topnav::-webkit-scrollbar{display:none}
 .topnav a{color:var(--dim);text-decoration:none}
@@ -78,7 +76,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .cell[aria-pressed="true"]{border-color:var(--cyan);background:rgba(34,211,238,.08)}
 .cell.center{border-color:rgba(34,211,238,.35)}
 .cell .no{font-family:var(--mono);font-size:.62rem;color:var(--cyan)}
-.cell .tg{font-family:'Sarabun',var(--thai);font-weight:600;font-size:.8rem;color:#ecfdf5;line-height:1.4;margin:0}
+.cell .tg{font-family:'Noto Sans Thai Looped',var(--thai);font-weight:600;font-size:.8rem;color:#ecfdf5;line-height:1.4;margin:0}
 .cell.dir{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:.56rem;color:var(--faint)}
 .cellwrap{position:relative}
 .formrow{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:34px;align-items:start}
@@ -124,24 +122,40 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 </style>
+<link rel="stylesheet" href="nav.css">
 <link rel="canonical" href="https://krisakornutama.github.io/project-sovereign/water.html">
 </head>
-<body>
+<body class="shell">
+
+<button class="rail-toggle" type="button" aria-label="เปิดเมนูหมวดหน้าเว็บ">☰</button>
+<aside class="rail" id="siteRail">
+  <a class="spine" href="index.html" aria-label="กลับหน้าภาพรวม (PROJECT SOVEREIGN)"><span class="spine-t">PROJECT SOVEREIGN</span></a>
+  <p class="seclab">หน้าเว็บ</p>
+  <a href="projects.html">ผลงาน</a>
+  <a href="fishery.html">การประมง</a>
+  <a href="farm.html">เกษตร &amp; สมุนไพร</a>
+  <a href="iot.html">บ้าน IoT</a>
+  <a href="education.html">AI สอนลูก</a>
+  <a href="books.html">คลังหนังสือ</a>
+  <a href="water.html" aria-current="page">ชัยภูมิน้ำ</a>
+  <p class="seclab">เครื่องมือ</p>
+  <a href="search.html">ค้นหา</a>
+  <a href="me.html">ผู้เขียน</a>
+  <a href="en.html">EN</a>
+</aside>
+
+
 
 <header class="topbar">
-  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
   <nav class="topnav" aria-label="เมนูหลัก">
     <a href="index.html">ภาพรวม</a>
-    <a href="projects.html">ผลงาน</a>
-    <a href="livestock.html">ปศุสัตว์</a>
-    <a href="fishery.html">ประมง</a>
-    <a href="farm.html">เกษตร&สมุนไพร</a>
-    <a href="water.html" aria-current="page">ชัยภูมิน้ำ</a>
-    <a href="iot.html">บ้าน IoT</a>
-    <a href="books.html">คลังหนังสือ</a>
-    <a href="search.html">ค้นหา</a>
-    <a href="me.html">ผู้เขียน</a>
-    <a href="en.html">EN</a>
+    <a href="index.html#sell">๑ ขาย</a>
+    <a href="index.html#fulfil">๒ ส่ง</a>
+    <a href="index.html#money">๓ เงิน</a>
+    <a href="index.html#tax">๔ ภาษี</a>
+    <a href="index.html#remind">๕ เตือน</a>
+    <a href="index.html#ai">๖ AI</a>
+    <a href="index.html#ops">๗ เฝ้าระบบ</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
   </nav>
 </header>
@@ -398,5 +412,6 @@ window.__water__ = {
 };
 </script>
 
+<script src="nav.js" defer></script>
 </body>
 </html>

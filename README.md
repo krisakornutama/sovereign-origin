@@ -53,7 +53,7 @@ sovereign-os/
   core-api/     ← Backend (Express + Prisma, ทุกโมดูล 38 modules)
   infra/        ← docker-compose (dev/prod) + .env (ไม่เข้า git)
 sovereign-frontend/  ← Dashboard (Next.js)
-docs/           ← Blueprint เอกสารออกแบบ (SERIES_RED_DMS_BLUEPRINT.md)
+docs/           ← Blueprint เอกสารออกแบบ (SERIES_RED_DMS_BLUEPRINT.md) + คู่มือ Google Search Console สำหรับเว็บ portfolio (google-search-console-guide.md)
 tools/install/  ← ตัวติดตั้งคลิกเดียว
 ```
 

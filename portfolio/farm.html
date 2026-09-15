@@ -9,14 +9,14 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Cpath d='M8 13V6' stroke='%2334d399' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M8 8C8 5 6 4 3.5 4 3.5 7 5.5 8 8 8zm0-1c0-2.6 2-3.6 4.5-3.6C12.5 6 10.5 7 8 7z' fill='%2334d399'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
   --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
-  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
-  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
-  --sarabun:'Sarabun',var(--thai);
+  --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Noto Sans Thai Looped','Cascadia Code','Courier New',monospace;
+  --body:'Noto Sans Thai Looped','IBM Plex Sans Thai Looped','Segoe UI',sans-serif;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
@@ -35,8 +35,6 @@ a{color:var(--green)}
 
 .topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
-.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
-.wordmark span{color:var(--green)}
 .topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .topnav::-webkit-scrollbar{display:none}
 .topnav a{color:var(--dim);text-decoration:none}
@@ -94,7 +92,7 @@ h2{font-size:1.6rem;font-weight:600;margin:0 0 8px}
 .herbsel select{font-family:var(--mono);font-size:.8rem;color:#a7f3d0;background:#0b1220;
   border:1px solid rgba(34,211,153,.35);border-radius:8px;padding:8px 10px;cursor:pointer}
 .herbcard{background:#F2F7E8;color:#22301b;border:1px solid #c9d6ae;border-radius:3px;padding:24px 26px;
-  font-family:var(--sarabun);box-shadow:0 18px 44px rgba(0,0,0,.55);position:relative}
+  font-family:var(--body);box-shadow:0 18px 44px rgba(0,0,0,.55);position:relative}
 .herbcard .tag{position:absolute;top:14px;right:16px;transform:rotate(2deg);border:2px solid #4d7c0f;color:#4d7c0f;
   font-weight:700;font-size:.66rem;padding:2px 9px;border-radius:3px;letter-spacing:.06em;filter:url(#grunge)}
 .hc-name{font-size:1.12rem;font-weight:700}
@@ -141,9 +139,29 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 </style>
+<link rel="stylesheet" href="nav.css">
 <link rel="canonical" href="https://krisakornutama.github.io/project-sovereign/farm.html">
 </head>
-<body>
+<body class="shell">
+
+<button class="rail-toggle" type="button" aria-label="เปิดเมนูหมวดหน้าเว็บ">☰</button>
+<aside class="rail" id="siteRail">
+  <a class="spine" href="index.html" aria-label="กลับหน้าภาพรวม (PROJECT SOVEREIGN)"><span class="spine-t">PROJECT SOVEREIGN</span></a>
+  <p class="seclab">หน้าเว็บ</p>
+  <a href="projects.html">ผลงาน</a>
+  <a href="fishery.html">การประมง</a>
+  <a href="farm.html" aria-current="page">เกษตร &amp; สมุนไพร</a>
+  <a href="iot.html">บ้าน IoT</a>
+  <a href="education.html">AI สอนลูก</a>
+  <a href="books.html">คลังหนังสือ</a>
+  <a href="water.html">ชัยภูมิน้ำ</a>
+  <p class="seclab">เครื่องมือ</p>
+  <a href="search.html">ค้นหา</a>
+  <a href="me.html">ผู้เขียน</a>
+  <a href="en.html">EN</a>
+</aside>
+
+
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <filter id="grunge">
@@ -153,19 +171,15 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 </svg>
 
 <header class="topbar">
-  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
   <nav class="topnav" aria-label="เมนูหลัก">
     <a href="index.html">ภาพรวม</a>
-    <a href="projects.html">ผลงาน</a>
-    <a href="livestock.html">ปศุสัตว์</a>
-    <a href="fishery.html">ประมง</a>
-    <a href="farm.html" aria-current="page">เกษตร&สมุนไพร</a>
-    <a href="iot.html">บ้าน IoT</a>
-    <a href="water.html">ชัยภูมิน้ำ</a>
-    <a href="books.html">คลังหนังสือ</a>
-    <a href="search.html">ค้นหา</a>
-    <a href="me.html">ผู้เขียน</a>
-    <a href="en.html">EN</a>
+    <a href="index.html#sell">๑ ขาย</a>
+    <a href="index.html#fulfil">๒ ส่ง</a>
+    <a href="index.html#money">๓ เงิน</a>
+    <a href="index.html#tax">๔ ภาษี</a>
+    <a href="index.html#remind">๕ เตือน</a>
+    <a href="index.html#ai">๖ AI</a>
+    <a href="index.html#ops">๗ เฝ้าระบบ</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
   </nav>
 </header>
@@ -187,7 +201,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <section id="modules">
     <p class="k-ch">// โมดูลจริง · <b>14 endpoints</b></p>
     <h2>จากแปลงถึงปุ๋ย ครบในระบบเดียว</h2>
-    <p class="sub">ทุกโมดูลอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็ก</p>
+    <p class="sub">ทุกโมดูลอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็กต์</p>
     <div class="mods">
       <div class="mod"><div class="t">🗺️ แผนผังแปลง</div><div class="d">/api/farm/map.svg</div></div>
       <div class="mod"><div class="t">🧪 ค่าดินรายแปลง</div><div class="d">/api/farm/:id/soil-readings</div></div>
@@ -345,5 +359,6 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   });
 })();
 </script>
+<script src="nav.js" defer></script>
 </body>
 </html>

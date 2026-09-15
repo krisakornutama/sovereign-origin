@@ -79,7 +79,10 @@ tools/*
 !tools/build-desktop.mjs
 !tools/verify.mjs
 !tools/publish-portfolio.mjs
+!tools/indexnow-notify.mjs
 !tools/portfolio-preview-server.mjs
+!tools/test/
+!tools/test/*.test.mjs
 !tools/
 !tools/install/
 tools/install/*
