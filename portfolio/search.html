@@ -97,6 +97,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="books.html">คลังหนังสือ</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
     <a href="search.html" aria-current="page">ค้นหา</a>
+    <a href="me.html">ผู้เขียน</a>
     <a href="en.html">EN</a>
   </nav>
 </header>
@@ -142,12 +143,13 @@ var PAGES = [
   { file: 'iot.html',       type: 'system',   label: 'บ้าน IoT' },
   { file: 'education.html', type: 'edu',      label: 'AI สอนลูก' },
   { file: 'books.html',     type: 'books',    label: 'คลังหนังสือ' },
+  { file: 'me.html',        type: 'author',   label: 'ผู้เขียน' },
   { file: 'en.html',        type: 'system',   label: 'English' }
 ];
 var PAGES_BOOKS = PAGES.filter(function (p) { return p.file === 'books.html'; })[0];
 var PAGES_WATER = PAGES.filter(function (p) { return p.file === 'water.html'; })[0];
-var TYPE_TH = { system: 'ระบบ', project: 'ผลงาน', farm: 'ฟาร์ม', concept: 'แนวคิด', edu: 'การศึกษา', books: 'หนังสือ', en: 'English' };
-var TYPE_ORDER = ['system', 'project', 'farm', 'concept', 'edu', 'books', 'en'];
+var TYPE_TH = { system: 'ระบบ', project: 'ผลงาน', farm: 'ฟาร์ม', concept: 'แนวคิด', edu: 'การศึกษา', books: 'หนังสือ', author: 'ผู้เขียน', en: 'English' };
+var TYPE_ORDER = ['system', 'project', 'farm', 'concept', 'edu', 'books', 'author', 'en'];
 
 function stripTags(s){ return s.replace(/<[^>]*>/g, ' '); }
 
