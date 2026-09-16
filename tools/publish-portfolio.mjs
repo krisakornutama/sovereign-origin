@@ -64,12 +64,16 @@ function walk(rel, out) {
     else out.push(r);
   }
 }
-const publishFiles = [];
+let publishFiles = [];
 for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: true })) {
   if (f.name === 'node_modules' || f.name === '.git') continue;
   if (f.isFile() && (/\.html$/.test(f.name) || /\.(css|js|png|txt|xml)$/.test(f.name) || f.name === '.nojekyll' ||
       f.name === 'README.md' || f.name === 'package.json' || f.name === 'package-lock.json')) publishFiles.push(f.name);
-  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github')) walk(f.name, publishFiles);
+  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github')) {
+    walk(f.name, publishFiles);
+    // กันไฟล์ทดลองหลุดขึ้น production (เคยเกิดจริง: scripts/tmp-perf.mjs ถูก sync ขึ้น Pages)
+    publishFiles = publishFiles.filter((r) => !/(^|\/)(tmp-[^/]*|[^/]*\.bak)$/.test(r));
+  }
 }
 
 /* 3. dirty guard — กันกลืนงานคนอื่น: diff เนื้อหาจริง = หยุด · EOL-noise (autocrlf) จัดการเองด้วย git add (git normalize เอง — noise แบบนี้เกิดจาก sync ตัวเองในรอบก่อนด้วย) */
