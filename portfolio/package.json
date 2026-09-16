@@ -5,7 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "serve": "node scripts/serve.mjs",
-    "audit": "node scripts/audit.js"
+    "audit": "node scripts/audit.js",
+    "check:copy": "node scripts/check-copy.mjs",
+    "check:copy:selftest": "node scripts/check-copy.mjs --self-test"
   },
   "devDependencies": {
     "playwright": "^1.62.1"

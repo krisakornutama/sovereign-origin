@@ -9,13 +9,13 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Crect x='5' y='5' width='6' height='6' rx='1' fill='%2334d399'/%3E%3Cpath d='M8 2v3M8 11v3M2 8h3M11 8h3' stroke='%2322d3ee' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#030712; --panel:rgba(17,24,39,.55); --line:rgba(52,211,153,.16);
   --green:#34d399; --cyan:#22d3ee; --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
-  --thai:'Prompt','Noto Sans Thai Looped','Segoe UI',sans-serif;
-  --mono:'JetBrains Mono','Cascadia Code','Courier New',monospace;
+  --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Noto Sans Thai Looped','Cascadia Code','Courier New',monospace;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.65;-webkit-font-smoothing:antialiased}
@@ -34,8 +34,6 @@ a{color:var(--green)}
 
 .topbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:13px 24px;border-bottom:1px solid var(--line);background:rgba(3,7,18,.86);backdrop-filter:blur(8px)}
-.wordmark{font-family:var(--mono);font-size:.8rem;font-weight:700;letter-spacing:.16em;color:#ecfdf5;text-decoration:none}
-.wordmark span{color:var(--green)}
 .topnav{display:flex;gap:15px;font-family:var(--mono);font-size:.72rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .topnav::-webkit-scrollbar{display:none}
 .topnav a{color:var(--dim);text-decoration:none}
@@ -122,24 +120,40 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 </style>
+<link rel="stylesheet" href="nav.css">
 <link rel="canonical" href="https://krisakornutama.github.io/project-sovereign/iot.html">
 </head>
-<body>
+<body class="shell">
+
+<button class="rail-toggle" type="button" aria-label="เปิดเมนูหมวดหน้าเว็บ">☰</button>
+<aside class="rail" id="siteRail">
+  <a class="spine" href="index.html" aria-label="กลับหน้าภาพรวม (PROJECT SOVEREIGN)"><span class="spine-t">PROJECT SOVEREIGN</span></a>
+  <p class="seclab">หน้าเว็บ</p>
+  <a href="projects.html">ผลงาน</a>
+  <a href="fishery.html">การประมง</a>
+  <a href="farm.html">เกษตร &amp; สมุนไพร</a>
+  <a href="iot.html" aria-current="page">บ้าน IoT</a>
+  <a href="education.html">AI สอนลูก</a>
+  <a href="books.html">คลังหนังสือ</a>
+  <a href="water.html">ชัยภูมิน้ำ</a>
+  <p class="seclab">เครื่องมือ</p>
+  <a href="search.html">ค้นหา</a>
+  <a href="me.html">ผู้เขียน</a>
+  <a href="en.html">EN</a>
+</aside>
+
+
 
 <header class="topbar">
-  <a class="wordmark" href="index.html">PROJECT<span> SOVEREIGN</span></a>
   <nav class="topnav" aria-label="เมนูหลัก">
     <a href="index.html">ภาพรวม</a>
-    <a href="projects.html">ผลงาน</a>
-    <a href="iot.html" aria-current="page">บ้าน IoT</a>
-    <a href="water.html">ชัยภูมิน้ำ</a>
-    <a href="books.html">คลังหนังสือ</a>
-    <a href="livestock.html">ปศุสัตว์</a>
-    <a href="farm.html">เกษตร&สมุนไพร</a>
-    <a href="education.html">AI สอนลูก</a>
-    <a href="search.html">ค้นหา</a>
-    <a href="me.html">ผู้เขียน</a>
-    <a href="en.html">EN</a>
+    <a href="index.html#sell">๑ ขาย</a>
+    <a href="index.html#fulfil">๒ ส่ง</a>
+    <a href="index.html#money">๓ เงิน</a>
+    <a href="index.html#tax">๔ ภาษี</a>
+    <a href="index.html#remind">๕ เตือน</a>
+    <a href="index.html#ai">๖ AI</a>
+    <a href="index.html#ops">๗ เฝ้าระบบ</a>
     <a href="index.html#faq">ถาม-ตอบ</a>
   </nav>
 </header>
@@ -161,7 +175,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <section id="modules">
     <p class="k-ch">// โมดูลจริง · <b>6 subsystems</b></p>
     <h2>สมองของบ้าน ครบทั้งหกส่วน</h2>
-    <p class="sub">ทุกส่วนอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็ก — และทุกอย่างวิ่งในเครื่องของบ้าน ไม่พึ่งคลาวด์</p>
+    <p class="sub">ทุกส่วนอยู่หลังระบบล็อกอิน/audit/backup ชุดเดียวกับทั้งโปรเจ็กต์ — และทุกอย่างวิ่งในเครื่องของบ้าน ไม่พึ่งคลาวด์</p>
     <div class="mods">
       <div class="mod"><div class="t">📟 อุปกรณ์+เซ็นเซอร์</div><div class="d">/api/devices · Device + SensorTelemetry</div></div>
       <div class="mod"><div class="t">🔌 รีเลย์+ตาราง</div><div class="d">/api/actuation · RelaySchedule</div></div>
@@ -223,7 +237,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <div class="loop"><div class="ic">📜</div><h3>กฎถ้า-แล้ว</h3><p>เขียนกฎครั้งเดียว ระบบเฝ้าทุกค่าและลงมือเองเมื่อเงื่อนไขจริง — พร้อม debounce กันอุปกรณ์สั่น</p><span class="ep">AutomationRule</span></div>
       <div class="loop"><div class="ic">🔔</div><h3>เตือนที่มีบริบท</h3><p>อะไรผิดปกติ ผิดที่ไหน ค่าเท่าไร — แจ้งเข้า Telegram ของบ้าน ไม่ใช่แค่กะพริบหน้าจอ</p><span class="ep">AutomationAlert</span></div>
       <div class="loop"><div class="ic">⚡</div><h3>พลังงานเป็นบาท</h3><p>ตามการใช้ไฟรายวันและต้นทุนจริง — รู้ว่าอุปกรณ์ไหนกินค่าไฟ</p><span class="ep">/api/energy</span></div>
-      <div class="loop"><div class="ic">⬆️</div><h3>อัปเดตจากที่เดียว</h3><p>อัปเดตเฟิร์มแวร์ ESP32 ทั้งบ้านจากหน้าเดียว มีประวัติ OtaEvent ทุกครั้ง กันแบรนด์อุปกรณ์ครึ่งทาง</p><span class="ep">/api/ota</span></div>
+      <div class="loop"><div class="ic">⬆️</div><h3>อัปเดตจากที่เดียว</h3><p>อัปเดตเฟิร์มแวร์ ESP32 ทั้งบ้านจากหน้าเดียว มีประวัติ OtaEvent ทุกครั้ง กันเครื่องพังกลางทาง</p><span class="ep">/api/ota</span></div>
     </div>
   </section>
 
@@ -236,7 +250,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <ul>
         <li><b>ต้องมีอุปกรณ์จริงก่อนถึงเห็นผล</b> — ระบบรองรับ ESP32/MQTT ครบ แต่จำนวนอุปกรณ์ที่ต่อจริงอยู่ที่การลงทุนของแต่ละบ้าน</li>
         <li><b>กฎอัตโนมัติต้องทดสอบก่อนปล่อยจริง</b> — ปั๊มน้ำ/วาล์วเป็นอุปกรณ์ที่พลาดแล้วกระทบจริง ระบบมี debounce แต่ควรทดลองเปิด-ปิดก่อนใช้ประจำ</li>
-        <li><b>ระบบเชื่อมต่ออุปกรณ์ผ่านเครือข่ายบ้าน</b> — ก่อนเปิดควบคุมจากภายนอกต้องมี VPN/domain+HTTPS ตามมาตรฐานความปลอดภัยของโปรเจ็ก</li>
+        <li><b>ระบบเชื่อมต่ออุปกรณ์ผ่านเครือข่ายบ้าน</b> — ก่อนเปิดควบคุมจากภายนอกต้องมี VPN/domain+HTTPS ตามมาตรฐานความปลอดภัยของโปรเจ็กต์</li>
       </ul>
     </div>
   </section>
@@ -301,5 +315,6 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   run();
 })();
 </script>
+<script src="nav.js" defer></script>
 </body>
 </html>

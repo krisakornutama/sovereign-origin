@@ -1,0 +1,50 @@
+/* nav.css — แถบหมวดฝั่งซ้าย (rail) + topbar ๑–๗
+   ภาษาของเว็บนี้: หนังสือเล่มหนึ่งบนโต๊ะทำงานกลางคืน — rail คือ "แกนหนังสือ" (ข้างเล่มกระดาษครีม
+   ชื่อเรื่องเรียงลงแนวตั้ง) · topbar คือแท็บบท ๑–๗ · ลิงก์เมนู = สารบัญย่อย
+   ทุกหน้าใช้: <link href="nav.css"> · <body class="shell"> · ปุ่ม .rail-toggle · aside#siteRail · <script src="nav.js"> */
+
+body.shell{--rail-w:190px}
+
+.rail{position:fixed;top:0;bottom:0;left:0;z-index:55;width:var(--rail-w);
+  display:flex;flex-direction:column;padding-left:26px;
+  background:rgba(3,7,18,.92);backdrop-filter:blur(10px);
+  border-right:1px solid rgba(52,211,153,.16);overflow-y:auto;overscroll-behavior:contain}
+
+/* แกนหนังสือ — กระดาษขอบซ้าย ชื่อเรื่องเรียงลงตามข้างเล่ม ปิดท้ายด้วยตราแดง */
+.spine{position:absolute;top:0;bottom:0;left:0;width:26px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0 14px;
+  background:#F3EADB;border-right:1px solid rgba(42,33,24,.25);text-decoration:none}
+.spine-t{writing-mode:vertical-rl;font-family:var(--mono);font-weight:700;font-size:.62rem;
+  letter-spacing:.34em;color:#2A2118}
+.spine::after{content:'';width:7px;height:7px;border-radius:1px;background:#B3352C}
+
+.rail .seclab{padding:12px 16px 4px;font-family:var(--mono);font-size:.58rem;letter-spacing:.22em;
+  color:var(--faint);text-transform:uppercase}
+.rail a:not(.spine){padding:10px 14px 10px 16px;font-family:var(--mono);font-size:.72rem;
+  color:var(--dim);text-decoration:none;white-space:nowrap;border-left:2px solid transparent}
+.rail a:not(.spine):hover{color:var(--green);background:rgba(52,211,153,.06)}
+.rail a[aria-current="page"]{color:var(--green);border-left-color:var(--green);background:rgba(52,211,153,.08)}
+
+.rail-toggle{display:none;position:fixed;top:10px;left:10px;z-index:60;width:40px;height:40px;
+  border:1px solid rgba(52,211,153,.4);border-radius:9px;background:rgba(3,7,18,.92);
+  color:var(--green);font-family:var(--mono);font-size:1.05rem;cursor:pointer}
+
+body.shell .topbar,
+body.shell main,
+body.shell footer{margin-left:var(--rail-w)}
+
+/* จอ ≤900px: rail เป็น drawer พร้อมแกนหนังสือ · ปุ่ม ☰ */
+@media (max-width:900px){
+  body.shell{--rail-w:0px}
+  body.shell .topbar,
+  body.shell main,
+  body.shell footer{margin-left:0}
+  body.shell .topbar{padding-left:58px} /* ให้พ้นปุ่ม ☰ */
+  .rail-toggle{display:flex}
+  .rail{width:min(84vw,300px);transform:translateX(-102%);transition:transform .22s ease;
+    box-shadow:14px 0 40px rgba(0,0,0,.5)}
+  body.rail-open .rail{transform:none}
+  .rail-scrim{position:fixed;inset:0;z-index:45;display:none;background:rgba(3,7,18,.55)}
+  body.rail-open .rail-scrim{display:block}
+}
+@media (prefers-reduced-motion:reduce){.rail{transition:none}}

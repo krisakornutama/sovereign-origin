@@ -7,6 +7,7 @@
     "verify": "node tools/verify.mjs",
     "verify:full": "node tools/verify.mjs --e2e",
     "build:desktop": "node tools/build-desktop.mjs",
-    "e2e": "cd sovereign-frontend && npm run e2e"
+    "e2e": "cd sovereign-frontend && npm run e2e",
+    "test:tools": "node --test \"tools/test/**/*.test.mjs\""
   }
 }

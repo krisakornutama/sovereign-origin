@@ -3,6 +3,7 @@ name: Audit site
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,6 +12,9 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portfolio
     steps:
       - uses: actions/checkout@v4
 
@@ -29,24 +33,3 @@ jobs:
 
       - name: Audit (links, anchors, console, overflow, widgets)
         run: node scripts/audit.js
-
-  deploy:
-    needs: audit
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
