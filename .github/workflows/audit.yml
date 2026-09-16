@@ -1,0 +1,35 @@
+name: Audit site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portfolio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Copy gate (Thai spelling/markup, no browser needed)
+        run: node scripts/check-copy.mjs --self-test && node scripts/check-copy.mjs
+
+      - name: Install audit tooling
+        run: npm install --no-fund --no-audit
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Audit (links, anchors, console, overflow, widgets)
+        run: node scripts/audit.js
