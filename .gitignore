@@ -8,11 +8,27 @@ node_modules/
 **/node_modules/
 
 # ── Build output ─────────────────────────────
+# นโยบาย: artifact สร้างใหม่ได้ทั้งหมด ห้ามเข้า git — ประวัติเคยบวม 13.5GB จากของพวกนี้
+# (ทางแก้ครั้งนั้นคือ filter-repo; กลับมาอีก = เจ็บกว่าเดิมหลายเท่า — ต้องกันตั้งแต่ commit เดียว)
 .next/
 out/
 dist/
+dist-*/
 build/
 *.tsbuildinfo
+
+# ── ไบนารี/แพ็กเกจขนาดใหญ่ (สร้างใหม่หรือดาวน์โหลดได้ — ไม่ใช่ซอร์ส) ──
+*.exe
+*.dll
+*.pak
+*.asar
+*.gguf
+*.bin
+*.zip
+*.msi
+*.apk
+*.dmg
+*.AppImage
 
 # ── Environment & secrets ────────────────────
 .env
@@ -70,6 +86,7 @@ Thumbs.db
 # ── Freebuff / tooling runtime ────────────────
 .freebuff/
 .agents/
+.publish-tmp/  # publish โหมด CI: clone mirror ชั่วคราว
 
 # ── Docker Desktop runtime state (not project code) ──
 Docker/
