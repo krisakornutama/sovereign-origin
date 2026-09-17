@@ -86,7 +86,7 @@ describe('knowledge upload route (HTTP จริงผ่าน express จร�
       const res = await postUpload(ts, token, 'a/b/c/../../business-notes.txt', Buffer.from('ข้อความทดสอบ'), 'text/plain');
       assert.equal(res.status, 201, `body=${JSON.stringify(res.json).slice(0, 200)}`);
       assert.equal(res.json.success, true);
-      assert.match(res.json.item.file_path, /^uploads[\\/]\d+-[0-9a-f-]{36}\.txt$/);
+      assert.match(res.json.item.file_path, /^uploads\/\d+-[0-9a-f-]{36}\.txt$/); // POSIX เสมอ
       assert.equal(res.json.item.title, 'business notes', 'title ต้องมาจาก safeDisplayName (dash ถูกแปลงเป็นช่องว่างตาม handler)');
 
       const added = walk(KNOWLEDGE_ROOT).filter((f) => !before.includes(f));

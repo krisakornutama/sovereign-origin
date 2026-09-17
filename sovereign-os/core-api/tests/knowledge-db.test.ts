@@ -67,7 +67,7 @@ describe('knowledge upload — real Postgres lifecycle', { skip: RUN_DB ? false 
       assert.ok(row, 'row ต้องอยู่ใน DB จริง');
       assert.equal(row.type, 'TXT');
       assert.equal(row.title, 'hello db');
-      assert.match(row.file_path, /^uploads[\\/]\d+-[0-9a-f-]{36}\.txt$/);
+      assert.match(row.file_path, /^uploads\/\d+-[0-9a-f-]{36}\.txt$/); // POSIX เสมอ — ใช้เป็น URL segment + ผ่าน resolveInsideRoot ทุกแพลตฟอร์ม
 
       /* 3) ไฟล์อยู่บนดิสก์จริงตาม file_path ที่เก็บ — ใช้ resolver ตัวเดียวกับแอป (ห้ามเดา flat/nested เอง) */
       const onDisk = path.join(knowledgeDir(), row.file_path);
