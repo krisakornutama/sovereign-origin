@@ -196,6 +196,48 @@ describe('platform matrix: พฤติกรรม path เหมือนก�
     assert.equal(safeDisplayName('a/b\\c/d.txt'), 'd.txt', 'ผสมทั้งสองแบบก็ตัดหมด');
   });
 
+  test('POST /detections — image_path ที่เก็บลง DB ต้องถูก normalize เป็น POSIX เสมอ (กัน regression แบบ knowledge file_path)', async () => {
+    const { default: infrastructureRoutes } = await import('../src/modules/infrastructure/infrastructure.routes');
+    const created: any[] = [];
+    mockModel(prisma, 'detectionEvent', {
+      create: async ({ data }: any) => {
+        const row = { id: `det-${created.length + 1}`, ...data, detected_at: data.detected_at ?? new Date() };
+        created.push(row);
+        return row;
+      },
+    });
+    mockModel(prisma, 'camera', { findUnique: async () => ({ id: 'cam-1', name: 'cam' }) });
+    mockModel(prisma, 'camera', { update: async ({ data }: any) => data });
+
+    const ts = await createTestServer((app: Express) => app.use('/api/infrastructure', infrastructureRoutes));
+    const detToken = makeToken();
+    try {
+      const res = await fetch(`${ts.baseUrl}/api/infrastructure/detections`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${detToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          camera_id: 'cam-1',
+          object_type: 'person',
+          image_path: 'snapshots\\2026\\win-path.jpg', // ฝั่ง Frigate/YOLO บน Windows อาจส่ง backslash มา
+        }),
+      });
+      assert.equal(res.status, 201, `body=${JSON.stringify(await res.json()).slice(0, 200)}`);
+      assert.match(String(created[0].image_path), /^[^\\]+$/, 'image_path ห้ามมี backslash — ต้อง normalize เป็น POSIX ก่อนลง DB');
+      assert.equal(created[0].image_path, 'snapshots/2026/win-path.jpg');
+
+      /* ไม่ส่ง image_path → null (ไม่ใช่ undefined ที่หลุด schema) */
+      const res2 = await fetch(`${ts.baseUrl}/api/infrastructure/detections`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${detToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ camera_id: 'cam-1', object_type: 'other' }),
+      });
+      assert.equal(res2.status, 201);
+      assert.equal(created[1].image_path, null);
+    } finally {
+      await ts.close();
+    }
+  });
+
   test('randomDiskName — ชื่อไฟล์ที่จะเก็บลง DB/ดิสก์ห้ามมี separator (backslash รวม) ไม่ว่า originalname จะแย่แค่ไหน', () => {
     for (const evil of ['..\\..\\x.pdf', 'C:\\boot\\sys.bin', 'a\\b\\c.txt', 'normal-name.md', '']) {
       const name = randomDiskName(evil);
