@@ -9,6 +9,8 @@ CONTEXTS=(
   "Audit site / audit"
   "File size guard / size"
   "Deploy portfolio / publish"
+  "Core API tests / test (ubuntu-latest)"
+  "Core API tests / test (windows-latest)"
 )
 
 # 1) สิทธิ์: repo ส่วนตัวฟรีจะ 403 ที่นี่ — สคริปต์บอกทางออกตรง ๆ ไม่เดา

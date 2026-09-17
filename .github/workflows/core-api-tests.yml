@@ -24,6 +24,22 @@ jobs:
     defaults:
       run:
         working-directory: sovereign-os/core-api
+    # real-Postgres บน ubuntu — knowledge-db.test.ts พิสูจน์ lifecycle จริงทั้งวงจร
+    # (windows ไม่รัน DB test — mock suite ยังครอบพฤติกรรมดิสก์/route ครบทุก OS)
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -37,10 +53,20 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Push schema to CI Postgres (ubuntu เท่านั้น)
+        if: runner.os == 'Linux'
+        run: npx prisma db push --skip-generate --accept-data-loss
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+
       - name: Run tests
         run: npm test
         env:
           JWT_SECRET: ci-secret-0123456789abcdef
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          # เทส real-DB (knowledge-db.test.ts) — บังคับรันบน ubuntu เท่านั้น
+          RUN_DB_TESTS: ${{ runner.os == 'Linux' && '1' || '0' }}
+          TEST_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          TEST_TMPDIR: ${{ github.workspace }}/.dbtest-tmp
           # service บางตัวใช้เวลาท้องถิ่น (getHours) — จัดเขตเวลาให้ CI ตรงเซิร์ฟเวอร์โปรดักชัน (กรุงเทพ)
           TZ: Asia/Bangkok
