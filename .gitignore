@@ -98,6 +98,7 @@ tools/*
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
 !tools/portfolio-preview-server.mjs
+!tools/set-required-checks.sh
 !tools/test/
 !tools/test/*.test.mjs
 !tools/
