@@ -191,9 +191,23 @@ export function getTelegramAlertDispatcher(): TelegramAlertDispatcher {
   return _dispatcher;
 }
 
+// ── DI (ใช้ในเทสต์) — แทน sender ของ singleton ชั่วคราว แบบเดียวกับ setVisionOllama ──
+// ตั้งแล้ว sendTelegramAlert จะสร้าง dispatcher ใหม่ที่ใช้ DI sender (dedup/rate state เริ่มใหม่
+// ต่อการตั้งค่าแต่ละครั้ง — กัน state ค้างข้ามชุดเทส) และ "ไม่ยิง network" เพราะไม่ผ่าน defaultSender
+export function setTelegramAlertSender(fn: ((html: string) => Promise<boolean>) | null): void {
+  diSender = fn;
+}
+let diSender: ((html: string) => Promise<boolean>) | null = null;
+
 /** ส่ง alert ผ่าน dispatcher (severity gate + dedup + rate-limit) — fire-and-forget ปลอดภัย */
 export function sendTelegramAlert(
   payload: TelegramAlertPayload
 ): Promise<{ sent: boolean; reason: string }> {
+  /* DI (เทส): ใช้ dispatcher สดที่ผูก sender ปลอม — ตัดสินจากค่าปัจจุบันของ diSender ทุกครั้ง
+     เพื่อให้ setTelegramAlertSender(null) กลับไป singleton จริงได้ทันที */
+  const diSenderNow = diSender;
+  if (diSenderNow) {
+    return createTelegramAlertDispatcher(config.telegramAlert, { send: diSenderNow }).send(payload);
+  }
   return getTelegramAlertDispatcher().send(payload);
 }

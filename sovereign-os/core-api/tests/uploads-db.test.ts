@@ -371,6 +371,101 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
     }
   });
 
+  test('nextgen /av/scan: multipart จริง → EICAR ผ่าน multer memory → quarantine จริง + securityEvent จากเส้นทาง POST ตรง (ไม่ผ่าน knowledge)', async () => {
+    const nextgenRoutes = (await import('../src/modules/security/nextgen.routes')).default;
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    crypto = crypto ?? (await import('node:crypto'));
+    /* EICAR มีอักขระพิเศษ — อ่านจาก module จริง (export แยกจาก engine) เพื่อให้ magic-byte ตรงทุกไบต์ */
+    const { EICAR } = await import('../src/services/hash-engine.service');
+    const bytes = Buffer.concat([Buffer.from('av-scan-dbtest '), Buffer.from(EICAR, 'latin1')]);
+    const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+    await ctx.prisma.securityEvent.deleteMany({ where: { description: { contains: 'av-dbtest' } } });
+
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/nextgen', nextgenRoutes));
+    try {
+      const { headers, body } = multipart({}, 'file', 'av-dbtest.txt', 'text/plain', bytes);
+      const res = await fetch(`${ts.baseUrl}/api/nextgen/av/scan`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...headers },
+        body,
+      });
+      const text = await res.text();
+      assert.equal(res.status, 200, text.slice(0, 300));
+      const payload = JSON.parse(text);
+      /* สัญญาของ /av/scan: echo ชื่อไฟล์เดิม + verdict จาก scanBuffer */
+      assert.equal(payload.fileName, 'av-dbtest.txt');
+      assert.equal(payload.verdict, 'malware');
+      assert.equal(payload.error, 'EICAR test signature');
+      assert.ok(payload.quarantinedTo, 'ต้องรายงานพาธ quarantine');
+
+      /* quarantine จริง + securityEvent จริง — จุดที่ mock suite (hashEngine.test.ts แบบ mockModel) พิสูจน์ไม่ได้ */
+      assert.ok(fs.existsSync(payload.quarantinedTo), 'ไฟล์ต้องเข้า quarantine จริง');
+      assert.ok(fs.readFileSync(payload.quarantinedTo).equals(bytes));
+      const ev = await ctx.prisma.securityEvent.findFirst({
+        where: { event_type: 'MALWARE_DETECTED', description: { contains: sha.slice(0, 16) } },
+        orderBy: { timestamp: 'desc' },
+      });
+      assert.ok(ev, 'securityEvent ต้องถูกเขียนลง DB จริงจาก POST /av/scan');
+      assert.equal(ev.severity, 'critical');
+      fs.rmSync(payload.quarantinedTo, { force: true });
+
+      /* clean file → ok + hash ครบ แต่ไม่สร้าง securityEvent */
+      const cleanBytes = Buffer.from('av-scan-clean-dbtest ' + 'x'.repeat(32));
+      const ok = multipart({}, 'file', 'clean-dbtest.txt', 'text/plain', cleanBytes);
+      const okRes = await fetch(`${ts.baseUrl}/api/nextgen/av/scan`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...ok.headers },
+        body: ok.body,
+      });
+      const okPayload = JSON.parse(await okRes.text());
+      assert.equal(okRes.status, 200);
+      assert.equal(okPayload.verdict, 'clean');
+      assert.ok(okPayload.hash, 'clean ต้องคืน sha256 ให้ client');
+      /* executable ปลอม (.txt แต่ magic bytes MZ) → policy reject + quarantine */
+      const exeBytes = Buffer.concat([Buffer.from('MZ'), Buffer.from('fake-exe-dbtest')]);
+      const exe = multipart({}, 'file', 'exe-dbtest.txt', 'text/plain', exeBytes);
+      const exeRes = await fetch(`${ts.baseUrl}/api/nextgen/av/scan`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...exe.headers },
+        body: exe.body,
+      });
+      const exePayload = JSON.parse(await exeRes.text());
+      assert.equal(exePayload.verdict, 'rejected');
+      assert.match(exePayload.error, /executable/);
+      assert.ok(exePayload.quarantinedTo, 'rejected ก็ต้องเข้า quarantine ตาม engine');
+      fs.rmSync(exePayload.quarantinedTo, { force: true });
+    } finally {
+      await ts.close();
+    }
+  });
+
+  test('documents /analyze: multipart ภาพจริง → AI mock อ่านฉลาก → ตอบ label โดยไม่เขียน DB (memory mode ไม่ลงดิสก์)', async () => {
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/documents', documentsRoutes));
+    try {
+      visionDeps.post = async (_url: string, body: any) => ({
+        data: { response: '{"name":"ข้าวเจ้า dbtest","category":"FOOD","quantity":2,"unit":"bag","shelf_life_days":180}' },
+      });
+      const { headers, body } = multipart({}, 'image', 'rice-db.png', 'image/png', PNG_1X1);
+      const res = await fetch(`${ts.baseUrl}/api/documents/analyze`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...headers },
+        body,
+      });
+      const text = await res.text();
+      assert.equal(res.status, 200, text.slice(0, 300));
+      const label = JSON.parse(text);
+      assert.equal(label.name, 'ข้าวเจ้า dbtest');
+      assert.equal(label.category, 'FOOD');
+      /* /analyze ตั้งใจไม่เขียน DB (บันทึกเกิดที่ /scan-to-inventory เท่านั้น — เทสแยกข้างบน) */
+      const rowsAfter = await ctx.prisma.inventoryItem.count({ where: { user_id: ctx.userId } });
+      assert.ok(rowsAfter >= 1, 'ต้องมีของจากเทส scan-to-inventory อยู่แล้ว — analyze ห้ามเพิ่ม');
+    } finally {
+      visionDeps.post = undefined;
+      await ts.close();
+    }
+  });
+
   test('teardown: คืน delegate ที่ mock ไว้ + ลบ user ทดสอบ (cascade) + ปิด MQTT + ปิด connection', async () => {
     restoreThreatIntel?.();
     restoreThreatIntel = null;

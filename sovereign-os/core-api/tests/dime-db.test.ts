@@ -222,6 +222,52 @@ describe('dime import — real Postgres lifecycle', { skip: RUN_DB ? false : SKI
     }
   });
 
+  test('telegram: PDF อ่านไม่ได้ → alert ⚠️ WARN พร้อมเหตุผลจาก parsePdf (DI sender — ไม่ยิง network)', async () => {
+    const telegramAlert = await import('../src/services/telegram-alert.service');
+    const sent: string[] = [];
+    telegramAlert.setTelegramAlertSender(async (html) => {
+      sent.push(html);
+      return true;
+    });
+
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/dime', dimeRoutes));
+    try {
+      process.env.DIME_OWNER_USERNAME = ownerWhere.username;
+      const restoreParse = dimeService.dimeProcessor.deps.parsePdf;
+      dimeService.dimeProcessor.deps.parsePdf = async () => {
+        throw new Error('Encrypted PDF — dbtest reason');
+      };
+      try {
+        const { headers, body } = multipart({}, 'file', 'broken-db.pdf', 'application/pdf', PDF_STUB);
+        const res = await fetch(`${ts.baseUrl}/api/dime/import`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, ...headers },
+          body,
+        });
+        const text = await res.text();
+        assert.equal(res.status, 200, text.slice(0, 300));
+        const payload = JSON.parse(text);
+        assert.equal(payload.data.status, 'error');
+        assert.match(payload.data.reason, /Encrypted PDF — dbtest reason/);
+
+        /* alert ต้องออก 1 ฉบับ: ป้าย WARN + เหตุผล + eventKey ติด dedup */
+        await new Promise((r) => setTimeout(r, 20)); /* ผู้ส่งเป็น fire-and-forget */
+        assert.equal(sent.length, 1, `ต้องส่ง alert 1 ฉบับ (ได้ ${sent.length})`);
+        assert.match(sent[0], /⚠️/);
+        assert.match(sent[0], /WARN/);
+        assert.match(sent[0], /Dime! Statement/);
+        assert.match(sent[0], /Encrypted PDF — dbtest reason/);
+      } finally {
+        dimeService.dimeProcessor.deps.parsePdf = restoreParse;
+      }
+    } finally {
+      telegramAlert.setTelegramAlertSender(null);
+      delete process.env.DIME_OWNER_USERNAME;
+      await ts.close();
+    }
+  });
+
   test('teardown: ล้างข้อมูลของ user ทดสอบ (cascade) + ปิด connection', async () => {
     await teardownCore(ctx);
   });
