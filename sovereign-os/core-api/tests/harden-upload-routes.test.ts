@@ -20,7 +20,7 @@ import type { Server } from 'node:http';
 import knowledgeRoutes from '../src/modules/knowledge/knowledge.routes';
 import { prisma } from '../src/lib/prisma';
 import { mockModel, makeToken, createTestServer, type TestServer } from './helpers';
-import { hardenUpload, safeDisplayName, resolveInsideRoot } from '../src/lib/harden-upload';
+import { hardenUpload, safeDisplayName, resolveInsideRoot, randomDiskName } from '../src/lib/harden-upload';
 
 const CORE_ROOT = path.resolve(__dirname, '..');
 const KNOWLEDGE_ROOT = path.join(CORE_ROOT, 'knowledge');
@@ -70,6 +70,12 @@ function mockUploadDeps() {
       created.push(row);
       return row;
     },
+    findUnique: async ({ where }: any) => created.find((r) => r.id === where.id) ?? null,
+    delete: async ({ where }: any) => {
+      const i = created.findIndex((r) => r.id === where.id);
+      if (i === -1) throw new Error('not found');
+      return created.splice(i, 1)[0];
+    },
   });
   mockModel(prisma, 'threatIntelItem', { findFirst: async () => null });
   return created;
@@ -111,6 +117,32 @@ describe('knowledge upload route (HTTP จริงผ่าน express จร�
       assert.match(res.json.error, /นามสกุล/, 'error ต้องมาจาก whitelist ของ hardenUpload');
       assert.equal(created.length, 0, 'ต้องไม่มี row ถูกสร้าง');
       assert.deepEqual(walk(KNOWLEDGE_ROOT), before, 'ไฟล์ตกขอบไม่มีทางลงดิสก์');
+    } finally {
+      await ts.close();
+    }
+  });
+
+  test('upload → DELETE → ไฟล์หายจากดิสก์จริง + file_path เป็น POSIX เสมอ (กัน regression บั๊ก Windows)', async () => {
+    const created = mockUploadDeps();
+    const before = walk(KNOWLEDGE_ROOT);
+    const ts = await createTestServer((app: Express) => app.use('/', knowledgeRoutes));
+    try {
+      const res = await postUpload(ts, token, 'roundtrip.txt', Buffer.from('ลบได้ทุก OS'), 'text/plain');
+      assert.equal(res.status, 201, `body=${JSON.stringify(res.json).slice(0, 200)}`);
+      /* สัญญา POSIX: ค่าที่เก็บลง DB ห้ามมี backslash เด็ดขาด — เดิม path.join บน Windows ให้ uploads\x
+         แล้ว resolveInsideRoot (แบน backslash ทุกแพลตฟอร์ม) throw ตอน DELETE → ไฟล์ค้างบนดิสก์
+         assertion นี้วิ่งทั้ง ubuntu+windows ใน CI เมทริกซ์ จึงจับ regression ได้จากทุก OS */
+      assert.match(String(res.json.item.file_path), /^uploads\/[^\\]+$/, 'file_path ต้องเป็น POSIX เสมอ');
+
+      const del = await fetch(`${ts.baseUrl}/items/${res.json.item.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const delBody = JSON.stringify(await del.json());
+      assert.equal(del.status, 200, `body=${delBody.slice(0, 200)}`);
+      assert.equal(created.length, 0, 'row ต้องหายจาก (mock) DB');
+      const added = walk(KNOWLEDGE_ROOT).filter((f) => !before.includes(f));
+      assert.deepEqual(added, [], 'ไฟล์ต้องถูกลบจากดิสก์จริง — บั๊ก Windows เดิมทิ้งไฟล์ค้าง');
     } finally {
       await ts.close();
     }
@@ -162,6 +194,14 @@ describe('platform matrix: พฤติกรรม path เหมือนก�
     assert.equal(safeDisplayName('C:\\Users\\com\\a.jpg'), 'a.jpg');
     assert.equal(safeDisplayName('/var/log/app.log'), 'app.log');
     assert.equal(safeDisplayName('a/b\\c/d.txt'), 'd.txt', 'ผสมทั้งสองแบบก็ตัดหมด');
+  });
+
+  test('randomDiskName — ชื่อไฟล์ที่จะเก็บลง DB/ดิสก์ห้ามมี separator (backslash รวม) ไม่ว่า originalname จะแย่แค่ไหน', () => {
+    for (const evil of ['..\\..\\x.pdf', 'C:\\boot\\sys.bin', 'a\\b\\c.txt', 'normal-name.md', '']) {
+      const name = randomDiskName(evil);
+      assert.doesNotMatch(name, /\\/, `randomDiskName(${JSON.stringify(evil)}) ห้ามมี backslash ทุกแพลตฟอร์ม`);
+      assert.match(name, /^\d+-[0-9a-f-]{36}(\.[a-z0-9.]{1,10})?$/, 'ต้องเป็นสุ่มล้วน + นามสกุลที่ล้างแล้วเท่านั้น');
+    }
   });
 
   test('resolveInsideRoot แบน backslash ทุกแพลตฟอร์ม + ปฏิเสธ traversal ของฝั่งตรงข้าม', () => {
