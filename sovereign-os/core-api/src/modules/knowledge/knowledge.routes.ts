@@ -288,7 +288,9 @@ router.post('/upload', authenticate, handledUpload(upload, 'file'), async (req, 
 
     const ext = path.extname(file.filename).toLowerCase();
     const isPdf = ext === '.pdf';
-    const relPath = path.join('uploads', file.filename);
+    /* POSIX-style เสมอ (uploads/xxx) — path.join บน Windows ให้ backslash แล้ว resolveInsideRoot
+       (แบน backslash ทุกแพลตฟอร์ม) จะปฏิเสธตอน DELETE ทำให้ไฟล์ค้างบนดิสก์ + ค่านี้ไปเป็น URL segment ด้วย */
+    const relPath = `uploads/${file.filename}`;
 
     let content = '';
     if (isPdf) {
