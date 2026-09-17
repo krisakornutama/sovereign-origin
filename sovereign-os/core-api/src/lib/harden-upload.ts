@@ -12,15 +12,29 @@ import path from 'node:path';
 import os from 'node:os';
 import multer from 'multer';
 
-/** ชื่อไฟล์สำหรับ "แสดงผล" เท่านั้น — basename + ตัด control chars + จำกัดความยาว (ไม่ใช้ตั้งชื่อไฟล์บนดิสก์) */
+/** ชื่อไฟล์สำหรับ "แสดงผล" เท่านั้น — ตัดทั้ง / และ \ (platform-agnostic — path.basename บน POSIX ไม่ตัด \) + ตัด control chars + จำกัดความยาว */
 export function safeDisplayName(originalname: unknown): string {
-  const base = path.basename(String(originalname ?? 'file')).replace(/[.\s]+$/, '');
+  const raw = String(originalname ?? 'file');
+  const parts = raw.split(/[/\\]+/); // ตัดทุกชั้นของทั้ง / และ \\ ก่อน basename ปกติ
+  const base = (parts[parts.length - 1] ?? '').replace(/[.\s]+$/, '');
   const cleaned = base
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f<>:"|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return (cleaned || 'file').slice(0, 120);
+}
+
+/** resolve path ที่ต้องอยู่ใต้ root เท่านั้น — นอก root (เช่น ..\..\ หรือ absolute อื่น) ทำให้ throw ก่อนแตะดิสก์
+    ใช้คู่ fs.unlinkSync/sendFile ทุกจุดที่ป้อน path จากข้อมูลภายนอก */
+export function resolveInsideRoot(root: string, ...segments: string[]): string {
+  const resolvedRoot = path.resolve(root);
+  const target = path.resolve(resolvedRoot, ...segments);
+  const rel = path.relative(resolvedRoot, target);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new RangeError(`path อยู่นอก root ที่อนุญาต: ${segments.join('/')}`);
+  }
+  return target;
 }
 
 /** นามสกุลที่ผ่านการล้างสำหรับใช้ต่อท้ายชื่อไฟล์สุ่ม — ไม่ตรง whitelist ใด ๆ = เป็น '' ได้ */

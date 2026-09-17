@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { hardenUpload, safeDisplayName } from '../../lib/harden-upload';
+import { hardenUpload, safeDisplayName, resolveInsideRoot } from '../../lib/harden-upload';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
@@ -208,12 +208,10 @@ router.delete('/items/:id', authenticate, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Item not found' });
     if (existing.file_path) {
       try {
-        /* defense-in-depth: ลบได้เฉพาะไฟล์ใต้ KNOWLEDGE_DIR เท่านั้น (ค่า file_path ใน DB ถูกคุมตั้งแต่ upload แล้ว) */
-        const root = path.resolve(KNOWLEDGE_DIR);
-        const target = path.resolve(root, existing.file_path);
-        if (target.startsWith(root + path.sep)) fs.unlinkSync(target);
+        /* defense-in-depth: ลบได้เฉพาะไฟล์ใต้ KNOWLEDGE_DIR เท่านั้น — นอก root จะ throw (ค่า file_path ใน DB ถูกคุมตั้งแต่ upload แล้ว) */
+        fs.unlinkSync(resolveInsideRoot(KNOWLEDGE_DIR, existing.file_path));
       } catch {
-        /* ไฟล์อาจหายแล้ว */
+        /* ไฟล์อาจหายแล้ว หรือ path นอก root (ถูกปฏิเสธ) */
       }
     }
     await prisma.knowledgeItem.delete({ where: { id: req.params.id } });
@@ -335,10 +333,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 // GET /api/knowledge/uploads/:file — เปิดไฟล์ที่อัปโหลด (PDF view ในเบราว์เซอร์)
 router.get('/uploads/:file', authenticate, (req, res) => {
   try {
-    const name = req.params.file;
-    const root = path.resolve(KNOWLEDGE_DIR);
-    const resolved = path.resolve(root, 'uploads', name);
-    if (!resolved.startsWith(root + path.sep) || !fs.existsSync(resolved)) {
+    const resolved = resolveInsideRoot(KNOWLEDGE_DIR, 'uploads', req.params.file);
+    if (!fs.existsSync(resolved)) {
       return res.status(404).json({ error: 'File not found' });
     }
     res.sendFile(resolved);
