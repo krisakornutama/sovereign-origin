@@ -266,7 +266,7 @@ export function createDimeProcessor(deps: DimeDeps, env: NodeJS.ProcessEnv = pro
     }
   }
 
-  return { processPdf, fetchFromMail };
+  return { processPdf, fetchFromMail, deps };
 }
 
 export type DimeProcessor = ReturnType<typeof createDimeProcessor>;
@@ -278,7 +278,14 @@ export { prisma };
 export const dimeProcessor: DimeProcessor = createDimeProcessor(
   {
     parsePdf: async (buf, password) => {
-      const pdfParse = (await import('pdf-parse')).default;
+      /* ห้าม import('pdf-parse') แบบ ESM dynamic — module.parent จะเป็น null ทำให้ index.js ของ
+         pdf-parse เข้าโหมด debug (isDebugMode = !module.parent) แล้ว readFileSync ไฟล์ fixture
+         ของมันเองจน ENOENT ทุกครั้ง (จับตอนเทส real-DB: dime import พังทั้งเส้นทาง)
+         createRequire ตั้ง module.parent ให้ปกติจึงไม่เข้ากิ่ง debug */
+      const { createRequire } = await import('node:module');
+      // createRequire(null) = resolve จาก cwd — เลี่ยง import.meta (tsc module ค่าเดิมไม่รองรับ)
+      const requireCjs = createRequire(null as unknown as string);
+      const pdfParse = requireCjs('pdf-parse') as (b: Buffer) => Promise<{ text?: string }>;
       try {
         const data = await pdfParse(buf);
         return { text: String(data.text ?? '') };
