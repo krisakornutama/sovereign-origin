@@ -1,0 +1,46 @@
+name: File size guard
+
+# กันประวัติบวมซ้ำ (เคย 13.5GB จาก build artifacts) — fail ถ้า commit ใหม่มีไฟล์เกิน 50MB
+# หมายเหตุ: ไฟล์ >100MB GitHub ปฏิเสธ push อยู่แล้ว; guard นี้เข้มกว่า (50MB) เพื่อเตือนก่อนถึงทางตัน
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # เห็นประวัติก่อนหน้า เพื่อเทียบ "ไฟล์ใหม่" เท่านั้น
+
+      - name: Fail if any newly committed file exceeds 50MB
+        run: |
+          LIMIT=$((50 * 1024 * 1024))
+          BASE="origin/${{ github.event.repository.default_branch || 'main' }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..HEAD"
+          else
+            RANGE="$BASE..HEAD"
+          fi
+          NEW=$(git diff --name-only --diff-filter=A -z "$RANGE" 2>/dev/null || git ls-files -z)
+          VIOLATIONS=""
+          while IFS= read -r -d '' f; do
+            [ -f "$f" ] || continue
+            SIZE=$(stat -c %s "$f")
+            if [ "$SIZE" -gt "$LIMIT" ]; then
+              MB=$((SIZE / 1048576))
+              VIOLATIONS="$VIOLATIONS$MB MB — $f"$'\n'
+            fi
+          done <<< "$NEW"
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::พบไฟล์ใหม่เกิน 50MB — สร้างใหม่ได้ทั้งหมดต้องไม่เข้า git (เช่น dist*/, *.exe, *.gguf, *.asar)"
+            printf '%s' "$VIOLATIONS"
+            exit 1
+          fi
+          echo "✓ ไม่มีไฟล์ใหม่เกิน 50MB"

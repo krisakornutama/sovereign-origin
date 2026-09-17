@@ -2,7 +2,8 @@
 /* publish-portfolio — คำสั่งเดียวจบ: sync → commit → push → (watch CI)
    ที่มา: sync มือ + commit -c identity + จับ CI เอง — พลาดง่าย (ผิด dir, ลืม identity)
    ใช้: node tools/publish-portfolio.mjs [--check] [--watch] [--message "เหตุผลสั้น ๆ"] [--no-indexnow]
-   --check = ดูอย่างเดียว (dry-run) · --watch = รอ CI "Audit site" จนจบ · --no-indexnow = ข้ามยิง IndexNow ท้ายงาน */
+   --check = ดูอย่างเดียว (dry-run) · --watch = รอ CI "Audit site" จนจบ · --no-indexnow = ข้ามยิง IndexNow ท้ายงาน
+   โหมด CI (GitHub Actions): ตั้ง env PUBLISH_REPO_URL=<url ของ publish repo> เมื่อรันบน runner ที่ไม่มี portfolio/.git — script จะ clone ชั่วคราว แล้ว push กลับ (workflow ต้องจัด credential ให้เอง) */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +18,7 @@ const MSG = ((args.find((a) => a.startsWith('--message=')) || '').slice('--messa
   .replace(/\s*\(mirror of [0-9a-f]{7,40}\)\s*$/i, '');
 const SKIP_INDEXNOW = args.includes('--no-indexnow'); // IndexNow = ping บอทค้นหาท้ายงาน (fail-safe — ล้มได้ ไม่กระทบ publish)
 const NOTIFIER = process.env.SOVEREIGN_NOTIFIER || path.join(ROOT, 'tools', 'indexnow-notify.mjs'); // override ได้เฉพาะเทสต์สัญญา
+const CI_REPO_URL = process.env.PUBLISH_REPO_URL || ''; // โหมด CI: clone publish repo ชั่วคราวแทนการหาบนดิสก์
 
 const LOG_FILE = path.join(ROOT, 'publish-indexnow.log'); // ประวัติการยิงลงไฟล์ท้ายโปรเจกต์ (*.log ถูก gitignore อยู่แล้ว)
 const note = (kind, fields) => {
@@ -50,8 +52,17 @@ function findPublishRepo() {
   } catch { /* fallthrough */ }
   return null;
 }
-const pub = findPublishRepo();
-if (!pub) { console.error('✗ หา publish repo ไม่เจอ (ไม่มี portfolio/.git ทั้งใน worktree นี้และ main worktree)'); process.exit(1); }
+let pub = findPublishRepo();
+/* โหมด CI: บน runner ไม่มี publish repo บนดิสก์ — clone ชั่วคราวใน workspace (ถูกทิ้งหลัง job ไม่ต้องเก็บกวาด)
+   ในเครื่องปกติ findPublishRepo เจออยู่แล้ว สาขานี้จึงไม่มีวันทำงาน */
+if (!pub && CI_REPO_URL) {
+  const tmp = path.join(ROOT, '.publish-tmp');
+  fs.rmSync(tmp, { recursive: true, force: true });
+  execFileSync('git', ['clone', '--depth', '1', CI_REPO_URL, tmp], { stdio: ['ignore', 'pipe', 'pipe'] });
+  pub = { dir: tmp, sameDir: false };
+  log(`CI mode: clone ${CI_REPO_URL} → .publish-tmp`);
+}
+if (!pub) { console.error('✗ หา publish repo ไม่เจอ (ไม่มี portfolio/.git ทั้งใน worktree นี้และ main worktree) — หรือตั้ง env PUBLISH_REPO_URL สำหรับโหมด CI'); process.exit(1); }
 const DEST = pub.dir;
 const monorepoSha = sha(ROOT);
 
@@ -120,8 +131,10 @@ if (pub.sameDir) {
 if (!CHECK) {
   if (changed.length === 0) { log('✓ publish repo ตรงกับ monorepo อยู่แล้ว — ไม่มีอะไรจะ publish'); process.exit(0); }
   git(DEST, 'add', ...changed);
-  const name = git(ROOT, 'config', 'user.name');
-  const email = git(ROOT, 'config', 'user.email');
+  /* identity: ในเครื่องอ่านจาก config บ้าน — บน runner (โหมด CI) ไม่มี config จึง fallback เป็น bot */
+  const cfg = (k, fb) => { try { return git(ROOT, 'config', k); } catch { return fb; } };
+  const name = cfg('user.name', 'sovereign-pages-bot');
+  const email = cfg('user.email', 'sovereign-pages-bot@users.noreply.github.com');
   execFileSync('git', ['-C', DEST, '-c', `user.name=${name}`, '-c', `user.email=${email}`, 'commit',
     '-m', `portfolio: ${MSG} (mirror of ${monorepoSha})`], { stdio: ['ignore', 'pipe', 'pipe'] });
   const pubSha = sha(DEST);

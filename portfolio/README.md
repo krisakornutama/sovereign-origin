@@ -32,9 +32,11 @@ git push -u origin main
 
 ## อัปเดตหน้าเว็บภายหลัง
 
-แก้ไฟล์ `index.html` แล้ว commit+push ใหม่ (หรืออัปโหลดทับ) — Pages จะ deploy เองใน 1–2 นาที
+แก้ไฟล์ใน `portfolio/` แล้ว commit+push ขึ้น `main` — workflow **"Deploy portfolio"** จะ sync → push ไป mirror repo → รอ Pages deploy เสร็จ → ยิง IndexNow ให้เองทั้งหมด (ทำงานเมื่อไฟล์ใน `portfolio/**` เปลี่ยนบน main เท่านั้น; audit ต้องผ่านก่อนทุกครั้ง)
 
-หรือใช้สคริปต์ publish คำสั่งเดียวจากโฟลเดอร์โปรเจกต์ (sync → commit → push → ยิง IndexNow แจ้งเครื่องมือค้นหาให้บอทมาเก็บหน้าใหม่ทันที):
+> ครั้งแรกที่ใช้: เพิ่ม secret `PAGES_TOKEN` (repo `sovereign-origin` → Settings → Secrets and variables → Actions) — token แบบ fine-grained ที่มีสิทธิ์ read/write contents ของ repo `project-sovereign` หนึ่งเดียว
+
+หรือจะรัน publish จากเครื่องตัวเองก็ได้ (sync → commit → push → ยิง IndexNow — คำสั่งเดียวจบ):
 
 ```bash
 node tools/publish-portfolio.mjs --watch        # --watch = รอ CI จนจบ · --no-indexnow = ข้ามการยิง IndexNow
