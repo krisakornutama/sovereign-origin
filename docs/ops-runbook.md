@@ -129,3 +129,17 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
   ```
   รอ 1–2 นาที ถ้ายังค้างซ้ำ ดู log ของ workflow `pages-build-and-deployment` ที่ repo นั้น (มักเจอไฟล์ >100MB หรือ Jekyll error — repo นี้มี `.nojekyll` แล้วจึงน่าจะเป็นขนาดไฟล์)
 - **ยืนยัน:** production ตอบเนื้อหาชุดล่าสุด (`curl` sitemap lastmod) แล้วยิง IndexNow เอง: `node tools/indexnow-notify.mjs --wait`
+
+## ๘. สุขภาพความปลอดภัยของ pipeline (ตรวจครั้งล่าสุด 2026-09-17)
+
+| หัวข้อ | สถานะ |
+|---|---|
+| `GITHUB_TOKEN` ค่าเริ่มต้น | **read** ทั้ง repo + ห้ามอนุมัติ PR (Settings → Actions → General) |
+| สิทธิ์ราย workflow | ทั้งหมด `contents: read` — เว้น token-expiry-watch (`issues: write` ตามหน้าที่) |
+| Deploy keys | 0 ตัว |
+| Secrets | `PAGES_TOKEN` ตัวเดียว (เดินทางผ่าน env + http.extraheader — ดู §๗.๑) |
+| Dependabot security updates | enabled |
+| Secret scanning / push protection | **ไม่พร้อมใช้บนแพลนปัจจุบัน (private + free)** — เปิดได้เมื่ออัปเกรด Pro/public ผ่าน Settings → Advanced Security |
+| Required checks บน main | พร้อมเช็คทั้ง 3 แล้ว (`audit`, `size`, `publish` โหมด PR) — ตั้งจริงเมื่อแพลนรองรับด้วย `bash tools/set-required-checks.sh --apply` |
+
+ทบทวนรอบถัดไปเมื่อ: อัปเกรดแพลน / เพิ่ม secret ใหม่ / เพิ่ม workflow ใหม่
