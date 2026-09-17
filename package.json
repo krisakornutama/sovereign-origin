@@ -8,6 +8,7 @@
     "verify:full": "node tools/verify.mjs --e2e",
     "build:desktop": "node tools/build-desktop.mjs",
     "e2e": "cd sovereign-frontend && npm run e2e",
-    "test:tools": "node --test \"tools/test/**/*.test.mjs\""
+    "test:tools": "node --test \"tools/test/**/*.test.mjs\"",
+    "health": "node tools/system-health.mjs"
   }
 }

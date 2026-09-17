@@ -99,6 +99,7 @@ tools/*
 !tools/indexnow-notify.mjs
 !tools/portfolio-preview-server.mjs
 !tools/set-required-checks.sh
+!tools/system-health.mjs
 !tools/test/
 !tools/test/*.test.mjs
 !tools/

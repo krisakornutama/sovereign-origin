@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import multer from 'multer';
+import { hardenUpload, safeDisplayName } from '../../lib/harden-upload';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
@@ -30,23 +30,11 @@ function ensureDirs(): void {
 }
 
 // อัปโหลดไฟล์ → knowledge/uploads (เฉพาะ PDF/TXT/MD — กันไฟล์อันตราย)
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      ensureDirs();
-      cb(null, UPLOAD_DIR);
-    },
-    filename: (_req, file, cb) => {
-      const safe = (file.originalname || 'file').replace(/[^\w.\- ]+/g, '_');
-      cb(null, `${Date.now()}-${safe}`);
-    },
-  }),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || '').toLowerCase();
-    if (['.pdf', '.txt', '.md', '.markdown'].includes(ext)) cb(null, true);
-    else cb(new Error('รองรับเฉพาะไฟล์ .pdf / .txt / .md เท่านั้น'));
-  },
+// harden: ชื่อบนดิสก์สุ่มเสมอ (ชื่อเดิมที่ sanitize แล้วไม่มีวันถูกใช้ตั้งชื่อไฟล์ — กัน path traversal ตั้งแต่ชั้น storage)
+const upload = hardenUpload({
+  destination: UPLOAD_DIR,
+  allowedExtensions: ['.pdf', '.txt', '.md', '.markdown'],
+  maxSizeMB: 25,
 });
 
 function parseTags(raw: unknown): string[] {
@@ -220,7 +208,10 @@ router.delete('/items/:id', authenticate, async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Item not found' });
     if (existing.file_path) {
       try {
-        fs.unlinkSync(path.join(KNOWLEDGE_DIR, existing.file_path));
+        /* defense-in-depth: ลบได้เฉพาะไฟล์ใต้ KNOWLEDGE_DIR เท่านั้น (ค่า file_path ใน DB ถูกคุมตั้งแต่ upload แล้ว) */
+        const root = path.resolve(KNOWLEDGE_DIR);
+        const target = path.resolve(root, existing.file_path);
+        if (target.startsWith(root + path.sep)) fs.unlinkSync(target);
       } catch {
         /* ไฟล์อาจหายแล้ว */
       }
@@ -281,9 +272,12 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     const file = req.file as Express.Multer.File | undefined;
     if (!file) return res.status(400).json({ error: 'file is required (.pdf / .txt / .md)' });
 
+    /* ชื่อสำหรับแสดงผล/เมทาดาทาเท่านั้น — เนื้อความปลอดภัยมาจาก diskname ที่สุ่มใน hardenUpload */
+    const displayName = safeDisplayName(file.originalname);
+
     // Lite AV: SHA-256 scan (MIME magic bytes + EICAR + Threat Intel FILE) ก่อนบันทึก
     const buf = fs.readFileSync(file.path);
-    const av = await hashEngine.scanBuffer(buf, { originalName: file.originalname });
+    const av = await hashEngine.scanBuffer(buf, { originalName: displayName });
     if (!av.ok) {
       fs.unlinkSync(file.path); // ลบทิ้ง — ต้นฉบับไปอยู่ quarantine แล้ว
       return res.status(403).json({
@@ -313,7 +307,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       content = buf.toString('utf-8').slice(0, 500000);
     }
 
-    const fallbackTitle = (file.originalname || 'file').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    const fallbackTitle = displayName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
     const title = String(req.body?.title || '').trim() || fallbackTitle;
 
     const row = await prisma.knowledgeItem.create({
