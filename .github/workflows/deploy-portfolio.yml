@@ -11,6 +11,10 @@ on:
       - 'tools/publish-portfolio.mjs'
       - 'tools/indexnow-notify.mjs'
       - '.github/workflows/deploy-portfolio.yml'
+  pull_request:
+    branches: [main]
+    # ไม่ใส่ paths filter: publish ต้องเป็น required check บนทุก PR — ถ้ากรอง paths เช็คจะหายเมื่อ PR ไม่แตะ portfolio/ แล้ว merge ไม่ได้
+    # (โหมด PR ทำแค่ checkout + preflight-skip ≈ 20 วิ)
   workflow_dispatch:
 
 permissions:
@@ -40,7 +44,14 @@ jobs:
         env:
           HAS_TOKEN: ${{ secrets.PAGES_TOKEN != '' }}
           EXPIRES: ${{ vars.PAGES_TOKEN_EXPIRES }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
+          # โหมด PR: ตรวจ workflow/preflight เท่านั้น — ห้ามแตะ publish repo และ IndexNow (production ยิงเองหลัง merge เข้า main เสมอ)
+          if [ "$IS_PR" = "true" ]; then
+            echo "โหมด PR — ข้าม publish (publish เกิดเฉพาะบน main)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$HAS_TOKEN" != "true" ]; then
             echo "::warning::ยังไม่มี secret PAGES_TOKEN — publish ถูกข้ามรอบนี้ เพิ่มที่ Settings → Secrets and variables → Actions (fine-grained token สิทธิ์ contents read/write ของ repo project-sovereign) แล้วระบบจะทำงานเองตั้งแต่ push ถัดไป"
             echo "skip=true" >> "$GITHUB_OUTPUT"

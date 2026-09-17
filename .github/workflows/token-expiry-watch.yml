@@ -1,0 +1,70 @@
+name: Token expiry watch
+
+# กันเหนียว: เตือนอายุ PAGES_TOKEN แม้ไม่มี push เกิดขึ้นเลยในช่วงใกล้หมดอายุ
+# (preflight ของ Deploy portfolio เตือนเฉพาะตอน "มี run" — ตัวนี้รายสัปดาห์ + เปิด/ปิด issue เอง)
+# วันหมดอายุอ่านจากตัวแปร PAGES_TOKEN_EXPIRES (กติกาและขั้นตอน: docs/token-rotation.md)
+on:
+  schedule:
+    - cron: '17 3 * * 1' # ทุกวันจันทร์ 03:17 UTC (schedule บน GitHub อาจหน่วงได้ — ไม่ใช่นาฬิกาเป๊ะ)
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - id: check
+        env:
+          EXPIRES: ${{ vars.PAGES_TOKEN_EXPIRES }}
+        run: |
+          if [ -z "$EXPIRES" ]; then
+            echo "days=none" >> "$GITHUB_OUTPUT"
+            echo "::warning::ไม่ได้ตั้งตัวแปร PAGES_TOKEN_EXPIRES — ระบบเตือนอายุ token ใช้งานไม่ได้ ตั้งตาม docs/token-rotation.md §๒ (สร้าง token ต้องตั้งตัวแปรนี้เสมอ)"
+            exit 0
+          fi
+          DAYS=$(( ( $(date -d "$EXPIRES" +%s 2>/dev/null || echo 0) - $(date -u +%s) ) / 86400 ))
+          {
+            echo "days=$DAYS"
+            echo "expires=$EXPIRES"
+          } >> "$GITHUB_OUTPUT"
+          echo "PAGES_TOKEN หมดอายุ $EXPIRES — คงเหลือ $DAYS วัน"
+
+      - name: เปิด/อัปเดต/ปิด issue เตือน
+        if: steps.check.outputs.days != 'none' && steps.check.outputs.days != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DAYS: ${{ steps.check.outputs.days }}
+          EXPIRES: ${{ steps.check.outputs.expires }}
+        run: |
+          SEARCH="PAGES_TOKEN rotation due in:title"
+          EXISTING=$(gh issue list --repo "$REPO" --state open --search "$SEARCH" --json number --jq '.[0].number' || true)
+          if [ "$DAYS" -lt 0 ]; then
+            SUB="หมดอายุมาแล้ว $(( -DAYS )) วัน"
+          else
+            SUB="เหลือ $DAYS วัน"
+          fi
+          TITLE="PAGES_TOKEN rotation due — $EXPIRES ($SUB)"
+          BODY=$(cat <<EOF
+          ## หมุนเวียน PAGES_TOKEN ก่อนหมดอายุ
+
+          - วันหมดอายุที่ตั้งไว้: **$EXPIRES** — **$SUB**
+          - ขั้นตอนทั้งหมด: \`docs/token-rotation.md\` §๒
+          - สรุปสั้น: สร้าง fine-grained PAT ใหม่ (เฉพาะ repo \`project-sovereign\`, Contents read/write, อายุ 90 วัน) → อัปเดต secret \`PAGES_TOKEN\` → แก้ตัวแปร \`PAGES_TOKEN_EXPIRES\` ให้ตรงวันใหม่ → ยิง Deploy portfolio ทดสอบ → revoke token ตัวเก่า
+
+          _เปิดอัตโนมัติโดย workflow **Token expiry watch** (รายสัปดาห์) — จะปิดเองเมื่อหมุนเสร็จ (วันหมดอายุใหม่เหลือมากกว่า 14 วัน)_
+          EOF
+          )
+          if [ "$DAYS" -le 14 ]; then
+            if [ -n "$EXISTING" ]; then
+              gh issue comment "$EXISTING" --repo "$REPO" --body "ยังไม่ได้หมุน — ตรวจรอบนี้: $SUB ($EXPIRES)"
+            else
+              gh issue create --repo "$REPO" --title "$TITLE" --body "$BODY"
+            fi
+          elif [ -n "$EXISTING" ]; then
+            gh issue close "$EXISTING" --repo "$REPO" --comment "วันหมดอายุใหม่เหลือ $DAYS วัน ($EXPIRES) — ถือว่าหมุนแล้ว ปิดอัตโนมัติ"
+          else
+            echo "เหลือ $DAYS วัน — ยังไม่ถึงเกณฑ์เตือน (≤14) และไม่มี issue ค้าง"
+          fi
