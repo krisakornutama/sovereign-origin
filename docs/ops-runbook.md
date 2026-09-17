@@ -138,7 +138,8 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 | สิทธิ์ราย workflow | ทั้งหมด `contents: read` — เว้น token-expiry-watch (`issues: write` ตามหน้าที่) |
 | Deploy keys | 0 ตัว |
 | Secrets | `PAGES_TOKEN` ตัวเดียว (เดินทางผ่าน env + http.extraheader — ดู §๗.๑) |
-| Dependabot security updates | enabled |
+| Dependabot security updates | enabled — **alerts เปิดค้าง 0** (ปิดครบ 10 เมื่อ 2026-09-17 ใน `f02ee74`: multer 2.4.0, qs 6.16.0*, uuid 11.1.1*, next 16.3.5, sharp 0.35.4 — * = npm overrides เพราะ express/body-parser และ node-cron pin ด้วย tilde) |
+| Dependabot version updates | `.github/dependabot.yml` — รายสัปดาห์วันเสาร์ รวมกลุ่ม patch/minor เป็น PR เดียวต่อ ecosystem · major ถูก hold back (ยกเว้น security) |
 | Secret scanning / push protection | **ไม่พร้อมใช้บนแพลนปัจจุบัน (private + free)** — เปิดได้เมื่ออัปเกรด Pro/public ผ่าน Settings → Advanced Security |
 | Required checks บน main | พร้อมเช็คทั้ง 3 แล้ว (`audit`, `size`, `publish` โหมด PR) — ตั้งจริงเมื่อแพลนรองรับด้วย `bash tools/set-required-checks.sh --apply` |
 
