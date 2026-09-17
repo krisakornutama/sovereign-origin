@@ -12,7 +12,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { RUN_DB, SKIP_REASON, primeDbEnv, setupCore, teardownCore, multipart, PNG_1X1, WAV_STUB, type CoreCtx } from './db-harness';
+import { RUN_DB, SKIP_REASON, primeDbEnv, setupCore, teardownCore, multipart, PNG_1X1, WAV_STUB, mockDelegate, type CoreCtx } from './db-harness';
 
 describe('uploads (documents + treasury + ota + whisper) — real Postgres lifecycle', { skip: RUN_DB ? false : SKIP_REASON }, () => {
   primeDbEnv();
@@ -28,6 +28,8 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
   let otaMod: typeof import('../src/modules/ota/ota.routes');
   let otaMqttPublishOrig: (...args: any[]) => any;
   let otaDirPath: string;
+  let restoreThreatIntel: (() => void) | null = null;
+  let crypto: typeof import('node:crypto');
 
   test('setup: เชื่อม DB จริง + user ทดสอบ (FK) + mock เฉพาะ AI vision', async () => {
     ctx = await setupCore();
@@ -268,9 +270,9 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
     const token = ctx.makeToken();
     knowledgeRoutes = (await import('../src/modules/knowledge/knowledge.routes')).default;
     ({ knowledgeDir } = await import('../src/services/knowledge-dir.service'));
-    ({ hashEngine } = await import('../src/services/hash-engine.service'));
-    const { EICAR } = await import('../src/services/hash-engine.service');
-    ctx.prisma.threatIntelItem = { findFirst: async () => null };
+    ({ hashEngine, EICAR } = await import('../src/services/hash-engine.service'));
+    /* threat-intel ให้ hit ไม่ได้เสมอ (ไฟล์ทดสอบไม่ใช่ malware) — restore ใน teardown เพื่อไม่ค้างข้ามไฟล์เทส */
+    restoreThreatIntel = mockDelegate(ctx.prisma, 'threatIntelItem', { findFirst: async () => null });
     /* ล้าง event จากรอบก่อน (รันซ้ำท้องถิ่นต้อง idempotent) */
     await ctx.prisma.securityEvent.deleteMany({ where: { description: { contains: 'eicar-dbtest' } } });
 
@@ -319,7 +321,59 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
     }
   });
 
-  test('teardown: ลบ user ทดสอบ (cascade) + ปิด MQTT + ปิด connection', async () => {
+  test('knowledge upload + Threat Intel FILE hit: seed hash จริง → อัปโหลดไฟล์ตรง hash → ปฏิเสธ + quarantine + securityEvent จากกิ่ง Threat Intel', async () => {
+    const token = ctx.makeToken();
+    crypto = await import('node:crypto');
+    /* ไฟล์ text จริงที่ไม่ใช่ EICAR — hash นี้คือสิ่งที่จะถูก seed ลงฐาน Threat Intel */
+    const evilBytes = Buffer.from('sovereign-threat-intel-dbtest payload ' + crypto.randomUUID(), 'utf8');
+    const sha256 = crypto.createHash('sha256').update(evilBytes).digest('hex');
+    /* คืน delegate จริงก่อน seed — กิ่งนี้ต้องพิสูจน์ว่า query ผ่าน DB จริงเจอ seed ที่เพิ่งใส่ */
+    restoreThreatIntel?.();
+    restoreThreatIntel = null;
+    await ctx.prisma.threatIntelItem.deleteMany({ where: { value: sha256 } });
+    await ctx.prisma.threatIntelItem.create({
+      data: { type: 'FILE', value: sha256, category: 'malware', source: 'manual', confidence: 1, active: true, note: 'dbtest' },
+    });
+    await ctx.prisma.securityEvent.deleteMany({ where: { description: { contains: 'threat-intel-dbtest' } } });
+
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/knowledge', knowledgeRoutes));
+    try {
+      const { headers, body } = multipart({}, 'file', 'threat-intel-dbtest.txt', 'text/plain', evilBytes);
+      const res = await fetch(`${ts.baseUrl}/api/knowledge/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...headers },
+        body,
+      });
+      const text = await res.text();
+      assert.equal(res.status, 403, text.slice(0, 300));
+      const payload = JSON.parse(text);
+      assert.equal(payload.verdict, 'malware');
+      assert.match(payload.error, /Threat Intel FILE hit \(malware\)/, 'ต้องติดกิ่ง Threat Intel ไม่ใช่ EICAR/policy');
+      assert.equal(payload.hash, sha256);
+
+      /* quarantine จริง + ไม่สร้าง row + ไม่เหลือใน uploads */
+      assert.ok(payload.quarantinedTo, 'ต้องรายงานพาธ quarantine');
+      assert.ok(fs.existsSync(payload.quarantinedTo), 'ไฟล์ต้องเข้า quarantine จริง');
+      assert.ok(fs.readFileSync(payload.quarantinedTo).equals(evilBytes), 'ไบต์ใน quarantine ต้องตรงไฟล์ที่อัปโหลด');
+      assert.equal(await ctx.prisma.knowledgeItem.findFirst({ where: { title: { contains: 'threat-intel-dbtest' } } }), null, 'ห้ามสร้าง row');
+      const sec = await ctx.prisma.securityEvent.findFirst({
+        where: { event_type: 'MALWARE_DETECTED', description: { contains: sha256.slice(0, 16) } },
+        orderBy: { timestamp: 'desc' },
+      });
+      assert.ok(sec, 'securityEvent MALWARE_DETECTED ต้องอยู่ใน DB จริง');
+      assert.match(sec.description, /Threat Intel FILE hit \(malware\)/);
+
+      /* เก็บกวาด: seed + ไฟล์ quarantine ของเทสนี้ */
+      await ctx.prisma.threatIntelItem.deleteMany({ where: { value: sha256 } });
+      fs.rmSync(payload.quarantinedTo, { force: true });
+    } finally {
+      await ts.close();
+    }
+  });
+
+  test('teardown: คืน delegate ที่ mock ไว้ + ลบ user ทดสอบ (cascade) + ปิด MQTT + ปิด connection', async () => {
+    restoreThreatIntel?.();
+    restoreThreatIntel = null;
     otaMod.mqttClient.end(true);
     await teardownCore(ctx);
   });
