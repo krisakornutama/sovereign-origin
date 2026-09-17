@@ -141,6 +141,9 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 | Dependabot security updates | enabled — **alerts เปิดค้าง 0** (ปิดครบ 10 เมื่อ 2026-09-17 ใน `f02ee74`: multer 2.4.0, qs 6.16.0*, uuid 11.1.1*, next 16.3.5, sharp 0.35.4 — * = npm overrides เพราะ express/body-parser และ node-cron pin ด้วย tilde) |
 | Dependabot version updates | `.github/dependabot.yml` — รายสัปดาห์วันเสาร์ รวมกลุ่ม patch/minor เป็น PR เดียวต่อ ecosystem · major ถูก hold back (ยกเว้น security) |
 | Secret scanning / push protection | **ไม่พร้อมใช้บนแพลนปัจจุบัน (private + free)** — เปิดได้เมื่ออัปเกรด Pro/public ผ่าน Settings → Advanced Security |
-| Required checks บน main | พร้อมเช็คทั้ง 3 แล้ว (`audit`, `size`, `publish` โหมด PR) — ตั้งจริงเมื่อแพลนรองรับด้วย `bash tools/set-required-checks.sh --apply` |
+| Required checks บน main | พร้อมเช็คทั้ง 5 แล้ว (`audit`, `size`, `publish` โหมด PR, `Core API tests / test (ubuntu-latest)`, `Core API tests / test (windows-latest)`) — ตั้งจริงเมื่อแพลนรองรับด้วย `bash tools/set-required-checks.sh --apply` |
+| CI: Core API tests | `core-api-tests.yml` — เมทริกซ์ ubuntu+windows × Node 24 (type-stripping) · `TZ=Asia/Bangkok` ตรง prod · **ubuntu มี Postgres 15 service container** พร้อมเทส real-DB lifecycle ของ knowledge upload (`RUN_DB_TESTS=1`) · เขียวครบ 2 OS ตั้งแต่ `2027836` |
+| CI: กฎเวลาท้องถิ่น | เทสใหม่ห้ามยึดเวลาเครื่อง (`getHours`) โดยไม่ inject `now` — CI วิ่ง Asia/Bangkok เท่านั้น (case จริง: agentTeam morning reports, `7cd7b9e`) |
+| CI: กฎชื่อไฟล์ | ไฟล์ที่สร้างต่อเนื่องใน ms เดียว (bundle/upload) ต้องมี suffix สุ่ม — ชื่อ timestamp ล้วนชนกันบน Linux (case จริง: mesh-lite, `2027836`) |
 
 ทบทวนรอบถัดไปเมื่อ: อัปเกรดแพลน / เพิ่ม secret ใหม่ / เพิ่ม workflow ใหม่
