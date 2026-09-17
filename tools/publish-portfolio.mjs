@@ -4,7 +4,7 @@
    ใช้: node tools/publish-portfolio.mjs [--check] [--watch] [--message "เหตุผลสั้น ๆ"] [--no-indexnow]
    --check = ดูอย่างเดียว (dry-run) · --watch = รอ CI "Audit site" จนจบ · --no-indexnow = ข้ามยิง IndexNow ท้ายงาน
    โหมด CI (GitHub Actions): ตั้ง env PUBLISH_REPO_URL=<url ของ publish repo> เมื่อรันบน runner ที่ไม่มี portfolio/.git — script จะ clone ชั่วคราว แล้ว push กลับ (workflow ต้องจัด credential ให้เอง) */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,13 @@ const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a]).toString().tri
 const gitRaw = (dir, ...a) => execFileSync('git', ['-C', dir, ...a]).toString().replace(/\r\n/g, '\n');
 const log = (s) => console.log(s);
 const norm = (p) => fs.readFileSync(p).toString().replace(/\r\n/g, '\n'); // EOL-noise (autocrlf) ไม่นับเป็นต่าง — ไม่งั้น commit แล้วไม่มีอะไร staged
+
+/* job summary ของ GitHub Actions (หน้าสรุปรอบ run) — เขียนล้มได้ ต้องไม่ทำ publish ล้ม (นอก runner ไม่มีตัวแปรสภาพแวดล้อมนี้ = ข้าม) */
+const summary = (lines) => {
+  const f = process.env.GITHUB_STEP_SUMMARY;
+  if (!f) return;
+  try { fs.appendFileSync(f, lines.join('\n') + '\n'); } catch { /* ไม่สำคัญพอให้ publish ล้ม */ }
+};
 
 /* 1. locate publish repo — สองโทโพโลยี:
    (ก) main worktree: portfolio/ คือ publish repo เอง (มี .git ซ้อน) → sameDir, ไม่ต้อง sync
@@ -129,7 +136,11 @@ if (pub.sameDir) {
 
 /* 5. commit (identity บ้านจาก monorepo — ไม่แก้ config) + push */
 if (!CHECK) {
-  if (changed.length === 0) { log('✓ publish repo ตรงกับ monorepo อยู่แล้ว — ไม่มีอะไรจะ publish'); process.exit(0); }
+  if (changed.length === 0) {
+    log('✓ publish repo ตรงกับ monorepo อยู่แล้ว — ไม่มีอะไรจะ publish');
+    summary(['## Deploy portfolio — publish', '- ไม่มีอะไรจะ publish: publish repo ตรงกับ monorepo อยู่แล้ว', `- monorepo: \`${monorepoSha}\``]);
+    process.exit(0);
+  }
   git(DEST, 'add', ...changed);
   /* identity: ในเครื่องอ่านจาก config บ้าน — บน runner (โหมด CI) ไม่มี config จึง fallback เป็น bot */
   const cfg = (k, fb) => { try { return git(ROOT, 'config', k); } catch { return fb; } };
@@ -154,14 +165,38 @@ if (!CHECK) {
     .filter((f) => /\.(html|md|xml|png|txt)$/i.test(f) && !f.startsWith('.'))
     .slice(0, 3)
     .flatMap((f) => [`--verify-file=${f}`]);
+  let indexnowLine = '— (ไม่ได้ยิง: --no-indexnow)';
   if (!SKIP_INDEXNOW) {
-    try {
-      execFileSync('node', [NOTIFIER, '--wait', `--expect-sha=${pubSha}`, ...verifyArgs], { stdio: 'inherit' });
-    } catch (e) {
-      // ห้ามให้ตัวยิงที่พังลากงานหลักลง: publish สำเร็จแล้ว → เตือนแล้วไปต่อ
-      log(`indexnow: ⚠ เรียกตัวยิงไม่สำเร็จ (${e.status ?? String(e.message || e).split('\n')[0]}) — ข้าม แล้วไปต่อ (ต้องยิงเองทีหลังถ้าต้องการ)`);
+    /* เปลี่ยนจาก execFileSync+inherit เป็น spawnSync เพื่อจับผลทั้ง stdout/stderr/status ไปเขียน job summary
+       — ตัวยิง fail-safe จะ exit 0 พร้อมข้อความ ✗ บน stderr ได้ ห้ามตีความว่า exit 0 = ยิงสำเร็จ
+       output พิมพ์คืนให้ log ครบเหมือนเดิม (ต่างแค่จบก่อนค่อยโผล่) */
+    const r = spawnSync('node', [NOTIFIER, '--wait', `--expect-sha=${pubSha}`, ...verifyArgs], { encoding: 'utf8' });
+    if (r.stdout) process.stdout.write(r.stdout);
+    if (r.stderr) process.stderr.write(r.stderr);
+    if (r.error) {
+      indexnowLine = '⚠ เรียกตัวยิงไม่ได้ — publish ยังขึ้นจริง (ยิงเองทีหลังได้: node tools/indexnow-notify.mjs)';
+      log(`indexnow: ⚠ เรียกตัวยิงไม่สำเร็จ (${r.error.message.split('\n')[0]}) — ข้าม แล้วไปต่อ`);
+    } else if (r.status !== 0) {
+      indexnowLine = `⚠ ยิงล้ม (exit ${r.status}) — publish ยังขึ้นจริง (ยิงเองทีหลังได้: node tools/indexnow-notify.mjs)`;
+      log(`indexnow: ⚠ เรียกตัวยิงไม่สำเร็จ (exit ${r.status}) — ข้าม แล้วไปต่อ (publish ไม่ล้มตาม)`);
+    } else if (/⏱ ยังไม่ตรง/.test(r.stdout)) {
+      indexnowLine = '⚠ production ยังไม่ตรง — ยิงเข้าคิว IndexNow แล้ว (บอทมาเองภายหลัง)';
+    } else if (/✗ indexnow:/.test(r.stderr)) {
+      indexnowLine = '⚠ ยิงล้ม — publish ยังขึ้นจริง (ยิงเองทีหลังได้: node tools/indexnow-notify.mjs)';
+    } else {
+      const m = /HTTP (\d{3}) — ส่ง (\d+) URL/.exec(r.stdout);
+      indexnowLine = m ? `✓ HTTP ${m[1]} · ${m[2]} URL` : '✓ ยิงสำเร็จ';
     }
-  } else log('skip: IndexNow (--no-indexnow)');
+  }
+
+  /* 5.6 job summary — สรุปรอบ publish ให้เห็นในหน้า Actions ทุกรอบ (นอก runner = ไม่เขียน) */
+  summary([
+    '## Deploy portfolio — publish',
+    `- monorepo: \`${monorepoSha}\``,
+    `- publish commit: \`${pubSha}\`${gh ? ` ([project-sovereign](https://github.com/${gh[1]}/commit/${pubSha}))` : ' (project-sovereign/main)'}`,
+    `- ไฟล์ที่ sync: ${changed.length}`,
+    `- IndexNow: ${indexnowLine}`,
+  ]);
 
   /* 6. watch CI ถ้าสั่ง --watch */
   if (WATCH) {

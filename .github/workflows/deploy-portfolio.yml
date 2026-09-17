@@ -33,9 +33,10 @@ jobs:
           node-version: 22
 
       - id: preflight
-        name: Preflight — secret PAGES_TOKEN (ยังไม่ตั้ง = ข้ามพร้อมคำเตือน)
+        name: Preflight — secret PAGES_TOKEN (ยังไม่ตั้ง = ข้ามพร้อมคำเตือน) + เตือนเมื่อใกล้หมดอายุ
         env:
           HAS_TOKEN: ${{ secrets.PAGES_TOKEN != '' }}
+          EXPIRES: ${{ vars.PAGES_TOKEN_EXPIRES }}
         run: |
           if [ "$HAS_TOKEN" != "true" ]; then
             echo "::warning::ยังไม่มี secret PAGES_TOKEN — publish ถูกข้ามรอบนี้ เพิ่มที่ Settings → Secrets and variables → Actions (fine-grained token สิทธิ์ contents read/write ของ repo project-sovereign) แล้วระบบจะทำงานเองตั้งแต่ push ถัดไป"
@@ -43,6 +44,19 @@ jobs:
             exit 0
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
+          # เตือนล่วงหน้าก่อน token หมดอายุ — GitHub API ไม่บอกวันหมดอายุของ PAT จึงตั้งวันเอง (YYYY-MM-DD)
+          # ที่ Settings → Secrets and variables → Actions → Variables: PAGES_TOKEN_EXPIRES (ขั้นตอนหมุนเวียน: docs/token-rotation.md)
+          if [ -n "$EXPIRES" ]; then
+            DAYS=$(( ( $(date -d "$EXPIRES" +%s 2>/dev/null || echo 0) - $(date -u +%s) ) / 86400 ))
+            echo "token_days_left=$DAYS" >> "$GITHUB_OUTPUT"
+            if [ "$DAYS" -lt 0 ]; then
+              echo "::warning::PAGES_TOKEN หมดอายุแล้วตามที่ตั้งไว้ (PAGES_TOKEN_EXPIRES=$EXPIRES) — รอบนี้ยังผ่านเพราะ GitHub ยังตอบรับ secret แต่อย่ารอ: สร้าง token ใหม่ + อัปเดต secret ตาม docs/token-rotation.md"
+            elif [ "$DAYS" -le 14 ]; then
+              echo "::warning::PAGES_TOKEN จะหมดอายุในอีก $DAYS วัน ($EXPIRES) — ถึงเวลาหมุนเวียน ขั้นตอนอยู่ที่ docs/token-rotation.md"
+            else
+              echo "token: หมดอายุอีก $DAYS วัน ($EXPIRES)"
+            fi
+          fi
 
       - name: Sync → commit → push (publish repo)
         if: steps.preflight.outputs.skip != 'true'
