@@ -23,6 +23,7 @@ describe('knowledge upload — real Postgres lifecycle', { skip: RUN_DB ? false 
   let prisma: any;
   let makeToken: (role?: string, overrides?: Record<string, unknown>) => string;
   let createTestServer: (mount: (app: import('express').Express) => void) => Promise<any>;
+  let knowledgeDir: () => string;
   let hashEngine: any;
 
   test('setup: เชื่อม DB จริง + อัปสคีมา + mock เฉพาะ threat-intel (สแกน AV ผ่าน)', async () => {
@@ -30,6 +31,7 @@ describe('knowledge upload — real Postgres lifecycle', { skip: RUN_DB ? false 
     ({ prisma } = await import('../src/lib/prisma'));
     ({ makeToken } = await import('./helpers'));
     ({ createTestServer } = await import('./helpers'));
+    ({ knowledgeDir } = await import('../src/services/knowledge-dir.service'));
     knowledgeRoutes = (await import('../src/modules/knowledge/knowledge.routes')).default;
     ({ hashEngine } = await import('../src/services/hash-engine.service'));
     /* threat-intel ให้ hit ไม่ได้เสมอ (ไฟล์ทดสอบไม่ใช่ malware) — ชั้นอื่นของ AV เป็นของจริง */
@@ -67,9 +69,8 @@ describe('knowledge upload — real Postgres lifecycle', { skip: RUN_DB ? false 
       assert.equal(row.title, 'hello db');
       assert.match(row.file_path, /^uploads[\\/]\d+-[0-9a-f-]{36}\.txt$/);
 
-      /* 3) ไฟล์อยู่บนดิสก์จริงตาม file_path ที่เก็บ */
-      const KNOWLEDGE_DIR = path.resolve(path.dirname(row.file_path) === 'uploads' ? path.join(process.cwd(), 'knowledge') : path.join(process.cwd(), 'knowledge', 'knowledge'));
-      const onDisk = path.join(KNOWLEDGE_DIR, row.file_path);
+      /* 3) ไฟล์อยู่บนดิสก์จริงตาม file_path ที่เก็บ — ใช้ resolver ตัวเดียวกับแอป (ห้ามเดา flat/nested เอง) */
+      const onDisk = path.join(knowledgeDir(), row.file_path);
       assert.ok(fs.existsSync(onDisk), `ไฟล์ต้องอยู่ที่ ${onDisk}`);
       assert.equal(fs.readFileSync(onDisk, 'utf8'), 'ข้อความจากเทส real-db');
 
