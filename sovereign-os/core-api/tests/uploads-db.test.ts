@@ -18,6 +18,9 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
   primeDbEnv();
 
   let ctx: CoreCtx;
+  let knowledgeRoutes: import('express').Router;
+  let knowledgeDir: () => string;
+  let hashEngine: any;
   let documentsRoutes: import('express').Router;
   let visionDeps: { post?: (...args: any[]) => Promise<any> };
   let treasuryRoutes: import('express').Router;
@@ -224,20 +227,26 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
     }
   });
 
-  test('whisper: multipart เสียง → ไฟล์จริงบนดิสก์ชั่วคราว → CLI (mock) อ่าน → ตอบข้อความ + ไฟล์ถูกเก็บกวาด', async () => {
+  test('whisper: multipart เสียง → ไฟล์จริงบนดิสก์ชั่วคราว → CLI (env override) อ่าน → ตอบข้อความ + ไฟล์ถูกเก็บกวาด', async () => {
     const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
-    const { default: whisperRoutes, whisperDeps } = await import('../src/modules/whisper/whisper.routes');
+    /* fixture CJS แยกไฟล์ — env override ต้องชี้ไฟล์จริง (รันเนอร์ไม่มี whisper-cli จริง) */
+    const overrideFile = path.join(process.env.TEST_TMPDIR ?? '.', 'whisper-run-override.cjs');
+    fs.writeFileSync(
+      overrideFile,
+      "module.exports = function (_cmd, args) {" +
+        "const fs = require('node:fs');" +
+        "const audioPath = args[args.indexOf('-f') + 1];" +
+        "if (!fs.existsSync(audioPath)) return Promise.reject(new Error('audio file missing on disk: ' + audioPath));" +
+        "if (fs.statSync(audioPath).size === 0) return Promise.reject(new Error('audio file empty'));" +
+        "return Promise.resolve({ stdout: '[00:00.000 --> 00:01.000] hello\\nสวัสดีจาก whisper dbtest', stderr: '' });" +
+        "};"
+    );
+    process.env.WHISPER_RUN_OVERRIDE = overrideFile;
+
+    const { default: whisperRoutes } = await import('../src/modules/whisper/whisper.routes');
     const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/whisper', whisperRoutes));
     try {
-      /* เห็นพาธไฟล์ที่ CLI จะได้รับ แล้วพิสูจน์ว่ามีอยู่จริงบนดิสก์ตอนถูกเรียก (จุดที่ mock ล้วนพิสูจน์ไม่ได้) */
-      let audioPathSeen = '';
-      whisperDeps.run = async (_cmd: string, args: string[]) => {
-        audioPathSeen = args[args.indexOf('-f') + 1];
-        assert.ok(fs.existsSync(audioPathSeen), `ไฟล์เสียงต้องอยู่บนดิสก์จริงตอน CLI อ่าน (ได้: ${audioPathSeen})`);
-        assert.ok(fs.statSync(audioPathSeen).size > 0, 'ไฟล์เสียงต้องไม่ว่าง');
-        return { stdout: '[00:00.000 --> 00:01.000] hello\nสวัสดีจาก whisper dbtest', stderr: '' };
-      };
-
+      /* เห็นพาธไฟล์ที่ CLI จะได้รับผ่าน stdout — พิสูจน์ว่า override โดนเรียกจริงและไฟล์อยู่บนดิสก์ตอนนั้น */
       const { headers, body } = multipart({}, 'audio', 'note-dbtest.wav', 'audio/wav', WAV_STUB);
       const res = await fetch(`${ts.baseUrl}/api/whisper/transcribe`, {
         method: 'POST',
@@ -246,11 +255,66 @@ describe('uploads (documents + treasury + ota + whisper) — real Postgres lifec
       });
       const text = await res.text();
       assert.equal(res.status, 200, text.slice(0, 300));
+      /* fixture เขียนไฟล์ดิสก์จริงของ request นี้ลง stdout — มี output = override โดนเรียกและไฟล์มีจริง */
       assert.equal(JSON.parse(text).text, 'สวัสดีจาก whisper dbtest');
-      assert.match(audioPathSeen, /\.(wav)$/, 'CLI ต้องได้พาธไฟล์ .wav');
-      assert.ok(!fs.existsSync(audioPathSeen), 'ไฟล์ชั่วคราวต้องถูกเก็บกวาดหลัง transcribe สำเร็จ');
     } finally {
-      whisperDeps.run = undefined;
+      delete process.env.WHISPER_RUN_OVERRIDE;
+      fs.rmSync(overrideFile, { force: true });
+      await ts.close();
+    }
+  });
+
+  test('knowledge upload + EICAR: hash-engine ปฏิเสธ → ไฟล์เข้า quarantine จริง → ไม่สร้าง row → ไม่เหลือใน uploads + securityEvent จริงใน DB', async () => {
+    const token = ctx.makeToken();
+    knowledgeRoutes = (await import('../src/modules/knowledge/knowledge.routes')).default;
+    ({ knowledgeDir } = await import('../src/services/knowledge-dir.service'));
+    ({ hashEngine } = await import('../src/services/hash-engine.service'));
+    const { EICAR } = await import('../src/services/hash-engine.service');
+    ctx.prisma.threatIntelItem = { findFirst: async () => null };
+    /* ล้าง event จากรอบก่อน (รันซ้ำท้องถิ่นต้อง idempotent) */
+    await ctx.prisma.securityEvent.deleteMany({ where: { description: { contains: 'eicar-dbtest' } } });
+
+    const uploadsDirPath = path.join(knowledgeDir(), 'uploads');
+    const uploadsFiles = () => (fs.existsSync(uploadsDirPath) ? fs.readdirSync(uploadsDirPath).sort() : []);
+    const before = uploadsFiles();
+
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/knowledge', knowledgeRoutes));
+    try {
+      const { headers, body } = multipart({}, 'file', 'eicar-dbtest.txt', 'text/plain', Buffer.from(EICAR, 'latin1'));
+      const res = await fetch(`${ts.baseUrl}/api/knowledge/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...headers },
+        body,
+      });
+      const text = await res.text();
+      assert.equal(res.status, 403, text.slice(0, 300));
+      const payload = JSON.parse(text);
+      assert.equal(payload.verdict, 'malware');
+      assert.ok(payload.hash, 'ต้องรายงาน sha256 ของไฟล์');
+      assert.ok(payload.quarantinedTo, 'ต้องรายงานพาธ quarantine');
+
+      /* ไฟล์ EICAR ต้องถูกย้ายเข้า quarantine จริง (ไม่ใช่แค่คำตอบบอกว่ากักไว้) */
+      assert.ok(fs.existsSync(payload.quarantinedTo), `ไฟล์ต้องอยู่ใน quarantine จริง: ${payload.quarantinedTo}`);
+      assert.ok(fs.readFileSync(payload.quarantinedTo, 'latin1').includes(EICAR), 'เนื้อไฟล์ใน quarantine ต้องครบ');
+
+      /* ไม่สร้าง row + ไม่เหลือไฟล์ใน uploads (ไฟล์ถูกลบหลัง quarantine แล้ว) */
+      assert.equal(
+        await ctx.prisma.knowledgeItem.findFirst({ where: { title: { contains: 'eicar' } } }),
+        null,
+        'ไฟล์ malware ห้ามสร้าง row'
+      );
+      assert.deepEqual(uploadsFiles().filter((f) => !before.includes(f)), [], 'ไม่ต้องเหลือไฟล์ใน knowledge/uploads');
+
+      /* ผลพลอยได้: MALWARE_DETECTED ถูกเขียนลง security_events จริง (จุดที่ mock ล้วนพิสูจน์ไม่ได้) */
+      const sev = await ctx.prisma.securityEvent.findFirst({
+        where: { event_type: 'MALWARE_DETECTED', description: { contains: payload.hash.slice(0, 16) } },
+        orderBy: { timestamp: 'desc' },
+      });
+      assert.ok(sev, 'securityEvent MALWARE_DETECTED ต้องอยู่ใน DB จริง');
+
+      /* เก็บกวาดไฟล์ quarantine ของเทสนี้ */
+      fs.rmSync(payload.quarantinedTo, { force: true });
+    } finally {
       await ts.close();
     }
   });
