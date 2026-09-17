@@ -1,0 +1,48 @@
+name: Deploy portfolio
+
+# เผยแพร่เว็บอัตโนมัติเมื่อ portfolio/ เปลี่ยนบน main (แทนการรัน publish script ในเครื่อง)
+# ลำดับเดิมคงอยู่: audit ("Audit site") ตรวจก่อน แล้วจึง sync → push ไป mirror repo (Pages)
+# → รอ deploy เสร็จจริง → ยิง IndexNow บอกบอทค้นหา
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'portfolio/**'
+      - 'tools/publish-portfolio.mjs'
+      - 'tools/indexnow-notify.mjs'
+      - '.github/workflows/deploy-portfolio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-portfolio
+  cancel-in-progress: false  # publish กลืนกันไม่ได้ — คิวทีละรอบ
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PUBLISH_REPO_URL: https://x-access-token:${{ secrets.PAGES_TOKEN }}@github.com/krisakornutama/project-sovereign.git
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Preflight — PAGES_TOKEN ต้องมี (ครั้งแรก: เพิ่ม secret แล้วกด Run workflow ซ้ำ)
+        env:
+          HAS_TOKEN: ${{ secrets.PAGES_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::error::ยังไม่มี secret PAGES_TOKEN — เพิ่มที่ Settings → Secrets and variables → Actions (fine-grained token สิทธิ์ contents read/write ของ repo project-sovereign) แล้วกด Run workflow ซ้ำ"
+            exit 1
+          fi
+
+      - name: Sync → commit → push (publish repo)
+        run: node tools/publish-portfolio.mjs --message "auto publish from CI"
+
+      - name: IndexNow (ping search bots after deploy — รอ Pages deploy เสร็จก่อนยิง)
+        run: node tools/indexnow-notify.mjs --wait
