@@ -7,8 +7,8 @@
 // ═════════════════════════════════════════════════════════════
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
-import multer from 'multer';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import { resolveOwnerId } from '../portfolio/portfolio.routes';
 import {
   STRATEGY_FAMILIES,
@@ -33,14 +33,12 @@ export { prisma };
 const VALID_ASSET_TYPES = ['CRYPTO', 'STOCK', 'COMMODITY'];
 
 // ── สลิปหลักฐานการโอน (ภาพ) — เก็บเป็น data URL ใน evidence_url (ไม่ต้อง static server) ──
-const SLIP_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff']);
-const slipUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // สลิปไม่ใหญ่ — 2MB พอ
-  fileFilter: (_req, file, cb) => {
-    if (SLIP_MIME.has(file.mimetype)) cb(null, true);
-    else cb(new Error('Only image files are allowed (jpg/png/webp/gif/bmp/tiff)'));
-  },
+// harden: memory mode (ไม่ลงดิสก์) + whitelist MIME ภาพ + จำกัด 2MB — เหมือนเดิมทุกข้อ
+const slipUpload = hardenUpload({
+  mode: 'memory',
+  allowedExtensions: IMAGE_EXTS,
+  maxSizeMB: 2,
+  mimeAllow: IMAGE_MIME,
 });
 
 import { nonNegativeFinite, avgPowerKw, loadPositions } from './treasury.helpers';

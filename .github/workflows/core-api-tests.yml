@@ -1,0 +1,44 @@
+name: Core API tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sovereign-os/core-api/**'
+      - 'tools/test/**'
+      - '.github/workflows/core-api-tests.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # เมทริกซ์แพลตฟอร์ม: พฤติกรรม path ของ harden-upload ต้องเหมือนกันทั้ง POSIX/Windows
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: sovereign-os/core-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # type-stripping — ทดสอบ import .ts ตรง ๆ แบบเดียวกับเครื่อง dev
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tests
+        run: npm test
+        env:
+          JWT_SECRET: ci-secret-0123456789abcdef
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci

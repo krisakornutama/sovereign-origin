@@ -6,22 +6,21 @@
 //   GET  /statements  → ประวัติที่ import มา
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
-import multer from 'multer';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { hardenUpload } from '../../lib/harden-upload';
 import { dimeProcessor } from '../../services/dime.service';
 import { isDimeConfigured, loadDimeImapConfig } from '../../services/dime-imap.service';
 
 const router = Router();
 export { prisma };
 
-const pdfUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // สเตตเมนต์ไม่ใหญ่ — 10MB พอ
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname)) cb(null, true);
-    else cb(new Error('Only PDF files are allowed'));
-  },
+// harden: memory mode (ไม่ลงดิสก์) + whitelist .pdf + จำกัด 10MB — เหมือนเดิมทุกข้อ
+const pdfUpload = hardenUpload({
+  mode: 'memory',
+  allowedExtensions: ['.pdf'],
+  maxSizeMB: 10,
+  mimeAllow: new Set(['application/pdf']),
 });
 
 // GET /api/dime/status — ตรวจสอบ config (ไม่เปิดเผย credentials)

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import multer from 'multer';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
@@ -17,9 +16,16 @@ import { runChaosDrill, lastDrillReport } from '../../services/chaos-drill.servi
 import { timeConsensus } from '../../services/time-consensus.service';
 import { config } from '../../config';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
+import { hardenUpload } from '../../lib/harden-upload';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+// harden: memory mode (ไม่ลงดิสก์) + whitelist .pdf/.txt/.md + จำกัด 25MB
+// (เดิมไม่มี filter เลย — ตัวนี้ยิงเข้า hashEngine ตรง ๆ ซึ่งมี magic-byte sniff รองรับเอง)
+const upload = hardenUpload({
+  mode: 'memory',
+  allowedExtensions: ['.pdf', '.txt', '.md', '.markdown'],
+  maxSizeMB: 25,
+});
 
 // ═══ STATUS — เช็คทุกเครื่องมือในครั้งเดียว ═══
 router.get('/status', authenticate, async (_req, res) => {

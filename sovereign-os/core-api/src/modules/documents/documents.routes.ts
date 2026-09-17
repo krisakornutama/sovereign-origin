@@ -1,8 +1,6 @@
 import { Router } from 'express';
-import { unlinkSync, readFileSync, existsSync } from 'fs';
-import multer from 'multer';
-import os from 'os';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import {
   prisma,
   analyzeProductLabel,
@@ -18,22 +16,16 @@ import type { CallVisionDeps } from '../../services/vision.service';
 const router = Router();
 
 // ใช้สำหรับเทสต์ยิงได้โดยไม่แตะเครือข่าย — inject post ผ่านตัวนี้
-export const visionDeps: CallVisionDeps = {};
-
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff']);
-
-const upload = multer({
-  dest: os.tmpdir(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME.has(file.mimetype)) cb(null, true);
-    else cb(new Error('Only image files are allowed (jpg/png/webp/gif/bmp/tiff)'));
-  },
+export const visionDeps: CallVisionDeps = {};// harden: memory mode (ไม่ลงดิสก์ — อ่านเป็น base64 ส่ง AI แล้วทิ้ง) + whitelist MIME/นามสกุล + 10MB — เหมือนเดิมทุกข้อ
+const upload = hardenUpload({
+  mode: 'memory',
+  allowedExtensions: IMAGE_EXTS,
+  maxSizeMB: 10,
+  mimeAllow: IMAGE_MIME,
 });
 
-function toBase64DataUri(path: string, mimetype: string): string {
-  const buf = readFileSync(path);
-  return `data:${mimetype};base64,${buf.toString('base64')}`;
+function toBase64DataUri(buffer: Buffer, mimetype: string): string {
+  return `data:${mimetype};base64,${buffer.toString('base64')}`;
 }
 
 /** ตรวจความถูกต้องขั้นต่ำก่อนบันทึก */
@@ -66,12 +58,10 @@ router.post('/analyze', authenticate, (req, res) => {
     if (err) return res.status(400).json({ error: 'Invalid image upload', detail: err.message });
     try {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
-      const base64 = toBase64DataUri(req.file.path, req.file.mimetype);
+      const base64 = toBase64DataUri(req.file.buffer, req.file.mimetype);
       const label = await analyzeProductLabel(base64, visionDeps);
-      unlinkSync(req.file.path);
       res.json(label);
     } catch (e: any) {
-      if (req.file && existsSync(req.file.path)) unlinkSync(req.file.path);
       res.status(500).json({ error: 'Label analysis failed', detail: e?.message || 'unknown' });
     }
   });
@@ -99,19 +89,16 @@ router.post('/scan-to-inventory', authenticate, requireRole(...WRITE_ROLES), asy
     if (err) return res.status(400).json({ error: 'Invalid image upload', detail: err.message });
     try {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
-      const base64 = toBase64DataUri(req.file.path, req.file.mimetype);
+      const base64 = toBase64DataUri(req.file.buffer, req.file.mimetype);
       let label = await analyzeProductLabel(base64, visionDeps);
       label = applyOverrides(label, (req.body || {}) as Record<string, unknown>);
       const e2 = validateLabel(label);
       if (e2) {
-        unlinkSync(req.file.path);
         return res.status(400).json({ error: e2 });
       }
       const id = await createInventoryItem(label, req.user?.id);
-      unlinkSync(req.file.path);
       res.status(201).json({ success: true, id });
     } catch (e: any) {
-      if (req.file && existsSync(req.file.path)) unlinkSync(req.file.path);
       res.status(500).json({ error: 'Failed to save inventory item', detail: e?.message || 'unknown' });
     }
   });

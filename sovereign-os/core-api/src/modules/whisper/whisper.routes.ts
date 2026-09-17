@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import { unlinkSync, existsSync } from 'fs';
 import { authenticate } from '../../middleware/auth.middleware';
-import { hardenUpload } from '../../lib/harden-upload';
+import { hardenUpload, handledUpload } from '../../lib/harden-upload';
 
 const router = Router();
 
@@ -17,7 +17,7 @@ const WHISPER_CLI = "E:\\My work\\Project Sovereign Origin\\tools\\whisper.cpp\\
 const WHISPER_MODEL = "E:\\My work\\Project Sovereign Origin\\tools\\whisper.cpp\\models\\ggml-small.bin";
 
 // POST /api/whisper/transcribe
-router.post('/transcribe', authenticate, upload.single('audio'), async (req, res) => {
+router.post('/transcribe', authenticate, handledUpload(upload, 'audio'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file uploaded' });
