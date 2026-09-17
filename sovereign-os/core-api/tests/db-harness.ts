@@ -25,8 +25,24 @@ export interface CoreCtx {
   userId: string;
 }
 
+/** override delegate ของ prisma model ชั่วคราว (เช่น threatIntelItem ให้ AV ผ่าน)
+ *  คืนฟังก์ชัน restore เป็น delegate จริงที่ capture ไว้ก่อน override — ชุดเทสถัดไปใน process เดียวกัน
+ *  ต้องได้ DB จริงกลับคืนเสมอ (รอบก่อนเคยเจอ mock ค้างข้ามไฟล์จน Threat Intel hit เทสไม่ได้) */
+export function mockDelegate(prisma: any, model: string, methods: Record<string, any>): () => void {
+  const original = prisma[model];
+  prisma[model] = { ...methods };
+  return () => {
+    prisma[model] = original;
+  };
+}
+
 /** เชื่อม DB จริง + upsert user ทดสอบ + ล้างข้อมูลเศษจากรอบก่อนของ user นั้น */
 export async function setupCore(): Promise<CoreCtx> {
+  /* setup-env ตั้ง Telegram token/chatId ปลอม — ถ้าปล่อยไว้ เส้นทางที่แจ้งเตือนจริง
+     (property INTRUSION / vision stranger) จะยิง api.telegram.org จากเทส
+     ลบก่อนโมดูล telegram-credentials ถูก import (มัน capture env ตอน import แบบ module-level) */
+  delete process.env.TELEGRAM_BOT_TOKEN;
+  delete process.env.TELEGRAM_CHAT_ID;
   const { prisma } = await import('../src/lib/prisma');
   const { makeToken, createTestServer } = await import('./helpers');
   await prisma.$connect();
