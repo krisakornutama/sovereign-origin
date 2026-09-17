@@ -46,7 +46,9 @@ jobs:
           # service บางตัวใช้เวลาท้องถิ่น (getHours) — จัดเขตเวลาให้ CI ตรงเซิร์ฟเวอร์โปรดักชัน (กรุงเทพ)
           TZ: Asia/Bangkok
 
-  # real-Postgres — lifecycle จริงของ knowledge upload (upload→DB row→serve→DELETE ลบทั้ง DB และดิสก์)
+  # real-Postgres — lifecycle จริงของจุดรับไฟล์ multer: knowledge upload (upload→DB row→serve→DELETE
+  #   ลบทั้ง DB และดิสก์) + documents scan-to-inventory (multipart→AI mock→inventory_items) + treasury slip
+  #   (evidence_url data URL ใน DB + ปฏิเสธเกิน 2MB + คำสั่ง VERIFIED อัปโหลดซ้ำไม่ได้)
   test-db:
     runs-on: ubuntu-latest
     defaults:
@@ -85,7 +87,7 @@ jobs:
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
 
       - name: Run real-DB lifecycle tests
-        run: npx tsx --test --test-concurrency=1 tests/knowledge-db.test.ts
+        run: npx tsx --test --test-concurrency=1 tests/knowledge-db.test.ts tests/uploads-db.test.ts
         env:
           JWT_SECRET: ci-secret-0123456789abcdef
           RUN_DB_TESTS: '1'
