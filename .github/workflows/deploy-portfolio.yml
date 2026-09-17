@@ -33,7 +33,7 @@ jobs:
       PUBLISH_REPO_URL: https://github.com/krisakornutama/project-sovereign.git
       PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
