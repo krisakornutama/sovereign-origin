@@ -1,82 +1,48 @@
-import './setup-env';
-/* multer uploads (documents scan-to-inventory + treasury slip) — lifecycle จริงบน Postgres
-   (ส่วนเสริมของ harden-upload-routes.test.ts — real-DB ชุดแรกคือ knowledge-db.test.ts)
-   ปกติชุด route-level ใช้ mockModel ครอบ prisma — ไฟล์นี้ปล่อย InventoryItem/TransferOrder เป็น DB จริงทั้งวงจร:
-     documents: POST /scan-to-inventory (multipart ภาพ + AI mock) → row จริงใน inventory_items พร้อม expiry
-                ที่คำนวณจาก shelf_life_days — โหมด memory: ไม่มีอะไรลงดิสก์เลย
-     treasury : สร้างคำสั่งโอน → POST /transfers/:id/evidence (สลิปภาพ) → evidence_url เป็น data URL
-                ใน DB ที่ base64-decode กลับได้ไบต์ตรง → เกิน 2MB ถูกปฏิเสธโดยไม่เขียน DB
-                → คำสั่งที่ VERIFIED แล้วอัปโหลดสลิปซ้ำไม่ได้ (เงื่อนไขอ่านจาก DB จริง)
-   Gated: รันเมื่อ RUN_DB_TESTS=1 และมี TEST_DATABASE_URL เท่านั้น (CI: job test-db เดิมใน core-api-tests.yml —
+/* multer/raw-body uploads (documents scan-to-inventory + treasury slip + OTA firmware + whisper)
+   — lifecycle จริงบน Postgres (ส่วนเสริมของ knowledge-db.test.ts, ใช้ harness กลางจาก db-harness.ts)
+   ปกติชุด route-level ใช้ mockModel ครอบ prisma — ไฟล์นี้ปล่อย DB เป็นของจริงทั้งวงจร:
+     documents: POST /scan-to-inventory (multipart ภาพ + AI mock) → row จริงใน inventory_items
+     treasury : upload สลิป → evidence_url data URL ใน DB decode ได้ไบต์ตรง → เกิน 2MB ปฏิเสธ → VERIFIED อัปโหลดซ้ำไม่ได้
+     ota      : POST firmware (raw body) → ไฟล์จริงบนดิสก์ → deploy → row จริงใน ota_events → DELETE ลบดิสก์
+     whisper  : ไม่แตะ DB — พิสูจน์วงจรดิสก์จริง (multipart → ดิสก์ → CLI อ่าน → เก็บกวาด) mock เฉพาะ CLI
+   Gated: รันเมื่อ RUN_DB_TESTS=1 และมี TEST_DATABASE_URL เท่านั้น (CI: job test-db เดิม —
    ท้องถิ่น: ชี้ไปที่ DB ทดสอบแล้ว RUN_DB_TESTS=1 npx tsx --test tests/uploads-db.test.ts)
-   ต่างจาก knowledge: ตารางทั้งสองมี FK → User จริง จึงสร้าง user ทดสอบใน setup (teardown cascade ลบ)
    ไฟล์นี้ตั้ง TEST_DATABASE_URL ก่อน import แช่น prisma — ต้องอยู่บรรทัดแรกสุดของเทส */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
+import { RUN_DB, SKIP_REASON, primeDbEnv, setupCore, teardownCore, multipart, PNG_1X1, WAV_STUB, type CoreCtx } from './db-harness';
 
-const RUN_DB = process.env.RUN_DB_TESTS === '1' && !!process.env.TEST_DATABASE_URL;
+describe('uploads (documents + treasury + ota + whisper) — real Postgres lifecycle', { skip: RUN_DB ? false : SKIP_REASON }, () => {
+  primeDbEnv();
 
-describe('multer uploads (documents + treasury) — real Postgres lifecycle', { skip: RUN_DB ? false : 'ต้องการ RUN_DB_TESTS=1 + TEST_DATABASE_URL (CI ubuntu job)' }, () => {
-  /* ตั้ง env ก่อน dynamic import ทุกชั้น app (prisma client สร้างจาก DATABASE_URL ตอน import แรก) */
-  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL as string;
-  process.env.HASH_QUARANTINE_DIR = path.join(process.env.TEST_TMPDIR ?? '.', 'quarantine');
-
-  let prisma: any;
-  let makeToken: (role?: string, overrides?: Record<string, unknown>) => string;
-  let createTestServer: (mount: (app: import('express').Express) => void) => Promise<any>;
+  let ctx: CoreCtx;
   let documentsRoutes: import('express').Router;
   let visionDeps: { post?: (...args: any[]) => Promise<any> };
   let treasuryRoutes: import('express').Router;
-  let userId = ''; // user จริงใน DB (FK ของ inventory_items / transfer_orders)
+  let otaRoutes: import('express').Router;
+  let otaMod: typeof import('../src/modules/ota/ota.routes');
+  let otaMqttPublishOrig: (...args: any[]) => any;
+  let otaDirPath: string;
 
-  /* PNG 1×1 จริง — magic bytes ผ่าน whitelist MIME/นามสกุลของทั้งสองโมดูล */
-  const PNG_1X1 = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-    'base64'
-  );
-
-  /** ประกอบ multipart body จริง (form fields + ไฟล์ 1 ช่อง) — แบบเดียวกับที่เบราว์เซอร์ส่ง */
-  function multipart(fields: Record<string, string>, fileField: string, filename: string, mime: string, bytes: Buffer) {
-    const boundary = '----updb' + Date.now() + Math.random().toString(36).slice(2);
-    const parts: Buffer[] = [];
-    for (const [name, value] of Object.entries(fields)) {
-      parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
-    }
-    parts.push(
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`),
-      bytes,
-      Buffer.from(`\r\n--${boundary}--\r\n`)
-    );
-    return { headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }, body: Buffer.concat(parts) };
-  }
-
-  test('setup: เชื่อม DB จริง + สร้าง user ทดสอบ (FK) + mock เฉพาะ AI vision', async () => {
-    ({ prisma } = await import('../src/lib/prisma'));
-    ({ makeToken, createTestServer } = await import('./helpers'));
+  test('setup: เชื่อม DB จริง + user ทดสอบ (FK) + mock เฉพาะ AI vision', async () => {
+    ctx = await setupCore();
     ({ default: documentsRoutes, visionDeps } = await import('../src/modules/documents/documents.routes'));
     treasuryRoutes = (await import('../src/modules/treasury/treasury.routes')).default;
-    await prisma.$connect();
-    await prisma.$executeRawUnsafe('SELECT 1');
-
-    /* ตาราง inventory_items/transfer_orders อ้าง User จริง — mock ทดแทนไม่ได้ ต้องมี row จริง */
-    const username = 'db-upload-test';
-    const user = await prisma.user.upsert({
-      where: { username },
-      update: {},
-      create: { username, password_hash: 'not-a-real-login' },
-    });
-    userId = user.id;
-
-    /* ล้างเศษจากรอบก่อน (CI รอบแรกไม่มีอยู่แล้ว) */
-    await prisma.inventoryItem.deleteMany({ where: { user_id: userId } });
-    await prisma.transferOrder.deleteMany({ where: { user_id: userId } });
-    await prisma.treasuryEvent.deleteMany({ where: { user_id: userId } });
+    /* OTA_DIR ถูกอ่านตอน import — ตั้งก่อน dynamic import ให้ firmware ลงโฟลเดอร์ชั่วคราวของชุดเทสนี้ */
+    process.env.OTA_DIR = path.join(process.env.TEST_TMPDIR ?? '.', 'ota-firmwares');
+    otaDirPath = process.env.OTA_DIR;
+    otaMod = await import('../src/modules/ota/ota.routes');
+    otaRoutes = otaMod.default;
+    otaMqttPublishOrig = otaMod.mqttClient.publish.bind(otaMod.mqttClient);
+    /* ล้าง event ของไฟล์ทดสอบจากรอบก่อน (ota_events ไม่มี FK — รันซ้ำท้องถิ่นต้อง idempotent) */
+    await ctx.prisma.otaEvent.deleteMany({ where: { firmware: 'fw-dbtest.bin' } });
   });
 
   test('documents: POST /scan-to-inventory (multipart) → AI อ่านฉลาก → row จริงใน inventory_items + expiry จาก shelf_life_days', async () => {
-    const token = makeToken('SUPERADMIN', { userId });
-    const ts = await createTestServer((app: import('express').Express) => app.use('/api/documents', documentsRoutes));
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/documents', documentsRoutes));
     try {
       /* AI vision เป็นของ mock — ชั้น multer → Prisma → Postgres เป็นของจริงทั้งสาย */
       visionDeps.post = async () => ({
@@ -95,9 +61,9 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
       assert.ok(id, 'ต้องได้ id ของ inventory item กลับมา');
 
       /* row อยู่ใน Postgres จริง — เจ้าของเป็น user จริงตาม FK */
-      const row = await prisma.inventoryItem.findUnique({ where: { id } });
+      const row = await ctx.prisma.inventoryItem.findUnique({ where: { id } });
       assert.ok(row, 'row ต้องอยู่ใน DB จริง');
-      assert.equal(row.user_id, userId);
+      assert.equal(row.user_id, ctx.userId);
       assert.equal(row.name, 'น้ำดื่ม db จริง');
       assert.equal(row.category, 'WATER');
       assert.equal(row.quantity, 6);
@@ -118,8 +84,8 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
   });
 
   test('treasury: สร้างคำสั่งโอน → อัปโหลดสลิป → evidence_url เป็น data URL ใน DB ที่ decode กลับได้ไบต์ตรง', async () => {
-    const token = makeToken('SUPERADMIN', { userId });
-    const ts = await createTestServer((app: import('express').Express) => app.use('/api/treasury', treasuryRoutes));
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/treasury', treasuryRoutes));
     try {
       /* 1) POST /transfers — คำสั่ง PENDING จริงใน DB (ยังไม่แตะ ledger) */
       const created = await fetch(`${ts.baseUrl}/api/treasury/transfers`, {
@@ -130,7 +96,7 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
       const createdText = await created.text();
       assert.equal(created.status, 201, createdText.slice(0, 300));
       const order = JSON.parse(createdText).order;
-      assert.equal((await prisma.transferOrder.findUnique({ where: { id: order.id } }))?.status, 'PENDING');
+      assert.equal((await ctx.prisma.transferOrder.findUnique({ where: { id: order.id } }))?.status, 'PENDING');
 
       /* 2) POST /transfers/:id/evidence — multipart สลิปภาพจริง */
       const { headers, body } = multipart({}, 'file', 'slip-db.png', 'image/png', PNG_1X1);
@@ -144,7 +110,7 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
 
       /* 3) evidence_url อยู่ใน Postgres จริงเป็น data URL — decode กลับได้ไบต์เดิมทุกไบต์
             (จุดที่ mock พิสูจน์ไม่ได้: ไฟล์ multipart ถึง DB ครบโดยไม่เสียหาย) */
-      const row = await prisma.transferOrder.findUnique({ where: { id: order.id } });
+      const row = await ctx.prisma.transferOrder.findUnique({ where: { id: order.id } });
       assert.match(row.evidence_url, /^data:image\/png;base64,/);
       const b64 = row.evidence_url.slice(row.evidence_url.indexOf(',') + 1);
       assert.ok(Buffer.from(b64, 'base64').equals(PNG_1X1), 'ไบต์สลิปใน DB ต้องตรงกับไฟล์ที่อัปโหลด');
@@ -155,8 +121,8 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
   });
 
   test('treasury: สลิปเกิน 2MB ถูกปฏิเสธโดยไม่เขียน DB + คำสั่ง VERIFIED อัปโหลดซ้ำไม่ได้', async () => {
-    const token = makeToken('SUPERADMIN', { userId });
-    const ts = await createTestServer((app: import('express').Express) => app.use('/api/treasury', treasuryRoutes));
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/treasury', treasuryRoutes));
     try {
       const created = await fetch(`${ts.baseUrl}/api/treasury/transfers`, {
         method: 'POST',
@@ -175,7 +141,7 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
       });
       assert.equal(up.status, 400);
       assert.match(await up.text(), /2MB/);
-      assert.equal((await prisma.transferOrder.findUnique({ where: { id: order.id } })).evidence_url, null, 'ไฟล์ที่ถูกปฏิเสธต้องไม่เขียน DB');
+      assert.equal((await ctx.prisma.transferOrder.findUnique({ where: { id: order.id } })).evidence_url, null, 'ไฟล์ที่ถูกปฏิเสธต้องไม่เขียน DB');
 
       /* 2) ยืนยันโอน → VERIFIED จริงใน DB (เงินสด 0 → หักได้ 0 — ledger ไม่พัง) */
       const confirm = await fetch(`${ts.baseUrl}/api/treasury/transfers/${order.id}/confirm`, {
@@ -184,7 +150,7 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
         body: JSON.stringify({ txid: 'TXID-dbtest-1234' }),
       });
       assert.equal(confirm.status, 200, (await confirm.text()).slice(0, 300));
-      assert.equal((await prisma.transferOrder.findUnique({ where: { id: order.id } })).status, 'VERIFIED');
+      assert.equal((await ctx.prisma.transferOrder.findUnique({ where: { id: order.id } })).status, 'VERIFIED');
 
       /* 3) อัปโหลดสลิปซ้ำบนคำสั่งที่ VERIFIED → 400 จากเงื่อนไขที่อ่านจาก DB จริง */
       const ok = multipart({}, 'file', 'late-slip.png', 'image/png', PNG_1X1);
@@ -200,8 +166,97 @@ describe('multer uploads (documents + treasury) — real Postgres lifecycle', { 
     }
   });
 
-  test('teardown: ลบ user ทดสอบ (cascade ลบ inventory/transfer ที่เหลือ) + ปิด connection', async () => {
-    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-    await prisma.$disconnect();
+  test('ota: อัปโหลด firmware (raw body) → ไฟล์จริงบนดิสก์ → deploy → row จริงใน ota_events → DELETE ลบทั้ง DB และดิสก์', async () => {
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/ota', otaRoutes));
+    const fw = Buffer.from('SOVEREIGN-FW-DBTEST v1.2.3 ' + Date.now());
+    try {
+      /* mock เฉพาะ broker — publish ต้องโดนเรียกจริง (พิสูจน์ว่า deploy ออก MQTT ชั้นเดิม) */
+      let published = 0;
+      otaMod.mqttClient.publish = ((...args: any[]) => {
+        published++;
+        const cb = args.find((a) => typeof a === 'function');
+        if (cb) cb();
+      }) as any;
+
+      /* 1) POST /firmwares — raw body จริง (ไม่ใช่ multipart — OTA ใช้ express.raw) */
+      const up = await fetch(`${ts.baseUrl}/api/ota/firmwares?name=fw-dbtest.bin`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' },
+        body: fw,
+      });
+      assert.equal(up.status, 200, (await up.text()).slice(0, 300));
+      const fwPath = path.join(otaDirPath, 'fw-dbtest.bin');
+      assert.ok(fs.existsSync(fwPath), 'firmware ต้องลงดิสก์จริงใน OTA_DIR ที่ประกาศ');
+      assert.ok(fs.readFileSync(fwPath).equals(fw), 'ไบต์ firmware บนดิสก์ต้องตรงกับที่อัปโหลด');
+
+      /* 2) POST /deploy — สั่งผ่าน MQTT + เขียน ota_events ลง DB จริง */
+      const deploy = await fetch(`${ts.baseUrl}/api/ota/deploy`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ nodeId: '11111111-1111-1111-1111-111111111111', file: 'fw-dbtest.bin' }),
+      });
+      const deployText = await deploy.text();
+      assert.equal(deploy.status, 200, deployText.slice(0, 300));
+      assert.ok(published >= 1, 'deploy ต้อง publish คำสั่งออก MQTT อย่างน้อย 1 ครั้ง');
+      const evs = await ctx.prisma.otaEvent.findMany({ where: { firmware: 'fw-dbtest.bin' } });
+      assert.equal(evs.length, 1, 'deploy ต้องเขียน ota_events จริง 1 row');
+      assert.equal(evs[0].status, 'sent');
+      /* version ของ OTA = ชื่อไฟล์ตัด .bin (สัญญาของ deploy handler) */
+      assert.equal(evs[0].version, 'fw-dbtest');
+
+      /* 3) GET /events — อ่านจาก DB จริงผ่าน API */
+      const list = await fetch(`${ts.baseUrl}/api/ota/events`, { headers: { Authorization: `Bearer ${token}` } });
+      const listed = JSON.parse(await list.text());
+      assert.ok(listed.some((e: any) => e.firmware === 'fw-dbtest.bin'), 'GET /events ต้องเห็น event จาก DB จริง');
+
+      /* 4) DELETE → ไฟล์หายจากดิสก์ (วงจรดิสก์ปิดจริง — ota_events ตั้งใจเก็บเป็น history) */
+      const del = await fetch(`${ts.baseUrl}/api/ota/firmwares/fw-dbtest.bin`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(del.status, 200);
+      assert.ok(!fs.existsSync(fwPath), 'firmware ต้องหายจากดิสก์หลัง DELETE');
+      assert.equal(await ctx.prisma.otaEvent.count({ where: { firmware: 'fw-dbtest.bin' } }), 1, 'event เป็น history — ต้องยังอยู่');
+    } finally {
+      otaMod.mqttClient.publish = otaMqttPublishOrig as any;
+      await ts.close();
+    }
+  });
+
+  test('whisper: multipart เสียง → ไฟล์จริงบนดิสก์ชั่วคราว → CLI (mock) อ่าน → ตอบข้อความ + ไฟล์ถูกเก็บกวาด', async () => {
+    const token = ctx.makeToken('SUPERADMIN', { userId: ctx.userId });
+    const { default: whisperRoutes, whisperDeps } = await import('../src/modules/whisper/whisper.routes');
+    const ts = await ctx.createTestServer((app: import('express').Express) => app.use('/api/whisper', whisperRoutes));
+    try {
+      /* เห็นพาธไฟล์ที่ CLI จะได้รับ แล้วพิสูจน์ว่ามีอยู่จริงบนดิสก์ตอนถูกเรียก (จุดที่ mock ล้วนพิสูจน์ไม่ได้) */
+      let audioPathSeen = '';
+      whisperDeps.run = async (_cmd: string, args: string[]) => {
+        audioPathSeen = args[args.indexOf('-f') + 1];
+        assert.ok(fs.existsSync(audioPathSeen), `ไฟล์เสียงต้องอยู่บนดิสก์จริงตอน CLI อ่าน (ได้: ${audioPathSeen})`);
+        assert.ok(fs.statSync(audioPathSeen).size > 0, 'ไฟล์เสียงต้องไม่ว่าง');
+        return { stdout: '[00:00.000 --> 00:01.000] hello\nสวัสดีจาก whisper dbtest', stderr: '' };
+      };
+
+      const { headers, body } = multipart({}, 'audio', 'note-dbtest.wav', 'audio/wav', WAV_STUB);
+      const res = await fetch(`${ts.baseUrl}/api/whisper/transcribe`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...headers },
+        body,
+      });
+      const text = await res.text();
+      assert.equal(res.status, 200, text.slice(0, 300));
+      assert.equal(JSON.parse(text).text, 'สวัสดีจาก whisper dbtest');
+      assert.match(audioPathSeen, /\.(wav)$/, 'CLI ต้องได้พาธไฟล์ .wav');
+      assert.ok(!fs.existsSync(audioPathSeen), 'ไฟล์ชั่วคราวต้องถูกเก็บกวาดหลัง transcribe สำเร็จ');
+    } finally {
+      whisperDeps.run = undefined;
+      await ts.close();
+    }
+  });
+
+  test('teardown: ลบ user ทดสอบ (cascade) + ปิด MQTT + ปิด connection', async () => {
+    otaMod.mqttClient.end(true);
+    await teardownCore(ctx);
   });
 });
