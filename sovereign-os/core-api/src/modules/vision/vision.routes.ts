@@ -1,9 +1,7 @@
 import { Router } from 'express';
-import { unlinkSync, readFileSync, existsSync } from 'fs';
-import multer from 'multer';
-import os from 'os';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
+import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import {
   prisma,
   runVisionAnalysis,
@@ -13,24 +11,20 @@ import {
 
 const router = Router();
 
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff']);
-
-const upload = multer({
-  dest: os.tmpdir(),
-  limits: { fileSize: VISION_MAX_IMAGE_MB * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME.has(file.mimetype)) cb(null, true);
-    else cb(new Error('Only image files are allowed (jpg/png/webp/gif/bmp/tiff)'));
-  },
+// harden: memory mode (ไม่ลงดิสก์ — อ่านเป็น base64 ส่ง VL model แล้วทิ้ง) + whitelist MIME/นามสกุล + จำกัดตาม VISION_MAX_IMAGE_MB — เหมือนเดิมทุกข้อ
+const upload = hardenUpload({
+  mode: 'memory',
+  allowedExtensions: IMAGE_EXTS,
+  maxSizeMB: VISION_MAX_IMAGE_MB,
+  mimeAllow: IMAGE_MIME,
 });
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-function toDataUri(path: string, mimetype: string): string {
-  const buf = readFileSync(path);
-  return `data:${mimetype};base64,${buf.toString('base64')}`;
+function toDataUri(buffer: Buffer, mimetype: string): string {
+  return `data:${mimetype};base64,${buffer.toString('base64')}`;
 }
 
 // POST /api/vision/analyze — อัปโหลดภาพ → VL model → บันทึก DetectionEvent (ถ้าให้ camera_id)
@@ -41,15 +35,12 @@ router.post('/analyze', authenticate, (req, res) => {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
       const cameraId = typeof req.body?.camera_id === 'string' && req.body.camera_id.trim() ? req.body.camera_id.trim() : null;
       if (cameraId && !isUuid(cameraId)) {
-        unlinkSync(req.file.path);
         return res.status(400).json({ error: 'Invalid camera_id format' });
       }
-      const base64 = toDataUri(req.file.path, req.file.mimetype);
+      const base64 = toDataUri(req.file.buffer, req.file.mimetype);
       const result = await runVisionAnalysis(base64, { cameraId });
-      unlinkSync(req.file.path);
       res.json(result);
     } catch (e: any) {
-      if (req.file && existsSync(req.file.path)) unlinkSync(req.file.path);
       res.status(500).json({ error: 'Vision analysis failed', detail: e?.message || 'unknown' });
     }
   });
@@ -70,7 +61,7 @@ router.post('/analyze-url', authenticate, async (req, res) => {
       headers: { 'User-Agent': 'sovereign-os/1.0' },
     });
     const contentType = String(resp.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
-    if (!ALLOWED_MIME.has(contentType)) {
+    if (!IMAGE_MIME.has(contentType)) {
       return res.status(400).json({ error: 'URL does not point to an image (unsupported content-type)' });
     }
     const base64 = `data:${contentType};base64,${Buffer.from(resp.data as Buffer).toString('base64')}`;
