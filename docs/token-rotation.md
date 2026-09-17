@@ -12,6 +12,7 @@
 | Permissions | **Contents: Read and write** (เท่านี้ — ไม่ต้องมี workflow, metadata อื่น ๆ) |
 | Expiration | **90 days** |
 | อยู่ที่ไหน | Secret `PAGES_TOKEN` ของ repo `sovereign-origin` (Settings → Secrets and variables → Actions) |
+| การเดินทาง | ผ่าน env เท่านั้น → script ใช้ `http.extraheader` (Basic auth) — **ไม่ฝังใน URL** จึงไม่มีทางโผล่ใน log/error ของ git หรือ `remote.origin.url` (ตั้งแต่ 2026-09-17) |
 
 ## ๒. ขั้นตอนหมุนเวียน (ทำทุก 90 วัน หรือเมื่อ workflow เตือน)
 

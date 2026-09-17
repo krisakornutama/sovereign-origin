@@ -19,6 +19,23 @@ const MSG = ((args.find((a) => a.startsWith('--message=')) || '').slice('--messa
 const SKIP_INDEXNOW = args.includes('--no-indexnow'); // IndexNow = ping บอทค้นหาท้ายงาน (fail-safe — ล้มได้ ไม่กระทบ publish)
 const NOTIFIER = process.env.SOVEREIGN_NOTIFIER || path.join(ROOT, 'tools', 'indexnow-notify.mjs'); // override ได้เฉพาะเทสต์สัญญา
 const CI_REPO_URL = process.env.PUBLISH_REPO_URL || ''; // โหมด CI: clone publish repo ชั่วคราวแทนการหาบนดิสก์
+const CI_TOKEN = process.env.PAGES_TOKEN || ''; // token อยู่แค่ใน env — ห้ามปรากฏใน URL/log/config ทุกเส้นทาง
+/* สิทธิ์แบบ actions/checkout: Basic auth ผ่าน http.extraheader เฉพาะคำสั่งที่ยิงไป github.com
+   → token ไม่เคยฝังใน URL (ไม่โผล่ใน log/error ของ git) และไม่ถูกเขียนลง .git/config (–c เท่านั้น)
+   ยังรองรับ URL แบบเก่าที่ฝัง token ไว้ด้วย (ยังใช้ได้) — แต่ log จะถูก redact เสมอ */
+const ghAuthArgs = CI_TOKEN
+  ? ['-c', `http.https://github.com/.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${CI_TOKEN}`).toString('base64')}`]
+  : [];
+const redact = (u) => String(u).replace(/\/\/[^/@\s]*@/, '//***@/'); // กันพลาด: URL ไหนมี credential ติดมา ห้ามโชว์ใน log
+/* คำสั่ง git ที่ต้องพกสิทธิ์ (clone/push) ต้องผ่าน authed เท่านั้น — git ล้มแล้ว Node จะพิมพ์ command ทั้งแถวใน error
+   ห้ามปล่อยหลุด: ทุก error ต้องผ่าน sanitizeErr (ตัด Basic auth + redact URL ก่อนพิมพ์ทุกครั้ง) */
+const sanitizeErr = (e) => String((e && e.message) || e)
+  .replace(/Authorization: Basic [A-Za-z0-9+/=]+/g, 'Authorization: Basic ***')
+  .replace(/\/\/[^/@\s]*@/g, '//***@/');
+const authed = (dir, ...a) => {
+  try { return execFileSync('git', ['-C', dir, ...ghAuthArgs, ...a], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim(); }
+  catch (e) { throw new Error(sanitizeErr(e)); }
+};
 
 const LOG_FILE = path.join(ROOT, 'publish-indexnow.log'); // ประวัติการยิงลงไฟล์ท้ายโปรเจกต์ (*.log ถูก gitignore อยู่แล้ว)
 const note = (kind, fields) => {
@@ -65,9 +82,10 @@ let pub = findPublishRepo();
 if (!pub && CI_REPO_URL) {
   const tmp = path.join(ROOT, '.publish-tmp');
   fs.rmSync(tmp, { recursive: true, force: true });
-  execFileSync('git', ['clone', '--depth', '1', CI_REPO_URL, tmp], { stdio: ['ignore', 'pipe', 'pipe'] });
+  try { authed(ROOT, 'clone', '--depth', '1', CI_REPO_URL, tmp); }
+  catch (e) { console.error(`✗ clone publish repo ไม่สำเร็จ: ${e.message.split('\n')[0]}`); process.exit(1); }
   pub = { dir: tmp, sameDir: false };
-  log(`CI mode: clone ${CI_REPO_URL} → .publish-tmp`);
+  log(`CI mode: clone ${redact(CI_REPO_URL)} → .publish-tmp`);
 }
 if (!pub) { console.error('✗ หา publish repo ไม่เจอ (ไม่มี portfolio/.git ทั้งใน worktree นี้และ main worktree) — หรือตั้ง env PUBLISH_REPO_URL สำหรับโหมด CI'); process.exit(1); }
 const DEST = pub.dir;
@@ -150,12 +168,13 @@ if (!CHECK) {
     '-m', `portfolio: ${MSG} (mirror of ${monorepoSha})`], { stdio: ['ignore', 'pipe', 'pipe'] });
   const pubSha = sha(DEST);
   log(`commit: ${pubSha} (${name})`);
-  git(DEST, 'push', 'origin', 'main');
+  try { authed(DEST, 'push', 'origin', 'main'); }
+  catch (e) { console.error(`✗ push ไป publish repo ไม่สำเร็จ: ${e.message.split('\n')[0]}`); process.exit(1); }
   log(`push: origin/main → ${pubSha}`);
   /* ลิงก์ CI เป็นของแถม — remote ที่ไม่ใช่ GitHub (เช่น host อื่น) ต้องไม่ทำ publish ล้ม */
   const remoteUrl = git(DEST, 'config', 'remote.origin.url');
   const gh = remoteUrl.match(/[:/]([^/]+\/[^/.]+?)(?:\.git)?$/);
-  log(gh && /github\.com/.test(remoteUrl) ? `CI: https://github.com/${gh[1]}/actions` : `remote: ${remoteUrl} (ไม่ใช่ GitHub — ไม่มีหน้าต่าง CI)`);
+  log(gh && /github\.com/.test(remoteUrl) ? `CI: https://github.com/${gh[1]}/actions` : `remote: ${redact(remoteUrl)} (ไม่ใช่ GitHub — ไม่มีหน้าต่าง CI)`);
   note('publish', { mirror: pubSha, mono: monorepoSha, files: changed.length, msg: MSG.slice(0, 90) });
   log(`log: ${path.relative(ROOT, LOG_FILE)}`);
 
