@@ -55,8 +55,10 @@ describe('knowledge upload — real Postgres lifecycle', { skip: RUN_DB ? false 
         headers: { Authorization: `Bearer ${token}`, 'content-type': `multipart/form-data; boundary=${boundary}` },
         body: body,
       });
-      assert.equal(up.status, 201, String(await up.text()).slice(0, 200));
-      const item = (await up.json() as any).item;
+      /* อ่าน body ครั้งเดียว — (บั๊กแรก: ใส่ await up.text() ใน assert message แล้ว json() พัง body already read) */
+      const upText = await up.text();
+      assert.equal(up.status, 201, upText.slice(0, 200));
+      const item = JSON.parse(upText).item;
 
       /* 2) row อยู่ใน Postgres จริง (query ตรง ๆ — ไม่ผ่านตัวที่ handler ใช้) */
       const row = await prisma.knowledgeItem.findUnique({ where: { id: item.id } });

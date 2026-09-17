@@ -14,18 +14,44 @@ permissions:
   contents: read
 
 jobs:
+  # เมทริกซ์แพลตฟอร์ม — mock suite ครบทุก OS (service containers ใช้ได้บน Linux เท่านั้น จึงแยก test-db ออก)
   test:
     strategy:
       fail-fast: false
       matrix:
-        # เมทริกซ์แพลตฟอร์ม: พฤติกรรม path ของ harden-upload ต้องเหมือนกันทั้ง POSIX/Windows
+        # พฤติกรรม path ของ harden-upload ต้องเหมือนกันทั้ง POSIX/Windows
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: sovereign-os/core-api
-    # real-Postgres บน ubuntu — knowledge-db.test.ts พิสูจน์ lifecycle จริงทั้งวงจร
-    # (windows ไม่รัน DB test — mock suite ยังครอบพฤติกรรมดิสก์/route ครบทุก OS)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # type-stripping — ทดสอบ import .ts ตรง ๆ แบบเดียวกับเครื่อง dev
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tests (mock suite)
+        run: npm test
+        env:
+          JWT_SECRET: ci-secret-0123456789abcdef
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          # service บางตัวใช้เวลาท้องถิ่น (getHours) — จัดเขตเวลาให้ CI ตรงเซิร์ฟเวอร์โปรดักชัน (กรุงเทพ)
+          TZ: Asia/Bangkok
+
+  # real-Postgres — lifecycle จริงของ knowledge upload (upload→DB row→serve→DELETE ลบทั้ง DB และดิสก์)
+  test-db:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sovereign-os/core-api
     services:
       postgres:
         image: postgres:15
@@ -45,7 +71,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24 # type-stripping — ทดสอบ import .ts ตรง ๆ แบบเดียวกับเครื่อง dev
+          node-version: 24
 
       - name: Install dependencies
         run: npm install --no-fund --no-audit
@@ -53,20 +79,15 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Push schema to CI Postgres (ubuntu เท่านั้น)
-        if: runner.os == 'Linux'
+      - name: Push schema to CI Postgres
         run: npx prisma db push --skip-generate --accept-data-loss
         env:
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run real-DB lifecycle tests
+        run: npx tsx --test --test-concurrency=1 tests/knowledge-db.test.ts
         env:
           JWT_SECRET: ci-secret-0123456789abcdef
-          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
-          # เทส real-DB (knowledge-db.test.ts) — บังคับรันบน ubuntu เท่านั้น
-          RUN_DB_TESTS: ${{ runner.os == 'Linux' && '1' || '0' }}
+          RUN_DB_TESTS: '1'
           TEST_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
           TEST_TMPDIR: ${{ github.workspace }}/.dbtest-tmp
-          # service บางตัวใช้เวลาท้องถิ่น (getHours) — จัดเขตเวลาให้ CI ตรงเซิร์ฟเวอร์โปรดักชัน (กรุงเทพ)
-          TZ: Asia/Bangkok
