@@ -246,9 +246,11 @@ export class MeshLiteService {
       { level: 9 }
     );
     const now = new Date();
+    // เติม suffix สุ่มกันชนชื่อ: เครื่องเร็ว (Linux CI) สร้างหลาย bundle ใน ms เดียวได้
+    // — ชื่อซ้ำจะ overwrite กันเองจน retention นับไม่ครบ (จับได้จากเทสบน ubuntu)
     const file = `sovereign_mesh_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(
       now.getHours()
-    )}${pad(now.getMinutes())}${pad(now.getSeconds())}_${pad(now.getMilliseconds())}.enc.json`;
+    )}${pad(now.getMinutes())}${pad(now.getSeconds())}_${pad(now.getMilliseconds())}_${crypto.randomUUID().slice(0, 8)}.enc.json`;
     const info: MeshBundleInfo = {
       file,
       createdAt: now.toISOString(),
