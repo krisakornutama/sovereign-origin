@@ -24,7 +24,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      PUBLISH_REPO_URL: https://x-access-token:${{ secrets.PAGES_TOKEN }}@github.com/krisakornutama/project-sovereign.git
+      # token เดินทางผ่าน env → script ใช้ http.extraheader (Basic auth แบบ actions/checkout)
+      # ไม่ฝังใน URL จึงไม่มีทางโผล่ใน log/error ของ git หรือ remote.origin.url (redact กันพลาดอีกชั้นใน script)
+      PUBLISH_REPO_URL: https://github.com/krisakornutama/project-sovereign.git
+      PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
