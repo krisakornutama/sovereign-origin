@@ -24,6 +24,11 @@ export const mqttClient = mqtt.connect({
   protocol: 'mqtt',
 });
 mqttClient.on('connect', () => console.log('🚀 OTA MQTT connected'));
+// ต้องมี listener 'error' เสมอ: mqtt client เชื่อมต่อตอน module load (localhost:1883) —
+// ถ้า broker ไม่พร้อมแล้ว error event ไม่มีใครรับ = uncaught exception ล้มทั้ง process
+// (เคยทำให้ test runner ล้มทั้งไฟล์ด้วย "Unable to deserialize cloned data" แบบสุ่ม)
+// client ยัง reconnect เองตามปกติ — เราแค่ไม่ให้ error พุ่งทะลุ
+mqttClient.on('error', (err) => console.error('OTA MQTT error:', err instanceof Error ? err.message : err));
 
 function isSafeFileName(name: string): boolean {
   return !!name && path.basename(name) === name && name.endsWith('.bin') && !name.includes('..') && !name.includes('/') && !name.includes('\\');

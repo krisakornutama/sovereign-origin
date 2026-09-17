@@ -5,14 +5,23 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import axios from 'axios';
+import { prisma } from '../src/lib/prisma';
 import telegramRoutes from '../src/modules/telegram/telegram.routes';
 import { drawTrendPng } from '../src/services/chart-snapshot.service';
-import { createTestServer, makeToken, TestServer } from './helpers';
+import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
 
 let server: TestServer;
 let adminToken: string;
 
 before(async () => {
+  // กัน flake ที่ต้นเหตุ: request แรกเรียก getTelegramCredentials() → prisma.systemSetting.findMany()
+  // ซึ่งไปต่อ 127.0.0.1:5432 (DATABASE_URL ปลอมของชุด mock) แล้ว Prisma engine พ่น rejection
+  // หลุดข้าม promise chain จน runner ตัดสินไฟล์ล้มทั้งไฟล์ — ผูก delegate ปลอมตามแพทเทิร์น mockModel
+  // ให้ resolve ทันที (ว่าง = service ใช้ env fallback ตามดีไซน์) โดยไม่แตะพฤติกรรม production
+  mockModel(prisma as any, 'systemSetting', {
+    findMany: async () => [] as any[],
+    findFirst: async () => null,
+  });
   server = await createTestServer((app) => app.use('/api/telegram', telegramRoutes));
   adminToken = makeToken('SUPERADMIN');
 });

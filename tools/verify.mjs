@@ -1,7 +1,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 // verify.mjs — Quality Gate เดียวของโปรเจ็ก Sovereign Origin
-// รัน: npm run verify          (build + typecheck + ทดสอบทั้ง backend/frontend)
-//      npm run verify:full     (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
+// รัน: npm run verify            (build + typecheck + ทดสอบทั้ง backend/frontend)
+//      npm run verify -- --db    (เพิ่มชุด real-Postgres = npm run test:db — ต้องมี Docker + container sovereign-db)
+//      npm run verify:full       (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
 //
 // กติกา: ผ่านทุกขั้นถึงจะ commit/merge ได้ (ตาม AGENTS.md ข้อ 2)
 // ────────────────────────────────────────────────────────────────────────────
@@ -14,6 +15,9 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(ROOT, '..', 'sovereign-frontend');
 const BACKEND = join(ROOT, '..', 'sovereign-os', 'core-api');
 const RUN_E2E = process.argv.includes('--e2e');
+// --db = รวมชุด real-Postgres (test:db → tools/test-db-local.mjs) เข้ามาใน gate เดียวกัน
+// เงื่อนไขเครื่อง: Docker + container `sovereign-db` + sovereign-os/infra/.env (ตัวรันจัดฐาน/forwarder ให้เอง)
+const RUN_DB = process.argv.includes('--db');
 
 const steps = [
   { name: 'backend: build (tsc)',        cwd: BACKEND,  cmd: 'npm', args: ['run', 'build'] },
@@ -21,6 +25,13 @@ const steps = [
   { name: 'frontend: typecheck (tsc)',   cwd: FRONTEND, cmd: 'npm', args: ['run', 'typecheck'] },
   { name: 'frontend: build (next)',      cwd: FRONTEND, cmd: 'npm', args: ['run', 'build'] },
 ];
+if (RUN_DB) {
+  // real-DB suite: สร้างฐาน sovereign_test + TCP forwarder (แก้ปัญหา WSL relay กิน startup packet) ให้เอง
+  // (ROOT ของ verify = tools/ — สคริปต์ test:db ต้องรันจากราก repo)
+  steps.push({ name: 'backend: real-DB suite (test:db)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'test:db'] });
+  // กระจกส่อง coverage (ไม่บังคับ threshold — แค่พิมพ์ตัวเลข + หลุมใหญ่ท้ายรอบ gate)
+  steps.push({ name: 'backend: coverage report (no threshold)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'coverage:core'] });
+}
 if (RUN_E2E) {
   steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'] });
 }

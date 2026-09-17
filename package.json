@@ -10,6 +10,7 @@
     "e2e": "cd sovereign-frontend && npm run e2e",
     "test:tools": "node --test \"tools/test/**/*.test.mjs\"",
     "test:db": "node tools/test-db-local.mjs",
+    "coverage:core": "node tools/coverage-core.mjs",
     "health": "node tools/system-health.mjs"
   }
 }
