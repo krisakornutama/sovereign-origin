@@ -1,0 +1,52 @@
+version: 2
+# อัตโนมัติรายสัปดาห์: patch/minor รวมเป็น PR เดียวต่อ ecosystem (กัน PR ท่วม)
+# major ถูก ignore ไว้ — เปิดเองเมื่อพร้อมอัปเกรด (ยกเว้น security update ซึ่งไม่โดน ignore และจะมาเสมอ)
+# บริบท: อัปเกรดรอบ 2026-09-17 แก้ 10 alerts (multer/qs/uuid/next/sharp) — ห้ามถอย lockfile กลับ
+updates:
+  - package-ecosystem: "npm"
+    directory: "/sovereign-os/core-api"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/sovereign-frontend"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      actions-patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
