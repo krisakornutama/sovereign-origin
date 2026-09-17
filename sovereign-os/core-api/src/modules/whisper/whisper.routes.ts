@@ -16,10 +16,26 @@ const upload = hardenUpload({
 const WHISPER_CLI = "E:\\My work\\Project Sovereign Origin\\tools\\whisper.cpp\\build\\bin\\Release\\Release\\whisper-cli.exe";
 const WHISPER_MODEL = "E:\\My work\\Project Sovereign Origin\\tools\\whisper.cpp\\models\\ggml-small.bin";
 
-/* จุดฉีดเทส (แบบเดียวกับ visionDeps ของ documents) — เทส inject ผ่านตัวนี้เพื่อพิสูจน์วงจร
-   multipart → ดิสก์จริง → CLI อ่าน → เก็บกวาด โดยไม่ต้องมี whisper-cli บนรันเนอร์
-   ผู้เรียกจริงใช้ค่าดีฟอลต์ = spawn whisper-cli เหมือนเดิมทุกอย่าง */
-export const whisperDeps: { run?: (cmd: string, args: string[]) => Promise<{ stdout: string; stderr: string }> } = {};
+/* จุดฉีดผ่าน env: WHISPER_RUN_OVERRIDE = path ของไฟล์ JS (CommonJS) ที่ export ฟังก์ชัน
+   (cmd: string, args: string[]) => Promise<{ stdout, stderr }>
+   ใช้โดยเทส/ผู้ดูแลเพื่อพิสูจน์วงจร multipart → ดิสก์จริง → CLI อ่าน → เก็บกวาด
+   โดยไม่ต้องมี whisper-cli บนรันเนอร์ — การตั้ง env เท่ากับควบคุม process อยู่แล้ว
+   (ระดับความเชื่อใจเดียวกับพาธ CLI/โมเดลที่ฮาร์ดโค้ดในไฟล์นี้) ไม่ใช่ช่องทางของ client
+   ไม่ตั้ง = spawn whisper-cli จริงเหมือนเดิมทุกอย่าง */
+function loadRunOverride(): ((cmd: string, args: string[]) => Promise<{ stdout: string; stderr: string }>) | null {
+  const p = process.env.WHISPER_RUN_OVERRIDE;
+  if (!p) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require(p);
+    const fn = mod?.default ?? mod;
+    if (typeof fn !== 'function') throw new Error('ต้อง export ฟังก์ชัน (cmd, args) => Promise<{ stdout, stderr }>');
+    return fn;
+  } catch (err: any) {
+    console.error(`WHISPER_RUN_OVERRIDE ใช้ไม่ได้ (${p}): ${err?.message || err}`);
+    return null;
+  }
+}
 
 function runWhisperCli(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -44,8 +60,8 @@ router.post('/transcribe', authenticate, handledUpload(upload, 'audio'), async (
     // language ผ่านแค่ตัวอักษร a-z / - (เช่น "th", "en", "ja") — กัน shell injection เดิม
     const language = String(req.body.language || 'th').replace(/[^a-zA-Z-]/g, '').slice(0, 16) || 'th';
 
-    // ใช้ argv array (ไม่มี shell — ค่าจาก user ไม่สามารถแทรกคำสั่งได้) — เทส inject ได้ผ่าน whisperDeps
-    const run = whisperDeps.run ?? runWhisperCli;
+    // ใช้ argv array (ไม่มี shell — ค่าจาก user ไม่สามารถแทรกคำสั่งได้) — เทส override ได้ผ่าน WHISPER_RUN_OVERRIDE
+    const run = loadRunOverride() ?? runWhisperCli;
     const { stdout, stderr } = await run(WHISPER_CLI, ['-m', WHISPER_MODEL, '-f', audioPath, '-l', language]);
 
     // Clean up temp file

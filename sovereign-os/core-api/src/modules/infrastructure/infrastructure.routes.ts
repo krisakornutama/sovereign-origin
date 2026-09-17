@@ -107,7 +107,12 @@ router.post('/detections', authenticate, async (req, res) => {
         camera_id,
         object_type,
         confidence: confidence != null ? Math.min(1, Math.max(0, Number(confidence))) : null,
-        image_path: typeof image_path === 'string' ? image_path.slice(0, 500) : null,
+        /* POSIX เสมอ (backslash → /) — ค่านี้ถูกอ่านกลับมาเปิดไฟล์จริงใน vision-rule.service (path.resolve)
+           เก็บ backslash = พังบน Linux + เสี่ยง regression แบบ knowledge file_path เดิม */
+        image_path:
+          typeof image_path === 'string' && image_path.trim()
+            ? image_path.replace(/\\/g, '/').slice(0, 500)
+            : null,
         triggered_action: typeof triggered_action === 'string' ? triggered_action.slice(0, 100) : null,
         detected_at: detected_at ? new Date(detected_at) : new Date(),
       },
