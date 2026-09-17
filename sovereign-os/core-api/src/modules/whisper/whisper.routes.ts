@@ -2,16 +2,14 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import { unlinkSync, existsSync } from 'fs';
 import { authenticate } from '../../middleware/auth.middleware';
-import multer from 'multer';
-import path from 'path';
-import os from 'os';
+import { hardenUpload } from '../../lib/harden-upload';
 
 const router = Router();
 
-// Multer setup
-const upload = multer({ 
-  dest: os.tmpdir(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+// Multer setup — whitelist นามสกุลเสียง + ชื่อไฟล์บนดิสก์สุ่มเสมอ (ก่อนหน้า: dest ตรง ๆ และรับทุกชนิด)
+const upload = hardenUpload({
+  allowedExtensions: ['.wav', '.mp3', '.m4a', '.ogg', '.webm'],
+  maxSizeMB: 10,
 });
 
 // Whisper paths
