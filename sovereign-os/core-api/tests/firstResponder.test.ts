@@ -4,6 +4,8 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { prisma } from '../src/lib/prisma';
+import { mockModel } from './helpers';
 
 describe('First-Responder Mode (SOS / Emergency Override)', () => {
   let testDir: string;
@@ -11,6 +13,13 @@ describe('First-Responder Mode (SOS / Emergency Override)', () => {
   let firstResponder: any;
 
   before(async () => {
+    // กัน flake ที่ต้นเหตุ (เหมือนกรณี telegram.test): firstResponder.set() ยิง prisma.securityEvent.create
+    // เข้า 127.0.0.1:5432 ปลอมของชุด mock — engine หมดเวลาต่อ ~2.3 วิ แล้วอาการ rejection ข้าม promise chain
+    // ทำให้ runner ตัดสินไฟล์ล้มทั้งไฟล์ (เคยเห็น "Unable to deserialize cloned data") — ผูก delegate ปลอม
+    // ตามแพทเทิร์น mockModel ให้ create ตอบทันที เทสนี้จึงไม่แตะ engine เลย (assertion ทั้งหมดอยู่ที่ state/ไฟล์)
+    mockModel(prisma as any, 'securityEvent', {
+      create: async (args: any) => ({ id: 1, ...args?.data }),
+    });
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sovereign-firstresponder-'));
     stateFile = path.join(testDir, 'first-responder.json');
     process.env.FIRST_RESPONDER_FILE = stateFile;

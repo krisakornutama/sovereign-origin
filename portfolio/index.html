@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Project Sovereign — ระบบหลังบ้านร้านค้า ที่คิดภาษีไทยให้เอง</title>
-<meta name="description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี ถึง ภ.พ.30 พร้อมยื่น — self-hosted ทั้งหมด ฟรี">
+<title>Project Sovereign — ระบบหลังบ้านร้านค้า ขาย รับเงิน บัญชีพร้อมส่งนักบัญชี</title>
+<meta name="description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี และจัดรูปแบบข้อมูลให้พร้อมส่งต่อนักบัญชี/สรรพากร — self-hosted ทั้งหมด ฟรี">
 <meta name="author" content="กฤษกรณ์ อุตมะ (Krisakorn Utama)">
 <script type="application/ld+json">
 {
@@ -325,15 +325,15 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Project Sovereign">
 <meta property="og:locale" content="th_TH">
-<meta property="og:title" content="Project Sovereign — ระบบหลังบ้านร้านค้า ที่คิดภาษีไทยให้เอง">
-<meta property="og:description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี ถึง ภ.พ.30 พร้อมยื่น — self-hosted ทั้งหมด ฟรี">
+<meta property="og:title" content="Project Sovereign — ระบบหลังบ้านร้านค้า ขาย รับเงิน บัญชีพร้อมส่งนักบัญชี">
+<meta property="og:description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี และจัดรูปแบบข้อมูลให้พร้อมส่งต่อนักบัญชี/สรรพากร — self-hosted ทั้งหมด ฟรี">
 <meta property="og:url" content="https://krisakornutama.github.io/project-sovereign/">
 <meta property="og:image" content="https://krisakornutama.github.io/project-sovereign/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Project Sovereign — ระบบหลังบ้านร้านค้า ที่คิดภาษีไทยให้เอง">
-<meta name="twitter:description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี ถึง ภ.พ.30 พร้อมยื่น — self-hosted ทั้งหมด ฟรี">
+<meta name="twitter:title" content="Project Sovereign — ระบบหลังบ้านร้านค้า ขาย รับเงิน บัญชีพร้อมส่งนักบัญชี">
+<meta name="twitter:description" content="ระบบหลังบ้านสำหรับร้านค้า ร้านอาหาร และฟาร์มปศุสัตว์: ขาย รับเงิน PromptPay แยก VAT ออกใบกำกับ ลงบัญชี และจัดรูปแบบข้อมูลให้พร้อมส่งต่อนักบัญชี/สรรพากร — self-hosted ทั้งหมด ฟรี">
 <meta name="twitter:image" content="https://krisakornutama.github.io/project-sovereign/og.png">
 </head>
 <body class="shell">
@@ -347,6 +347,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <a href="livestock.html">ปศุสัตว์</a>
   <a href="fishery.html">ประมง</a>
   <a href="farm.html">เกษตร &amp; สมุนไพร</a>
+  <a href="guardmini.html">SovereignGuardMini</a>
   <a href="iot.html">บ้าน IoT</a>
   <a href="education.html">AI สอนลูก</a>
   <a href="books.html">คลังหนังสือ</a>
@@ -389,9 +390,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 
     <article class="cover">
       <p class="cover-kicker">PROJECT SOVEREIGN · SELF-HOSTED LIFE &amp; BUSINESS OS</p>
-      <h1>ระบบหลังบ้าน ร้านค้า ร้านอาหาร ฟาร์ม<br>ที่<em>คิดภาษีไทยให้เอง</em></h1>
+      <h1>ระบบหลังบ้าน ร้านค้า ร้านอาหาร ฟาร์ม<br>ที่<em>พร้อมส่งต่อนักบัญชี</em></h1>
       <hr class="cover-rule">
-      <p class="cover-blurb">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 พร้อมยื่น และตัวเตือนก่อนกำหนดส่ง — และนั่นยังเป็นแค่ฝั่งธุรกิจ ด้านล่างคือทั้งหมดที่ระบบทำได้</p>
+      <p class="cover-blurb">หน้านี้พาเดินทั้งระบบทีละส่วน ตามเงินบาทเดียวที่ลูกค้าจ่ายเข้ามา — ตั้งแต่กดสั่งซื้อ จ่าย QR ตัดสต็อก ออกใบกำกับ ลงสมุด แยก VAT จนถึงแผ่น ภ.พ.30 ที่ระบบเตรียมตัวเลขให้เสร็จ ส่วนการยื่นให้นักบัญชี/เจ้าของกิจการตัดสินใจ และตัวเตือนก่อนกำหนดช่วยไม่ให้พลาด — และนั่นยังเป็นแค่ฝั่งธุรกิจ ด้านล่างคือทั้งหมดที่ระบบทำได้</p>
       <p class="cover-by">โดย <a href="me.html">กฤษกรณ์ อุตมะ</a> <span class="en">(Krisakorn Utama)</span></p>
       <p class="cover-ed">พิมพ์ครั้งที่ 1 · กันยายน 2569</p>
       <div class="cover-cta">
@@ -410,7 +411,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <p class="grp">ส่วนนำ</p>
       <ul class="rows">
         <li><a class="tr" href="#fit"><span class="n"></span><span class="l">ใครใช้ได้</span><span class="dots"></span><span class="d">ร้านค้า · ร้านอาหาร · ฟาร์ม</span></a></li>
-        <li><a class="tr" href="#all"><span class="n"></span><span class="l">ทั้งระบบ</span><span class="dots"></span><span class="d">45+ หน้าจอ ครบทุกโดเมน</span></a></li>
+        <li><a class="tr" href="#all"><span class="n"></span><span class="l">สายพานธุรกิจ</span><span class="dots"></span><span class="d">ครบทุกด่านที่เก็บเงินได้</span></a></li>
         <li><a class="tr" href="#eng"><span class="n"></span><span class="l">วิศวกรรมเบื้องหลัง</span><span class="dots"></span><span class="d">เกตคุณภาพ · เทสจริง</span></a></li>
       </ul>
 
@@ -419,7 +420,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
         <li><a class="tr" href="#sell"><span class="n">๑</span><span class="l">ขาย</span><span class="dots"></span><span class="d">ลูกค้าสั่ง + จ่ายเอง</span></a></li>
         <li><a class="tr" href="#fulfil"><span class="n">๒</span><span class="l">ส่ง</span><span class="dots"></span><span class="d">ยืนยัน ส่ง ใบกำกับ</span></a></li>
         <li><a class="tr" href="#money"><span class="n">๓</span><span class="l">เงิน</span><span class="dots"></span><span class="d">สมุด + Treasury</span></a></li>
-        <li><a class="tr" href="#tax"><span class="n">๔</span><span class="l">ภาษี</span><span class="dots"></span><span class="d">ภ.พ.30 พร้อมยื่น</span></a></li>
+        <li><a class="tr" href="#tax"><span class="n">๔</span><span class="l">ภาษี</span><span class="dots"></span><span class="d">ข้อมูลพร้อมส่งนักบัญชี</span></a></li>
         <li><a class="tr" href="#remind"><span class="n">๕</span><span class="l">เตือน</span><span class="dots"></span><span class="d">Telegram 7/3/1 วัน</span></a></li>
         <li><a class="tr" href="#ai"><span class="n">๖</span><span class="l">AI</span><span class="dots"></span><span class="d">พร้อมเมื่อคุณพร้อม</span></a></li>
         <li><a class="tr" href="#ops"><span class="n">๗</span><span class="l">เฝ้าระบบ</span><span class="dots"></span><span class="d">backup + ฟื้นเอง</span></a></li>
@@ -428,6 +429,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <p class="grp">ภาคผนวก · หน้าอื่นในเว็บ</p>
       <ul class="rows">
         <li><a class="tr" href="projects.html"><span class="n"></span><span class="l">ผลงานทีละชิ้น</span><span class="dots"></span><span class="d">แนวคิด → เป้าหมาย</span></a></li>
+        <li><a class="tr" href="guardmini.html"><span class="n"></span><span class="l">SovereignGuardMini</span><span class="dots"></span><span class="d">เฝ้าตู้แช่ · หน้าสินค้า B2B</span></a></li>
         <li><a class="tr" href="livestock.html"><span class="n"></span><span class="l">ปศุสัตว์</span><span class="dots"></span><span class="d">จากคอกถึงกำไร</span></a></li>
         <li><a class="tr" href="fishery.html"><span class="n"></span><span class="l">การประมง</span><span class="dots"></span><span class="d">แบบแปลนโมดูล</span></a></li>
         <li><a class="tr" href="farm.html"><span class="n"></span><span class="l">เกษตร &amp; สมุนไพร</span><span class="dots"></span><span class="d">แปลง + ฐานสมุนไพร</span></a></li>
@@ -479,23 +481,25 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
         <div class="node"><div class="t">🛡️ เฝ้าระบบ</div><div class="d">backup · watchdog</div></div>
         <div class="node" style="border-style:dashed"><div class="t">💰 Treasury</div><div class="d">เงินร้านไหลเข้าเจ้าของ</div></div>
       </div>
-      <div class="map-key">เส้นทางเงิน: <b>หน้าร้าน → ออเดอร์ → สมุดบัญชี → ภาษี + Treasury</b> — ทุกด่านทำเองอัตโนมัติหลังรับชำระเงิน</div>
+      <div class="map-key">เส้นทางเงิน: <b>หน้าร้าน → ออเดอร์ → สมุดบัญชี → ภาษี + Treasury</b> — ทุกด่านทำเองอัตโนมัติหลังรับชำระเงิน ส่วนการยื่นงวดเป็นดุลพินิจของเจ้าของกิจการ/นักบัญชี</div>
     </div>
   </section>
 
   <!-- ═══ FULL CATALOG ═══ -->
   <section id="all">
-    <p class="k-ch">// ทั้งระบบ · <b>45+ หน้าจอ</b></p>
-    <h2>ทุกอย่างที่ระบบทำได้</h2>
-    <p class="sub">สรุปจากเมนูจริงของแอปทั้งหมด — ธุรกิจ ฟาร์ม บ้าน สุขภาพ ความปลอดภัย AI และระบบหลังบ้าน อยู่ในเครื่องเดียว</p>
+    <p class="k-ch">// สายพานธุรกิจ · <b>Production-Ready</b></p>
+    <h2>สายพานที่เก็บเงินได้จริง</h2>
+    <p class="sub">สรุปจากเมนูจริงของแอป — แต่ละด่านพิสูจน์ด้วยการรันจริงและชุดทดสอบอัตโนมัติ · ส่วนงานวิจัยและความสนใจส่วนตัวอยู่ใต้รายการนี้แยกชัดเจน</p>
     <div class="catalog-grid">
-      <div class="cat"><div class="h"><span class="ic">🛒</span><h3>ธุรกิจ &amp; ขายของ</h3><span class="count">8 หน้าจอ + /shop</span></div>
+      <div class="cat"><div class="h"><span class="ic">💰</span><h3>Commercial Product — สายพานรายได้</h3><span class="count">ใช้งานจริง · production-ready</span></div>
         <ul>
           <li><b>ขายของ (POS)</b> — ออเดอร์ สต็อก ทีม ใบเสนอราคา</li>
           <li><b>ธุรกิจของฉัน</b> — ลูกค้า B2B ทีม ผู้ติดตั้ง สมุดบัญชี ภาษี ผู้ช่วย AI 5 ตำแหน่ง</li>
           <li><b>หน้าร้านสาธารณะ /shop</b> — ลูกค้าสั่งเอง + PromptPay QR</li>
+          <li><b>ร้านอาหาร</b> — เมนู+สูตรคิดทุนต่อจาน จอครัว KDS</li>
+          <li><b>สต็อก &amp; บัญชี</b> — ตัดสต็อกจริง แยก VAT/WHT ข้อมูลพร้อมส่งนักบัญชี</li>
         </ul></div>
-      <div class="cat"><div class="h"><span class="ic">🍜</span><h3>ร้านอาหาร</h3><span class="count">5 หน้าจอ</span></div>
+      <div class="cat"><div class="h"><span class="ic">🍜</span><h3>ร้านอาหาร</h3><span class="count">เมนู+สูตร · KDS · รายวัน</span></div>
         <ul>
           <li><b>จัดการเมนู &amp; สูตร</b> — รู้ทุนต่อจานจากวัตถุดิบ</li>
           <li><b>จอครัว KDS</b> — คิวออเดอร์หน้าเตาเรียลไทม์</li>
@@ -549,13 +553,15 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
           <li><b>สำรองข้อมูล</b> — backup + ซ้อมกู้จริง</li>
           <li><b>ผู้ใช้ · ตรวจสอบ · ตั้งค่า</b> — สิทธิ์ audit log ทุกการเปลี่ยน</li>
         </ul></div>
-      <div class="cat"><div class="h"><span class="ic">🧪</span><h3>งานวิจัย &amp; จำลอง</h3><span class="count">2 หน้าจอ</span></div>
+      <div class="cat"><div class="h"><span class="ic">🧪</span><h3>Personal Sandbox — งานวิจัย &amp; จำลอง</h3><span class="count">ใช้ในบ้าน · ไม่ใช่สินค้า</span></div>
         <ul>
           <li><b>จำลองการปกครอง</b> — war room จำลองสังคม</li>
           <li><b>ทักษะคน + วันรอด</b> — ประเมินความพร้อมครอบครัว</li>
+          <li><b>ธรรมะบำบัด</b> — สมาธิ สมุนไพร เยียวยา (ส่วนตัว)</li>
+          <li><b>แผนที่ทรัพย์สิน 3D</b> — ที่ดิน บ้าน จุดยุทธศาสตร์ (ส่วนตัว)</li>
         </ul></div>
     </div>
-    <p class="vert-note">ตัวเลข “หน้าจอ” นับจากเมนูใช้งานจริงของแอป · ทุกโดเมนแชร์ผู้ใช้/สิทธิ์/audit log/backup ชุดเดียวกัน — เรียนรู้จุดเดียว ใช้ได้ทั้งระบบ</p>
+    <p class="vert-note">โครงเดียวกันทุกโดเมน: ผู้ใช้/สิทธิ์/audit log/backup ชุดเดียว — เรียนรู้จุดเดียว ใช้ได้ทั้งระบบ · หมวด <b>Commercial</b> ข้างบนคือสายพานที่ขายได้จริง ส่วน <b>Personal Sandbox</b> เป็นงานวิจัยและความสนใจส่วนตัวที่แชร์โครงเดียวกัน แต่ไม่ได้ถูกพัฒนาเพื่อขาย</p>
   </section>
 
   <!-- ═══ CH.1 SELL ═══ -->
@@ -646,8 +652,8 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   <!-- ═══ CH.4 TAX ═══ -->
   <section id="tax">
     <p class="k-ch">// ส่วนที่ ๔ · <b>ภาษี</b></p>
-    <h2>จบงวด ภ.พ.30 ก็พร้อมยื่น</h2>
-    <p class="sub">ภาษีขายจากทุกออเดอร์ ลบภาษีซื้อจากทุกรายจ่าย (ใส่เลขจากใบกำกับซัพพลายเออร์ได้ในฟอร์มเดียว) — สุทธิขึ้นบนแผ่น ภ.พ.30 เลือกงวดย้อนหลังได้ ครบด้วย ภ.ง.ด.3/50/90 และปฏิทินยื่นนับวันถอยหลัง</p>
+    <h2>จบงวด ข้อมูลพร้อมส่งนักบัญชี</h2>
+    <p class="sub">ภาษีขายจากทุกออเดอร์ ลบภาษีซื้อจากทุกรายจ่าย (ใส่เลขจากใบกำกับซัพพลายเออร์ได้ในฟอร์มเดียว) — ระบบ<em>รวบรวมและจัดรูปแบบข้อมูลบัญชีให้สอดคล้องตามเกณฑ์สรรพากรเพื่อส่งต่อนักบัญชี</em> พร้อมแผ่น ภ.พ.30 เลือกงวดย้อนหลังได้ ครบด้วย ภ.ง.ด.3/50/90 และปฏิทินยื่นนับวันถอยหลัง — การยื่นจริงเป็นดุลพินิจของนักบัญชี/เจ้าของกิจการ</p>
     <div class="taxgrid">
       <div>
         <ul class="bullet">
@@ -746,9 +752,9 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <span class="chip">Telegram Bot API</span><span class="chip">PromptPay QR</span><span class="chip">Ollama-ready</span>
     </div>
     <div class="evid">
-      <div><span class="cmd">$ npm run verify</span> <span class="arr">→</span> <span class="val">4/4</span> build · test · tsc สองฝั่ง · next build</div>
+      <div><span class="cmd">$ npm run verify -- --db</span> <span class="arr">→</span> <span class="val">6/6</span> build · mock suite · tsc สองฝั่ง · next build · real-DB suite · coverage</div>
       <div><span class="cmd">$ thai-tax.test.ts</span> <span class="arr">→</span> <span class="val">16/16</span> ฟังก์ชันภาษี pure เทสได้ทุกกฎ</div>
-      <div><span class="cmd">$ full suite</span> <span class="arr">→</span> <span class="val">1,000+ asserts</span> ต่อรอบ merge</div>
+      <div><span class="cmd">$ full suite</span> <span class="arr">→</span> <span class="val">1,100+ เทส</span> ต่อรอบ merge + ชุด real-Postgres แยกต่างหาก</div>
       <div><span class="cmd">$ restore rehearsal</span> <span class="arr">→</span> dump → temp DB → <span class="val">row counts ตรง</span></div>
       <div><span class="cmd">$ watchdog drill</span> <span class="arr">→</span> kill :3000 → <span class="val">ฟื้นเอง &lt; 60 วิ</span></div>
     </div>
@@ -797,7 +803,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     </details>
     <details>
       <summary>ต้องมีความรู้เรื่องภาษีไหม</summary>
-      <p>ไม่ต้อง — ระบบแยก VAT อัตโนมัติตอนรับเงิน จดภาษีหัก ณ ที่จ่ายทั้งสองฝั่ง ทำปฏิทินยื่นพร้อมนับวันถอยหลัง สิ่งเดียวที่ต้องทำคือกรอกยอดจากใบกำกับซัพพลายเออร์เมื่อมีรายจ่าย</p>
+      <p>ไม่ต้อง — ระบบแยก VAT อัตโนมัติตอนรับเงิน จดภาษีหัก ณ ที่จ่ายทั้งสองฝั่ง ทำปฏิทินยื่นพร้อมนับวันถอยหลัง สิ่งเดียวที่ต้องทำคือกรอกยอดจากใบกำกับซัพพลายเออร์เมื่อมีรายจ่าย ส่วนการยื่นและตัดสินใจทางภาษี ระบบจัดข้อมูลให้พร้อมส่งต่อนักบัญชีตรวจ/ยื่นต่อได้ทันที</p>
     </details>
     <details>
       <summary>กับร้านอาหารหรือฟาร์มปศุสัตว์ ใช้ได้จริงไหม</summary>
@@ -812,11 +818,22 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
       <p>ไม่ต้อง — ระบบตั้งค่าที่อยู่ของ Ollama ไว้ถูกต้องแล้ว พอติดตั้ง Ollama ในเครื่อง ผู้ช่วยทั้ง 5 ตำแหน่งใช้ได้ทันที และช่วงที่ยังไม่มี AI ทุกฟีเจอร์อื่นก็เดินครบ</p>
     </details>
   </section>
+
+  <!-- ═══ DEVELOPER CREDIT ═══ -->
+  <section id="credit">
+    <p class="k-ch">// ผู้พัฒนา</p>
+    <h2>ออกแบบและพัฒนาโดย</h2>
+    <p class="sub" style="margin-bottom:18px">กฤษกรณ์ อุตมะ (Krisakorn Utama) — <b style="color:#ecfdf5">System Architect</b> · ผู้ออกแบบและสร้างทุกชิ้นในระบบนี้ ตั้งแต่สถาปัตยกรรมฐานข้อมูลจนถึงหน้าจอใช้งานจริง</p>
+    <div class="cover-cta">
+      <a class="go" href="projects.html">ดูคลังผลงานและวิจัยเชิงวิศวกรรมทั้งหมด →</a>
+      <a class="alt" href="me.html">โปรไฟล์ผู้สร้าง</a>
+    </div>
+  </section>
 </main>
 
 <footer>
   PROJECT SOVEREIGN · สร้างบนเครื่องส่วนตัวด้วย AI pair (Codebuff) · ก.ย. 2569<br>
-  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
+  ตัวเลขทั้งหมดบนหน้านี้เป็นข้อมูลสาธิต · ระบบเตรียม/จัดรูปแบบข้อมูลบัญชีให้สอดคล้องเกณฑ์สรรพากร ไม่ใช่บริการยื่นแบบหรือคำแนะนำทางภาษี — การยื่นโปรดดุลพินิจนักบัญชี/ผู้มีอำนาจ · หน้านี้โฮสต์ฟรีด้วย GitHub Pages
 </footer>
 
 <script>
