@@ -42,3 +42,5 @@ jobs:
         env:
           JWT_SECRET: ci-secret-0123456789abcdef
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          # service บางตัวใช้เวลาท้องถิ่น (getHours) — จัดเขตเวลาให้ CI ตรงเซิร์ฟเวอร์โปรดักชัน (กรุงเทพ)
+          TZ: Asia/Bangkok
