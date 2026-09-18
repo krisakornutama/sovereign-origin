@@ -102,6 +102,7 @@ tools/*
 !tools/set-required-checks.sh
 !tools/system-health.mjs
 !tools/coverage-core.mjs
+!tools/release-notes-v1.1.1.md
 !tools/test/
 !tools/test/*.test.mjs
 !tools/
