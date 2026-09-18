@@ -1,0 +1,23 @@
+{
+  "skill_name": "skill-execution",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Activate the `canvas-design` Agent Skill from C:\\Users\\com\\.agents\\skills\\canvas-design and follow its SKILL.md: create one poster PNG for 'วันจ่ายบิลของร้าน' (a small restaurant's bill-paying day) with the design philosophy as its own .md file. Follow every step and phase the skill specifies, in order.",
+      "expected_output": "Exactly one poster PNG + one philosophy .md, all skill phases executed in order (philosophy → deduced subtle reference → canvas → second refinement pass), no scratch/temp files left behind, and a final report that states any fallback used (e.g. fonts fetched from Google Fonts if canvas-fonts/ is empty) with proof it works and any hard requirements that could not be met reported honestly.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Activate the `frontend-design` Agent Skill from C:\\Users\\com\\.agents\\skills\\frontend-design and follow its SKILL.md to restyle one landing page (plain HTML/CSS file provided) for a laundromat booking app. Do everything the skill says — but prove the final page actually behaves (responsive, interactive elements work, no console errors) before reporting done.",
+      "expected_output": "One restyled HTML page; design plan visible only in thinking, not dumped as scratch files; verification evidence from a real browser/headless run (specifics asserted, FAILs traced to either real bugs — fixed — or tool flake — reported); delivery checklist satisfied: no temp files, no missed hard requirements.",
+      "files": ["evals/fixtures/landing-draft.html"]
+    },
+    {
+      "id": 2,
+      "prompt": "Activate the `skill-creator` Agent Skill from C:\\Users\\com\\.agents\\skills\\skill-creator and follow its SKILL.md to draft a tiny new skill called 'rename-cleanup' that batch-renames files and cleans temp artifacts. This environment has no subagents — the skill-creator workflow assumes them, so use honest fallbacks and still complete every phase that can be completed.",
+      "expected_output": "A new draft skill directory with SKILL.md; skill-creator phases executed with declared fallbacks where subagents/browser are missing (no silent skipping); every fallback actually works (proven by running it); the run ends with a delivery report listing what was done, which fallbacks were used and why, what could not be done, and no leftover scratch artifacts.",
+      "files": []
+    }
+  ]
+}

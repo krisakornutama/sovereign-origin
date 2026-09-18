@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Quiet Ledger — Plate 02</title>
+<style>
+  <!-- Fallback per discipline: canvas-fonts/ holds only OFL licenses, so faces are
+       fetched from Google Fonts (skill-sanctioned source) and verified as real TTFs. -->
+  @font-face { font-family: 'Italiana'; src: url('fonts/Italiana.ttf') format('truetype'); }
+  @font-face { font-family: 'DM Mono'; src: url('fonts/DMMono-400.ttf') format('truetype'); font-weight: 400; }
+  @font-face { font-family: 'DM Mono'; src: url('fonts/DMMono-300.ttf') format('truetype'); font-weight: 300; }
+  html, body { margin: 0; padding: 0; background: #EAF0EC; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg id="plate" width="1600" height="2000" viewBox="0 0 1600 2000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ledgerdepth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EDF3EF"/>
+      <stop offset="0.5" stop-color="#E7EEE9"/>
+      <stop offset="1" stop-color="#E2EAE4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ledger stock -->
+  <rect x="0" y="0" width="1600" height="2000" fill="url(#ledgerdepth)"/>
+
+  <!-- ============ HEADER ============ -->
+  <text x="120" y="146" font-family="'DM Mono',monospace" font-weight="400" font-size="13" letter-spacing="6" fill="#5C6B62">PLATE 02 — SETTLEMENT STUDY</text>
+  <text x="120" y="238" font-family="'Italiana',serif" font-size="88" letter-spacing="4" fill="#1F2A26">Quiet Ledger</text>
+  <text x="1480" y="238" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="14" letter-spacing="3" fill="#5C6B62">NO. 0731</text>
+
+  <!-- double rule: the material signature of the ledger -->
+  <line x1="120" y1="272" x2="1480" y2="272" stroke="#1F2A26" stroke-width="2"/>
+  <line x1="120" y1="279" x2="1480" y2="279" stroke="#1F2A26" stroke-width="0.75"/>
+
+  <!-- ============ COLUMN HEADS ============ -->
+  <!-- Installment I : days 1–15 ; Installment II : days 16–30 -->
+  <text x="120" y="348" font-family="'Italiana',serif" font-size="54" fill="#1F2A26">I</text>
+  <text x="168" y="348" font-family="'DM Mono',monospace" font-weight="300" font-size="12.5" letter-spacing="4" fill="#5C6B62">MID-MONTH SETTLEMENT</text>
+  <text x="1480" y="348" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="12.5" letter-spacing="4" fill="#5C6B62">MONTH-END SETTLEMENT</text>
+  <text x="1432" y="348" text-anchor="end" font-family="'Italiana',serif" font-size="54" fill="#1F2A26">II</text>
+
+  <text x="120" y="378" font-family="'DM Mono',monospace" font-weight="300" font-size="11.5" letter-spacing="2" fill="#7A877E">DAYS 01–15 · 15 LINES</text>
+  <text x="1480" y="378" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="11.5" letter-spacing="2" fill="#7A877E">DAYS 16–30 · 15 LINES</text>
+
+  <!-- ============ THE TALLY FIELD ============
+       Two columns on one shared grid: band edges align across the fold.
+       Each band = one day's obligation, lived and settled.
+       Column bands: x 138..718 (I), x 900..1480 (II) — same width, same y.
+       Day numerals sit OUTSIDE the bands: col I ends at x=120 (margin), col II ends at x=882 (gutter).
+       Rows: y0=420, row height 34, gap 4 → pitch 38, 15 rows.
+       Row 12 of column II carries the vermilion completion mark. -->
+
+  <g id="tally"></g>
+
+  <!-- closing summaries under each column -->
+  <text id="sumI" x="718" y="1024" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="13" letter-spacing="2.5" fill="#43524A">BAL. CLOSED .00</text>
+  <text id="sumII" x="1480" y="1024" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="13" letter-spacing="2.5" fill="#43524A">BAL. CLOSED .00</text>
+  <text x="900" y="1024" font-family="'DM Mono',monospace" font-weight="300" font-size="13" letter-spacing="2.5" fill="#43524A">Σ 30 LINES</text>
+
+  <!-- ============ THE COMPLETION MARK (single vermilion event) ============ -->
+  <g id="stamp">
+    <rect x="900" y="1076" width="580" height="64" fill="none" stroke="#B4432F" stroke-width="1.5"/>
+    <rect x="906" y="1082" width="568" height="52" fill="none" stroke="#B4432F" stroke-width="0.5"/>
+    <text x="940" y="1116" font-family="'DM Mono',monospace" font-weight="400" font-size="16" letter-spacing="7" fill="#B4432F">SETTLED IN FULL</text>
+    <text x="1444" y="1116" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="13" letter-spacing="2" fill="#B4432F">DAY 30 · .00</text>
+  </g>
+
+  <!-- ============ CLOSING PHRASE ============ -->
+  <text x="120" y="1240" font-family="'Italiana',serif" font-size="64" letter-spacing="2" fill="#1F2A26">Paid quietly, recorded entirely.</text>
+
+  <!-- ============ FIGURE CAPTION + LEGEND ============ -->
+  <line x1="120" y1="1290" x2="1480" y2="1290" stroke="#1F2A26" stroke-width="0.75"/>
+  <text x="120" y="1330" font-family="'DM Mono',monospace" font-weight="300" font-size="12.5" letter-spacing="2" fill="#5C6B62">FIG. 2 — TWO INSTALLMENTS PER MONTH · PREPARED FOR REVIEW</text>
+  <text x="1480" y="1330" text-anchor="end" font-family="'DM Mono',monospace" font-weight="300" font-size="12.5" letter-spacing="2" fill="#5C6B62">OBLIGATIONS, DAILY, AS KEPT</text>
+
+  <g id="legend" font-family="'DM Mono',monospace" font-weight="300" font-size="11.5" letter-spacing="2">
+    <rect x="120"  y="1386" width="26" height="10" fill="#4C7A6B"/>
+    <text x="158"  y="1396" fill="#5C6B62">SETTLED</text>
+    <rect x="290"  y="1386" width="26" height="10" fill="#C08A3E"/>
+    <text x="328"  y="1396" fill="#5C6B62">APPROACHING TERM</text>
+    <rect x="560"  y="1386" width="26" height="10" fill="#B4432F"/>
+    <text x="598"  y="1396" fill="#5C6B62">CLOSED AT .00</text>
+  </g>
+
+  <!-- ============ FOOTER RULE + IMPRINT ============ -->
+  <line x1="120" y1="1846" x2="1480" y2="1846" stroke="#1F2A26" stroke-width="0.75"/>
+  <text x="120" y="1880" font-family="'DM Mono',monospace" font-weight="300" font-size="12" letter-spacing="4" fill="#7A877E">QUIET LEDGER · A FIELD GUIDE TO OBLIGATIONS KEPT</text>
+</svg>
+
+<script>
+// Tally rows are generated once, on the shared grid, by hand-verified pitch —
+// repetition with consequence, never decoration.
+(function buildTally() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.getElementById('tally');
+  const Y0 = 420, PITCH = 38, H = 30;
+  // color story: calm settled lines, two rare amber "approaching term" days,
+  // and the single vermilion line that closes the month at exactly .00.
+  const I_STYLE  = ['s','s','s','s','a','s','s','s','s','s','s','s','s','s','s'];
+  const II_STYLE = ['s','s','s','s','s','s','a','s','s','s','s','s','s','s','x'];
+  const FILL = { s: '#4C7A6B', a: '#C08A3E', x: '#B4432F' };
+
+  function col(x0, styles, idPrefix) {
+    styles.forEach((st, i) => {
+      const y = Y0 + i * PITCH;
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', x0); r.setAttribute('y', y);
+      r.setAttribute('width', 580); r.setAttribute('height', H);
+      r.setAttribute('fill', FILL[st]);
+      r.setAttribute('opacity', st === 'a' ? 0.85 : (st === 'x' ? 1 : 0.9));
+      r.setAttribute('class', 'band ' + idPrefix + '-r' + (i + 1));
+      g.appendChild(r);
+      // day numeral set into the left margin of each band — the labor made visible
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', x0 - 18); t.setAttribute('y', y + H - 9);
+      t.setAttribute('text-anchor', 'end');
+      t.setAttribute('font-family', "'DM Mono',monospace");
+      t.setAttribute('font-weight', '300');
+      t.setAttribute('font-size', '10.5');
+      t.setAttribute('fill', '#8A968D');
+      t.setAttribute('class', 'daynum ' + idPrefix + '-d' + (i + 1));
+      t.textContent = String(idPrefix === 'I' ? i + 1 : i + 16).padStart(2, '0');
+      g.appendChild(t);
+    });
+  }
+  col(138, I_STYLE, 'I');    // numerals end at x=120 — inside the left margin
+  col(900, II_STYLE, 'II');  // numerals end at x=882 — inside the gutter
+})();
+</script>
+</body>
+</html>
