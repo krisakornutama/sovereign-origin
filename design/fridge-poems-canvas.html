@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fridge Poems — Plate 07</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders:opsz,wght@10..72,500;10..72,700;10..72,800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#060B12}
+  #canvas{width:1600px;height:2000px;position:relative;background:#060B12}
+  .seg.g{fill:#23D3A0}
+  .seg.w{fill:#D8A23C}
+  .seg.a{fill:#C4483B}
+</style>
+</head>
+<body>
+<div id="canvas">
+<svg id="art" width="1600" height="2000" viewBox="0 0 1600 2000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fridge Poems — 48 nights of temperature records, one event">
+  <!-- ground (cold-room depth, barely-there) -->
+  <defs>
+    <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08101A"/>
+      <stop offset="0.55" stop-color="#060B12"/>
+      <stop offset="1" stop-color="#04080D"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1600" height="2000" fill="url(#groundGrad)"/>
+  <rect x="36" y="36" width="1528" height="1928" fill="none" stroke="#101822" stroke-width="1.5"/>
+
+  <!-- header -->
+  <line x1="120" y1="178" x2="1480" y2="178" stroke="#1A2430" stroke-width="1"/>
+  <text x="120" y="200" font-family="'DM Mono',monospace" font-size="11" letter-spacing="2.5" fill="#6A7683">PLATE 07 — REFRIGERATION</text>
+  <text x="1480" y="200" text-anchor="end" font-family="'DM Mono',monospace" font-size="11" letter-spacing="2.5" fill="#6A7683">SHEET 01 / 01</text>
+
+  <!-- title -->
+  <text x="114" y="352" font-family="'Big Shoulders',sans-serif" font-weight="800" font-size="175" letter-spacing="1" fill="#EDF2F7">FRIDGE POEMS</text>
+  <text x="122" y="424" font-family="'DM Mono',monospace" font-weight="300" font-size="12.5" letter-spacing="2.8" fill="#6A7683">TEMPERATURE RECORD — FORTY-EIGHT NIGHTS, ONE EVENT</text>
+
+  <!-- hour ticks (behind bars) -->
+  <g id="ticks" stroke="#141E28" stroke-width="1"></g>
+
+  <!-- group separators (centered in 78px gaps: gap1 860–938, gap2 1317–1395) -->
+  <line x1="120" y1="899"  x2="1480" y2="899"  stroke="#101822" stroke-width="1"/>
+  <line x1="120" y1="1356" x2="1480" y2="1356" stroke="#101822" stroke-width="1"/>
+
+  <!-- group labels (in empty horizontal strips above each band) -->
+  <text x="136" y="472" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">NIGHTS 001–016</text>
+  <text x="1480" y="472" text-anchor="end" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">AUG 18 — SEP 02</text>
+  <text x="136" y="901" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">NIGHTS 017–032</text>
+  <text x="1480" y="901" text-anchor="end" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">SEP 03 — SEP 18</text>
+  <text x="136" y="1358" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">NIGHTS 033–048</text>
+  <text x="1480" y="1358" text-anchor="end" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#5A6674">SEP 19 — OCT 04</text>
+
+  <!-- threshold line (event row 31 → band 1299–1317, center 1308) -->
+  <line id="threshold" x1="216" y1="1308" x2="1368" y2="1308" stroke="#C4483B" stroke-opacity="0.5" stroke-width="1" stroke-dasharray="7 5"/>
+  <text x="1480" y="1304" text-anchor="end" font-family="'DM Mono',monospace" font-size="10" letter-spacing="1.5" fill="#C4483B" fill-opacity="0.8">THRESHOLD −4.0°</text>
+  <text x="1241" y="1341" text-anchor="middle" font-family="'DM Mono',monospace" font-size="9.5" letter-spacing="1.5" fill="#C4483B" fill-opacity="0.75">02:58 → 03:20</text>
+
+  <!-- 48 nights × 48 hours (filled by script for precision) -->
+  <g id="segs"></g>
+
+  <!-- bottom rule + caption -->
+  <line x1="120" y1="1796" x2="1480" y2="1796" stroke="#1A2430" stroke-width="1"/>
+  <text x="120" y="1822" font-family="'DM Mono',monospace" font-weight="300" font-size="11" letter-spacing="2" fill="#6A7683">FIG. 7 — COMPRESSION FAILURE DETECTED 02:58 · RESTORED 03:20 · NIGHT 032 (SEP 18)</text>
+
+  <!-- notes -->
+  <text x="120" y="1856" font-family="'DM Mono',monospace" font-size="10" letter-spacing="1.8" fill="#D8A23C" fill-opacity="0.85">THRESHOLD −4.0°</text>
+  <text x="120" y="1874" font-family="'DM Mono',monospace" font-size="10" letter-spacing="1.8" fill="#D8A23C" fill-opacity="0.85">INTERVAL 60 SEC · AMBIENT +8°</text>
+  <text x="1480" y="1856" text-anchor="end" font-family="'DM Mono',monospace" font-size="10" letter-spacing="1.8" fill="#8A94A2">48 NIGHTS OBSERVED</text>
+  <text x="1480" y="1874" text-anchor="end" font-family="'DM Mono',monospace" font-size="10" letter-spacing="1.8" fill="#C4483B" fill-opacity="0.85">ONE EVENT RECORDED</text>
+
+  <!-- footer (folio in margin) -->
+  <text x="120" y="1952" font-family="'DM Mono',monospace" font-size="10.5" letter-spacing="2" fill="#566068">SOVEREIGNGUARDMINI · FIELD RECORDS DIVISION</text>
+  <text x="1480" y="1954" text-anchor="end" font-family="'Big Shoulders',sans-serif" font-weight="700" font-size="26" letter-spacing="2" fill="#3E4A5A">IV°</text>
+</svg>
+</div>
+
+<script>
+/* 48 nights × 48 hours — one mark per recorded hour.
+   Bars: x = 216 + h*24, w = 11 (10h + 3px gap), capsule r=5.5/9.
+   Night 032 (row 31): 28 green → 10 amber (02:40–03:00) → 10 red (03:00–03:20) = 48h. */
+(function () {
+  var g = document.getElementById('segs');
+  var NS = 'http://www.w3.org/2000/svg';
+  var ROW_H = 24, GROUP_H = 72, TOP = 480, X0 = 216, STEP = 24, W = 11;
+  function y(row) { return TOP + row * ROW_H + Math.floor(row / 16) * GROUP_H; }
+  function seg(row, h, hours, cls) {
+    var r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', X0 + h * STEP);
+    r.setAttribute('y', y(row) + 3);
+    r.setAttribute('width', hours * STEP - 13);
+    r.setAttribute('height', 18);
+    r.setAttribute('rx', 5.5);
+    r.setAttribute('ry', 9);
+    r.setAttribute('class', 'seg ' + cls);
+    g.appendChild(r);
+  }
+  for (var row = 0; row < 48; row++) {
+    if (row === 31) {
+      seg(row, 0, 28, 'g');
+      seg(row, 28, 10, 'w');
+      seg(row, 38, 10, 'a');
+    } else {
+      seg(row, 0, 48, 'g');
+    }
+  }
+  var ticks = document.getElementById('ticks');
+  for (var h = 0; h <= 48; h += 2) {
+    var t = document.createElementNS(NS, 'line');
+    t.setAttribute('x1', X0 + h * STEP);
+    t.setAttribute('x2', X0 + h * STEP);
+    t.setAttribute('y1', 480);
+    t.setAttribute('y2', 1796);
+    ticks.appendChild(t);
+  }
+})();
+</script>
+</body>
+</html>
