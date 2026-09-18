@@ -357,20 +357,20 @@ async function checkForUpdates(interactive) {
 function downloadFile(url, dest, redirectDepth = 0) {
   return new Promise((resolve, reject) => {
     if (redirectDepth > 4) return reject(new Error('redirect ลึกเกินไป'));
-    let settled = false;
-    const fail = (e) => { if (!settled) { settled = true; try { fs.unlink(dest, () => {}); } catch { /* ignore */ } reject(e); } };
+    let done = false;
     const file = fs.createWriteStream(dest);
-    // แนบ error ตั้งแต่ทันที — ไฟล์เขียนไม่ได้ (สิทธิ์/ดิสก์เต็ม) ต้อง settle ทันที ไม่ค้าง IPC
+    const discard = (cb) => file.close(() => fs.unlink(dest, cb));
+    const fail = (e) => { if (!done) { done = true; discard(() => reject(e)); } };
+    // error ต้องแนบทันที — ไฟล์เขียนไม่ได้ (สิทธิ์/ดิสก์เต็ม) ต้อง reject ทันที ไม่งั้น IPC ค้าง
     file.on('error', fail);
     https.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        settled = true;
-        file.close(() => fs.unlink(dest, () => {}));
-        return resolve(downloadFile(res.headers.location, dest, redirectDepth + 1));
+        done = true;
+        return discard(() => resolve(downloadFile(res.headers.location, dest, redirectDepth + 1)));
       }
-      if (res.statusCode !== 200) { res.resume(); settled = true; file.close(() => fs.unlink(dest, () => {})); return reject(new Error('HTTP ' + res.statusCode)); }
+      if (res.statusCode !== 200) { res.resume(); return fail(new Error('HTTP ' + res.statusCode)); }
       res.pipe(file);
-      file.on('finish', () => { if (!settled) { settled = true; file.close(() => resolve(dest)); } });
+      file.on('finish', () => { if (!done) { done = true; file.close(() => resolve(dest)); } });
     }).on('error', fail);
   });
 }
