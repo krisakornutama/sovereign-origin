@@ -152,6 +152,21 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+/* ── หลักฐานหน้างานจริง (evidence grid) ── */
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 22px; }
+.ev-item { background: rgba(15,23,42,.55); border: 1px solid rgba(148,163,184,.22); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+.ev-media { position: relative; aspect-ratio: 16/10; background: #0b1220; display: flex; align-items: center; justify-content: center; }
+.ev-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ev-media video { width: 100%; height: 100%; object-fit: contain; display: block; background: #0b1220; }
+.ev-missing { color: #64748b; font-size: 13px; text-align: center; padding: 0 18px; }
+.ev-tag { position: absolute; top: 10px; left: 10px; font-size: 11px; letter-spacing: .5px; padding: 3px 9px; border-radius: 99px; background: rgba(16,185,129,.16); color: #34d399; border: 1px solid rgba(52,211,153,.35); }
+.ev-item.ev-pending .ev-tag { background: rgba(245,158,11,.14); color: #fbbf24; border-color: rgba(251,191,36,.35); }
+.ev-body { padding: 14px 16px 16px; }
+.ev-body b { display: block; font-size: 14.5px; margin-bottom: 5px; }
+.ev-body p { font-size: 13px; line-height: 1.65; color: #94a3b8; margin: 0 0 8px; }
+.ev-date { font-size: 11.5px; color: #64748b; }
+.ev-canvas { width: 100%; height: 100%; display: block; }
+@media (max-width: 640px) { .ev-grid { grid-template-columns: 1fr; } }
 </style>
 <link rel="stylesheet" href="nav.css">
 <link rel="canonical" href="https://krisakornutama.github.io/project-sovereign/guardmini.html">
@@ -184,6 +199,7 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
     <a href="#sla">รับประกัน</a>
     <a href="#data">ข้อมูลเป็นของคุณ</a>
     <a href="#failure">เมื่อไฟ/เน็ตมีปัญหา</a>
+    <a href="#evidence">หลักฐานหน้างาน</a>
     <a href="#honest">ตรงไปตรงมา</a>
   </nav>
 </header>
@@ -311,6 +327,17 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
   </section>
 
   <!-- ═══ HONEST ═══ -->
+  <!-- ═══ หลักฐานหน้างานจริง (เจ้าของเติมผ่าน evidence/evidence.json — เว็บเรนเดอร์เอง) ═══ -->
+  <section id="evidence">
+    <p class="k-ch">// หลักฐานหน้างานจริง — Real-World Evidence</p>
+    <h2>ไม่ใช่แค่โค้ด — ของจริงกำลังถูกสร้าง</h2>
+    <p class="lede">ชิ้นงานฮาร์ดแวร์กำลังประกอบทีละชิ้น ส่วนนี้คือบันทึกหน้างานที่ต่อเติมเรื่อย ๆ — รูปตัวเครื่อง คลิปทดสอบเซนเซอร์ และกราฟอุณหภูมิจากการใช้จริง</p>
+    <div id="evidenceGrid" class="ev-grid" aria-live="polite">กำลังโหลดหลักฐาน…</div>
+    <noscript>
+      <div class="ev-item"><div class="ev-body"><b>หลักฐานหน้างาน</b><br>เปิดไฟล์ที่ portfolio/evidence/ โดยตรง หรือเปิดใช้ JavaScript เพื่อดูแกลเลอรี</div></div>
+    </noscript>
+  </section>
+
   <section id="honest">
     <p class="k-ch">// ตรงไปตรงมา</p>
     <h2>สถานะจริงของสินค้านี้</h2>
@@ -342,6 +369,106 @@ footer{border-top:1px solid var(--line);text-align:center;padding:30px 24px 40px
 </footer>
 
 <script src="nav.js" defer></script>
+<script>
+// ── หลักฐานหน้างานจริง: อ่าน evidence/evidence.json แล้วเรนเดอร์ (รูป/วิดีโอ/กราฟ CSV) ──
+(function loadEvidence() {
+  const grid = document.getElementById('evidenceGrid');
+  if (!grid) return;
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function drawChart(canvas, rows) {
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const nums = rows.map((r) => parseFloat(r[1])).filter((v) => !isNaN(v));
+    if (!nums.length) return false;
+    const mn = Math.min(...nums), mx = Math.max(...nums);
+    const pad = (mx - mn) * 0.15 || 1;
+    const lo = mn - pad, hi = mx + pad;
+    const xs = (i) => 44 + (i * (W - 64)) / Math.max(1, nums.length - 1);
+    const ys = (v) => H - 34 - ((v - lo) * (H - 56)) / (hi - lo);
+    ctx.fillStyle = '#0b1220'; ctx.fillRect(0, 0, W, H);
+    // เส้นประเกณฑ์ −4 และ −18 (โซนเดียวกับ LCD ด้านบน)
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(148,163,184,.35)'; ctx.lineWidth = 1;
+    for (const t of [-4, -18]) { if (t > lo && t < hi) { ctx.beginPath(); ctx.moveTo(44, ys(t)); ctx.lineTo(W - 20, ys(t)); ctx.stroke(); } }
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#64748b'; ctx.font = '11px monospace';
+    ctx.fillText(mx.toFixed(1) + '°', 8, ys(mx) + 4); ctx.fillText(mn.toFixed(1) + '°', 8, ys(mn) + 4);
+    // เส้นอุณหภูมิ — เขียวในโซน (≤ −4) อำพันนอกโซน
+    ctx.lineWidth = 2; ctx.strokeStyle = '#34d399'; ctx.beginPath();
+    let pen = false, off = false;
+    nums.forEach((v, i) => { const y = ys(v); if (!pen) { ctx.moveTo(xs(i), y); pen = true; } else ctx.lineTo(xs(i), y); if (v > -4) off = true; });
+    ctx.stroke();
+    if (off) { ctx.strokeStyle = '#fbbf24'; ctx.beginPath(); pen = false;
+      nums.forEach((v, i) => { if (v > -4) { if (!pen) { ctx.moveTo(xs(i), ys(v)); pen = true; } else ctx.lineTo(xs(i), ys(v)); } else pen = false; });
+      ctx.stroke(); }
+    ctx.fillStyle = '#94a3b8'; ctx.fillText('°C', W - 30, 18);
+    return true;
+  }
+
+  // สถานะจาก manifest เป็นแหล่งความจริง (ไม่ยิง probe ที่ต้อง 404) — ถ้า status บอกว่ามีแต่ไฟล์ยังไม่มา media onerror จะสลับเป็นป้ายรอเอง
+  function pendingNote(it, media) {
+    const wrap = document.createElement('div'); wrap.className = 'ev-media';
+    wrap.innerHTML = '<span class="ev-missing">⏳ รอไฟล์ <code>' + esc(it.file) + '</code><br>ทิ้งไว้ที่ portfolio/evidence/ แล้วการ์ดนี้โชว์เอง</span>';
+    if (media) media.replaceWith(wrap); else return wrap;
+    return wrap;
+  }
+
+  function render(items) {
+    grid.innerHTML = '';
+    if (!items.length) { grid.textContent = 'ยังไม่มีรายการใน evidence.json'; return; }
+    for (const it of items) {
+      const pending = it.status === 'pending';
+      const card = document.createElement('article');
+      card.className = 'ev-item' + (pending ? ' ev-pending' : '');
+      const media = (() => {
+        const wrap = document.createElement('div'); wrap.className = 'ev-media';
+        if (pending) {
+          return pendingNote(it);
+        } else if (it.type === 'photo') {
+          const img = document.createElement('img');
+          img.src = 'evidence/' + encodeURIComponent(it.file); img.alt = it.title || 'หลักฐานหน้างาน'; img.loading = 'lazy';
+          img.addEventListener('error', () => pendingNote(it, img));
+          return wrapWith(img);
+        } else if (it.type === 'video') {
+          const v = document.createElement('video');
+          v.src = 'evidence/' + encodeURIComponent(it.file); v.controls = true; v.preload = 'metadata'; v.setAttribute('aria-label', it.title || 'คลิปสาธิต');
+          v.addEventListener('error', () => pendingNote(it, v));
+          return wrapWith(v);
+        } else {
+          wrap.innerHTML = '<canvas class="ev-canvas" width="560" height="350" role="img" aria-label="กราฟอุณหภูมิจาก ' + esc(it.file) + '"></canvas>';
+          return wrap;
+        }
+        function wrapWith(el) { wrap.appendChild(el); return wrap; }
+      })();
+      media.insertAdjacentHTML('beforeend', '<span class="ev-tag">' + (pending ? 'รอหลักฐาน' : it.type === 'photo' ? '📷 ของจริง' : it.type === 'video' ? '🎬 สาธิตจริง' : (it.status === 'sample' ? '📈 ตัวอย่างรูปแบบ' : '📈 บันทึกจริง')) + '</span>');
+      card.appendChild(media);
+      const body = document.createElement('div');
+      body.className = 'ev-body';
+      body.innerHTML = '<b>' + esc(it.title) + '</b><p>' + esc(it.desc) + '</p><span class="ev-date">' + esc(it.date) + '</span>';
+      card.appendChild(body);
+      grid.appendChild(card);
+      if (!pending && it.type === 'data') {
+        fetch('evidence/' + encodeURIComponent(it.file)).then((r) => r.ok ? r.text() : Promise.reject()).then((txt) => {
+          const rows = txt.split(/\r?\n/).map((l) => l.split(',')).filter((r) => r.length >= 2);
+          const rows2 = /^\s*(time|date|วัน|เวลา|timestamp)/i.test(rows[0] ? rows[0][0] : '') ? rows.slice(1) : rows;
+          const canvas = card.querySelector('canvas');
+          if (!canvas || !drawChart(canvas, rows2)) {
+            const m = card.querySelector('.ev-media');
+            if (m) m.innerHTML = '<span class="ev-missing">ไฟล์ <code>' + esc(it.file) + '</code> ยังไม่พร้อมวาดกราฟ (ต้องเป็น CSV: คอลัมน์แรกเวลา คอลัมน์ที่สองอุณหภูมิ)</span>';
+          }
+        }).catch(() => {
+          const m = card.querySelector('.ev-media');
+          if (m) m.innerHTML = '<span class="ev-missing">⏳ รอไฟล์ <code>' + esc(it.file) + '</code> ที่ portfolio/evidence/</span>';
+        });
+      }
+    }
+  }
+
+  fetch('evidence/evidence.json').then((r) => { if (!r.ok) throw 0; return r.json(); })
+    .then((j) => render(j.items || []))
+    .catch(() => { grid.innerHTML = '<div class="ev-item"><div class="ev-body">ยังไม่มีไฟล์หลักฐาน — เติมที่ <code>evidence/evidence.json</code></div></div>'; });
+})();
+</script>
 <script>
 /* แถบเฝ้าระวังจำลอง — จำลองพฤติกรรมสามเหตุขัดข้องตามที่หน้าอธิบาย (ข้อมูลจริงดูหัวข้อ ตรงไปตรงมา) */
 (function () {
