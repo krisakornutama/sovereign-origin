@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
+const { verifyAsset } = require('./verify-asset');
 
 const DASHBOARD_URL = 'http://localhost:3000';
 const LAUNCHER_URL = 'http://localhost:4100';
@@ -473,9 +474,25 @@ ipcMain.handle('sovereign:downloadUpdate', async () => {
   const dest = path.join(app.getPath('downloads'), 'Sovereign-OS-' + String(u.latest).replace(/^v/, '') + '-portable.exe');
   try {
     await downloadFile(u.assetUrl, dest);
+    // ด่านความปลอดภัย: ตรวจ SHA-256 ก่อนเปิดรัน — ไม่ผ่าน/ไม่มีลายเซ็นอ้างอิง/ตรวจไม่ได้ = ลบไฟล์ทิ้ง ห้ามเปิด (fail-closed)
+    let v;
+    try { v = await verifyAsset({ assetUrl: u.assetUrl, dest }); }
+    catch (ve) {
+      try { fs.unlinkSync(dest); } catch { /* ignore */ }
+      dlog('update verify error:', ve.message);
+      return { ok: false, message: 'ยกเลิกการติดตั้ง — ตรวจลายเซ็นไม่สำเร็จ (' + ve.message + ') ลบไฟล์ที่ดาวน์โหลดแล้ว' };
+    }
+    if (!v.ok) {
+      try { fs.unlinkSync(dest); } catch { /* ignore */ }
+      dlog('update rejected:', v.reason);
+      const why = v.reason === 'mismatch' ? 'ลายเซ็นไม่ตรง (ไฟล์เสียหายหรือไม่น่าเชื่อถือ)'
+        : v.reason === 'no-reference' ? 'release นี้ยังไม่มีลายเซ็นอ้างอิง (digest/SHA256SUMS)'
+        : 'ลายเซ็นอ้างอิงไม่ถูกต้อง';
+      return { ok: false, message: 'ยกเลิกการติดตั้ง — ' + why + ' ลบไฟล์ที่ดาวน์โหลดแล้ว' };
+    }
     shell.openPath(dest);
-    dlog('update downloaded:', dest);
-    return { ok: true, message: 'ดาวน์โหลดแล้ว — เปิดตัวติดตั้งให้แล้ว (แนะนำปิดโปรแกรมเดิมก่อนติดตั้ง)' };
+    dlog('update downloaded + hash verified (' + v.source + '):', dest);
+    return { ok: true, message: 'ดาวน์โหลดแล้ว และตรวจลายเซ็น SHA-256 ผ่าน (' + (v.source === 'github-digest' ? 'GitHub digest' : 'SHA256SUMS') + ') — เปิดตัวติดตั้งให้แล้ว (แนะนำปิดโปรแกรมเดิมก่อนติดตั้ง)' };
   } catch (e) { return { ok: false, message: 'ดาวน์โหลดไม่สำเร็จ: ' + e.message }; }
 });
 
