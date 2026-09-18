@@ -63,7 +63,7 @@ function writeNdjson(res: Response, obj: unknown): void {
 }
 
 // ── GET /models — inventory + VRAM + task mappings ──
-router.get('/models', async (_req: Request, res: Response) => {
+router.get('/models', authenticate, async (_req: Request, res: Response) => {
   try {
     const [inventory, routes, engineUp] = await Promise.all([
       listModels(),
@@ -77,7 +77,7 @@ router.get('/models', async (_req: Request, res: Response) => {
 });
 
 // ── POST /models/pull {model} — stream progress NDJSON ทันที ──
-router.post('/models/pull', async (req: Request, res: Response) => {
+router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   const model = String(req.body?.model || '').trim();
   if (!model) return res.status(400).json({ error: 'ต้องระบุ model' });
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -85,6 +85,7 @@ router.post('/models/pull', async (req: Request, res: Response) => {
   res.setHeader('X-Accel-Buffering', 'no');
   let closed = false;
   req.on('close', () => { closed = true; });
+  res.on('close', () => { closed = true; });
   writeNdjson(res, { status: `เริ่มดาวน์โหลด ${model}`, percent: 0 });
   const result = await pullModel(model, (p) => {
     if (!closed) writeNdjson(res, p);
@@ -96,7 +97,7 @@ router.post('/models/pull', async (req: Request, res: Response) => {
 });
 
 // ── POST /models/import-gguf {modelName, ggufUrl, systemPrompt?} — เริ่ม job ──
-router.post('/models/import-gguf', async (req: Request, res: Response) => {
+router.post('/models/import-gguf', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   const modelName = String(req.body?.modelName || '').trim();
   const ggufUrl = String(req.body?.ggufUrl || '').trim();
   const systemPrompt = req.body?.systemPrompt ? String(req.body.systemPrompt) : undefined;
@@ -132,14 +133,14 @@ router.post('/models/import-gguf', async (req: Request, res: Response) => {
 });
 
 // ── GET /jobs/:id — สถานะ import job ──
-router.get('/jobs/:id', (req: Request, res: Response) => {
+router.get('/jobs/:id', authenticate, (req: Request, res: Response) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'ไม่พบ job' });
   res.json(job);
 });
 
 // ── POST /models/route {taskType, model} — ตั้ง task→model ──
-router.post('/models/route', async (req: Request, res: Response) => {
+router.post('/models/route', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   const taskType = String(req.body?.taskType || '');
   const model = String(req.body?.model || '');
   const r = await setModelForTask(taskType, model);
@@ -148,7 +149,7 @@ router.post('/models/route', async (req: Request, res: Response) => {
 });
 
 // ── DELETE /models/:name — ลบโมเดลออกจากพื้นที่จัดเก็บ ──
-router.delete('/models/:name', async (req: Request, res: Response) => {
+router.delete('/models/:name', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   const name = decodeURIComponent(req.params.name || '');
   if (!name) return res.status(400).json({ error: 'ต้องระบุชื่อโมเดล' });
   const r = await deleteModel(name);
@@ -157,7 +158,7 @@ router.delete('/models/:name', async (req: Request, res: Response) => {
 });
 
 // ── POST /models/:name/unload — ปล่อย VRAM ทันที ──
-router.post('/models/:name/unload', async (req: Request, res: Response) => {
+router.post('/models/:name/unload', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   const name = decodeURIComponent(req.params.name || '');
   if (!name) return res.status(400).json({ error: 'ต้องระบุชื่อโมเดล' });
   const r = await unloadModelFromVram(name);
