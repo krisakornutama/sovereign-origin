@@ -105,7 +105,7 @@ for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: tr
   if (f.name === 'node_modules' || f.name === '.git') continue;
   if (f.isFile() && (/\.html$/.test(f.name) || /\.(css|js|png|txt|xml)$/.test(f.name) || f.name === '.nojekyll' ||
       f.name === 'README.md' || f.name === 'package.json' || f.name === 'package-lock.json')) publishFiles.push(f.name);
-  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github')) {
+  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github' || f.name === 'evidence')) { // evidence = หลักฐานหน้างานจริงของ guardmini (รูป/คลิป/CSV) — เจ้าของทิ้งไฟล์แล้วเว็บโชว์เอง
     walk(f.name, publishFiles);
     // กันไฟล์ทดลองหลุดขึ้น production (เคยเกิดจริง: scripts/tmp-perf.mjs ถูก sync ขึ้น Pages)
     publishFiles = publishFiles.filter((r) => !/(^|\/)(tmp-[^/]*|[^/]*\.bak)$/.test(r));
