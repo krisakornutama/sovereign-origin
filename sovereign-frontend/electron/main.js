@@ -9,6 +9,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 const { verifyAsset } = require('./verify-asset');
+const { downloadFile } = require('./download');
 
 const DASHBOARD_URL = 'http://localhost:3000';
 const LAUNCHER_URL = 'http://localhost:4100';
@@ -353,26 +354,6 @@ async function checkForUpdates(interactive) {
     try { dialog.showMessageBox(win || undefined, { type: 'info', title: 'Sovereign OS — อัปเดต', message: msg }); } catch { /* ignore */ }
   }
   return res;
-}
-function downloadFile(url, dest, redirectDepth = 0) {
-  return new Promise((resolve, reject) => {
-    if (redirectDepth > 4) return reject(new Error('redirect ลึกเกินไป'));
-    let done = false;
-    const file = fs.createWriteStream(dest);
-    const discard = (cb) => file.close(() => fs.unlink(dest, cb));
-    const fail = (e) => { if (!done) { done = true; discard(() => reject(e)); } };
-    // error ต้องแนบทันที — ไฟล์เขียนไม่ได้ (สิทธิ์/ดิสก์เต็ม) ต้อง reject ทันที ไม่งั้น IPC ค้าง
-    file.on('error', fail);
-    https.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop' } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        done = true;
-        return discard(() => resolve(downloadFile(res.headers.location, dest, redirectDepth + 1)));
-      }
-      if (res.statusCode !== 200) { res.resume(); return fail(new Error('HTTP ' + res.statusCode)); }
-      res.pipe(file);
-      file.on('finish', () => { if (!done) { done = true; file.close(() => resolve(dest)); } });
-    }).on('error', fail);
-  });
 }
 
 // ── sidecar backend (เฉพาะตอนมี dist จริง — เช่นรันจากซอร์ส) ──
