@@ -3,7 +3,7 @@
 //  โหลดแบบมีลำดับสำรอง: Dashboard :3000 → Launcher :4100 → หน้า Offline ในตัว
 //  ตรวจสถานะทุก 3 วิ แล้วเด้งไป Dashboard อัตโนมัติเมื่อระบบขึ้น
 // ─────────────────────────────────────────────────────────────
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -19,6 +19,14 @@ let backend;
 let probeTimer = null;
 let showingOffline = false;
 let autoStarted = false;
+
+// ── tray / wizard / updater สถานะ ──
+let tray = null;
+let setupWin = null;
+let quitting = false; // ปิดหน้าต่าง = ย่อลง tray จนกว่าจะสั่งออกจากเมนู tray
+let lastStatus = { frontend: false, launcher: false, api: false };
+let updateInfo = null; // ผลตรวจอัปเดตล่าสุด (แสดงในเมนู tray + wizard)
+const UPSTREAM_REPO = 'krisakornutama/sovereign-origin';
 
 const DOCKER_DESKTOP_CANDIDATES = [
   path.join(process.env.LOCALAPPDATA || '', 'Programs', 'DockerDesktop', 'Docker Desktop.exe'),
@@ -50,6 +58,10 @@ function createWindow() {
     }
   });
   win.on('closed', () => { win = null; });
+  // ปิดหน้าต่าง = ย่อลง tray (ระบบยังเฝ้า/เริ่มเองได้) — ออกจริงผ่านเมนู tray เท่านั้น
+  win.on('close', (e) => {
+    if (!quitting) { e.preventDefault(); win.hide(); dlog('close → hidden to tray'); }
+  });
 }
 
 // ── probe: เช็คว่า URL ตอบไหม (timeout 800ms) ──
@@ -68,7 +80,9 @@ async function probeStatus() {
   const [frontend, launcher, api] = await Promise.all([
     probe(DASHBOARD_URL), probe(LAUNCHER_URL), probe(API_URL + '/api/health'),
   ]);
-  return { frontend, launcher, api };
+  lastStatus = { frontend, launcher, api };
+  updateTrayMenu();
+  return lastStatus;
 }
 
 // ── หน้า offline ในตัว + วงจร probe ──
@@ -226,6 +240,136 @@ function autoStartOnce() {
   }, 1500);
 }
 
+// ── System Tray: สถานะสด + เปิด Dashboard + ออกจริง ──
+function statusGlyph(on) { return on ? '🟢' : '⚪'; }
+function updateTrayMenu() {
+  if (!tray) return;
+  try {
+    const st = lastStatus;
+    const upd = updateInfo;
+    const updLabel = (upd && upd.ok && upd.hasUpdate)
+      ? `⬆️ มีเวอร์ชันใหม่ ${upd.latest} (ตอนนี้ v${upd.current}) — เปิดตั้งค่า`
+      : 'ตรวจอัปเดต…';
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '🏰 Sovereign OS v' + app.getVersion(), enabled: false },
+      { type: 'separator' },
+      { label: 'เปิดหน้าจอหลัก (Dashboard)', click: showMainWindow },
+      { type: 'separator' },
+      { label: `${statusGlyph(st.frontend)} Dashboard :3000 — ${st.frontend ? 'ออนไลน์' : 'ออฟไลน์'}`, enabled: false },
+      { label: `${statusGlyph(st.api)} Core API :3001 — ${st.api ? 'ออนไลน์' : 'ออฟไลน์'}`, enabled: false },
+      { label: `${statusGlyph(st.launcher)} Launcher :4100 — ${st.launcher ? 'ออนไลน์' : 'ออฟไลน์'}`, enabled: false },
+      { type: 'separator' },
+      { label: '🚀 เริ่มระบบทั้งหมด', click: () => { startSystem(); } },
+      { label: updLabel, click: () => { if (upd && upd.ok && upd.hasUpdate) openWizard('update'); else checkForUpdates(true); } },
+      { label: '⚙️ ตั้งค่าครั้งแรก (Setup Wizard)', click: () => openWizard() },
+      { type: 'separator' },
+      { label: '❌ ออกจาก Sovereign OS', click: () => { quitting = true; app.quit(); } },
+    ]));
+  } catch (e) { dlog('updateTrayMenu error:', e.message); }
+}
+
+function createTray() {
+  try {
+    tray = new Tray(path.join(__dirname, 'tray-icon.png'));
+    tray.setToolTip('Sovereign OS v' + app.getVersion());
+    updateTrayMenu();
+    dlog('tray created');
+  } catch (e) { dlog('tray create failed:', e.message); }
+}
+
+function showMainWindow() {
+  try {
+    if (!win || win.isDestroyed()) { createWindow(); boot(); return; }
+    if (win.isMinimized()) win.restore();
+    win.show(); win.focus();
+  } catch (e) { dlog('showMainWindow error:', e.message); }
+}
+
+// ── Setup Wizard: ตั้งค่าครั้งแรก (โฟลเดอร์/ตรวจสภาพแวดล้อม/เริ่มระบบ/อัปเดต) ──
+function setupFlagPath() { return path.join(app.getPath('userData'), 'setup-done.json'); }
+function setupDone() { try { return fs.existsSync(setupFlagPath()); } catch { return false; } }
+
+function openWizard(focus) {
+  if (setupWin && !setupWin.isDestroyed()) {
+    if (focus) setupWin.webContents.send('sovereign:wizardFocus', focus);
+    setupWin.show(); setupWin.focus(); return;
+  }
+  setupWin = new BrowserWindow({
+    width: 720, height: 680, show: false,
+    backgroundColor: '#020617', autoHideMenuBar: true, resizable: false,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: 'Sovereign OS — ตั้งค่าครั้งแรก',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') },
+  });
+  setupWin.once('ready-to-show', () => setupWin.show());
+  setupWin.on('closed', () => { setupWin = null; });
+  setupWin.loadFile(path.join(__dirname, 'setup-wizard.html'), focus ? { hash: focus } : undefined);
+}
+
+function runCmd(cmd, args, timeout = 8000) {
+  return new Promise((resolve) => {
+    try {
+      const c = spawn(cmd, args, { windowsHide: true, timeout, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      c.stdout && c.stdout.on('data', (d) => { out += d; });
+      c.on('error', () => resolve(null));
+      c.on('exit', () => resolve(out.trim() || null));
+    } catch { resolve(null); }
+  });
+}
+
+// ── Auto-Update: ตรวจ release จาก GitHub (ไม่พึ่ง dependency ภายนอก) ──
+const https = require('https');
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop', Accept: 'application/vnd.github+json' } }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+      let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+    }).on('error', reject);
+  });
+}
+function cmpVer(a, b) {
+  const p = (s) => String(s).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const pa = p(a), pb = p(b);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0) ? 1 : -1; }
+  return 0;
+}
+async function checkForUpdates(interactive) {
+  const res = { ok: false, latest: null, current: app.getVersion(), assetUrl: null, hasUpdate: false, error: null, at: Date.now() };
+  try {
+    const rel = await fetchJson('https://api.github.com/repos/' + UPSTREAM_REPO + '/releases/latest');
+    const asset = (rel.assets || []).find((a) => /portable\.exe$/i.test(a.name)) || null;
+    res.ok = true; res.latest = rel.tag_name; res.assetUrl = asset ? asset.browser_download_url : null;
+  } catch (e) { res.error = e.message; }
+  res.hasUpdate = !!(res.ok && res.latest && cmpVer(res.latest, res.current) > 0);
+  updateInfo = res;
+  updateTrayMenu();
+  for (const w of [win, setupWin]) { try { w && !w.isDestroyed() && w.webContents.send('sovereign:update', res); } catch { /* ignore */ } }
+  if (interactive) {
+    const msg = !res.ok ? ('ตรวจอัปเดตไม่สำเร็จ: ' + res.error)
+      : res.hasUpdate ? ('มีเวอร์ชันใหม่ ' + res.latest + ' (ตอนนี้ v' + res.current + ')' + (res.assetUrl ? ' — ดาวน์โหลดได้จากหน้าตั้งค่า' : ' — ยังไม่มีไฟล์ติดตั้งใน release'))
+      : ('ใช้เวอร์ชันล่าสุดแล้ว (v' + res.current + ')');
+    try { dialog.showMessageBox(win || undefined, { type: 'info', title: 'Sovereign OS — อัปเดต', message: msg }); } catch { /* ignore */ }
+  }
+  return res;
+}
+function downloadFile(url, dest, redirectDepth = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectDepth > 4) return reject(new Error('redirect ลึกเกินไป'));
+    const file = fs.createWriteStream(dest);
+    https.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        file.close(() => fs.unlink(dest, () => {}));
+        return resolve(downloadFile(res.headers.location, dest, redirectDepth + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); file.close(() => fs.unlink(dest, () => {})); return reject(new Error('HTTP ' + res.statusCode)); }
+      res.pipe(file);
+      file.on('finish', () => file.close(() => resolve(dest)));
+      file.on('error', (e) => { try { fs.unlink(dest, () => {}); } catch { /* ignore */ } reject(e); });
+    }).on('error', (e) => { try { fs.unlink(dest, () => {}); } catch { /* ignore */ } reject(e); });
+  });
+}
+
 // ── sidecar backend (เฉพาะตอนมี dist จริง — เช่นรันจากซอร์ส) ──
 function startBackend() {
   try {
@@ -256,9 +400,12 @@ app.whenReady().then(() => {
   if (!hasSingleLock) return; // กันหน้าต่างซ้อนในช่วงรอ app.quit() ของ instance ที่แพ้ lock
   // จด login item เฉพาะตอน packaged — โหมด dev ห้ามลงทะเบียน auto-start ชี้ไปที่ electron ตัวทดสอบ
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
+  createTray();
   startBackend();
   createWindow();
   boot();
+  if (!setupDone()) openWizard(); // ครั้งแรกของเครื่องนี้ — เปิด wizard รอเลย (ปิดข้ามได้)
+  setTimeout(() => { checkForUpdates(false).catch(() => {}); }, 15000); // เช็คเงียบ ๆ รอบเดียวหลังบูต
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) { createWindow(); boot(); } });
 });
 
@@ -290,6 +437,50 @@ ipcMain.handle('sovereign:retryDashboard', async () => {
   return { ok: false, message: 'Dashboard ยังไม่พร้อม' };
 });
 
+// ── IPC: wizard + อัปเดต ──
+ipcMain.handle('sovereign:openWizard', (_e, focus) => { openWizard(focus); return { ok: true }; });
+ipcMain.handle('sovereign:pickInstallDir', async () => {
+  const r = await dialog.showOpenDialog(setupWin || win, { properties: ['openDirectory', 'createDirectory'], title: 'เลือกโฟลเดอร์สำหรับ Sovereign OS' });
+  if (r.canceled || !r.filePaths[0]) return null;
+  return r.filePaths[0];
+});
+ipcMain.handle('sovereign:checkEnv', async () => {
+  const [nodeV, dockerV] = await Promise.all([runCmd('node', ['--version']), runCmd('docker', ['--version'])]);
+  const found = findStartBat();
+  return {
+    node: nodeV ? { ok: true, detail: nodeV } : { ok: false, detail: 'ไม่พบ node — จำเป็นเฉพาะโหมดซอร์ส (แพ็กเกจในตัวไม่ต้องใช้)' },
+    docker: dockerV ? { ok: true, detail: dockerV } : { ok: false, detail: 'ไม่พบ Docker — โปรแกรมจะเปิด Docker Desktop ให้เองตอนเริ่มระบบ (ถ้ามีติดตั้ง)' },
+    bat: found ? { ok: true, detail: found.bat } : { ok: false, detail: 'ไม่พบ start-sovereign.bat ใกล้ตัวโปรแกรม — ยังเริ่มระบบหลักอัตโนมัติไม่ได้' },
+  };
+});
+ipcMain.handle('sovereign:getSetupDir', () => {
+  try { const j = JSON.parse(fs.readFileSync(setupFlagPath(), 'utf8')); return j.dir || null; } catch { return null; }
+});
+ipcMain.handle('sovereign:beginSetup', (_e, dir) => {
+  try { fs.writeFileSync(setupFlagPath(), JSON.stringify({ dir: dir || null, ts: Date.now() }, null, 2)); } catch (e) { return { ok: false, message: e.message }; }
+  if (dir && fs.existsSync(dir)) {
+    try { fs.writeFileSync(path.join(dir, 'sovereign-home.txt'), 'Sovereign OS setup marker — ' + new Date().toISOString() + '\n'); } catch { /* best-effort */ }
+  }
+  dlog('setup done:', dir || '(no dir)');
+  if (setupWin && !setupWin.isDestroyed()) setupWin.close();
+  showMainWindow();
+  return { ok: true };
+});
+ipcMain.handle('sovereign:checkUpdates', () => checkForUpdates(true));
+ipcMain.handle('sovereign:downloadUpdate', async () => {
+  const u = updateInfo;
+  if (!u || !u.ok || !u.hasUpdate || !u.assetUrl) return { ok: false, message: 'ยังไม่มีตัวติดตั้งให้ดาวน์โหลด — กดตรวจอัปเดตก่อน' };
+  const dest = path.join(app.getPath('downloads'), 'Sovereign-OS-' + String(u.latest).replace(/^v/, '') + '-portable.exe');
+  try {
+    await downloadFile(u.assetUrl, dest);
+    shell.openPath(dest);
+    dlog('update downloaded:', dest);
+    return { ok: true, message: 'ดาวน์โหลดแล้ว — เปิดตัวติดตั้งให้แล้ว (แนะนำปิดโปรแกรมเดิมก่อนติดตั้ง)' };
+  } catch (e) { return { ok: false, message: 'ดาวน์โหลดไม่สำเร็จ: ' + e.message }; }
+});
+
+app.on('before-quit', () => { quitting = true; });
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
@@ -299,4 +490,4 @@ app.on('quit', () => {
   if (backend && !backend.killed) { try { backend.kill(); } catch { /* ignore */ } }
 });
 
-dlog('desktop-shell loaded — version 1.2.0 overlay (auto-start)');
+dlog('desktop-shell loaded — version', app.getVersion(), '(tray+wizard+autostart)');
