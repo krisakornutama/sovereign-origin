@@ -98,14 +98,17 @@ async function main() {
   /* หน้าบางหน้ามีข้อความที่ "พิมพ์ทีละตัว" (บูต/จำลอง) — วัดตอนกำลังพิมพ์จะเทียบกันไม่ได้
      จึงรอให้จำนวนตัวอักษรนิ่งก่อน (2 ตัวอย่างติดกันเท่ากัน) แล้วค่อยใช้เทียบ */
   async function settledTextLen(page) {
+    /* คืน { len, settled } — หน้าที่มีข้อความ "พิมพ์/เติมท้ายต่อเนื่อง" (บูต log, จำลองเซนเซอร์)
+       ไม่มีจุดนิ่งให้รอเลย จึงต้องรายงานสถานะ unsettled แทนที่จะปลอมตัวเป็นตัวเลขนิ่ง
+       (ผู้เรียกใช้เทียบความยาวได้เฉพาะเมื่อทั้งสองข้าง settled) */
     let prev = -1;
     for (let i = 0; i < 14; i++) {
       const n = await page.evaluate(() => document.body.innerText.length);
-      if (n === prev) return n;
+      if (n === prev) return { len: n, settled: true };
       prev = n;
       await page.waitForTimeout(250);
     }
-    return prev;
+    return { len: prev, settled: false };
   }
   const probe = (p) => p.evaluate(() => {
     /* `document.fonts.check()` ตอบ true ให้ตระกูลที่ไม่รู้จัก (ถือเป็น system font) —
@@ -178,7 +181,9 @@ async function main() {
       p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
       p.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
       await p.goto(`http://127.0.0.1:4919/${page}`, { waitUntil: 'networkidle', timeout: 30000 });
-      await p.waitForTimeout(400);
+      // รอสัญญาณจริงของฟอนต์ (fonts.ready) แทนหน้าต่างตาย 400ms — CDN มาช้ากว่านั้นคือเรื่องเครือข่าย ไม่ใช่ defect ของหน้า
+      await p.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 8000))]));
+      await p.waitForTimeout(150);
       const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       report(errs.length === 0 && overflow === 0, `${label} ${page}`, `errors=${errs.length} overflow=${overflow}${errs.length ? ' :: ' + errs.join(' | ').slice(0, 160) : ''}`);
       const m = await probe(p);
@@ -407,13 +412,14 @@ async function main() {
         headingWidth: h ? h.getBoundingClientRect().width : document.body.scrollHeight,
       };
     });
-    const downTextLen = await settledTextLen(dp);
+    const downTextLen = await settledTextLen(dp); // { len, settled }
     dp.off('console', onConsole);
     dp.off('pageerror', onPageError);
     if (m.faces !== 0) downFails.push(`${page}: ${m.faces} webfont face(s) still declared — blocking did not take effect, test is meaningless`);
     if (errs.length) downFails.push(`${page}: errors=${errs.length} :: ${errs[0]}`);
     if (m.overflow !== 0) downFails.push(`${page}: overflow=${m.overflow}`);
-    if (gate.textLen[page] !== undefined && downTextLen !== gate.textLen[page]) downFails.push(`${page}: rendered text changed ${gate.textLen[page]}→${downTextLen}`);
+    const base = gate.textLen[page];
+    if (base && base.settled && downTextLen.settled && downTextLen.len !== base.len) downFails.push(`${page}: rendered text changed ${base.len}→${downTextLen.len}`);
     if (m.headingWidth < 20) downFails.push(`${page}: heading collapsed (${Math.round(m.headingWidth)}px)`);
   }
   report(downFails.length === 0, `resilience: all ${pages.length} pages usable with Google Fonts unreachable (no errors, no overflow, text + layout intact)`, downFails.slice(0, 4).join(' ; '));
