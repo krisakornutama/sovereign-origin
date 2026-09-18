@@ -15,6 +15,7 @@ out/
 dist/
 dist-*/
 build/
+!sovereign-frontend/build/
 *.tsbuildinfo
 
 # ── ไบนารี/แพ็กเกจขนาดใหญ่ (สร้างใหม่หรือดาวน์โหลดได้ — ไม่ใช่ซอร์ส) ──

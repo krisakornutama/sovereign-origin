@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sovereign OS — ตั้งค่าครั้งแรก</title>
+  <style>
+    :root {
+      --bg: #020617; --card: #0f172a; --border: #1e293b;
+      --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+      --text: #e2e8f0; --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', 'IBM Plex Sans Thai', system-ui, sans-serif;
+      background: radial-gradient(ellipse at 50% -20%, #0d2137 0%, var(--bg) 60%);
+      color: var(--text); min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .panel { width: 100%; max-width: 640px; }
+    .logo { text-align: center; margin-bottom: 22px; }
+    .logo h1 { font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+    .logo p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; margin-bottom: 14px;
+    }
+    .step-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+    .row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; font-size: 14px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #475569; flex-shrink: 0; }
+    .dot.on { background: var(--green); box-shadow: 0 0 8px rgba(16,185,129,.7); }
+    .dot.bad { background: var(--red); }
+    .row .name { flex: 1; }
+    .row .val { color: var(--muted); font-size: 12px; text-align: right; max-width: 55%; }
+    .btn {
+      width: 100%; padding: 13px; border: 0; border-radius: 10px; cursor: pointer;
+      background: linear-gradient(135deg, #059669, #10b981); color: #fff;
+      font-size: 15px; font-weight: 700; transition: transform .1s, filter .15s;
+    }
+    .btn:hover { filter: brightness(1.12); }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .55; cursor: wait; }
+    .btn-ghost {
+      width: 100%; margin-top: 8px; padding: 11px; border-radius: 10px; cursor: pointer;
+      background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 13px;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #334155; }
+    .msg {
+      display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+      font-size: 13px; background: rgba(245,158,11,.12); color: var(--amber);
+      border: 1px solid rgba(245,158,11,.3); line-height: 1.6;
+    }
+    .msg.ok { background: rgba(16,185,129,.12); color: var(--green); border-color: rgba(16,185,129,.3); }
+    .dir { font-family: Consolas, monospace; font-size: 12.5px; color: var(--text); }
+    .muted { color: var(--muted); }
+    .progress { display: none; margin-top: 10px; height: 8px; background: #1e293b; border-radius: 99px; overflow: hidden; }
+    .progress.on { display: block; }
+    .progress > div { height: 100%; width: 35%; background: var(--green); border-radius: 99px; animation: slide 1.4s ease-in-out infinite; }
+    @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+    .update-latest { color: var(--green); font-size: 13px; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="logo">
+      <h1>🏰 ตั้งค่า Sovereign OS ครั้งแรก</h1>
+      <p>สามขั้นจบ — เลือกโฟลเดอร์ · ตรวจสภาพแวดล้อม · เริ่มระบบ (ปิดข้ามได้ ตั้งใหม่ได้จากเมนู tray)</p>
+    </div>
+
+    <div class="card" id="cardDir">
+      <div class="step-title">1 · โฟลเดอร์หลักของระบบ</div>
+      <div class="row">
+        <span class="dir" id="dirLabel">ยังไม่ได้เลือก (ใช้ค่าเริ่มต้นถัดไป)</span>
+      </div>
+      <button class="btn-ghost" id="btnPick" style="margin-top:10px">📁 เลือกโฟลเดอร์…</button>
+      <div class="hint muted" style="margin-top:8px;font-size:12px;line-height:1.6">
+        แนะนำโฟลเดอร์บนไดรฟ์ข้อมูลที่มีพื้นที่เหลือมาก (เช่น E:) — ข้อมูล/บันทึกของระบบจะอยู่ที่นี่ ไม่แตะโฟลเดอร์ติดตั้งโปรแกรม
+      </div>
+    </div>
+
+    <div class="card" id="cardEnv">
+      <div class="step-title">2 · ตรวจสภาพแวดล้อม</div>
+      <div class="row"><span class="dot" id="d-node"></span><span class="name">Node.js</span><span class="val" id="v-node">…</span></div>
+      <div class="row"><span class="dot" id="d-docker"></span><span class="name">Docker (สำหรับเริ่มระบบหลักอัตโนมัติ)</span><span class="val" id="v-docker">…</span></div>
+      <div class="row"><span class="dot" id="d-bat"></span><span class="name">start-sovereign.bat</span><span class="val" id="v-bat">…</span></div>
+      <button class="btn-ghost" id="btnRecheck" style="margin-top:10px">🔄 ตรวจใหม่</button>
+    </div>
+
+    <div class="card" id="cardGo">
+      <div class="step-title">3 · เริ่มใช้งาน</div>
+      <button class="btn" id="btnStart">🚀 บันทึกการตั้งค่า + เริ่มระบบทั้งหมด</button>
+      <div class="progress" id="prog"><div></div></div>
+      <div class="msg" id="msg"></div>
+    </div>
+
+    <div class="card" id="cardUpdate">
+      <div class="step-title">4 · อัปเดตโปรแกรม (ไม่บังคับ)</div>
+      <div class="row"><span class="name">เวอร์ชันปัจจุบัน</span><span class="val" id="vCur">…</span></div>
+      <div class="row"><span class="name">เวอร์ชันล่าสุดบน GitHub</span><span class="val" id="vLatest">ยังไม่ตรวจ</span></div>
+      <button class="btn-ghost" id="btnCheck" style="margin-top:10px">🔍 ตรวจอัปเดต</button>
+      <button class="btn-ghost" id="btnDl" style="display:none">⬇️ ดาวน์โหลดตัวติดตั้งใหม่ (.exe)</button>
+      <div class="msg" id="msgUpd"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let pickedDir = null;
+
+    function showMsg(text, ok, el) {
+      const m = el || $('msg');
+      m.textContent = text;
+      m.className = 'msg' + (ok ? ' ok' : '');
+      m.style.display = 'block';
+      setTimeout(() => { m.style.display = 'none'; }, 9000);
+    }
+    function setRow(key, ok, detail) {
+      $('d-' + key).className = 'dot ' + (ok ? 'on' : 'bad');
+      $('v-' + key).textContent = detail || (ok ? 'พร้อม' : 'ไม่พบ');
+    }
+
+    async function loadDir() {
+      try { pickedDir = await window.sovereign.getSetupDir(); } catch { pickedDir = null; }
+      $('dirLabel').textContent = pickedDir ? pickedDir : 'ยังไม่ได้เลือก (ใช้ค่าเริ่มต้นถัดไป)';
+    }
+    async function checkEnv() {
+      try {
+        const env = await window.sovereign.checkEnv();
+        setRow('node', env.node.ok, env.node.detail);
+        setRow('docker', env.docker.ok, env.docker.detail);
+        setRow('bat', env.bat.ok, env.bat.detail);
+      } catch (e) { showMsg('ตรวจสภาพแวดล้อมไม่สำเร็จ: ' + e.message, false); }
+    }
+    async function applyUpdate(u) {
+      if (!u) return;
+      $('vCur').textContent = 'v' + u.current;
+      if (u.ok) {
+        $('vLatest').textContent = u.latest + (u.hasUpdate ? ' — มีเวอร์ชันใหม่' : ' — ล่าสุดแล้ว');
+        $('vLatest').style.color = u.hasUpdate ? 'var(--amber)' : 'var(--green)';
+        $('btnDl').style.display = (u.hasUpdate && u.assetUrl) ? 'block' : 'none';
+      } else {
+        $('vLatest').textContent = 'ตรวจไม่สำเร็จ';
+        $('btnDl').style.display = 'none';
+      }
+    }
+
+    $('btnPick').addEventListener('click', async () => {
+      const d = await window.sovereign.pickInstallDir();
+      if (d) { pickedDir = d; $('dirLabel').textContent = d; }
+    });
+    $('btnRecheck').addEventListener('click', checkEnv);
+    $('btnStart').addEventListener('click', async () => {
+      $('btnStart').disabled = true;
+      $('prog').className = 'progress on';
+      try {
+        const r = await window.sovereign.startSystem();
+        showMsg(r.message || (r.ok ? 'กำลังเริ่มระบบ — เชลล์จะพาเข้า Dashboard เองเมื่อพร้อม' : 'เริ่มระบบไม่สำเร็จ'), r.ok);
+      } catch (e) { showMsg('สั่งเริ่มไม่สำเร็จ: ' + e.message, false); }
+      try { await window.sovereign.beginSetup(pickedDir); } catch { /* window จะปิดเอง */ }
+    });
+    $('btnCheck').addEventListener('click', async () => {
+      $('btnCheck').disabled = true;
+      try { await applyUpdate(await window.sovereign.checkUpdates()); }
+      finally { $('btnCheck').disabled = false; }
+    });
+    $('btnDl').addEventListener('click', async () => {
+      $('btnDl').disabled = true;
+      try {
+        const r = await window.sovereign.downloadUpdate();
+        showMsg(r.message, r.ok, $('msgUpd'));
+      } finally { $('btnDl').disabled = false; }
+    });
+
+    try { window.sovereign.onUpdate(applyUpdate); } catch { /* ignore */ }
+    try { window.sovereign.onWizardFocus((f) => { if (f === 'update') $('btnCheck').scrollIntoView({ behavior: 'smooth' }); }); } catch { /* ignore */ }
+    loadDir().then(checkEnv);
+  </script>
+</body>
+</html>

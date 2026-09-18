@@ -1,6 +1,6 @@
 {
   "name": "sovereign-frontend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -25,11 +25,46 @@
   "build": {
     "appId": "com.sovereign.os",
     "productName": "Sovereign OS",
-    "directories": { "output": "dist-electron" },
-    "files": ["electron/**/*", "public/**/*", "package.json"],
-    "extraResources": [{ "from": "../sovereign-os/core-api/dist", "to": "core-api/dist" }, { "from": "../sovereign-os/core-api/prisma", "to": "core-api/prisma" }, { "from": "../sovereign-os/core-api/package.json", "to": "core-api/package.json" }, { "from": "../sovereign-os/core-api/node_modules", "to": "core-api/node_modules" }, { "from": "out", "to": "out" }],
-    "win": { "target": ["portable", "zip"], "icon": "public/icon.png" },
-    "portable": { "artifactName": "Sovereign-OS-${version}-portable.${ext}" }
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../sovereign-os/core-api/dist",
+        "to": "core-api/dist"
+      },
+      {
+        "from": "../sovereign-os/core-api/prisma",
+        "to": "core-api/prisma"
+      },
+      {
+        "from": "../sovereign-os/core-api/package.json",
+        "to": "core-api/package.json"
+      },
+      {
+        "from": "../sovereign-os/core-api/node_modules",
+        "to": "core-api/node_modules"
+      },
+      {
+        "from": "out",
+        "to": "out"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "Sovereign-OS-${version}-portable.${ext}"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
