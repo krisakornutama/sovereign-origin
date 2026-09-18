@@ -23,9 +23,13 @@ fi
 
 # 2) ตั้งจริงผ่าน Branch protection API (ต้อง admin)
 if [ "${1:-}" = "--apply" ]; then
-  gh api -X PUT "repos/$REPO/branches/main/protection" \
-    -f "required_status_checks[strict]=true" \
-    $(printf ' -f "required_status_checks[contexts][]=%s"' "${CONTEXTS[@]}") \
+  # สร้าง args เป็น array — context มีช่องว่าง ห้ามผ่าน printf แล้วให้ shell แตกคำ
+  # -F (typed) กับ strict เพื่อให้เป็น boolean จริง — -f จะส่งสตริง "true" แล้ว GitHub ตอบ 422
+  ARGS=(-F "required_status_checks[strict]=true")
+  for c in "${CONTEXTS[@]}"; do
+    ARGS+=(-f "required_status_checks[contexts][]=$c")
+  done
+  gh api -X PUT "repos/$REPO/branches/main/protection" "${ARGS[@]}" \
     -F "enforce_admins=false" \
     -F "required_pull_request_reviews=null" \
     -F "restrictions=null"
