@@ -198,3 +198,4 @@ health.json
 # playwright e2e creds (local only)
 .env.playwright
 .dbtest-tmp/
+sovereign-frontend/out/

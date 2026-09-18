@@ -254,7 +254,8 @@ else { dlog('single-instance: Sovereign OS รันอยู่แล้ว —
 
 app.whenReady().then(() => {
   if (!hasSingleLock) return; // กันหน้าต่างซ้อนในช่วงรอ app.quit() ของ instance ที่แพ้ lock
-  app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
+  // จด login item เฉพาะตอน packaged — โหมด dev ห้ามลงทะเบียน auto-start ชี้ไปที่ electron ตัวทดสอบ
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   startBackend();
   createWindow();
   boot();
