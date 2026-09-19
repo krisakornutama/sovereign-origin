@@ -55,6 +55,9 @@ app.use('/api/auth', authRoutes);
 // route ใหม่จริง
 app.use('/api/client-monitor', clientMonitorRoutes);
 
+// user management จริง (reset-password + PUT ตั้งบังคับ) — ใช้กับการทดสอบ UI หน้า /users
+app.use('/api/users', require(`${CORE}/dist/modules/users/users.routes.js`).default);
+
 // endpoint จริงที่แผง Client Health เรียก (middleware authenticate จริง)
 app.get('/api/system/client-health', authenticate, async (req, res) => {
   try {
