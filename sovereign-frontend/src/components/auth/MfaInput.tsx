@@ -136,12 +136,6 @@ export default function MfaInput() {
     }
   };
 
-  // ยกเลิกเซสชันครึ่งวงจร (mfa_required) → เคลียร์ token ชั่วคราวแล้วกลับหน้าล็อกอิน
-  const cancelMfa = () => {
-    logout();
-    router.push('/');
-  };
-
   // auto-submit เมื่อครบ 6 หลัก (ดีเลย์นิดหน่อยให้ user เห็นตัวสุดท้าย)
   useEffect(() => {
     if (code.length !== DIGIT_COUNT) return;
@@ -271,7 +265,7 @@ export default function MfaInput() {
 
           <button
             type="button"
-            onClick={cancelMfa}
+            onClick={logout}
             className="mt-1 mx-auto block text-xs text-gray-500 hover:text-gray-300"
           >
             {t('login.mfaCancel', 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ')}
