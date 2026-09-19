@@ -564,18 +564,7 @@ export default function UsersPage() {
             <div className="flex items-center gap-2">
               <code className="flex-1 px-3 py-2 rounded bg-gray-950 border border-gray-700 text-emerald-300 text-sm font-mono tracking-wider select-all">{tempPw.password}</code>
               <button
-                onClick={() => {
-                  try {
-                    navigator.clipboard?.writeText(tempPw.password);
-                  } catch {
-                    const ta = document.createElement('textarea');
-                    ta.value = tempPw.password;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                  }
-                }}
+                onClick={() => navigator.clipboard?.writeText(tempPw.password)}
                 className="btn-secondary text-sm"
               >
                 {t('users.copyPw', 'คัดลอก')}
