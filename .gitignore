@@ -163,6 +163,8 @@ sovereign-os/infra/\[...prev
 # Playwright E2E
 sovereign-frontend/e2e/.auth/
 sovereign-frontend/playwright-report/
+# playwright browsers ดาวน์โหลดไว้บน E: (กฎ drive)
+.playwright-browsers/
 sovereign-frontend/test-results/
 
 # Local LLM models (GGUF — หลาย GB อย่า commit)
