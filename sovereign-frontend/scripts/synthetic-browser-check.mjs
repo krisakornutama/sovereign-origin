@@ -13,7 +13,7 @@
 // env:
 //   SYNTHETIC_TARGET_URL   หน้าที่จะตรวจ (default http://localhost:3000/shop — หน้าสาธารณะ)
 //   SYNTHETIC_API_URL      API ที่รายงานเข้า (default http://localhost:3001)
-//   SYNTHETIC_ENGINE       chromium (default) | webkit | auto
+//   SYNTHETIC_ENGINE       chromium (default) | webkit
 //                          webkit = engine จริงของ iOS (รัน `npx playwright install webkit` ก่อน)
 //
 // ไม่เพิ่ม dependency — ใช้ @playwright/test ที่มีอยู่ใน devDependencies แล้ว
@@ -99,12 +99,9 @@ async function checkProfile(launcher, profile) {
     });
     const page = await context.newPage();
 
-    const consoleErrors = [];
     const pageErrors = [];
     const failedRequests = [];
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 200));
-    });
+    // ไม่ดัก console.error — JS error จริงโผล่ที่ pageerror อยู่แล้ว (กัน false-positive จาก log ระบบ)
     page.on('pageerror', (err) => pageErrors.push(String(err?.message || err).slice(0, 200)));
     page.on('requestfailed', (req) => {
       const url = req.url();
@@ -112,7 +109,11 @@ async function checkProfile(launcher, profile) {
     });
 
     // 1) โหลดหน้า — ลูกค้าไม่รอเกิน ~15 วิ (WebView ช้าจริง แต่ไม่ใช่ไม่มีวันเสร็จ)
-    await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+    //    status >= 400 นับพัดด้วย (404/500 ที่ HTML ยัง render ได้ ไม่ควรผ่าน "uptime แบบลูกค้า")
+    const resp = await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+    if (resp && resp.status() >= 400) {
+      failures.push(`HTTP ${resp.status()} จากหน้าเป้าหมาย`);
+    }
 
     // 2) render จริง — ต้องมี <main> และต้องไม่ติดหน้า "Application error"
     await page.waitForSelector('main, body', { timeout: 10_000 });
@@ -161,7 +162,7 @@ async function runOnce() {
     // เลือก engine: profile Android = chromium เสมอ · profile iOS ใช้ WebKit จริงเมื่อสั่ง
     // SYNTHETIC_ENGINE=webkit (ต้อง `npx playwright install webkit` ก่อน) —
     // default chromium = จำลองด้วย UA อย่างเดียว แต่รันได้ทุกเครื่องที่ลง playwright มา
-    const useLauncher = profile.engine === 'webkit' && (ENGINE === 'webkit' || ENGINE === 'auto') ? webkit : chromium;
+    const useLauncher = profile.engine === 'webkit' && ENGINE === 'webkit' ? webkit : chromium;
     const result = await checkProfile(useLauncher, profile);
     results.push(result);
     log(`${result.ok ? '✅ PASS' : '❌ FAIL'} — ${result.profile}${result.ok ? '' : ` → ${result.failures.join(' | ')}`}`);

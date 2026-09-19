@@ -9,7 +9,6 @@ import {
   shouldAlert,
   tally,
   aggregateClientHealth,
-  type AlertCounters,
   type ClientHealthEventRow,
 } from '../src/services/client-monitor.service';
 
@@ -136,7 +135,7 @@ describe('Client Monitor: aggregateClientHealth', () => {
 });
 
 describe('Client Monitor: shouldAlert (threshold 3 ใน 5 นาที)', () => {
-  const counters: AlertCounters = { windows: new Map() };
+  const counters = new Map<string, number[]>();
 
   it('ครั้งที่ 1-2 ยังไม่ alert', () => {
     assert.equal(shouldAlert(counters, 'fp1', 1000), false);
