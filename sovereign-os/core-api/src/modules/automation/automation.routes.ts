@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { authenticate } from '../../middleware/auth.middleware';
+import { config } from '../../config';
 import { automationEngine, automationEmitter } from '../../services/automation.service';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
 
@@ -89,8 +91,18 @@ router.post('/check', authenticate, (req, res) => {
   res.json({ alerts });
 });
 
-// GET /api/automation/alerts/stream (SSE)
+// GET /api/automation/alerts/stream (SSE) — ด่าน query-token แบบเดียวกับ nextgen/events
+// (EventSource ฝั่ง browser ส่ง Authorization header ไม่ได้ จึงรับ token ทาง query)
 router.get('/alerts/stream', (req, res) => {
+  const token = String(req.query.token || '');
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    if (!decoded.mfa_verified) return res.status(403).json({ error: 'MFA verification required' });
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
