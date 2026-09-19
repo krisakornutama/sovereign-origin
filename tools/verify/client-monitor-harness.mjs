@@ -60,6 +60,9 @@ app.use('/api/client-monitor', clientMonitorRoutes);
 // user management จริง (reset-password + PUT ตั้งบังคับ) — ใช้กับการทดสอบ UI หน้า /users
 app.use('/api/users', require(`${CORE}/dist/modules/users/users.routes.js`).default);
 
+// audit viewer จริง (หน้า /audit ใช้ — SUPERADMIN)
+app.use('/api/audit', require(`${CORE}/dist/modules/audit/audit.routes.js`).default);
+
 // endpoint จริงที่แผง Client Health เรียก (middleware authenticate จริง)
 app.get('/api/system/client-health', authenticate, async (req, res) => {
   try {
@@ -86,7 +89,8 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function seedUser() {
-  const hash = await bcrypt.hash(process.env.HARNESS_TEST_PASSWORD, 10);
+  const testPassword = process.env.HARNESS_TEST_PASSWORD || 'Verify-Admin-2026!';
+  const hash = await bcrypt.hash(testPassword, 10);
   await prisma.user.upsert({
     where: { username: 'verify-admin' },
     update: { password_hash: hash, must_change_password: false, mfa_secret: null },
@@ -94,11 +98,19 @@ async function seedUser() {
   });
 }
 
-const server = app.listen(PORT, process.env.HARNESS_HOST || '127.0.0.1', () => console.log(`HARNESS-READY on ${PORT}`));
+// test rig: async error จาก route ห้ามพา process ตาย (Express 4 ไม่จับ async)
+process.on('unhandledRejection', (err) => console.error('HARNESS-ASYNC-ERR', err?.message || err));
+process.on('uncaughtException', (err) => console.error('HARNESS-UNCAUGHT', err?.message || err));
+
+let server;
+seedUser()
+  .then(() => {
+    server = app.listen(PORT, process.env.HARNESS_HOST || '127.0.0.1', () => console.log(`HARNESS-READY on ${PORT}`));
+    console.log('HARNESS-SEEDED user verify-admin');
+  })
+  .catch((err) => { console.error('HARNESS-SEED-FAIL', err?.message || err); process.exit(1); });
 
 process.on('SIGTERM', () => { server.close(); prisma.$disconnect().finally(() => process.exit(0)); });
 process.on('SIGINT', () => { server.close(); prisma.$disconnect().finally(() => process.exit(0)); });
 
-seedUser()
-  .then(() => console.log('HARNESS-SEEDED user verify-admin'))
-  .catch((err) => { console.error('HARNESS-SEED-FAIL', err?.message || err); process.exit(1); });
+

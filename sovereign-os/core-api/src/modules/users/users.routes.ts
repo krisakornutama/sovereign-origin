@@ -45,11 +45,11 @@ router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) 
 // + bump token_version → token เดิมทุกอุปกรณ์ตายทันที และลง audit log ทุกครั้ง
 router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
-    const { temporaryPassword } = await AuthService.adminResetPassword(req.params.id);
+    const { temporaryPassword, targetUsername } = await AuthService.adminResetPassword(req.params.id);
     await AuditService.logAction({
       userId: req.user!.id,
       actionType: 'USER_PASSWORD_RESET_BY_ADMIN',
-      payload: { target_user_id: req.params.id, ip: req.ip },
+      payload: { target_user_id: req.params.id, target_username: targetUsername, ip: req.ip },
     });
     res.json({ temporaryPassword });
   } catch (err: any) {
