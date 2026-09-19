@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { agentActions } from '../../services/agent-actions.service';
 import { listProcesses } from '../../services/system-processes.service';
 import { getDiskInfo } from '../../services/system-monitor.service';
+import { getClientHealthSummary } from '../../services/client-monitor.service';
 import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
 import { fetchRouterSimData, setAdminPassword } from '../../services/tplink-mr505.service';
 
@@ -77,6 +78,18 @@ router.post('/processes/kill', authenticate, async (req, res) => {
   if (result.status === 'denied') return res.status(403).json(result);
   if (result.status === 'requires_approval') return res.status(202).json(result);
   return res.json(result);
+});
+
+// ── Client Health — สรุป error ที่เก็บจาก browser ผู้ใช้ (SecurityEvent event_type=CLIENT_ERROR) ──
+// GET /api/system/client-health?days=7 — แผง Client Health ในหน้า /system
+router.get('/client-health', authenticate, async (req, res) => {
+  try {
+    const days = Math.min(Math.max(parseInt(String(req.query.days) || '7', 10) || 7, 1), 30);
+    res.json(await getClientHealthSummary(days));
+  } catch (err) {
+    console.error('client-health summary failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to summarize client health' });
+  }
 });
 
 // ── WAN Monitor (Archer MR505 SIM) ──

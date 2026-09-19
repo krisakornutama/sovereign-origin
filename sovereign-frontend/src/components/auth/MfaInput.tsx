@@ -265,7 +265,11 @@ export default function MfaInput() {
 
           <button
             type="button"
+<<<<<<< HEAD
             onClick={logout}
+=======
+            onClick={logout}
+>>>>>>> freebuff/task-26201e6b-f023-4119-9715-4a8b45522306
             className="mt-1 mx-auto block text-xs text-gray-500 hover:text-gray-300"
           >
             {t('login.mfaCancel', 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ')}
