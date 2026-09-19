@@ -44,6 +44,8 @@ const cors = require('cors');
 const app = express();
 app.use(cors({ origin: true })); // harness: อนุญาตทุก origin (เทสเท่านั้น) — production ใช้ cors จริงใน server.ts
 app.use(express.json({ limit: '1mb' }));
+// เหมือน prod (server.ts): auto-audit ทุก POST/PUT/PATCH/DELETE ที่ผ่าน auth
+app.use(require(`${CORE}/dist/middleware/auth.middleware.js`).auditStateChange);
 
 // หน้า health สำหรับ ApiConnectionBanner ของ frontend (ให้ UI ทดสอบสงบ)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
