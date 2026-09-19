@@ -1,7 +1,0 @@
-{
-  "name": "sovereign-frontend",
-  "version": "1.0.0",
-  "private": true,
-  "main": "electron/main.js",
-  "_comment": "Generated from sovereign-frontend/package.json by tools/build-desktop.mjs — ห้ามแก้มือ แก้ที่ซอร์สแล้วรัน build-desktop ใหม่"
-}
