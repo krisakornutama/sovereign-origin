@@ -27,6 +27,8 @@ interface AuditLog {
 }
 
 const LIMIT_OPTIONS = [50, 100, 200, 500];
+// คำนำหน้า action_type ของวงจรรหัสผ่าน — ใช้เป็นปุ่มกรองด่วนในหน้า
+const PASSWORD_PREFIX = 'USER_PASSWORD';
 
 export default function AuditPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
@@ -35,12 +37,17 @@ export default function AuditPage() {
   const [limit, setLimit] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [passwordOnly, setPasswordOnly] = useState(false);
 
   const loadLogs = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit?limit=${limit}`);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (query.trim()) params.set('q', query.trim());
+      if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLogs(data);
@@ -55,7 +62,7 @@ export default function AuditPage() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated) return;
     loadLogs();
-  }, [isHydrated, isAuthenticated, limit]);
+  }, [isHydrated, isAuthenticated, limit, passwordOnly]);
 
   if (!isHydrated) {
     return <div className="text-white p-8">{t('common.loading', 'กำลังโหลด...')}</div>;
@@ -98,6 +105,26 @@ export default function AuditPage() {
         <div className="flex justify-between items-center">
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('audit.title', 'ประวัติการกระทำ (Audit Log)')}</h2>
           <div className="flex gap-3 items-center">
+            <form
+              onSubmit={(e) => { e.preventDefault(); loadLogs(); }}
+              className="flex gap-2 items-center"
+            >
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('audit.searchPlaceholder', 'ค้น action/payload เช่น somchai, /api/users')}
+                className="input text-sm w-64"
+              />
+              <button type="submit" className="btn-secondary" disabled={loading}>
+                {t('audit.search', 'ค้นหา')}
+              </button>
+            </form>
+            <button
+              onClick={() => setPasswordOnly((v) => !v)}
+              className={passwordOnly ? 'btn-primary' : 'btn-secondary'}
+            >
+              🔑 {t('audit.passwordOnly', 'เรื่องรหัสผ่าน')}
+            </button>
             <select
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
@@ -137,7 +164,7 @@ export default function AuditPage() {
             </thead>
             <tbody className="divide-y divide-gray-800/50">
               {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-800/50">
+                <tr key={log.id} className={log.action_type.startsWith(PASSWORD_PREFIX) ? 'bg-amber-500/10 hover:bg-amber-500/20' : 'hover:bg-gray-800/50'}>
                   <td className="px-4 py-2 text-xs text-gray-400 whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString(fmtLocale())}
                   </td>
