@@ -134,13 +134,6 @@ export default function AuditPage() {
                 <option key={n} value={n}>{t('audit.showLimit', 'แสดง {n} รายการ', { n })}</option>
               ))}
             </select>
-            <button
-              onClick={loadLogs}
-              className="btn-secondary"
-            >
-              <Icon name="refresh" size={14} />
-              {t('common.refresh', 'รีเฟรช')}
-            </button>
           </div>
         </div>
 
