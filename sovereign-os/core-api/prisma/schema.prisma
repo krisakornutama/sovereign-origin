@@ -125,11 +125,12 @@ model RelaySchedule {
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
   timestamp   DateTime @default(now()) @db.Timestamptz
-  user_id     String   @db.Uuid
+  // nullable + SetNull: audit เป็นประวัติระบบ ต้องรอดแม้ user ถูกลบ (เคสจริง: FK บังคับทำ DELETE /api/users/:id ค้าง)
+  user_id     String?  @db.Uuid
   action_type String
   payload     Json
 
-  user User @relation(fields: [user_id], references: [id])
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
 }
