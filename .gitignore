@@ -201,3 +201,9 @@ health.json
 .env.playwright
 .dbtest-tmp/
 sovereign-frontend/out/
+
+# ── ฐานข้อมูล local (ห้ามเข้า git — กัน schema เดิมกลืนข้อมูลจริง) ──
+sovereign-os/core-api/prisma/data.db
+sovereign-os/core-api/prisma/prisma/
+*.db
+!**/node_modules/**/*.db
