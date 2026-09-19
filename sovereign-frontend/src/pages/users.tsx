@@ -48,6 +48,8 @@ export default function UsersPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // รหัสชั่วคราวจากการ "ตั้งรหัสใหม่" — โชว์ครั้งเดียวใน modal (server สุ่ม, admin ไม่รู้ก่อนหน้า)
+  const [tempPw, setTempPw] = useState<{ username: string; password: string } | null>(null);
   const t = useLanguageStore((s) => s.t);
 
   // ── สิทธิ์ฟังก์ชั่นต่อคน ──
@@ -181,23 +183,45 @@ export default function UsersPage() {
     }
   };
 
-  // บังคับให้ user เปลี่ยนรหัสผ่านครั้งหน้า login (เช่น สงสัยว่ารั่ว/ลืมรหัส)
-  const forcePasswordChange = async (id: string, username: string) => {
-    if (!confirm(t('users.forcePwConfirm', 'บังคับให้ {username} เปลี่ยนรหัสผ่านครั้งหน้า login?', { username }))) return;
+  // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่านครั้งหน้า login (เช่น สงสัยว่ารั่ว/ลืมรหัส)
+  const setForceChange = async (id: string, username: string, target: boolean) => {
+    const verb = target
+      ? t('users.forcePwConfirm', 'บังคับให้ {username} เปลี่ยนรหัสผ่านครั้งหน้า login?', { username })
+      : t('users.forcePwCancelConfirm', 'ยกเลิกบังคับเปลี่ยนรหัสผ่านของ {username}?', { username });
+    if (!confirm(verb)) return;
     setMessage('');
     setError('');
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ must_change_password: true }),
+        body: JSON.stringify({ must_change_password: target }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('users.settingFailed', 'ตั้งค่าไม่สำเร็จ'));
-      setMessage(t('users.forcePwDone', 'ตั้งบังคับเปลี่ยนรหัสผ่านให้ {username} แล้ว — ครั้งหน้า login ต้องเปลี่ยนก่อนเข้าใช้', { username }));
+      setMessage(target
+        ? t('users.forcePwDone', 'ตั้งบังคับเปลี่ยนรหัสผ่านให้ {username} แล้ว — ครั้งหน้า login ต้องเปลี่ยนก่อนเข้าใช้', { username })
+        : t('users.forcePwCancelled', 'ยกเลิกบังคับเปลี่ยนรหัสผ่านของ {username} แล้ว', { username }));
       loadUsers();
     } catch (err: any) {
       setError(`${err.message || t('users.settingFailed', 'ตั้งค่าไม่สำเร็จ')}`);
+    }
+  };
+
+  // ตั้งรหัสใหม่ให้ user (กู้ลืมรหัส / สงสัยรั่ว): server สุ่มรหัสชั่วคราว + token เดิมทุกอุปกรณ์ตายทันที
+  // → โชว์รหัสครั้งเดียวให้ admin ส่งต่อสมาชิก — เขา login ด้วยรหัสนี้แล้วถูกบังคับเปลี่ยนเอง
+  const resetPassword = async (id: string, username: string) => {
+    if (!confirm(t('users.resetPwConfirm', 'ตั้งรหัสผ่านชั่วคราวให้ {username}? — session เดิมทุกอุปกรณ์จะถูกตัดทันที', { username }))) return;
+    setMessage('');
+    setError('');
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}/reset-password`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('users.resetPwFailed', 'ตั้งรหัสใหม่ไม่สำเร็จ'));
+      setTempPw({ username, password: data.temporaryPassword });
+      loadUsers();
+    } catch (err: any) {
+      setError(`${err.message || t('users.resetPwFailed', 'ตั้งรหัสใหม่ไม่สำเร็จ')}`);
     }
   };
 
@@ -419,16 +443,22 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-400">{u.assigned_node_id || '-'}</td>
                     <td className="px-4 py-2">
-                      {!u.must_change_password && (
-                        <button
-                          onClick={() => forcePasswordChange(u.id, u.username)}
-                          disabled={u.id === user.id}
-                          title={t('users.forcePwTitle', 'บังคับเปลี่ยนรหัสผ่านครั้งหน้า login')}
-                          className="text-amber-400 hover:text-amber-300 text-xs disabled:opacity-30 mr-3"
-                        >
-                          <Icon name="key" size={12} /> {t('users.forcePwBtn', 'บังคับเปลี่ยน')}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => resetPassword(u.id, u.username)}
+                        disabled={u.id === user.id}
+                        title={t('users.resetPwTitle', 'สุ่มรหัสชั่วคราวใหม่ — session เดิมตัดทันที')}
+                        className="text-sky-400 hover:text-sky-300 text-xs disabled:opacity-30 mr-3"
+                      >
+                        <Icon name="refresh" size={12} /> {t('users.resetPwBtn', 'ตั้งรหัสใหม่')}
+                      </button>
+                      <button
+                        onClick={() => setForceChange(u.id, u.username, !u.must_change_password)}
+                        disabled={u.id === user.id}
+                        title={u.must_change_password ? t('users.forcePwCancelTitle', 'ยกเลิกบังคับเปลี่ยนรหัสผ่าน') : t('users.forcePwTitle', 'บังคับเปลี่ยนรหัสผ่านครั้งหน้า login')}
+                        className="text-amber-400 hover:text-amber-300 text-xs disabled:opacity-30 mr-3"
+                      >
+                        <Icon name="key" size={12} /> {u.must_change_password ? t('users.forcePwCancelBtn', 'ยกเลิกบังคับ') : t('users.forcePwBtn', 'บังคับเปลี่ยน')}
+                      </button>
                       <button
                         onClick={() => deleteUser(u.id, u.username)}
                         disabled={u.id === user.id}
@@ -525,6 +555,40 @@ export default function UsersPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal: รหัสชั่วคราวจากการตั้งรหัสใหม่ — โชว์ครั้งเดียว */}
+      {tempPw && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="panel panel-cyan w-full max-w-md shadow-2xl p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('users.tempPwModalTitle', 'รหัสชั่วคราวของ {username}', { username: tempPw.username })}</h2>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 px-3 py-2 rounded bg-gray-950 border border-gray-700 text-emerald-300 text-sm font-mono tracking-wider select-all">{tempPw.password}</code>
+              <button
+                onClick={() => {
+                  try {
+                    navigator.clipboard?.writeText(tempPw.password);
+                  } catch {
+                    const ta = document.createElement('textarea');
+                    ta.value = tempPw.password;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                  }
+                }}
+                className="btn-secondary text-sm"
+              >
+                {t('users.copyPw', 'คัดลอก')}
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400">{t('users.tempPwHint1', 'ส่งรหัสนี้ให้สมาชิกทางช่องทางปลอดภัย — ปิดหน้านี้แล้วดูอีกไม่ได้ (ตั้งรหัสใหม่ได้เสมอ)')}</p>
+            <p className="text-[11px] text-amber-300">{t('users.tempPwHint2', 'สมาชิก login ด้วยรหัสนี้แล้วระบบจะบังคับให้ตั้งรหัสใหม่เองทันที · session เดิมของเขาทุกอุปกรณ์ถูกตัดแล้ว')}</p>
+            <div className="text-right">
+              <button onClick={() => setTempPw(null)} className="btn-primary text-sm">{t('common.close', 'ปิด')}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: สรุปสิทธิ์ทั้งครอบครัว — ใครเห็นหน้าไหน มองทีเดียวจบ */}
       {summaryOpen && (

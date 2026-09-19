@@ -111,7 +111,9 @@ router.post('/verify-mfa', mfaLimiter, authenticatePartial, mfaAccountLimiter, a
 router.post('/change-password', changePasswordLimiter, authenticatePartial, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
-    if (typeof currentPassword !== 'string' || !currentPassword) {
+    // forced flow: สมาชิกที่ login ด้วยรหัสชั่วคราวไม่ต้องพิมพ์รหัสปัจจุบันซ้ำ (flag จาก DB ของ user ตัวเอง)
+    const inForcedFlow = !currentPassword && req.user?.must_change_password === true;
+    if (!inForcedFlow && (typeof currentPassword !== 'string' || !currentPassword)) {
       return res.status(400).json({ error: 'currentPassword is required' });
     }
     if (typeof newPassword !== 'string' || !newPassword) {

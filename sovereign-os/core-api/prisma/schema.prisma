@@ -27,6 +27,10 @@ model User {
   mfa_backup_hash      String?
   // true = ต้องเปลี่ยนรหัสผ่านก่อนใช้งาน (บังคับหลัง login ครั้งแรก / admin ตั้งให้)
   must_change_password Boolean @default(false)
+  // ── Token versioning: เปลี่ยน/รีเซ็ตรหัสผ่านครั้งไหนเลขนี้ +1 ──
+  // JWT ฝังเลขนี้ — middleware เทียบกับ DB ทุก request → token เก่าทุกใบ (อุปกรณ์/session เดิม)
+  // หมดอายุ "ทันที" เมื่อรหัสผ่านเปลี่ยน ไม่ต้องรอครบ 24 ชม.
+  token_version        Int     @default(0)
   assigned_node_id     String? @db.Uuid
 
   assigned_node Node?         @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
