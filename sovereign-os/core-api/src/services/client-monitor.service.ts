@@ -34,6 +34,7 @@ export interface NormalizedClientError {
   line: number;
   column: number;
   page: string;
+  kind: string; // js | promise | resource | fetch | capability | synthetic | unknown
   ua: string;
   isWebView: boolean;
 }
@@ -95,6 +96,7 @@ export function normalizeClientError(payload: ClientErrorPayload, ua = ''): Norm
     line: Number.isFinite(Number(payload.line)) ? Number(payload.line) : 0,
     column: Number.isFinite(Number(payload.column)) ? Number(payload.column) : 0,
     page: boundedString(payload.page, MAX_META_LENGTH) || '/',
+    kind: boundedString(payload.kind, 20) || 'unknown',
     ua: boundedString(ua, 300),
     isWebView: isWebViewUa(ua),
   };
@@ -149,6 +151,7 @@ class ClientMonitor {
             browser: extractBrowser(normalized.ua),
             isWebView: normalized.isWebView,
             errorSource: normalized.source,
+            kind: normalized.kind,
             line: normalized.line,
             column: normalized.column,
             stack: normalized.stack || undefined,
@@ -193,3 +196,101 @@ class ClientMonitor {
 }
 
 export const clientMonitor = new ClientMonitor();
+
+// ── Client Health Summary — สำหรับแผง Client Health (หน้า /system) ──
+
+export interface ClientHealthEventRow {
+  timestamp: Date;
+  description: string;
+  raw_data: unknown;
+}
+
+export interface ClientHealthSummary {
+  days: number;
+  total: number;
+  webviewCount: number;
+  byBrowser: Array<{ key: string; count: number }>;
+  byPage: Array<{ key: string; count: number }>;
+  byKind: Array<{ key: string; count: number }>;
+  topErrors: Array<{ message: string; count: number; lastAt: string }>;
+  daily: Array<{ date: string; count: number }>;
+}
+
+/** นับกลุ่ม → เรียงมากไปน้อย */
+export function tally(entries: Array<[string, number]>): Array<{ key: string; count: number }> {
+  return [...entries]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+}
+
+/**
+ * รวม SecurityEvent (event_type=CLIENT_ERROR) เป็นสรุปตาม browser/หน้า/ชนิด + กราฟต่อวัน
+ * pure function — เทสได้ไม่ต้อง DB (วันที่กรอกเป็น UTC YYYY-MM-DD)
+ */
+export function aggregateClientHealth(events: ClientHealthEventRow[], days = 7): ClientHealthSummary {
+  const browserCounts = new Map<string, number>();
+  const pageCounts = new Map<string, number>();
+  const kindCounts = new Map<string, number>();
+  const errorCounts = new Map<string, { count: number; lastAt: Date | string }>();
+  const dayCounts = new Map<string, number>();
+  let webviewCount = 0;
+
+  for (const e of events) {
+    const raw = (typeof e.raw_data === 'object' && e.raw_data !== null ? e.raw_data : {}) as Record<string, unknown>;
+    const browser = boundedString(raw.browser, 40) || 'unknown';
+    const page = boundedString(raw.page, MAX_META_LENGTH) || '/';
+    const kind = boundedString(raw.kind, 20) || 'unknown';
+    browserCounts.set(browser, (browserCounts.get(browser) || 0) + 1);
+    pageCounts.set(page, (pageCounts.get(page) || 0) + 1);
+    kindCounts.set(kind, (kindCounts.get(kind) || 0) + 1);
+    if (raw.isWebView === true) webviewCount++;
+
+    const message = e.description.replace(/^\[client\]\s*/, '').slice(0, 120) || 'unknown';
+    const prev = errorCounts.get(message);
+    errorCounts.set(message, {
+      count: (prev?.count || 0) + 1,
+      lastAt: new Date(prev?.lastAt || 0) > new Date(e.timestamp) ? prev?.lastAt || e.timestamp : e.timestamp,
+    });
+
+    const ts = e.timestamp instanceof Date ? e.timestamp : new Date(e.timestamp);
+    const day = Number.isNaN(ts.getTime()) ? 'unknown' : ts.toISOString().slice(0, 10);
+    dayCounts.set(day, (dayCounts.get(day) || 0) + 1);
+  }
+
+  // กราฟ: ครบทุกวัน (วันไหนไม่มี error = 0) เรียงเก่า → ใหม่
+  const daily: Array<{ date: string; count: number }> = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000).toISOString().slice(0, 10);
+    daily.push({ date: d, count: dayCounts.get(d) || 0 });
+  }
+
+  return {
+    days,
+    total: events.length,
+    webviewCount,
+    byBrowser: tally([...browserCounts.entries()]),
+    byPage: tally([...pageCounts.entries()]).slice(0, 10),
+    byKind: tally([...kindCounts.entries()]),
+    topErrors: [...errorCounts.entries()]
+      .map(([message, v]) => {
+        const d = new Date(v.lastAt);
+        return { message, count: v.count, lastAt: Number.isNaN(d.getTime()) ? '' : d.toISOString() };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    daily,
+  };
+}
+
+/** ดึงสรุปจาก DB — ใช้โดย GET /api/system/client-health */
+export async function getClientHealthSummary(days = 7): Promise<ClientHealthSummary> {
+  const since = new Date(Date.now() - days * 86400000);
+  const events = await prisma.securityEvent.findMany({
+    where: { event_type: 'CLIENT_ERROR', timestamp: { gte: since } },
+    select: { timestamp: true, description: true, raw_data: true },
+    orderBy: { timestamp: 'desc' },
+    take: 5000,
+  });
+  return aggregateClientHealth(events as ClientHealthEventRow[], days);
+}

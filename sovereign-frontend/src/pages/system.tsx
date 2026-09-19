@@ -11,6 +11,7 @@ import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import RouterCard from '../components/system/RouterCard';
 import LocalLLMCard from '../components/system/LocalLLMCard';
+import ClientHealthPanel from '../components/system/ClientHealthPanel';
 
 interface ProcessInfo {
   pid: number;
@@ -124,6 +125,8 @@ export default function SystemHealthPage() {
         />
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
         <RouterCard />
+        {/* Client Health — error ที่เก็บจาก browser ลูกค้าจริง (real user + synthetic check) */}
+        <ClientHealthPanel />
         <div className="text-[11px] text-gray-500 bg-gray-900/40 border border-gray-800 rounded-lg px-3 py-2">Telegram กลุ่ม <code>-5308443540</code>: ต้องเชิญบอท <code>8807…YcZI</code> เข้ากลุ่มก่อน ถึงจะ `success:true` — ไป `Telegram → กลุ่ม → Add member → @bot` แล้วกด `START` ที่บอท</div>
         <LocalLLMCard />
         {actionMsg && (

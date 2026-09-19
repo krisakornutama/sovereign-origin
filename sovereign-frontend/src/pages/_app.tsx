@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { applyAppearance } from '../lib/config';
 import { installClientErrorReporter, installFetchFailureReporter } from '../lib/clientErrorReporter';
 import ApiConnectionBanner from '../components/layout/ApiConnectionBanner';
+import CapabilityBanner from '../components/layout/CapabilityBanner';
 import MobileNav from '../components/layout/MobileNav';
 import AgentBackgroundBadge from '../components/AgentBackgroundBadge';
 import CommandPaletteHost from '../components/CommandPaletteHost';
@@ -148,6 +149,8 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       {/* self-healing: แสดงสถานะ "กำลังเชื่อมต่อใหม่" ถ้า API ตาย พร้อม retry อัตโนมัติ */}
       <ApiConnectionBanner />
+      {/* capability guard: เตือนเมื่อ browser/WebView ขาดของที่แอปต้องใช้ (LINE/FB in-app ฯลฯ) */}
+      <CapabilityBanner />
       {blocked ? (
         <NoAccessScreen />
       ) : (
