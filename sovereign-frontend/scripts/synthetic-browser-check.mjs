@@ -171,10 +171,14 @@ async function runOnce() {
   log(allOk ? '✅ ทุก profile ผ่าน — uptime มีความหมายรอบนี้' : `❌ พัง ${results.filter((r) => !r.ok).length}/${results.length} profile`);
 
   // รายงานผลทั้งรอบไปยัง streak tracker — นับ FAIL ติดกัน → critical Telegram ทันทีที่ครบเกณฑ์
+  // (token เฉพาะเครื่อง — บน prod request ผ่าน Docker NAT ไม่ใช่ loopback จึงต้องยืนยันด้วย header)
   try {
     await fetch(`${API_URL}/api/client-monitor/synthetic-round`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(process.env.SYNTHETIC_ROUND_TOKEN ? { 'x-synthetic-token': process.env.SYNTHETIC_ROUND_TOKEN } : {}),
+      },
       body: JSON.stringify({ results: results.map(({ profile, ok, failures }) => ({ profile, ok, failures })) }),
     });
   } catch (err) {

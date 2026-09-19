@@ -37,10 +37,14 @@ router.post('/error', errorLimiter, textParser, (req, res) => {
 
 // POST /synthetic-round — synthetic check รายงานผล "ทั้งรอบ" (PASS/FAIL ต่อ profile)
 // ไว้ให้ streak tracker นับ consecutive FAIL → critical Telegram ทันทีที่ครบ threshold
-// เรียกจากเครื่องตัวเองเท่านั้น (loopback) — ปฏิเสธ request จากภายนอก
+// อนุญาต: loopback เสมอ (dev) · request อื่นต้องมี SYNTHETIC_ROUND_TOKEN ใน header
+// (บน prod จริง request ผ่าน Docker port mapping จะไม่ใช่ loopback อีกต่อไป — จึงต้องใช้ token)
 router.post('/synthetic-round', (req, res) => {
-  if (req.ip && !/^::ffff:127\.0\.0\.1$|^127\.0\.0\.1$|^::1$/.test(req.ip)) {
-    return res.status(403).json({ error: 'loopback only' });
+  const isLoopback = !!req.ip && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.ip);
+  const token = process.env.SYNTHETIC_ROUND_TOKEN || '';
+  const hasToken = token.length >= 16 && req.headers['x-synthetic-token'] === token;
+  if (!isLoopback && !hasToken) {
+    return res.status(403).json({ error: 'loopback or token required' });
   }
   const results = Array.isArray(req.body?.results) ? req.body.results : null;
   if (!results) return res.status(400).json({ error: 'results array required' });
