@@ -94,7 +94,7 @@ async function seedUser() {
   });
 }
 
-const server = app.listen(PORT, '127.0.0.1', () => console.log(`HARNESS-READY on ${PORT}`));
+const server = app.listen(PORT, process.env.HARNESS_HOST || '127.0.0.1', () => console.log(`HARNESS-READY on ${PORT}`));
 
 process.on('SIGTERM', () => { server.close(); prisma.$disconnect().finally(() => process.exit(0)); });
 process.on('SIGINT', () => { server.close(); prisma.$disconnect().finally(() => process.exit(0)); });

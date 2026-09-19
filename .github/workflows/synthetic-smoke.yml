@@ -1,0 +1,88 @@
+name: Synthetic browser smoke
+
+# Smoke test มุมมองลูกค้าก่อน merge: build จริงทั้งสองฝั่ง → synthetic check เปิดหน้า
+# ด้วย UA LINE WebView / iOS WebKit → หน้าต้องโหลด+hydrate+ใช้งานได้จริง
+# (HTTP 200 อย่างเดียวไม่พอ — เคส zentwork: server เขียวแต่ WebView เข้าไม่ได้)
+on:
+  pull_request:
+    paths:
+      - 'sovereign-frontend/**'
+      - 'sovereign-os/core-api/**'
+      - '.github/workflows/synthetic-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sovereign-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sovereign-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3000
+
+      - name: Install backend dependencies
+        working-directory: sovereign-os/core-api
+        run: npm install --no-fund --no-audit
+
+      - name: Build backend
+        working-directory: sovereign-os/core-api
+        run: npm run build
+
+      # backend รันใน process เดียวกับ job (mock DB ไม่ต้องมี — synthetic ไม่แตะ DB
+      # และหน้า /shop ที่ synthetic ตรวจเป็นหน้าสาธารณะไม่เรียก API ที่ต้อง auth)
+      - name: Start backend (fire-and-forget)
+        working-directory: sovereign-os/core-api
+        run: |
+          JWT_SECRET=ci-smoke-secret-0000000000000000 \
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/none \
+          node dist/server.js &
+          echo $! > backend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3001/api/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3001/api/health >/dev/null
+
+      - name: Start frontend
+        run: |
+          npx next start -p 3000 &
+          echo $! > frontend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/shop >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/shop >/dev/null
+
+      # พัง = exit 1 = PR บล็อก · SYNTHETIC_ENGINE=webkit รองรับในอนาคต
+      # (ubuntu runner ติดตั้ง webkit deps ได้ ถ้าอยากเข้มขึ้นเปลี่ยน ENGINE + install webkit)
+      - name: Run synthetic browser check
+        run: node scripts/synthetic-browser-check.mjs
+        env:
+          SYNTHETIC_TARGET_URL: http://127.0.0.1:3000/shop
+          SYNTHETIC_API_URL: http://127.0.0.1:3001
+
+      - name: Stop servers
+        if: always()
+        run: |
+          [ -f backend.pid ] && kill $(cat ../sovereign-os/core-api/backend.pid) 2>/dev/null || true
+          [ -f frontend.pid ] && kill $(cat frontend.pid) 2>/dev/null || true

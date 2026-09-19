@@ -68,7 +68,6 @@ async function reportToApi(result) {
       line: 0,
       column: 0,
       page: new URL(TARGET_URL).pathname || '/',
-      ua: result.ua || '',
       ts: Date.now(),
     });
     const res = await fetch(`${API_URL}/api/client-monitor/error`, {
@@ -170,6 +169,18 @@ async function runOnce() {
   }
   const allOk = results.every((r) => r.ok);
   log(allOk ? '✅ ทุก profile ผ่าน — uptime มีความหมายรอบนี้' : `❌ พัง ${results.filter((r) => !r.ok).length}/${results.length} profile`);
+
+  // รายงานผลทั้งรอบไปยัง streak tracker — นับ FAIL ติดกัน → critical Telegram ทันทีที่ครบเกณฑ์
+  try {
+    await fetch(`${API_URL}/api/client-monitor/synthetic-round`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results: results.map(({ profile, ok, failures }) => ({ profile, ok, failures })) }),
+    });
+  } catch (err) {
+    log(`รายงาน streak ไม่ได้: ${err?.message || err}`);
+  }
+
   return allOk;
 }
 

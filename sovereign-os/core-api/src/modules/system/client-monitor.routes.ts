@@ -6,7 +6,7 @@
 // (ตารางเดียวกับ system-monitor) — ปิดได้ผ่าน env (CLIENT_ERROR_ENABLED=false)
 import express, { Router } from 'express';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
-import { clientMonitor, type ClientErrorPayload } from '../../services/client-monitor.service';
+import { clientMonitor, syntheticStreak, type ClientErrorPayload } from '../../services/client-monitor.service';
 
 const router = Router();
 
@@ -32,6 +32,19 @@ router.post('/error', errorLimiter, textParser, (req, res) => {
   }
   // fire-and-forget: beacon ไม่ควรรอ DB — ตอบ 204 ทันที (204 = navigator.sendBeacon ถือว่า success)
   clientMonitor.report(payload, req.headers['user-agent'] || '').catch(() => {});
+  res.status(204).end();
+});
+
+// POST /synthetic-round — synthetic check รายงานผล "ทั้งรอบ" (PASS/FAIL ต่อ profile)
+// ไว้ให้ streak tracker นับ consecutive FAIL → critical Telegram ทันทีที่ครบ threshold
+// เรียกจากเครื่องตัวเองเท่านั้น (loopback) — ปฏิเสธ request จากภายนอก
+router.post('/synthetic-round', (req, res) => {
+  if (req.ip && !/^::ffff:127\.0\.0\.1$|^127\.0\.0\.1$|^::1$/.test(req.ip)) {
+    return res.status(403).json({ error: 'loopback only' });
+  }
+  const results = Array.isArray(req.body?.results) ? req.body.results : null;
+  if (!results) return res.status(400).json({ error: 'results array required' });
+  syntheticStreak.recordRound(results).catch(() => {});
   res.status(204).end();
 });
 
