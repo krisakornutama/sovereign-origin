@@ -39,10 +39,6 @@ export interface NormalizedClientError {
   isWebView: boolean;
 }
 
-export interface AlertCounters {
-  windows: Map<string, number[]>;
-}
-
 // ── Pure helpers (เทสได้ไม่ต้อง DB) ──
 
 /** ทุก field ต้องเป็น string/number — payload มาจาก internet อย่าเชื่อ */
@@ -104,22 +100,22 @@ export function normalizeClientError(payload: ClientErrorPayload, ua = ''): Norm
 
 /** นับต่อ fingerprint ใน window — คืน "ขึ้น threshold พอดีครั้งนี้" เพื่อยิง alert รอบเดียว */
 export function shouldAlert(
-  counters: AlertCounters,
+  counts: Map<string, number[]>,
   fingerprint: string,
   now = Date.now(),
   threshold = ALERT_THRESHOLD,
   windowMs = ALERT_WINDOW_MS
 ): boolean {
   const cutoff = now - windowMs;
-  const list = (counters.windows.get(fingerprint) || []).filter((t) => t >= cutoff);
+  const list = (counts.get(fingerprint) || []).filter((t) => t >= cutoff);
   list.push(now);
-  counters.windows.set(fingerprint, list);
-  if (counters.windows.size > MAX_FINGERPRINTS) {
-    // เก็บ fingerprint ที่พึ่งเห็นล่าสุดไว้ 200 กลุ่มพอ — ตัวเก่า drop
-    const entries = [...counters.windows.entries()]
-      .sort((a, b) => b[1][b[1].length - 1] - a[1][a[1].length - 1])
-      .slice(0, MAX_FINGERPRINTS);
-    counters.windows = new Map(entries);
+  counts.set(fingerprint, list);
+  if (counts.size > MAX_FINGERPRINTS) {
+    // เก็บ fingerprint ที่พึ่งเห็นล่าสุดไว้ 200 กลุ่มพอ — ตัวเก่า drop (เรียงตาม timestamp ล่าสุด)
+    const oldest = [...counts.entries()]
+      .sort((a, b) => a[1][a[1].length - 1] - b[1][b[1].length - 1])
+      .slice(0, counts.size - MAX_FINGERPRINTS);
+    for (const [k] of oldest) counts.delete(k);
   }
   return list.length === threshold;
 }
@@ -131,7 +127,7 @@ export interface ClientErrorReport {
 }
 
 class ClientMonitor {
-  private counters: AlertCounters = { windows: new Map() };
+  private counters = new Map<string, number[]>();
 
   async report(payload: ClientErrorPayload, ua = ''): Promise<ClientErrorReport> {
     const normalized = normalizeClientError(payload, ua);
@@ -166,7 +162,7 @@ class ClientMonitor {
     // 2) alert เมื่อ error เดิมโดนซ้ำพอใน window (threshold ป้องกัน bot/noise ยิงเตือนรัว)
     const shouldAlertNow = shouldAlert(this.counters, fingerprint);
     if (shouldAlertNow) {
-      const count = (this.counters.windows.get(fingerprint) || []).length;
+      const count = (this.counters.get(fingerprint) || []).length;
       const browser = extractBrowser(normalized.ua);
       const where = normalized.isWebView ? `${browser} (in-app/WebView)` : browser;
       securityStream.push('SYSTEM', {
@@ -191,7 +187,7 @@ class ClientMonitor {
 
   /** เทสต์เรียกเคลียร์ state ระหว่างชุดเทส */
   resetCounters(): void {
-    this.counters = { windows: new Map() };
+    this.counters.clear();
   }
 }
 

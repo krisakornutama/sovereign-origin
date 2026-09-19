@@ -105,6 +105,8 @@ tools/*
 !tools/release-notes-v1.1.1.md
 !tools/test/
 !tools/test/*.test.mjs
+!tools/verify/
+!tools/verify/*.mjs
 !tools/
 !tools/install/
 tools/install/*
