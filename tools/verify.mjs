@@ -95,7 +95,15 @@ const results = [];
 const t0 = Date.now();
 for (const step of steps) {
   process.stdout.write(`▶ ${step.name} ... `);
-  const r = spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: true, stdio: 'pipe', encoding: 'utf8' });
+  const run = () => spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: true, stdio: 'pipe', encoding: 'utf8' });
+  let r = run();
+  // exit 134 = build worker ตายแบบ native OOM (Zone Allocation) — พบจริงเมื่อแรม/commit charge ของเครื่อง
+  // ต่ำ (prod server + docker รันคู่กัน) · ไม่ใช่บั๊กโค้ด (CI บน GitHub แรมโล่งผ่านเสมอ) → พักแล้วลองใหม่ 2 ครั้ง
+  for (let retry = 1; r.status === 134 && retry <= 2; retry++) {
+    console.log(`พังชั่วคราว (exit 134 — OOM) → พัก 20 วิ แล้วลองใหม่ (${retry}/2)`);
+    await new Promise((res) => setTimeout(res, 20_000));
+    r = run();
+  }
   const ok = r.status === 0;
   results.push({ name: step.name, ok });
   console.log(ok ? 'ผ่าน' : `พัง (exit ${r.status})`);
