@@ -4,7 +4,7 @@
   "description": "Sovereign OS Core API",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "sh scripts/ensure-prisma-client.sh && tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
