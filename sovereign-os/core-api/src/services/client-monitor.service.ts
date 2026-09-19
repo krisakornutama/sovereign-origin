@@ -193,6 +193,44 @@ class ClientMonitor {
 
 export const clientMonitor = new ClientMonitor();
 
+// ── Synthetic Streak Tracker — "พังติดกันหลายรอบ = วิกฤต แจ้งทันที" ──
+// synthetic check รายงานผลทั้ง PASS/FAIL ต่อรอบที่นี่ นับ FAIL ติดกัน (PASS reset เป็น 0)
+// ครบ threshold → ยิง Telegram severity=critical ซึ่ง dispatcher ข้าม dedup อยู่แล้ว + ค้างหยุด
+// จนกว่าจะเจอ PASS (กัน alert ซ้ำทุกรอบที่ยังพัง) — กู้คืนเมื่อกลับมา PASS แล้วพังใหม่
+const SYNTHETIC_STREAK_THRESHOLD = Number(process.env.SYNTHETIC_STREAK_ALERT_THRESHOLD || 2);
+
+class SyntheticStreakTracker {
+  private consecutiveFails = 0;
+  private alertedForCurrentStreak = false;
+
+  async recordRound(results: { profile: string; ok: boolean; failures: string[] }[]): Promise<void> {
+    const anyFail = results.some((r) => !r.ok);
+    if (!anyFail) {
+      this.consecutiveFails = 0;
+      this.alertedForCurrentStreak = false;
+      return;
+    }
+    this.consecutiveFails += 1;
+    if (this.consecutiveFails < SYNTHETIC_STREAK_THRESHOLD || this.alertedForCurrentStreak) return;
+    this.alertedForCurrentStreak = true;
+    const failed = results.filter((r) => !r.ok);
+    sendTelegramAlert({
+      text:
+        `🚨 Synthetic browser check พังติดกัน ${this.consecutiveFails} รอบ\n` +
+        `${failed.map((r) => `• ${r.profile}: ${r.failures.join(' | ')}`).join('\n')}`.slice(0, 500),
+      severity: 'critical',
+      eventKey: 'synthetic-streak-critical',
+    }).catch(() => {});
+  }
+}
+
+export const syntheticStreak = new SyntheticStreakTracker();
+
+export function resetSyntheticStreakForTest(): void {
+  syntheticStreak['consecutiveFails'] = 0;
+  syntheticStreak['alertedForCurrentStreak'] = false;
+}
+
 // ── Client Health Summary — สำหรับแผง Client Health (หน้า /system) ──
 
 export interface ClientHealthEventRow {
