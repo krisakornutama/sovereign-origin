@@ -248,6 +248,6 @@ export class AuthService {
         token_version: { increment: 1 },
       },
     });
-    return { temporaryPassword };
+    return { temporaryPassword, targetUsername: user.username };
   }
 }
