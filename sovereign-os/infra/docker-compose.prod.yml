@@ -61,6 +61,7 @@ services:
       TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SYNTHETIC_ROUND_TOKEN: ${SYNTHETIC_ROUND_TOKEN:-}
       OTA_BASE_URL: ${OTA_BASE_URL:-http://localhost:3001}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       DEFCON_ENABLED: ${DEFCON_ENABLED:-true}
@@ -101,6 +102,9 @@ services:
     ports:
       - "${CORE_API_PORT:-3001}:3001"
     volumes:
+      - ../core-api/src:/app/src
+      - ../core-api/dist:/app/dist
+      - ../core-api/prisma:/app/prisma
       - ./backups:/app/backups
       - ./data:/app/data
       - ./knowledge:/app/knowledge
