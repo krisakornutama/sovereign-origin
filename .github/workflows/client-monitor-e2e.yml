@@ -1,0 +1,48 @@
+name: Client monitor E2E
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sovereign-os/core-api/src/services/client-monitor.service.ts'
+      - 'sovereign-os/core-api/src/modules/system/client-monitor.routes.ts'
+      - 'sovereign-frontend/src/lib/clientErrorReporter.ts'
+      - 'sovereign-frontend/src/lib/capabilityGuard.ts'
+      - 'tools/verify/**'
+      - '.github/workflows/client-monitor-e2e.yml'
+  pull_request:
+    paths:
+      - 'sovereign-os/core-api/src/services/client-monitor.service.ts'
+      - 'sovereign-os/core-api/src/modules/system/client-monitor.routes.ts'
+      - 'sovereign-frontend/src/lib/clientErrorReporter.ts'
+      - 'tools/verify/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# ขับท่อจริงทั้งเส้นเหมือนบนเครื่อง dev: beacon (JSON + text/plain ที่ reporter ส่ง)
+# → 204 → SecurityEvent → aggregate → Telegram stub (threshold/dedup) → rate limit
+# runner ปั่น Postgres ทดสอบ ephemeral เองผ่าน docker (ubuntu runner มี docker ให้)
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install core-api dependencies
+        run: npm install --no-fund --no-audit
+        working-directory: sovereign-os/core-api
+
+      - name: Build core-api (harness โหลด dist จริง)
+        run: npm run build
+        working-directory: sovereign-os/core-api
+
+      - name: Run client-monitor E2E (ปั่น Postgres ทดสอบเอง, ไม่แตะ DB อื่น)
+        run: node tools/verify/run-client-monitor-e2e.mjs
+        env:
+          TZ: Asia/Bangkok
