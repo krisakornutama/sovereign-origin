@@ -67,6 +67,7 @@ import learningRoutes from './modules/learning/learning.routes';
 import usersRoutes from './modules/users/users.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import systemRoutes, { livenessRouter } from './modules/system/system.routes';
+import clientMonitorRoutes from './modules/system/client-monitor.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
 import businessShopRoutes from './modules/business/business-shop.routes';
@@ -174,5 +175,9 @@ export function mountRoutes(app: Express): void {
   app.use('/api/knowledge', knowledgeFilesRoutes); // ไฟล์ .txt/.md — หลัง search/knowledge/teach เสมอ
   app.use(livenessRouter); // GET /healthz (Docker healthcheck + watchdog — ไม่มี auth)
   app.use('/api/system', systemRoutes); // /health /processes /processes/kill
+  // Client Error Monitoring — รับ error จาก browser ผู้ใช้ (สาธารณะ+rate limit — error ก่อน login ก็ต้องเห็น)
+  if (process.env.CLIENT_ERROR_ENABLED !== 'false') {
+    app.use('/api/client-monitor', clientMonitorRoutes);
+  }
   app.use('/api/automation', automationAlertsRoutes); // GET /alerts — หลัง automation.routes เสมอ
 }
