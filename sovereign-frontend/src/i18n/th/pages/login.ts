@@ -16,6 +16,7 @@ export default {
   mfaBackupHint: 'กรอกรหัสสำรอง 10 ตัวที่เก็บไว้ (ใช้ได้ครั้งเดียว)',
   mfaUseTotp: 'กลับไปกรอกรหัสจากแอป Authenticator',
   mfaUseBackup: 'โทรศัพท์หาย? ใช้รหัสสำรองแทน',
+  mfaCancel: 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ',
   loginFailed: 'เข้าสู่ระบบล้มเหลว',
   otpInvalid: 'รหัส OTP ไม่ถูกต้อง',
   genericError: 'เกิดข้อผิดพลาด',

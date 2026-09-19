@@ -21,7 +21,7 @@ export default function MfaInput() {
   const [cooldown, setCooldown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const { token, login } = useAuthStore();
+  const { token, login, logout } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   const router = useRouter();
 
@@ -134,6 +134,12 @@ export default function MfaInput() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ยกเลิกเซสชันครึ่งวงจร (mfa_required) → เคลียร์ token ชั่วคราวแล้วกลับหน้าล็อกอิน
+  const cancelMfa = () => {
+    logout();
+    router.push('/');
   };
 
   // auto-submit เมื่อครบ 6 หลัก (ดีเลย์นิดหน่อยให้ user เห็นตัวสุดท้าย)
@@ -261,6 +267,14 @@ export default function MfaInput() {
             {useBackup
               ? t('login.mfaUseTotp', 'กลับไปกรอกรหัสจากแอป Authenticator')
               : t('login.mfaUseBackup', 'โทรศัพท์หาย? ใช้รหัสสำรองแทน')}
+          </button>
+
+          <button
+            type="button"
+            onClick={cancelMfa}
+            className="mt-1 mx-auto block text-xs text-gray-500 hover:text-gray-300"
+          >
+            {t('login.mfaCancel', 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ')}
           </button>
 
           <p className="mt-4 text-center text-[11px] text-gray-500 font-mono">

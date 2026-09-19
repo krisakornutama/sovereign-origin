@@ -16,6 +16,7 @@ export default {
   mfaBackupHint: 'Enter one of your 10-character backup codes (single use)',
   mfaUseTotp: 'Back to Authenticator code',
   mfaUseBackup: 'Lost your phone? Use a backup code instead',
+  mfaCancel: 'Cancel and return to sign in',
   loginFailed: 'Sign in failed',
   otpInvalid: 'Invalid OTP code',
   genericError: 'Something went wrong',
