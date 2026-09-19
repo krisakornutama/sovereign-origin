@@ -87,7 +87,7 @@ jobs:
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
 
       - name: Run real-DB lifecycle tests
-        run: npx tsx --test --test-concurrency=1 tests/knowledge-db.test.ts tests/uploads-db.test.ts tests/vision-detections-db.test.ts tests/security-events-db.test.ts tests/dime-db.test.ts
+        run: npx tsx --test --test-concurrency=1 tests/knowledge-db.test.ts tests/uploads-db.test.ts tests/vision-detections-db.test.ts tests/security-events-db.test.ts tests/dime-db.test.ts tests/password-lifecycle-db.test.ts
         env:
           JWT_SECRET: ci-secret-0123456789abcdef
           RUN_DB_TESTS: '1'

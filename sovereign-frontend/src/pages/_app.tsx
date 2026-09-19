@@ -40,10 +40,10 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   // กันหน้าเปิดสิทธิ์: ยังไม่ได้เปลี่ยนรหัสผ่าน (บังคับหลัง login ครั้งแรก)
   // → ทุกหน้าถูกส่งไป /change-password จนกว่าจะเปลี่ยนสำเร็จ
   useEffect(() => {
-    if (isHydrated && isAuthenticated && mustChangePassword && pathname !== '/change-password') {
+    if (isHydrated && isAuthenticated && mustChangePassword && normalizedPath !== '/change-password') {
       router.replace('/change-password');
     }
-  }, [isHydrated, isAuthenticated, mustChangePassword, pathname, router]);
+  }, [isHydrated, isAuthenticated, mustChangePassword, normalizedPath, router]);
 
   // SPA navigation ระดับสากล: <a> ภายใน (href ขึ้นต้นด้วย /) ที่ไม่ได้มาผ่าน next/link
   // จะถูกแปลงเป็น router.push แทนการ reload หน้า — คลิกปกติเปลี่ยนหน้าแบบ SPA
@@ -82,9 +82,11 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       setBlocked(false);
       return;
     }
-    const deniedAdmin = ADMIN_PAGES.has(pathname);
-    setBlocked(deniedAdmin || (granted !== null && isBlocked(pathname)));
-  }, [pathname, isHydrated, isAuthenticated, user, isSuperadmin, granted, isBlocked]);
+    const deniedAdmin = ADMIN_PAGES.has(normalizedPath);
+    // เทียบด้วย normalizedPath เสมอ — usePathname() คืน '/xxx/' (trailing slash) บน build ที่เปิด
+    // trailingSlash ทำให้เทียบ ADMIN_PAGES/isBlocked พลาดทั้งชุด (เคสจริง: '/change-password/' โดน NoAccess)
+    setBlocked(deniedAdmin || (granted !== null && isBlocked(normalizedPath)));
+  }, [normalizedPath, isHydrated, isAuthenticated, user, isSuperadmin, granted, isBlocked]);
 
   useEffect(() => {
     // Client Error Monitoring — จับ error ฝั่ง browser (WebView/LINE ฯลฯ) ส่ง beacon เข้า API
