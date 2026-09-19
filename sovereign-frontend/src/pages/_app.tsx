@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
 import { applyAppearance } from '../lib/config';
+import { installClientErrorReporter, installFetchFailureReporter } from '../lib/clientErrorReporter';
 import ApiConnectionBanner from '../components/layout/ApiConnectionBanner';
 import MobileNav from '../components/layout/MobileNav';
 import AgentBackgroundBadge from '../components/AgentBackgroundBadge';
@@ -85,6 +86,11 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   }, [pathname, isHydrated, isAuthenticated, user, isSuperadmin, granted, isBlocked]);
 
   useEffect(() => {
+    // Client Error Monitoring — จับ error ฝั่ง browser (WebView/LINE ฯลฯ) ส่ง beacon เข้า API
+    // (server monitoring มองไม่เห็นพังที่เกิดก่อน request — นี่คือตาอีกข้าง)
+    installClientErrorReporter();
+    installFetchFailureReporter();
+
     // ใช้ธีม + ขนาดตัวอักษรที่ผู้ใช้ตั้งไว้ในหน้า Settings (ทันทีที่โหลด)
     applyAppearance();
 
