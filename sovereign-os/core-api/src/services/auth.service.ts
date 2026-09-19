@@ -170,9 +170,8 @@ export class AuthService {
     if (!user) throw new Error('User not found');
 
     const valid = await bcrypt.compare(currentPassword || '', user.password_hash);
-    // forced flow (login ครั้งแรกด้วยรหัสชั่วคราว): ผู้ใช้เพิ่งพิสูจน์ตัวตนด้วยรหัสชั่วคราวตอน login —
-    // ไม่บังคับพิมพ์ซ้ำ เปิดเฉพาะ user ที่ยังติด flag บังคับเปลี่ยน (ความสดของ token — ว่าไม่ใช่
-    // token เก่าหลัง reset อื่น — เช็คอยู่ใน authenticatePartial แล้ว ถึงขั้นนี้ได้แปลว่า token ใช้ได้)
+    // forced flow (login ครั้งแรกด้วยรหัสชั่วคราว): ผู้ใช้เพิ่งพิสูจน์ตัวตนแล้ว — ไม่บังคับพิมพ์ซ้ำ
+    // (ความสดของ token เช็คอยู่ใน authenticatePartial แล้ว)
     const inForcedFlow = !currentPassword && user.must_change_password === true;
     if (!valid && !inForcedFlow) throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง');
 
@@ -184,14 +183,13 @@ export class AuthService {
     const hash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id: userId },
-      // bump token_version → token เก่าทุกอุปกรณ์ (ถ้ามี) ตายทันที — เปลี่ยนรหัสเพราะสงสัยรั่ว
-      // ต้องตัด session เดิมด้วย ไม่ใช่แค่เปลี่ยนรหัสทิ้งไว้
+      // bump token_version → token เก่าทุกอุปกรณ์ตายทันที (เคสสงสัยรหัสรั่ว)
       data: { password_hash: hash, must_change_password: false, token_version: { increment: 1 } },
     });
 
     // คืน token ใหม่ (ไม่มี flag บังคับเปลี่ยน + เลข version ใหม่) — session ต่อเนื่อง ไม่ต้อง login ใหม่
     return {
-      token: this.generateToken({ ...user, password_hash: hash, must_change_password: false, token_version: (user.token_version ?? 0) + 1 }, true),
+      token: this.generateToken({ ...user, password_hash: hash, must_change_password: false, token_version: user.token_version + 1 }, true),
     };
   }
 
@@ -218,7 +216,7 @@ export class AuthService {
       must_change_password: user.must_change_password === true,
       // token versioning — middleware เทียบกับ DB ทุก request: เปลี่ยน/รีเซ็ตรหัสครั้งไหน
       // token ทุกใบที่มีเลขเก่าตายทันที (ไม่ต้องรอหมดอายุ 24 ชม.)
-      token_version: user.token_version ?? 0,
+      token_version: user.token_version,
     };
     return jwt.sign(payload, config.jwtSecret, { expiresIn: '24h' });
   }
@@ -227,7 +225,7 @@ export class AuthService {
   // สุ่มรหัสชั่วคราวฝั่ง server — admin ไม่ตั้งเอง (ไม่รู้รหัสจริงของ user) และรหัสนี้
   // ถูกบังคับให้ user เปลี่ยนเองตอน login ครั้งหน้า (must_change_password)
   static generateTemporaryPassword(): string {
-    // 12 ตัว อ่านง่าย ไม่มี 0/O/1/l/I — เดียวกับตัวสุ่มในหน้า users
+    // 12 ตัว อ่านง่าย ไม่มี 0/O/1/l/I
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
     const arr = crypto.randomBytes(12);
     let p = '';
@@ -240,9 +238,9 @@ export class AuthService {
   static async adminResetPassword(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
-    const temporaryPassword = this.generateTemporaryPassword();
+    const temporaryPassword = AuthService.generateTemporaryPassword();
     const hash = await bcrypt.hash(temporaryPassword, 12);
-    const updated = await prisma.user.update({
+    await prisma.user.update({
       where: { id: userId },
       data: {
         password_hash: hash,
@@ -250,6 +248,6 @@ export class AuthService {
         token_version: { increment: 1 },
       },
     });
-    return { temporaryPassword, tokenVersion: updated.token_version };
+    return { temporaryPassword };
   }
 }

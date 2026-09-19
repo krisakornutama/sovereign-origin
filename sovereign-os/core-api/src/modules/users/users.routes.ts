@@ -68,16 +68,8 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     if (role !== undefined) data.role = role;
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
     // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
-    if (must_change_password !== undefined) {
-      data.must_change_password = must_change_password === true;
-      // ปิด/เปิดบังคับโดยไม่แตะรหัส → bump version ไม่ตัด session ปัจจุบันของ user คนนั้น
-      // (เปลี่ยนบทบาท/node ก็เช่นกัน — เฉพาะ password ops เท่านั้นที่ตัด session)
-      await AuditService.logAction({
-        userId: req.user!.id,
-        actionType: must_change_password ? 'USER_PASSWORD_FORCE_CHANGE' : 'USER_PASSWORD_FORCE_CANCEL',
-        payload: { target_user_id: req.params.id, ip: req.ip },
-      });
-    }
+    if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
+    // ทุก PUT นี้ลง audit อัตโนมัติผ่าน auditStateChange (server.ts) — actionType = "PUT /api/users/:id"
     await prisma.user.update({ where: { id: req.params.id }, data });
     res.json({ success: true });
   } catch (err) {

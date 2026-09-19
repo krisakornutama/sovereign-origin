@@ -7,7 +7,7 @@ import { RUN_DB, SKIP_REASON, primeDbEnv, setupCore, teardownCore, type CoreCtx 
      2) เปลี่ยนรหัสเอง → ใช้งานได้ → token "ใบเก่า" (ก่อนเปลี่ยน) ตายทันที — token_version bump
      3) admin รีเซ็ตรหัสให้ (POST /api/users/:id/reset-password) → ได้รหัสชั่วคราว + token ของ user ตายทันที
      4) login ด้วยรหัสชั่วคราว → โดนบังคับเปลี่ยนอีก → ตั้งรหัสใหม่ → ใช้งานปกติ
-     5) audit log มีทั้ง USER_PASSWORD_RESET_BY_ADMIN / FORCE_CHANGE / FORCE_CANCEL
+     5) audit log มี USER_PASSWORD_RESET_BY_ADMIN (force toggle เข้า auto-audit global)
    ครอบรูที่เคยรั่ว: user ที่ติด flag ค้าง admin ยกเลิกไม่ได้ (UI เดิมซ่อนปุ่ม) — PUT must_change_password=false ต้องผ่าน
    Gated: RUN_DB_TESTS=1 + TEST_DATABASE_URL (CI: job test-db) */
 describe('password lifecycle — real Postgres (reset + token versioning + audit)', { skip: RUN_DB ? false : SKIP_REASON }, () => {
@@ -155,12 +155,10 @@ describe('password lifecycle — real Postgres (reset + token versioning + audit
     assert.equal(ok.status, 200);
   });
 
-  test('4) audit log ครบทุก password op + ตัวรับปฏิเสธ non-SUPERADMIN', async () => {
+  test('4) audit log reset + auto-audit ปิดจบในตัว + ตัวรับปฏิเสธ non-SUPERADMIN', async () => {
     const { prisma } = ctx;
     const types = (await prisma.auditLog.findMany({ where: { user_id: adminId, action_type: { startsWith: 'USER_PASSWORD_' } } })).map((r: any) => r.action_type);
     assert.ok(types.includes('USER_PASSWORD_RESET_BY_ADMIN'), 'reset โดย admin ลง log');
-    assert.ok(types.includes('USER_PASSWORD_FORCE_CANCEL'), 'ยกเลิกบังคับลง log');
-    assert.ok(!types.some((t: string) => t === 'USER_PASSWORD_FORCE_CHANGE'), 'รอบนี้ไม่มีการบังคับเพิ่ม');
 
     // non-SUPERADMIN เรียก reset → 403
     const memberLogin = await fetch(`${server.baseUrl}/api/auth/login`, {
