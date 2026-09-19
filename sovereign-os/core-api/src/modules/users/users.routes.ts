@@ -36,8 +36,14 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   res.json({ success: true });
 });
 router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
-  await prisma.user.delete({ where: { id: req.params.id } });
-  res.json({ success: true });
+  try {
+    await prisma.user.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    // ไม่มี try/catch เดิม → Prisma error (เช่น FK จาก audit_logs) ทำ request ค้างจน timeout
+    console.error('[users:delete] failed:', err?.code || '', err?.message || err);
+    res.status(500).json({ error: 'ลบผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
+  }
 });
 
 // POST /api/users/:id/reset-password — กู้ลืมรหัส / สงสัยรั่ว (SUPERADMIN)
