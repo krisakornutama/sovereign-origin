@@ -198,8 +198,11 @@ if (LOOP) {
     }
   };
   await tick();
-  setInterval(tick, INTERVAL_MIN * 60_000);
+  setInterval(tick, INTERVAL_MIN * 60_000).unref?.();
 } else {
   const ok = await runOnce();
-  process.exit(ok ? 0 : 1);
+  // Node 24/Windows: teardown ปกติ abort ที่ libuv async.c (handle ค้างจาก fetch/playwright)
+  // → exit code กลายเป็น crash เสมอทั้งที่งานสำเร็จ — reallyExit ข้าม teardown ตรงนั้น
+  process.exitCode = ok ? 0 : 1;
+  process.reallyExit(process.exitCode);
 }
