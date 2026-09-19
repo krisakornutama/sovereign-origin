@@ -119,6 +119,16 @@ try {
   });
   await sleep(150);
 
+  // beacon แบบ text/plain — สิ่งที่ reporter จริงใน browser ส่ง (safelisted, ไม่ preflight)
+  // express.json ไม่ parse content-type นี้ → route ต้อง parse body เอง (บั๊กจริงที่เจอจาก UI)
+  const rawBeacon = await fetchJson(`${BASE}/api/client-monitor/error`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', 'User-Agent': LINE_IOS_UA },
+    body: JSON.stringify({ kind: 'js', message: 'raw text/plain beacon (reporter)', page: '/raw' }),
+  });
+  assert(rawBeacon.status === 204, 'beacon text/plain (ที่ reporter จริงส่ง) ตอบ 204');
+  await sleep(150);
+
   // ── ตรวจ SecurityEvent เข้าจริง (ผ่าน DB ของ harness — ทางอ้อมผ่าน client-health) ──
   const seedUser = await fetchJson(`${BASE}/api/auth/login`, {
     method: 'POST',
@@ -133,13 +143,13 @@ try {
   });
   assert(healthRes.status === 200, 'GET /api/system/client-health 200 (authenticate จริง)');
   const s = healthRes.body;
-  assert(s.total === 4, 'aggregate นับรวม 4 events', `total=${s.total}`);
+  assert(s.total === 5, 'aggregate นับรวม 5 events (รวม text/plain beacon)', `total=${s.total}`);
   assert(s.byBrowser[0]?.key === 'LINE WebView', 'browser อันดับ 1 = LINE WebView (จำแนกจาก UA จริง)', JSON.stringify(s.byBrowser));
-  assert(s.byPage.some((x) => x.key === '/shop') && s.byPage.some((x) => x.key === '/dashboard'), 'หน้า /shop + /dashboard ถูกนับ');
+  assert(s.byPage.some((x) => x.key === '/shop') && s.byPage.some((x) => x.key === '/raw'), 'หน้า /shop + /raw (text/plain) ถูกนับ');
   assert(s.byKind.some((x) => x.key === 'js') && s.byKind.some((x) => x.key === 'fetch'), 'kind js+fetch ถูกเก็บ (บั๊ก normalize ที่แก้ไปได้ผลจริง)');
-  assert(s.webviewCount === 3, 'webviewCount = 3 (LINE UA ตรวจพบ)', `webview=${s.webviewCount}`);
-  assert(Array.isArray(s.daily) && s.daily.length === 7 && s.daily[6].count === 4, 'กราฟรายวัน 7 วัน + วันนี้นับ 4');
-  assert(s.topErrors.some((e) => e.message.includes('Cannot read properties of undefined')), 'topErrors มี error จริง');
+  assert(s.webviewCount === 4, 'webviewCount = 4 (LINE UA ตรวจพบ)', `webview=${s.webviewCount}`);
+  assert(Array.isArray(s.daily) && s.daily.length === 7 && s.daily[6].count === 5, 'กราฟรายวัน 7 วัน + วันนี้นับ 5');
+  assert(s.topErrors.some((e) => e.message.includes('Cannot read properties of undefined')) && s.topErrors.some((e) => e.message.includes('text/plain beacon')), 'topErrors มี error จริงทั้งจาก fetch/JSON และ text/plain');
 
   // ── ขั้น B: threshold alert — error ที่ 3 ของกลุ่มเดียวกันต้องยิง Telegram (stub) ──
   console.log('▶ [5/6] threshold alert + rate limit + UA แปลก');

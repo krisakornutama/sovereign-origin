@@ -82,9 +82,11 @@ export function sendClientErrorReport(kind: string, message: string, opts: SendO
     }).slice(0, MAX_BODY_BYTES);
 
     // sendBeacon ก่อนเสมอ (รอดตอน page unload) — ไม่มีค่อย fallback XHR
+    // ห้ามใช้ Blob type application/json: beacon ข้าม origin ทำ CORS-preflight ไม่ได้
+    // → browser ทิ้งเงียบ ๆ (เจอจากการทดสอบ UI จริง) — text/plain เป็น safelisted จึงส่งได้เสมอ
     const url = endpoint();
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      navigator.sendBeacon(url, new Blob([body], { type: 'text/plain' }));
     } else {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
