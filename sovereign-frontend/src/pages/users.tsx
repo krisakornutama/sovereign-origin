@@ -217,7 +217,8 @@ export default function UsersPage() {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}/reset-password`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('users.resetPwFailed', 'ตั้งรหัสใหม่ไม่สำเร็จ'));
+      // server ส่ง reason มาด้วยเมื่อพัง — แสดงเพื่อวินิจฉัยได้ทันที (เช่น schema mismatch)
+      if (!res.ok) throw new Error([data.error, data.reason].filter(Boolean).join(' — ') || t('users.resetPwFailed', 'ตั้งรหัสใหม่ไม่สำเร็จ'));
       setTempPw({ username, password: data.temporaryPassword });
       loadUsers();
     } catch (err: any) {

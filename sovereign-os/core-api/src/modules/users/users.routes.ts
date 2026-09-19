@@ -53,8 +53,15 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
     });
     res.json({ temporaryPassword });
   } catch (err: any) {
+    // log จริงทุกครั้ง — เคสจริง: PrismaClientValidationError จาก client ไม่ตรง schema
+    // ถูก catch-all กลืนเป็น "Reset failed" เงียบ ๆ ทั้งที่รากอยู่ที่ deploy (prisma generate ไม่ผ่าน)
+    console.error('[reset-password] failed:', err?.code || '', err?.message || err);
     if (err?.message === 'User not found') return res.status(404).json({ error: 'User not found' });
-    res.status(500).json({ error: 'Reset failed' });
+    // Prisma P2021/P2022 = ตาราง/คอลัมน์หาย (สคีมา DB ไม่ตรง) — บอกชัดว่าเป็นฝั่งระบบ ให้ admin ตรวจ deploy
+    if (err?.code === 'P2021' || err?.code === 'P2022') {
+      return res.status(503).json({ error: 'ระบบฐานข้อมูลไม่ตรงกับแอป (schema mismatch) — ติดต่อผู้ดูแลระบบ' });
+    }
+    res.status(500).json({ error: 'Reset failed', reason: err?.message || 'unknown' });
   }
 });
 router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
