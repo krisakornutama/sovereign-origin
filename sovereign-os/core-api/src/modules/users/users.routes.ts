@@ -2,6 +2,8 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { AuthService } from '../../services/auth.service';
+import { AuditService } from '../../services/audit.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // User Management (SUPERADMIN) — ย้ายมาจาก inline routes ใน server.ts
@@ -37,6 +39,24 @@ router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) 
   await prisma.user.delete({ where: { id: req.params.id } });
   res.json({ success: true });
 });
+
+// POST /api/users/:id/reset-password — กู้ลืมรหัส / สงสัยรั่ว (SUPERADMIN)
+// server สุ่มรหัสชั่วคราวให้ (admin ไม่ตั้งเอง → ไม่รู้รหัสจริงของ user) + บังคับเปลี่ยนตอน login ครั้งหน้า
+// + bump token_version → token เดิมทุกอุปกรณ์ตายทันที และลง audit log ทุกครั้ง
+router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const { temporaryPassword } = await AuthService.adminResetPassword(req.params.id);
+    await AuditService.logAction({
+      userId: req.user!.id,
+      actionType: 'USER_PASSWORD_RESET_BY_ADMIN',
+      payload: { target_user_id: req.params.id, ip: req.ip },
+    });
+    res.json({ temporaryPassword });
+  } catch (err: any) {
+    if (err?.message === 'User not found') return res.status(404).json({ error: 'User not found' });
+    res.status(500).json({ error: 'Reset failed' });
+  }
+});
 router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const { role, assigned_node_id, must_change_password } = req.body;
@@ -48,7 +68,16 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     if (role !== undefined) data.role = role;
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
     // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
-    if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
+    if (must_change_password !== undefined) {
+      data.must_change_password = must_change_password === true;
+      // ปิด/เปิดบังคับโดยไม่แตะรหัส → bump version ไม่ตัด session ปัจจุบันของ user คนนั้น
+      // (เปลี่ยนบทบาท/node ก็เช่นกัน — เฉพาะ password ops เท่านั้นที่ตัด session)
+      await AuditService.logAction({
+        userId: req.user!.id,
+        actionType: must_change_password ? 'USER_PASSWORD_FORCE_CHANGE' : 'USER_PASSWORD_FORCE_CANCEL',
+        payload: { target_user_id: req.params.id, ip: req.ip },
+      });
+    }
     await prisma.user.update({ where: { id: req.params.id }, data });
     res.json({ success: true });
   } catch (err) {

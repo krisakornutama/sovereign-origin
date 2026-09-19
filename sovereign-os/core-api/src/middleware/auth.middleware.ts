@@ -17,6 +17,7 @@ declare global {
         role: string;
         assigned_node_id?: string | null;
         mfa_verified: boolean;
+        must_change_password?: boolean;
       };
     }
   }
@@ -37,8 +38,18 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (!decoded.mfa_verified) {
       return res.status(403).json({ error: 'MFA verification required' });
     }
+    // Token versioning — เทียบเลขใน token กับ DB ทุก request: รหัสผ่านถูกเปลี่ยน/รีเซ็ตเมื่อไหร่
+    // token เก่าทุกใบ (อุปกรณ์/session เดิม) หมดอายุ "ทันที" ไม่ต้องรอครบ 24 ชม.
+    // DB ล่ม → fail open: token ยัง verify ด้วย secret อยู่ ไม่ล็อกทั้งระบบเพราะ DB ชั่วคราว
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { token_version: true } });
+      if (dbUser && (decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+        return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
+      }
+    } catch { /* fail open */ }
     // บังคับเปลี่ยนรหัสผ่านให้เป็น server-side (เดิมฝั่ง client เท่านั้น — เรียก API ตรง ๆ ข้ามได้)
     // /api/auth/change-password ใช้ authenticatePartial พอดี จึงยังเป็นทางออกของ flow นี้
+    // (เช็คหลัง version — token ที่หมดอายุเพราะรหัสเปลี่ยนต้องบอกว่า "session ตาย" ไม่ใช่ "ต้องเปลี่ยนรหัส")
     if (decoded.must_change_password === true) {
       return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
     }
@@ -47,6 +58,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       role: decoded.role,
       assigned_node_id: decoded.assigned_node_id,
       mfa_verified: true,
+      must_change_password: decoded.must_change_password === true,
     };
     warRoomPulse(); // ข้อ 3: ทุก request ที่ผ่าน auth = สัญญาณ "มนุษย์กำลังใช้ War Room"
     next();
@@ -145,7 +157,7 @@ export function auditStateChange(req: Request, res: Response, next: NextFunction
  * 5. Partial authentication – verify JWT only, skip MFA check.
  *    Used for /verify-mfa where the token has mfa_verified = false.
  */
-export function authenticatePartial(req: Request, res: Response, next: NextFunction) {
+export async function authenticatePartial(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing token' });
@@ -154,11 +166,20 @@ export function authenticatePartial(req: Request, res: Response, next: NextFunct
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
+    // Token versioning (เช่น admin รีเซ็ตรหัสซ้ำระหว่าง user ค้างอยู่หน้าบังคับเปลี่ยน)
+    // → token ชั่วคราวใบเก่าตายทันที — fail open เมื่อ DB ล่ม เช่นเดียวกับ authenticate
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { token_version: true } });
+      if (dbUser && (decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+        return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
+      }
+    } catch { /* fail open */ }
     req.user = {
       id: decoded.userId,
       role: decoded.role,
       assigned_node_id: decoded.assigned_node_id,
       mfa_verified: decoded.mfa_verified,   // เก็บสถานะเดิมไว้ (false)
+      must_change_password: decoded.must_change_password === true,
     };
     next();
   } catch (err) {
