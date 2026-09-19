@@ -7,7 +7,10 @@ import {
   errorFingerprint,
   normalizeClientError,
   shouldAlert,
+  tally,
+  aggregateClientHealth,
   type AlertCounters,
+  type ClientHealthEventRow,
 } from '../src/services/client-monitor.service';
 
 const LINE_UA =
@@ -77,6 +80,58 @@ describe('Client Monitor: normalizeClientError', () => {
     const n = normalizeClientError({}, '');
     assert.ok(n.message.length > 0);
     assert.equal(n.page, '/');
+  });
+});
+
+describe('Client Monitor: tally', () => {
+  it('เรียงจากมากไปน้อย + tie-break ตามชื่อ key', () => {
+    const r = tally([['b', 2], ['a', 5], ['c', 2], ['d', 9]]);
+    assert.deepEqual(r.map((x) => x.key), ['d', 'a', 'b', 'c']);
+    assert.deepEqual(r.map((x) => x.count), [9, 5, 2, 2]);
+  });
+  it('entries ว่าง = ผลว่าง', () => {
+    assert.deepEqual(tally([]), []);
+  });
+});
+
+describe('Client Monitor: aggregateClientHealth', () => {
+  const now = new Date('2026-09-19T10:00:00Z');
+  const mk = (over: Partial<ClientHealthEventRow>): ClientHealthEventRow => ({
+    timestamp: now,
+    description: '[client] boom',
+    raw_data: {},
+    ...over,
+  });
+
+  it('รวมตาม browser/page/kind + นับ WebView + strip prefix [client]', () => {
+    const events: ClientHealthEventRow[] = [
+      mk({ raw_data: { browser: 'LINE WebView', page: '/shop', kind: 'js', isWebView: true } }),
+      mk({ raw_data: { browser: 'LINE WebView', page: '/shop', kind: 'fetch', isWebView: true } }),
+      mk({ description: '[client] fetch failed: ERR', raw_data: { browser: 'Chrome', page: '/dashboard', kind: 'fetch' } }),
+    ];
+    const s = aggregateClientHealth(events, 7);
+    assert.equal(s.total, 3);
+    assert.equal(s.webviewCount, 2);
+    assert.equal(s.byBrowser[0].key, 'LINE WebView');
+    assert.equal(s.byPage[0].key, '/shop');
+    assert.equal(s.byKind[0].key, 'fetch');
+    assert.equal(s.topErrors[0].message, 'boom');
+    assert.equal(s.topErrors[1].message, 'fetch failed: ERR');
+  });
+
+  it('กราฟรายวันครบ 7 วัน — วันที่ไม่มี error = 0 และเรียงเก่า→ใหม่', () => {
+    const s = aggregateClientHealth([mk({ timestamp: new Date('2026-09-19T08:00:00Z') })], 7);
+    assert.equal(s.daily.length, 7);
+    assert.equal(s.daily[6].date, '2026-09-19');
+    assert.equal(s.daily[6].count, 1);
+    assert.ok(s.daily.slice(0, 6).every((d) => d.count === 0));
+  });
+
+  it('raw_data ว่าง/แปลก ๆ ไม่ crash — ใช้ค่า default', () => {
+    const s = aggregateClientHealth([mk({ raw_data: null }), mk({ raw_data: 'not-an-object' }), mk({ timestamp: 'garbage' as any })], 3);
+    assert.equal(s.total, 3);
+    assert.equal(s.byBrowser[0].key, 'unknown');
+    assert.equal(s.daily.filter((d) => d.date === 'unknown').length, 0); // timestamp เพี้ยนไม่หลุดเข้ากราฟ
   });
 });
 
