@@ -56,15 +56,18 @@ async function main() {
   const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
   const results = [];
   for (const c of checks) {
-    if (c.name.startsWith('ui-sweep')) await ensureProdFrontend();
     try {
+      // ensure ต้องอยู่ใน try: ถ้า watchdog ตาย (:3000 ไม่ตื่น) ต้องกลายเป็น failed result → Telegram
+      // ไม่ใช่ unhandled rejection ที่ทำให้ gate ตายเงียบทั้งกระบวนการ
+      if (c.name.startsWith('ui-sweep')) await ensureProdFrontend();
       const out = execFileSync(c.cmd, c.args, {
         cwd: ROOT, encoding: 'utf8', timeout: 300_000, windowsHide: true,
         maxBuffer: 10 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
       });
       results.push({ ...c, code: 0, out });
     } catch (e) {
-      results.push({ ...c, code: e.status ?? 1, out: String(e.stdout || '') + String(e.stderr || '') });
+      const proc = String(e.stdout || '') + String(e.stderr || '');
+      results.push({ ...c, code: e.status ?? 1, out: proc || String(e.message || e) });
     }
   }
   const failed = results.filter((r) => r.code !== 0);

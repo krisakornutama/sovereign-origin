@@ -71,7 +71,49 @@ if (!loginBlocked) {
   }
 }
 
-console.log('── 3) Brute-force — rate limit ต้องตอบ 429 ──');
+console.log('── 3) Over-privilege / IDOR (OPERATOR ชั่วคราว) ──');
+// ต้องรับก่อน brute-force: ถ้า brute กิน per-IP window ก่อน login ของส่วนนี้จะได้ 429/401 ลวง
+// (token ตายเพราะ rate limit ไม่ใช่ RBAC ปฏิเสธ) — จึง assert ว่าได้ token จริงก่อน probe ทุกครั้ง
+{
+  const uname = 'pentest-op-' + Date.now().toString(36).slice(-4);
+  let r = await fetch(`${API}/api/users`, { method: 'POST', headers: H, body: JSON.stringify({ username: uname, password: 'Pentest-Init-2026!', role: 'OPERATOR' }) });
+  if (![200, 201].includes(r.status)) {
+    ok('เตรียมบัญชี OPERATOR ทดสอบ', false, `สร้างไม่ได้ HTTP ${r.status}`);
+  } else {
+    const uid = psql(`SELECT id FROM users WHERE username='${uname}'`);
+    r = await fetch(`${API}/api/users/${uid}/reset-password`, { method: 'POST', headers: H });
+    const { temporaryPassword: temp } = await r.json();
+    r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
+    const partial = r.ok ? (await r.json())?.token : null;
+    ok('login ด้วยรหัสชั่วคราวได้จริง', !!partial, `HTTP ${r.status}`);
+    let OH = null;
+    if (partial) {
+      await fetch(`${API}/api/auth/change-password`, { method: 'POST', headers: { Authorization: `Bearer ${partial}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: 'Pentest-Changed-2026!' }) });
+      r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: 'Pentest-Changed-2026!' }) });
+      const tok = r.ok ? (await r.json())?.token : null;
+      ok('login รอบสอง (หลังเปลี่ยนรหัส) ได้จริง', !!tok, `HTTP ${r.status}`);
+      OH = tok ? { Authorization: `Bearer ${tok}` } : null;
+    }
+    const probe = async (name, url, init) => {
+      const rr = await fetch(`${API}${url}`, init).catch(() => null);
+      ok(name, !!rr && [401, 403, 404].includes(rr.status), `HTTP ${rr?.status}`);
+    };
+    if (OH) {
+      await probe('OPERATOR อ่านรายชื่อ user ไม่ได้', '/api/users', { headers: OH });
+      await probe('OPERATOR อ่าน audit ไม่ได้', '/api/audit?limit=5', { headers: OH });
+      await probe('IDOR อ่าน user อื่นตรง ๆ ไม่ได้', `/api/users/${adminId}`, { headers: OH });
+      await probe('IDOR แก้ user อื่นไม่ได้', `/api/features/users/${adminId}`, { method: 'PUT', headers: { ...OH, 'Content-Type': 'application/json' }, body: '{}' });
+      await probe('IDOR ลบ user อื่นไม่ได้', `/api/users/${adminId}`, { method: 'DELETE', headers: OH });
+    } else {
+      ok('IDOR probes', false, 'ไม่มี token (ถูก rate limit ขวางหรือ flow พัง) — นับ FAIL กันผลลวง');
+    }
+    await fetch(`${API}/api/users/${uid}`, { method: 'DELETE', headers: H }).catch(() => {});
+    const gone = psql(`SELECT count(*) FROM users WHERE username='${uname}'`);
+    ok('เก็บกวาดบัญชีทดสอบ', gone === '0', `เหลือ=${gone}`);
+  }
+}
+
+console.log('── 4) Brute-force — rate limit ต้องตอบ 429 ──');
 if (!loginBlocked) {
   const rlUser = 'pentest-rl-' + Date.now().toString(36);
   let n429 = 0, first429 = null, statuses = [];
@@ -84,36 +126,6 @@ if (!loginBlocked) {
   }
   ok('per-IP rate limit บล็อกจริง', n429 > 0 && !statuses.includes(200), `429×${n429}/18 · เริ่มบล็อกครั้งที่ ${first429}`);
   if (first429 === 1) warn('โดนบล็อกตั้งแต่ครั้งแรก', 'IP ยังอยู่ใน window จากรอบก่อน — ตัวเลขอาจไม่สะท้อนของจริง');
-}
-
-console.log('── 4) Over-privilege / IDOR (OPERATOR ชั่วคราว) ──');
-{
-  const uname = 'pentest-op-' + Date.now().toString(36).slice(-4);
-  let r = await fetch(`${API}/api/users`, { method: 'POST', headers: H, body: JSON.stringify({ username: uname, password: 'Pentest-Init-2026!', role: 'OPERATOR' }) });
-  if (![200, 201].includes(r.status)) {
-    ok('เตรียมบัญชี OPERATOR ทดสอบ', false, `สร้างไม่ได้ HTTP ${r.status}`);
-  } else {
-    const uid = psql(`SELECT id FROM users WHERE username='${uname}'`);
-    r = await fetch(`${API}/api/users/${uid}/reset-password`, { method: 'POST', headers: H });
-    const { temporaryPassword: temp } = await r.json();
-    r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
-    const partial = (await r.json())?.token;
-    await fetch(`${API}/api/auth/change-password`, { method: 'POST', headers: { Authorization: `Bearer ${partial}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: 'Pentest-Changed-2026!' }) });
-    r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: 'Pentest-Changed-2026!' }) });
-    const OH = { Authorization: `Bearer ${(await r.json())?.token}` };
-    const probe = async (name, url, init) => {
-      const rr = await fetch(`${API}${url}`, init).catch(() => null);
-      ok(name, !!rr && [401, 403, 404].includes(rr.status), `HTTP ${rr?.status}`);
-    };
-    await probe('OPERATOR อ่านรายชื่อ user ไม่ได้', '/api/users', { headers: OH });
-    await probe('OPERATOR อ่าน audit ไม่ได้', '/api/audit?limit=5', { headers: OH });
-    await probe('IDOR อ่าน user อื่นตรง ๆ ไม่ได้', `/api/users/${adminId}`, { headers: OH });
-    await probe('IDOR แก้ user อื่นไม่ได้', `/api/features/users/${adminId}`, { method: 'PUT', headers: { ...OH, 'Content-Type': 'application/json' }, body: '{}' });
-    await probe('IDOR ลบ user อื่นไม่ได้', `/api/users/${adminId}`, { method: 'DELETE', headers: OH });
-    await fetch(`${API}/api/users/${uid}`, { method: 'DELETE', headers: H }).catch(() => {});
-    const gone = psql(`SELECT count(*) FROM users WHERE username='${uname}'`);
-    ok('เก็บกวาดบัญชีทดสอบ', gone === '0', `เหลือ=${gone}`);
-  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed, ${warnCount} warn (warn ไม่ทำให้ gate ตื่ม)`);
