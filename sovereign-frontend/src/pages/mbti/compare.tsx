@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
-import { MBTI_TYPES, MBTI_QUESTIONS, scoreMbti, compareMbti, typeInfo, latestLocalResult, DIM_LABELS, LETTER_NAMES, type MbtiResult, type MbtiTypeInfo } from "../../lib/mbtiData";
+import { MBTI_TYPES, MBTI_QUESTIONS, scoreMbti, compareMbti, typeInfo, latestLocalResult, DIM_LABELS, familyOf, FAM_RGB, type MbtiResult, type MbtiTypeInfo } from "../../lib/mbtiData";
+import Seal from "../../components/mbti/Seal";
 
 const RELATION_STYLE: Record<string, { chip: string; label: string; icon: string }> = {
   same:    { chip: "text-emerald-300 bg-emerald-900/40 border-emerald-700/60", label: "เหมือนกัน", icon: "🤝" },
@@ -28,7 +29,7 @@ export default function MbtiComparePage() {
 
   const compare = useMemo(() => {
     if (!myResult || !otherCode) return null;
-    // ฝั่ง "อีกคน" สร้างจากโค้ด 4 ตัว + คะแนนกลาง 50/50 (ใช้เฉพาะตัวอักษรในการเทียบ)
+    // ฝั่ง "อีกคน" จากโค้ด 4 ตัว + คะแนนกลาง 50/50 (ใช้เฉพาะตัวอักษรในการเทียบ)
     const half: Record<number, number> = {};
     MBTI_QUESTIONS.forEach((q) => { half[q.id] = otherCode.includes(q.d[1]) ? 1 : 0; });
     return compareMbti(myResult, scoreMbti(half, MBTI_QUESTIONS));
@@ -59,13 +60,12 @@ export default function MbtiComparePage() {
           ) : (
             <>
               {/* ── การ์ดสองฝั่ง ── */}
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="card panel-glow p-5">
+              <div className="grid sm:grid-cols-2 gap-3">                  <div className="card panel-glow p-5">
                   <div className="text-[11px] text-gray-500 mb-2">คุณ (ผลจากเครื่องนี้)</div>
                   <div className="flex items-center gap-3">
                     <span className="text-3xl">{myInfo?.emoji}</span>
                     <div>
-                      <div className="text-xl font-bold text-fuchsia-300">{myResult.code}</div>
+                      <div className="text-xl font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(myResult.code) ?? "nt"]})` }}>{myResult.code}</div>
                       <div className="text-xs text-gray-400">{myInfo?.name} · {myInfo?.nameEn}</div>
                     </div>
                   </div>
@@ -76,7 +76,7 @@ export default function MbtiComparePage() {
                     <div className="flex items-center gap-3">
                       <span className="text-3xl">{otherInfo.emoji}</span>
                       <div>
-                        <div className="text-xl font-bold text-violet-300">{otherCode}</div>
+                        <div className="text-xl font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(otherCode) ?? "nt"]})` }}>{otherCode}</div>
                         <div className="text-xs text-gray-400">{otherInfo.name} · {otherInfo.nameEn}</div>
                       </div>
                     </div>
@@ -108,13 +108,26 @@ export default function MbtiComparePage() {
               {/* ── ผลการเทียบ ── */}
               {compare && otherInfo && myInfo && (
                 <>
-                  <div className="card panel-glow p-6 text-center space-y-2">
-                    <div className="text-3xl">{compare.summary.sameCount >= 3 ? "💞" : compare.summary.sameCount === 2 ? "🧩" : "🌋"}</div>
-                    <h2 className="text-lg font-bold glow-text">{myResult.code} × {otherCode}</h2>
-                    <p className="text-sm text-fuchsia-200/90 max-w-xl mx-auto leading-relaxed">{compare.summary.headline}</p>
-                    <div className="flex justify-center gap-2 pt-1">
-                      <span className="inset px-2 py-1 rounded text-xs text-emerald-300">เหมือนกัน {compare.summary.sameCount}/4 มิติ</span>
-                      <span className="inset px-2 py-1 rounded text-xs text-amber-300">ต่างกัน {compare.summary.diffCount}/4 มิติ</span>
+                  <div className="card panel-glow p-6">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="text-center space-y-2">
+                        <div className="text-3xl">{compare.summary.sameCount >= 3 ? "💞" : compare.summary.sameCount === 2 ? "🧩" : "🌋"}</div>
+                        <h2 className="text-xl font-bold">
+                          <span style={{ color: `rgb(${FAM_RGB[familyOf(myResult.code) ?? "nt"]})` }}>{myResult.code}</span>
+                          <span className="text-gray-600"> × </span>
+                          <span style={{ color: `rgb(${FAM_RGB[familyOf(otherCode) ?? "nt"]})` }}>{otherCode}</span>
+                        </h2>
+                        <p className="text-sm text-fuchsia-200/90">{compare.summary.headline}</p>
+                        <div className="flex justify-center gap-2 pt-1">
+                          <span className="inset px-2 py-1 rounded text-xs text-emerald-300">เหมือนกัน {compare.summary.sameCount}/4 มิติ</span>
+                          <span className="inset px-2 py-1 rounded text-xs text-amber-300">ต่างกัน {compare.summary.diffCount}/4 มิติ</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-3 sm:gap-6">
+                        <Seal letters={myResult.code} dims={myResult.dims} famRgb={FAM_RGB[familyOf(myResult.code) ?? "nt"]} />
+                        <span className="text-lg text-gray-600 font-light">×</span>
+                        <Seal letters={otherCode} dims={compare.dims.map((d, i) => ({ dim: d.dim, letter: otherCode[i], clarity: 50 }))} famRgb={FAM_RGB[familyOf(otherCode) ?? "nt"]} />
+                      </div>
                     </div>
                   </div>
 
@@ -127,7 +140,7 @@ export default function MbtiComparePage() {
                             <h3 className="text-sm font-bold text-gray-200">{DIM_LABELS[d.dim]}</h3>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full border ${st.chip}`}>{st.icon} {st.label}</span>
                             <span className="text-xs text-gray-500 ml-auto">
-                              <b className="text-fuchsia-300">{d.aLetter}</b> ({LETTER_NAMES[d.aLetter]}) × <b className="text-violet-300">{d.bLetter}</b> ({LETTER_NAMES[d.bLetter]})
+                              <b style={{ color: `rgb(${FAM_RGB[familyOf(myResult.code) ?? "nt"]})` }}>{d.aLetter}</b> × <b style={{ color: `rgb(${FAM_RGB[familyOf(otherCode) ?? "nt"]})` }}>{d.bLetter}</b>
                             </span>
                           </div>
                           <p className="text-sm text-gray-300 leading-relaxed">{d.note}</p>

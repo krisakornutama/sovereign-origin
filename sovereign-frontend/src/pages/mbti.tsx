@@ -12,9 +12,10 @@ import Icon from "../components/ui/Icon";
 import Link from "next/link";
 import {
   MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, MBTI_TYPES, MBTI_STORE_KEY,
-  scoreMbti, typeInfo,
+  scoreMbti, typeInfo, familyOf, FAM_RGB,
   type MbtiResult, type MbtiTypeInfo, type MbtiQuestion,
 } from "../lib/mbtiData";
+import Seal from "../components/mbti/Seal";
 
 const DIM_LABEL: Record<string, { first: string; second: string; hint: string }> = {
   EI: { first: "E — มุ่งออก (Extraversion)", second: "I — มุ่งเข้า (Introversion)", hint: "พลังงานมาจากไหน" },
@@ -232,11 +233,18 @@ export default function MbtiPage() {
     const prevSame = history.filter((h) => h.code === result.code).length;
     return (
       <div className="space-y-5 max-w-4xl mx-auto w-full">
-        <div className="card panel-glow p-8 text-center space-y-3">
-          <div className="text-6xl">{info?.emoji ?? "🧩"}</div>
-          <div className="text-4xl font-bold text-fuchsia-300 tracking-widest glow-text">{result.code}</div>
-          <div className="text-xl font-bold text-white">{info?.name} — {info?.nameEn}</div>
-          <p className="text-sm text-fuchsia-200/80 italic">&quot;{info?.tagline}&quot;</p>
+        <div className="card panel-glow p-8 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
+            <div className="text-center space-y-2 order-2 sm:order-1">
+              <div className="text-6xl">{info?.emoji ?? "🧩"}</div>
+              <div className="text-4xl mbti-serif font-bold text-fuchsia-300 tracking-widest glow-text">{result.code}</div>
+              <div className="text-xl font-bold text-white">{info?.name} — {info?.nameEn}</div>
+              <p className="text-sm text-fuchsia-200/80 italic">&quot;{info?.tagline}&quot;</p>
+            </div>
+            <div className="order-1 sm:order-2">
+              <Seal letters={result.code} dims={result.dims} famRgb={FAM_RGB[familyOf(result.code) ?? "nt"]} />
+            </div>
+          </div>
           <p className="text-sm text-gray-400 max-w-2xl mx-auto leading-relaxed">{info?.desc}</p>
           <div className="flex flex-wrap justify-center gap-2 pt-1 text-xs text-gray-500">
             <span className="inset px-2 py-1 rounded">ทำ {fmtDate(result.date)}</span>
@@ -345,7 +353,7 @@ export default function MbtiPage() {
             <div className="space-y-1.5">
               {[...MBTI_TYPES].sort((a, b) => a.share - b.share).map((t) => (
                 <button key={t.code} onClick={() => setLibraryCode(t.code)} className="w-full flex items-center gap-2 text-left group">
-                  <span className="text-xs w-12 text-gray-400 group-hover:text-white">{t.code}</span>
+                  <span className="text-xs w-12 text-gray-400 group-hover:text-white" style={{ borderBottom: `2px solid rgb(${FAM_RGB[familyOf(t.code) ?? "nt"]})` }}>{t.code}</span>
                   <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-500" style={{ width: `${Math.min(100, (t.share / 14) * 100)}%` }} />
                   </div>
@@ -363,7 +371,7 @@ export default function MbtiPage() {
               <div className="flex items-center gap-3">
                 <span className="text-4xl">{t.emoji}</span>
                 <div>
-                  <div className="text-2xl font-bold text-fuchsia-300">{t.code} — {t.name}</div>
+                  <div className="text-2xl mbti-serif font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(t.code) ?? "nt"]})` }}>{t.code} — {t.name}</div>
                   <div className="text-sm text-gray-400">{t.nameEn} · ~{t.share}% ของประชากร · คู่เข้ากัน: {t.pair}</div>
                 </div>
               </div>

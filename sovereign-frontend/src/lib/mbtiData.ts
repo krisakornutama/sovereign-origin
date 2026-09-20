@@ -354,6 +354,26 @@ export function typeInfo(code: string): MbtiTypeInfo | undefined {
   return MBTI_TYPES.find((t) => t.code === code);
 }
 
+/** ตระกูลบุคลิก (taxonomy จริงของ MBTI) — คีย์เข้ากับ CSS var --fam-nt/nf/sj/sp */
+export type MbtiFamily = 'nt' | 'nf' | 'sj' | 'sp';
+export const FAMILY_OF: Record<string, MbtiFamily> = {
+  INTJ: 'nt', INTP: 'nt', ENTJ: 'nt', ENTP: 'nt',
+  INFJ: 'nf', INFP: 'nf', ENFJ: 'nf', ENFP: 'nf',
+  ISTJ: 'sj', ISFJ: 'sj', ESTJ: 'sj', ESFJ: 'sj',
+  ISTP: 'sp', ISFP: 'sp', ESTP: 'sp', ESFP: 'sp',
+};
+export function familyOf(code: string): MbtiFamily | null {
+  return FAMILY_OF[code] ?? null;
+}
+
+/** สีตระกูล R-G-B (แหล่งเดียว — compose เป็น rgb()/rgba() ที่จุดใช้) */
+export const FAM_RGB: Record<MbtiFamily, string> = {
+  nt: '167 139 250', // นักวิเคราะห์ — วอยเลต
+  nf: '240 171 252', // นักการทูต — โรส
+  sj: '125 211 252', // ผู้พิทักษ์ — สกาย
+  sp: '252 211 77',  // นักสำรวจ — แอมเบอร์
+};
+
 // ─────────────────────────────────────────────────────────────
 //  ชุดสั้น 32 ข้อ (Quick Quiz สำหรับมือถือ)
 //  โครง E-I 8 · S-N 8 · T-F 9 · J-P 7 — คำถามเขียนใหม่ กระชับ อ่านจบใน 5–7 นาที

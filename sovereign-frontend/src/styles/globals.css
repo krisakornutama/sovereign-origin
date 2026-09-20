@@ -1100,3 +1100,11 @@ html[data-theme='light'] .atmo-mind::before { opacity: 0.45; }
 .atmo-mind .glow-dot-cyan  { box-shadow: 0 0 6px rgba(192, 132, 252, 0.9); }
 .atmo-mind .input:focus    { border-color: rgba(192, 132, 252, 0.55); box-shadow: 0 0 12px rgba(168, 85, 247, 0.14); }
 .atmo-mind .card-hover:hover { border-color: rgba(192, 132, 252, 0.45); }
+
+/* ── MBTI: ตราแปดส่วน (signature) + ตระกูลสี่สี ──
+   สีตระกูล (NT/NF/SJ/SP) อยู่ที่เดียวใน lib/mbtiData.ts (FAM_RGB) — ไม่ทำซ้ำใน CSS
+   ใช้เฉพาะ: ตรา, ตัวอักษรผล, ขีดโค้ดในคลัง — ไม่กระจายทั่วหน้า */
+.mbti-serif {
+  font-family: 'Noto Serif Thai', var(--font-thai);
+  letter-spacing: 0.08em;
+}
