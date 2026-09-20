@@ -20,9 +20,9 @@ const ROUTE_THEMES: Array<{ atmo: Atmosphere; re: RegExp }> = [
   { atmo: 'power', re: /^\/(energy|sensors|relay|automation|ota|infrastructure|predictive|ai|ai-agent|learning|governance-sim)(\/|$)/ },
   { atmo: 'wellness', re: /^\/(health|health-export|selfreliance|skills|lifestyle|crisis)(\/|$)/ },
   { atmo: 'lotus', re: /^\/healing(\/|$)/ },
-  { atmo: 'nature', re: /^\/(farm|livestock|inventory|research)(\/|$)/ },
+  { atmo: 'nature', re: /^\/(farm|livestock|inventory|research|terrain-demo)(\/|$)/ },
   { atmo: 'guard', re: /^\/(security|vision|property|alerts|risk-monitor)(\/|$)/ },
-  { atmo: 'wealth', re: /^\/(treasury|reports|knowledge)(\/|$)/ },
+  { atmo: 'wealth', re: /^\/(treasury|reports|knowledge|history)(\/|$)/ },
   { atmo: 'kitchen', re: /^\/restaurant(\/|$)/ },
   { atmo: 'system', re: /^\/(business|system|backup|users|audit|settings|change-password|hover-cards)(\/|$)/ },
 ];

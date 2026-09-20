@@ -87,6 +87,43 @@ const menus = [
 ];
 const restaurantOrders = [];
 
+// หน้าฟาร์ม (atmo-nature) — แปลงตัวอย่างให้การ์ดมีของดู
+const farmPlots = {
+  plots: [
+    { id: 'fp1', name: 'แปลงทุเรียนหน้าบ้าน', crop: 'ทุเรียน', location: 'รั้วด้านตะวันออก', area_sqm: 320, status: 'growing', planted_at: '2026-06-01' },
+    { id: 'fp2', name: 'สวนสมุนไพร', crop: 'ขมิ้นชัน', location: 'หลังครัว', area_sqm: 48, status: 'active', planted_at: '2026-08-15' },
+    { id: 'fp3', name: 'แปลงข้าวหอมมะลิ', crop: 'ข้าวหอมมะลิ', location: 'ทุ่งเหนือ', area_sqm: 1600, status: 'harvested', planted_at: '2026-05-10' },
+    { id: 'fp4', name: 'แปลงพักดิน', crop: null, location: 'ทุ่งใต้', area_sqm: 700, status: 'fallow', planted_at: null },
+  ],
+};
+
+// หน้าห้องเยียวยา (atmo-lotus) — คำสอน/สมุนไพร/สมาธิให้เทียนไฟมีของเผา
+const healingTeachings = {
+  teachings: [
+    { id: 't1', title: 'สติปัฏฐาน 4', category: 'สติ', category_tags: ['สติ', 'ปัญญา'], content: 'พิจารณากาย ความรู้สึก จิต ธรรม — เห็นตามจริง ไม่ยึด', application: 'ใช้เวลาเจ็บป่วยเป็นโอกาสฝึกเห็นเวทนา', source: 'มหาสติปัฏฐานสูตร' },
+    { id: 't2', title: 'อริยสัจ 4', category: 'ปัญญา', category_tags: ['เหตุผล'], content: 'รูปทุกข์ · ละสมุทัย · ทำนิโรธ · ปฏิบัติมรรค', application: 'ไล่หาเหตุของอาการ แล้วแก้ที่เหตุ ไม่ใช่แก้ที่ปลาย', source: 'ธัมมจักกัปปวัตนสูตร' },
+    { id: 't3', title: 'อนัตตา — ปล่อยวาง', category: 'สติ', category_tags: ['วาง'], content: 'กายใจไม่ใช่เรา จึงไม่ทุกข์กับสิ่งที่เปลี่ยน', application: 'วางความกังวลเรื่องผลลัพธ์ ทำหน้าที่แล้วปล่อย', source: 'อนัตตลักขณสูตร' },
+  ],
+};
+const healingHerbs = {
+  herbs: [
+    { name: 'ขมิ้นชัน', uses: ['ลดการอักเสบ', 'ช่วยย่อยอาหาร'], warnings: ['โรคนิ่วในถุงน้ำดี ควรปรึกษาแพทย์'], interactions: [] },
+    { name: 'ฟ้าทะลายโจร', uses: ['บรรเทาเจ็บคอ', 'ต้านไวรัส'], warnings: ['ไม่ควรใช้ต่อเนื่องเกิน 8 สัปดาห์'], interactions: [{ med: 'ยาละลายลิ่มเลือด', severity: 'สูง', note: 'เพิ่มความเสี่ยงเลือดออก' }] },
+    { name: 'ขิง', uses: ['แก้คลื่นไส้', 'ขับลม'], warnings: ['ความดันสูงบางราย'], interactions: [] },
+  ],
+};
+const healingProgress = (days) => days > 1
+  ? {
+      progress: [
+        { metric: 'stress', before: 6.4, after: 3.1, delta: -3.3, improving: true, samples: 42 },
+        { metric: 'pain', before: 5.0, after: 2.8, delta: -2.2, improving: true, samples: 38 },
+        { metric: 'meditation_min', before: 5, after: 28, delta: 23, improving: true, samples: 90 },
+        { metric: 'sleep_hours', before: 5.2, after: 6.8, delta: 1.6, improving: true, samples: 60 },
+      ],
+      meditation: { total_min: 2520, sessions: 84 },
+    }
+  : { progress: [], meditation: { total_min: 25, sessions: 1 } };
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
@@ -118,6 +155,13 @@ http
     else if (url.startsWith('/api/treasury/transfers')) body = treasuryTransfers;
     else if (url === '/api/restaurant/menus') body = menus;
     else if (url.startsWith('/api/restaurant/orders')) body = restaurantOrders;
+    else if (url === '/api/farm/plots') body = farmPlots;
+    else if (url.startsWith('/api/healing/teachings')) body = healingTeachings;
+    else if (url.startsWith('/api/healing/herbs')) body = healingHerbs;
+    else if (url.startsWith('/api/healing/progress')) {
+      const days = Number((req.url || '').match(/days=(\d+)/)?.[1] ?? 90);
+      body = healingProgress(days);
+    }
     // endpoint อื่น ๆ → {} (หน้าส่วนใหญ่มี guard asArray/asObject รองรับ)
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify(body));

@@ -947,3 +947,87 @@ html[data-theme='light'] .atmo-day::before,
 html[data-theme='light'] .atmo-dusk::before {
   opacity: 0.45;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ขัดเกลาธีม (Deep polish) — ให้แต่ละบรรยากาศคุมลึกถึงจิ๋ว:
+   สีเลือกข้อความ · scrollbar · หัวตาราง · จุดสถานะ · ขอบช่องกรอกตอนโฟกัส
+   ใช้ --atmo-nav ที่ประกาศไว้แล้วเป็นสีหลักของธีม
+   ═══════════════════════════════════════════════════════════════ */
+
+/* สีเลือกข้อความ (highlight ตอนลากเมาส์) */
+.atmo-power ::selection     { background: rgba(251, 191, 36, 0.32); color: #fffbeb; }
+.atmo-wellness ::selection  { background: rgba(45, 212, 191, 0.30); color: #f0fdfa; }
+.atmo-lotus ::selection     { background: rgba(202, 168, 90, 0.35); color: #fffbeb; }
+.atmo-nature ::selection    { background: rgba(132, 204, 22, 0.28); color: #f7fee7; }
+.atmo-guard ::selection     { background: rgba(251, 113, 133, 0.32); color: #fff1f2; }
+.atmo-wealth ::selection    { background: rgba(234, 179, 8, 0.32); color: #fefce8; }
+.atmo-kitchen ::selection   { background: rgba(251, 146, 60, 0.30); color: #fff7ed; }
+.atmo-system ::selection    { background: rgba(34, 211, 238, 0.28); color: #ecfeff; }
+
+/* scrollbar เปลี่ยนเฉดตามธีม */
+.atmo-power     * { scrollbar-color: rgba(251, 191, 36, 0.30) transparent; }
+.atmo-wellness  * { scrollbar-color: rgba(45, 212, 191, 0.30) transparent; }
+.atmo-lotus     * { scrollbar-color: rgba(202, 168, 90, 0.35) transparent; }
+.atmo-nature    * { scrollbar-color: rgba(132, 204, 22, 0.28) transparent; }
+.atmo-guard     * { scrollbar-color: rgba(251, 113, 133, 0.30) transparent; }
+.atmo-wealth    * { scrollbar-color: rgba(234, 179, 8, 0.30) transparent; }
+.atmo-kitchen   * { scrollbar-color: rgba(251, 146, 60, 0.30) transparent; }
+.atmo-system    * { scrollbar-color: rgba(34, 211, 238, 0.28) transparent; }
+
+/* หัวตาราง (HUD) → เฉดของงาน */
+.atmo-power .table thead th     { color: rgb(251 191 36 / 0.75); }
+.atmo-wellness .table thead th  { color: rgb(45 212 191 / 0.75); }
+.atmo-lotus .table thead th     { color: rgb(231 208 148 / 0.80); }
+.atmo-nature .table thead th    { color: rgb(163 230 53 / 0.72); }
+.atmo-guard .table thead th     { color: rgb(253 164 175 / 0.75); }
+.atmo-wealth .table thead th    { color: rgb(253 224 71 / 0.72); }
+.atmo-kitchen .table thead th   { color: rgb(253 186 116 / 0.75); }
+.atmo-system .table thead th    { color: rgb(103 232 249 / 0.72); }
+
+/* จุดสถานะนีออน → เฉดของงาน */
+.atmo-power .glow-dot,
+.atmo-power .glow-dot-cyan     { box-shadow: 0 0 6px rgba(251, 191, 36, 0.9); }
+.atmo-wellness .glow-dot,
+.atmo-wellness .glow-dot-cyan  { box-shadow: 0 0 6px rgba(45, 212, 191, 0.9); }
+.atmo-lotus .glow-dot,
+.atmo-lotus .glow-dot-cyan     { box-shadow: 0 0 6px rgba(202, 168, 90, 0.95); }
+.atmo-nature .glow-dot,
+.atmo-nature .glow-dot-cyan    { box-shadow: 0 0 6px rgba(132, 204, 22, 0.9); }
+.atmo-guard .glow-dot,
+.atmo-guard .glow-dot-cyan     { box-shadow: 0 0 6px rgba(251, 113, 133, 0.9); }
+.atmo-wealth .glow-dot,
+.atmo-wealth .glow-dot-cyan    { box-shadow: 0 0 6px rgba(234, 179, 8, 0.9); }
+.atmo-kitchen .glow-dot,
+.atmo-kitchen .glow-dot-cyan   { box-shadow: 0 0 6px rgba(251, 146, 60, 0.9); }
+.atmo-system .glow-dot,
+.atmo-system .glow-dot-cyan    { box-shadow: 0 0 6px rgba(34, 211, 238, 0.9); }
+
+/* ช่องกรอกตอนโฟกัส → ขอบ+แสงเฉดของงาน */
+.atmo-power .input:focus     { border-color: rgba(251, 191, 36, 0.55); box-shadow: 0 0 12px rgba(245, 158, 11, 0.14); }
+.atmo-wellness .input:focus  { border-color: rgba(45, 212, 191, 0.55); box-shadow: 0 0 12px rgba(45, 212, 191, 0.14); }
+.atmo-lotus .input:focus     { border-color: rgba(202, 168, 90, 0.60); box-shadow: 0 0 12px rgba(202, 168, 90, 0.16); }
+.atmo-nature .input:focus    { border-color: rgba(132, 204, 22, 0.55); box-shadow: 0 0 12px rgba(132, 204, 22, 0.13); }
+.atmo-guard .input:focus     { border-color: rgba(251, 113, 133, 0.55); box-shadow: 0 0 12px rgba(251, 113, 133, 0.14); }
+.atmo-wealth .input:focus    { border-color: rgba(234, 179, 8, 0.55); box-shadow: 0 0 12px rgba(234, 179, 8, 0.14); }
+.atmo-kitchen .input:focus   { border-color: rgba(251, 146, 60, 0.55); box-shadow: 0 0 12px rgba(251, 146, 60, 0.14); }
+.atmo-system .input:focus    { border-color: rgba(34, 211, 238, 0.55); box-shadow: 0 0 12px rgba(34, 211, 238, 0.13); }
+
+/* การ์ด hover → เส้นขอบเรืองเฉดของงาน */
+.atmo-power .card-hover:hover     { border-color: rgba(251, 191, 36, 0.45); }
+.atmo-wellness .card-hover:hover  { border-color: rgba(45, 212, 191, 0.45); }
+.atmo-lotus .card-hover:hover     { border-color: rgba(202, 168, 90, 0.50); }
+.atmo-nature .card-hover:hover    { border-color: rgba(132, 204, 22, 0.42); }
+.atmo-guard .card-hover:hover     { border-color: rgba(251, 113, 133, 0.45); }
+.atmo-wealth .card-hover:hover    { border-color: rgba(234, 179, 8, 0.45); }
+.atmo-kitchen .card-hover:hover   { border-color: rgba(251, 146, 60, 0.45); }
+.atmo-system .card-hover:hover    { border-color: rgba(34, 211, 238, 0.42); }
+
+/* eyebrow-cyan → เฉดของงาน (สำหรับหน้าที่ใช้ eyebrow-cyan) */
+.atmo-power .eyebrow-cyan     { color: rgb(251 191 36 / 0.9); text-shadow: 0 0 8px rgba(245, 158, 11, 0.35); }
+.atmo-wellness .eyebrow-cyan  { color: rgb(94 234 212 / 0.85); text-shadow: 0 0 8px rgba(45, 212, 191, 0.35); }
+.atmo-lotus .eyebrow-cyan     { color: rgb(231 208 148 / 0.9); text-shadow: 0 0 8px rgba(202, 168, 90, 0.35); }
+.atmo-nature .eyebrow-cyan    { color: rgb(163 230 53 / 0.85); text-shadow: 0 0 8px rgba(132, 204, 22, 0.35); }
+.atmo-guard .eyebrow-cyan     { color: rgb(253 164 175 / 0.85); text-shadow: 0 0 8px rgba(251, 113, 133, 0.35); }
+.atmo-wealth .eyebrow-cyan    { color: rgb(253 224 71 / 0.85); text-shadow: 0 0 8px rgba(234, 179, 8, 0.35); }
+.atmo-kitchen .eyebrow-cyan   { color: rgb(253 186 116 / 0.9); text-shadow: 0 0 8px rgba(251, 146, 60, 0.35); }
+.atmo-system .eyebrow-cyan    { color: rgb(103 232 249 / 0.85); text-shadow: 0 0 8px rgba(34, 211, 238, 0.3); }
