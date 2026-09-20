@@ -7,6 +7,25 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+  // CSP (เติมตามผล security-audit): ปลดล็อกเฉพาะที่แอปใช้จริง —
+  //   style ผ่าน Google Fonts + inline (Next hydration) · font จาก gstatic ·
+  //   img: data/blob (QR/ภาพในเว็บ) + QR generator + สแนปชอตกล้องใน LAN ·
+  //   connect: API/WS ที่ตั้งได้ในหน้า settings (localhost + IP เครื่องนี้ใน LAN) ·
+  //   frame: YouTube/Vimeo embed ที่มีในหน้าต่าง ๆ
+  { key: 'Content-Security-Policy', value: [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https://api.qrserver.com http://192.168.1.50",
+    "media-src 'self' blob:",
+    "connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 http://192.168.1.102:3001 ws://localhost:3001 ws://127.0.0.1:3001 ws://192.168.1.102:3001",
+    "frame-src 'self' https://www.youtube.com https://player.vimeo.com",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join('; ') },
 ];
 
 const nextConfig = {

@@ -4,7 +4,7 @@ services:
     image: timescale/timescaledb:latest-pg15
     container_name: sovereign-db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # loopback เท่านั้น — DB ไม่ควรเห็นจาก LAN (audit 20 ก.ย. 2569)
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sovereign}
@@ -30,8 +30,8 @@ services:
       EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_USERNAME:-admin}
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?EMQX_PASSWORD is required (see .env.example)}
     ports:
-      - "0.0.0.0:1883:1883"
-      - "0.0.0.0:18083:18083"
+      - "127.0.0.1:1883:1883"    # loopback เท่านั้น — MQTT broker ใช้ภายในเครื่อง
+      - "127.0.0.1:18083:18083"  # loopback เท่านั้น — dashboard จัดการ EMQX ใช้จากเครื่องนี้
     volumes:
       - ./data/emqx:/opt/emqx/data
       - ./data/emqx-logs:/opt/emqx/log
