@@ -66,7 +66,7 @@ const PG_PASSWORD = readPostgresPassword();
       (relay loopback กิน startup packet — prisma จะ P1001 ตลอด) */
 function fwdRunning() {
   try {
-    const state = sh(`docker inspect ${FWD_NAME} --format '{{.State.Running}}'`);
+    const state = sh(`docker inspect ${FWD_NAME} --format "{{.State.Running}}"`);
     return state === 'true';
   } catch { return false; }
 }
@@ -97,7 +97,7 @@ if (await fwdHealthy()) {
     log(`forwarder ค้าง (ไม่ตอบ startup packet) → ลบแล้วสร้างใหม่`);
     shOk(`docker rm -f ${FWD_NAME}`);
   }
-  const network = sh(`docker inspect ${DB_CONTAINER} --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'`);
+  const network = sh(`docker inspect ${DB_CONTAINER} --format "{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}"`);
   log(`สร้าง forwarder ${FWD_NAME} (network ${network} → 127.0.0.1:${FWD_PORT})`);
   const run = spawnSync('docker', [
     'run', '-d', '--rm', '--name', FWD_NAME,
