@@ -48,7 +48,7 @@ export default function KitchenIOTPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-kitchen min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.kitchen.title', 'ครัว IOT — น้ำหนัก + ตู้เย็น')} icon={<Icon name="sensors" size={18} />} subtitle={t('restaurant.kitchen.subtitle', 'HX711 น้ำหนัก → Inventory อัตโนมัติ • DS18B20 ตู้เย็น → เตือนของเสีย')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />

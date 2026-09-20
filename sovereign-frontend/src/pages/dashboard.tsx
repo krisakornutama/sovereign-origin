@@ -25,6 +25,7 @@ import { fmtLocale } from '../lib/formatDate';
 import Sidebar from '../components/layout/Sidebar';
 import { useRiskStore } from '../stores/useRiskStore';
 import { useWealthStore } from '../stores/useWealthStore';
+import { useCircadianAtmo } from '../lib/useCircadian';
 
 const categoryMap: Record<string, { name: string; metrics: string[] }> = {
   energy: { name: 'พลังงาน', metrics: ['battery_soc', 'power_kw', 'voltage', 'current'] },
@@ -419,6 +420,7 @@ function PerfGauges({ metrics, deviceStatus }: { metrics: Record<string, number>
 }
 
 export default function Dashboard() {
+  const circadianAtmo = useCircadianAtmo();
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   useSocket();
@@ -886,7 +888,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <div className={`${circadianAtmo} min-h-screen bg-gray-950 text-gray-100`}>
       <Header queuedCount={queuedCount} isOnline={isOnline} syncNow={syncNow} neonPct={neonPct} />
       <main className="flex">
         <Sidebar />

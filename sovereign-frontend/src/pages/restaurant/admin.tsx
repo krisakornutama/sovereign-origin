@@ -58,7 +58,7 @@ export default function RestaurantAdminPage() {
   if(!isAuthenticated) return <div className="text-white p-8">{t('restaurant.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-kitchen min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.admin.title', 'จัดการร้าน — เมนู & สูตร')} icon={<Icon name="inventory" size={18} />} subtitle={t('restaurant.admin.subtitle', 'เมนูเพิ่มได้ไม่จำกัด • สูตรดึงจาก Farm โดยตรง + สแกนบิลตลาด (เน้นผลิตเอง)')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
