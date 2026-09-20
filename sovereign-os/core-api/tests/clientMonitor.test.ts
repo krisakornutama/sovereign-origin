@@ -119,9 +119,11 @@ describe('Client Monitor: aggregateClientHealth', () => {
   });
 
   it('กราฟรายวันครบ 7 วัน — วันที่ไม่มี error = 0 และเรียงเก่า→ใหม่', () => {
-    const s = aggregateClientHealth([mk({ timestamp: new Date('2026-09-19T08:00:00Z') })], 7);
+    // bucket ยึด "วันนี้" ตาม impl — ห้ามตรึงวันที่ตายตัวไม่งั้นพังเองเมื่อข้ามวัน
+    const today = new Date().toISOString().slice(0, 10);
+    const s = aggregateClientHealth([mk({ timestamp: new Date(`${today}T08:00:00Z`) })], 7);
     assert.equal(s.daily.length, 7);
-    assert.equal(s.daily[6].date, '2026-09-19');
+    assert.equal(s.daily[6].date, today);
     assert.equal(s.daily[6].count, 1);
     assert.ok(s.daily.slice(0, 6).every((d) => d.count === 0));
   });
