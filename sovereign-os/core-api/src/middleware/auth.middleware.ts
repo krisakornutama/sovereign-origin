@@ -128,6 +128,10 @@ export function auditStateChange(req: Request, res: Response, next: NextFunction
   if (!auditableMethods.includes(req.method)) {
     return next();
   }
+  // เส้น polling ที่ UI เรียกถี่ — บันทึกทุกครั้ง = ขยะ audit หลายพันแถว/วัน ไม่มีคุณค่าเชิงตรวจสอบ (20 ก.ย. 2569)
+  if (req.path === '/api/automation/check') {
+    return next();
+  }
 
   // Capture the original end to log after response is sent
   const originalEnd = res.end;
