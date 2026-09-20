@@ -25,10 +25,26 @@ const server = http.createServer(app);
 const io = createSocketServer(server);
 
 app.disable('x-powered-by');
+// CSP สำหรับ response ฝั่ง API — เปิดแบบเข้มได้เพราะ API ไม่ serve HTML เลย (ตรวจแล้ว 20 ก.ย. 2569)
+// ประโยชน์จริง: frame-ancestors กันการฝัง API ใน iframe ของเว็บอื่น + ปิด object/base ที่ไม่จำเป็น
 app.use(helmet({
-  contentSecurityPolicy: false, // Pages Router + inline SVG/img data URLs — ปิด CSP ไว้ก่อน (แจ้งผู้ใช้หากเปิด)
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      frameAncestors: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
 }));
+// Permissions-Policy — helmet ไม่ตั้งให้เอง · ค่าตรงกับฝั่ง web (next.config.js) เป๊ะ
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 // อยู่หลัง proxy (nginx/caddy) → rate-limit นับ IP จริงได้
 app.set('trust proxy', 1);
 app.use(cors({
