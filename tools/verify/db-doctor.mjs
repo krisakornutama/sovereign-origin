@@ -59,11 +59,13 @@ const strangers = dbs.filter(d => !KNOWN.has(d) && d !== appDb);
 strangers.length === 0 ? ok('ไม่มีฐานแปลกปลอมใน cluster')
   : strangers.forEach(d => { const sz = psql(`SELECT pg_size_pretty(pg_database_size('${d}'))`, 'postgres'); warn(`ฐานไม่รู้จัก "${d}" (${sz}) วางอยู่ใน cluster — ยืนยันแล้ว drop หรือ rename ให้ชัด`); });
 
-// ── 4) schema drift: ทุก field ใน model AuditLog ต้องมีคอลัมน์จริงในฐาน ──
+// ── 4) schema drift: ทุก scalar field ใน model AuditLog ต้องมีคอลัมน์จริงในฐาน (ข้าม @relation/@@map/comment) ──
 const auditBlock = fs.readFileSync(SCHEMA, 'utf8').match(/model AuditLog \{([\s\S]*?)\n\}/)?.[1];
 if (!auditBlock) die('อ่าน model AuditLog จาก schema.prisma ไม่ได้');
-const fieldToCol = ([, f, mapped]) => mapped?.[1] || f.replace(/[A-Z]/g, c => '_' + c.toLowerCase()); // @map หรือ camelCase→snake_case
-const expectCols = [...auditBlock.matchAll(/^\s*(\w+)\s+\w+.*?(@map\("(\w+)"\))?/gm)].map(fieldToCol);
+const expectCols = auditBlock.split('\n')
+  .map(l => l.trim())
+  .filter(l => l && !l.startsWith('//') && !l.startsWith('@@') && !/@relation/.test(l))
+  .map(l => { const f = l.split(/\s+/)[0]; const m = l.match(/@map\("(\w+)"\)/); return m ? m[1] : f.replace(/[A-Z]/g, c => '_' + c.toLowerCase()); });
 const actualCols = new Set(psql("SELECT column_name FROM information_schema.columns WHERE table_name='audit_logs'", appDb).split('\n'));
 const missing = expectCols.filter(c => c && !actualCols.has(c));
 missing.length === 0 ? ok(`schema AuditLog ↔ ฐาน "${appDb}" ตรงกัน (${expectCols.length} คอลัมน์)`)
