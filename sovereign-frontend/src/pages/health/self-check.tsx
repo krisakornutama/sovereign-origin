@@ -207,7 +207,7 @@ export default function SelfCheckPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <div className="atmo-wellness min-h-screen bg-gray-950 text-gray-100 flex">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <PageHeader eyebrow="ชีวิต & สุขภาพ" title="ผลวินิจฉัยเบื้องต้น" icon={<Icon name="health" size={18} />} />
@@ -243,7 +243,7 @@ export default function SelfCheckPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-wellness min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader

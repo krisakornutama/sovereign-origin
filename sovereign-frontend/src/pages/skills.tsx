@@ -108,7 +108,7 @@ export default function SkillsPage() {
   const lowCount = summary?.lowSkills ?? items.filter((r) => r.level < 3).length;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-wellness min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">

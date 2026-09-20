@@ -29,7 +29,7 @@ export default function RiceResearchPage() {
   if(!isAuthenticated) return <div className="text-white p-8">Unauthorized</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader eyebrow="วิจัย" title="วิจัยพันธุ์ข้าว + ดิน (A)" icon={<Icon name="farm" size={18} />} subtitle="เทียบ yield/area + วิเคราะห์ดิน NPK — เก็บสูตรในคลังความรู้" actions={<Link href="/knowledge" className="text-sm text-sky-400 hover:underline">คลังความรู้</Link>} />

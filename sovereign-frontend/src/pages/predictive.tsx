@@ -116,12 +116,12 @@ export default function PredictivePage() {
   const secondsLeft = f?.hoursToEmpty != null ? f.hoursToEmpty * 3600 : null;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader
           eyebrow={t('predictive.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title={t('predictive.title', 'Predictive AI')} icon={<Icon name="predictive" size={18} />}
+          title={t('predictive.title', 'Predictive AI')} theme="power" icon={<Icon name="predictive" size={18} />}
           subtitle={t('predictive.subtitle', 'พยากรณ์แบตเตอรี่ + ตรวจจับความผิดปกติ (z-score)')} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('predictive.backDashboard', '← กลับ Dashboard')}</Link>}
         />
 

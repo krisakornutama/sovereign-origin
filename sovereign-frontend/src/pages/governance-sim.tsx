@@ -185,12 +185,12 @@ export default function GovernanceSimPage() {
   if (!isAuthenticated) return <div className="min-h-screen bg-gray-950" />;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <main className="flex-1 p-6 overflow-y-auto">
         <PageHeader
           eyebrow={t('governanceSim.eyebrow', 'Governance Simulation — War Room')}
-          title={t('governanceSim.title', 'ระบบจำลองการปกครองและเสถียรภาพสังคม')} icon={<Icon name="governance" size={18} />}
+          title={t('governanceSim.title', 'ระบบจำลองการปกครองและเสถียรภาพสังคม')} theme="power" icon={<Icon name="governance" size={18} />}
           subtitle={t('governanceSim.subtitle', 'จำลองระดับบุคคลหลายพันคน ตามทฤษฎี Legitimacy · Asabiyyah · Inclusive Institutions — เรื่องจริง: อำนาจไม่ได้วัดที่กองทัพ แต่ที่ความสามารถบริหารความขัดแย้ง')}
         />
 
