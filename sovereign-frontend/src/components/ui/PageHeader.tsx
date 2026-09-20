@@ -3,13 +3,17 @@
 /**
  * หัวหน้าเพจมาตรฐาน — ใช้แทนการเขียน header ซ้ำ ๆ กันทุกหน้า
  * eyebrow = กลุ่มของหน้า (เช่น "ชีวิต & การเงิน"), title = ชื่อหน้า
- * theme = บรรยากาศของงาน ("power" | "wellness" | "lotus" | "nature" | "guard" | "wealth" | "kitchen")
+ * theme = บรรยากาศของงาน ("power" | "wellness" | "lotus" | "nature" | "guard" | "wealth" | "kitchen" | "system")
+ *         หรือ "circadian" = ตามเวลาของวัน (เช้า/สาย/เย็น/กลางคืนโทนฐาน)
  *         — ถ้าไม่ส่งมา ระบบเดาจากเส้นทางปัจจุบัน (auto) หรือส่ง "none" เพื่อบังคับค่าเดิม
  */
 import { usePathname } from 'next/navigation';
+import { circadianClass } from '../../lib/useCircadian';
 
-export type PageTheme = 'auto' | 'none' | 'power' | 'wellness' | 'lotus' | 'nature' | 'guard' | 'wealth' | 'kitchen';
-type Atmosphere = Exclude<PageTheme, 'auto' | 'none'>;
+export type PageTheme =
+  | 'auto' | 'none' | 'circadian'
+  | 'power' | 'wellness' | 'lotus' | 'nature' | 'guard' | 'wealth' | 'kitchen' | 'system';
+type Atmosphere = Exclude<PageTheme, 'auto' | 'none' | 'circadian'>;
 
 /** แผนที่เส้นทาง → ธีมบรรยากาศ (ใช้เมื่อไม่ได้ส่ง theme มาให้) */
 const ROUTE_THEMES: Array<{ atmo: Atmosphere; re: RegExp }> = [
@@ -20,6 +24,7 @@ const ROUTE_THEMES: Array<{ atmo: Atmosphere; re: RegExp }> = [
   { atmo: 'guard', re: /^\/(security|vision|property|alerts|risk-monitor)(\/|$)/ },
   { atmo: 'wealth', re: /^\/(treasury|reports|knowledge)(\/|$)/ },
   { atmo: 'kitchen', re: /^\/restaurant(\/|$)/ },
+  { atmo: 'system', re: /^\/(business|system|backup|users|audit|settings|change-password|hover-cards)(\/|$)/ },
 ];
 
 export function themeClassForPath(pathname: string): string {
@@ -46,7 +51,10 @@ export default function PageHeader({
 }) {
   const pathname = usePathname() || '/';
   const resolved =
-    theme === 'auto' ? themeClassForPath(pathname) : theme === 'none' ? '' : `atmo-${theme}`;
+    theme === 'auto' ? themeClassForPath(pathname)
+    : theme === 'none' ? ''
+    : theme === 'circadian' ? circadianClass()
+    : `atmo-${theme}`;
 
   return (
     <header className={`flex flex-wrap items-end justify-between gap-4 mb-7 ${resolved}`}>

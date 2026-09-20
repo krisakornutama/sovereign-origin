@@ -12,6 +12,8 @@ import { ALL_PAGES } from '../lib/navigation';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
+import { themeClassForPath } from './ui/PageHeader';
+import { useCircadianAtmo, atmoNavStyle } from '../lib/useCircadian';
 import Icon from './ui/Icon';
 
 const PALETTE_EVENT = 'sovereign:palette';
@@ -57,6 +59,11 @@ function scoreItem(q: string, item: { label: string; href: string; keywords?: st
 
 export default function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
   const router = useRouter();
+  // สีเน้นของ palette ตามธีมหน้าปัจจุบัน (atmo-*) — ไม่มีธีม = ตามเวลาของวัน (circadian)
+  // (เรียก hook ตรง ๆ เสมอ — hook ห้ามเรียกแบบมีเงื่อนไข; pathname ไม่เอา hash)
+  const routeAtmo = themeClassForPath(router.pathname || '/');
+  const circadianAtmo = useCircadianAtmo();
+  const atmo = routeAtmo || circadianAtmo;
   const user = useAuthStore((s) => s.user);
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
@@ -126,7 +133,8 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[12vh] px-4"
+      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-start justify-center pt-[12vh] px-4"
+      style={atmoNavStyle(atmo)}
       onMouseDown={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
@@ -134,6 +142,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
     >
       <div
         className="w-full max-w-lg bg-gray-900 border border-gray-800 rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
+        style={{ borderColor: 'color-mix(in srgb, var(--atmo-nav) 22%, #1f2937)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* ช่องค้นหา */}
@@ -163,15 +172,19 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
                 onClick={() => go(r.href)}
                 onMouseEnter={() => setActive(i)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                  i === active ? 'bg-emerald-500/10 text-emerald-300' : 'text-gray-300'
+                  i === active ? '' : 'text-gray-300'
                 }`}
+                style={i === active ? {
+                  color: 'var(--atmo-nav-text)',
+                  backgroundColor: 'color-mix(in srgb, var(--atmo-nav) 10%, transparent)',
+                } : undefined}
               >
-                <Icon name={r.icon} size={15} className={i === active ? 'text-emerald-300' : 'text-gray-500'} />
+                <Icon name={r.icon} size={15} className={i === active ? '' : 'text-gray-500'} style={i === active ? { color: 'var(--atmo-nav-text)' } : undefined} />
               <span className="flex-1 min-w-0">
                 <span className="block truncate">{t(r.labelKey, r.label)}</span>
                 <span className="block text-[10px] text-gray-500">{t(r.groupKey, r.group)}</span>
               </span>
-              {i === active && <span className="text-[10px] text-emerald-400">↵ {t('common.open', 'เปิด')}</span>}
+              {i === active && <span className="text-[10px]" style={{ color: 'var(--atmo-nav)' }}>↵ {t('common.open', 'เปิด')}</span>}
               </button>
             ))
           )}

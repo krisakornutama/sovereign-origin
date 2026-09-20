@@ -9,6 +9,8 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import Icon from '../ui/Icon';
 import { NAV_GROUPS } from '../../lib/navigation';
+import { themeClassForPath } from '../ui/PageHeader';
+import { useCircadianAtmo, atmoNavStyle } from '../../lib/useCircadian';
 
 // เมนูหลักบนมือถือ/แท็บเล็ต — Sidebar จะหายไปบนจอเล็ก เลยต้องมีทางนำทางนี้
 // (flex-wrap แสดงครบทุกเมนู ไม่ต้องไปหาเมนู)
@@ -21,6 +23,11 @@ const ITEMS: Array<{ href: string; label: string; labelKey: string; icon: string
 
 export default function MobileNav() {
   const pathname = usePathname();
+  // สีเน้นของเมนูตามธีมหน้าปัจจุบัน (atmo-*) — ไม่มีธีม = ตามเวลาของวัน (circadian)
+  // (เรียก hook ตรง ๆ เสมอ — hook ห้ามเรียกแบบมีเงื่อนไข)
+  const routeAtmo = themeClassForPath(pathname || '/');
+  const circadianAtmo = useCircadianAtmo();
+  const atmo = routeAtmo || circadianAtmo;
   const user = useAuthStore((s) => s.user);
   const hasFeature = useFeatureStore((s) => s.has);
   const loadFeatures = useFeatureStore((s) => s.load);
@@ -41,7 +48,8 @@ export default function MobileNav() {
   return (
     <nav
       aria-label={t('common.mobileMenu', 'เมนูหลัก (มือถือ)')}
-      className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-900/95 border-t border-gray-800 backdrop-blur-md"
+      className={`${atmo} fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-900/95 border-t border-gray-800 backdrop-blur-md`}
+      style={{ ...atmoNavStyle(atmo), borderColor: 'color-mix(in srgb, var(--atmo-nav) 26%, transparent)' }}
     >
       {/* flex-wrap: แสดงครบทุกเมนู (เดิมเลื่อนแนวนอนแล้วคนไม่รู้ว่ามีเมนูต่อ) */}
       <div className="flex flex-wrap justify-center">
@@ -61,9 +69,15 @@ export default function MobileNav() {
             href={item.href} scroll={false}
             className={`flex flex-col items-center justify-center gap-1 px-3 py-2 border-t-2 transition ${
               active(item.href)
-                ? 'border-emerald-400 text-emerald-300 bg-emerald-500/10 shadow-[0_-2px_12px_rgba(52,211,153,0.2)]'
+                ? ''
                 : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
             }`}
+            style={active(item.href) ? {
+              borderColor: 'var(--atmo-nav)',
+              color: 'var(--atmo-nav-text)',
+              backgroundColor: 'color-mix(in srgb, var(--atmo-nav) 10%, transparent)',
+              boxShadow: '0 -2px 12px color-mix(in srgb, var(--atmo-nav) 22%, transparent)',
+            } : undefined}
           >
             <Icon name={item.icon} size={17} />
             <span className="text-[10px] font-medium">{t(item.labelKey, item.label)}</span>
