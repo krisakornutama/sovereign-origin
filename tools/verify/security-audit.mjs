@@ -51,16 +51,16 @@ for (const [label, url] of [['web :3000', `${WEB}/`], ['api :3001', `${API}/api/
 
 console.log('── 2) SQL injection probes (ฟอร์มตัวเอง) ──');
 const SQLERR = /pg::|syntax error|sequelize|sqlite|unterminated|psql/i;
+// แยก rate-limit bucket ต่อ section ด้วย X-Forwarded-For (server ตั้ง trust proxy 1 → req.ip = ค่า XFF)
+// กันสองปัญหา: (1) section กิน quota กันเอง (2) ชนกับ full-system-check ที่ใช้ IP จริงใน gate เดียว → 429 ลวงทุกคืน
+const xf = (ip) => ({ 'X-Forwarded-For': ip, 'Content-Type': 'application/json' });
+const SQLI_IP = `10.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}.1`;
+const IDOR_IP = `10.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}.2`;
+const BRUTE_IP = `10.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}.3`;
 const sqliPayloads = ["' OR '1'='1' --", "admin'--", "' OR 1=1#", "'; WAITFOR DELAY '0:0:3'--"];
-let loginBlocked = false;
 {
-  const probe = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'pentest-probe', password: 'x' }) });
-  loginBlocked = probe.status === 429;
-  if (loginBlocked) warn('login endpoint ยังถูกบล็อกจากรอบก่อน (429)', 'รอ 15 นาทีแล้วรันใหม่ ผลส่วน SQLi/brute-force จะสมบูรณ์');
-}
-if (!loginBlocked) {
   for (const p of sqliPayloads) {
-    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: p, password: p }) }).catch(() => null);
+    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: xf(SQLI_IP), body: JSON.stringify({ username: p, password: p }) }).catch(() => null);
     const body = r ? await r.text().catch(() => '') : '';
     ok(`SQLi login ${JSON.stringify(p.slice(0, 14))}`, !!r && [400, 401, 422, 429].includes(r.status) && !SQLERR.test(body), `HTTP ${r?.status}`);
   }
@@ -83,13 +83,13 @@ console.log('── 3) Over-privilege / IDOR (OPERATOR ชั่วคราว)
     const uid = psql(`SELECT id FROM users WHERE username='${uname}'`);
     r = await fetch(`${API}/api/users/${uid}/reset-password`, { method: 'POST', headers: H });
     const { temporaryPassword: temp } = await r.json();
-    r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
+    r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: xf(IDOR_IP), body: JSON.stringify({ username: uname, password: temp }) });
     const partial = r.ok ? (await r.json())?.token : null;
     ok('login ด้วยรหัสชั่วคราวได้จริง', !!partial, `HTTP ${r.status}`);
     let OH = null;
     if (partial) {
       await fetch(`${API}/api/auth/change-password`, { method: 'POST', headers: { Authorization: `Bearer ${partial}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: 'Pentest-Changed-2026!' }) });
-      r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: 'Pentest-Changed-2026!' }) });
+      r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: xf(IDOR_IP), body: JSON.stringify({ username: uname, password: 'Pentest-Changed-2026!' }) });
       const tok = r.ok ? (await r.json())?.token : null;
       ok('login รอบสอง (หลังเปลี่ยนรหัส) ได้จริง', !!tok, `HTTP ${r.status}`);
       OH = tok ? { Authorization: `Bearer ${tok}` } : null;
@@ -114,11 +114,11 @@ console.log('── 3) Over-privilege / IDOR (OPERATOR ชั่วคราว)
 }
 
 console.log('── 4) Brute-force — rate limit ต้องตอบ 429 ──');
-if (!loginBlocked) {
+{
   const rlUser = 'pentest-rl-' + Date.now().toString(36);
   let n429 = 0, first429 = null, statuses = [];
   for (let i = 1; i <= 18; i++) {
-    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: rlUser, password: `Wrong-${i}-xY!` }) }).catch(() => null);
+    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: xf(BRUTE_IP), body: JSON.stringify({ username: rlUser, password: `Wrong-${i}-xY!` }) }).catch(() => null);
     const s = r?.status ?? 0;
     statuses.push(s);
     if (s === 429 && first429 === null) first429 = i;
