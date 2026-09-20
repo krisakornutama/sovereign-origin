@@ -24,6 +24,8 @@ const [adminId, tvStr] = psql("SELECT id||'|'||token_version FROM users WHERE us
 if (!adminId) { console.error('FATAL ไม่พบ mock-admin (จำเป็นสำหรับ mint session)'); process.exit(2); }
 const tok = jwt.sign({ userId: adminId, role: 'SUPERADMIN', assigned_node_id: null, mfa_verified: true, must_change_password: false, token_version: Number(tvStr) }, secret, { expiresIn: '30m' });
 const H = { 'Authorization': `Bearer ${tok}`, 'Content-Type': 'application/json' };
+// bucket ส่วนตัวของ fsc — server ตั้ง trust proxy=1 → req.ip = ค่า XFF (กันชน quota login 10/15น กับ traffic จริง/audit อื่นใน gate เดียว)
+const FSC_IP = '10.77.77.77';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? ' — ' + extra : ''}`); cond ? pass++ : fail++; };
@@ -46,7 +48,7 @@ console.log('── 2) public endpoints ตอบตามดีไซน์ ─
 {
   const r = await fetch(`${API}/api/health`).catch(() => null);
   ok('GET /api/health (public)', r?.status === 200, `HTTP ${r?.status}`);
-  const r3 = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'nobody', password: 'wrong' }) }).catch(() => null);
+  const r3 = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'X-Forwarded-For': FSC_IP, 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'nobody', password: 'wrong' }) }).catch(() => null);
   ok('login ผิดรหัส → 401', r3?.status === 401, `HTTP ${r3?.status}`);
 }
 
@@ -81,12 +83,12 @@ const uid = psql(`SELECT id FROM users WHERE username='${uname}'`);
 r = await fetch(`${API}/api/users/${uid}/reset-password`, { method: 'POST', headers: H });
 ok('admin reset', r.status === 200, `HTTP ${r.status}`);
 const { temporaryPassword: temp } = await r.json();
-r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
+r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'X-Forwarded-For': FSC_IP, 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
 ok('login temp', r.status === 200, `HTTP ${r.status}`);
 const utok = (await r.json())?.token;
 r = await fetch(`${API}/api/auth/change-password`, { method: 'POST', headers: { Authorization: `Bearer ${utok}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword: 'Trust-Changed-2026!' }) });
 ok('เปลี่ยนรหัส forced', r.status === 200, `HTTP ${r.status}`);
-r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
+r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'X-Forwarded-For': FSC_IP, 'Content-Type': 'application/json' }, body: JSON.stringify({ username: uname, password: temp }) });
 ok('temp ตายหลังเปลี่ยน', r.status === 401, `HTTP ${r.status}`);
 r = await fetch(`${API}/api/users/${uid}`, { method: 'DELETE', headers: H });
 ok('DELETE user', r.status === 200, `HTTP ${r.status}`);
