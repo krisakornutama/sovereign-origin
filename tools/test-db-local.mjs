@@ -66,7 +66,7 @@ const PG_PASSWORD = readPostgresPassword();
       (relay loopback กิน startup packet — prisma จะ P1001 ตลอด) */
 function fwdRunning() {
   try {
-    const state = sh(`docker inspect ${FWD_NAME} --format '{{.State.Running}}'`);
+    const state = sh(`docker inspect ${FWD_NAME} --format "{{.State.Running}}"`);
     return state === 'true';
   } catch { return false; }
 }
@@ -97,7 +97,7 @@ if (await fwdHealthy()) {
     log(`forwarder ค้าง (ไม่ตอบ startup packet) → ลบแล้วสร้างใหม่`);
     shOk(`docker rm -f ${FWD_NAME}`);
   }
-  const network = sh(`docker inspect ${DB_CONTAINER} --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'`);
+  const network = sh(`docker inspect ${DB_CONTAINER} --format "{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}"`);
   log(`สร้าง forwarder ${FWD_NAME} (network ${network} → 127.0.0.1:${FWD_PORT})`);
   const run = spawnSync('docker', [
     'run', '-d', '--rm', '--name', FWD_NAME,
@@ -105,8 +105,10 @@ if (await fwdHealthy()) {
     '-p', `127.0.0.1:${FWD_PORT}:${FWD_PORT}`,
     'node:20-alpine', 'node', '-e',
     `const net=require('net');const srv=net.createServer(c=>{const up=net.connect({host:'${DB_CONTAINER}',port:5432});c.pipe(up);up.pipe(c);up.on('error',()=>c.destroy());c.on('error',()=>up.destroy());});srv.listen(${FWD_PORT},()=>console.log('READY'));`,
-  ], { stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32' });
-  if (run.status !== 0) fail('สร้าง forwarder container ไม่สำเร็จ');
+  // ห้าม shell:true บน Windows — Node ต่อ args โดยไม่ escape (DEP0190) ทำสคริปต์ -e ที่มีช่องว่าง
+  // ถูกหักเป็นหลาย arg → container ตายทันทีและ --rm เก็บศพ (อาการ: "ไม่ตอบ startup packet")
+  ], { stdio: ['ignore', 'pipe', 'inherit'] });
+  if (run.status !== 0) fail(`สร้าง forwarder container ไม่สำเร็จ: ${run.stderr || '(ไม่มี stderr)'}`);
   createdFwd = true;
 
   /* รอ healthy สูงสุด ~20 วิ (image pull อาจช้าในรอบแรก) */
