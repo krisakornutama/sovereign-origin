@@ -30,7 +30,9 @@ const warn = (m) => { console.log(`WARN  ${m}`); warns++; };
 if (!fs.existsSync(ENV_FILE)) die(`ไม่พบ ${ENV_FILE}`);
 const env = Object.fromEntries(fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/).filter(l => l.includes('=') && !l.startsWith('#')).map(l => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]));
 const appDb = env.POSTGRES_DB || 'sovereign';                       // ฐานที่ app ใช้ตาม env
-const composeUrlLine = sh('docker compose config core-api 2>/dev/null | grep "^\\s*DATABASE_URL:"', INFRA).split('DATABASE_URL:')[1]?.trim();
+// ห้าม pipe/redirect ใน execSync บน Windows (cmd.exe ไม่รู้จัก /dev/null) — parse ใน JS แทน
+const composeCfg = sh('docker compose config core-api', INFRA);
+const composeUrlLine = composeCfg.split(/\r?\n/).find(l => l.trim().startsWith('DATABASE_URL:'))?.split('DATABASE_URL:')[1]?.trim();
 if (!composeUrlLine) die('อ่าน DATABASE_URL จาก docker compose config ไม่ได้ — เช็คว่ารันจาก checkout ที่มี sovereign-os/infra/.env (gitignored, อยู่เฉพาะเครื่อง)');
 let composeHost, composeDb;
 try { const u = new URL(composeUrlLine); composeHost = u.hostname; composeDb = u.pathname.slice(1); } catch { die(`DATABASE_URL จาก compose parse ไม่ได้: ${composeUrlLine}`); }
@@ -57,11 +59,13 @@ const strangers = dbs.filter(d => !KNOWN.has(d) && d !== appDb);
 strangers.length === 0 ? ok('ไม่มีฐานแปลกปลอมใน cluster')
   : strangers.forEach(d => { const sz = psql(`SELECT pg_size_pretty(pg_database_size('${d}'))`, 'postgres'); warn(`ฐานไม่รู้จัก "${d}" (${sz}) วางอยู่ใน cluster — ยืนยันแล้ว drop หรือ rename ให้ชัด`); });
 
-// ── 4) schema drift: ทุก field ใน model AuditLog ต้องมีคอลัมน์จริงในฐาน ──
+// ── 4) schema drift: ทุก scalar field ใน model AuditLog ต้องมีคอลัมน์จริงในฐาน (ข้าม @relation/@@map/comment) ──
 const auditBlock = fs.readFileSync(SCHEMA, 'utf8').match(/model AuditLog \{([\s\S]*?)\n\}/)?.[1];
 if (!auditBlock) die('อ่าน model AuditLog จาก schema.prisma ไม่ได้');
-const fieldToCol = ([, f, mapped]) => mapped?.[1] || f.replace(/[A-Z]/g, c => '_' + c.toLowerCase()); // @map หรือ camelCase→snake_case
-const expectCols = [...auditBlock.matchAll(/^\s*(\w+)\s+\w+.*?(@map\("(\w+)"\))?/gm)].map(fieldToCol);
+const expectCols = auditBlock.split('\n')
+  .map(l => l.trim())
+  .filter(l => l && !l.startsWith('//') && !l.startsWith('@@') && !/@relation/.test(l))
+  .map(l => { const f = l.split(/\s+/)[0]; const m = l.match(/@map\("(\w+)"\)/); return m ? m[1] : f.replace(/[A-Z]/g, c => '_' + c.toLowerCase()); });
 const actualCols = new Set(psql("SELECT column_name FROM information_schema.columns WHERE table_name='audit_logs'", appDb).split('\n'));
 const missing = expectCols.filter(c => c && !actualCols.has(c));
 missing.length === 0 ? ok(`schema AuditLog ↔ ฐาน "${appDb}" ตรงกัน (${expectCols.length} คอลัมน์)`)
