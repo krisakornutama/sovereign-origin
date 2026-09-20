@@ -53,8 +53,10 @@ console.log('── พอร์ตที่เปิดรับจากข้
   const KNOWN = new Map([['3000', 'Sovereign web'], ['3001', 'Sovereign API'], ['3002', 'Juice Shop (lab)'], ['1883', 'EMQX MQTT'], ['8083', 'EMQX WS'], ['18083', 'EMQX dashboard'], ['5432', 'Postgres']]);
   try {
     const out = execFileSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 20_000, windowsHide: true });
-    const rows = out.split(/\r?\n/).filter((l) => l.includes('LISTENING') && /\s(0\.0\.0\.0|\[::\]):/.test(l));
-    const ports = [...new Set(rows.map((l) => l.trim().split(/\s+/)[1].split(':').pop()))];
+    const rows = out.split(/\r?\n/).filter((l) => l.includes('LISTENING'));
+    const ports = [...new Set(rows.map((l) => l.trim().split(/\s+/)[1] || '')
+      .filter((addr) => /^(0\.0\.0\.0|\[::\]):/.test(addr)) // เฉพาะ bind แบบเปิดรับจริง (127.0.0.1/[::1] = วงใน ไม่นับ)
+      .map((addr) => addr.split(':').pop()))];
     if (ports.length === 0) ok('ไม่มีพอร์ตเปิดรับ LAN');
     else for (const p of ports) console.log(`NOTE  :${p} เปิดรับ LAN — ${KNOWN.get(p) || 'ไม่รู้จัก (ตรวจว่าใช่อะไร)'}`);
   } catch { warn('อ่าน netstat ไม่ได้'); }
