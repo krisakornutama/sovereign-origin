@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-SCHEMA_HASH=$(npx prisma --version >/dev/null 2>&1; sha256sum prisma/schema.prisma | cut -d' ' -f1)
+SCHEMA_HASH=$(sha256sum prisma/schema.prisma | cut -d' ' -f1)
 CLIENT_HASH=$(sha256sum node_modules/.prisma/client/schema.prisma 2>/dev/null | cut -d' ' -f1 || echo "no-client")
 
 if [ "$SCHEMA_HASH" != "$CLIENT_HASH" ]; then
