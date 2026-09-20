@@ -2,13 +2,13 @@
 // tools/verify/nightly-gate.mjs — ประตูคุณภาพรายคืน (03:20 ทุกวัน ผ่าน Task Scheduler)
 //   node tools/verify/nightly-gate.mjs              → รัน gate ทั้งหมด
 //   node tools/verify/nightly-gate.mjs --selftest   → ส่งข้อความทดสอบเข้า Telegram (พิสูจน์ช่องทาง)
-// ขั้นตรวจ: 1) npm run verify (build+test ทั้งสองฝั่ง)  2) db-doctor (env/schema/ฐานแปลกปลอม)
+// ขั้นตรวจ: db-doctor → verify (build+test) → full-system-check (API จริงทุก mount) → ui-sweep (หน้าจอจริง Chromium)
 // ผ่าน = เงียบ (exit 0) · พัง = เขียน log + ส่ง Telegram แล้ว exit 1
-// creds: system_settings (ตั้งผ่านหน้า Settings — เหมือน core-api) → fallback infra/.env (TELEGRAM_*)
+// creds: system_settings (ตั้งผ่านหน้า Settings — ตัวกำหนดค่าแท้คือ core-api: telegram-credentials.service.ts)
+//        → fallback infra/.env (TELEGRAM_*) เผื่อ DB ล่ม · ชื่อฐาน/ผู้ใช้อ่านจาก infra/.env ไม่ hardcode
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -18,58 +18,51 @@ const LAST_LOG = path.join(ROOT, '.freebuff', 'nightly-gate-last.log');
 // npm บน Windows เป็น .cmd — spawn .cmd โดยไม่ผ่าน shell โดน Node v24+ บล็อก (EINVAL)
 // จึงเรียก npm-cli.js ด้วย node ตรง ๆ (ไม่ผ่าน shell เลย ปลอดกับดัก quote/DEP0190)
 const NPM_CLI = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-const npmRun = (...args) => ({ cmd: 'node', args: [NPM_CLI, ...args] });
 
 const checks = [
   { name: 'db-doctor (env/schema/ฐานแปลกปลอม)', cmd: 'node', args: ['tools/verify/db-doctor.mjs'] },
-  { name: 'verify (backend build+test + frontend typecheck+build)', ...npmRun('run', 'verify') },
+  { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'] },
+  { name: 'full-system-check (mounts ปิดสนิท + lifecycle จริง)', cmd: 'node', args: ['tools/verify/full-system-check.mjs'] },
+  { name: 'ui-sweep (หน้าจอจริงผ่าน Chromium)', cmd: 'node', args: ['tools/verify/ui-sweep.mjs'] },
 ];
+
+function readInfraEnv() {
+  if (!fs.existsSync(INFRA_ENV)) return {}; // รันจาก worktree (ไม่มี .env) — ตกลง default ด้านบน
+  const env = {};
+  for (const line of fs.readFileSync(INFRA_ENV, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return env;
+}
 
 // ── Telegram ── ลำดับเดียวกับ telegram-credentials.service.ts: DB ชนะ env ──
 function readTelegramCreds() {
+  const infra = readInfraEnv();
+  let token = '', chatId = '';
   try {
     const q = (key) => execFileSync('docker',
-      ['exec', 'sovereign-db', 'psql', '-U', 'sovereign', '-d', 'sovereign', '-tAc',
+      ['exec', 'sovereign-db', 'psql', '-U', infra.POSTGRES_USER || 'sovereign', '-d', infra.POSTGRES_DB || 'sovereign', '-tAc',
        `SELECT value FROM system_settings WHERE key='${key}'`],
       { encoding: 'utf8', timeout: 15_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
     ).trim();
-    const token = q('telegram.botToken');
-    const chatId = q('telegram.chatId');
+    token = q('telegram.botToken');
+    chatId = q('telegram.chatId');
     if (token && chatId) return { token, chatId, source: 'db' };
-  } catch { /* db ล่ม/ตารางหาย — ลอง env ต่อ */ }
-  let token = '', chatId = '';
-  if (fs.existsSync(INFRA_ENV)) {
-    for (const line of fs.readFileSync(INFRA_ENV, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^(TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID)=(.*)$/);
-      if (!m) continue;
-      const v = m[2].trim().replace(/^["']|["']$/g, '');
-      if (m[1] === 'TELEGRAM_BOT_TOKEN') token = v; else chatId = v;
-    }
-  }
-  return { token, chatId, source: 'env' };
+  } catch (e) { console.error(`[creds] อ่านจาก DB ไม่สำเร็จ (${e?.message || e}) — ลอง env ต่อ`); }
+  return { token: infra.TELEGRAM_BOT_TOKEN || '', chatId: infra.TELEGRAM_CHAT_ID || '', source: 'env' };
 }
 
-function sendTelegram(text, creds) {
-  return new Promise((resolve) => {
-    const body = JSON.stringify({ chat_id: creds.chatId, text, disable_web_page_preview: true });
-    const req = https.request({
-      hostname: 'api.telegram.org',
-      path: `/bot${creds.token}/sendMessage`,
+async function sendTelegram(text, creds) {
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${creds.token}/sendMessage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-      timeout: 15_000,
-    }, (res) => {
-      let body = '';
-      res.on('data', (c) => { body += c; });
-      res.on('end', () => resolve({
-        ok: res.statusCode === 200,
-        error: res.statusCode === 200 ? undefined : `${res.statusCode} ${body.slice(0, 160)}`,
-      }));
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: creds.chatId, text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(15_000),
     });
-    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
-    req.on('error', (e) => resolve({ ok: false, error: e.message }));
-    req.end(body);
-  });
+    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${(await r.text()).slice(0, 160)}` };
+  } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
 }
 
 // ── gate ──
@@ -102,9 +95,8 @@ async function main() {
   const creds = readTelegramCreds();
   const sent = creds.token && creds.chatId
     ? await sendTelegram(msg, creds)
-    : { ok: false, skipped: true, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ infra/.env)' };
-  console.log(`[${stamp}] nightly gate: พัง ${failed.length}/${checks.length} — Telegram: ${
-    sent.ok ? 'ส่งแล้ว' : `ไม่ได้ส่ง (${sent.error})`}`);
+    : { ok: false, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env)' };
+  console.log(`[${stamp}] nightly gate: พัง ${failed.length}/${checks.length} — Telegram: ${sent.ok ? 'ส่งแล้ว' : `ไม่ได้ส่ง (${sent.error})`}`);
   process.exit(1);
 }
 
