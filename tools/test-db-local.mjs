@@ -105,8 +105,10 @@ if (await fwdHealthy()) {
     '-p', `127.0.0.1:${FWD_PORT}:${FWD_PORT}`,
     'node:20-alpine', 'node', '-e',
     `const net=require('net');const srv=net.createServer(c=>{const up=net.connect({host:'${DB_CONTAINER}',port:5432});c.pipe(up);up.pipe(c);up.on('error',()=>c.destroy());c.on('error',()=>up.destroy());});srv.listen(${FWD_PORT},()=>console.log('READY'));`,
-  ], { stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32' });
-  if (run.status !== 0) fail('สร้าง forwarder container ไม่สำเร็จ');
+  // ห้าม shell:true บน Windows — Node ต่อ args โดยไม่ escape (DEP0190) ทำสคริปต์ -e ที่มีช่องว่าง
+  // ถูกหักเป็นหลาย arg → container ตายทันทีและ --rm เก็บศพ (อาการ: "ไม่ตอบ startup packet")
+  ], { stdio: ['ignore', 'pipe', 'inherit'] });
+  if (run.status !== 0) fail(`สร้าง forwarder container ไม่สำเร็จ: ${run.stderr || '(ไม่มี stderr)'}`);
   createdFwd = true;
 
   /* รอ healthy สูงสุด ~20 วิ (image pull อาจช้าในรอบแรก) */
