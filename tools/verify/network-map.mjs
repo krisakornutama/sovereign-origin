@@ -57,7 +57,7 @@ console.log(`\nพบ ${alive.size} อุปกรณ์:`);
 for (const ip of [...alive].sort((a, b) => a.split('.').pop() - b.split('.').pop())) {
   const mac = macs[ip] || '?';
   now[ip] = mac;
-  const isNew = prev && !(ip in prev) && ip !== gw.ip;
+  const isNew = prev && !(ip in prev) && ip !== gw.gw; // กันตั้งแต่รอบแรก: gateway ไม่นับเป็นอุปกรณ์ใหม่
   console.log(`  ${ip.padEnd(16)} ${mac.padEnd(20)} ${vendor(mac).padEnd(18)} ${ip === gw.gw ? '← gateway' : ''}${isNew ? '  🆕 ใหม่ (ไม่เคยเห็น)' : ''}`);
 }
 fs.mkdirSync(path.dirname(SNAPSHOT), { recursive: true });
