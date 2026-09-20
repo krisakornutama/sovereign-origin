@@ -2,17 +2,16 @@
 // tools/verify/nightly-gate.mjs — ประตูคุณภาพรายคืน (03:20 ทุกวัน ผ่าน Task Scheduler)
 //   node tools/verify/nightly-gate.mjs              → รัน gate ทั้งหมด
 //   node tools/verify/nightly-gate.mjs --selftest   → ส่งข้อความทดสอบเข้า Telegram (พิสูจน์ช่องทาง)
-// ขั้นตรวจ: db-doctor → full-system-check (API จริงทุก mount) → verify (build ท้ายสุดก่อนจัดการ :3000) → ui-sweep (หน้าจอจริง, บังคับโหมด prod ก่อนวัด)
+// ขั้นตรวจ: db-doctor → full-system-check → verify (build ท้าย) → ui-sweep (บังคับ prod ก่อนวัด) → security-audit (สุดท้าย — กิน login rate-limit window)
 // ผ่าน = เงียบ (exit 0) · พัง = เขียน log + ส่ง Telegram แล้ว exit 1
-// creds: system_settings (ตั้งผ่านหน้า Settings — ตัวกำหนดค่าแท้คือ core-api: telegram-credentials.service.ts)
-//        → fallback infra/.env (TELEGRAM_*) เผื่อ DB ล่ม · ชื่อฐาน/ผู้ใช้อ่านจาก infra/.env ไม่ hardcode
+// creds: tools/verify/telegram-creds.mjs (เจ้าของเดียว — shared กับ security-anomaly)
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readTelegramCreds, sendTelegram } from './telegram-creds.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const INFRA_ENV = path.join(ROOT, 'sovereign-os', 'infra', '.env');
 const LAST_LOG = path.join(ROOT, '.freebuff', 'nightly-gate-last.log');
 
 // npm บน Windows เป็น .cmd — spawn .cmd โดยไม่ผ่าน shell โดน Node v24+ บล็อก (EINVAL)
@@ -24,46 +23,10 @@ const checks = [
   { name: 'full-system-check (mounts ปิดสนิท + lifecycle จริง)', cmd: 'node', args: ['tools/verify/full-system-check.mjs'] },
   { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'] },
   { name: 'ui-sweep (หน้าจอจริงผ่าน Chromium)', cmd: 'node', args: ['tools/verify/ui-sweep.mjs'] },
+  // security-audit ต้องเป็นตัวสุดท้าย: brute-force test กิน per-IP login window (10/15 นาที) —
+  // ถ้ารันก่อน check อื่นจะบล็อก API จาก IP เดิมใน window
+  { name: 'security-audit (headers/SQLi/rate-limit/IDOR)', cmd: 'node', args: ['tools/verify/security-audit.mjs'] },
 ];
-
-function readInfraEnv() {
-  if (!fs.existsSync(INFRA_ENV)) return {}; // รันจาก worktree (ไม่มี .env) — ตกลง default ด้านบน
-  const env = {};
-  for (const line of fs.readFileSync(INFRA_ENV, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
-  }
-  return env;
-}
-
-// ── Telegram ── ลำดับเดียวกับ telegram-credentials.service.ts: DB ชนะ env ──
-function readTelegramCreds() {
-  const infra = readInfraEnv();
-  let token = '', chatId = '';
-  try {
-    const q = (key) => execFileSync('docker',
-      ['exec', 'sovereign-db', 'psql', '-U', infra.POSTGRES_USER || 'sovereign', '-d', infra.POSTGRES_DB || 'sovereign', '-tAc',
-       `SELECT value FROM system_settings WHERE key='${key}'`],
-      { encoding: 'utf8', timeout: 15_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
-    ).trim();
-    token = q('telegram.botToken');
-    chatId = q('telegram.chatId');
-    if (token && chatId) return { token, chatId, source: 'db' };
-  } catch (e) { console.error(`[creds] อ่านจาก DB ไม่สำเร็จ (${e?.message || e}) — ลอง env ต่อ`); }
-  return { token: infra.TELEGRAM_BOT_TOKEN || '', chatId: infra.TELEGRAM_CHAT_ID || '', source: 'env' };
-}
-
-async function sendTelegram(text, creds) {
-  try {
-    const r = await fetch(`https://api.telegram.org/bot${creds.token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: creds.chatId, text, disable_web_page_preview: true }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${(await r.text()).slice(0, 160)}` };
-  } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
-}
 
 // ── โหมด :3000 — verify (next build) เขียน .next ทับตัวที่ prod serve อยู่ → ช่วง build watchdog อาจชุบเป็น dev
 // (บทเรียนจริง 20 ก.ย. 2026 · runbook §๓) ui-sweep ต้องวัด prod จริง: มี BUILD_ID → ฆ่า listener
