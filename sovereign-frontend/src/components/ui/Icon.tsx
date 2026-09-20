@@ -622,11 +622,13 @@ export function Icon({
   size = 16,
   className = '',
   strokeWidth = 1.8,
+  style,
 }: {
   name: string;
   size?: number;
   className?: string;
   strokeWidth?: number;
+  style?: React.CSSProperties;
 }) {
   return (
     <svg
@@ -639,6 +641,7 @@ export function Icon({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={style}
       aria-hidden="true"
       focusable="false"
     >

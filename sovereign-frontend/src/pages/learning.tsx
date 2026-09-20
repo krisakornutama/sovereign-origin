@@ -65,11 +65,11 @@ export default function LearningPage() {
   if(!isHydrated) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t("common.loading","กำลังโหลด...")}</div>;
   if(!isAuthenticated) return <div className="text-white p-8">Unauthorized</div>;
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar/>
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
-          <PageHeader eyebrow="เรียนรู้เอง" title="Learning Center — D ทั้งหมดเรียนรู้ต่อจากอดีต" subtitle="Data Lake → Feature → Ollama qwen3:8b → predict → actual → accuracy เรียนรู้ต่ออัตโนมัติ (cron 02:00 nightly)" icon={<Icon name="ai" size={18}/>} />
+          <PageHeader eyebrow="เรียนรู้เอง" title="Learning Center — D ทั้งหมดเรียนรู้ต่อจากอดีต" subtitle="Data Lake → Feature → Ollama qwen3:8b → predict → actual → accuracy เรียนรู้ต่ออัตโนมัติ (cron 02:00 nightly)" icon={<Icon name="ai" size={18}/>} theme="power" />
           {msg && <div className="inset p-3 text-sm text-emerald-300 border-emerald-700">{msg}</div>}
           {err && <div className="inset p-3 text-sm text-red-400 border-red-700">{err}</div>}
           <div className="flex flex-wrap gap-2">

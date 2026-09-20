@@ -19,7 +19,7 @@ const securityHeaders = [
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://api.qrserver.com http://192.168.1.50",
     "media-src 'self' blob:",
-    "connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 http://192.168.1.102:3001 ws://localhost:3001 ws://127.0.0.1:3001 ws://192.168.1.102:3001",
+    "connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 http://192.168.1.102:3001 ws://localhost:3001 ws://127.0.0.1:3001 ws://192.168.1.102:3001 http://localhost:3101 http://127.0.0.1:3101",
     "frame-src 'self' https://www.youtube.com https://player.vimeo.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",

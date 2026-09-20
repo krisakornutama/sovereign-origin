@@ -49,7 +49,7 @@ export default function ChangePasswordPage() {
 
   // ── โหมดสมัครใจ: สมาชิกทุกคนเปลี่ยนเองได้เมื่อไหร่ก็ได้ ──
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-system min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader

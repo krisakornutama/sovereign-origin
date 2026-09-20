@@ -190,12 +190,12 @@ export default function RelayPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title="SOVEREIGN OS" icon={<Icon name="relay" size={18} />}
+          title="SOVEREIGN OS" theme="power" icon={<Icon name="relay" size={18} />}
           subtitle={t('relay.subtitle', 'Relay Control')} actions={<div className="flex gap-3 items-center">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</Link>
         </div>}
