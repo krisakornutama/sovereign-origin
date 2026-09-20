@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readTelegramCreds, sendTelegram } from './telegram-creds.mjs';
+import { notify, readTelegramCreds } from './telegram-creds.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const LAST_LOG = path.join(ROOT, '.freebuff', 'nightly-gate-last.log');
@@ -38,7 +38,9 @@ async function ensureProdFrontend() {
     pid = execFileSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 15_000, windowsHide: true })
       .split(/\r?\n/).find((l) => l.includes('LISTENING') && /:3000\s/.test(l))?.trim().split(/\s+/).pop();
   } catch { /* อ่าน netstat ไม่ได้ — ข้าม kill แล้วรอตื่นข้างล่าง */ }
-  try { execFileSync('taskkill', ['/PID', pid, '/T', '/F'], { timeout: 15_000, windowsHide: true, stdio: 'ignore' }); } catch { /* ไม่มี listener หรือมีคนฆ่าไปก่อน */ }
+  if (pid && pid !== '0') {
+    try { execFileSync('taskkill', ['/PID', pid, '/T', '/F'], { timeout: 15_000, windowsHide: true, stdio: 'ignore' }); } catch { /* มีคนฆ่าไปก่อน */ }
+  }
   const t0 = Date.now();
   while (Date.now() - t0 < 90_000) {
     try { const r = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(4_000) }); if (r.ok) return; } catch { /* ยังไม่ตื่น */ }
@@ -75,10 +77,7 @@ async function main() {
   const msg = `🚨 Sovereign nightly gate พัง (${stamp})\n\n`
     + failed.map((f) => `✖ ${f.name} (exit ${f.code})\n${tail(f.out, 700)}`).join('\n\n')
     + `\n\nlog เต็ม: .freebuff/nightly-gate-last.log`;
-  const creds = readTelegramCreds();
-  const sent = creds.token && creds.chatId
-    ? await sendTelegram(msg, creds)
-    : { ok: false, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env)' };
+  const sent = await notify(msg);
   console.log(`[${stamp}] nightly gate: พัง ${failed.length}/${checks.length} — Telegram: ${sent.ok ? 'ส่งแล้ว' : `ไม่ได้ส่ง (${sent.error})`}`);
   process.exit(1);
 }
@@ -89,7 +88,7 @@ if (process.argv[2] === '--selftest') {
     console.error('selftest: ไม่มี credentials — ตั้งที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env');
     process.exit(1);
   }
-  const r = await sendTelegram(
+  const r = await notify(
     `🧪 Sovereign nightly gate — ข้อความทดสอบ (${new Date().toISOString().slice(0, 16)})\nระบบแจ้งเตือนพร้อมใช้ · creds จาก: ${creds.source}`,
     creds
   );
