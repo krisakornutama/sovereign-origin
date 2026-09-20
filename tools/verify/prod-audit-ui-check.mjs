@@ -4,8 +4,8 @@ import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 
 const BASE = process.env.PROD_URL || 'http://localhost:3000';
-const API = process.env.API_URL || 'http://localhost:3001';
-const TOKEN = readFileSync('E:/My work/Project Sovereign Origin/.freebuff/prod-session.jwt', 'utf8').trim();
+// token อ่านจากไฟล์ (ผู้รัน mint เอง — ไม่มีใน git)
+const TOKEN = readFileSync(process.env.SESSION_JWT || '', 'utf8').trim();
 
 let failures = [];
 const ok = (name, cond) => { console.log(`${cond ? 'PASS' : 'FAIL'} ${name}`); if (!cond) failures.push(name); };
@@ -41,10 +41,6 @@ try {
   await page.waitForTimeout(1500);
   const qRows = await page.locator('tbody tr').count();
   ok(`ค้นหา "user_password" (ตัวเล็ก) เจอ (${qRows} แถว)`, qRows > 0);
-
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e?.message || e)));
-  ok('ไม่มี pageerror ในหน้า', errors.length === 0);
 } finally {
   await browser.close().catch(() => {});
 }

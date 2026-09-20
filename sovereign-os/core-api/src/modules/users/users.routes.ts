@@ -40,7 +40,7 @@ router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) 
     await prisma.user.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err: any) {
-    // ไม่มี try/catch เดิม → Prisma error (เช่น FK จาก audit_logs) ทำ request ค้างจน timeout
+    // เคสจริง: Prisma error ถูก catch-all กลืนเงียบ ๆ วินิจฉัยไม่ได้ — log เต็ม + ส่ง reason เสมอ
     console.error('[users:delete] failed:', err?.code || '', err?.message || err);
     res.status(500).json({ error: 'ลบผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
   }
@@ -59,14 +59,9 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
     });
     res.json({ temporaryPassword });
   } catch (err: any) {
-    // log จริงทุกครั้ง — เคสจริง: PrismaClientValidationError จาก client ไม่ตรง schema
-    // ถูก catch-all กลืนเป็น "Reset failed" เงียบ ๆ ทั้งที่รากอยู่ที่ deploy (prisma generate ไม่ผ่าน)
+    // เคสจริง: PrismaClientValidationError จาก client ไม่ตรง schema ถูกกลืนเป็น "Reset failed" เงียบ ๆ
     console.error('[reset-password] failed:', err?.code || '', err?.message || err);
     if (err?.message === 'User not found') return res.status(404).json({ error: 'User not found' });
-    // Prisma P2021/P2022 = ตาราง/คอลัมน์หาย (สคีมา DB ไม่ตรง) — บอกชัดว่าเป็นฝั่งระบบ ให้ admin ตรวจ deploy
-    if (err?.code === 'P2021' || err?.code === 'P2022') {
-      return res.status(503).json({ error: 'ระบบฐานข้อมูลไม่ตรงกับแอป (schema mismatch) — ติดต่อผู้ดูแลระบบ' });
-    }
     res.status(500).json({ error: 'Reset failed', reason: err?.message || 'unknown' });
   }
 });
