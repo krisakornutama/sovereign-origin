@@ -48,6 +48,23 @@ taskkill //F //PID <PID> //T
 node frontend-watchdog.mjs                        # idempotent — เช็คและชุบเอง
 ```
 
+โหมดของ :3000 เลือกอัตโนมัติจากไฟล์ `sovereign-frontend/.next/BUILD_ID`:
+
+- **มี BUILD_ID = production build (`next start`)** — สถานะปกติตั้งแต่ 20 ก.ย. 2026
+- **ไม่มี = `next dev`** (fallback สำหรับเครื่องที่ยังไม่เคย build)
+
+**Rollback กลับไป next dev** (เมื่อ prod build มีปัญหา):
+
+```bash
+rm "E:\My work\Project Sovereign Origin\sovereign-frontend\.next\BUILD_ID"
+netstat -ano | grep ":3000" | grep -i LISTENING   # kill PID เดิม
+taskkill //F //PID <PID> //T
+sleep 70                                          # รอ watchdog tick ชุบเองเป็น dev
+# หรือชุบทันที: node frontend-watchdog.mjs
+```
+
+**กลับมา prod:** build ใหม่ (`cd sovereign-frontend && npm run build`) — BUILD_ID กลับมา แล้ว watchdog จะชุบเป็น prod เอง
+
 ## ๔. เช็คสุขภาพ 1 นาที (Git Bash / PowerShell)
 
 ```bash
@@ -55,7 +72,7 @@ cd "/e/My work/Project Sovereign Origin"
 curl -s -o /dev/null -w "web     : %{http_code}\n"  http://localhost:3000
 curl -s http://localhost:3001/healthz | grep -o '"ok":true' && echo "API     : OK"
 docker ps --filter name=sovereign --format "{{.Names}}: {{.Status}}"
-ls -t backups/postgres/sovereign_v2_*.dump | head -1
+ls -t backups/postgres/sovereign_*.dump | head -1   # ฐานรวมชื่อ sovereign ตั้งแต่ 20 ก.ย. (ไฟล์ sovereign_v2_* เก่า = ประวัติ)
 tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 ```
 
