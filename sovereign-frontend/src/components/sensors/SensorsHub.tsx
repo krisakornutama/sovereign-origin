@@ -254,7 +254,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
   const latestRain = records.filter(r => r.metric === 'rain_detect')[0]?.value;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
@@ -262,6 +262,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
             eyebrow={t('sensorsHub.eyebrow', 'อุปกรณ์ & พลังงาน')}
             title={t('sensorsHub.title', 'อุปกรณ์และเซ็นเซอร์')}
             subtitle={t('sensorsHub.headerSub', 'จัดการอุปกรณ์ ESP/เซ็นเซอร์ และดูข้อมูลย้อนหลัง')}
+            theme="power"
             icon={<Icon name="sensors" size={18} />}
           />
 

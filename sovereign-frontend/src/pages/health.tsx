@@ -272,12 +272,12 @@ export default function HealthPage() {
   const pendingFlags = flags.filter((f) => f.status === 'PENDING');
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-wellness min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('health.page.eyebrow', 'ชีวิต & การเงิน')}
-          title={t('health.page.title', 'Health Screening (Ambient)')} icon={<Icon name="health" size={18} />} actions={<div className="flex items-center gap-3">
+          title={t('health.page.title', 'Health Screening (Ambient)')} theme="wellness" icon={<Icon name="health" size={18} />} actions={<div className="flex items-center gap-3">
           <Link href="/health/self-check" scroll={false} className="btn-primary"><Icon name="healing" size={13} /> {t('health.page.selfCheck', 'Self-Check 32 ข้อ (พูด/พิมพ์)')}</Link>
           <Link href="/health-export" scroll={false} className="btn-secondary"><Icon name="reports" size={13} /> {t('health.page.report30d', 'รายงาน 30 วัน (PDF/CSV)')}</Link>
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('health.page.backDashboard', '← กลับ Dashboard')}</Link>

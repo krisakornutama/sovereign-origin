@@ -214,12 +214,12 @@ export default function AutomationPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('automation.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title="SOVEREIGN OS" icon={<Icon name="automation" size={18} />}
+          title="SOVEREIGN OS" theme="power" icon={<Icon name="automation" size={18} />}
           subtitle="Automation Rules" actions={<div className="flex gap-3">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
           <Link href="/sensors" scroll={false} className="text-sm text-sky-400 hover:underline">{t('automation.sensorsLink', 'เซ็นเซอร์')}</Link>

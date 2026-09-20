@@ -153,12 +153,12 @@ export default function EnergyPage() {
   if (!isAuthenticated || !user) return <div className="text-white p-8">{t('energy.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-power min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('energy.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title={t('energy.title', 'Energy Management')} icon={<Icon name="energy" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</Link>}
+          title={t('energy.title', 'Energy Management')} theme="power" icon={<Icon name="energy" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
         {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}

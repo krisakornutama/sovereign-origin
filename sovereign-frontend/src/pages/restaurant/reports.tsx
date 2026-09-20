@@ -27,7 +27,7 @@ export default function RestaurantReportsPage() {
   if(!isAuthenticated) return <div className="text-white p-8">{t('restaurant.unauthorized', 'Unauthorized')}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="atmo-kitchen min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader eyebrow={t('restaurant.eyebrow', 'จักรวรรดิ')} title={t('restaurant.reports.title', 'รายงานร้านอาหาร')} icon={<Icon name="reports" size={18} />} subtitle={t('restaurant.reports.subtitle', 'รายรับ • รายจ่าย • กำไร — แยกกระเป๋าร้าน superadmin เห็นหมด')} actions={<Link href="/restaurant" className="text-sm text-sky-400 hover:underline">{t('restaurant.backToPos', '← POS')}</Link>} />
