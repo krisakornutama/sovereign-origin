@@ -173,7 +173,7 @@ export default function HealingPage() {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/healing/companion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tone ? { message: chatMsg, mbti: tone.code, mbtiTone: tone.tone, mbtiHealing: tone.healing, mbtiSalut: tone.salut } : { message: chatMsg }),
+        body: JSON.stringify(tone ? { message: chatMsg, mbti: tone.code } : { message: chatMsg }),
       });
       const j = await r.json();
       setChatReply(j.reply ?? (j.error ?? t('healing.companion.noReply', 'ไม่มีการตอบกลับ')));

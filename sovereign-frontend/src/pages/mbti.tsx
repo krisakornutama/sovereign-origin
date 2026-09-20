@@ -86,7 +86,7 @@ export default function MbtiPage() {
 
   const finish = () => {
     if (answered < questions.length) return;
-    const r = scoreMbti(answers);
+    const r = scoreMbti(answers, questions);
     setResult(r);
     saveResult(r);
     setScreen("result");
@@ -443,10 +443,6 @@ export default function MbtiPage() {
               {[0, 0.5, 1].map((f) => (
                 <line key={f} x1={PAD_L} x2={W - PAD_R} y1={PAD_T + f * plotH} y2={PAD_T + f * plotH} stroke="#374151" strokeDasharray={f === 0.5 ? "3 4" : ""} strokeWidth="1" />
               ))}
-              {dims.map((dim, di) => {
-                const y = PAD_T + plotH / 2 + (di - 1.5) * 0; // ป้ายรวมด้านล่างแทน
-                return null;
-              })}
               {/* เส้นข้อมูล */}
               {seriesList.map((s) => series(s.list).map(({ dim, pts }) => (
                 <g key={s.label + dim}>
@@ -539,7 +535,6 @@ export default function MbtiPage() {
     );
   })();
 
-  const eyebrow = "ชีวิต & สุขภาพ";
   const titles: Record<Screen, string> = {
     intro: "MBTI — รู้จักตัวเอง 16 ประเภท",
     quiz: mode === "short" ? "ควิซสั้น — 32 ข้อ" : "แบบทดสอบ — 93 ข้อ",
@@ -548,29 +543,28 @@ export default function MbtiPage() {
     evolution: "วิวัฒนาการของฉัน",
   };
 
-  const navTabs: Array<{ key: Screen; label: string; show: boolean }> = [
-    { key: "intro", label: "หน้าหลัก", show: true },
-    { key: "library", label: "คลัง 16 ประเภท", show: true },
-    { key: "evolution", label: "📈 วิวัฒนาการ", show: history.length >= 2 },
-  ];
+  const navBtn = (key: Screen, label: string) => (
+    <button onClick={() => setScreen(key)} className={screen === key ? "text-fuchsia-300 font-bold" : "text-gray-400 hover:text-white"}>{label}</button>
+  );
 
   return (
     <div className="atmo-mind min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader
-          eyebrow={eyebrow}
+          eyebrow="ชีวิต & สุขภาพ"
           title={titles[screen]}
           subtitle="Local-First — ทำเอง เก็บเองในเบราว์เซอร์ ไม่ส่งข้อมูลออกนอกเครื่อง"
           icon={<Icon name="healing" size={18} />}
           actions={
-            <div className="flex gap-2 text-sm flex-wrap">
-              {navTabs.filter((t) => t.show).map((t, i) => (
-                <span key={t.key} className="flex gap-2 items-center">
-                  {i > 0 && <span className="text-gray-700">·</span>}
-                  <button onClick={() => setScreen(t.key)} className={screen === t.key ? "text-fuchsia-300 font-bold" : "text-gray-400 hover:text-white"}>{t.label}</button>
-                </span>
-              ))}
+            <div className="flex gap-2 text-sm flex-wrap items-center">
+              {navBtn("intro", "หน้าหลัก")}
+              <span className="text-gray-700">·</span>
+              {navBtn("library", "คลัง 16 ประเภท")}
+              {history.length >= 2 && <>
+                <span className="text-gray-700">·</span>
+                {navBtn("evolution", "📈 วิวัฒนาการ")}
+              </>}
               <span className="text-gray-700">·</span>
               <Link href="/mbti/compare" className="text-gray-400 hover:text-white">⚖️ เทียบสองคน</Link>
             </div>
