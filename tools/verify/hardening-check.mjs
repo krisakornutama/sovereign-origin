@@ -22,7 +22,6 @@ tamper === 'True' ? ok('Tamper protection เปิด') : tamper === null ? nee
 
 console.log('── Firewall / UAC ──');
 const fwOff = ps('(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Name');
-fwOff === '' || fwOff === null && ps('(Get-NetFirewallProfile).Enabled').includes('True') === false ? null : null;
 if (fwOff === '') ok('Firewall ทั้ง 3 profile เปิด');
 else if (fwOff === null) needAdmin('Firewall profiles');
 else bad('Firewall profile ปิด: ' + fwOff.replace(/\r?\n/g, ', '));

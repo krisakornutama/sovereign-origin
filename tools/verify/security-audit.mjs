@@ -36,7 +36,6 @@ for (const [label, url] of [['web :3000', `${WEB}/`], ['api :3001', `${API}/api/
   const h = Object.fromEntries([...r.headers].map(([k, v]) => [k.toLowerCase(), v]));
   for (const name of REQUIRED) {
     if (h[name]) continue;
-    if (name === 'strict-transport-security') continue; // HTTP ภายใน — ไม่หัก
     warn(`ขาด ${name} (${label})`, 'ควรเพิ่มใน middleware');
   }
   if (h['x-powered-by']) warn(`X-Powered-By รั่วชื่อ framework (${label})`, h['x-powered-by']);
