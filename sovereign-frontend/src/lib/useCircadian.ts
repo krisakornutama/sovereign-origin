@@ -14,6 +14,11 @@
 export type CircadianPhase = 'dawn' | 'day' | 'dusk' | 'night';
 
 export function circadianPhase(d: Date = new Date()): CircadianPhase {
+  // override ทดสอบ: ?atmo=dawn|day|dusk|night — ใช้ดูธีมแต่ละช่วงได้ไม่ต้องรอเวลาจริง
+  if (typeof window !== 'undefined') {
+    const q = new URLSearchParams(window.location.search).get('atmo');
+    if (q === 'dawn' || q === 'day' || q === 'dusk' || q === 'night') return q;
+  }
   const h = d.getHours();
   if (h >= 5 && h < 12) return 'dawn';
   if (h >= 12 && h < 17) return 'day';
