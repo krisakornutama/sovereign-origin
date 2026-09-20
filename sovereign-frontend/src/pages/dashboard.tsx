@@ -483,7 +483,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
     const fetchData = () => {
-      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); api.post('/api/automation/check',{metrics:data.metrics||{}}).catch(()=>{}); } }).catch(()=>{});
+      // เรียก /api/automation/check เฉพาะที่ AlertsPanel (จุดเดียว ทุก 60 วิ) — ที่นี่โหลด stats เพื่อแสดงผลเท่านั้น
+      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); } }).catch(()=>{});
       api.getObject<any>('/api/devices/status').then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); }).catch(()=>{});
       api.getObject<any>('/api/inventory/status').then((data:any)=> data && setInventoryStatus(data.totals)).catch(()=> setInventoryStatus(null));
       api.getObject<any>('/api/farm/plots/overview').then((data:any)=> data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null)).catch(()=> setFarmOverview(null));
