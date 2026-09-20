@@ -1,0 +1,28 @@
+# กัน Windows node_modules ทับ linux layer (native binary พัง + บวม 380M)
+node_modules/
+
+# Secrets — ค่าจริง inject ผ่าน compose environment เสมอ ห้ามอบใน image
+.env
+.env.*
+host-infra.env
+
+# Build output — generate ใหม่ใน image (CMD: prisma generate && build)
+dist/
+
+# Runtime data / backups — mount จาก host ตอนรัน ไม่ใช่ของ image
+data/
+backups/
+knowledge/
+ota_firmwares/
+models/
+offsite/
+
+# Prisma client ที่ generate ไว้บน host (สถาปัตยกรรมเครื่องอื่น)
+prisma/*.db
+prisma/prisma/
+
+# Git / เอกสาร / ทดสอบ — ไม่จำเป็นใน image
+.git/
+docs/
+tests/
+*.log
