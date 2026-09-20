@@ -45,7 +45,10 @@ docker restart sovereign-emqx        # MQTT
 cd "E:\My work\Project Sovereign Origin"
 netstat -ano | grep ":3000" | grep -i LISTENING   # อ่าน PID จากคอลัมน์สุดท้าย
 taskkill //F //PID <PID> //T
-node frontend-watchdog.mjs                        # idempotent — เช็คและชุบเอง
+# จบแค่นี้ — watchdog ที่รันอยู่ชุบเองภายใน ≤30 วิ (tick ทุก 30 วิ)
+# อย่ารัน `node frontend-watchdog.mjs` ซ้ำ: มันไม่ออกเอง จะกลายเป็น poller ซ้ำสองตัว (ทดสอบจริง 20 ก.ย. 2026)
+# ปลุก watchdog ใหม่เฉพาะเมื่อมันตาย:
+#   powershell Start-Process node -ArgumentList 'frontend-watchdog.mjs' -WorkingDirectory 'E:\My work\Project Sovereign Origin' -WindowStyle Hidden
 ```
 
 โหมดของ :3000 เลือกอัตโนมัติจากไฟล์ `sovereign-frontend/.next/BUILD_ID`:
@@ -59,11 +62,22 @@ node frontend-watchdog.mjs                        # idempotent — เช็ค�
 rm "E:\My work\Project Sovereign Origin\sovereign-frontend\.next\BUILD_ID"
 netstat -ano | grep ":3000" | grep -i LISTENING   # kill PID เดิม
 taskkill //F //PID <PID> //T
-sleep 70                                          # รอ watchdog tick ชุบเองเป็น dev
-# หรือชุบทันที: node frontend-watchdog.mjs
+# รอ watchdog ชุบเองเป็น dev — วัดจริง 20 ก.ย. 2026: 57 วิ (tick ≤30 วิ + dev boot ~27 วิ)
+# ยืนยันโหมดจริงเสมอ — dev ก็ตอบ 200 เหมือน prod ต้องดู cmdline:
+#   powershell "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\"" | grep -oE 'next" (start|dev)'
 ```
 
-**กลับมา prod:** build ใหม่ (`cd sovereign-frontend && npm run build`) — BUILD_ID กลับมา แล้ว watchdog จะชุบเป็น prod เอง
+**กลับมา prod:** ต้อง kill dev ก่อน build — watchdog จะไม่สลับเองถ้า :3000 ยังตอบ!
+
+```bash
+netstat -ano | grep ":3000" | grep -i LISTENING   # kill dev ทั้งกิ่งก่อน
+taskkill //F //PID <PID> //T
+cd "E:\My work\Project Sovereign Origin\sovereign-frontend" && npm run build
+# watchdog ชุบเป็น prod เอง — วัดจริง ~1 วิ (16:47:53 เริ่ม → 16:47:54 ตอบ)
+```
+
+⚠️ บทเรียนจริง 20 ก.ย. 2026: dev ตัวค้างแย่งพอร์ต :3000 กลับไปเงียบ ๆ และ dev boot จะลบ BUILD_ID ทิ้ง
+— watchdog แยก prod/dev ไม่ได้จาก HTTP (ตอบ 200 เหมือนกัน) จึงต้องยืนยันโหมดด้วย cmdline เสมอ
 
 ## ๔. เช็คสุขภาพ 1 นาที (Git Bash / PowerShell)
 
@@ -80,7 +94,7 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 ## ๕. สำรอง / กู้คืนฐานข้อมูล
 
-- **สำรองอัตโนมัติ:** Scheduled Task `Sovereign DB Backup` ทุกวัน 03:00 → `backups\postgres\sovereign_v2_YYYYMMDD_*.dump` (เก็บหลายวันย้อนหลัง)
+- **สำรองอัตโนมัติ:** Scheduled Task `Sovereign DB Backup` ทุกวัน 03:00 → `backups\postgres\sovereign_YYYYMMDD_*.dump` (เก็บหลายวันย้อนหลัง)
 - **กู้คืน** (ทดสอบก่อนใช้จริงเสมอ) — ต้องใช้โหมด restore ของ TimescaleDB ด้วย ไม่งั้น `pg_restore` ตรง ๆ จะล้มเหลวที่ chunk catalog (ซ้อมจริงแล้ว 14 ก.ย. 2026):
   ```bash
   # 1) ฐานปลายทาง + ปลดล็อก TimescaleDB
