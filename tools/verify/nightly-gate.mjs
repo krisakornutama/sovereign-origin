@@ -2,7 +2,7 @@
 // tools/verify/nightly-gate.mjs — ประตูคุณภาพรายคืน (03:20 ทุกวัน ผ่าน Task Scheduler)
 //   node tools/verify/nightly-gate.mjs              → รัน gate ทั้งหมด
 //   node tools/verify/nightly-gate.mjs --selftest   → ส่งข้อความทดสอบเข้า Telegram (พิสูจน์ช่องทาง)
-// ขั้นตรวจ: db-doctor → verify (build+test) → full-system-check (API จริงทุก mount) → ui-sweep (หน้าจอจริง Chromium)
+// ขั้นตรวจ: db-doctor → verify (build+test) → full-system-check (API จริงทุก mount) → ui-sweep (หน้าจอจริง Chromium, บังคับโหมด prod ก่อนวัด)
 // ผ่าน = เงียบ (exit 0) · พัง = เขียน log + ส่ง Telegram แล้ว exit 1
 // creds: system_settings (ตั้งผ่านหน้า Settings — ตัวกำหนดค่าแท้คือ core-api: telegram-credentials.service.ts)
 //        → fallback infra/.env (TELEGRAM_*) เผื่อ DB ล่ม · ชื่อฐาน/ผู้ใช้อ่านจาก infra/.env ไม่ hardcode
@@ -65,6 +65,25 @@ async function sendTelegram(text, creds) {
   } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
 }
 
+// ── โหมด :3000 — verify (next build) เขียน .next ทับตัวที่ prod serve อยู่ → ช่วง build watchdog อาจชุบเป็น dev
+// (บทเรียนจริง 20 ก.ย. 2026 · runbook §๓) ui-sweep ต้องวัด prod จริง: มี BUILD_ID → ฆ่า listener
+// แล้วรอ watchdog ชุบ prod (~1 วิ) · ไม่มี BUILD_ID = สถานะ rollback จริง ปล่อยเป็น dev ตามปกติ
+async function ensureProdFrontend() {
+  if (!fs.existsSync(path.join(ROOT, 'sovereign-frontend', '.next', 'BUILD_ID'))) return;
+  let pid;
+  try {
+    pid = execFileSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 15_000, windowsHide: true })
+      .split(/\r?\n/).find((l) => l.includes('LISTENING') && /:3000\s/.test(l))?.trim().split(/\s+/).pop();
+  } catch { return; }
+  if (!pid || pid === '0') return;
+  try { execFileSync('taskkill', ['/PID', pid, '/T', '/F'], { timeout: 15_000, windowsHide: true, stdio: 'ignore' }); } catch { /* มีคนฆ่าไปก่อน */ }
+  const t0 = Date.now();
+  while (Date.now() - t0 < 60_000) {
+    try { const r = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(4_000) }); if (r.ok) return; } catch { /* ยังไม่ตื่น */ }
+    await new Promise((r) => setTimeout(r, 3_000));
+  }
+}
+
 // ── gate ──
 function tail(s, n) { s = String(s); return s.length > n ? '…' + s.slice(-n) : s; }
 
@@ -72,6 +91,7 @@ async function main() {
   const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
   const results = [];
   for (const c of checks) {
+    if (c.name.startsWith('ui-sweep')) await ensureProdFrontend();
     try {
       const out = execFileSync(c.cmd, c.args, {
         cwd: ROOT, encoding: 'utf8', timeout: 300_000, windowsHide: true,
