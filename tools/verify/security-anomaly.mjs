@@ -48,7 +48,7 @@ const acct = psqlRows(`SELECT to_char(a."timestamp" AT TIME ZONE 'Asia/Bangkok',
   WHERE a."timestamp" > now() - interval '24 hours'
     AND (a.action_type IN ('USER_PASSWORD_RESET_BY_ADMIN','POST /api/auth/change-password','POST /api/users') OR a.action_type LIKE 'DELETE /api/users/%')
     AND ${ACTOR_EXCL} AND a.user_id IS NOT NULL ORDER BY a."timestamp" DESC LIMIT 15;`);
-add('ℹ️', 'เหตุการณ์บัญชี (รีเซ็ต/สร้าง/ลบ)', acct.map(r => `  - ${r.replace('|', ' · ').replace('|', ' · ')}`));
+add('ℹ️', 'เหตุการณ์บัญชี (รีเซ็ต/สร้าง/ลบ)', acct.map(r => `  - ${r.split('|').join(' · ')}`));
 
 // 5) user แตะโมดูลที่ไม่เคยแตะมา 30 วันก่อนหน้า (first-seen)
 const firstSeen = psqlRows(`WITH base AS (
