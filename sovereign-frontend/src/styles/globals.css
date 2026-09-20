@@ -840,3 +840,110 @@ html[data-theme='light'] .atmo-wealth::before,
 html[data-theme='light'] .atmo-kitchen::before {
   opacity: 0.45;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ธีมระบบ (atmo-system) — สตูดิโอผู้ดูแล: ไซอันเย็นโปร่ง + ตารางชัด
+   ใช้กับหน้าธุรกิจ/ระบบ/admin — โทนเป็นกลาง เย็นตา มืออาชีพ
+   ═══════════════════════════════════════════════════════════════ */
+.atmo-system {
+  --atmo-accent: 34 211 238;
+  --atmo-accent-2: 103 232 249;
+  --atmo-accent-3: 14 165 233;
+}
+.atmo-system::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(880px 500px at 88% -10%, rgba(34, 211, 238, 0.09), transparent 60%),
+    radial-gradient(720px 420px at 6% 110%, rgba(14, 165, 233, 0.06), transparent 62%),
+    linear-gradient(rgba(34, 211, 238, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.015) 1px, transparent 1px);
+  background-size: auto, auto, 52px 52px, 52px 52px;
+}
+.atmo-system .panel-glow {
+  border-color: rgba(34, 211, 238, 0.24);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.05),
+    0 0 20px rgba(34, 211, 238, 0.09),
+    inset 0 0 26px rgba(34, 211, 238, 0.03);
+}
+.atmo-system .glow-text,
+.atmo-system .glow-text-cyan { text-shadow: 0 0 10px rgba(34, 211, 238, 0.4); }
+.atmo-system .eyebrow {
+  color: rgb(103 232 249 / 0.85);
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.3);
+}
+.atmo-system .page-badge {
+  background: rgba(34, 211, 238, 0.10);
+  border-color: rgba(34, 211, 238, 0.25);
+  color: #67e8f9;
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.15);
+}
+.atmo-system :focus-visible { outline-color: rgba(34, 211, 238, 0.7); }
+
+/* ═══════════════════════════════════════════════════════════════
+   ธีมตามเวลาของวัน (Circadian) — สำหรับ Dashboard
+   เช้า (dawn) → สาย (day) → เย็น (dusk) → กลางคืน = โทนฐานเดิม
+   เข้ากับปรัชญา "วิถีชีวิต" ของระบบ: บ้านมีจังหวะตามดวงอาทิตย์
+   ═══════════════════════════════════════════════════════════════ */
+.atmo-dawn::before,
+.atmo-day::before,
+.atmo-dusk::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+/* เช้า: แดดแรกสีอำพันอ่อนจากตะวันออก + แสงชมพูแดวน */
+.atmo-dawn::before {
+  background:
+    radial-gradient(900px 500px at 14% -8%, rgba(253, 186, 116, 0.13), transparent 60%),
+    radial-gradient(760px 440px at 88% 6%, rgba(244, 114, 182, 0.06), transparent 62%);
+}
+/* สาย/เที่ยง: ฟ้าใสแจ่ม + ตารางชัดขึ้น (ช่วงทำงานเต็มสมรรถนะ) */
+.atmo-day::before {
+  background:
+    radial-gradient(1000px 560px at 50% -14%, rgba(56, 189, 248, 0.11), transparent 60%),
+    radial-gradient(720px 420px at 88% 108%, rgba(34, 211, 238, 0.07), transparent 62%),
+    linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px);
+  background-size: auto, auto, 100% 36px;
+}
+/* เย็น: อาทิตย์ตกส้มอุ่นมุมขวาล่าง + ม่วงพลบค่ำจากบน */
+.atmo-dusk::before {
+  background:
+    radial-gradient(900px 500px at 82% 106%, rgba(249, 115, 22, 0.10), transparent 60%),
+    radial-gradient(760px 440px at 10% -6%, rgba(129, 140, 248, 0.09), transparent 62%);
+}
+.atmo-dawn .glow-text,
+.atmo-dusk .glow-text { text-shadow: 0 0 10px rgba(251, 191, 36, 0.35); }
+.atmo-day .glow-text { text-shadow: 0 0 10px rgba(56, 189, 248, 0.38); }
+.atmo-dawn .eyebrow { color: rgb(253 186 116 / 0.9); text-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }
+.atmo-day .eyebrow { color: rgb(125 211 252 / 0.9); text-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
+.atmo-dusk .eyebrow { color: rgb(165 180 252 / 0.9); text-shadow: 0 0 8px rgba(129, 140, 248, 0.3); }
+
+/* ── สีเน้นของเมนู (Sidebar/MobileNav/CommandPalette) ตามธีมหน้าปัจจุบัน ──
+   ค่า default = เขียวนีออนฐาน · หน้าไหนมี atmo-* เมนู active จะเปลี่ยนสีตามงาน */
+:root { --atmo-nav: #34d399; --atmo-nav-text: #6ee7b7; }
+.atmo-power { --atmo-nav: #fbbf24; --atmo-nav-text: #fde68a; }
+.atmo-wellness { --atmo-nav: #2dd4bf; --atmo-nav-text: #5eead4; }
+.atmo-lotus { --atmo-nav: #caa856; --atmo-nav-text: #e7d094; }
+.atmo-nature { --atmo-nav: #84cc16; --atmo-nav-text: #bef264; }
+.atmo-guard { --atmo-nav: #fb7185; --atmo-nav-text: #fda4af; }
+.atmo-wealth { --atmo-nav: #eab308; --atmo-nav-text: #fde047; }
+.atmo-kitchen { --atmo-nav: #fb923c; --atmo-nav-text: #fdba74; }
+.atmo-system { --atmo-nav: #22d3ee; --atmo-nav-text: #67e8f9; }
+.atmo-dawn { --atmo-nav: #fbbf24; --atmo-nav-text: #fde68a; }
+.atmo-day { --atmo-nav: #38bdf8; --atmo-nav-text: #7dd3fc; }
+.atmo-dusk { --atmo-nav: #818cf8; --atmo-nav-text: #a5b4fc; }
+
+/* ธีมสว่าง: ลดความเข้มธีมใหม่ที่เพิ่มเข้ามาด้วย */
+html[data-theme='light'] .atmo-system::before,
+html[data-theme='light'] .atmo-dawn::before,
+html[data-theme='light'] .atmo-day::before,
+html[data-theme='light'] .atmo-dusk::before {
+  opacity: 0.45;
+}
