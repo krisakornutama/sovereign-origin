@@ -107,6 +107,8 @@ tools/*
 !tools/test/*.test.mjs
 !tools/verify/
 !tools/verify/*.mjs
+# test-db-local.mjs ถูก package.json (test:db) อ้าง — ต้องเข้า repo ไม่งั้น gate พังบน clone สด
+!tools/test-db-local.mjs
 !tools/
 !tools/install/
 tools/install/*
