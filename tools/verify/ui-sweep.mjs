@@ -10,9 +10,17 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WEB = process.env.WEB_URL || 'http://127.0.0.1:3000';
+// browsers อยู่ที่ <repo>/.playwright-browsers (กฎ drive E:) — ต้องตั้ง env "ก่อน" require playwright
+// (playwright 1.63 อ่าน PLAYWRIGHT_BROWSERS_PATH ตอน require — ตั้งหลัง require จะถูกเมินเงียบ ๆ)
+const BROWSERS = path.join(ROOT, '.playwright-browsers');
+process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSERS;
 const require = createRequire(import.meta.url);
 const jwt = require(path.join(ROOT, 'sovereign-os/core-api/node_modules/jsonwebtoken'));
 const { chromium } = require(path.join(ROOT, 'sovereign-frontend/node_modules/playwright'));
+if (!fs.existsSync(BROWSERS) || !fs.readdirSync(BROWSERS).some((d) => d.startsWith('chromium'))) {
+  console.error(`FATAL ไม่พบ browsers ที่ ${BROWSERS} — รัน: npx playwright install (จาก sovereign-frontend)`);
+  process.exit(2);
+}
 const psql = (sql) => execSync(`docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "${sql}"`, { encoding: 'utf8' }).trim();
 const secret = fs.readFileSync(path.join(ROOT, 'sovereign-os/infra/.env'), 'utf8')
   .split(/\r?\n/).find(l => l.startsWith('JWT_SECRET=')).slice('JWT_SECRET='.length).replace(/^["']|["']$/g, '');
@@ -20,7 +28,6 @@ const [adminId, tvStr] = psql("SELECT id||'|'||token_version FROM users WHERE us
 if (!adminId) { console.error('FATAL ไม่พบ mock-admin'); process.exit(2); }
 const token = jwt.sign({ userId: adminId, role: 'SUPERADMIN', assigned_node_id: null, mfa_verified: true, must_change_password: false, token_version: Number(tvStr) }, secret, { expiresIn: '30m' });
 
-process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.join(ROOT, '.playwright-browsers');
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript((t) => { localStorage.setItem('sovereign-auth', t); }, JSON.stringify({ state: { token }, version: 0 }));
