@@ -18,7 +18,7 @@ export default function AlertsPanel() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
-    // Poll alerts every 5 seconds
+    // ผู้เรียก /api/automation/check เพียงจุดเดียวของแอป — ทุก 60 วิพอ (เดิม 5 วิ = 17,000 ครั้ง/วันต่อแท็บ)
     const fetchAlerts = async () => {
       try {
         const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/stats`);
@@ -61,7 +61,7 @@ export default function AlertsPanel() {
     };
 
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 5000);
+    const interval = setInterval(fetchAlerts, 60_000);
     
     // Request notification permission
     if (Notification.permission === 'default') {
