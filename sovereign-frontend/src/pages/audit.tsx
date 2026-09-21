@@ -94,9 +94,9 @@ export default function AuditPage() {
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('audit.eyebrow', 'ระบบ')}
-          title="SOVEREIGN OS"
+          title="บันทึกการตรวจสอบ"
           icon={<Icon name="audit" size={18} />}
-          subtitle="Audit Log" actions={<div className="flex gap-3 items-center">
+          subtitle="ใครทำอะไรในระบบนี้ ทุกอย่างถูกจดไว้" actions={<div className="flex gap-3 items-center">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">Dashboard</Link>
         </div>}
         />
