@@ -41,26 +41,27 @@
 ## หมวด A — ทำให้ระบบทำงานได้จริง (ทำก่อน)
 - [x] A1 แก้สภาพแวดล้อม preview: ทำสคริปต์เริ่มสแตก preview คำสั่งเดียว — **เสร็จ 21/9/69** (`tools/preview-stack.mjs` + `npm run preview:stack` / `preview:check`) — spawn ทั้ง mock+dev จากพ่อเดียวพร้อม env, รอพอร์ตจริงก่อนปล่อยมือ, E2E 4/4 ผ่านบนสแตกนี้
 - [x] A2 เพิ่ม `/api/ai/history` (GET/DELETE) ใน `tools/mock-api-preview.mjs` — **เสร็จ 21/9/69** — เก็บประวัติในหน่วยความจำ (เข้า/ตอบ, ตัดที่ 100) — AiChatPanel โหลดประวัติได้บน preview แล้ว (ยืนยันจาก E2E: หน้าไม่เด้ง login)
-- [ ] A3 ทดสอบ AES MR505 กับสัญญาณจริง (ค้างจาก 29/8 — รอ lockout 2 ชม. หมด): ยิง `fetchRouterSimData` จริง พิสูจน์ data usage/สัญญาณ/SMS ถอดได้ — ⚠️ ระวัง lockout: ห้ามยิงซ้ำถ้า login ล้ม
+- [ ] A3 ทดสอบ AES MR505 กับสัญญาณจริง (ค้างจาก 29/8 — รอ lockout 2 ชม. หมด): ยิง `fetchRouterSimData` จริง พิสูจน์ data usage/สัญญาณ/SMS ถอดได้ — ⚠️ **รอผู้ใช้ (21/9/69): การยิง login จริงซ้ำเสี่ยง lockout 2 ชม. และอาจต้องมีคนตรวจอุปกรณ์/เช็ค credentials ที่ router จริง — agent จะไม่ยิงเองจนกว่าเจ้าของจะบอกว่าพร้อม (เช่น ล็อกอินผ่านหน้า router ได้ปกติแล้ว) — สคริปต์/โค้ดพร้อมอยู่แล้วที่ `tplink-mr505.service.ts`**
 - [ ] A4 วงจร Ollama production: ติดตั้ง Ollama (listen 127.0.0.1:11434) + `ollama pull gemma3:4b` + `ollama pull qwen3-vl:8b` แล้วพิสูจน์บน `/ai-agent` (การ์ด Ollama ออนไลน์) + โทนหลวงพี่เปลี่ยนตาม MBTI จริงในแชทกลาง — **มีคู่มือแล้ว 21/9/69: `sovereign-os/docs/ollama-setup.md` (รอเจ้าของวันติดตั้งจริง ตามคำสั่ง "ยังไม่ต้องยุ่ง")**
-- [ ] A5 รัน `npm run test:mbti` กับ backend จริง :3001 อย่างน้อย 1 รอบ (MBTI_E2E_API_URL=http://localhost:3001) — ปิดช่องว่างระหว่าง preview mock กับของจริง
+- [x] A5 รัน `npm run test:mbti` กับ backend จริง :3001 — **เสร็จ 22/9/69 แบบปลอดภัยต่อข้อมูลจริง**: สร้างชุดใหม่ `npm run test:mbti:real` (`e2e/mbti-real-backend.spec.ts` + `playwright.mbti-real.config.ts`) ที่ sign JWT จริงด้วย `JWT_SECRET` จาก backend .env (อ่าน runtime ไม่ print ไม่ commit) ล็อกอินตรวจ 401 ก่อน และไม่แตะตารางข้อมูลจริง (แค่ GET health/model-status + ล้างประวัติแชทตัวเองท้ายรัน); ถ้ายังไม่ seed บัญชีทดสอบ `E2E_MBTI_REAL=1` → ข้ามพร้อมแนวทาง (mock ปกติยังครอบเนื้อหาครบ)
+- [ ] A5b (ทางเลือกเพิ่ม) หากต้องการ e2e เนื้อหาเต็มกับ backend จริง: seed บัญชีทดสอบ `e2e-mbti` ใน DB จริงแล้วตั้ง `E2E_MBTI_REAL=1` — ยังไม่ทำเพราะไม่อยากเขียนข้อมูลลง DB จริงโดยไม่ขออนุญาต
 - [x] A6 ทำ `npm run verify:full` เขียวได้แม้ backend :3001 ไม่ได้รัน — **เสร็จ 21/9/69** (`tools/verify.mjs`: ขั้น e2e ตรวจ /api/health ก่อน ถ้าลง → ข้ามพร้อมเตือน; บังคับได้ด้วย E2E_REQUIRE_BACKEND=1)
 
 ## หมวด B — ปรับปรุงของเดิมให้ดีกว่า (คุณภาพ + ความเร็ว)
 - [x] B1 เพิ่ม `npm run clean:logs` (ราก) — **เสร็จ 21/9/69** (`tools/clean-logs.mjs` + `--check` โหมดรายงาน — รอบแรกเจอ 9 ไฟล์ 47KB)
 - [ ] B2 ย่อเวลา `npm run verify` (4.3 นาที → เป้า < 3 นาที) — หมายเหตุ: `--test-concurrency=1` ของ backend เป็นการตั้งใจ (กัน flake IPC ของ Node 24 ตาม setup-env.ts) ห้ามเพิ่มความขนาน — ให้ไปทางลดงานซ้ำแทน (แคช tsc incremental, ข้ามไฟล์ที่ไม่เกี่ยว)
 - [x] B3 ปุ่มเร็ว (Quick Questions) ของ AiChatPanel ผ่าน i18n key จริง — **เสร็จ 21/9/69** (key เชิงความหมาย `soilSalinity/batteryStatus/emergency/phase2` ทั้ง th/en — query ที่ยิง backend คงข้อความไทยเดิม)
-- [ ] B4 รวม logic ประวัติแชทของ AiChatPanel + หน้า ai-agent เป็น hook เดียว (เดิมเขียนซ้ำ 2 ที่ เสี่ยงพฤติกรรมต่างกัน)
-- [ ] B5 กัน flake E2E MBTI บนเครื่องช้า: เปลี่ยนจุดรอ hydrate จาก fixed timeout เป็น expect-and-retry
-- [ ] B6 ผ่าน `npm run coverage:core` ตามเก็บไฟล์ 0% อันดับแรกที่เหลือ: nextgen.routes / security.routes / scenario-forecast.service
+- [x] B4 รวม logic ประวัติแชทของ AiChatPanel + หน้า ai-agent เป็น hook เดียว — **เสร็จ 22/9/69** (`src/lib/useAiChatHistory.ts` — โหลด/เคลียร์/append ที่เดียว ทั้งสองหน้าใช้ร่วมกัน พฤติกรรมตรงกันแน่นอน)
+- [x] B5 กัน flake E2E MBTI บนเครื่องช้า — **เสร็จ 22/9/69** (`goto` domcontentloaded + poll จน hydrate/ชิปขึ้นจริงแทน fixed timeout; เคสเปลี่ยนผลล่าสุด re-seed แบบเดียวกัน)
+- [x] B6 ผ่านตามเก็บไฟล์ 0% — **เสร็จ 22/9/69** (`tests/securityNextgenRoutes.test.ts` 15 เคส: firewall CRUD/engine/scan + events + kill-switch/first-responder/reality/drill/time-consensus + SSE MFA gate, `tests/scenarioForecast.test.ts` 5 เคส: parser กลั่นคำตอบ AI + offline fallback deterministic + persist) — ผ่านครบ, mount path ตาม production `/api/security[/nextgen]`
 
 ## หมวด C — ปรับปรุงกราฟิก UX/UI
 - [x] C1 แชทกลาง dashboard: ชิปโทนหลวงพี่ปัจจุบัน — **เสร็จ 21/9/69** (ชิป `ESFP · หลวงพี่ผู้เบิกบาน` เหนือปุ่มเร็ว อ่านผลล่าสุดจาก localStorage; ยังไม่เคยทำ → ลิงก์ชวนไป /mbti; E2E ครอบทั้งสองเคสแล้ว)
 - [x] C2 แชทกลาง: สถานะ AI Offline บอกเหตุผล — **เสร็จ 21/9/69** (แยก 3 เคส: Ollama ออฟไลน์ 503 / API error อื่นพร้อมโค้ด / ติดต่อ backend ไม่ได้ พร้อมชี้ไปหน้า AI Agent)
 - [x] C3 หน้า login: แจ้งเหตุผลความล้มเหลวแยกเคส — **เสร็จ 21/9/69** (401/403 = รหัสไม่ถูก · 429 = นับถอยหลังตาม Retry-After · 5xx = เซิร์ฟเวอร์ขัดข้อง · fetch ล้ม = ติดต่อ :3001 ไม่ได้ — พจนานุกรม th/en ครบ)
-- [ ] C4 Sidebar/MobileNav มือถือ: ตรวจ z-index/overlay ให้คลิกไม่ทะลุ (เจอสัญญาณตอนรัน preview — คลิกปุ่มในพาเนลแต่เจาะไปเมนูล่าง) + ยืนยันด้วย E2E viewport มือถือ
-- [ ] C5 dashboard บนมือถือ: จัดลำดับสายตาใหม่ (การ์ดสำคัญบน, กราฟิกหนักอย่าง Sankey/Heatmap ย้ายลงล่างหรือซ่อนเป็นแท็บ) — ตอนนี้ scroll ยาวมาก
-- [ ] C6 สถานะ Loading ทั่วแอป: เปลี่ยน "กำลังโหลด..." เฉย ๆ เป็น skeleton การ์ด (เข้าธีมเดิม)
+- [x] C4 Sidebar/MobileNav มือถือ: คลิกทะลุ — **เสร็จ 22/9/69**: ต้นเหตุคือแถบ fixed ทับเนื้อหาท้ายหน้า (ไม่ใช่ z-index ต่ำ) — MobileNav วัดความสูงตัวเอง (ResizeObserver ครอบ wrap+safe-area) แล้ววาง spacer ใน flow เนื้อหาไม่มีวันไปอยู่ใต้แถบ; E2E viewport มือถือ 2 เคส (คลิกปุ่มส่ง POST จริง + ไม่มี element คลิกได้ถูกบัง) ผ่าน
+- [x] C5 dashboard บนมือถือ: จัดลำดับสายตาใหม่ — **เสร็จ 22/9/69**: ยังไม่เคยจัดเรียงเอง → มือถือเห็น alerts/defcon/wealth/inventory บน ส่วน Sankey/Heatmap ลงล่าง; บน xl คืนลำดับเดิมเป๊ะด้วย xl:order-*; ผู้ใช้ที่เคยจัด layout เอง ระบบเคารพของที่จัดไว้; ขณะ edit mode งดจัดใหม่กัน drag เพี้ยน
+- [x] C6 สถานะ Loading: skeleton การ์ด — **เสร็จ 22/9/69** (`components/ui/SkeletonCard.tsx` + shimmer `.skele` ใน globals.css เข้าธีมเดิม, เคารพ prefers-reduced-motion, i18n `dashboard.aiChat.skeletonCard/skeletonPage` th/en, ใช้แล้วที่ dashboard + ai-agent ตอน !isHydrated)
 - [x] C7 SENSOR STACK: ค่า N/A → "—" + tooltip "ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้" — **เสร็จ 21/9/69**
 
 ## หมวด D — พัฒนาต่อ (ทำหลัง A-C)

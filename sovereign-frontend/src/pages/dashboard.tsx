@@ -17,6 +17,7 @@ import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
 import SectionCard from '../components/ui/SectionCard';
 import EmptyState from '../components/ui/EmptyState';
+import { SkeletonGrid } from '../components/ui/SkeletonCard';
 import { authFetch } from '../lib/apiFetch';
 import { api } from '../lib/apiClient';
 import { useFeatureStore } from '../stores/useFeatureStore';
@@ -503,7 +504,13 @@ export default function Dashboard() {
   }, [isHydrated, isAuthenticated, token]);
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500 text-sm">{t('common.loading', 'กำลังโหลด...')}</div>;
+    // C6: skeleton แดชบอร์ดแทนข้อความเฉย ๆ — ให้รู้สึกว่าโครงหน้ามาแล้ว ข้อมูลกำลังตามมา
+    return (
+      <div className="min-h-screen bg-gray-950 p-4 lg:p-6 max-w-7xl mx-auto">
+        <SkeletonGrid count={6} className="!grid-cols-1 md:!grid-cols-2 xl:!grid-cols-3" />
+        <p className="sr-only">{t('dashboard.aiChat.skeletonPage', 'กำลังโหลดแดชบอร์ด...')}</p>
+      </div>
+    );
   }
   if (!isAuthenticated || !user) {
     return <div className="text-white">{t('dashboard.unauthorized', 'Unauthorized')}</div>;
@@ -539,6 +546,30 @@ export default function Dashboard() {
     return true;
   };
   const visibleOrder = order.filter((k) => isVisibleForUser(k) && (editMode || !hidden[k]));
+
+  // C5 มือถือ: ลำดับที่เหมาะกับจอเล็ก (ตัวเลข/เตือนบน กราฟิกหนักลงล่าง) —
+  // ใช้เฉพาะเมื่อผู้ใช้ยังไม่เคยจัดเรียงเอง (order ยังเป็นค่า default) ไม่งั้นเคารพของที่จัดไว้
+  // บน xl กลับเป็นลำดับเดิม 100% (order-classes คืนตำแหน่งเดิมเมื่อ CSS Grid มี 12 คอลัมน์ให้)
+  const usingDefaultOrder = order.length === DEFAULT_ORDER.length && order.every((k, i) => k === DEFAULT_ORDER[i]);
+  const MOBILE_ORDER: WidgetKey[] = ['alerts', 'defcon', 'wealth', 'inventory', 'status', 'actions', 'stats', 'map', 'sensors', 'farm', 'kids'];
+  const MOBILE_RANK: Record<string, number> = {};
+  MOBILE_ORDER.forEach((k, i) => { MOBILE_RANK[k] = i; });
+  const MOBILE_XL_ORDER: Record<string, string> = {
+    alerts: 'xl:order-4',
+    defcon: 'xl:order-1',
+    wealth: 'xl:order-2',
+    inventory: 'xl:order-3',
+    status: 'xl:order-6',
+    actions: 'xl:order-7',
+    stats: 'xl:order-8',
+    map: 'xl:order-9',
+    sensors: 'xl:order-10',
+    farm: 'xl:order-5',
+    kids: 'xl:order-11',
+  };
+  // (ขณะ edit mode งดจัดใหม่ — index ของ drag-and-drop ผูกกับ visibleOrder ตรง ๆ
+  //  และบนจอใหญ่ order-classes ทำให้ผลเหมือนเดิมเป๊ะอยู่แล้ว)
+  const mobileFirst = usingDefaultOrder && !editMode;
 
   const renderDense = (key: WidgetKey) => {
     switch (key) {
@@ -948,10 +979,13 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {visibleOrder.map((key, i) => (
+            {(mobileFirst
+              ? [...visibleOrder].sort((a, b) => (MOBILE_RANK[a] ?? 99) - (MOBILE_RANK[b] ?? 99))
+              : visibleOrder
+            ).map((key, i) => (
               <WidgetShell
                 key={key}
-                className={DENSE_SPAN[key] ?? 'col-span-12'}
+                className={`${DENSE_SPAN[key] ?? 'col-span-12'} ${mobileFirst ? MOBILE_XL_ORDER[key] ?? '' : ''}`}
                 title={t(`dashboard.widget.${key}`, WIDGET_DEFS[key].label)}
                 editMode={editMode}
                 hidden={!!hidden[key]}

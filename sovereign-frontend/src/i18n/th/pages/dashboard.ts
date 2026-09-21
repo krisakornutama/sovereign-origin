@@ -192,6 +192,9 @@ export default {
     apiError: 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์',
     offlineHint: '⚠️ ติดต่อ Core API (:3001) ไม่ได้ — ตรวจว่า backend เปิดอยู่ หรือไปที่หน้า AI Agent เพื่อดูสถานะ',
     listening: 'กำลังฟังเสียง...',
+    send: 'ส่งข้อความ',
+    skeletonCard: 'กำลังโหลดข้อมูลส่วนนี้...',
+    skeletonPage: 'กำลังโหลดแดชบอร์ด...',
     placeholder: 'พิมพ์หรือกดไมค์เพื่อพูด...',
     quickQuestions: {
       soilSalinity: 'เช็คดินเค็ม',

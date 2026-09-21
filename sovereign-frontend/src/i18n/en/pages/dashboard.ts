@@ -192,6 +192,9 @@ export default {
     apiError: 'Server error',
     offlineHint: '⚠️ Cannot reach the Core API (:3001) — check that the backend is running, or open the AI Agent page for status',
     listening: 'Listening...',
+    send: 'Send message',
+    skeletonCard: 'Loading this section...',
+    skeletonPage: 'Loading dashboard...',
     placeholder: 'Type or press the mic to speak...',
     quickQuestions: {
       soilSalinity: 'Check soil salinity',

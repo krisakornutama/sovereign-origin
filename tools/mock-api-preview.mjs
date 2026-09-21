@@ -207,6 +207,30 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+// __upstream — ส่งต่อไป backend จริง (ใช้เฉพาะงาน dev ในเครื่อง เช่น MBTI_E2E_API_UPSTREAM ของ A5)
+// ไม่ expose นอก localhost: อนุญาตเฉพาะ request ที่มาจาก 127.0.0.1/::1 เท่านั้น (mock ฟัง 127.0.0.1 อยู่แล้ว)
+// และต้องตั้ง env MBTI_E2E_API_UPSTREAM=1 ที่ตัว mock ด้วย — ปิดสองชั้น กันยิงข้ามเครือข่าย
+const UPSTREAM = process.env.MBTI_E2E_API_UPSTREAM === '1' ? process.env.MBTI_E2E_API_UPSTREAM_URL || 'http://127.0.0.1:3001' : null;
+
+async function proxyToUpstream(req, res) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const body = Buffer.concat(chunks);
+  try {
+    const r = await fetch(UPSTREAM + req.url, {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json', ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}) },
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
+    });
+    const text = await r.text();
+    res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/json', ...CORS });
+    return res.end(text);
+  } catch (e) {
+    res.writeHead(502, { 'Content-Type': 'application/json', ...CORS });
+    return res.end(JSON.stringify({ error: 'upstream unavailable' }));
+  }
+}
+
 http
   .createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
@@ -214,6 +238,18 @@ http
       return res.end();
     }
     const url = (req.url || '').split('?')[0];
+    // auth gate ระดับ mock — จริงใจกับ backend จริง: ทุก endpoint ที่ backend ปิด ต้องการ Authorization ทั้งหมด
+    // (ยกเว้นเฉพาะ __upstream ซึ่งส่ง Authorization ต่อให้ backend ตัดสินเอง)
+    // ผลข้างเคียงที่ตั้งใจ: e2e เดิมที่ยิง fetch ตรง ๆ โดยไม่แนบ token จะเห็น 401 แบบเดียวกับของจริง
+    if (!url.startsWith('/__upstream') && !req.headers.authorization) {
+      res.writeHead(401, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ error: 'Unauthorized (mock gate — แนบ Authorization ให้เหมือนของจริง)' }));
+    }
+    // __upstream — ส่งต่อไป backend จริง (ใช้เฉพาะงาน dev ในเครื่อง เช่น MBTI_E2E_API_UPSTREAM ของ A5)
+    if (UPSTREAM && url.startsWith('/__upstream/')) {
+      req.url = req.url.replace('/__upstream', '');
+      return proxyToUpstream(req, res);
+    }
     // ai/history — ประวัติสนทนาในหน่วยความจำ (GET = list, DELETE = ล้าง) — AiChatPanel โหลดตอนเปิดหน้า
     if (url === '/api/ai/history') {
       if (req.method === 'DELETE') {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { authFetch } from '../../lib/apiFetch';
 import { withMbti } from '../../lib/mbtiAi';
 import { careToneFor, latestLocalResult } from '../../lib/mbtiData';
+import { useAiChatHistory } from '../../lib/useAiChatHistory';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import VoiceInput from './VoiceInput';
@@ -26,7 +27,8 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // B4: ประวัติแชทมีเจ้าของเดียว — hook useAiChatHistory (เดิมเขียนโหลด/ล้างเอง ซ้ำกับหน้า ai-agent)
+  const { messages, setMessages, appendLocal, clearServer } = useAiChatHistory(50);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -46,41 +48,9 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // P1: โหลดประวัติสนทนาจากเซิร์ฟเวอร์ (Conversational Memory)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history?limit=50`);
-        if (!res.ok) return;
-        const body = await res.json();
-        if (!cancelled && Array.isArray(body.history)) {
-          setMessages(
-            body.history.map((m: any) => ({
-              id: m.id,
-              role: m.role === 'user' ? 'user' : 'ai',
-              content: m.content,
-            }))
-          );
-        }
-      } catch {
-        // offline — เริ่มด้วยประวัติว่าง
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const clearHistory = async () => {
     if (!window.confirm(t('dashboard.aiChat.clearHistoryConfirm', 'ล้างประวัติการสนทนาทั้งหมด? AI จะจำไม่ได้ว่าคุยอะไรไว้'))) return;
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history`, { method: 'DELETE' });
-      if (!res.ok) return;
-      setMessages([]);
-    } catch {
-      // เงียบ
-    }
+    await clearServer();
   };
 
   // จำนวนคำขออนุมัติที่รออยู่ (เฉพาะ SUPERADMIN — API นี้ต้องการ role สูงสุด)
@@ -140,7 +110,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
     const text = query || input;
     if (!text.trim() || isLoading) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content: text }]);
+    appendLocal({ role: 'user', content: text });
     setInput('');
     setIsLoading(true);
 
@@ -151,20 +121,18 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
         body: JSON.stringify(withMbti({ message: text })),
       });
 
-      if (!res.ok) throw new Error('API error');
-
       const data = await res.json().catch(() => ({} as any));
       if (!res.ok) {
         // backend ตอบกลับแต่ล้มเหลว — แยกเคส AI offline (503) จากเคสอื่น
         const msg = res.status === 503
           ? t('dashboard.aiChat.aiOffline', '⚠️ AI ออฟไลน์ — ตรวจว่า Ollama เปิดอยู่ที่ :11434 หรือเปิดหน้า AI Agent เพื่อดูสถานะ')
           : `${t('dashboard.aiChat.apiError', 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์')} (${res.status})`;
-        setMessages((prev) => [...prev, { role: 'ai', content: msg }]);
+        appendLocal({ role: 'ai', content: msg });
         return;
       }
       const reply = data.reply || t('dashboard.aiChat.processError', 'ไม่สามารถประมวลผลได้');
 
-      setMessages((prev) => [...prev, { role: 'ai', content: reply }]);
+      appendLocal({ role: 'ai', content: reply });
 
       // ถ้า AI ขออนุมัติ → อัปเดต badge ทันที
       if (isApprovalReply(reply)) loadPendingCount();
@@ -175,7 +143,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
       }
     } catch (err) {
       // fetch ล้มเอง = ติดต่อ backend ไม่ได้เลย — บอกผู้ใช้ว่าต้องเช็คอะไร ไม่ใช่แค่ "เกิดข้อผิดพลาด"
-      setMessages((prev) => [...prev, { role: 'ai', content: t('dashboard.aiChat.offlineHint', '⚠️ ติดต่อ Core API (:3001) ไม่ได้ — ตรวจว่า backend เปิดอยู่ หรือไปที่หน้า AI Agent เพื่อดูสถานะ') }]);
+      appendLocal({ role: 'ai', content: t('dashboard.aiChat.offlineHint', '⚠️ ติดต่อ Core API (:3001) ไม่ได้ — ตรวจว่า backend เปิดอยู่ หรือไปที่หน้า AI Agent เพื่อดูสถานะ') });
     } finally {
       setIsLoading(false);
     }
@@ -347,6 +315,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
 
           <button
             onClick={() => sendMessage()}
+            aria-label={t('dashboard.aiChat.send', 'ส่งข้อความ')}
             disabled={isLoading || !input.trim()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
