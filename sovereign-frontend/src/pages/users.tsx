@@ -326,7 +326,7 @@ export default function UsersPage() {
       <PageHeader
           eyebrow={t('users.page.eyebrow', 'ระบบ')}
           title="ผู้ใช้งาน"
-          subtitle={t('users.page.subtitle', 'สมาชิกบ้านและสิทธิ์การเข้าถึง')} icon={<Icon name="users" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('users.page.dashboardLink', 'Dashboard')}</Link>}
+          subtitle="สมาชิกบ้านและสิทธิ์การเข้าถึง" icon={<Icon name="users" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('users.page.dashboardLink', 'Dashboard')}</Link>}
         />
 
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
