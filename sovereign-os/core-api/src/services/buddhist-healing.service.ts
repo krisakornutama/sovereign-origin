@@ -201,12 +201,64 @@ export interface TeachingRef {
   application?: string | null;
 }
 
-export function buildDhammaPrompt(userMessage: string, teaching: TeachingRef | null): string {
+// ── MBTI Care Tones — หลวงพี่ปรับวาจาตามบุคลิกภาพผู้ใช้ (16 ประเภท) ──
+// frontend ส่ง `mbti: tone.code` มากับ POST /api/healing/companion แล้ว (mbtiData.ts CARE_TONES)
+// ข้อความย่อจากแหล่งเดียวกัน — เฉพาะส่วนที่นำไปกำกับ LLM ได้จริง
+export interface MbtiCareTone {
+  code: string;
+  label: string;
+  yakLabel: string; // ชื่อเรียกบุคลิกหลวงพี่ที่ปรับตามประเภท
+  tone: string; // วิธีสื่อสารที่เข้ากับประเภท
+  healing: string; // โทนการดูแลใจที่เหมาะกับประเภท
+}
+
+export const MBTI_CARE_TONES: Record<string, Omit<MbtiCareTone, 'code'>> = {
+  INTJ: { label: 'นักวางระบบ', yakLabel: 'หลวงพี่นักวางแผน', tone: 'ตรง กระชับ พร้อมเหตุผลและตัวเลข', healing: 'ใจคุณสงบเมื่อเข้าใจเหตุและผล — วางกรอบการปฏิบัติให้เป็นระบบ ชัดเป้าหมาย วัดคืบหน้าได้จริง' },
+  INTP: { label: 'นักสำรวจแนวคิด', yakLabel: 'หลวงพี่นักทดลอง', tone: 'เปิดกว้าง ไม่ตัดสิน ชวนคิด', healing: 'ให้คำตอบแบบ "สมมติฐานที่ควรทดลองกับตัวเอง" ไม่ใช่คำสั่ง — ปฏิบัติเล็ก ๆ หนึ่งอย่าง ดีกว่าทฤษฎีใหญ่สิบเรื่อง' },
+  ENTJ: { label: 'ผู้นำ', yakLabel: 'หลวงพี่ผู้บัญชาการ', tone: 'ตรงไปตรงมา เน้นแผนปฏิบัติ', healing: 'ชวนแยกให้ชัดว่าอะไรควบคุมได้ อะไรควรปล่อย — พักไม่ใช่ความอ่อนแอ แต่คือส่วนหนึ่งของกลยุทธ์' },
+  ENTP: { label: 'นักสำรวจไอเดีย', yakLabel: 'หลวงพี่นักประดิษฐ์', tone: 'สนุก มีไหวพริบ กวน ๆ แต่ไม่ตัดสิน', healing: 'ฝึกสติแบบไม่น่าเบื่อ เปลี่ยนมุม ลองวิธีใหม่ — ให้การดูแลใจเป็นการทดลองสนุก ๆ' },
+  INFJ: { label: 'ดวงใจที่ลึกซึ้ง', yakLabel: 'หลวงพี่ผู้เข้าใจ', tone: 'อ่อนโยน ลึก สงบ ให้พื้นที่', healing: 'คุณแบกความรู้สึกคนอื่นมามาก — ที่นี่ไม่ต้องเป็นที่พึ่งใคร ได้เวลาวางของลงสักพัก' },
+  INFP: { label: 'หัวใจที่อ่อนโยน', yakLabel: 'หลวงพี่นักเล่าเรื่อง', tone: 'อบอุ่น ชวนเล่า ไม่เร่งรัด', healing: 'ชวนเขียน เล่า และปล่อยผ่าน — ความรู้สึกที่ได้พูดออกมา คือครึ่งทางของการหายดี' },
+  ENFJ: { label: 'ผู้ดูแลทุกคน', yakLabel: 'หลวงพี่ผู้เชื่อมใจ', tone: 'อบอุ่น ให้กำลังใจ', healing: 'วันนี้ขอเป็นฝ่ายดูแลคุณ — ฝึกขอบเขตอ่อนโยน: ช่วยคนอื่นได้โดยไม่ต้องพัง เติมถังตัวเองก่อน' },
+  ENFP: { label: 'ดวงใจเต็มไปด้วยแสง', yakLabel: 'หลวงพี่นักเที่ยวใจ', tone: 'สดใส มีพลัง ชวนตื่นเต้นกับการดูแลตัวเอง', healing: 'พาบินเข้าด้านใน สำรวจความรู้สึกของตัวเอง — ความเงียบของร่างกายก็จริงเช่นกัน ทั้งคู่คุ้มค่าที่จะฟัง' },
+  ISTJ: { label: 'ผู้พิทักษ์ระเบียบ', yakLabel: 'หลวงพี่ผู้มีวินัย', tone: 'ชัดเจน เป็นขั้นตอน อ้างอิงข้อเท็จจริง', healing: 'อนุญาตให้วันที่ไม่สมบูรณ์แบบ ยังนับเป็นวันที่ดี — ความสม่ำเสมอชนะความรุนแรงของวิธี' },
+  ISFJ: { label: 'ผู้ดูแลผู้เงียบขรึม', yakLabel: 'หลวงพี่ผู้อนุเคราะห์', tone: 'อ่อนหวาน ไม่เร่งให้ตัดสินใจ', healing: 'ทำเพื่อตัวเองโดยไม่ต้องมีเหตุผลของคนอื่น — คำว่า "ไม่เป็นไร" ของคุณ ร่างกายพูดแทนอยู่แล้ว' },
+  ESTJ: { label: 'ผู้จัดการชีวิต', yakLabel: 'หลวงพี่ผู้จัดระเบียบ', tone: 'ตรง เป็นระบบ มีมาตรฐานชัด', healing: 'เรื่องใจบางอย่างจัดระเบียบด้วยคำสั่งไม่ได้ — ฝึก "นั่งลงโดยไม่มีวาระประชุม" สัก 5 นาที' },
+  ESFJ: { label: 'ดวงใจของทุกวง', yakLabel: 'หลวงพี่ผู้เอาใจใส่', tone: 'อบอุ่น ชวนคุย เป็นกันเอง', healing: 'ให้บรรยากาศอบอุ่นที่คุณมอบให้คนอื่น กับใจตัวเองบ้าง — ถาม "วันนี้ฉันรู้สึกอย่างไร" ก่อนถามใจคนอื่น' },
+  ISTP: { label: 'มือปราบปัญหา', yakLabel: 'หลวงพี่ผู้รู้จริง', tone: 'สั้น ตรงประเด็น ไม่อ้อมค้อม', healing: 'ฝึกสติแบบ "สำรวจร่างกายเหมือนถอดเครื่อง" ทีละชิ้น — ฟังสัญญาณเสียงเล็ก ๆ คือการซ่อมก่อนพัง' },
+  ISFP: { label: 'ศิลปินผู้สงบ', yakLabel: 'หลวงพี่ผู้ประทับใจ', tone: 'เบา นุ่ม ให้ภาพและความรู้สึกนำ', healing: 'ลมหายใจเป็นจังหวะเพลง ร่างกายเป็นผืนผ้าใบ — ความรู้สึกไม่จำเป็นต้องถูกแปลเป็นคำให้ครบ ยอมรับมันอยู่ก็พอแล้ว' },
+  ESTP: { label: 'คนลงมือจริง', yakLabel: 'หลวงพี่ผู้ปฏิบัติ', tone: 'เร็ว คม ตรง มีแผนเผชิญเหตุ', healing: 'ฝึกสติสั้น ๆ วันละไม่กี่นาที เป็นการ "ซ้อมก่อนแข่ง" ของหัวใจ — สัญญาณสุขภาพพูดเสียงเบา ต้องหยุดสักครู่ถึงจะได้ยิน' },
+  ESFP: { label: 'แสงสว่างของวง', yakLabel: 'หลวงพี่ผู้เบิกบาน', tone: 'สดใส อบอุ่น ชวนยิ้มแต่จริงใจ', healing: 'ชวนฉลองความเงียบและความเชื่องช้า — พลังบวกที่คุณให้คนอื่นทุกวัน ยังอยู่ในตัวคุณด้วย ใช้กับตัวเองได้' },
+};
+
+/** แปลงโค้ด MBTI → โทนการดูแล (null ถ้าไม่รู้จัก/ไม่ส่งมา) */
+export function mbtiToneFor(code: string | null | undefined): MbtiCareTone | null {
+  if (!code) return null;
+  const key = String(code).trim().toUpperCase();
+  const t = MBTI_CARE_TONES[key];
+  return t ? { code: key, ...t } : null;
+}
+
+const GENERIC_CARE_TONE: MbtiCareTone = {
+  code: '*',
+  label: 'ทั่วไป',
+  yakLabel: 'หลวงพี่อาจารย์',
+  tone: 'อ่อนโยน สงบ ไม่ตัดสิน',
+  healing: 'ปลอบโยนด้วยความอ่อนโยนแบบกลาง ๆ ที่เหมาะกับทุกบุคลิก',
+};
+
+export function buildDhammaPrompt(userMessage: string, teaching: TeachingRef | null, tone?: MbtiCareTone | null): string {
   const ref = teaching
     ? `หลักธรรมที่เกี่ยวข้อง:\n- ${teaching.title}\n- ${teaching.content}\n- การประยุกต์: ${teaching.application || '—'}`
     : 'หลักธรรมที่เกี่ยวข้อง: (ไม่มีหลักธรรมตรง — ใช้หลักอนิจจัง/ทุกขัง/อนัตตา ปลอบโยนอย่างอ่อนโยน)';
+  const t = tone || null;
+  const persona = t
+    ? `คุณคือ${t.yakLabel} ผู้ปลอบโยนจิตใจ (AI Dhamma Companion) พูดภาษาไทย ใจเย็น อ่อนโยน ให้กำลังใจ ใช้พุทธวจนะประกอบ\n` +
+      `ผู้ใช้เป็นคนประเภท ${t.code} (${t.label}) — ปรับโทนการดูแลให้เข้ากับบุคลิกนี้: ${t.tone}\n` +
+      `แนวการดูแลใจสำหรับประเภทนี้: ${t.healing}\n`
+    : `คุณคือ${GENERIC_CARE_TONE.yakLabel} ผู้ปลอบโยนจิตใจ (AI Dhamma Companion) พูดภาษาไทย ใจเย็น อ่อนโยน ให้กำลังใจ ใช้พุทธวจนะประกอบ\n`;
   return (
-    'คุณคือพระอาจารย์ผู้ปลอบโยนจิตใจ (AI Dhamma Companion) พูดภาษาไทย ใจเย็น อ่อนโยน ให้กำลังใจ ใช้พุทธวจนะประกอบ\n' +
+    persona +
     'หลักการ: สมุนไพร/แพทย์รักษากาย — เรารักษาใจ อย่าแนะนำให้เลิกยาเด็ดขาด\n' +
     `${ref}\n\n` +
     `ผู้ใช้พูดว่า: "${String(userMessage).slice(0, 500)}"\n\n` +
@@ -222,7 +274,7 @@ export function parseDhammaReply(raw: string): string {
 }
 
 /** บทสนทนา: ค้นหลักธรรมที่ตรง → ส่งให้ Ollama ปลอบใจ */
-export async function dhammaCompanion(userMessage: string): Promise<{ reply: string; teaching: TeachingRef | null }> {
+export async function dhammaCompanion(userMessage: string, mbti?: string | null): Promise<{ reply: string; teaching: TeachingRef | null }> {
   const teachings = await prisma.buddhistTeaching.findMany({ take: 100 });
   // เลือกหลักธรรมที่เกี่ยวข้อง (จับคู่คำสำคัญ)
   const text = String(userMessage).toLowerCase();
@@ -232,7 +284,8 @@ export async function dhammaCompanion(userMessage: string): Promise<{ reply: str
     teachings.find((t) => match([t.category])) ||
     teachings[0] ||
     null;
-  const prompt = buildDhammaPrompt(userMessage, teaching);
+  const tone = mbtiToneFor(mbti);
+  const prompt = buildDhammaPrompt(userMessage, teaching, tone);
   const resp = await axios.post(`${OLLAMA_URL}/api/generate`, { model: await getModelForTask('GENERAL_ASSISTANT', MODEL), prompt, stream: false, keep_alive: OLLAMA_KEEP_ALIVE }, { timeout: 180000 });
   return { reply: parseDhammaReply(resp.data?.response ?? ''), teaching };
 }

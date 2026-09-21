@@ -33,8 +33,13 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 await ctx.addInitScript((t) => { localStorage.setItem('sovereign-auth', t); }, JSON.stringify({ state: { token }, version: 0 }));
 const page = await ctx.newPage();
 
-const pageErrors = [], api5xx = [];
+// เก็บ error ต่อหน้า — pageerror (exception ของหน้า) + console.error ที่ไม่ใช่ noise ของ infra
+// (HMR websocket, MIME manifest, stack-frame 403 ของ dev overlay — พบเองตอนทดสอบ มีอยู่ทุกหน้าใน dev)
+const NOISE = /(ResizeObserver|hmr|_clientMiddlewareManifest|__nextjs_original-stack-frames|Download the React DevTools)/i;
+const NOISE_URL = /(hmr|_clientMiddlewareManifest|__nextjs_original-stack-frames)/i;
+let pageErrors = [], consoleErrors = [], api5xx = [];
 page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 100)));
+page.on('console', (m) => { if (m.type() === 'error' && !NOISE.test(m.text()) && !NOISE_URL.test(m.location()?.url || '')) consoleErrors.push(`${m.text().slice(0, 100)} (${(m.location()?.url || '').slice(-40)})`); });
 page.on('response', (r) => { if (r.url().includes(':3001/api') && r.status() >= 500) api5xx.push(`${r.status()} ${r.url().slice(-40)}`); });
 
 let pass = 0, fail = 0;
@@ -46,15 +51,19 @@ ok('session ใช้ได้ — ไม่โดนเตะ login', !first.hi
 
 const PAGES = (process.env.SWEEP_PAGES || '/dashboard,/audit,/users,/system,/sensors,/devices,/nodes,/reports').split(',');
 for (const p of PAGES) {
+  // เริ่มนับใหม่ทุกหน้า — error ของหน้าก่อนต้องไม่ติดโทษหน้าถัดไป (กัน fail ลูกโซ่)
+  pageErrors = []; consoleErrors = [];
   await page.goto(`${WEB}${p}`, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => {});
   await page.waitForTimeout(600);
   const app = await page.evaluate(() => !!document.querySelector('#__next')?.children.length);
   const len = await page.evaluate(() => document.body.innerText.trim().length);
   const err = pageErrors.filter(e => !/ResizeObserver/.test(e));
   ok(`${p} render + ไม่มี pageerror`, app && len > 10 && err.length === 0, `len=${len}` + (err.length ? ` · ${err[0]}` : ''));
+  // เช็คใหม่: หน้าต้องไม่มี console.error จากงาน — จับเคส mock/API คืนรูปทรงผิดแล้วหน้า crash ซ้ำ ๆ
+  ok(`${p} ไม่มี console error (นอกจาก noise infra)`, consoleErrors.length === 0, consoleErrors.length ? `· ${consoleErrors[0]}` : '');
 }
 
-console.log(`\n── สรุป: pageerror=${pageErrors.length} API 5xx=${api5xx.length}`);
+console.log(`\n── สรุป: pageerror=${pageErrors.length} console=${consoleErrors.length} API 5xx=${api5xx.length}`);
 if (api5xx.length) console.log('API 5xx:', [...new Set(api5xx)].slice(0, 5).join(' | '));
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
