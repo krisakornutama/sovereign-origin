@@ -211,6 +211,16 @@ http
       return res.end();
     }
     const url = (req.url || '').split('?')[0];
+    // healing/companion + ai/chat — ตอบโทนตาม mbti ที่ client ส่ง (พิสูจน์ว่า backend ใช้ค่านี้จริง)
+    if ((url === '/api/healing/companion' || url === '/api/ai/chat') && req.method === 'POST') {
+      const b = await readJsonBody(req);
+      const code = typeof b.mbti === 'string' && /^[IE][NS][TF][JP]$/i.test(b.mbti) ? b.mbti.toUpperCase() : null;
+      const reply = code
+        ? `[mock] ผมเห็นโค้ด "${code}" จาก request ของคุณ — โทนนี้คือโทนของ ${code} โดยเฉพาะ (ถ้าเปลี่ยนโค้ด ข้อความนี้จะเปลี่ยนตาม)`
+        : '[mock] ไม่พบโค้ด MBTI ใน request — นี่คือการตอบแบบกลาง (ไม่มีการปรับโทน)';
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(url === '/api/healing/companion' ? { reply, teaching: null } : { reply }));
+    }
     // automation/rules — stateful: POST toggle/สร้าง, DELETE ลบ (พิสูจน์ lifecycle บนหน้าจริง)
     if (url === '/api/automation/rules') {
       if (req.method === 'POST') {

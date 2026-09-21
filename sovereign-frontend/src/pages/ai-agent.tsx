@@ -7,6 +7,7 @@ import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
 import { asArray } from '../lib/fetchJson';
+import { withMbti } from '../lib/mbtiAi';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -367,7 +368,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text || 'ดูรูปภาพนี้ให้หน่อย', imageBase64 }),
+        body: JSON.stringify(withMbti({ message: text || 'ดูรูปภาพนี้ให้หน่อย', imageBase64 })),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
