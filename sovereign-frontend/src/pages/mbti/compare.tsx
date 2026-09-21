@@ -2,15 +2,17 @@
 // ─────────────────────────────────────────────────────────────
 //  MBTI Compare — เทียบผลสองคน (คู่สมรส/สมาชิกครอบครัว)
 //  ข้อมูลอยู่บนเครื่องทั้งหมด: ผลของ "ฉัน" มาจาก localStorage ของเบราว์เซอร์นี้
-//  ผลของอีกคน: ผู้ใช้เลือกจากคลัง 16 ประเภท (รู้ผลเขาอยู่แล้ว) หรือกรอกโค้ด 4 ตัว
+//  ผลของอีกคน 2 วิธี: ① เลือกจากคลัง 16 ประเภท (รู้ผลเขาอยู่แล้ว)
+//                     ② ให้เขาทำแบบทดสอบเองบนเครื่องนี้ → บันทึกเป็น profile ตั้งชื่อได้ (แม่นกว่า)
 //  ธีม: atmo-mind
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
-import { MBTI_TYPES, MBTI_QUESTIONS, scoreMbti, compareMbti, typeInfo, latestLocalResult, DIM_LABELS, familyOf, FAM_RGB, type MbtiResult, type MbtiTypeInfo } from "../../lib/mbtiData";
+import { MBTI_TYPES, MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, scoreMbti, compareMbti, typeInfo, latestLocalResult, DIM_LABELS, familyOf, FAM_RGB, loadProfiles, saveProfile, deleteProfile, type MbtiResult, type MbtiProfile, type MbtiTypeInfo } from "../../lib/mbtiData";
 import Seal from "../../components/mbti/Seal";
+import QuizCard from "../../components/mbti/QuizCard";
 
 const RELATION_STYLE: Record<string, { chip: string; label: string; icon: string }> = {
   same:    { chip: "text-emerald-300 bg-emerald-900/40 border-emerald-700/60", label: "เหมือนกัน", icon: "🤝" },
@@ -19,12 +21,20 @@ const RELATION_STYLE: Record<string, { chip: string; label: string; icon: string
   clash:   { chip: "text-rose-300 bg-rose-900/40 border-rose-700/60", label: "มุมเสียดสี", icon: "⚡" },
 };
 
+type PickMode = "menu" | "quiz" | "naming";
+
 export default function MbtiComparePage() {
   const [myResult, setMyResult] = useState<MbtiResult | null>(null);
   const [otherCode, setOtherCode] = useState<string>("");
+  const [pickMode, setPickMode] = useState<PickMode>("menu");
+  const [profiles, setProfiles] = useState<MbtiProfile[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number> | null>(null);
+  const [quizKind, setQuizKind] = useState<'full' | 'short'>('full');
+  const [profileName, setProfileName] = useState("");
 
   useEffect(() => {
     setMyResult(latestLocalResult());
+    setProfiles(loadProfiles());
   }, []);
 
   const compare = useMemo(() => {
@@ -37,6 +47,25 @@ export default function MbtiComparePage() {
 
   const myInfo: MbtiTypeInfo | undefined = myResult ? typeInfo(myResult.code) : undefined;
   const otherInfo: MbtiTypeInfo | undefined = otherCode ? typeInfo(otherCode) : undefined;
+
+  // เสร็จแบบทดสอบของอีกคน → ไปหน้าตั้งชื่อโปรไฟล์
+  const finishQuiz = (answers: Record<number, number>) => {
+    setQuizAnswers(answers);
+    setPickMode("naming");
+  };
+
+  const confirmProfile = () => {
+    if (!quizAnswers) return;
+    const name = profileName.trim() || "คนในบ้าน";
+    const questions = quizKind === 'full' ? MBTI_QUESTIONS : MBTI_SHORT_QUESTIONS;
+    const result = scoreMbti(quizAnswers, questions);
+    const saved = saveProfile({ name, result, quiz: quizKind });
+    setProfiles((p) => [saved, ...p]);
+    setOtherCode(saved.result.code);
+    setQuizAnswers(null);
+    setProfileName("");
+    setPickMode("menu");
+  };
 
   return (
     <div className="atmo-mind min-h-screen bg-gray-950 text-gray-100 flex">
@@ -60,7 +89,8 @@ export default function MbtiComparePage() {
           ) : (
             <>
               {/* ── การ์ดสองฝั่ง ── */}
-              <div className="grid sm:grid-cols-2 gap-3">                  <div className="card panel-glow p-5">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="card panel-glow p-5">
                   <div className="text-[11px] text-gray-500 mb-2">คุณ (ผลจากเครื่องนี้)</div>
                   <div className="flex items-center gap-3">
                     <span className="text-3xl">{myInfo?.emoji}</span>
@@ -81,14 +111,25 @@ export default function MbtiComparePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-gray-500 pt-2">← เลือกประเภทของเขาด้านล่าง</div>
+                    <div className="text-xs text-gray-500 pt-2">← เลือกวิธีรู้จักเขาด้านล่าง</div>
                   )}
                 </div>
               </div>
 
               {/* ── เลือกอีกคน ── */}
-              {!otherCode && (
+              {!otherCode && pickMode === "menu" && (
                 <div className="card p-5 space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <button onClick={() => setPickMode("quiz")}
+                      className="inset rounded-xl p-4 text-left hover:border-violet-500/50 transition-colors">
+                      <div className="text-lg">📝 ให้เขาทำแบบทดสอบเอง <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-900/60 text-violet-300">แม่นที่สุด</span></div>
+                      <div className="text-xs text-gray-500 mt-1">ส่งเครื่อง/นั่งด้วยกันครั้งเดียว — บันทึกเป็นโปรไฟล์ตั้งชื่อได้ ใช้เทียบใหม่ได้ตลอด</div>
+                    </button>
+                    <div className="inset rounded-xl p-4 text-left bg-gray-800/30">
+                      <div className="text-lg">📚 เลือกจากคลัง 16 ประเภท</div>
+                      <div className="text-xs text-gray-500 mt-1">รู้ผลเขาอยู่แล้ว — เลือกเร็ว ไม่ต้องทำแบบทดสอบ</div>
+                    </div>
+                  </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1.5">เลือกประเภทของเขา (จากคลัง 16 ประเภท)</label>
                     <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
@@ -102,8 +143,81 @@ export default function MbtiComparePage() {
                       ))}
                     </div>
                   </div>
+                  {profiles.length > 0 && (
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1.5">โปรไฟล์ที่บันทึกไว้ ({profiles.length})</label>
+                      <div className="space-y-1.5">
+                        {profiles.map((p) => {
+                          const info = typeInfo(p.result.code);
+                          return (
+                            <div key={p.id} className="inset rounded-lg px-3 py-2 flex items-center gap-3">
+                              <span className="text-lg">{info?.emoji ?? "🧩"}</span>
+                              <button onClick={() => setOtherCode(p.result.code)} className="flex items-center gap-2 flex-1 text-left hover:text-white">
+                                <span className="font-bold text-sm">{p.name}</span>
+                                <span className="text-xs" style={{ color: `rgb(${FAM_RGB[familyOf(p.result.code) ?? "nt"]})` }}>{p.result.code}</span>
+                                <span className="text-xs text-gray-500">{info?.name}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">{p.quiz === 'full' ? 'ชุดเต็ม 93' : 'ควิซสั้น 32'}</span>
+                              </button>
+                              <button onClick={() => { deleteProfile(p.id); setProfiles(loadProfiles()); }}
+                                className="text-xs text-gray-600 hover:text-rose-400" title="ลบโปรไฟล์">ลบ</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* ── โหมด: อีกคนทำแบบทดสอบเอง ── */}
+              {!otherCode && pickMode === "quiz" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 justify-center">
+                    {(['full', 'short'] as const).map((k) => (
+                      <button key={k} onClick={() => setQuizKind(k)}
+                        className={`px-3 py-1.5 rounded-lg text-xs ${quizKind === k ? "bg-violet-600 text-white" : "bg-gray-800 text-gray-400"}`}>
+                        {k === 'full' ? "ชุดเต็ม 93 ข้อ (แม่น)" : "ควิซสั้น 32 ข้อ (เร็ว)"}
+                      </button>
+                    ))}
+                  </div>
+                  <QuizCard
+                    key={quizKind}
+                    questions={quizKind === 'full' ? MBTI_QUESTIONS : MBTI_SHORT_QUESTIONS}
+                    title="แบบทดสอบของอีกคน"
+                    subtitle="ให้เขานั่งทำเอง — เลือกข้อความที่ตรงกับเขากว่า ไม่มีถูกผิด"
+                    tone="violet"
+                    onDone={finishQuiz}
+                    onCancel={() => setPickMode("menu")}
+                  />
+                </div>
+              )}
+
+              {/* ── โหมด: ตั้งชื่อโปรไฟล์ ── */}
+              {!otherCode && pickMode === "naming" && quizAnswers && (() => {
+                const questions = quizKind === 'full' ? MBTI_QUESTIONS : MBTI_SHORT_QUESTIONS;
+                const preview = scoreMbti(quizAnswers, questions);
+                const info = typeInfo(preview.code);
+                return (
+                  <div className="card p-6 text-center space-y-4 max-w-xl mx-auto">
+                    <div className="text-4xl">{info?.emoji}</div>
+                    <div className="text-2xl font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(preview.code) ?? "nt"]})` }}>{preview.code}</div>
+                    <div className="text-sm text-gray-300">{info?.name} — {info?.nameEn}</div>
+                    <p className="text-xs text-gray-500">บันทึกเป็นโปรไฟล์ของเขา เพื่อเทียบใหม่ได้โดยไม่ต้องทำซ้ำ</p>
+                    <input
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") confirmProfile(); }}
+                      placeholder="ชื่อเขา เช่น แม่, พี่ชาย, คู่สมรส"
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:border-violet-500 outline-none"
+                      autoFocus
+                    />
+                    <div className="flex justify-center gap-2">
+                      <button onClick={() => setPickMode("quiz")} className="btn-secondary px-4 py-2 text-sm">ทำใหม่</button>
+                      <button onClick={confirmProfile} className="btn-primary px-5 py-2 text-sm">บันทึกและเทียบเลย</button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ── ผลการเทียบ ── */}
               {compare && otherInfo && myInfo && (
@@ -167,7 +281,7 @@ export default function MbtiComparePage() {
               )}
             </>
           )}
-          <p className="text-[11px] text-gray-500 text-center">ข้อมูลทั้งหมดอยู่บนเครื่องของคุณ — ผลของอีกคนใช้การเลือกจากคลัง ไม่มีการส่งข้อมูลออกนอกเครื่อง</p>
+          <p className="text-[11px] text-gray-500 text-center">ข้อมูลทั้งหมดอยู่บนเครื่องของคุณ — โปรไฟล์ของคนในบ้านเก็บในเบราว์เซอร์นี้เท่านั้น ไม่มีการส่งข้อมูลออกนอกเครื่อง</p>
         </main>
       </div>
     </div>

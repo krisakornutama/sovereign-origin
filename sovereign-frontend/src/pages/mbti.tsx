@@ -495,6 +495,29 @@ export default function MbtiPage() {
           </div>
         </div>
 
+        {/* ตราซ้อน: เงา (เก่าสุด) → เต็ม (ใหม่สุด) — ส่วนสีเลื่อนข้ามมิติเมื่อเวลาผ่านไป */}
+        {all.length >= 2 && (() => {
+          const oldest = all[0], newest = all[all.length - 1];
+          const famOf = (code: string) => FAM_RGB[familyOf(code) ?? "nt"];
+          return (
+            <div className="card p-5">
+              <h3 className="text-sm font-bold text-fuchsia-300 mb-3">ตราซ้อน — จาก {oldest.code} → {newest.code}</h3>
+              <div className="flex flex-wrap items-center justify-center gap-6">
+                <div className="relative">
+                  <Seal letters={oldest.code} dims={oldest.dims} famRgb={famOf(oldest.code)} ghost />
+                  <Seal letters={newest.code} dims={newest.dims} famRgb={famOf(newest.code)}
+                    className="absolute inset-0" />
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div><span className="inline-block w-3 h-3 rounded-full border-2 border-fuchsia-400 align-middle mr-1.5" />เงา = {fmtDate(oldest.date)} ({oldest.code})</div>
+                  <div><span className="inline-block w-3 h-3 rounded-full align-middle mr-1.5" style={{ background: `rgb(${famOf(newest.code)})` }} />เต็ม = {fmtDate(newest.date)} ({newest.code})</div>
+                  {oldest.code !== newest.code && <div className="text-gray-500">ส่วนที่สีทับเงา = มิติที่เลื่อนข้ามตัวอักษร</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* สรุปการเปลี่ยนแปลง */}
         {all.length >= 2 && (() => {
           const oldest = all[0], newest = all[all.length - 1];
