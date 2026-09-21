@@ -472,6 +472,39 @@ export function latestLocalResult(): MbtiResult | null {
 export const MBTI_STORE_KEY = 'sovereign.mbti.results.v1';
 
 // ─────────────────────────────────────────────────────────────
+//  โปรไฟล์ของคนในบ้าน — ผลแบบทดสอบของ "คนอื่น" บนเครื่องเดียวกัน
+//  ใช้โดยหน้าเทียบคู่: ให้อีกคนทำเอง (แม่นกว่าการเลือกจากคลัง) เก็บเป็น profile ตั้งชื่อได้
+// ─────────────────────────────────────────────────────────────
+export const MBTI_PROFILES_KEY = 'sovereign.mbti.profiles.v1';
+
+export interface MbtiProfile {
+  id: string;
+  name: string;
+  result: MbtiResult;
+  quiz: 'full' | 'short';
+}
+
+function loadList<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+
+export function loadProfiles(): MbtiProfile[] {
+  return loadList<MbtiProfile>(MBTI_PROFILES_KEY);
+}
+
+export function saveProfile(p: Omit<MbtiProfile, 'id'>): MbtiProfile {
+  const list = loadProfiles();
+  const full: MbtiProfile = { ...p, id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+  localStorage.setItem(MBTI_PROFILES_KEY, JSON.stringify([full, ...list].slice(0, 20)));
+  return full;
+}
+
+export function deleteProfile(id: string): void {
+  localStorage.setItem(MBTI_PROFILES_KEY, JSON.stringify(loadProfiles().filter((p) => p.id !== id)));
+}
+
+// ─────────────────────────────────────────────────────────────
 //  เทียบผลสองคน (คู่สมรส/สมาชิกครอบครัว) — วิเคราะห์รายมิติ
 // ─────────────────────────────────────────────────────────────
 
