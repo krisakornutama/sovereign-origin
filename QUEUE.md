@@ -49,7 +49,7 @@
 
 ## หมวด B — ปรับปรุงของเดิมให้ดีกว่า (คุณภาพ + ความเร็ว)
 - [x] B1 เพิ่ม `npm run clean:logs` (ราก) — **เสร็จ 21/9/69** (`tools/clean-logs.mjs` + `--check` โหมดรายงาน — รอบแรกเจอ 9 ไฟล์ 47KB)
-- [ ] B2 ย่อเวลา `npm run verify` (4.3 นาที → เป้า < 3 นาที) — หมายเหตุ: `--test-concurrency=1` ของ backend เป็นการตั้งใจ (กัน flake IPC ของ Node 24 ตาม setup-env.ts) ห้ามเพิ่มความขนาน — ให้ไปทางลดงานซ้ำแทน (แคช tsc incremental, ข้ามไฟล์ที่ไม่เกี่ยว)
+- [x] B2 ย่อเวลา `npm run verify` — **เสร็จ 22/9/69**: รันเป็น 2 สายขนานกัน (backend build→test ∥ frontend typecheck→build) เวลารวม = สายที่ช้าที่สุด ไม่ใช่ผลรวม — มาตรฐานทุกขั้นเท่าเดิม (ตาม AGENTS.md ข้อ 2), `--test-concurrency=1` คงเดิม, OOM retry/e2e-skip/dev-restore ครบ; debug ลำดับเดิมได้ด้วย `VERIFY_SEQUENTIAL=1`
 - [x] B3 ปุ่มเร็ว (Quick Questions) ของ AiChatPanel ผ่าน i18n key จริง — **เสร็จ 21/9/69** (key เชิงความหมาย `soilSalinity/batteryStatus/emergency/phase2` ทั้ง th/en — query ที่ยิง backend คงข้อความไทยเดิม)
 - [x] B4 รวม logic ประวัติแชทของ AiChatPanel + หน้า ai-agent เป็น hook เดียว — **เสร็จ 22/9/69** (`src/lib/useAiChatHistory.ts` — โหลด/เคลียร์/append ที่เดียว ทั้งสองหน้าใช้ร่วมกัน พฤติกรรมตรงกันแน่นอน)
 - [x] B5 กัน flake E2E MBTI บนเครื่องช้า — **เสร็จ 22/9/69** (`goto` domcontentloaded + poll จน hydrate/ชิปขึ้นจริงแทน fixed timeout; เคสเปลี่ยนผลล่าสุด re-seed แบบเดียวกัน)
@@ -65,10 +65,10 @@
 - [x] C7 SENSOR STACK: ค่า N/A → "—" + tooltip "ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้" — **เสร็จ 21/9/69**
 
 ## หมวด D — พัฒนาต่อ (ทำหลัง A-C)
-- [ ] D1 AI Agent ทีม: พิสูจน์ daily_report ส่ง Telegram จริง (ปุ่ม/ตัวเลือกมีใน UI แต่ยังไม่เคยยืนยันว่าถึงกลุ่ม `-5308443540`)
-- [ ] D2 i18n เต็มรูป: ย้ายข้อความไทยที่แข็งใน JSX (dashboard บางการ์ด, healing บางปุ่ม) เข้าพจนานุกรม th/en ครบ
-- [ ] D3 PWA offline ลึกขึ้น: แคชหน้า dashboard + แชทล่าสุดไว้ใช้ตอนเน็ตหลุด (ปัจจุบัน SW แคชเฉพาะ asset)
-- [ ] D4 MBTI: การ์ดชวนทำแบบทดสอบบน dashboard เมื่อยังไม่เคยทำ (อ่อนโยน ไม่บังคับ) — แทนการปล่อย AI ตอบโทนกลางโดยผู้ใช้ไม่รู้ตัว
+- [x] D1 AI Agent รายงาน Telegram รายวัน — **เสร็จ 22/9/69**: ต่อบน cron เดิม (ทุก 30 นาที); `runMorningReports` ตรวจ `hasTelegramCredentials()` ก่อน — ไม่มี token = ปิดเงียบพร้อม flag `telegramConfigured:false` ไม่สร้างงานเปล่า ไม่ crash cron อื่น; **ส่งไม่สำเร็จ = ไม่มาร์ควัน** (แก้บั๊กเดิมที่รายงานหาย) รอบถัดไปลองใหม่ — test เพิ่ม 3 เคส (ไม่มี token / ส่งล้ม / token จาก DB)
+- [x] D2 i18n เต็มรูป — **เสร็จ 22/9/69**: หน้าหลักที่ใช้จริง — **mbti.tsx** (เดิมไม่มี i18n เลย ~29 ข้อความ → พจนานุกรมใหม่ `i18n/{th,en}/pages/mbti.ts` ครบ + ใช้ t()), **dashboard.tsx** (StatCards, ลิงก์รายละเอียด, kids ยังไม่เคยทำควิซ, missing prices, จัดการเซ็นเซอร์) — ai-agent/healing/security ตรวจแล้วใช้ i18n อยู่แล้ว (ไทยที่เห็นคือ fallback ตาม pattern ของ repo); เนื้อหาข้อมูล (MBTI_TYPES, คำถาม, คำตอบ AI) ไม่แปลตามหัวข้อพจนานุกรม
+- [x] D3 PWA offline ลึกขึ้น — **เสร็จ 22/9/69**: SW v3 — navigation fallback ลึกขึ้น (cache ตรง → ignoreSearch → หน้า local-first `/dashboard` `/mbti` `/` → หน้า offline); ห้าม mock ข้อมูล API จริง (หน้าแสดงสถานะ offline ของตัวเองตามที่แอปจัดไว้)
+- [x] D4 MBTI: การ์ดชวนทำแบบทดสอบบน dashboard — **เสร็จ 22/9/69**: การ์ด `mbti-invite-card` แสดงเฉพาะเมื่อ `latestLocalResult() === null` (ตรงข้ามกับชิปโทนหลวงพี่) — CTA ไป /mbti, i18n th/en, E2E ครอบทั้งเคสมี/ไม่มีผล
 
 **ลำดับส่งมอบ:** A → B → C → D · ทีละงาน ผ่าน `npm run verify` ก่อน commit ทุกครั้ง (AGENTS.md ข้อ 2)
 

@@ -8,8 +8,9 @@ import { prisma } from '../lib/prisma';
 const TELEGRAM_TOKEN_KEY = 'telegram.botToken';
 const TELEGRAM_CHAT_ID_KEY = 'telegram.chatId';
 
-const ENV_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const ENV_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+// อ่าน env สดตอนเรียกใช้ (ไม่ capture ตอน module load) — การล้าง/แก้ env หลัง import ต้องมีผล (และ test จำลอง "ไม่มี token" ได้)
+const envToken = () => process.env.TELEGRAM_BOT_TOKEN || '';
+const envChatId = () => process.env.TELEGRAM_CHAT_ID || '';
 
 // cache ระยะสั้น (5 วิ) — เซฟ DB ไม่ให้โดนอ่านทุก alert ที่ส่ง แต่ UI อัปเดตแล้วเห็นผลไว
 let cache: { token?: string; chatId?: string } | null = null;
@@ -43,11 +44,17 @@ export interface TelegramCredentials {
 /** credential ที่ใช้งานจริงตอนนี้ (db override ชนะ env) */
 export async function getTelegramCredentials(): Promise<TelegramCredentials> {
   const db = await loadFromDb();
-  const token = db.token && db.token.trim() ? db.token.trim() : ENV_TOKEN;
-  const chatId = db.chatId && db.chatId.trim() ? db.chatId.trim() : ENV_CHAT_ID;
+  const token = db.token && db.token.trim() ? db.token.trim() : envToken();
+  const chatId = db.chatId && db.chatId.trim() ? db.chatId.trim() : envChatId();
   if (!token || !chatId) return { botToken: token, chatId, source: 'none' };
   const source: TelegramCredentials['source'] = db.token && db.token.trim() ? 'db' : 'env';
   return { botToken: token, chatId, source };
+}
+
+/** มี credentials ครบ (token + chatId) พร้อมส่งจริงไหม — cron/งานเบื้องหลังใช้ตัดสิน "ปิดเงียบแบบมี flag" */
+export async function hasTelegramCredentials(): Promise<boolean> {
+  const c = await getTelegramCredentials();
+  return Boolean(c.botToken && c.chatId);
 }
 
 /** ตั้งค่า/แก้ Telegram credentials ผ่าน UI (upsert ลง DB) */

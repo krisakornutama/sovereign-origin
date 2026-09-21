@@ -30,6 +30,8 @@ export default {
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {
     totalDevices: 'อุปกรณ์ทั้งหมด',
+    online: 'ออนไลน์',
+    offline: 'ออฟไลน์',
   },
   stats: {
     battery: 'แบตเตอรี่',
@@ -67,6 +69,7 @@ export default {
     pendingSummary: 'มีงานค้าง:',
     choresCount: '{name} งานค้าง {n}',
     billsCount: '{name} บิลค้าง {n} ใบ',
+    noQuizYet: 'ยังไม่เคยทำแบบทดสอบ',
     viewHome: '→ ดูหน้าบ้าน',
     weekdays: {
       sunday: 'อาทิตย์',
@@ -247,5 +250,12 @@ export default {
     emptyBefore: 'ยังไม่มีข้อมูล — เปิด ',
     emptyAfter: ' ใน .env แล้วกด',
     fetchPrices: ' ดึงราคา',
+  },
+
+  // ── D4: การ์ดชวนทำ MBTI (แสดงเฉพาะคนที่ยังไม่มีผล) ──
+  mbtiCard: {
+    title: 'รู้จักตัวเองให้ลึกขึ้น',
+    desc: 'ทำแบบทดสอบบุคลิกภาพ 16 ประเภท (5–7 นาที) แล้ว AI จะปรับโทนการดูแลให้เข้ากับคุณ',
+    cta: 'เริ่มแบบทดสอบ →',
   },
 } as const;

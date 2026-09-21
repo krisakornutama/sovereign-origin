@@ -179,6 +179,16 @@ test.describe('มือถือ: MobileNav ไม่บัง/ไม่รั�
     expect(req.postDataJSON().mbti).toBe('ESFP');
   });
 
+  test('D4: การ์ดชวนทำ MBTI — แสดงเฉพาะเมื่อยังไม่มีผล และหายเมื่อมีผลแล้ว', async ({ page }) => {
+    await seedAndOpen(page, []);
+    const card = page.locator('[data-testid="mbti-invite-card"]');
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    // มีผลแล้ว → การ์ดหาย (ชิปโทนหลวงพี่แสดงแทน)
+    await seedAndOpen(page, ['ESFP']);
+    await expect(card).toHaveCount(0);
+    await expect(page.locator('[data-testid="mbti-tone-chip"]')).toBeVisible({ timeout: 15_000 });
+  });
+
   test('ตัวอักษรสุดท้ายของหน้าไม่ถูก nav บัง — สกอล์ลถึงล่างสุดแล้วท้ายเนื้อหาอยู่เหนือแถบเมนู', async ({ page }) => {
     await seedAndOpen(page, []);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); // สกอลล์ลงสุดก่อนวัด
