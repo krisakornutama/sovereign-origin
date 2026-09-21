@@ -124,11 +124,78 @@ const healingProgress = (days) => days > 1
     }
   : { progress: [], meditation: { total_min: 25, sessions: 1 } };
 
-// หน้าระบบอัตโนมัติ (atmo-power) — กฎตัวอย่างให้ตารางมีของดู
+// หน้าระบบอัตโนมัติ (atmo-power) — กฎตัวอย่าง + stateful เพื่อไล่ lifecycle จริง (toggle/สร้าง/ลบ)
 const automationRules = [
   { id: 'r1', metric: 'battery_soc', condition: 'lt', threshold: 20, message: 'แบตเตอรี่ต่ำกว่า 20% — กรุณาตรวจสอบแผงโซลาร์', severity: 'critical', enabled: true, is_default: true },
   { id: 'r2', metric: 'power_kw_latest', condition: 'gt', threshold: 3, message: 'ใช้พลังงานสูงผิดปกติ (เกิน 3 kW)', severity: 'warning', enabled: true, is_default: false },
   { id: 'r3', metric: 'temp_c', condition: 'gt', threshold: 38, message: 'อุณหภูมิห้องเครื่องสูง', severity: 'warning', enabled: false, is_default: false },
+];
+
+function readJsonBody(req) {
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); } });
+  });
+}
+
+// หน้าบันทึกตรวจสอบ (atmo-system) — log ตาม schema จริง {id,timestamp,action_type,payload,user}
+const auditLogs = [
+  { id: 'a1', timestamp: new Date().toISOString(), action_type: 'LOGIN', user: { username: 'preview' }, payload: { method: 'POST', path: '/api/login', statusCode: 200, ip: '192.168.1.10' } },
+  { id: 'a2', timestamp: new Date().toISOString(), action_type: 'API_ACCESS', user: { username: 'preview' }, payload: { method: 'GET', path: '/api/energy/summary', statusCode: 200, ip: '192.168.1.10' } },
+  { id: 'a3', timestamp: new Date().toISOString(), action_type: 'API_ACCESS', user: { username: 'preview' }, payload: { method: 'POST', path: '/api/automation/rules', statusCode: 201, ip: '192.168.1.10' } },
+  { id: 'a4', timestamp: new Date().toISOString(), action_type: 'PASSWORD_CHANGE_ATTEMPT', user: { username: 'preview' }, payload: { method: 'DELETE', path: '/api/reports/x', statusCode: 403, ip: '203.0.113.7' } },
+];
+
+// หน้าสุขภาพระบบ (atmo-system) — health/processes/wan/sim ตาม schema จริง
+const systemHealth = { uptime: '11 วัน 4 ชม.', cpuUsage: '23%', memory: '61%', disk: '48%' };
+const systemProcesses = [
+  { pid: 101, name: 'core-api (node)', mem: '182 MB' },
+  { pid: 102, name: 'ollama (qwen3:8b)', mem: '6.1 GB' },
+  { pid: 103, name: 'frontend (next)', mem: '310 MB' },
+  { pid: 104, name: 'timescaledb', mem: '240 MB' },
+  { pid: 105, name: 'mqtt-broker', mem: '48 MB' },
+];
+const systemWan = {
+  up: true, latencyMs: 23, host: '1.1.1.1', lastCheck: new Date().toISOString(),
+  router: { up: true, latencyMs: 3, since: new Date().toISOString() },
+  lanDevices: [{ ip: '192.168.1.10', latencyMs: 2 }, { ip: '192.168.1.23', latencyMs: 9 }],
+  lastSpeedtest: { mbps: 42.6, at: new Date().toISOString() },
+  subnet: '192.168.1.0/24', routerHost: '192.168.1.1',
+};
+const systemSim = { loggedIn: true, signal: { rsrp: -92, sinr: 13, bars: 4 } };
+// Client Health — โครงตาม ClientHealthSummary (arrays ว่าง = สถานะว่างที่สวย ไม่ crash)
+const clientHealth = {
+  days: 7, total: 0, webviewCount: 0,
+  byBrowser: [], byPage: [], byKind: [], topErrors: [], daily: [],
+};
+
+const aiStatus = {
+  ollamaOnline: true,
+  ollamaUrl: 'http://127.0.0.1:11434',
+  currentModel: 'qwen3:8b',
+  models: [{ name: 'qwen3:8b', size: '5.2 GB' }, { name: 'llama3.2:3b', size: '2.0 GB' }],
+  resources: { cpuCores: 8, cpuUsagePercent: 23, memoryTotalGb: 16, memoryFreeGb: 6.2, memoryUsedPercent: 61 },
+};
+
+// หน้า AI Agent — policy ตาม schema จริง (หน้าอ่าน .length ตรง ๆ ไม่มี guard)
+const aiPolicy = {
+  autonomy: 'suggest',
+  approvalTtlMs: 300000,
+  protectedIps: ['192.168.1.1'],
+  protectedProcesses: ['core-api', 'timescaledb'],
+  tools: [
+    { name: 'getSystemStatus', kind: 'read', description: 'อ่านสถานะระบบและอุปกรณ์ทั่วบ้าน', available: true },
+    { name: 'readAuditLog', kind: 'read', description: 'อ่านบันทึกการตรวจสอบย้อนหลัง', available: true },
+    { name: 'blockIP', kind: 'action', description: 'บล็อก IP ที่มีพฤติกรรมน่าสงสัย', available: true },
+    { name: 'killProcess', kind: 'action', description: 'หยุด process ที่กินทรัพยากรผิดปกติ', available: false },
+  ],
+};
+
+// หน้าผู้ใช้ — ตาม schema {id,username,role,assigned_node_id}
+const systemUsers = [
+  { id: 'u1', username: 'preview', role: 'SUPERADMIN', assigned_node_id: null },
+  { id: 'u2', username: 'member01', role: 'USER', assigned_node_id: null },
 ];
 
 const CORS = {
@@ -138,12 +205,78 @@ const CORS = {
 };
 
 http
-  .createServer((req, res) => {
+  .createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS);
       return res.end();
     }
     const url = (req.url || '').split('?')[0];
+    // automation/rules — stateful: POST toggle/สร้าง, DELETE ลบ (พิสูจน์ lifecycle บนหน้าจริง)
+    if (url === '/api/automation/rules') {
+      if (req.method === 'POST') {
+        const b = await readJsonBody(req);
+        const rule = {
+          id: `r${Date.now()}`,
+          metric: b.metric || 'battery_soc',
+          condition: b.condition || 'gt',
+          threshold: Number(b.threshold) || 0,
+          message: b.message || 'กฎใหม่',
+          severity: b.severity || 'warning',
+          enabled: b.enabled !== false,
+          is_default: false,
+        };
+        automationRules.unshift(rule);
+        res.writeHead(201, { 'Content-Type': 'application/json', ...CORS });
+        return res.end(JSON.stringify(rule));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(automationRules));
+    }
+    if (url.startsWith('/api/audit')) {
+      const q = (req.url || '').split('?')[1] || '';
+      const params = new URLSearchParams(q);
+      let rows = [...auditLogs];
+      const qStr = params.get('q');
+      if (qStr) rows = rows.filter((r) => `${r.action_type} ${r.payload?.path ?? ''}`.toLowerCase().includes(qStr.toLowerCase()));
+      const pfx = params.get('actionPrefix');
+      if (pfx) rows = rows.filter((r) => r.action_type.startsWith(pfx));
+      const limit = Number(params.get('limit')) || 50;
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(rows.slice(0, limit)));
+    }
+    const mToggle = url.match(/^\/api\/automation\/rules\/([^/]+)\/toggle$/);
+    if (mToggle && req.method === 'POST') {
+      const rule = automationRules.find((r) => r.id === mToggle[1]);
+      if (rule) {
+        const b = await readJsonBody(req);
+        rule.enabled = typeof b.enabled === 'boolean' ? b.enabled : !rule.enabled;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(rule ?? { ok: true }));
+    }
+    const mRule = url.match(/^\/api\/automation\/rules\/([^/]+)$/);
+    if (mRule && req.method === 'PUT') {
+      const rule = automationRules.find((r) => r.id === mRule[1]);
+      if (rule) {
+        const b = await readJsonBody(req);
+        Object.assign(rule, {
+          metric: b.metric ?? rule.metric,
+          condition: b.condition ?? rule.condition,
+          threshold: b.threshold !== undefined ? Number(b.threshold) : rule.threshold,
+          message: b.message ?? rule.message,
+          severity: b.severity ?? rule.severity,
+          enabled: typeof b.enabled === 'boolean' ? b.enabled : rule.enabled,
+        });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(rule ?? { ok: true }));
+    }
+    if (mRule && req.method === 'DELETE') {
+      const i = automationRules.findIndex((r) => r.id === mRule[1]);
+      if (i >= 0) automationRules.splice(i, 1);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ ok: true }));
+    }
     // nextgen/kill-switch · first-responder · reality → 404 (หน้ามี guard แสดงสถานะว่างให้อยู่แล้ว)
     if (url.startsWith('/api/security/nextgen/')) {
       res.writeHead(404, { 'Content-Type': 'application/json', ...CORS });
@@ -161,6 +294,14 @@ http
     else if (url.startsWith('/api/security/firewall/blocks')) body = securityBlocks;
     else if (url.startsWith('/api/treasury/overview')) body = treasuryData;
     else if (url.startsWith('/api/treasury/transfers')) body = treasuryTransfers;
+    else if (url === '/api/system/health') body = systemHealth;
+    else if (url === '/api/system/processes') body = systemProcesses;
+    else if (url === '/api/system/wan/sim') body = systemSim;
+    else if (url === '/api/system/wan') body = systemWan;
+    else if (url.startsWith('/api/system/client-health')) body = clientHealth;
+    else if (url === '/api/users') body = systemUsers;
+    else if (url === '/api/ai/policy') body = aiPolicy;
+    else if (url === '/api/ai/status') body = aiStatus;
     else if (url === '/api/restaurant/menus') body = menus;
     else if (url.startsWith('/api/restaurant/orders')) body = restaurantOrders;
     else if (url === '/api/farm/plots') body = farmPlots;

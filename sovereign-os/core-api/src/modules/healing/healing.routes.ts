@@ -29,7 +29,9 @@ router.post('/companion', authenticate, async (req, res) => {
   try {
     const message = String(req.body?.message ?? '').trim().slice(0, 1000);
     if (!message) return res.status(400).json({ error: 'message is required' });
-    const result = await dhammaCompanion(message);
+    // MBTI — frontend (healing.tsx) ส่ง `mbti` มาให้หลวงพี่ปรับโทนตามบุคลิก (16 ประเภท)
+    const mbti = typeof req.body?.mbti === 'string' ? req.body.mbti.slice(0, 4) : null;
+    const result = await dhammaCompanion(message, mbti);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: String(err?.message || 'AI ปลอบโยนไม่สำเร็จ') });
