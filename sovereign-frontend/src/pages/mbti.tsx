@@ -12,10 +12,11 @@ import Icon from "../components/ui/Icon";
 import Link from "next/link";
 import {
   MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, MBTI_TYPES, MBTI_STORE_KEY,
-  scoreMbti, typeInfo, familyOf, FAM_RGB,
+  scoreMbti, typeInfo, familyOf, FAM_RGB, MBTI_DIM_INFO,
   type MbtiResult, type MbtiTypeInfo, type MbtiQuestion,
 } from "../lib/mbtiData";
 import Seal from "../components/mbti/Seal";
+import QuizCard from "../components/mbti/QuizCard";
 
 const DIM_LABEL: Record<string, { first: string; second: string; hint: string }> = {
   EI: { first: "E — มุ่งออก (Extraversion)", second: "I — มุ่งเข้า (Introversion)", hint: "พลังงานมาจากไหน" },
@@ -43,8 +44,6 @@ function quizModeOf(r: MbtiResult): "เต็ม 93" | "สั้น 32" {
 export default function MbtiPage() {
   const [screen, setScreen] = useState<Screen>("intro");
   const [mode, setMode] = useState<"full" | "short">("full");
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
   const [result, setResult] = useState<MbtiResult | null>(null);
   const [history, setHistory] = useState<MbtiResult[]>([]);
   const [libraryCode, setLibraryCode] = useState<string | null>(null);
@@ -60,33 +59,10 @@ export default function MbtiPage() {
   const questions: MbtiQuestion[] = mode === "short" ? MBTI_SHORT_QUESTIONS : MBTI_QUESTIONS;
 
   const start = (m: "full" | "short") => {
-    setMode(m); setAnswers({}); setIdx(0); setResult(null); setScreen("quiz");
+    setMode(m); setResult(null); setScreen("quiz");
   };
 
-  const pick = (v: number) => {
-    const q = questions[idx];
-    setAnswers((a) => ({ ...a, [q.id]: v }));
-  };
-
-  // ตอบด้วยคีย์บอร์ด A/B หรือ ลูกศรซ้ายขวา
-  useEffect(() => {
-    if (screen !== "quiz") return;
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "a" || e.key === "A" || e.key === "1") pick(0);
-      else if (e.key === "b" || e.key === "B" || e.key === "2") pick(1);
-      else if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
-      else if (e.key === "ArrowRight") setIdx((i) => Math.min(questions.length - 1, i + 1));
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [screen, idx, mode]);
-
-  const answered = Object.keys(answers).length;
-  const progress = Math.round((answered / questions.length) * 100);
-  const q = questions[idx];
-
-  const finish = () => {
-    if (answered < questions.length) return;
+  const finish = (answers: Record<number, number>) => {
     const r = scoreMbti(answers, questions);
     setResult(r);
     saveResult(r);
@@ -156,73 +132,14 @@ export default function MbtiPage() {
 
   // ═══════════ หน้าทำแบบทดสอบ (ใช้ได้ทั้งชุดเต็ม/ชุดสั้น) ═══════════
   const quizScreen = (
-    <div className="space-y-4 max-w-3xl mx-auto w-full">
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>ข้อ {idx + 1} / {questions.length} — ตอบแล้ว {answered} ข้อ <span className="text-fuchsia-400">({mode === "short" ? "ควิซสั้น" : "ชุดเต็ม"})</span></span>
-        <span className="text-fuchsia-400">{progress}%</span>
-      </div>
-      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-        <div className="h-full bg-fuchsia-500 transition-all" style={{ width: `${progress}%` }} />
-      </div>
-
-      <div className="card panel-glow p-6 space-y-5">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="px-2 py-1 rounded bg-gray-800 border border-gray-700 text-gray-300">{DIM_LABEL[q.d].hint}</span>
-          <span className="text-gray-500">#{q.id}</span>
-          {answers[q.id] != null && <span className="ml-auto text-fuchsia-400 flex items-center gap-1"><Icon name="check-circle" size={12} /> ตอบแล้ว</span>}
-        </div>
-
-        <h2 className="text-lg font-bold text-white leading-relaxed text-center py-2">เลือกข้อความที่ &quot;ใช่&quot; กับตัวคุณมากกว่า</h2>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          {[
-            { v: 0, label: "A", text: q.a },
-            { v: 1, label: "B", text: q.b },
-          ].map((o) => (
-            <button key={o.v} onClick={() => pick(o.v)}
-              className={`p-4 rounded-xl border text-left transition-all ${
-                answers[q.id] === o.v
-                  ? "bg-fuchsia-600/25 border-fuchsia-500 text-white shadow-[0_0_18px_rgba(217,70,239,0.25)]"
-                  : "bg-gray-800/60 border-gray-700 text-gray-200 hover:border-fuchsia-500/50"
-              }`}>
-              <span className="inline-flex w-6 h-6 rounded-full bg-gray-900 border border-gray-600 items-center justify-center text-xs font-bold mr-2 mb-1">{o.label}</span>
-              <span className="text-sm leading-relaxed">{o.text}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex justify-between pt-3 border-t border-gray-800">
-          <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-            className="px-4 py-2 bg-gray-800 disabled:opacity-40 rounded-lg text-sm">← ก่อนหน้า</button>
-          {idx < questions.length - 1 ? (
-            <button onClick={() => setIdx((i) => i + 1)} disabled={answers[q.id] == null}
-              className="px-5 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 rounded-lg text-sm text-white">ถัดไป →</button>
-          ) : (
-            <button onClick={finish} disabled={answered < questions.length}
-              className="px-6 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 rounded-lg text-sm font-bold text-white">
-              {answered < questions.length ? `ตอบให้ครบอีก ${questions.length - answered} ข้อ` : "ดูผลลัพธ์ →"}
-            </button>
-          )}
-        </div>
-        <p className="text-[11px] text-gray-500 text-center">กด A/B หรือ 1/2 บนคีย์บอร์ดได้ • ลูกศร ← → เลื่อนข้อ • คำตอบเก็บในเบราว์เซอร์นี้เท่านั้น</p>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5 justify-center">
-        {questions.map((qq, i) => (
-          <button key={qq.id} onClick={() => setIdx(i)}
-            className={`w-7 h-7 rounded text-[10px] ${
-              i === idx ? "bg-fuchsia-600 text-white"
-              : answers[qq.id] != null ? "bg-fuchsia-900/60 text-fuchsia-300 border border-fuchsia-700"
-              : "bg-gray-800 text-gray-500"
-            }`} title={`ข้อ ${qq.id}`}>{i + 1}</button>
-        ))}
-      </div>
-      {mode === "short" && (
-        <p className="text-[11px] text-center text-gray-500">
-          💡 ผลจากชุดสั้นเป็นการประเมินเบื้องต้น — เมื่อมีเวลา แนะนำ <button onClick={() => start("full")} className="text-fuchsia-300 underline">ทำชุดเต็ม 93 ข้อ</button> เพื่อความแม่นยำที่สูงขึ้น
-        </p>
-      )}
-    </div>
+    <QuizCard
+      key={mode}
+      variant="page"
+      questions={questions}
+      modeLabel={mode === "short" ? "ควิซสั้น" : "ชุดเต็ม"}
+      onDone={finish}
+      onSwitchFull={mode === "short" ? () => start("full") : undefined}
+    />
   );
 
   // ═══════════ หน้าผลลัพธ์ ═══════════
@@ -465,7 +382,7 @@ export default function MbtiPage() {
                   {pts.map((p, i) => (
                     <g key={i}>
                       <circle cx={p.x} cy={p.y} r={4.5} fill={dimColors[dim]} opacity={s.dash ? 0.5 : 0.95}>
-                        <title>{`${DIM_LABEL[dim].hint}: ${p.pct}% ฝั่ง${DIM_LABEL[dim].second.split(" ")[0]} (${p.code}, ${fmtDate(s.list[i].date)})`}</title>
+                        <title>{`${MBTI_DIM_INFO[dim].hint}: ${p.pct}% ฝั่ง${MBTI_DIM_INFO[dim].secondShort} (${p.code}, ${fmtDate(s.list[i].date)})`}</title>
                       </circle>
                       {i === pts.length - 1 && (
                         <text x={p.x + 7} y={p.y + 3} fontSize="9" fill={dimColors[dim]} opacity="0.9">{s.label}</text>
@@ -489,11 +406,34 @@ export default function MbtiPage() {
             {dims.map((dim) => (
               <span key={dim} className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ background: dimColors[dim] }} />
-                <b className="text-gray-300">{DIM_LABEL[dim].hint}</b> — ล่าง = {DIM_LABEL[dim].first.split(" ")[0]} · บน = {DIM_LABEL[dim].second.split(" ")[0]}
+                <b className="text-gray-300">{MBTI_DIM_INFO[dim].hint}</b> — ล่าง = {MBTI_DIM_INFO[dim].firstShort} · บน = {MBTI_DIM_INFO[dim].secondShort}
               </span>
             ))}
           </div>
         </div>
+
+        {/* ตราซ้อน: เงา (เก่าสุด) → เต็ม (ใหม่สุด) — ส่วนสีเลื่อนข้ามมิติเมื่อเวลาผ่านไป */}
+        {all.length >= 2 && (() => {
+          const oldest = all[0], newest = all[all.length - 1];
+          const famOf = (code: string) => FAM_RGB[familyOf(code) ?? "nt"];
+          return (
+            <div className="card p-5">
+              <h3 className="text-sm font-bold text-fuchsia-300 mb-3">ตราซ้อน — จาก {oldest.code} → {newest.code}</h3>
+              <div className="flex flex-wrap items-center justify-center gap-6">
+                <div className="relative">
+                  <Seal letters={oldest.code} dims={oldest.dims} famRgb={famOf(oldest.code)} ghost />
+                  <Seal letters={newest.code} dims={newest.dims} famRgb={famOf(newest.code)}
+                    className="absolute inset-0" />
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div><span className="inline-block w-3 h-3 rounded-full border-2 border-fuchsia-400 align-middle mr-1.5" />เงา = {fmtDate(oldest.date)} ({oldest.code})</div>
+                  <div><span className="inline-block w-3 h-3 rounded-full align-middle mr-1.5" style={{ background: `rgb(${famOf(newest.code)})` }} />เต็ม = {fmtDate(newest.date)} ({newest.code})</div>
+                  {oldest.code !== newest.code && <div className="text-gray-500">ส่วนที่สีทับเงา = มิติที่เลื่อนข้ามตัวอักษร</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* สรุปการเปลี่ยนแปลง */}
         {all.length >= 2 && (() => {

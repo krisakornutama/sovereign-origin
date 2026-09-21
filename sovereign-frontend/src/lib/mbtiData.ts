@@ -472,6 +472,39 @@ export function latestLocalResult(): MbtiResult | null {
 export const MBTI_STORE_KEY = 'sovereign.mbti.results.v1';
 
 // ─────────────────────────────────────────────────────────────
+//  โปรไฟล์ของคนในบ้าน — ผลแบบทดสอบของ "คนอื่น" บนเครื่องเดียวกัน
+//  ใช้โดยหน้าเทียบคู่: ให้อีกคนทำเอง (แม่นกว่าการเลือกจากคลัง) เก็บเป็น profile ตั้งชื่อได้
+// ─────────────────────────────────────────────────────────────
+export const MBTI_PROFILES_KEY = 'sovereign.mbti.profiles.v1';
+
+export interface MbtiProfile {
+  id: string;
+  name: string;
+  result: MbtiResult;
+  quiz: 'full' | 'short';
+}
+
+function loadList<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+
+export function loadProfiles(): MbtiProfile[] {
+  return loadList<MbtiProfile>(MBTI_PROFILES_KEY);
+}
+
+export function saveProfile(p: Omit<MbtiProfile, 'id'>): MbtiProfile {
+  const list = loadProfiles();
+  const full: MbtiProfile = { ...p, id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+  localStorage.setItem(MBTI_PROFILES_KEY, JSON.stringify([full, ...list].slice(0, 20)));
+  return full;
+}
+
+export function deleteProfile(id: string): void {
+  localStorage.setItem(MBTI_PROFILES_KEY, JSON.stringify(loadProfiles().filter((p) => p.id !== id)));
+}
+
+// ─────────────────────────────────────────────────────────────
 //  เทียบผลสองคน (คู่สมรส/สมาชิกครอบครัว) — วิเคราะห์รายมิติ
 // ─────────────────────────────────────────────────────────────
 
@@ -486,6 +519,14 @@ export interface CompareDimRow {
 export interface CompareSummary { headline: string; sameCount: number; diffCount: number; }
 
 export const DIM_LABELS: Record<MbtiDim, string> = { EI: 'พลังงาน', SN: 'การรับรู้', TF: 'การตัดสินใจ', JP: 'วิถีชีวิต' };
+
+/** ข้อมูลมิติแบบสั้น (แหล่งเดียว) — ชิปในควิซ, คำอธิบายแกนกราฟ, สรุปวิวัฒนาการ */
+export const MBTI_DIM_INFO: Record<MbtiDim, { hint: string; firstShort: string; secondShort: string }> = {
+  EI: { hint: 'พลังงานมาจากไหน', firstShort: 'E', secondShort: 'I' },
+  SN: { hint: 'รับข้อมูลโลกแบบไหน', firstShort: 'S', secondShort: 'N' },
+  TF: { hint: 'ตัดสินใจด้วยอะไร', firstShort: 'T', secondShort: 'F' },
+  JP: { hint: 'ใช้ชีวิตแบบไหน', firstShort: 'J', secondShort: 'P' },
+};
 export const LETTER_NAMES: Record<string, string> = {
   E: 'มุ่งออก', I: 'มุ่งเข้า', S: 'จับต้องได้', N: 'นามธรรม',
   T: 'ตรรกะ', F: 'ความรู้สึก', J: 'จัดระเบียบ', P: 'ล่องลอย',
