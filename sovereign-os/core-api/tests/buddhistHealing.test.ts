@@ -161,3 +161,64 @@ test('buildDhammaPrompt without tone falls back to generic monk (no MBTI section
   const oldSignature = buildDhammaPrompt('ไม่สบายใจ', null);
   assert.ok(oldSignature.includes('หลวงพี่อาจารย์'), 'เรียกแบบ signature เดิม (2 พารามิเตอร์) ต้องยังทำงาน');
 });
+
+// ── หลักฐานว่า prompt ของหลวงพี่ 16 โค้ดต่างกันจริง (ไม่ใช่แค่มีครบ) ──
+
+const MBTI_CODES_16 = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'];
+
+/** ตัวเลขความแตกต่างระหว่าง 2 prompt (จำนวนอักขระต่างกันแบบไม่อิงตำแหน่ง) */
+function charDistance(a: string, b: string): number {
+  const ca = new Map<string, number>();
+  for (const ch of a) ca.set(ch, (ca.get(ch) ?? 0) + 1);
+  const cb = new Map<string, number>();
+  for (const ch of b) cb.set(ch, (cb.get(ch) ?? 0) + 1);
+  let diff = 0;
+  for (const [ch, n] of ca) diff += Math.abs(n - (cb.get(ch) ?? 0));
+  for (const [ch, n] of cb) if (!ca.has(ch)) diff += n;
+  return diff;
+}
+
+test('buildDhammaPrompt: 16 โค้ด → 16 prompt ต่างกันจริงทั้ง 120 คู่', () => {
+  const teaching = { title: 'อนิจจัง', content: 'ทุกสิ่งเกิดขึ้นแล้วดับไป', application: 'เห็นความไม่แน่นอน' };
+  const prompts = new Map<string, string>();
+  for (const c of MBTI_CODES_16) {
+    const p = buildDhammaPrompt('ช่วยดูแลใจผู้ใช้หน่อย', teaching, mbtiToneFor(c));
+    assert.ok(p.includes(MBTI_CARE_TONES[c].yakLabel), `${c}: prompt ต้องอ้าง "${MBTI_CARE_TONES[c].yakLabel}"`);
+    prompts.set(c, p);
+  }
+  assert.equal(prompts.size, 16, 'ต้องได้ prompt ไม่ซ้ำกันเลย 16 ชุด');
+  for (let i = 0; i < MBTI_CODES_16.length; i++) {
+    for (let j = i + 1; j < MBTI_CODES_16.length; j++) {
+      const a = MBTI_CODES_16[i], b = MBTI_CODES_16[j];
+      const pa = prompts.get(a)!, pb = prompts.get(b)!;
+      assert.ok(pa !== pb, `${a} vs ${b}: prompt ต้องไม่เท่ากัน`);
+      assert.ok(!pa.includes(MBTI_CARE_TONES[b].yakLabel), `${a}: ห้ามไปอ้างบุคลิกของ ${b}`);
+      assert.ok(!pb.includes(MBTI_CARE_TONES[a].yakLabel), `${b}: ห้ามไปอ้างบุคลิกของ ${a}`);
+      const d = charDistance(pa, pb);
+      assert.ok(d >= 20, `${a} vs ${b}: ความต่างเชิงเนื้อหา = ${d} อักขระ (น้อยกว่าเกณฑ์ 20)`);
+    }
+  }
+});
+
+test('buildDhammaPrompt: บทบาทของหลวงพี่ (persona) ไม่หลุดเกณฑ์กลางของ AI นิจธรรม', () => {
+  const teaching = { title: 'สติ', content: 'รู้ลมหายใจเข้าออก', application: null };
+  for (const c of MBTI_CODES_16) {
+    const p = buildDhammaPrompt('วันนี้ใจไม่นิ่ง', teaching, mbtiToneFor(c));
+    assert.ok(p.includes('หลวงพี่'), `${c}: ต้องขึ้นบทบาทหลวงพี่`);
+    assert.ok(p.includes('อย่าแนะนำให้เลิกยา'), `${c}: กติกาเรื่องยาต้องอยู่ครบทุกโค้ด`);
+    assert.ok(p.includes('รู้ลมหายใจ') || p.includes('หายใจเข้าออก'), `${c}: คำแนะนำการปฏิบัติต้องอยู่`);
+    assert.ok(p.includes('วันนี้ใจไม่นิ่ง'), `${c}: ข้อความผู้ใช้ต้องถูกฝัง`);
+  }
+});
+
+test('mbtiToneFor: โค้ด 16 ตัวต้องไม่โดน map ไปโทนอื่นและ normalize ให้ตรงกันเสมอ', () => {
+  for (const c of MBTI_CODES_16) {
+    const t = mbtiToneFor(c);
+    assert.ok(t, `${c} ต้องมีโทน`);
+    assert.equal(t!.code, c);
+    assert.equal(t!.yakLabel, MBTI_CARE_TONES[c].yakLabel);
+    // lowercase ต้องได้ object เดียวกัน (same tone)
+    const lower = mbtiToneFor(c.toLowerCase());
+    assert.equal(lower!.yakLabel, t!.yakLabel, `${c.toLowerCase()} ต้อง normalize เป็นโทนเดียวกับ ${c}`);
+  }
+});
