@@ -14,9 +14,12 @@ interface SealProps {
   letters: string; // โค้ด 4 ตัว เช่น "INTJ"
   dims: { dim: MbtiDim; letter: string; clarity: number }[];
   famRgb: string; // "r g b"
+  /** โหมดเงา: เส้นขอบล้วน (ไม่เต็มสี) — ใช้สำหรับตรา "ครั้งก่อน" วางซ้อน/คู่กับตราปัจจุบัน */
+  ghost?: boolean;
+  className?: string; // เพิ่มเติม เช่น absolute inset-0 เมื่อวางซ้อน
 }
 
-export default function Seal({ letters, dims, famRgb }: SealProps) {
+export default function Seal({ letters, dims, famRgb, ghost = false, className }: SealProps) {
   // ส่วนละ 45° เรียงตามมิติ: ฝั่งชนะ (E,S,T,J ตามลำดับมุมบน) แล้วตามด้วยฝั่งแพ้
   const segs = dims.flatMap((d, i) => [
     { letter: d.letter, win: true, clarity: d.clarity, a: i * 90, b: i * 90 + 45 },
@@ -33,11 +36,14 @@ export default function Seal({ letters, dims, famRgb }: SealProps) {
   };
 
   return (
-    <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0" role="img" aria-label={`ตราแปดส่วนของ ${letters}`}>
+    <svg viewBox="0 0 120 120" className={`h-32 w-32 sm:h-44 sm:w-44 shrink-0${className ? ` ${className}` : ''}`} role="img" aria-label={`ตราแปดส่วนของ ${letters}`}>
       {segs.map((s, i) => (
         <path key={i} d={wedge(s.a, s.b)}
-          fill={s.win ? `rgb(${famRgb} / ${0.25 + (0.55 * s.clarity) / 100})` : 'none'}
-          stroke={s.win ? 'none' : 'rgb(148 163 184 / 0.35)'} strokeWidth="1" strokeDasharray={s.win ? undefined : '3 3'} />
+          fill={ghost || !s.win ? 'none' : `rgb(${famRgb} / ${0.25 + (0.55 * s.clarity) / 100})`}
+          stroke={s.win
+            ? (ghost ? `rgb(${famRgb} / 0.7)` : 'none')
+            : 'rgb(148 163 184 / 0.35)'}
+          strokeWidth={ghost && s.win ? '1.5' : '1'} strokeDasharray={!s.win ? '3 3' : undefined} />
       ))}
       {segs.map((s, i) => {
         const [x, y] = polar((s.a + s.b) / 2, 64);
