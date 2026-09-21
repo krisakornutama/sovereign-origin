@@ -690,7 +690,7 @@ export default function Dashboard() {
                 <StatCard
                   key={idx}
                   label={stat.label}
-                  value={(stat as any).isBoolean ? <span className={(stat as any).tone}>{stat.value === 1 ? (stat as any).trueLabel : (stat as any).falseLabel}</span> : <span className={stat.tone}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : 'N/A'}</span>}
+                  value={(stat as any).isBoolean ? <span className={(stat as any).tone}>{stat.value === 1 ? (stat as any).trueLabel : (stat as any).falseLabel}</span> : <span className={stat.tone} title={stat.value != null ? undefined : t('dashboard.sensors.noData', 'ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้')}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : '—'}</span>}
                   icon={<Icon name={stat.icon} size={12} className="text-gray-500" />}
                 />
               ))}

@@ -198,6 +198,9 @@ const systemUsers = [
   { id: 'u2', username: 'member01', role: 'USER', assigned_node_id: null },
 ];
 
+// ประวัติแชทจำลอง (ในหน่วยความจำ) — เก็บทั้งข้อความเข้า/ตอบ เพื่อพิสูจน์ Conversational Memory บน preview
+const chatHistory = [];
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
@@ -211,6 +214,16 @@ http
       return res.end();
     }
     const url = (req.url || '').split('?')[0];
+    // ai/history — ประวัติสนทนาในหน่วยความจำ (GET = list, DELETE = ล้าง) — AiChatPanel โหลดตอนเปิดหน้า
+    if (url === '/api/ai/history') {
+      if (req.method === 'DELETE') {
+        chatHistory.length = 0;
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        return res.end(JSON.stringify({ ok: true }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ history: chatHistory }));
+    }
     // healing/companion + ai/chat — ตอบโทนตาม mbti ที่ client ส่ง (พิสูจน์ว่า backend ใช้ค่านี้จริง)
     if ((url === '/api/healing/companion' || url === '/api/ai/chat') && req.method === 'POST') {
       const b = await readJsonBody(req);
@@ -218,6 +231,11 @@ http
       const reply = code
         ? `[mock] ผมเห็นโค้ด "${code}" จาก request ของคุณ — โทนนี้คือโทนของ ${code} โดยเฉพาะ (ถ้าเปลี่ยนโค้ด ข้อความนี้จะเปลี่ยนตาม)`
         : '[mock] ไม่พบโค้ด MBTI ใน request — นี่คือการตอบแบบกลาง (ไม่มีการปรับโทน)';
+      chatHistory.unshift(
+        { id: `u${Date.now()}`, role: 'user', content: typeof b.message === 'string' ? b.message : '' },
+        { id: `a${Date.now()}`, role: 'assistant', content: reply }
+      );
+      if (chatHistory.length > 100) chatHistory.length = 100;
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       return res.end(JSON.stringify(url === '/api/healing/companion' ? { reply, teaching: null } : { reply }));
     }
