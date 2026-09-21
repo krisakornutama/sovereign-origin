@@ -12,9 +12,10 @@ import Icon from "../components/ui/Icon";
 import Link from "next/link";
 import {
   MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, MBTI_TYPES, MBTI_STORE_KEY,
-  scoreMbti, typeInfo, familyOf, FAM_RGB, MBTI_DIM_INFO,
+  scoreMbti, typeInfo, familyOf, FAM_RGB, MBTI_DIM_INFO, careToneFor,
   type MbtiResult, type MbtiTypeInfo, type MbtiQuestion,
 } from "../lib/mbtiData";
+import { authFetch } from "../lib/apiFetch";
 import Seal from "../components/mbti/Seal";
 import QuizCard from "../components/mbti/QuizCard";
 
@@ -70,6 +71,37 @@ export default function MbtiPage() {
   };
 
   const openLibrary = (code: string | null) => { setLibraryCode(code); setScreen("library"); };
+
+  // 🙏 ให้หลวงพี่อธิบายผล — เรียก companion พร้อมโค้ดประเภทจริง (backend ปรับโทนตามประเภท 16 แบบ)
+  const [monkReply, setMonkReply] = useState<string | null>(null);
+  const [monkBusy, setMonkBusy] = useState(false);
+  const [monkError, setMonkError] = useState<string | null>(null);
+  useEffect(() => { setMonkReply(null); setMonkError(null); }, [result]);
+
+  const askMonk = async () => {
+    if (!result || monkBusy) return;
+    setMonkBusy(true); setMonkError(null); setMonkReply(null);
+    try {
+      const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/healing/companion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `ช่วยอธิบายผลแบบทดสอบบุคลิกภาพของฉัน (${result.code}) หน่อย — คนแบบนี้ควรดูแลใจตัวเองอย่างไรดี`,
+          mbti: result.code,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.reply) {
+        setMonkError(j.error || 'หลวงพี่ตอบไม่ได้ตอนนี้ — ตรวจว่า AI (Ollama) เปิดอยู่');
+        return;
+      }
+      setMonkReply(j.teaching?.title ? `${j.reply}\n\n📿 ${j.teaching.title}` : j.reply);
+    } catch {
+      setMonkError('เชื่อมต่อ Core API ไม่ได้');
+    } finally {
+      setMonkBusy(false);
+    }
+  };
 
   // ═══════════ หน้าแนะนำ ═══════════
   const introScreen = (
@@ -223,7 +255,25 @@ export default function MbtiPage() {
           </div>
         </div>
 
+        {(monkBusy || monkReply || monkError) && (
+          <div className="card p-5 space-y-2">
+            <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+              🙏 {careToneFor(result.code)?.yakLabel ?? "หลวงพี่"} อธิบายผล {result.code}
+            </h3>
+            {monkBusy && <p className="text-xs text-gray-500">หลวงพี่กำลังพิจารณา... (อาจใช้เวลานานในเครื่อง CPU)</p>}
+            {monkError && <p className="text-xs text-rose-300">{monkError}</p>}
+            {monkReply && (
+              <div className="inset rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap text-gray-200 border-l-2 border-l-amber-400/70">
+                {monkReply}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2 justify-center">
+          <button onClick={askMonk} disabled={monkBusy} className="btn-secondary px-5 py-2 text-sm">
+            {monkBusy ? "หลวงพี่กำลังพิจารณา..." : "🙏 ให้หลวงพี่อธิบายผลของคุณ"}
+          </button>
           <button onClick={() => start(mode)} className="btn-secondary px-5 py-2 text-sm">ทำใหม่อีกครั้ง</button>
           <button onClick={() => openLibrary(result.code)} className="btn-secondary px-5 py-2 text-sm">เทียบกับ 16 ประเภท</button>
           <button onClick={() => setScreen("intro")} className="px-4 py-2 bg-gray-800 rounded-lg text-sm">← กลับหน้าหลัก MBTI</button>
