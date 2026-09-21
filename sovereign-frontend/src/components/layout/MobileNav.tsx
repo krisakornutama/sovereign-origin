@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useIsSuperadmin } from '../../lib/roles';
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openCommandPalette } from '../CommandPalette';
 import { useFeatureStore } from '../../stores/useFeatureStore';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -45,12 +45,36 @@ export default function MobileNav() {
   const active = (href: string) =>
     pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
 
+  // C4: แถบ fixed ทับเนื้อหาท้ายหน้า → ปุ่มโดนบังแล้วคลิกเจาะไปเมนูล่าง.
+  // วัดความสูงตัวเองด้วย ResizeObserver (ครอบ wrap 2 แถว + safe-area) แล้ววาง spacer ใน flow —
+  // เนื้อหาจะไม่มีวันไปอยู่ใต้แถบนำทางอีก บนจอใหญ่ (md+) spacer = 0 จึงไม่กระทบเดิม
+  const navRef = useRef<HTMLElement>(null);
+  const [spacerH, setSpacerH] = useState(0);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      // จอใหญ่: nav ถูกซ่อนด้วย md:hidden → rect กว้าง/สูง 0 → ไม่ต้องมี spacer
+      // (ห้ามใช้ offsetParent — เป็น null เสมอสำหรับ position: fixed)
+      const r = el.getBoundingClientRect();
+      setSpacerH(r.height > 0 && r.width > 0 ? el.offsetHeight : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
+
   return (
-    <nav
-      aria-label={t('common.mobileMenu', 'เมนูหลัก (มือถือ)')}
-      className={`${atmo} fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-900/95 border-t border-gray-800 backdrop-blur-md`}
-      style={{ ...atmoNavStyle(atmo), borderColor: 'color-mix(in srgb, var(--atmo-nav) 26%, transparent)' }}
-    >
+    <>
+      <div aria-hidden className="md:hidden" style={{ height: spacerH }} />
+      <nav
+        ref={navRef}
+        aria-label={t('common.mobileMenu', 'เมนูหลัก (มือถือ)')}
+        className={`${atmo} fixed bottom-0 inset-x-0 z-40 md:hidden bg-gray-900/95 border-t border-gray-800 backdrop-blur-md`}
+        style={{ ...atmoNavStyle(atmo), borderColor: 'color-mix(in srgb, var(--atmo-nav) 26%, transparent)' }}
+      >
       {/* flex-wrap: แสดงครบทุกเมนู (เดิมเลื่อนแนวนอนแล้วคนไม่รู้ว่ามีเมนูต่อ) */}
       <div className="flex flex-wrap justify-center">
         {visibleItems.map((item) =>
@@ -87,6 +111,7 @@ export default function MobileNav() {
       </div>
       {/* พื้นที่กันเนื้อหาถูกบังโดยแถบนำทาง */}
       <div className="h-[env(safe-area-inset-bottom)]" />
-    </nav>
+      </nav>
+    </>
   );
 }
