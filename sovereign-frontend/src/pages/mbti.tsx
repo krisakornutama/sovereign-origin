@@ -536,11 +536,11 @@ export default function MbtiPage() {
   })();
 
   const titles: Record<Screen, string> = {
-    intro: "MBTI — รู้จักตัวเอง 16 ประเภท",
-    quiz: mode === "short" ? "ควิซสั้น — 32 ข้อ" : "แบบทดสอบ — 93 ข้อ",
-    result: "ผลลัพธ์ของคุณ",
-    library: "คลัง 16 ประเภท",
-    evolution: "วิวัฒนาการของฉัน",
+    intro: t("mbti.page.introTitle", "แบบทดสอบบุคลิกภาพ 16 ประเภท"),
+    quiz: mode === "short" ? t("mbti.page.shortTitle", "📱 ควิซสั้น 32 ข้อ") : t("mbti.page.fullTitle", "📋 ชุดเต็ม 93 ข้อ"),
+    result: t("mbti.result.title", "ผลลัพธ์ของคุณ"),
+    library: t("mbti.page.openLibrary", "ดูคลัง 16 ประเภท"),
+    evolution: t("mbti.evolution.title", "วิวัฒนาการของฉัน"),
   };
 
   const navBtn = (key: Screen, label: string) => (
@@ -552,21 +552,21 @@ export default function MbtiPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader
-          eyebrow="ชีวิต & สุขภาพ"
+          eyebrow={t("mbti.page.eyebrow", "ชีวิต & สุขภาพ")}
           title={titles[screen]}
-          subtitle="Local-First — ทำเอง เก็บเองในเบราว์เซอร์ ไม่ส่งข้อมูลออกนอกเครื่อง"
+          subtitle={t("mbti.page.localFirst", "Local-First — ทำเอง เก็บเองในเบราว์เซอร์ ไม่ส่งข้อมูลออกนอกเครื่อง")}
           icon={<Icon name="healing" size={18} />}
           actions={
             <div className="flex gap-2 text-sm flex-wrap items-center">
-              {navBtn("intro", "หน้าหลัก")}
+              {navBtn("intro", t("common.nav.dashboard", "หน้าหลัก"))}
               <span className="text-gray-700">·</span>
-              {navBtn("library", "คลัง 16 ประเภท")}
+              {navBtn("library", t("mbti.page.openLibrary", "ดูคลัง 16 ประเภท"))}
               {history.length >= 2 && <>
                 <span className="text-gray-700">·</span>
-                {navBtn("evolution", "📈 วิวัฒนาการ")}
+                {navBtn("evolution", t("mbti.page.viewEvolution", "ดูกราฟย้อนหลัง →"))}
               </>}
               <span className="text-gray-700">·</span>
-              <Link href="/mbti/compare" className="text-gray-400 hover:text-white">⚖️ เทียบสองคน</Link>
+              <Link href="/mbti/compare" className="text-gray-400 hover:text-white">{t("mbti.page.compareLink", "⚖️ เทียบผลกับคนรัก/ครอบครัว")}</Link>
             </div>
           }
         />
