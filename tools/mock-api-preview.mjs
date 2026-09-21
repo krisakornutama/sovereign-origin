@@ -124,6 +124,13 @@ const healingProgress = (days) => days > 1
     }
   : { progress: [], meditation: { total_min: 25, sessions: 1 } };
 
+// หน้าระบบอัตโนมัติ (atmo-power) — กฎตัวอย่างให้ตารางมีของดู
+const automationRules = [
+  { id: 'r1', metric: 'battery_soc', condition: 'lt', threshold: 20, message: 'แบตเตอรี่ต่ำกว่า 20% — กรุณาตรวจสอบแผงโซลาร์', severity: 'critical', enabled: true, is_default: true },
+  { id: 'r2', metric: 'power_kw_latest', condition: 'gt', threshold: 3, message: 'ใช้พลังงานสูงผิดปกติ (เกิน 3 kW)', severity: 'warning', enabled: true, is_default: false },
+  { id: 'r3', metric: 'temp_c', condition: 'gt', threshold: 38, message: 'อุณหภูมิห้องเครื่องสูง', severity: 'warning', enabled: false, is_default: false },
+];
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
@@ -144,6 +151,7 @@ http
     }
     let body = {};
     if (url === '/api/energy/summary') body = energySummary;
+    else if (url === '/api/automation/rules') body = automationRules;
     else if (url.startsWith('/api/timescale/history')) body = [];
     else if (url === '/api/health/overview') body = healthOverview;
     else if (url.startsWith('/api/health/readings')) body = healthReadings;

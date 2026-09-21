@@ -468,8 +468,8 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('aiAgent.eyebrow', 'ความปลอดภัย')}
-          title="SOVEREIGN OS" theme="power" icon={<Icon name="ai-agent" size={18} />}
-          subtitle="AI Agent Control" actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('aiAgent.backDashboard', '← กลับ Dashboard')}</Link>}
+          title="AI Agent — ทีมงานอัตโนมัติของบ้าน" theme="power" icon={<Icon name="ai-agent" size={18} />}
+          subtitle="ตั้งเป้าหมาย ปล่อยทีม Agent ลงมือเอง แล้วตรวจผลทีเดียว" actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('aiAgent.backDashboard', '← กลับ Dashboard')}</Link>}
         />
 
       {/* ── แท็บ: นโยบาย / ทีม Agent / งานเบื้องหลัง ── */}
