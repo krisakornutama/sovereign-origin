@@ -1,0 +1,591 @@
+"use client";
+// ─────────────────────────────────────────────────────────────
+//  MBTI — แบบทดสอบบุคลิกภาพ 16 ประเภท (Local-First)
+//  โครงเดียวกับ Self-Check: ทำเอง เก็บเอง ไม่พึ่งเซิร์ฟเวอร์
+//  ธีมบรรยากาศ: atmo-mind (ม่วงอเมทิสต์ — ห้องสะท้อนความคิด)
+//  โหมด: หน้าหลัก · ชุดเต็ม 93 · ควิซสั้น 32 · ผลลัพธ์ · คลัง 16 · เทียบสองคน · วิวัฒนาการ
+// ─────────────────────────────────────────────────────────────
+import { useState, useEffect, useCallback } from "react";
+import Sidebar from "../components/layout/Sidebar";
+import PageHeader from "../components/ui/PageHeader";
+import Icon from "../components/ui/Icon";
+import Link from "next/link";
+import {
+  MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, MBTI_TYPES, MBTI_STORE_KEY,
+  scoreMbti, typeInfo, familyOf, FAM_RGB,
+  type MbtiResult, type MbtiTypeInfo, type MbtiQuestion,
+} from "../lib/mbtiData";
+import Seal from "../components/mbti/Seal";
+
+const DIM_LABEL: Record<string, { first: string; second: string; hint: string }> = {
+  EI: { first: "E — มุ่งออก (Extraversion)", second: "I — มุ่งเข้า (Introversion)", hint: "พลังงานมาจากไหน" },
+  SN: { first: "S — จับต้องได้ (Sensing)", second: "N — นามธรรม (Intuition)", hint: "รับข้อมูลโลกแบบไหน" },
+  TF: { first: "T — ตรรกะ (Thinking)", second: "F — ความรู้สึก (Feeling)", hint: "ตัดสินใจด้วยอะไร" },
+  JP: { first: "J — จัดระเบียบ (Judging)", second: "P — ล่องลอย (Perceiving)", hint: "ใช้ชีวิตแบบไหน" },
+};
+
+type Screen = "intro" | "quiz" | "result" | "library" | "evolution";
+
+function loadResults(): MbtiResult[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(MBTI_STORE_KEY) || "[]"); } catch { return []; }
+}
+
+function fmtDate(iso: string): string {
+  try { return new Date(iso).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); } catch { return iso.slice(0, 10); }
+}
+
+/** ชื่อโหมดชุดคำถามที่ใช้ — จากจำนวนข้อที่ตอบ */
+function quizModeOf(r: MbtiResult): "เต็ม 93" | "สั้น 32" {
+  return r.answered <= 32 ? "สั้น 32" : "เต็ม 93";
+}
+
+export default function MbtiPage() {
+  const [screen, setScreen] = useState<Screen>("intro");
+  const [mode, setMode] = useState<"full" | "short">("full");
+  const [idx, setIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [result, setResult] = useState<MbtiResult | null>(null);
+  const [history, setHistory] = useState<MbtiResult[]>([]);
+  const [libraryCode, setLibraryCode] = useState<string | null>(null);
+
+  useEffect(() => { setHistory(loadResults()); }, []);
+
+  const saveResult = useCallback((r: MbtiResult) => {
+    const all = [r, ...loadResults()].slice(0, 30);
+    try { localStorage.setItem(MBTI_STORE_KEY, JSON.stringify(all)); } catch {}
+    setHistory(all);
+  }, []);
+
+  const questions: MbtiQuestion[] = mode === "short" ? MBTI_SHORT_QUESTIONS : MBTI_QUESTIONS;
+
+  const start = (m: "full" | "short") => {
+    setMode(m); setAnswers({}); setIdx(0); setResult(null); setScreen("quiz");
+  };
+
+  const pick = (v: number) => {
+    const q = questions[idx];
+    setAnswers((a) => ({ ...a, [q.id]: v }));
+  };
+
+  // ตอบด้วยคีย์บอร์ด A/B หรือ ลูกศรซ้ายขวา
+  useEffect(() => {
+    if (screen !== "quiz") return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "a" || e.key === "A" || e.key === "1") pick(0);
+      else if (e.key === "b" || e.key === "B" || e.key === "2") pick(1);
+      else if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
+      else if (e.key === "ArrowRight") setIdx((i) => Math.min(questions.length - 1, i + 1));
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [screen, idx, mode]);
+
+  const answered = Object.keys(answers).length;
+  const progress = Math.round((answered / questions.length) * 100);
+  const q = questions[idx];
+
+  const finish = () => {
+    if (answered < questions.length) return;
+    const r = scoreMbti(answers, questions);
+    setResult(r);
+    saveResult(r);
+    setScreen("result");
+  };
+
+  const openLibrary = (code: string | null) => { setLibraryCode(code); setScreen("library"); };
+
+  // ═══════════ หน้าแนะนำ ═══════════
+  const introScreen = (
+    <div className="space-y-5 max-w-3xl mx-auto w-full">
+      <div className="card panel-glow p-8 text-center space-y-4">
+        <div className="text-6xl">🧠</div>
+        <h2 className="text-xl font-bold glow-text">แบบทดสอบบุคลิกภาพ 16 ประเภท</h2>
+        <p className="text-sm text-gray-400 leading-relaxed">
+          forced-choice เลือก A หรือ B — ไม่มีถูกผิด · ครบ 4 มิติ: มุ่งออก–มุ่งเข้า · จับต้องได้–นามธรรม · ตรรกะ–ความรู้สึก · จัดระเบียบ–ล่องลอย
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3 pt-2">
+          <button onClick={() => start("short")} className="inset rounded-xl p-4 text-left hover:border-fuchsia-500/40 transition-colors">
+            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">📱 ควิซสั้น 32 ข้อ <span className="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-900/60 text-fuchsia-200">5–7 นาที</span></div>
+            <div className="text-xs text-gray-400 mt-1">เหมาะกับมือถือและมือใหม่ — ได้ผลตัวอักษร 4 ตัวเหมือนกัน</div>
+          </button>
+          <button onClick={() => start("full")} className="inset rounded-xl p-4 text-left hover:border-fuchsia-500/40 transition-colors">
+            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">📋 ชุดเต็ม 93 ข้อ <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">10–15 นาที</span></div>
+            <div className="text-xs text-gray-400 mt-1">แม่นยำตามโครงมาตรฐาน (21·26·28·18) — ควรทำเมื่อมีเวลา</div>
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 justify-center pt-1">
+          <button onClick={() => openLibrary(null)} className="btn-secondary px-5 py-2.5 text-sm">ดูคลัง 16 ประเภท</button>
+          <Link href="/mbti/compare" className="btn-secondary px-5 py-2.5 text-sm inline-flex items-center gap-1.5">⚖️ เทียบผลกับคนรัก/ครอบครัว</Link>
+          {history.length >= 2 && (
+            <button onClick={() => setScreen("evolution")} className="btn-secondary px-5 py-2.5 text-sm">📈 วิวัฒนาการของฉัน</button>
+          )}
+        </div>
+        <p className="text-[11px] text-gray-500 pt-1">
+          🕊️ เวอร์ชันอิงทฤษฎีจัดทำเอง เพื่อความเข้าใจตนเอง — ไม่ใช่เครื่องมือทางการ MBTI® และไม่ใช่การวินิจฉัยทางจิตวิทยา
+        </p>
+      </div>
+
+      {history.length > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2"><Icon name="history" size={14} /> ผลครั้งก่อน ({history.length})</h3>
+            {history.length >= 2 && (
+              <button onClick={() => setScreen("evolution")} className="text-xs text-fuchsia-300 hover:underline">ดูกราฟย้อนหลัง →</button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {history.slice(0, 6).map((h, i) => {
+              const info = typeInfo(h.code);
+              return (
+                <button key={i} onClick={() => { setResult(h); setScreen("result"); }}
+                  className="w-full inset px-3 py-2.5 rounded-lg flex items-center gap-3 text-left hover:border-fuchsia-500/40 transition-colors">
+                  <span className="text-xl">{info?.emoji ?? "🧩"}</span>
+                  <span className="font-bold text-fuchsia-200 w-14">{h.code}</span>
+                  <span className="text-sm text-gray-300 flex-1 truncate">{info?.name}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">{quizModeOf(h)}</span>
+                  <span className="text-xs text-gray-500">{fmtDate(h.date)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ═══════════ หน้าทำแบบทดสอบ (ใช้ได้ทั้งชุดเต็ม/ชุดสั้น) ═══════════
+  const quizScreen = (
+    <div className="space-y-4 max-w-3xl mx-auto w-full">
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>ข้อ {idx + 1} / {questions.length} — ตอบแล้ว {answered} ข้อ <span className="text-fuchsia-400">({mode === "short" ? "ควิซสั้น" : "ชุดเต็ม"})</span></span>
+        <span className="text-fuchsia-400">{progress}%</span>
+      </div>
+      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-full bg-fuchsia-500 transition-all" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="card panel-glow p-6 space-y-5">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="px-2 py-1 rounded bg-gray-800 border border-gray-700 text-gray-300">{DIM_LABEL[q.d].hint}</span>
+          <span className="text-gray-500">#{q.id}</span>
+          {answers[q.id] != null && <span className="ml-auto text-fuchsia-400 flex items-center gap-1"><Icon name="check-circle" size={12} /> ตอบแล้ว</span>}
+        </div>
+
+        <h2 className="text-lg font-bold text-white leading-relaxed text-center py-2">เลือกข้อความที่ &quot;ใช่&quot; กับตัวคุณมากกว่า</h2>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          {[
+            { v: 0, label: "A", text: q.a },
+            { v: 1, label: "B", text: q.b },
+          ].map((o) => (
+            <button key={o.v} onClick={() => pick(o.v)}
+              className={`p-4 rounded-xl border text-left transition-all ${
+                answers[q.id] === o.v
+                  ? "bg-fuchsia-600/25 border-fuchsia-500 text-white shadow-[0_0_18px_rgba(217,70,239,0.25)]"
+                  : "bg-gray-800/60 border-gray-700 text-gray-200 hover:border-fuchsia-500/50"
+              }`}>
+              <span className="inline-flex w-6 h-6 rounded-full bg-gray-900 border border-gray-600 items-center justify-center text-xs font-bold mr-2 mb-1">{o.label}</span>
+              <span className="text-sm leading-relaxed">{o.text}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex justify-between pt-3 border-t border-gray-800">
+          <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+            className="px-4 py-2 bg-gray-800 disabled:opacity-40 rounded-lg text-sm">← ก่อนหน้า</button>
+          {idx < questions.length - 1 ? (
+            <button onClick={() => setIdx((i) => i + 1)} disabled={answers[q.id] == null}
+              className="px-5 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 rounded-lg text-sm text-white">ถัดไป →</button>
+          ) : (
+            <button onClick={finish} disabled={answered < questions.length}
+              className="px-6 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 rounded-lg text-sm font-bold text-white">
+              {answered < questions.length ? `ตอบให้ครบอีก ${questions.length - answered} ข้อ` : "ดูผลลัพธ์ →"}
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-gray-500 text-center">กด A/B หรือ 1/2 บนคีย์บอร์ดได้ • ลูกศร ← → เลื่อนข้อ • คำตอบเก็บในเบราว์เซอร์นี้เท่านั้น</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 justify-center">
+        {questions.map((qq, i) => (
+          <button key={qq.id} onClick={() => setIdx(i)}
+            className={`w-7 h-7 rounded text-[10px] ${
+              i === idx ? "bg-fuchsia-600 text-white"
+              : answers[qq.id] != null ? "bg-fuchsia-900/60 text-fuchsia-300 border border-fuchsia-700"
+              : "bg-gray-800 text-gray-500"
+            }`} title={`ข้อ ${qq.id}`}>{i + 1}</button>
+        ))}
+      </div>
+      {mode === "short" && (
+        <p className="text-[11px] text-center text-gray-500">
+          💡 ผลจากชุดสั้นเป็นการประเมินเบื้องต้น — เมื่อมีเวลา แนะนำ <button onClick={() => start("full")} className="text-fuchsia-300 underline">ทำชุดเต็ม 93 ข้อ</button> เพื่อความแม่นยำที่สูงขึ้น
+        </p>
+      )}
+    </div>
+  );
+
+  // ═══════════ หน้าผลลัพธ์ ═══════════
+  const resultScreen = () => {
+    if (!result) return null;
+    const info: MbtiTypeInfo | undefined = typeInfo(result.code);
+    const isShort = quizModeOf(result) === "สั้น 32";
+    const prevSame = history.filter((h) => h.code === result.code).length;
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto w-full">
+        <div className="card panel-glow p-8 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
+            <div className="text-center space-y-2 order-2 sm:order-1">
+              <div className="text-6xl">{info?.emoji ?? "🧩"}</div>
+              <div className="text-4xl mbti-serif font-bold text-fuchsia-300 tracking-widest glow-text">{result.code}</div>
+              <div className="text-xl font-bold text-white">{info?.name} — {info?.nameEn}</div>
+              <p className="text-sm text-fuchsia-200/80 italic">&quot;{info?.tagline}&quot;</p>
+            </div>
+            <div className="order-1 sm:order-2">
+              <Seal letters={result.code} dims={result.dims} famRgb={FAM_RGB[familyOf(result.code) ?? "nt"]} />
+            </div>
+          </div>
+          <p className="text-sm text-gray-400 max-w-2xl mx-auto leading-relaxed">{info?.desc}</p>
+          <div className="flex flex-wrap justify-center gap-2 pt-1 text-xs text-gray-500">
+            <span className="inset px-2 py-1 rounded">ทำ {fmtDate(result.date)}</span>
+            <span className="inset px-2 py-1 rounded">{quizModeOf(result)}</span>
+            <span className="inset px-2 py-1 rounded">ประมาณ {info?.share}% ของประชากร</span>
+            {prevSame > 1 && <span className="inset px-2 py-1 rounded">ได้ผลนี้แล้ว {prevSame} ครั้ง</span>}
+          </div>
+          {isShort && (
+            <div className="inset rounded-lg p-3 text-xs text-amber-200/90 max-w-xl mx-auto">
+              📱 นี่คือผลจากควิซสั้น 32 ข้อ (ประเมินเบื้องต้น) —{" "}
+              <button onClick={() => start("full")} className="text-fuchsia-300 underline">ทำชุดเต็ม 93 ข้อ</button> เพื่อยืนยันความแม่นยำ
+            </div>
+          )}
+        </div>
+
+        <div className="card p-5 space-y-4">
+          <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2"><Icon name="predictive" size={14} /> คะแนนรายมิติ</h3>
+          {result.dims.map((d) => {
+            const L = DIM_LABEL[d.dim];
+            return (
+              <div key={d.dim}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className={d.letter === d.first ? "text-fuchsia-300 font-bold" : "text-gray-500"}>{L.first} · {d.firstCount}</span>
+                  <span className={d.letter === d.second ? "text-fuchsia-300 font-bold" : "text-gray-500"}>{d.secondCount} · {L.second}</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-gray-800 overflow-hidden flex" title={`ความชัด ${d.clarity}%`}>
+                  <div className="h-full bg-gradient-to-r from-fuchsia-600 to-violet-500" style={{ width: `${d.firstPct}%` }} />
+                  <div className="h-full bg-gray-700" style={{ width: `${100 - d.firstPct}%` }} />
+                </div>
+                <div className="text-[10px] text-gray-500 mt-0.5 text-right">ความชัดเจน {d.clarity}%{d.clarity < 15 ? " — ใกล้เคียงมาก ลองอ่านทั้งสองฝั่งประกอบ" : ""}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-emerald-300 mb-3 flex items-center gap-2"><Icon name="check-circle" size={14} /> จุดแข็ง</h3>
+            <ul className="space-y-1.5 text-sm text-gray-300">
+              {info?.strengths.map((s) => <li key={s} className="flex gap-2"><span className="text-emerald-400">▸</span>{s}</li>)}
+            </ul>
+          </div>
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-rose-300 mb-3 flex items-center gap-2"><Icon name="alert-triangle" size={14} /> จุดที่ควรระวัง</h3>
+            <ul className="space-y-1.5 text-sm text-gray-300">
+              {info?.weaknesses.map((s) => <li key={s} className="flex gap-2"><span className="text-rose-400">▸</span>{s}</li>)}
+            </ul>
+          </div>
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-sky-300 mb-3 flex items-center gap-2"><Icon name="knowledge" size={14} /> เส้นทางอาชีพที่เข้ากัน</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {info?.careers.map((c) => <span key={c} className="px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-xs text-gray-300">{c}</span>)}
+            </div>
+          </div>
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-amber-300 mb-3 flex items-center gap-2"><Icon name="dashboard" size={14} /> เข้ากับบ้านอัจฉริยะนี้อย่างไร</h3>
+            <p className="text-sm text-gray-300 leading-relaxed">{info?.homeFit}</p>
+            <p className="text-xs text-gray-500 mt-3">✨ คู่ที่มักเข้ากันดี: <b className="text-fuchsia-300">{info?.pair}</b> — <Link href="/mbti/compare" className="underline">เทียบกับคนสำคัญ</Link></p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 justify-center">
+          <button onClick={() => start(mode)} className="btn-secondary px-5 py-2 text-sm">ทำใหม่อีกครั้ง</button>
+          <button onClick={() => openLibrary(result.code)} className="btn-secondary px-5 py-2 text-sm">เทียบกับ 16 ประเภท</button>
+          <button onClick={() => setScreen("intro")} className="px-4 py-2 bg-gray-800 rounded-lg text-sm">← กลับหน้าหลัก MBTI</button>
+        </div>
+      </div>
+    );
+  };
+
+  // ═══════════ คลัง 16 ประเภท ═══════════
+  const libraryScreen = (
+    <div className="space-y-4 w-full">
+      {libraryCode && (
+        <button onClick={() => setLibraryCode(null)} className="text-xs text-gray-400 hover:text-white flex items-center gap-1">
+          ← ดูทั้ง 16 ประเภท
+        </button>
+      )}
+      {!libraryCode ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[["นักวิเคราะห์ (NT)", ["INTJ", "INTP", "ENTJ", "ENTP"]],
+              ["นักการทูต (NF)", ["INFJ", "INFP", "ENFJ", "ENFP"]],
+              ["ผู้พิทักษ์ (SJ)", ["ISTJ", "ISFJ", "ESTJ", "ESFJ"]],
+              ["นักสำรวจ (SP)", ["ISTP", "ISFP", "ESTP", "ESFP"]]].map(([group, codes]) => (
+              <div key={group as string} className="card p-3">
+                <div className="text-xs font-bold text-gray-300 mb-2">{group as string}</div>
+                <div className="space-y-1.5">
+                  {(codes as string[]).map((c) => {
+                    const t = typeInfo(c)!;
+                    return (
+                      <button key={c} onClick={() => setLibraryCode(c)}
+                        className="w-full inset px-2.5 py-2 rounded-lg flex items-center gap-2 text-left hover:border-fuchsia-500/40 transition-colors">
+                        <span className="text-lg">{t.emoji}</span>
+                        <span className="text-xs font-bold text-fuchsia-200 w-11">{c}</span>
+                        <span className="text-xs text-gray-400 truncate">{t.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-fuchsia-300 mb-3">เทียบความหายาก (% ประชากรโดยประมาณ)</h3>
+            <div className="space-y-1.5">
+              {[...MBTI_TYPES].sort((a, b) => a.share - b.share).map((t) => (
+                <button key={t.code} onClick={() => setLibraryCode(t.code)} className="w-full flex items-center gap-2 text-left group">
+                  <span className="text-xs w-12 text-gray-400 group-hover:text-white" style={{ borderBottom: `2px solid rgb(${FAM_RGB[familyOf(t.code) ?? "nt"]})` }}>{t.code}</span>
+                  <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-violet-600 to-fuchsia-500" style={{ width: `${Math.min(100, (t.share / 14) * 100)}%` }} />
+                  </div>
+                  <span className="text-[10px] text-gray-500 w-10 text-right">{t.share}%</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (() => {
+        const t = typeInfo(libraryCode)!;
+        return (
+          <div className="space-y-4">
+            <div className="card panel-glow p-6 space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">{t.emoji}</span>
+                <div>
+                  <div className="text-2xl mbti-serif font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(t.code) ?? "nt"]})` }}>{t.code} — {t.name}</div>
+                  <div className="text-sm text-gray-400">{t.nameEn} · ~{t.share}% ของประชากร · คู่เข้ากัน: {t.pair}</div>
+                </div>
+              </div>
+              <p className="text-sm text-fuchsia-200/80 italic">&quot;{t.tagline}&quot;</p>
+              <p className="text-sm text-gray-300 leading-relaxed">{t.desc}</p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="card p-5">
+                <h3 className="text-sm font-bold text-emerald-300 mb-2">จุดแข็ง</h3>
+                <ul className="space-y-1.5 text-sm text-gray-300">{t.strengths.map((s) => <li key={s} className="flex gap-2"><span className="text-emerald-400">▸</span>{s}</li>)}</ul>
+              </div>
+              <div className="card p-5">
+                <h3 className="text-sm font-bold text-rose-300 mb-2">จุดที่ควรระวัง</h3>
+                <ul className="space-y-1.5 text-sm text-gray-300">{t.weaknesses.map((s) => <li key={s} className="flex gap-2"><span className="text-rose-400">▸</span>{s}</li>)}</ul>
+              </div>
+              <div className="card p-5">
+                <h3 className="text-sm font-bold text-sky-300 mb-2">อาชีพที่เข้ากัน</h3>
+                <div className="flex flex-wrap gap-1.5">{t.careers.map((c) => <span key={c} className="px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-xs text-gray-300">{c}</span>)}</div>
+              </div>
+              <div className="card p-5">
+                <h3 className="text-sm font-bold text-amber-300 mb-2">ในบ้านอัจฉริยะนี้</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{t.homeFit}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+
+  // ═══════════ วิวัฒนาการ (กราฟย้อนหลัง) ═══════════
+  const evolutionScreen = (() => {
+    // เรียงเก่า → ใหม่ (ใหม่อยู่ขวาสุด) — แยกชุดเต็มกับชุดสั้นออกจากกัน
+    const all = [...history].reverse();
+    const full = all.filter((r) => quizModeOf(r) === "เต็ม 93");
+    const short = all.filter((r) => quizModeOf(r) === "สั้น 32");
+    if (all.length < 2) {
+      return (
+        <div className="card p-8 text-center max-w-xl mx-auto">
+          <div className="text-5xl mb-3">📈</div>
+          <h3 className="text-lg font-bold mb-2">ต้องมีผลอย่างน้อย 2 ครั้ง</h3>
+          <p className="text-sm text-gray-400 mb-4">ทำแบบทดสอบซ้ำในวันต่างกัน (แนะนำเว้น 2–4 สัปดาห์ หลังเหตุการณ์สำคัญในชีวิต) แล้วกราฟนี้จะแสดงการเปลี่ยนแปลงรายมิติ</p>
+          <button onClick={() => start("short")} className="btn-primary px-5 py-2 text-sm">เริ่มควิซสั้น 32 ข้อ</button>
+        </div>
+      );
+    }
+    const W = 640, H = 200, PAD_L = 46, PAD_R = 16, PAD_T = 14, PAD_B = 30;
+    const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+    // ความหมายแกน: 0% = ตัวอักษรแรก (E/S/T/J) เต็มขวา, 100% = ตัวอักษรที่สอง (I/N/F/P)
+    const dims = ["EI", "SN", "TF", "JP"] as const;
+    const dimColors: Record<string, string> = { EI: "#fbbf24", SN: "#38bdf8", TF: "#34d399", JP: "#c084fc" };
+    const series = (list: MbtiResult[]) => dims.map((dim) => {
+      const pts = list.map((r, i) => {
+        const d = r.dims.find((x) => x.dim === dim);
+        const secondPct = d ? 100 - d.firstPct : 50; // 0=ฝั่งแรก 100=ฝั่งสอง
+        return { x: PAD_L + (list.length === 1 ? plotW / 2 : (i / (list.length - 1)) * plotW), y: PAD_T + (1 - secondPct / 100) * plotH, pct: secondPct, code: r.code };
+      });
+      return { dim, pts };
+    });
+    const seriesList = [
+      ...(full.length >= 1 ? [{ label: "ชุดเต็ม 93", list: full, dash: "" }] : []),
+      ...(short.length >= 1 ? [{ label: "ควิซสั้น 32", list: short, dash: "4 4" }] : []),
+    ];
+    return (
+      <div className="space-y-4 max-w-4xl mx-auto w-full">
+        <div className="card panel-glow p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2"><Icon name="predictive" size={14} /> วิวัฒนาการรายมิติ ({all.length} ครั้ง)</h3>
+            <div className="flex gap-3 text-[11px] text-gray-400">
+              {full.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-fuchsia-400 align-middle mr-1" />ชุดเต็ม 93</span>}
+              {short.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-dashed border-sky-400 align-middle mr-1" />ควิซสั้น 32</span>}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[520px]" role="img" aria-label="กราฟวิวัฒนาการ MBTI รายมิติ">
+              {/* กริด + ป้ายแกนซ้าย/ขวา */}
+              {[0, 0.5, 1].map((f) => (
+                <line key={f} x1={PAD_L} x2={W - PAD_R} y1={PAD_T + f * plotH} y2={PAD_T + f * plotH} stroke="#374151" strokeDasharray={f === 0.5 ? "3 4" : ""} strokeWidth="1" />
+              ))}
+              {/* เส้นข้อมูล */}
+              {seriesList.map((s) => series(s.list).map(({ dim, pts }) => (
+                <g key={s.label + dim}>
+                  <polyline
+                    points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke={dimColors[dim]}
+                    strokeWidth={s.dash ? 1.6 : 2.4}
+                    strokeDasharray={s.dash || undefined}
+                    opacity={s.dash ? 0.65 : 0.95}
+                  />
+                  {pts.map((p, i) => (
+                    <g key={i}>
+                      <circle cx={p.x} cy={p.y} r={4.5} fill={dimColors[dim]} opacity={s.dash ? 0.5 : 0.95}>
+                        <title>{`${DIM_LABEL[dim].hint}: ${p.pct}% ฝั่ง${DIM_LABEL[dim].second.split(" ")[0]} (${p.code}, ${fmtDate(s.list[i].date)})`}</title>
+                      </circle>
+                      {i === pts.length - 1 && (
+                        <text x={p.x + 7} y={p.y + 3} fontSize="9" fill={dimColors[dim]} opacity="0.9">{s.label}</text>
+                      )}
+                    </g>
+                  ))}
+                </g>
+              )))}
+              {/* ป้ายวันที่ใต้แกน (อิงชุดที่มีจุดมากที่สุด) */}
+              {(() => {
+                const ref = full.length >= short.length ? full : short;
+                return ref.map((r, i) => (
+                  <text key={i} x={PAD_L + (ref.length === 1 ? plotW / 2 : (i / (ref.length - 1)) * plotW)} y={H - 8} fontSize="8.5" fill="#9ca3af" textAnchor={i === 0 ? "start" : i === ref.length - 1 ? "end" : "middle"}>
+                    {new Date(r.date).toLocaleDateString("th-TH", { month: "short", day: "numeric" })}·{r.code}
+                  </text>
+                ));
+              })()}
+            </svg>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-400">
+            {dims.map((dim) => (
+              <span key={dim} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: dimColors[dim] }} />
+                <b className="text-gray-300">{DIM_LABEL[dim].hint}</b> — ล่าง = {DIM_LABEL[dim].first.split(" ")[0]} · บน = {DIM_LABEL[dim].second.split(" ")[0]}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* สรุปการเปลี่ยนแปลง */}
+        {all.length >= 2 && (() => {
+          const oldest = all[0], newest = all[all.length - 1];
+          const changes = dims.map((dim) => {
+            const d1 = oldest.dims.find((x) => x.dim === dim);
+            const d2 = newest.dims.find((x) => x.dim === dim);
+            const letter1 = d1?.letter ?? "?", letter2 = d2?.letter ?? "?";
+            const shift = d1 && d2 ? d2.firstPct - d1.firstPct : 0;
+            return { dim, letter1, letter2, changed: letter1 !== letter2, shift };
+          });
+          const changed = changes.filter((c) => c.changed);
+          return (
+            <div className="card p-5 space-y-2">
+              <h3 className="text-sm font-bold text-fuchsia-300">สรุปการเปลี่ยนแปลง</h3>
+              <p className="text-sm text-gray-300">
+                {fmtDate(oldest.date)} คุณเป็น <b className="text-fuchsia-300">{oldest.code}</b> → ล่าสุด ({fmtDate(newest.date)}) เป็น <b className="text-fuchsia-300">{newest.code}</b>
+              </p>
+              {changed.length === 0 ? (
+                <p className="text-sm text-emerald-300">✅ ตัวอักษรทั้ง 4 ตัวมั่นคง — บุคลิกภาพของคุณสอดคล้องกันดีระหว่างสองช่วงเวลา</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {changed.map((c) => (
+                    <div key={c.dim} className="inset rounded-lg px-3 py-2 text-sm">
+                      <b className="text-amber-300">{DIM_LABEL[c.dim].hint}</b> เปลี่ยนจาก {c.letter1} → {c.letter2}
+                      <span className="text-xs text-gray-500 ml-2">(คะแนนเลื่อน {Math.abs(c.shift)}%)</span>
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-500 pt-1">💡 มิติที่เปลี่ยนบ่อยคือมิติที่คุณ &quot;ยืดหยุ่น&quot; มากที่สุด — ไม่ใช่ความผิดพลาด แต่คือบริบทชีวิตที่เปลี่ยนไป</p>
+                </div>
+              )}
+              {(() => {
+                const avg = dims.map((dim) => {
+                  const cl = all.map((r) => r.dims.find((x) => x.dim === dim)?.clarity ?? 0);
+                  return Math.round(cl.reduce((a, b) => a + b, 0) / cl.length);
+                });
+                return (
+                  <p className="text-xs text-gray-500">
+                    ความชัดเจนเฉลี่ยรายมิติ: {dims.map((d, i) => `${DIM_LABEL[d].hint} ${avg[i]}%`).join(" · ")}
+                  </p>
+                );
+              })()}
+            </div>
+          );
+        })()}
+      </div>
+    );
+  })();
+
+  const titles: Record<Screen, string> = {
+    intro: "MBTI — รู้จักตัวเอง 16 ประเภท",
+    quiz: mode === "short" ? "ควิซสั้น — 32 ข้อ" : "แบบทดสอบ — 93 ข้อ",
+    result: "ผลลัพธ์ของคุณ",
+    library: "คลัง 16 ประเภท",
+    evolution: "วิวัฒนาการของฉัน",
+  };
+
+  const navBtn = (key: Screen, label: string) => (
+    <button onClick={() => setScreen(key)} className={screen === key ? "text-fuchsia-300 font-bold" : "text-gray-400 hover:text-white"}>{label}</button>
+  );
+
+  return (
+    <div className="atmo-mind min-h-screen bg-gray-950 text-gray-100 flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <PageHeader
+          eyebrow="ชีวิต & สุขภาพ"
+          title={titles[screen]}
+          subtitle="Local-First — ทำเอง เก็บเองในเบราว์เซอร์ ไม่ส่งข้อมูลออกนอกเครื่อง"
+          icon={<Icon name="healing" size={18} />}
+          actions={
+            <div className="flex gap-2 text-sm flex-wrap items-center">
+              {navBtn("intro", "หน้าหลัก")}
+              <span className="text-gray-700">·</span>
+              {navBtn("library", "คลัง 16 ประเภท")}
+              {history.length >= 2 && <>
+                <span className="text-gray-700">·</span>
+                {navBtn("evolution", "📈 วิวัฒนาการ")}
+              </>}
+              <span className="text-gray-700">·</span>
+              <Link href="/mbti/compare" className="text-gray-400 hover:text-white">⚖️ เทียบสองคน</Link>
+            </div>
+          }
+        />
+        <main className="flex-1 p-4 lg:p-6 w-full">
+          {screen === "intro" && introScreen}
+          {screen === "quiz" && quizScreen}
+          {screen === "result" && resultScreen()}
+          {screen === "library" && libraryScreen}
+          {screen === "evolution" && evolutionScreen}
+        </main>
+      </div>
+    </div>
+  );
+}

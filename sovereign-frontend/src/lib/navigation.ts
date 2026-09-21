@@ -71,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/skills', label: 'ทักษะคน', labelKey: 'common.nav.skills', icon: 'users', keywords: 'ทักษะ สกิล คน ครอบครัว' },
       { href: '/health', label: 'ตรวจสุขภาพ', labelKey: 'common.nav.health', icon: 'health', keywords: 'สุขภาพ ตรวจสุขภาพ โรค คัดกรอง สมุนไพร' },
       { href: '/health/self-check', label: 'Self-Check 32 ข้อ', labelKey: 'common.nav.selfCheck', icon: 'healing', keywords: 'self-check วินิจฉัย ตัวเอง 32 ข้อ พูด พิมพ์ คัดกรอง' },
+      { href: '/mbti', label: 'แบบทดสอบ MBTI', labelKey: 'common.nav.mbti', icon: 'healing', keywords: 'mbti บุคลิกภาพ 16 ประเภท แบบทดสอบ จิตวิทยา รู้จักตัวเอง สมอง ใจ E I S N T F J P' },
       { href: '/healing', label: 'ธรรมะบำบัด', labelKey: 'common.nav.healing', icon: 'healing', keywords: 'ธรรมะ สมาธิ สมุนไพร เยียวยา วัด ใจ' },
       { href: '/lifestyle', label: 'วิถีชีวิต', labelKey: 'common.nav.lifestyle', icon: 'lifestyle', keywords: 'วิถี ชีวิต ธรรมชาติ จังหวะ หน้าต่าง อากาศ แสง circadian manual day' },
       { href: '/crisis', label: 'โหมดวิกฤต', labelKey: 'common.nav.crisis', icon: 'shield', keywords: 'วิกฤต ฉุกเฉิน น้ำท่วม ดับไฟ ปลอดภัย' },

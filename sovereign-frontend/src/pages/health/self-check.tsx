@@ -7,6 +7,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
 import { useLanguageStore } from "../../stores/useLanguageStore";
 import Link from "next/link";
+import { careToneFor, latestLocalResult } from "../../lib/mbtiData";
 
 type HealthCategory = "SLEEP" | "URINATION" | "APPETITE" | "DIGESTION" | "FATIGUE" | "FEVER" | "MOOD" | "OTHER";
 
@@ -99,6 +100,9 @@ export default function SelfCheckPage() {
   const [done, setDone] = useState<any>(null);
   const [error, setError] = useState("");
   const recogRef = useRef<any>(null);
+  // MBTI care-tone — ปรับโทนการดูแลตามบุคลิกภาพ (ผลจากเครื่องนี้)
+  const [tone, setTone] = useState<ReturnType<typeof careToneFor>>(null);
+  useEffect(() => { setTone(careToneFor(latestLocalResult()?.code)); }, []);
 
   const q = QUESTIONS[idx];
   const progress = Math.round((Object.keys(answers).length / QUESTIONS.length) * 100);
@@ -212,6 +216,13 @@ export default function SelfCheckPage() {
         <div className="flex-1 flex flex-col min-w-0">
           <PageHeader eyebrow="ชีวิต & สุขภาพ" title="ผลวินิจฉัยเบื้องต้น" icon={<Icon name="health" size={18} />} />
           <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-3xl mx-auto w-full space-y-4 w-full">
+            {tone && (
+              <div className="card p-4 space-y-1.5">
+                <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-1.5">🧠 มุมที่ดูแลสำหรับ {tone.code} — {tone.label}</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{tone.selfCheck}</p>
+                <p className="text-xs text-gray-500">💡 {tone.insight} · <a href="/mbti" className="underline">ดูผล MBTI ของคุณ</a></p>
+              </div>
+            )}
             <div className="card panel-glow p-6 text-center">
               <div className="text-5xl mb-3">✅</div>
               <h2 className="text-lg font-bold glow-text">บันทึกแล้ว {answered} ข้อ</h2>
@@ -245,11 +256,10 @@ export default function SelfCheckPage() {
   return (
     <div className="atmo-wellness min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <PageHeader
+      <div className="flex-1 flex flex-col min-w-0">          <PageHeader
             eyebrow="ชีวิต & สุขภาพ"
             title="Self-Check — วินิจฉัยตัวเอง 32 ข้อ"
-            subtitle="พูดตอบหรือพิมพ์ตอบก็ได้ — AI เก็บให้อัตโนมัติ (0=ไม่มี 5=ทุกวัน/รุนแรง)"
+            subtitle={tone ? `${tone.salut} — พูดตอบหรือพิมพ์ตอบก็ได้ (0=ไม่มี 5=ทุกวัน/รุนแรง)` : "พูดตอบหรือพิมพ์ตอบก็ได้ — AI เก็บให้อัตโนมัติ (0=ไม่มี 5=ทุกวัน/รุนแรง)"}
             icon={<Icon name="health" size={18} />}
             actions={<Link href="/health" className="text-sm text-sky-400 hover:underline">← กลับ Health</Link>}
           />

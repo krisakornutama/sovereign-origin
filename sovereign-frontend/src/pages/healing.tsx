@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import Icon from '../components/ui/Icon';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import { careToneFor, latestLocalResult } from '../lib/mbtiData';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
 interface Teaching {
@@ -116,6 +117,9 @@ export default function HealingPage() {
   const [metricForm, setMetricForm] = useState({ metric: 'stress', value: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // MBTI care-tone — หลวงพี่ AI ปรับบุคลิกตามประเภทของผู้ใช้ (ผลจากเครื่องนี้)
+  const [tone, setTone] = useState<ReturnType<typeof careToneFor>>(null);
+  useEffect(() => { setTone(careToneFor(latestLocalResult()?.code)); }, []);
 
   const load = useCallback(async () => {
     try {
@@ -169,7 +173,7 @@ export default function HealingPage() {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/healing/companion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: chatMsg }),
+        body: JSON.stringify(tone ? { message: chatMsg, mbti: tone.code } : { message: chatMsg }),
       });
       const j = await r.json();
       setChatReply(j.reply ?? (j.error ?? t('healing.companion.noReply', 'ไม่มีการตอบกลับ')));
@@ -303,8 +307,8 @@ export default function HealingPage() {
           {tab === 'ธรรมะ' && (
             <div className="grid md:grid-cols-2 gap-4">
               <div className={`${CARD} p-4 space-y-3 panel-glow`}>
-                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> AI Dhamma Companion</h2>
-                <p className="text-xs text-[#8A7A58]">{t('healing.companion.desc', 'เล่าให้หลวงพี่ AI ฟัง — ระบบค้นพุทธวจนะที่ตรง แล้วปลอบโยนพร้อมคำแนะนำการปฏิบัติ')}</p>
+                <h2 className="text-base font-semibold text-[#EDE3CC]"><span className="text-[#E3B04B]">▍</span> AI Dhamma Companion{tone && <span className="text-[#B99F70] text-sm font-normal"> — {tone.yakLabel}</span>}</h2>
+                <p className="text-xs text-[#8A7A58]">{t('healing.companion.desc', 'เล่าให้หลวงพี่ AI ฟัง — ระบบค้นพุทธวจนะที่ตรง แล้วปลอบโยนพร้อมคำแนะนำการปฏิบัติ')}{tone && <span className="block mt-1 text-[#B99F70]">🧠 ปรับโทนสำหรับ {tone.code} ({tone.label}): {tone.healing}</span>}</p>
                 <textarea
                   value={chatMsg}
                   onChange={(e) => setChatMsg(e.target.value)}
