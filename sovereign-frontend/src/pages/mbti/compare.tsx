@@ -150,16 +150,16 @@ export default function MbtiComparePage() {
                         {profiles.map((p) => {
                           const info = typeInfo(p.result.code);
                           return (
-                            <div key={p.id} className="inset rounded-lg px-3 py-2 flex items-center gap-3">
-                              <span className="text-lg">{info?.emoji ?? "🧩"}</span>
-                              <button onClick={() => setOtherCode(p.result.code)} className="flex items-center gap-2 flex-1 text-left hover:text-white">
-                                <span className="font-bold text-sm">{p.name}</span>
-                                <span className="text-xs" style={{ color: `rgb(${FAM_RGB[familyOf(p.result.code) ?? "nt"]})` }}>{p.result.code}</span>
-                                <span className="text-xs text-gray-500">{info?.name}</span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">{p.quiz === 'full' ? 'ชุดเต็ม 93' : 'ควิซสั้น 32'}</span>
+                            <div key={p.id} className="inset rounded-lg px-3 py-2 flex items-center gap-2 sm:gap-3 min-w-0">
+                              <span className="text-lg shrink-0">{info?.emoji ?? "🧩"}</span>
+                              <button onClick={() => setOtherCode(p.result.code)} className="flex items-center gap-2 flex-1 text-left hover:text-white min-w-0">
+                                <span className="font-bold text-sm shrink-0 max-w-[9rem] truncate">{p.name}</span>
+                                <span className="text-xs shrink-0" style={{ color: `rgb(${FAM_RGB[familyOf(p.result.code) ?? "nt"]})` }}>{p.result.code}</span>
+                                <span className="text-xs text-gray-500 truncate">{info?.name}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 shrink-0 hidden sm:inline">{p.quiz === 'full' ? 'ชุดเต็ม 93' : 'ควิซสั้น 32'}</span>
                               </button>
                               <button onClick={() => { deleteProfile(p.id); setProfiles(loadProfiles()); }}
-                                className="text-xs text-gray-600 hover:text-rose-400" title="ลบโปรไฟล์">ลบ</button>
+                                className="text-xs text-gray-600 hover:text-rose-400 shrink-0" title="ลบโปรไฟล์">ลบ</button>
                             </div>
                           );
                         })}
@@ -182,6 +182,7 @@ export default function MbtiComparePage() {
                   </div>
                   <QuizCard
                     key={quizKind}
+                    variant="inline"
                     questions={quizKind === 'full' ? MBTI_QUESTIONS : MBTI_SHORT_QUESTIONS}
                     title="แบบทดสอบของอีกคน"
                     subtitle="ให้เขานั่งทำเอง — เลือกข้อความที่ตรงกับเขากว่า ไม่มีถูกผิด"
@@ -237,7 +238,7 @@ export default function MbtiComparePage() {
                           <span className="inset px-2 py-1 rounded text-xs text-amber-300">ต่างกัน {compare.summary.diffCount}/4 มิติ</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-center gap-3 sm:gap-6">
+                      <div className="flex items-center justify-center gap-2 sm:gap-6">
                         <Seal letters={myResult.code} dims={myResult.dims} famRgb={FAM_RGB[familyOf(myResult.code) ?? "nt"]} />
                         <span className="text-lg text-gray-600 font-light">×</span>
                         <Seal letters={otherCode} dims={compare.dims.map((d, i) => ({ dim: d.dim, letter: otherCode[i], clarity: 50 }))} famRgb={FAM_RGB[familyOf(otherCode) ?? "nt"]} />

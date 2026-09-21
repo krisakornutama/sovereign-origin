@@ -36,7 +36,7 @@ export default function Seal({ letters, dims, famRgb, ghost = false, className }
   };
 
   return (
-    <svg viewBox="0 0 120 120" className={`h-44 w-44 shrink-0${className ? ` ${className}` : ''}`} role="img" aria-label={`ตราแปดส่วนของ ${letters}`}>
+    <svg viewBox="0 0 120 120" className={`h-32 w-32 sm:h-44 sm:w-44 shrink-0${className ? ` ${className}` : ''}`} role="img" aria-label={`ตราแปดส่วนของ ${letters}`}>
       {segs.map((s, i) => (
         <path key={i} d={wedge(s.a, s.b)}
           fill={ghost || !s.win ? 'none' : `rgb(${famRgb} / ${0.25 + (0.55 * s.clarity) / 100})`}
