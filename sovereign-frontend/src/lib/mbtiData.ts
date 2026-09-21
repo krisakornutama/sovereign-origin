@@ -519,6 +519,14 @@ export interface CompareDimRow {
 export interface CompareSummary { headline: string; sameCount: number; diffCount: number; }
 
 export const DIM_LABELS: Record<MbtiDim, string> = { EI: 'พลังงาน', SN: 'การรับรู้', TF: 'การตัดสินใจ', JP: 'วิถีชีวิต' };
+
+/** ข้อมูลมิติแบบสั้น (แหล่งเดียว) — ชิปในควิซ, คำอธิบายแกนกราฟ, สรุปวิวัฒนาการ */
+export const MBTI_DIM_INFO: Record<MbtiDim, { hint: string; firstShort: string; secondShort: string }> = {
+  EI: { hint: 'พลังงานมาจากไหน', firstShort: 'E', secondShort: 'I' },
+  SN: { hint: 'รับข้อมูลโลกแบบไหน', firstShort: 'S', secondShort: 'N' },
+  TF: { hint: 'ตัดสินใจด้วยอะไร', firstShort: 'T', secondShort: 'F' },
+  JP: { hint: 'ใช้ชีวิตแบบไหน', firstShort: 'J', secondShort: 'P' },
+};
 export const LETTER_NAMES: Record<string, string> = {
   E: 'มุ่งออก', I: 'มุ่งเข้า', S: 'จับต้องได้', N: 'นามธรรม',
   T: 'ตรรกะ', F: 'ความรู้สึก', J: 'จัดระเบียบ', P: 'ล่องลอย',
