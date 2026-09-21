@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useIsSuperadmin } from '../../lib/roles';
 import Link from 'next/link';
 import { authFetch } from '../../lib/apiFetch';
+import { withMbti } from '../../lib/mbtiAi';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import VoiceInput from './VoiceInput';
@@ -138,7 +139,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify(withMbti({ message: text })),
       });
 
       if (!res.ok) throw new Error('API error');
