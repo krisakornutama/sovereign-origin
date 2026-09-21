@@ -15,6 +15,8 @@ export default {
     openLibrary: 'Browse all 16 types',
     compareLink: '⚖️ Compare with partner/family',
     viewEvolution: 'View history chart →',
+    eyebrow: 'Life & Health',
+    localFirst: 'Local-First — done on your device, stored in your browser, nothing sent off it',
   },
   monk: {
     askPrompt: 'Ask the monk to explain this result',
@@ -26,6 +28,7 @@ export default {
     askMessage: 'Please explain my personality test result ({code}) — how should someone like me take care of their mind?',
   },
   result: {
+    title: 'Your result',
     taken: 'Taken {date}',
     rarity: '≈ {share}% of population',
     timesBefore: 'Got this result {n} times before',
@@ -45,6 +48,7 @@ export default {
     rarityCompare: 'Compare rarity (approx. % of population)',
   },
   evolution: {
+    title: 'My evolution',
     needTwo: 'Need at least 2 results',
     needTwoHint: 'Retake on different days (2–4 weeks apart is recommended, after major life events) and this chart shows per-dimension shifts',
     startShort: 'Start the 32-item short quiz',

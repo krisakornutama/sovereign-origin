@@ -10,7 +10,7 @@ import { defineConfig, devices } from '@playwright/test';
 // ────────────────────────────────────────────────────────────────────────────
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /mbti-ai-chat\.spec\.ts/,
+  testMatch: /mbti-(ai-chat|i18n-verify)\.spec\.ts/,
   timeout: 60_000,
   fullyParallel: false,
   workers: 1,
