@@ -196,7 +196,7 @@ export default function RelayPage() {
       <PageHeader
           eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
           title="รีเลย์ — สวิตช์ทุกห้องในมือเดียว" theme="power" icon={<Icon name="relay" size={18} />}
-          subtitle={t('relay.subtitle', 'เปิด-ปิดเครื่องใช้ทั่วบ้าน ตามห้องและวงจร')} actions={<div className="flex gap-3 items-center">
+          subtitle="เปิด-ปิดเครื่องใช้ทั่วบ้าน ตามห้องและวงจร" actions={<div className="flex gap-3 items-center">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</Link>
         </div>}
         />

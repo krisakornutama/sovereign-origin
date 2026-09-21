@@ -117,7 +117,7 @@ export default function SystemHealthPage() {
       <PageHeader
           eyebrow={t('system.page.eyebrow', 'ระบบ')}
           title="สุขภาพระบบ"
-          subtitle={t('system.page.subtitle', 'สถานะหัวใจของบ้าน — API · ฐานข้อมูล · AI · เครือข่าย')} icon={<Icon name="system" size={18} />} actions={<div className="flex items-center gap-3">
+          subtitle="สถานะหัวใจของบ้าน — API · ฐานข้อมูล · AI · เครือข่าย" icon={<Icon name="system" size={18} />} actions={<div className="flex items-center gap-3">
           <Link href="/system/ai-models" scroll={false} className="text-sm text-emerald-400 hover:underline inline-flex items-center gap-1"><Icon name="cpu" size={13} /> {t('system.page.aiModels', 'AI Model Manager')}</Link>
           <Link href="/ai-agent" scroll={false} className="text-sm text-sky-400 hover:underline">{t('system.page.aiAgent', 'AI Agent')}</Link>
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('system.page.backDashboard', '← กลับ Dashboard')}</Link>
