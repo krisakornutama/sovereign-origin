@@ -30,6 +30,8 @@ export default {
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {
     totalDevices: 'Total devices',
+    online: 'Online',
+    offline: 'Offline',
   },
   stats: {
     battery: 'Battery',
@@ -67,6 +69,7 @@ export default {
     pendingSummary: 'Pending:',
     choresCount: '{name} {n} chores pending',
     billsCount: '{name} {n} unpaid bills',
+    noQuizYet: 'No quiz attempt yet',
     viewHome: '→ View home',
     weekdays: {
       sunday: 'Sunday',
@@ -247,5 +250,12 @@ export default {
     emptyBefore: 'No data yet — enable ',
     emptyAfter: ' in .env, then click',
     fetchPrices: ' fetch prices',
+  },
+
+  // ── D4: MBTI invite card (shown only when no result exists) ──
+  mbtiCard: {
+    title: 'Know yourself a little better',
+    desc: 'Take the 16-type personality test (5–7 min) and the AI adapts its care tone to you',
+    cta: 'Start the test →',
   },
 } as const;

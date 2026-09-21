@@ -99,14 +99,15 @@ export function setAgentOllama(deps: { post?: PostFn }): void {
   if (deps?.post) ollamaPost = deps.post;
 }
 
-// ── Telegram DI (สรุปรายวัน) ──
-type NotifyFn = (message: string) => Promise<void>;
+// ── Telegram DI (สรุปรายวัน) — คืน true เมื่อส่งถึงมือผู้ใช้จริง (D1: ส่งไม่สำเร็จ = ห้ามมาร์ควัน) ──
+type NotifyFn = (message: string) => Promise<boolean>;
 let agentNotify: NotifyFn = async (message: string) => {
   try {
     const { sendTelegram } = await import('../modules/telegram/telegram.routes');
-    await sendTelegram(message);
+    return await sendTelegram(message);
   } catch (err) {
     console.error('agent notify error:', err instanceof Error ? err.message : err);
+    return false;
   }
 };
 export function setAgentNotify(fn: NotifyFn): void {
@@ -345,13 +346,24 @@ export async function processAgentQueue(opts?: { limit?: number }): Promise<{ ra
 /**
  * สรุปประจำวันส่ง Telegram ของแต่ละบทบาท (ทุกเช้า ตาม report_hour)
  * — กันส่งซ้ำด้วย last_report_date (YYYY-MM-DD) — รันแบบ await ใน worker
+ * D1: ไม่มี token → ปิดเงียบแบบมี flag (telegramConfigured: false, ไม่ crash cron อื่น)
+ *      ส่งไม่สำเร็จ (ตอบ false) → ไม่มาร์ค last_report_date เพื่อให้รอบถัดไป (30 นาที) ลองใหม่
  */
-export async function runMorningReports(now?: Date): Promise<{ reported: number; skipped: number }> {
+export async function runMorningReports(now?: Date): Promise<{
+  reported: number; skipped: number; telegramConfigured: boolean;
+}> {
   const at = now ?? new Date();
   const today = at.toISOString().slice(0, 10);
+  const { hasTelegramCredentials } = await import('./telegram-credentials.service');
+  const telegramConfigured = await hasTelegramCredentials();
   const roles = await prisma.agentRole.findMany({ where: { enabled: true } });
   let reported = 0;
   let skipped = 0;
+  if (!telegramConfigured) {
+    // ไม่มี token/chatId — ไม่ต้องสร้างงานให้เปล่า: ปิดเงียบแบบมี flag ชัดเจน (cron อื่นไม่กระทบ)
+    console.log('🤖 Agent morning report: ข้าม (Telegram ยังไม่ได้ตั้ง botToken/chatId — ตั้งได้ที่หน้า Settings)');
+    return { reported: 0, skipped: roles.length, telegramConfigured };
+  }
   for (const role of roles) {
     if (!role.daily_report) { skipped += 1; continue; }
     if (role.last_report_date === today) { skipped += 1; continue; }
@@ -368,10 +380,20 @@ export async function runMorningReports(now?: Date): Promise<{ reported: number;
     });
     const result = await executeAgentJob(job);
     if (result) {
-      await agentNotify(`🤖 ${role.emoji ?? '📋'} ${role.name} — สรุปประจำวัน\n${result}`);
+      const sent = await agentNotify(`🤖 ${role.emoji ?? '📋'} ${role.name} — สรุปประจำวัน\n${result}`);
+      if (!sent) {
+        // ส่งไม่ถึง (เช่น Telegram ล่มชั่วคราว) — ไม่มาร์ควัน ให้รอบถัดไปลองใหม่ รายงานไม่หาย
+        console.warn(`🤖 Agent morning report: ส่ง Telegram ไม่สำเร็จ (${role.name}) — จะลองใหม่รอบถัดไป`);
+        skipped += 1;
+        continue;
+      }
+      await prisma.agentRole.update({ where: { id: role.id }, data: { last_report_date: today } });
       reported += 1;
+    } else {
+      // Ollama ว่าง/ผลิตผลไม่ได้ — มาร์ควันได้ (งานสร้างแล้ว ผลเสียเป็นเรื่อง AI ไม่ใช่การส่ง)
+      await prisma.agentRole.update({ where: { id: role.id }, data: { last_report_date: today } });
+      skipped += 1;
     }
-    await prisma.agentRole.update({ where: { id: role.id }, data: { last_report_date: today } });
   }
-  return { reported, skipped };
+  return { reported, skipped, telegramConfigured };
 }

@@ -25,6 +25,7 @@ import knowledge from './pages/knowledge';
 import lifestyle from './pages/lifestyle';
 import { livestock } from './pages/livestock';
 import login from './pages/login';
+import mbti from './pages/mbti';
 import ota from './pages/ota';
 import portfolio from './pages/portfolio';
 import predictive from './pages/predictive';
@@ -67,6 +68,7 @@ export default {
   lifestyle,
   livestock,
   login,
+  mbti,
   ota,
   portfolio,
   predictive,

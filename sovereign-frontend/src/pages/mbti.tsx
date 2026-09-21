@@ -16,6 +16,7 @@ import {
   type MbtiResult, type MbtiTypeInfo, type MbtiQuestion,
 } from "../lib/mbtiData";
 import { authFetch } from "../lib/apiFetch";
+import { useLanguageStore } from "../stores/useLanguageStore";
 import Seal from "../components/mbti/Seal";
 import QuizCard from "../components/mbti/QuizCard";
 
@@ -43,6 +44,7 @@ function quizModeOf(r: MbtiResult): "เต็ม 93" | "สั้น 32" {
 }
 
 export default function MbtiPage() {
+  const t = useLanguageStore((s) => s.t);
   const [screen, setScreen] = useState<Screen>("intro");
   const [mode, setMode] = useState<"full" | "short">("full");
   const [result, setResult] = useState<MbtiResult | null>(null);
@@ -92,12 +94,12 @@ export default function MbtiPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.reply) {
-        setMonkError(j.error || 'หลวงพี่ตอบไม่ได้ตอนนี้ — ตรวจว่า AI (Ollama) เปิดอยู่');
+        setMonkError(j.error || t('mbti.monk.errorOffline', 'หลวงพี่ตอบไม่ได้ตอนนี้ — ตรวจว่า AI (Ollama) เปิดอยู่'));
         return;
       }
       setMonkReply(j.teaching?.title ? `${j.reply}\n\n📿 ${j.teaching.title}` : j.reply);
     } catch {
-      setMonkError('เชื่อมต่อ Core API ไม่ได้');
+      setMonkError(t('mbti.monk.errorConn', 'เชื่อมต่อ Core API ไม่ได้'));
     } finally {
       setMonkBusy(false);
     }
@@ -108,22 +110,22 @@ export default function MbtiPage() {
     <div className="space-y-5 max-w-3xl mx-auto w-full">
       <div className="card panel-glow p-8 text-center space-y-4">
         <div className="text-6xl">🧠</div>
-        <h2 className="text-xl font-bold glow-text">แบบทดสอบบุคลิกภาพ 16 ประเภท</h2>
+        <h2 className="text-xl font-bold glow-text">{t('mbti.page.introTitle', 'แบบทดสอบบุคลิกภาพ 16 ประเภท')}</h2>
         <p className="text-sm text-gray-400 leading-relaxed">
-          forced-choice เลือก A หรือ B — ไม่มีถูกผิด · ครบ 4 มิติ: มุ่งออก–มุ่งเข้า · จับต้องได้–นามธรรม · ตรรกะ–ความรู้สึก · จัดระเบียบ–ล่องลอย
+          {t('mbti.page.introDesc', 'forced-choice เลือก A หรือ B — ไม่มีถูกผิด · ครบ 4 มิติ: มุ่งออก–มุ่งเข้า · จับต้องได้–นามธรรม · ตรรกะ–ความรู้สึก · จัดระเบียบ–ล่องลอย')}
         </p>
         <div className="grid sm:grid-cols-2 gap-3 pt-2">
           <button onClick={() => start("short")} className="inset rounded-xl p-4 text-left hover:border-fuchsia-500/40 transition-colors">
-            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">📱 ควิซสั้น 32 ข้อ <span className="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-900/60 text-fuchsia-200">5–7 นาที</span></div>
-            <div className="text-xs text-gray-400 mt-1">เหมาะกับมือถือและมือใหม่ — ได้ผลตัวอักษร 4 ตัวเหมือนกัน</div>
+            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">{t('mbti.page.shortTitle', '📱 ควิซสั้น 32 ข้อ')} <span className="text-[10px] px-1.5 py-0.5 rounded bg-fuchsia-900/60 text-fuchsia-200">{t('mbti.page.shortBadge', '5–7 นาที')}</span></div>
+            <div className="text-xs text-gray-400 mt-1">{t('mbti.page.shortHint', 'เหมาะกับมือถือและมือใหม่ — ได้ผลตัวอักษร 4 ตัวเหมือนกัน')}</div>
           </button>
           <button onClick={() => start("full")} className="inset rounded-xl p-4 text-left hover:border-fuchsia-500/40 transition-colors">
-            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">📋 ชุดเต็ม 93 ข้อ <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">10–15 นาที</span></div>
-            <div className="text-xs text-gray-400 mt-1">แม่นยำตามโครงมาตรฐาน (21·26·28·18) — ควรทำเมื่อมีเวลา</div>
+            <div className="text-sm font-bold text-fuchsia-300 flex items-center gap-2">{t('mbti.page.fullTitle', '📋 ชุดเต็ม 93 ข้อ')} <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">{t('mbti.page.fullBadge', '10–15 นาที')}</span></div>
+            <div className="text-xs text-gray-400 mt-1">{t('mbti.page.fullHint', 'แม่นยำตามโครงมาตรฐาน (21·26·28·18) — ควรทำเมื่อมีเวลา')}</div>
           </button>
         </div>
         <div className="flex flex-wrap gap-2 justify-center pt-1">
-          <button onClick={() => openLibrary(null)} className="btn-secondary px-5 py-2.5 text-sm">ดูคลัง 16 ประเภท</button>
+          <button onClick={() => openLibrary(null)} className="btn-secondary px-5 py-2.5 text-sm">{t('mbti.page.openLibrary', 'ดูคลัง 16 ประเภท')}</button>
           <Link href="/mbti/compare" className="btn-secondary px-5 py-2.5 text-sm inline-flex items-center gap-1.5">⚖️ เทียบผลกับคนรัก/ครอบครัว</Link>
           {history.length >= 2 && (
             <button onClick={() => setScreen("evolution")} className="btn-secondary px-5 py-2.5 text-sm">📈 วิวัฒนาการของฉัน</button>
@@ -139,7 +141,7 @@ export default function MbtiPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2"><Icon name="history" size={14} /> ผลครั้งก่อน ({history.length})</h3>
             {history.length >= 2 && (
-              <button onClick={() => setScreen("evolution")} className="text-xs text-fuchsia-300 hover:underline">ดูกราฟย้อนหลัง →</button>
+              <button onClick={() => setScreen("evolution")} className="text-xs text-fuchsia-300 hover:underline">{t('mbti.page.viewEvolution', 'ดูกราฟย้อนหลัง →')}</button>
             )}
           </div>
           <div className="space-y-2">
@@ -196,15 +198,15 @@ export default function MbtiPage() {
           </div>
           <p className="text-sm text-gray-400 max-w-2xl mx-auto leading-relaxed">{info?.desc}</p>
           <div className="flex flex-wrap justify-center gap-2 pt-1 text-xs text-gray-500">
-            <span className="inset px-2 py-1 rounded">ทำ {fmtDate(result.date)}</span>
+            <span className="inset px-2 py-1 rounded">{t('mbti.result.taken', 'ทำ {date}', { date: fmtDate(result.date) })}</span>
             <span className="inset px-2 py-1 rounded">{quizModeOf(result)}</span>
-            <span className="inset px-2 py-1 rounded">ประมาณ {info?.share}% ของประชากร</span>
-            {prevSame > 1 && <span className="inset px-2 py-1 rounded">ได้ผลนี้แล้ว {prevSame} ครั้ง</span>}
+            <span className="inset px-2 py-1 rounded">{t('mbti.result.rarity', 'ประมาณ {share}% ของประชากร', { share: info?.share })}</span>
+            {prevSame > 1 && <span className="inset px-2 py-1 rounded">{t('mbti.result.timesBefore', 'ได้ผลนี้แล้ว {n} ครั้ง', { n: prevSame })}</span>}
           </div>
           {isShort && (
             <div className="inset rounded-lg p-3 text-xs text-amber-200/90 max-w-xl mx-auto">
               📱 นี่คือผลจากควิซสั้น 32 ข้อ (ประเมินเบื้องต้น) —{" "}
-              <button onClick={() => start("full")} className="text-fuchsia-300 underline">ทำชุดเต็ม 93 ข้อ</button> เพื่อยืนยันความแม่นยำ
+              <button onClick={() => start("full")} className="text-fuchsia-300 underline">{t('mbti.result.retakeFull', 'ทำชุดเต็ม 93 ข้อ')}</button>{t('mbti.result.retakeFullSuffix', ' เพื่อยืนยันความแม่นยำ')}
             </div>
           )}
         </div>
@@ -223,7 +225,7 @@ export default function MbtiPage() {
                   <div className="h-full bg-gradient-to-r from-fuchsia-600 to-violet-500" style={{ width: `${d.firstPct}%` }} />
                   <div className="h-full bg-gray-700" style={{ width: `${100 - d.firstPct}%` }} />
                 </div>
-                <div className="text-[10px] text-gray-500 mt-0.5 text-right">ความชัดเจน {d.clarity}%{d.clarity < 15 ? " — ใกล้เคียงมาก ลองอ่านทั้งสองฝั่งประกอบ" : ""}</div>
+                <div className="text-[10px] text-gray-500 mt-0.5 text-right">{t('mbti.result.clarity', 'ความชัดเจน {pct}%', { pct: d.clarity })}{d.clarity < 15 ? t('mbti.result.clarityNear', ' — ใกล้เคียงมาก ลองอ่านทั้งสองฝั่งประกอบ') : ""}</div>
               </div>
             );
           })}
@@ -251,7 +253,7 @@ export default function MbtiPage() {
           <div className="card p-5">
             <h3 className="text-sm font-bold text-amber-300 mb-3 flex items-center gap-2"><Icon name="dashboard" size={14} /> เข้ากับบ้านอัจฉริยะนี้อย่างไร</h3>
             <p className="text-sm text-gray-300 leading-relaxed">{info?.homeFit}</p>
-            <p className="text-xs text-gray-500 mt-3">✨ คู่ที่มักเข้ากันดี: <b className="text-fuchsia-300">{info?.pair}</b> — <Link href="/mbti/compare" className="underline">เทียบกับคนสำคัญ</Link></p>
+            <p className="text-xs text-gray-500 mt-3">{t('mbti.result.goodPair', '✨ คู่ที่มักเข้ากันดี')}: <b className="text-fuchsia-300">{info?.pair}</b> — <Link href="/mbti/compare" className="underline">{t('mbti.result.compareImportant', 'เทียบกับคนสำคัญ')}</Link></p>
           </div>
         </div>
 
@@ -260,7 +262,7 @@ export default function MbtiPage() {
             <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
               🙏 {careToneFor(result.code)?.yakLabel ?? "หลวงพี่"} อธิบายผล {result.code}
             </h3>
-            {monkBusy && <p className="text-xs text-gray-500">หลวงพี่กำลังพิจารณา... (อาจใช้เวลานานในเครื่อง CPU)</p>}
+            {monkBusy && <p className="text-xs text-gray-500">{t('mbti.monk.busy', 'หลวงพี่กำลังพิจารณา... (อาจใช้เวลานานในเครื่อง CPU)')}</p>}
             {monkError && <p className="text-xs text-rose-300">{monkError}</p>}
             {monkReply && (
               <div className="inset rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap text-gray-200 border-l-2 border-l-amber-400/70">
@@ -274,8 +276,8 @@ export default function MbtiPage() {
           <button onClick={askMonk} disabled={monkBusy} className="btn-secondary px-5 py-2 text-sm">
             {monkBusy ? "หลวงพี่กำลังพิจารณา..." : "🙏 ให้หลวงพี่อธิบายผลของคุณ"}
           </button>
-          <button onClick={() => start(mode)} className="btn-secondary px-5 py-2 text-sm">ทำใหม่อีกครั้ง</button>
-          <button onClick={() => openLibrary(result.code)} className="btn-secondary px-5 py-2 text-sm">เทียบกับ 16 ประเภท</button>
+          <button onClick={() => start(mode)} className="btn-secondary px-5 py-2 text-sm">{t('mbti.result.retake', 'ทำใหม่อีกครั้ง')}</button>
+          <button onClick={() => openLibrary(result.code)} className="btn-secondary px-5 py-2 text-sm">{t('mbti.result.compare16', 'เทียบกับ 16 ประเภท')}</button>
           <button onClick={() => setScreen("intro")} className="px-4 py-2 bg-gray-800 rounded-lg text-sm">← กลับหน้าหลัก MBTI</button>
         </div>
       </div>
@@ -316,7 +318,7 @@ export default function MbtiPage() {
             ))}
           </div>
           <div className="card p-5">
-            <h3 className="text-sm font-bold text-fuchsia-300 mb-3">เทียบความหายาก (% ประชากรโดยประมาณ)</h3>
+            <h3 className="text-sm font-bold text-fuchsia-300 mb-3">{t('mbti.result.rarityCompare', 'เทียบความหายาก (% ประชากรโดยประมาณ)')}</h3>
             <div className="space-y-1.5">
               {[...MBTI_TYPES].sort((a, b) => a.share - b.share).map((t) => (
                 <button key={t.code} onClick={() => setLibraryCode(t.code)} className="w-full flex items-center gap-2 text-left group">
@@ -331,36 +333,36 @@ export default function MbtiPage() {
           </div>
         </>
       ) : (() => {
-        const t = typeInfo(libraryCode)!;
+        const info = typeInfo(libraryCode)!;
         return (
           <div className="space-y-4">
             <div className="card panel-glow p-6 space-y-2">
               <div className="flex items-center gap-3">
-                <span className="text-4xl">{t.emoji}</span>
+                <span className="text-4xl">{info.emoji}</span>
                 <div>
-                  <div className="text-2xl mbti-serif font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(t.code) ?? "nt"]})` }}>{t.code} — {t.name}</div>
-                  <div className="text-sm text-gray-400">{t.nameEn} · ~{t.share}% ของประชากร · คู่เข้ากัน: {t.pair}</div>
+                  <div className="text-2xl mbti-serif font-bold" style={{ color: `rgb(${FAM_RGB[familyOf(info.code) ?? "nt"]})` }}>{info.code} — {info.name}</div>
+                  <div className="text-sm text-gray-400">{info.nameEn} · ~{info.share}% ของประชากร · คู่เข้ากัน: {info.pair}</div>
                 </div>
               </div>
-              <p className="text-sm text-fuchsia-200/80 italic">&quot;{t.tagline}&quot;</p>
-              <p className="text-sm text-gray-300 leading-relaxed">{t.desc}</p>
+              <p className="text-sm text-fuchsia-200/80 italic">&quot;{info.tagline}&quot;</p>
+              <p className="text-sm text-gray-300 leading-relaxed">{info.desc}</p>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-emerald-300 mb-2">จุดแข็ง</h3>
-                <ul className="space-y-1.5 text-sm text-gray-300">{t.strengths.map((s) => <li key={s} className="flex gap-2"><span className="text-emerald-400">▸</span>{s}</li>)}</ul>
+                <h3 className="text-sm font-bold text-emerald-300 mb-2">{t('mbti.result.strengths', 'จุดแข็ง')}</h3>
+                <ul className="space-y-1.5 text-sm text-gray-300">{info.strengths.map((s) => <li key={s} className="flex gap-2"><span className="text-emerald-400">▸</span>{s}</li>)}</ul>
               </div>
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-rose-300 mb-2">จุดที่ควรระวัง</h3>
-                <ul className="space-y-1.5 text-sm text-gray-300">{t.weaknesses.map((s) => <li key={s} className="flex gap-2"><span className="text-rose-400">▸</span>{s}</li>)}</ul>
+                <h3 className="text-sm font-bold text-rose-300 mb-2">{t('mbti.result.watchouts', 'จุดที่ควรระวัง')}</h3>
+                <ul className="space-y-1.5 text-sm text-gray-300">{info.weaknesses.map((s) => <li key={s} className="flex gap-2"><span className="text-rose-400">▸</span>{s}</li>)}</ul>
               </div>
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-sky-300 mb-2">อาชีพที่เข้ากัน</h3>
-                <div className="flex flex-wrap gap-1.5">{t.careers.map((c) => <span key={c} className="px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-xs text-gray-300">{c}</span>)}</div>
+                <h3 className="text-sm font-bold text-sky-300 mb-2">{t('mbti.result.careers', 'อาชีพที่เข้ากัน')}</h3>
+                <div className="flex flex-wrap gap-1.5">{info.careers.map((c) => <span key={c} className="px-2.5 py-1 rounded-full bg-gray-800 border border-gray-700 text-xs text-gray-300">{c}</span>)}</div>
               </div>
               <div className="card p-5">
-                <h3 className="text-sm font-bold text-amber-300 mb-2">ในบ้านอัจฉริยะนี้</h3>
-                <p className="text-sm text-gray-300 leading-relaxed">{t.homeFit}</p>
+                <h3 className="text-sm font-bold text-amber-300 mb-2">{t('mbti.result.homeFitTitle', 'ในบ้านอัจฉริยะนี้')}</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{info.homeFit}</p>
               </div>
             </div>
           </div>
@@ -379,9 +381,9 @@ export default function MbtiPage() {
       return (
         <div className="card p-8 text-center max-w-xl mx-auto">
           <div className="text-5xl mb-3">📈</div>
-          <h3 className="text-lg font-bold mb-2">ต้องมีผลอย่างน้อย 2 ครั้ง</h3>
-          <p className="text-sm text-gray-400 mb-4">ทำแบบทดสอบซ้ำในวันต่างกัน (แนะนำเว้น 2–4 สัปดาห์ หลังเหตุการณ์สำคัญในชีวิต) แล้วกราฟนี้จะแสดงการเปลี่ยนแปลงรายมิติ</p>
-          <button onClick={() => start("short")} className="btn-primary px-5 py-2 text-sm">เริ่มควิซสั้น 32 ข้อ</button>
+          <h3 className="text-lg font-bold mb-2">{t('mbti.evolution.needTwo', 'ต้องมีผลอย่างน้อย 2 ครั้ง')}</h3>
+          <p className="text-sm text-gray-400 mb-4">{t('mbti.evolution.needTwoHint', 'ทำแบบทดสอบซ้ำในวันต่างกัน (แนะนำเว้น 2–4 สัปดาห์ หลังเหตุการณ์สำคัญในชีวิต) แล้วกราฟนี้จะแสดงการเปลี่ยนแปลงรายมิติ')}</p>
+          <button onClick={() => start("short")} className="btn-primary px-5 py-2 text-sm">{t('mbti.evolution.startShort', 'เริ่มควิซสั้น 32 ข้อ')}</button>
         </div>
       );
     }
@@ -408,8 +410,8 @@ export default function MbtiPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-fuchsia-300 flex items-center gap-2"><Icon name="predictive" size={14} /> วิวัฒนาการรายมิติ ({all.length} ครั้ง)</h3>
             <div className="flex gap-3 text-[11px] text-gray-400">
-              {full.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-fuchsia-400 align-middle mr-1" />ชุดเต็ม 93</span>}
-              {short.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-dashed border-sky-400 align-middle mr-1" />ควิซสั้น 32</span>}
+              {full.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-fuchsia-400 align-middle mr-1" />{t('mbti.evolution.legendFull93', 'ชุดเต็ม 93')}</span>}
+              {short.length >= 1 && <span><span className="inline-block w-4 border-t-2 border-dashed border-sky-400 align-middle mr-1" />{t('mbti.evolution.legendShort32', 'ควิซสั้น 32')}</span>}
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -468,7 +470,7 @@ export default function MbtiPage() {
           const famOf = (code: string) => FAM_RGB[familyOf(code) ?? "nt"];
           return (
             <div className="card p-5">
-              <h3 className="text-sm font-bold text-fuchsia-300 mb-3">ตราซ้อน — จาก {oldest.code} → {newest.code}</h3>
+              <h3 className="text-sm font-bold text-fuchsia-300 mb-3">{t('mbti.evolution.overlayTitle', 'ตราซ้อน — จาก {oldest} → {newest}', { oldest: oldest.code, newest: newest.code })}</h3>
               <div className="flex flex-wrap items-center justify-center gap-6">
                 <div className="relative">
                   <Seal letters={oldest.code} dims={oldest.dims} famRgb={famOf(oldest.code)} ghost />
@@ -476,9 +478,9 @@ export default function MbtiPage() {
                     className="absolute inset-0" />
                 </div>
                 <div className="space-y-1.5 text-xs">
-                  <div><span className="inline-block w-3 h-3 rounded-full border-2 border-fuchsia-400 align-middle mr-1.5" />เงา = {fmtDate(oldest.date)} ({oldest.code})</div>
-                  <div><span className="inline-block w-3 h-3 rounded-full align-middle mr-1.5" style={{ background: `rgb(${famOf(newest.code)})` }} />เต็ม = {fmtDate(newest.date)} ({newest.code})</div>
-                  {oldest.code !== newest.code && <div className="text-gray-500">ส่วนที่สีทับเงา = มิติที่เลื่อนข้ามตัวอักษร</div>}
+                  <div><span className="inline-block w-3 h-3 rounded-full border-2 border-fuchsia-400 align-middle mr-1.5" />{t('mbti.evolution.shadowLegend', 'เงา = {date} ({code})', { date: fmtDate(oldest.date), code: oldest.code })}</div>
+                  <div><span className="inline-block w-3 h-3 rounded-full align-middle mr-1.5" style={{ background: `rgb(${famOf(newest.code)})` }} />{t('mbti.evolution.solidLegend', 'เต็ม = {date} ({code})', { date: fmtDate(newest.date), code: newest.code })}</div>
+                  {oldest.code !== newest.code && <div className="text-gray-500">{t('mbti.evolution.overlapHint', 'ส่วนที่สีทับเงา = มิติที่เลื่อนข้ามตัวอักษร')}</div>}
                 </div>
               </div>
             </div>
@@ -498,7 +500,7 @@ export default function MbtiPage() {
           const changed = changes.filter((c) => c.changed);
           return (
             <div className="card p-5 space-y-2">
-              <h3 className="text-sm font-bold text-fuchsia-300">สรุปการเปลี่ยนแปลง</h3>
+              <h3 className="text-sm font-bold text-fuchsia-300">{t('mbti.evolution.changeSummary', 'สรุปการเปลี่ยนแปลง')}</h3>
               <p className="text-sm text-gray-300">
                 {fmtDate(oldest.date)} คุณเป็น <b className="text-fuchsia-300">{oldest.code}</b> → ล่าสุด ({fmtDate(newest.date)}) เป็น <b className="text-fuchsia-300">{newest.code}</b>
               </p>
