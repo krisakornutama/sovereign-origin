@@ -103,6 +103,8 @@ tools/*
 !tools/system-health.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
+!tools/preview-stack.mjs
+!tools/clean-logs.mjs
 !tools/release-notes-v1.1.1.md
 !tools/test/
 !tools/test/*.test.mjs

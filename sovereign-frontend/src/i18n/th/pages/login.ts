@@ -18,6 +18,10 @@ export default {
   mfaUseBackup: 'โทรศัพท์หาย? ใช้รหัสสำรองแทน',
   mfaCancel: 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ',
   loginFailed: 'เข้าสู่ระบบล้มเหลว',
+  badCredentials: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',
+  serverError: 'เซิร์ฟเวอร์ขัดข้องชั่วคราว — ลองใหม่อีกครั้งในอีกสักครู่',
+  cannotReachServer: 'ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจว่า Core API (:3001) เปิดอยู่',
+  rateLimitedNoHeader: 'ลองพยายามบ่อยเกินไป — พักสักครู่แล้วลองใหม่',
   otpInvalid: 'รหัส OTP ไม่ถูกต้อง',
   genericError: 'เกิดข้อผิดพลาด',
 } as const;

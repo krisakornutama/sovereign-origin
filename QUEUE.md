@@ -39,29 +39,29 @@
 # คิวงานรอบใหม่ (วางเมื่อ 21/9/69) — ทำให้ระบบทำงานได้ → ปรับปรุงของเดิม → UX/UI → พัฒนาต่อ
 
 ## หมวด A — ทำให้ระบบทำงานได้จริง (ทำก่อน)
-- [ ] A1 แก้สภาพแวดล้อม preview: ทำสคริปต์เริ่มสแตก preview คำสั่งเดียว (mock :3101 + dev :3100 ที่ตั้ง NEXT_PUBLIC_API_URL ให้ propagate จริง) — ปัญหาที่พบจริง: dev ที่รันอยู่ไม่ได้รับ env หน้าเว็บ fallback ไป :3001 แล้วโดน 401 เด้ง login
-- [ ] A2 เพิ่ม `/api/ai/history` (GET/DELETE) ใน `tools/mock-api-preview.mjs` — แชท dashboard บน preview โหลดประวัติไม่ได้ (โดน 401 จาก backend จริงแล้ว authFetch เด้งกลับ `/`)
+- [x] A1 แก้สภาพแวดล้อม preview: ทำสคริปต์เริ่มสแตก preview คำสั่งเดียว — **เสร็จ 21/9/69** (`tools/preview-stack.mjs` + `npm run preview:stack` / `preview:check`) — spawn ทั้ง mock+dev จากพ่อเดียวพร้อม env, รอพอร์ตจริงก่อนปล่อยมือ, E2E 4/4 ผ่านบนสแตกนี้
+- [x] A2 เพิ่ม `/api/ai/history` (GET/DELETE) ใน `tools/mock-api-preview.mjs` — **เสร็จ 21/9/69** — เก็บประวัติในหน่วยความจำ (เข้า/ตอบ, ตัดที่ 100) — AiChatPanel โหลดประวัติได้บน preview แล้ว (ยืนยันจาก E2E: หน้าไม่เด้ง login)
 - [ ] A3 ทดสอบ AES MR505 กับสัญญาณจริง (ค้างจาก 29/8 — รอ lockout 2 ชม. หมด): ยิง `fetchRouterSimData` จริง พิสูจน์ data usage/สัญญาณ/SMS ถอดได้ — ⚠️ ระวัง lockout: ห้ามยิงซ้ำถ้า login ล้ม
-- [ ] A4 วงจร Ollama production: ติดตั้ง Ollama (listen 127.0.0.1:11434) + `ollama pull gemma3:4b` + `ollama pull qwen3-vl:8b` แล้วพิสูจน์บน `/ai-agent` (การ์ด Ollama ออนไลน์) + โทนหลวงพี่เปลี่ยนตาม MBTI จริงในแชทกลาง (checklist ที่ docs/ollama-setup.md)
+- [ ] A4 วงจร Ollama production: ติดตั้ง Ollama (listen 127.0.0.1:11434) + `ollama pull gemma3:4b` + `ollama pull qwen3-vl:8b` แล้วพิสูจน์บน `/ai-agent` (การ์ด Ollama ออนไลน์) + โทนหลวงพี่เปลี่ยนตาม MBTI จริงในแชทกลาง — **มีคู่มือแล้ว 21/9/69: `sovereign-os/docs/ollama-setup.md` (รอเจ้าของวันติดตั้งจริง ตามคำสั่ง "ยังไม่ต้องยุ่ง")**
 - [ ] A5 รัน `npm run test:mbti` กับ backend จริง :3001 อย่างน้อย 1 รอบ (MBTI_E2E_API_URL=http://localhost:3001) — ปิดช่องว่างระหว่าง preview mock กับของจริง
-- [ ] A6 ทำ `npm run verify:full` เขียวได้แม้ backend :3001 ไม่ได้รัน: verify.mjs เช็คสุขภาพ backend ก่อนขั้น e2e — ถ้าลง → ข้ามพร้อมข้อความเตือน (ไม่ fail ทั้ง gate)
+- [x] A6 ทำ `npm run verify:full` เขียวได้แม้ backend :3001 ไม่ได้รัน — **เสร็จ 21/9/69** (`tools/verify.mjs`: ขั้น e2e ตรวจ /api/health ก่อน ถ้าลง → ข้ามพร้อมเตือน; บังคับได้ด้วย E2E_REQUIRE_BACKEND=1)
 
 ## หมวด B — ปรับปรุงของเดิมให้ดีกว่า (คุณภาพ + ความเร็ว)
-- [ ] B1 เพิ่ม `npm run clean:logs` (ราก) — กวาด *.log ที่ราก dev-3100/mock-3101/dev-server ฯลฯ คำสั่งเดียว ลด noise ก่อน verify
+- [x] B1 เพิ่ม `npm run clean:logs` (ราก) — **เสร็จ 21/9/69** (`tools/clean-logs.mjs` + `--check` โหมดรายงาน — รอบแรกเจอ 9 ไฟล์ 47KB)
 - [ ] B2 ย่อเวลา `npm run verify` (4.3 นาที → เป้า < 3 นาที) — หมายเหตุ: `--test-concurrency=1` ของ backend เป็นการตั้งใจ (กัน flake IPC ของ Node 24 ตาม setup-env.ts) ห้ามเพิ่มความขนาน — ให้ไปทางลดงานซ้ำแทน (แคช tsc incremental, ข้ามไฟล์ที่ไม่เกี่ยว)
-- [ ] B3 ปุ่มเร็ว (Quick Questions) ของ AiChatPanel ผ่าน i18n key จริง — เดิมใช้ข้อความไทยเป็น key (`เช็คดินเค็ม`) ทำให้ lookup พลาดและสลับภาษาไม่เปลี่ยน
+- [x] B3 ปุ่มเร็ว (Quick Questions) ของ AiChatPanel ผ่าน i18n key จริง — **เสร็จ 21/9/69** (key เชิงความหมาย `soilSalinity/batteryStatus/emergency/phase2` ทั้ง th/en — query ที่ยิง backend คงข้อความไทยเดิม)
 - [ ] B4 รวม logic ประวัติแชทของ AiChatPanel + หน้า ai-agent เป็น hook เดียว (เดิมเขียนซ้ำ 2 ที่ เสี่ยงพฤติกรรมต่างกัน)
 - [ ] B5 กัน flake E2E MBTI บนเครื่องช้า: เปลี่ยนจุดรอ hydrate จาก fixed timeout เป็น expect-and-retry
 - [ ] B6 ผ่าน `npm run coverage:core` ตามเก็บไฟล์ 0% อันดับแรกที่เหลือ: nextgen.routes / security.routes / scenario-forecast.service
 
 ## หมวด C — ปรับปรุงกราฟิก UX/UI
-- [ ] C1 แชทกลาง dashboard: ชิปโทนหลวงพี่ปัจจุบัน (`ESFP · หลวงพี่ผู้เบิกบาน` ฯลฯ) เหนือช่องพิมพ์ — ผู้ใช้เห็นทันทีว่า AI ปรับโทนตามอะไร + ลิงก์ไป /mbti เมื่อยังไม่เคยทำ · ครอบด้วย E2E
-- [ ] C2 แชทกลาง: สถานะ AI Offline ต้องบอกเหตุผล + ปุ่มลงมือ (เปิด Ollama / เช็ค :3001) แทน error แดงเปล่า ๆ
-- [ ] C3 หน้า login: แจ้งเหตุผลความล้มเหลวแยกเคส (user/pass ผิด, บัญชีถูกล็อก, backend ไม่ตอบ) — เดิมข้อความกล้ำกัน
+- [x] C1 แชทกลาง dashboard: ชิปโทนหลวงพี่ปัจจุบัน — **เสร็จ 21/9/69** (ชิป `ESFP · หลวงพี่ผู้เบิกบาน` เหนือปุ่มเร็ว อ่านผลล่าสุดจาก localStorage; ยังไม่เคยทำ → ลิงก์ชวนไป /mbti; E2E ครอบทั้งสองเคสแล้ว)
+- [x] C2 แชทกลาง: สถานะ AI Offline บอกเหตุผล — **เสร็จ 21/9/69** (แยก 3 เคส: Ollama ออฟไลน์ 503 / API error อื่นพร้อมโค้ด / ติดต่อ backend ไม่ได้ พร้อมชี้ไปหน้า AI Agent)
+- [x] C3 หน้า login: แจ้งเหตุผลความล้มเหลวแยกเคส — **เสร็จ 21/9/69** (401/403 = รหัสไม่ถูก · 429 = นับถอยหลังตาม Retry-After · 5xx = เซิร์ฟเวอร์ขัดข้อง · fetch ล้ม = ติดต่อ :3001 ไม่ได้ — พจนานุกรม th/en ครบ)
 - [ ] C4 Sidebar/MobileNav มือถือ: ตรวจ z-index/overlay ให้คลิกไม่ทะลุ (เจอสัญญาณตอนรัน preview — คลิกปุ่มในพาเนลแต่เจาะไปเมนูล่าง) + ยืนยันด้วย E2E viewport มือถือ
 - [ ] C5 dashboard บนมือถือ: จัดลำดับสายตาใหม่ (การ์ดสำคัญบน, กราฟิกหนักอย่าง Sankey/Heatmap ย้ายลงล่างหรือซ่อนเป็นแท็บ) — ตอนนี้ scroll ยาวมาก
 - [ ] C6 สถานะ Loading ทั่วแอป: เปลี่ยน "กำลังโหลด..." เฉย ๆ เป็น skeleton การ์ด (เข้าธีมเดิม)
-- [ ] C7 SENSOR STACK / AI THOUGHT STREAM: ค่า N/A ให้แสดง "—" + คำอธิบายสั้นได้ ไม่ปล่อยช่องว่างลอย
+- [x] C7 SENSOR STACK: ค่า N/A → "—" + tooltip "ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้" — **เสร็จ 21/9/69**
 
 ## หมวด D — พัฒนาต่อ (ทำหลัง A-C)
 - [ ] D1 AI Agent ทีม: พิสูจน์ daily_report ส่ง Telegram จริง (ปุ่ม/ตัวเลือกมีใน UI แต่ยังไม่เคยยืนยันว่าถึงกลุ่ม `-5308443540`)

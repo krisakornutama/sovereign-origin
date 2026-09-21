@@ -120,4 +120,17 @@ test.describe('Dashboard AI chat แนบ MBTI จาก localStorage', () => {
     expect(reply.length).toBeGreaterThan(0);
     await expect(page.getByText(reply).first()).toBeVisible();
   });
+
+  test('ชิปโทนหลวงพี่: มีผลล่าสุด → แสดงโค้ด+ชื่อหลวงพี่ / ไม่มีผล → ชวนไป /mbti', async ({ page }) => {
+    await seedAndOpen(page, ['ESFP']);
+    const chip = page.locator('[data-testid="mbti-tone-chip"]');
+    await expect(chip).toBeVisible({ timeout: 15_000 });
+    await expect(chip).toContainText('ESFP');
+    await expect(chip).toContainText('หลวงพี่ผู้เบิกบาน'); // ESFP → หลวงพี่ผู้เบิกบาน (MBTI_CARE_TONES)
+
+    // เคสไม่มีผล: seed ใหม่แบบไม่มี mbti → ชิปหาย และมีลิงก์ชวนทำแบบทดสอบ
+    await seedAndOpen(page, []);
+    await expect(page.locator('[data-testid="mbti-tone-chip"]')).toHaveCount(0);
+    await expect(page.getByText('MBTI', { exact: false }).first()).toBeVisible(); // ลิงก์เชิญชวน (มีคำ MBTI)
+  });
 });
