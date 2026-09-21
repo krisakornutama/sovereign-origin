@@ -1031,3 +1031,80 @@ html[data-theme='light'] .atmo-dusk::before {
 .atmo-wealth .eyebrow-cyan    { color: rgb(253 224 71 / 0.85); text-shadow: 0 0 8px rgba(234, 179, 8, 0.35); }
 .atmo-kitchen .eyebrow-cyan   { color: rgb(253 186 116 / 0.9); text-shadow: 0 0 8px rgba(251, 146, 60, 0.35); }
 .atmo-system .eyebrow-cyan    { color: rgb(103 232 249 / 0.85); text-shadow: 0 0 8px rgba(34, 211, 238, 0.3); }
+
+/* ═══════════════════════════════════════════════════════════════
+   atmo-mind — ห้องสะท้อนความคิด (MBTI / จิตวิทยา / การรู้จักตนเอง)
+   ─────────────────────────────────────────────────────────────
+   ม่วงอเมทิสต์ลึก + กลุ่มดาวความคิด (จุดแสงเล็ก ๆ กระจาย)
+   อ่อนหวานพอให้รู้สึกปลอดภัยที่จะสำรวจใจตัวเอง — สงบแบบห้องสมุด
+   ═══════════════════════════════════════════════════════════════ */
+.atmo-mind      { --atmo-accent: 168 85 247;  --atmo-accent-2: 217 70 239;  --atmo-accent-3: 139 92 246; }
+.atmo-mind      { --atmo-nav: #c084fc; --atmo-nav-text: #d8b4fe; }
+.atmo-mind::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(880px 500px at 78% -10%, rgba(168, 85, 247, 0.12), transparent 60%),
+    radial-gradient(680px 420px at 10% 112%, rgba(217, 70, 239, 0.07), transparent 62%),
+    radial-gradient(2px 2px at 14% 22%, rgba(216, 180, 254, 0.20), transparent 100%),
+    radial-gradient(1.5px 1.5px at 68% 14%, rgba(216, 180, 254, 0.16), transparent 100%),
+    radial-gradient(1.5px 1.5px at 86% 44%, rgba(216, 180, 254, 0.14), transparent 100%),
+    radial-gradient(2px 2px at 32% 76%, rgba(216, 180, 254, 0.12), transparent 100%),
+    radial-gradient(1.5px 1.5px at 52% 58%, rgba(216, 180, 254, 0.15), transparent 100%);
+}
+html[data-theme='light'] .atmo-mind::before { opacity: 0.45; }
+
+.atmo-mind .panel-cyan {
+  border-color: rgba(var(--atmo-accent), 0.28);
+  box-shadow:
+    0 0 0 1px rgba(var(--atmo-accent), 0.06),
+    0 0 20px rgba(var(--atmo-accent), 0.10),
+    inset 0 0 26px rgba(var(--atmo-accent), 0.03);
+}
+.atmo-mind .panel-cyan:hover { border-color: rgba(var(--atmo-accent), 0.42); }
+
+.atmo-mind .glow-text,
+.atmo-mind .glow-text-cyan { text-shadow: 0 0 10px rgba(192, 132, 252, 0.42); }
+
+.atmo-mind .eyebrow {
+  color: rgb(216 180 254 / 0.9);
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.35);
+}
+.atmo-mind .eyebrow-cyan {
+  color: rgb(216 180 254 / 0.85);
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.35);
+}
+
+.atmo-mind .page-badge {
+  background: rgba(168, 85, 247, 0.10);
+  border-color: rgba(168, 85, 247, 0.28);
+  color: #d8b4fe;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.18);
+}
+
+/* ปุ่มหลัก: ม่วงอเมทิสต์ — ปุ่มเริ่มทดสอบต้องรู้สึก "ชวนสำรวจ" */
+.atmo-mind .btn-primary {
+  background: #9333ea;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.22);
+}
+.atmo-mind .btn-primary:hover { background: #a855f7; }
+
+.atmo-mind :focus-visible { outline-color: rgba(192, 132, 252, 0.7); }
+.atmo-mind ::selection    { background: rgba(192, 132, 252, 0.30); color: #faf5ff; }
+.atmo-mind *              { scrollbar-color: rgba(192, 132, 252, 0.30) transparent; }
+.atmo-mind .table thead th { color: rgb(216 180 254 / 0.75); }
+.atmo-mind .glow-dot,
+.atmo-mind .glow-dot-cyan  { box-shadow: 0 0 6px rgba(192, 132, 252, 0.9); }
+.atmo-mind .input:focus    { border-color: rgba(192, 132, 252, 0.55); box-shadow: 0 0 12px rgba(168, 85, 247, 0.14); }
+.atmo-mind .card-hover:hover { border-color: rgba(192, 132, 252, 0.45); }
+
+/* ── MBTI: ตราแปดส่วน (signature) + ตระกูลสี่สี ──
+   สีตระกูล (NT/NF/SJ/SP) อยู่ที่เดียวใน lib/mbtiData.ts (FAM_RGB) — ไม่ทำซ้ำใน CSS
+   ใช้เฉพาะ: ตรา, ตัวอักษรผล, ขีดโค้ดในคลัง — ไม่กระจายทั่วหน้า */
+.mbti-serif {
+  font-family: 'Noto Serif Thai', var(--font-thai);
+  letter-spacing: 0.08em;
+}

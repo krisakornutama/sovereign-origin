@@ -12,13 +12,14 @@ import { circadianClass } from '../../lib/useCircadian';
 
 export type PageTheme =
   | 'auto' | 'none' | 'circadian'
-  | 'power' | 'wellness' | 'lotus' | 'nature' | 'guard' | 'wealth' | 'kitchen' | 'system';
+  | 'power' | 'wellness' | 'lotus' | 'nature' | 'guard' | 'wealth' | 'kitchen' | 'system' | 'mind';
 type Atmosphere = Exclude<PageTheme, 'auto' | 'none' | 'circadian'>;
 
 /** แผนที่เส้นทาง → ธีมบรรยากาศ (ใช้เมื่อไม่ได้ส่ง theme มาให้) */
 const ROUTE_THEMES: Array<{ atmo: Atmosphere; re: RegExp }> = [
   { atmo: 'power', re: /^\/(energy|sensors|relay|automation|ota|infrastructure|predictive|ai|ai-agent|learning|governance-sim)(\/|$)/ },
   { atmo: 'wellness', re: /^\/(health|health-export|selfreliance|skills|lifestyle|crisis)(\/|$)/ },
+  { atmo: 'mind', re: /^\/mbti(\/|$)/ },
   { atmo: 'lotus', re: /^\/healing(\/|$)/ },
   { atmo: 'nature', re: /^\/(farm|livestock|inventory|research|terrain-demo)(\/|$)/ },
   { atmo: 'guard', re: /^\/(security|vision|property|alerts|risk-monitor)(\/|$)/ },
