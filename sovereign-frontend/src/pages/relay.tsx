@@ -195,8 +195,8 @@ export default function RelayPage() {
       <div className="flex-1 flex flex-col min-w-0">
       <PageHeader
           eyebrow={t('relay.eyebrow', 'อุปกรณ์ & พลังงาน')}
-          title="SOVEREIGN OS" theme="power" icon={<Icon name="relay" size={18} />}
-          subtitle={t('relay.subtitle', 'Relay Control')} actions={<div className="flex gap-3 items-center">
+          title="รีเลย์ — สวิตช์ทุกห้องในมือเดียว" theme="power" icon={<Icon name="relay" size={18} />}
+          subtitle={t('relay.subtitle', 'เปิด-ปิดเครื่องใช้ทั่วบ้าน ตามห้องและวงจร')} actions={<div className="flex gap-3 items-center">
           <Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('relay.dashboardLink', 'Dashboard')}</Link>
         </div>}
         />

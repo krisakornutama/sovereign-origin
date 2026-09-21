@@ -667,7 +667,7 @@ const loadKidProgress = useCallback(async (kidId: string) => {
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader
           eyebrow={t('knowledge.eyebrow', 'ชีวิต & การเงิน')}
-          title="SOVEREIGN OS" icon={<Icon name="knowledge" size={18} />}
+          title="คลังความรู้ของบ้าน" icon={<Icon name="knowledge" size={18} />}
           subtitle={t('knowledge.subtitle', 'Knowledge Base — เก็บทุกอย่างไว้ในที่เดียว')} actions={<div className="flex items-center gap-3">
             <button
               onClick={() => { setShowAdd(!showAdd); setError(''); }}
