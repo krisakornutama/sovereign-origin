@@ -34,6 +34,45 @@
 - [x] Self-Learning D — Data Lake + Engine พื้นฐาน — **เสร็จแล้ว 29/8/69 04:00** (`prisma LearningSnapshot/Prediction/ModelState` + `data-lake.service` + `learning-engine.service` qwen3:8b/heuristic + `learning.routes` 8 endpoints + `/learning` 51 routes)
   - ทดสอบสด: `POST /api/learning/collect` `4` snapshots (sensor/farm/health/inventory), `POST /predict sensor` `heuristic risk 0.8`, `POST /predictions/:id/evaluate` `accuracy 100%` → `GET /models` ขึ้นแล้ว — cron nightly พร้อม (เรียก `nightlyLearn` ได้)
 
+---
+
+# คิวงานรอบใหม่ (วางเมื่อ 21/9/69) — ทำให้ระบบทำงานได้ → ปรับปรุงของเดิม → UX/UI → พัฒนาต่อ
+
+## หมวด A — ทำให้ระบบทำงานได้จริง (ทำก่อน)
+- [ ] A1 แก้สภาพแวดล้อม preview: ทำสคริปต์เริ่มสแตก preview คำสั่งเดียว (mock :3101 + dev :3100 ที่ตั้ง NEXT_PUBLIC_API_URL ให้ propagate จริง) — ปัญหาที่พบจริง: dev ที่รันอยู่ไม่ได้รับ env หน้าเว็บ fallback ไป :3001 แล้วโดน 401 เด้ง login
+- [ ] A2 เพิ่ม `/api/ai/history` (GET/DELETE) ใน `tools/mock-api-preview.mjs` — แชท dashboard บน preview โหลดประวัติไม่ได้ (โดน 401 จาก backend จริงแล้ว authFetch เด้งกลับ `/`)
+- [ ] A3 ทดสอบ AES MR505 กับสัญญาณจริง (ค้างจาก 29/8 — รอ lockout 2 ชม. หมด): ยิง `fetchRouterSimData` จริง พิสูจน์ data usage/สัญญาณ/SMS ถอดได้ — ⚠️ ระวัง lockout: ห้ามยิงซ้ำถ้า login ล้ม
+- [ ] A4 วงจร Ollama production: ติดตั้ง Ollama (listen 127.0.0.1:11434) + `ollama pull gemma3:4b` + `ollama pull qwen3-vl:8b` แล้วพิสูจน์บน `/ai-agent` (การ์ด Ollama ออนไลน์) + โทนหลวงพี่เปลี่ยนตาม MBTI จริงในแชทกลาง (checklist ที่ docs/ollama-setup.md)
+- [ ] A5 รัน `npm run test:mbti` กับ backend จริง :3001 อย่างน้อย 1 รอบ (MBTI_E2E_API_URL=http://localhost:3001) — ปิดช่องว่างระหว่าง preview mock กับของจริง
+- [ ] A6 ทำ `npm run verify:full` เขียวได้แม้ backend :3001 ไม่ได้รัน: verify.mjs เช็คสุขภาพ backend ก่อนขั้น e2e — ถ้าลง → ข้ามพร้อมข้อความเตือน (ไม่ fail ทั้ง gate)
+
+## หมวด B — ปรับปรุงของเดิมให้ดีกว่า (คุณภาพ + ความเร็ว)
+- [ ] B1 เพิ่ม `npm run clean:logs` (ราก) — กวาด *.log ที่ราก dev-3100/mock-3101/dev-server ฯลฯ คำสั่งเดียว ลด noise ก่อน verify
+- [ ] B2 ย่อเวลา `npm run verify` (4.3 นาที → เป้า < 3 นาที) — หมายเหตุ: `--test-concurrency=1` ของ backend เป็นการตั้งใจ (กัน flake IPC ของ Node 24 ตาม setup-env.ts) ห้ามเพิ่มความขนาน — ให้ไปทางลดงานซ้ำแทน (แคช tsc incremental, ข้ามไฟล์ที่ไม่เกี่ยว)
+- [ ] B3 ปุ่มเร็ว (Quick Questions) ของ AiChatPanel ผ่าน i18n key จริง — เดิมใช้ข้อความไทยเป็น key (`เช็คดินเค็ม`) ทำให้ lookup พลาดและสลับภาษาไม่เปลี่ยน
+- [ ] B4 รวม logic ประวัติแชทของ AiChatPanel + หน้า ai-agent เป็น hook เดียว (เดิมเขียนซ้ำ 2 ที่ เสี่ยงพฤติกรรมต่างกัน)
+- [ ] B5 กัน flake E2E MBTI บนเครื่องช้า: เปลี่ยนจุดรอ hydrate จาก fixed timeout เป็น expect-and-retry
+- [ ] B6 ผ่าน `npm run coverage:core` ตามเก็บไฟล์ 0% อันดับแรกที่เหลือ: nextgen.routes / security.routes / scenario-forecast.service
+
+## หมวด C — ปรับปรุงกราฟิก UX/UI
+- [ ] C1 แชทกลาง dashboard: ชิปโทนหลวงพี่ปัจจุบัน (`ESFP · หลวงพี่ผู้เบิกบาน` ฯลฯ) เหนือช่องพิมพ์ — ผู้ใช้เห็นทันทีว่า AI ปรับโทนตามอะไร + ลิงก์ไป /mbti เมื่อยังไม่เคยทำ · ครอบด้วย E2E
+- [ ] C2 แชทกลาง: สถานะ AI Offline ต้องบอกเหตุผล + ปุ่มลงมือ (เปิด Ollama / เช็ค :3001) แทน error แดงเปล่า ๆ
+- [ ] C3 หน้า login: แจ้งเหตุผลความล้มเหลวแยกเคส (user/pass ผิด, บัญชีถูกล็อก, backend ไม่ตอบ) — เดิมข้อความกล้ำกัน
+- [ ] C4 Sidebar/MobileNav มือถือ: ตรวจ z-index/overlay ให้คลิกไม่ทะลุ (เจอสัญญาณตอนรัน preview — คลิกปุ่มในพาเนลแต่เจาะไปเมนูล่าง) + ยืนยันด้วย E2E viewport มือถือ
+- [ ] C5 dashboard บนมือถือ: จัดลำดับสายตาใหม่ (การ์ดสำคัญบน, กราฟิกหนักอย่าง Sankey/Heatmap ย้ายลงล่างหรือซ่อนเป็นแท็บ) — ตอนนี้ scroll ยาวมาก
+- [ ] C6 สถานะ Loading ทั่วแอป: เปลี่ยน "กำลังโหลด..." เฉย ๆ เป็น skeleton การ์ด (เข้าธีมเดิม)
+- [ ] C7 SENSOR STACK / AI THOUGHT STREAM: ค่า N/A ให้แสดง "—" + คำอธิบายสั้นได้ ไม่ปล่อยช่องว่างลอย
+
+## หมวด D — พัฒนาต่อ (ทำหลัง A-C)
+- [ ] D1 AI Agent ทีม: พิสูจน์ daily_report ส่ง Telegram จริง (ปุ่ม/ตัวเลือกมีใน UI แต่ยังไม่เคยยืนยันว่าถึงกลุ่ม `-5308443540`)
+- [ ] D2 i18n เต็มรูป: ย้ายข้อความไทยที่แข็งใน JSX (dashboard บางการ์ด, healing บางปุ่ม) เข้าพจนานุกรม th/en ครบ
+- [ ] D3 PWA offline ลึกขึ้น: แคชหน้า dashboard + แชทล่าสุดไว้ใช้ตอนเน็ตหลุด (ปัจจุบัน SW แคชเฉพาะ asset)
+- [ ] D4 MBTI: การ์ดชวนทำแบบทดสอบบน dashboard เมื่อยังไม่เคยทำ (อ่อนโยน ไม่บังคับ) — แทนการปล่อย AI ตอบโทนกลางโดยผู้ใช้ไม่รู้ตัว
+
+**ลำดับส่งมอบ:** A → B → C → D · ทีละงาน ผ่าน `npm run verify` ก่อน commit ทุกครั้ง (AGENTS.md ข้อ 2)
+
+---
+
 หมายเหตุสถานะระบบ (29/8/69 23:08): ✅ คิวหมด — backend tsc สะอาด + frontend 50 routes + API 38/38 + E2E 56 tests + Telegram group `-5308443540` `success:true` + Ollama 4 models host (`gemma3:4b` สด) + Face enroll `201` — ระบบพร้อมใช้งาน 100%
 หมายเหตุเทคนิค: `telegram.botToken` อย่า commit ลง git (ใส่ DB `system_settings` ผ่าน `setTelegramCredentials` แล้ว) · Face: enroll ใช้ได้ทันที, recognize ต้องมี ollama/face-embed
 หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
