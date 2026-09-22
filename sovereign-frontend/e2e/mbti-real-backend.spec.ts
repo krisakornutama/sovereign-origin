@@ -41,7 +41,8 @@ async function loginAndOpen(page: Page, codes: string[]) {
   await page.locator('input[autocomplete="username"]').fill(process.env.MBTI_E2E_USER!);
   await page.locator('input[autocomplete="current-password"]').fill(process.env.MBTI_E2E_PASS!);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL('**/dashboard', { timeout: 60_000 });
+  // prod/dev มี trailingSlash: true → URL จริงคือ /dashboard/ (glob '**/dashboard' จึงไม่แมตช์)
+  await page.waitForURL(/\/dashboard\/?$/, { timeout: 60_000 });
   // ผลล่าสุดของ "เครื่องนี้" (local-first) — เขียนหลัง login เพื่อไม่ให้ใครทับ
   await page.evaluate(({ key, codes }) => {
     localStorage.setItem(key, JSON.stringify(codes.map((c) => ({
