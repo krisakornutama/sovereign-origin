@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authFetch } from '../lib/apiFetch';
+import { getWsUrl } from '../lib/config';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -10,6 +12,7 @@ import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
 interface Alert {
+  id?: string;
   ruleId: string;
   metric: string;
   value: number;
@@ -41,6 +44,33 @@ export default function AlertsPage() {
     }
   };
 
+  // Real-time push (Socket.IO): alert ใหม่โชว์ทันทีไม่ต้องรอ poll 10 วิ — REST ยังเป็นแหล่ง seed/ประวัติเดิม
+  // dedupe ด้วย id กันตัวซ้ำตอน push มาก่อน/หลัง poll (backend ตัด payload ตาม allowlist ของ event แล้ว)
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated || !token) return;
+    const merge = (a: Partial<Alert> & Record<string, unknown>) =>
+      setAlerts((prev) => {
+        const alert: Alert = {
+          id: typeof a.id === 'string' ? a.id : undefined,
+          ruleId: (a.ruleId as string) ?? '—',
+          metric: (a.metric as string) ?? (a.type as string) ?? 'event',
+          value: typeof a.value === 'number' ? a.value : typeof a.battery_soc === 'number' ? (a.battery_soc as number) : 0,
+          threshold: typeof a.threshold === 'number' ? a.threshold : 0,
+          message: (a.message as string) ?? '',
+          severity: (a.severity as string) ?? 'info',
+          timestamp: (a.timestamp as string) ?? new Date().toISOString(),
+        };
+        if (alert.id && prev.some((x) => x.id === alert.id)) return prev;
+        return [alert, ...prev];
+      });
+    const socket = io(getWsUrl(), { auth: { token }, transports: ['websocket'] });
+    socket.on('new_alert', merge);
+    socket.on('critical_alert', merge);
+    return () => {
+      socket.disconnect();
+    };
+  }, [isHydrated, isAuthenticated, token]);
+
   if (!isHydrated) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
@@ -69,7 +99,7 @@ export default function AlertsPage() {
           ) : (
           alerts.map((alert, i) => (
             <div
-              key={i}
+              key={alert.id ?? i}
               className={`card card-hover p-4 ${
                 alert.severity === 'critical' ? 'border-rose-800/60' :
                 alert.severity === 'warning' ? 'border-amber-800/60' : 'border-blue-800/60 panel-cyan'
