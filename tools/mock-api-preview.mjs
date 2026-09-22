@@ -3,7 +3,8 @@
 // ใช้: node tools/mock-api-preview.mjs   (ฟัง 127.0.0.1:3101)
 // แล้วรัน dev ด้วย NEXT_PUBLIC_API_URL=http://localhost:3101
 // หน้าไหนมีข้อมูลจำลองจะแสดงตัวเลขสวย ๆ หน้าอื่นแสดงโครงธีมพร้อมสถานะว่าง
-// (MOCK_PORT=<พอร์ต> — override พอร์ตสำหรับเทส tools/test/mock-socket.test.mjs)
+// (MOCK_PORT=<พอร์ต> — override พอร์ตสำหรับเทส tools/test/mock-socket.test.mjs ·
+//  MOCK_ALERT_INTERVAL_MS — รอบฉีด alert สด default 45000, เทสตั้งสั้นเพื่อไม่ต้องรอ)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.MOCK_PORT) || 3101;
+const ALERT_INTERVAL_MS = Number(process.env.MOCK_ALERT_INTERVAL_MS) || 45000;
 const require = createRequire(import.meta.url);
 
 // ข้อมูลจำลองหน้าพลังงาน — ให้เห็นการ์ด/กราฟในบรรยากาศ atmo-power ครบ
@@ -129,6 +131,20 @@ const healingProgress = (days) => days > 1
       meditation: { total_min: 2520, sessions: 84 },
     }
   : { progress: [], meditation: { total_min: 25, sessions: 1 } };
+
+// หน้าประวัติการแจ้งเตือน (/alerts) — stateful: seed ประวัติ + alert ใหม่ที่ injectAlert เพิ่มตามรอบ
+// รูปแบบตรง Alert ที่หน้าใช้ {ruleId,metric,value,threshold,message,severity,timestamp} + id สำหรับ dedupe
+const automationAlerts = [
+  { id: 'a-seed-2', ruleId: 'r3', metric: 'temp_c', value: 39.2, threshold: 38, message: 'อุณหภูมิห้องเครื่องสูง (seed)', severity: 'warning', timestamp: new Date(Date.now() - 25 * 60000).toISOString() },
+  { id: 'a-seed-1', ruleId: 'r1', metric: 'battery_soc', value: 19, threshold: 20, message: 'แบตเตอรี่ต่ำกว่า 20% (seed)', severity: 'critical', timestamp: new Date(Date.now() - 90 * 60000).toISOString() },
+];
+
+// ฉากจำลองวนรอบ — ตรง allowlist ของ backend (new_alert/critical_alert ใน core-api/src/realtime/socket.ts)
+const ALERT_SCENARIOS = [
+  { type: 'battery_low', severity: 'critical', ruleId: 'r1', metric: 'battery_soc', value: 17, threshold: 20, message: 'แบตเตอรี่โหนดหลักต่ำกว่า 20% — ตรวจแผงโซลาร์ด่วน' },
+  { type: 'rule_trigger', severity: 'warning', ruleId: 'r2', metric: 'power_kw_latest', value: 3.4, threshold: 3, message: 'ใช้พลังงานสูงผิดปกติ (เกิน 3 kW)' },
+  { type: 'ups_test', severity: 'info', ruleId: 'ups', metric: 'ups_runtime_min', value: 42, threshold: 30, message: 'ระบบสำรองไฟทำงานปกติ (ทดสอบรายสัปดาห์)' },
+];
 
 // หน้าระบบอัตโนมัติ (atmo-power) — กฎตัวอย่าง + stateful เพื่อไล่ lifecycle จริง (toggle/สร้าง/ลบ)
 const automationRules = [
@@ -272,8 +288,11 @@ function attachMockSocket(server) {
     kitchen_humidity: 58, pantry_door: false, kitchen_weight: 12.4, solar_radiation: 412, ...over,
   });
   const jitter = (v, d) => Math.round((v + (Math.random() * 2 - 1) * d) * 100) / 100;
+  let firstKick = true;
   io.on('connection', (socket) => {
     console.log(`[mock-api] socket connected (online: ${io.engine.clientsCount})`);
+    // คนแรกเข้ามาชม = ฉีด alert ตัวอย่างให้ดูเร็ว (3 วิ) ไม่ต้องรอรอบเต็ม
+    if (firstKick) { firstKick = false; setTimeout(() => injectAlert(), 3000); }
     // snapshot แรกทันทีที่ต่อ — การ์ด/กราฟบน dashboard มีของโชว์โดยไม่ต้องรอรอบถัดไป
     socket.emit('telemetry_update', telemetry());
     socket.emit('threat_update', { overall: 18, categories: { cyber: 12, physical: 8, operational: 21 }, summary: 'ความเสี่ยงรวมต่ำ (mock)' });
@@ -288,6 +307,22 @@ function attachMockSocket(server) {
   }, 15000);
   return io;
 }
+
+// ฉีด alert ใหม่ตามรอบ — REST (ประวัติ) + socket (new_alert/critical_alert สด) มาจากที่เดียวกันเสมอ
+let alertCursor = 0;
+function injectAlert() {
+  if (!io || io.engine.clientsCount === 0) return; // ไม่มีคนดู = ไม่ฉีด (ประวัติไม่เต้าฟรี)
+  const s = ALERT_SCENARIOS[alertCursor++ % ALERT_SCENARIOS.length];
+  const alert = { id: `a-${Date.now()}`, type: s.type, severity: s.severity, message: s.message, metric: s.metric, value: s.value, threshold: s.threshold, ruleId: s.ruleId, timestamp: new Date().toISOString() };
+  automationAlerts.unshift(alert);
+  if (automationAlerts.length > 50) automationAlerts.length = 50;
+  io.emit('new_alert', alert);
+  if (s.severity === 'critical') {
+    io.emit('critical_alert', { id: alert.id, type: s.type, severity: 'critical', message: s.message, nodeId: 'node-01', battery_soc: s.value, level: 1, timestamp: alert.timestamp });
+  }
+  console.log(`[mock-api] inject alert (${s.severity}): ${s.type}`);
+}
+setInterval(injectAlert, ALERT_INTERVAL_MS);
 
 const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
@@ -338,6 +373,11 @@ const server = http.createServer(async (req, res) => {
       if (chatHistory.length > 100) chatHistory.length = 100;
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       return res.end(JSON.stringify(url === '/api/healing/companion' ? { reply, teaching: null } : { reply }));
+    }
+    // automation/alerts — ประวัติแจ้งเตือน (หน้า /alerts poll ทุก 10 วิ) — stateful รวม alert ที่ injectAlert เพิ่ม
+    if (url === '/api/automation/alerts') {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify(automationAlerts));
     }
     // automation/rules — stateful: POST toggle/สร้าง, DELETE ลบ (พิสูจน์ lifecycle บนหน้าจริง)
     if (url === '/api/automation/rules') {
