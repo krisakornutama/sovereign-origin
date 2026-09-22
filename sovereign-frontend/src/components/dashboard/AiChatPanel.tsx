@@ -4,6 +4,8 @@ import { useIsSuperadmin } from '../../lib/roles';
 import Link from 'next/link';
 import { authFetch } from '../../lib/apiFetch';
 import { withMbti } from '../../lib/mbtiAi';
+import { careToneFor, latestLocalResult } from '../../lib/mbtiData';
+import { useAiChatHistory } from '../../lib/useAiChatHistory';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import VoiceInput from './VoiceInput';
@@ -25,7 +27,8 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // B4: ประวัติแชทมีเจ้าของเดียว — hook useAiChatHistory (เดิมเขียนโหลด/ล้างเอง ซ้ำกับหน้า ai-agent)
+  const { messages, setMessages, appendLocal, clearServer } = useAiChatHistory(50);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -33,45 +36,21 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
   const [pendingCount, setPendingCount] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // โทนหลวงพี่ปัจจุบัน — อ่านจากผล MBTI ล่าสุดใน localStorage (client-only, รอ hydrate)
+  // ทำไม: ผู้ใช้ควรเห็นว่า AI กำลังปรับโทนตามอะไร — และเมื่อยังไม่เคยทำแบบทดสอบ ให้ชวนอย่างอ่อนโยน
+  const [mbtiCode, setMbtiCode] = useState<string | null>(null);
+  useEffect(() => {
+    setMbtiCode(latestLocalResult()?.code ?? null);
+  }, []);
+  const careTone = careToneFor(mbtiCode);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // P1: โหลดประวัติสนทนาจากเซิร์ฟเวอร์ (Conversational Memory)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history?limit=50`);
-        if (!res.ok) return;
-        const body = await res.json();
-        if (!cancelled && Array.isArray(body.history)) {
-          setMessages(
-            body.history.map((m: any) => ({
-              id: m.id,
-              role: m.role === 'user' ? 'user' : 'ai',
-              content: m.content,
-            }))
-          );
-        }
-      } catch {
-        // offline — เริ่มด้วยประวัติว่าง
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const clearHistory = async () => {
     if (!window.confirm(t('dashboard.aiChat.clearHistoryConfirm', 'ล้างประวัติการสนทนาทั้งหมด? AI จะจำไม่ได้ว่าคุยอะไรไว้'))) return;
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history`, { method: 'DELETE' });
-      if (!res.ok) return;
-      setMessages([]);
-    } catch {
-      // เงียบ
-    }
+    await clearServer();
   };
 
   // จำนวนคำขออนุมัติที่รออยู่ (เฉพาะ SUPERADMIN — API นี้ต้องการ role สูงสุด)
@@ -131,7 +110,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
     const text = query || input;
     if (!text.trim() || isLoading) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content: text }]);
+    appendLocal({ role: 'user', content: text });
     setInput('');
     setIsLoading(true);
 
@@ -142,12 +121,18 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
         body: JSON.stringify(withMbti({ message: text })),
       });
 
-      if (!res.ok) throw new Error('API error');
-
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        // backend ตอบกลับแต่ล้มเหลว — แยกเคส AI offline (503) จากเคสอื่น
+        const msg = res.status === 503
+          ? t('dashboard.aiChat.aiOffline', '⚠️ AI ออฟไลน์ — ตรวจว่า Ollama เปิดอยู่ที่ :11434 หรือเปิดหน้า AI Agent เพื่อดูสถานะ')
+          : `${t('dashboard.aiChat.apiError', 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์')} (${res.status})`;
+        appendLocal({ role: 'ai', content: msg });
+        return;
+      }
       const reply = data.reply || t('dashboard.aiChat.processError', 'ไม่สามารถประมวลผลได้');
 
-      setMessages((prev) => [...prev, { role: 'ai', content: reply }]);
+      appendLocal({ role: 'ai', content: reply });
 
       // ถ้า AI ขออนุมัติ → อัปเดต badge ทันที
       if (isApprovalReply(reply)) loadPendingCount();
@@ -157,7 +142,8 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
         setTimeout(() => speakText(reply), 300);
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'ai', content: t('dashboard.aiChat.offlineError', 'AI Offline หรือเกิดข้อผิดพลาด') }]);
+      // fetch ล้มเอง = ติดต่อ backend ไม่ได้เลย — บอกผู้ใช้ว่าต้องเช็คอะไร ไม่ใช่แค่ "เกิดข้อผิดพลาด"
+      appendLocal({ role: 'ai', content: t('dashboard.aiChat.offlineHint', '⚠️ ติดต่อ Core API (:3001) ไม่ได้ — ตรวจว่า backend เปิดอยู่ หรือไปที่หน้า AI Agent เพื่อดูสถานะ') });
     } finally {
       setIsLoading(false);
     }
@@ -168,11 +154,12 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
     sendMessage(text);
   };
 
+  // ปุ่มเร็ว — label ผ่าน i18n (key เชิงความหมาย), query เป็นข้อความจริงที่ยิง backend
   const quickQuestions = [
-    { label: 'เช็คดินเค็ม', query: 'เช็คดินเค็ม' },
-    { label: 'สถานะแบตเตอรี่', query: 'สถานะแบตเตอรี่' },
-    { label: 'Emergency', query: 'Emergency Protocol' },
-    { label: 'Phase 2', query: 'แผน Phase 2' },
+    { key: 'soilSalinity', label: t('dashboard.aiChat.quickQuestions.soilSalinity', 'เช็คดินเค็ม'), query: 'เช็คดินเค็ม' },
+    { key: 'batteryStatus', label: t('dashboard.aiChat.quickQuestions.batteryStatus', 'สถานะแบตเตอรี่'), query: 'สถานะแบตเตอรี่' },
+    { key: 'emergency', label: t('dashboard.aiChat.quickQuestions.emergency', 'Emergency'), query: 'Emergency Protocol' },
+    { key: 'phase2', label: t('dashboard.aiChat.quickQuestions.phase2', 'แผน Phase 2'), query: 'แผน Phase 2' },
   ];
 
   return (
@@ -277,16 +264,36 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
         <div ref={chatEndRef} />
       </div>
 
+      {/* ชิปโทนหลวงพี่ — บอกผู้ใช้ว่า AI กำลังปรับโทนตามผล MBTI ล่าสุด (หรือชวนไปทำแบบทดสอบ) */}
+      {mbtiCode && careTone && (
+        <div className="px-4 pb-1 flex items-center gap-1.5 flex-wrap">
+          <span
+            data-testid="mbti-tone-chip"
+            className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-900/30 border border-fuchsia-700/60 text-fuchsia-300"
+            title={`${careTone.tone} — ${careTone.insight ?? ''}`}
+          >
+            ✨ {mbtiCode} · {careTone.yakLabel}
+          </span>
+        </div>
+      )}
+      {!mbtiCode && (
+        <div className="px-4 pb-1">
+          <Link href="/mbti" className="text-[10px] text-gray-500 hover:text-fuchsia-300 transition">
+            {t('dashboard.aiChat.mbtiInvite', '✨ ทำแบบทดสอบ MBTI แล้ว AI จะปรับโทนการดูแลให้เข้ากับคุณ →')}
+          </Link>
+        </div>
+      )}
+
       {/* Quick Questions */}
       <div className="px-4 pb-2 flex gap-1.5 flex-wrap">
         {quickQuestions.map((q) => (
           <button
-            key={q.query}
+            key={q.key}
             onClick={() => sendMessage(q.query)}
             disabled={isLoading}
             className="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded-full transition disabled:opacity-50"
           >
-            {t(`dashboard.aiChat.quickQuestions.${q.query}`, q.label)}
+            {q.label}
           </button>
         ))}
       </div>
@@ -308,6 +315,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
 
           <button
             onClick={() => sendMessage()}
+            aria-label={t('dashboard.aiChat.send', 'ส่งข้อความ')}
             disabled={isLoading || !input.trim()}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
           >

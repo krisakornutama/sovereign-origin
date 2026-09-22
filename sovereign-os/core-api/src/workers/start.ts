@@ -247,10 +247,12 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   startWanMonitor(60_000);
 
   // ── Agentic AI: สรุปประจำวันของแต่ละบทบาทส่ง Telegram ทุกเช้า (report_hour) ──
+  // D1: ไม่มี token = ปิดเงียบแบบมี flag (telegramConfigured: false) ไม่ crash cron อื่น
   async function runAgentMorningReports() {
     try {
       const res = await runMorningReports();
       if (res.reported > 0) console.log(`🤖 สรุปรายวันส่ง Telegram แล้ว ${res.reported} บทบาท (ข้าม ${res.skipped})`);
+      else if (!res.telegramConfigured) console.log('🤖 Agent morning report: Telegram ยังไม่ตั้งค่า — ปิดเงียบ (ตั้งได้ที่ Settings → Telegram)');
     } catch (err) {
       console.error('Agent morning report error:', err instanceof Error ? err.message : err);
     }

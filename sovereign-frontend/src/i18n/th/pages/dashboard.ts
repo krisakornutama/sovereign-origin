@@ -30,6 +30,8 @@ export default {
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {
     totalDevices: 'อุปกรณ์ทั้งหมด',
+    online: 'ออนไลน์',
+    offline: 'ออฟไลน์',
   },
   stats: {
     battery: 'แบตเตอรี่',
@@ -67,6 +69,7 @@ export default {
     pendingSummary: 'มีงานค้าง:',
     choresCount: '{name} งานค้าง {n}',
     billsCount: '{name} บิลค้าง {n} ใบ',
+    noQuizYet: 'ยังไม่เคยทำแบบทดสอบ',
     viewHome: '→ ดูหน้าบ้าน',
     weekdays: {
       sunday: 'อาทิตย์',
@@ -132,6 +135,7 @@ export default {
     trendLabel: 'แนวโน้ม:',
     others: 'อื่นๆ',
     waiting: 'กำลังรอข้อมูลเซ็นเซอร์...',
+    noData: 'ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้',
     manage: 'จัดการ',
     fullChart24h: 'ดูกราฟเต็ม 24 ชม. ในหน้า History',
     fullChart7d: 'ดูกราฟเต็ม 7 วัน ในหน้า History',
@@ -186,13 +190,20 @@ export default {
     you: 'คุณ',
     replay: 'อ่านซ้ำ',
     goToAgent: 'ไปจัดการที่หน้า AI Agent →',
+    mbtiInvite: '✨ ทำแบบทดสอบ MBTI แล้ว AI จะปรับโทนการดูแลให้เข้ากับคุณ →',
+    aiOffline: '⚠️ AI ออฟไลน์ — ตรวจว่า Ollama เปิดอยู่ที่ :11434 หรือเปิดหน้า AI Agent เพื่อดูสถานะ',
+    apiError: 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์',
+    offlineHint: '⚠️ ติดต่อ Core API (:3001) ไม่ได้ — ตรวจว่า backend เปิดอยู่ หรือไปที่หน้า AI Agent เพื่อดูสถานะ',
     listening: 'กำลังฟังเสียง...',
+    send: 'ส่งข้อความ',
+    skeletonCard: 'กำลังโหลดข้อมูลส่วนนี้...',
+    skeletonPage: 'กำลังโหลดแดชบอร์ด...',
     placeholder: 'พิมพ์หรือกดไมค์เพื่อพูด...',
     quickQuestions: {
-      'เช็คดินเค็ม': 'เช็คดินเค็ม',
-      'สถานะแบตเตอรี่': 'สถานะแบตเตอรี่',
-      'Emergency Protocol': 'Emergency',
-      'แผน Phase 2': 'Phase 2',
+      soilSalinity: 'เช็คดินเค็ม',
+      batteryStatus: 'สถานะแบตเตอรี่',
+      emergency: 'Emergency',
+      phase2: 'แผน Phase 2',
     },
   },
 
@@ -239,5 +250,12 @@ export default {
     emptyBefore: 'ยังไม่มีข้อมูล — เปิด ',
     emptyAfter: ' ใน .env แล้วกด',
     fetchPrices: ' ดึงราคา',
+  },
+
+  // ── D4: การ์ดชวนทำ MBTI (แสดงเฉพาะคนที่ยังไม่มีผล) ──
+  mbtiCard: {
+    title: 'รู้จักตัวเองให้ลึกขึ้น',
+    desc: 'ทำแบบทดสอบบุคลิกภาพ 16 ประเภท (5–7 นาที) แล้ว AI จะปรับโทนการดูแลให้เข้ากับคุณ',
+    cta: 'เริ่มแบบทดสอบ →',
   },
 } as const;

@@ -7,6 +7,7 @@
 // กติกา: ผ่านทุกขั้นถึงจะ commit/merge ได้ (ตาม AGENTS.md ข้อ 2)
 // ────────────────────────────────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
 import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +34,7 @@ if (RUN_DB) {
   steps.push({ name: 'backend: coverage report (no threshold)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'coverage:core'] });
 }
 if (RUN_E2E) {
-  steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'] });
+  steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'], e2e: true });
 }
 
 console.log('═══ Sovereign Quality Gate ═══');
@@ -93,26 +94,98 @@ if (RUN_E2E && !existsSync(join(FRONTEND, 'node_modules', '@playwright', 'test')
 
 const results = [];
 const t0 = Date.now();
-for (const step of steps) {
-  process.stdout.write(`▶ ${step.name} ... `);
+
+// e2e ต้องมี backend :3001 รันอยู่ (spec ชุดหลักยิง API จริง) — ถ้าลง → ข้ามพร้อมเตือน
+// แทน fail ทั้ง gate (เคสจริง: รัน verify:full บนเครื่องที่เปิดแค่ frontend = pos-flow พังทั้งชุด)
+// ข้อยกเว้น: มี backend จริงรันอยู่เสมอเมื่อ ENV E2E_REQUIRE_BACKEND=1 (CI ตั้งครบ)
+async function backendAlive() {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port: 3001, path: '/api/health', timeout: 2500 }, (res) => { res.resume(); resolve(true); });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+// B2: รัน 4 ขั้นเป็น 2 สายขนานกัน (backend build→test ∥ frontend typecheck→build)
+// — มาตรฐานเท่าเดิมทุกขั้น (ตาม AGENTS.md ข้อ 2) แต่เวลารวม = สายที่ช้าที่สุด ไม่ใช่ผลรวม
+// (เคยวัด 3.6 นาทีแบบลำดับ; เป้า < 3 นาที) · OOM retry, e2e-skip, dev-restore คงเดิมหมด
+// env VERIFY_SEQUENTIAL=1 = บังคับรันลำดับแบบเดิม (debug เครื่องที่แรมน้อยจริง ๆ)
+async function runStep(step) {
+  process.stdout.write(`▶ ${step.name} ...\n`);
   const run = () => spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: true, stdio: 'pipe', encoding: 'utf8' });
   let r = run();
   // exit 134 = build worker ตายแบบ native OOM (Zone Allocation) — พบจริงเมื่อแรม/commit charge ของเครื่อง
   // ต่ำ (prod server + docker รันคู่กัน) · ไม่ใช่บั๊กโค้ด (CI บน GitHub แรมโล่งผ่านเสมอ) → พักแล้วลองใหม่ 2 ครั้ง
   for (let retry = 1; r.status === 134 && retry <= 2; retry++) {
-    console.log(`พังชั่วคราว (exit 134 — OOM) → พัก 20 วิ แล้วลองใหม่ (${retry}/2)`);
+    console.log(`   ${step.name}: พังชั่วคราว (exit 134 — OOM) → พัก 20 วิ แล้วลองใหม่ (${retry}/2)`);
     await new Promise((res) => setTimeout(res, 20_000));
     r = run();
   }
-  const ok = r.status === 0;
-  results.push({ name: step.name, ok });
-  console.log(ok ? 'ผ่าน' : `พัง (exit ${r.status})`);
-  if (!ok) {
-    // แสดง 30 บรรทัดท้ายของ output ให้เห็นสาเหตุ
-    const out = `${r.stdout || ''}\n${r.stderr || ''}`.trim().split('\n');
-    console.error(out.slice(-30).join('\n'));
-    console.error(`\n❌ ล้มเหลวที่ขั้น: ${step.name} — แก้ให้ผ่านก่อน commit (กฎ AGENTS.md ข้อ 2)`);
-    process.exit(1);
+  return r;
+}
+
+const e2eSteps = steps.filter((s) => s.e2e);
+const coreSteps = steps.filter((s) => !s.e2e);
+
+if (process.env.VERIFY_SEQUENTIAL === '1') {
+  for (const step of steps) {
+    if (step.e2e) {
+      const alive = process.env.E2E_REQUIRE_BACKEND === '1' || (await backendAlive());
+      if (!alive) {
+        results.push({ name: step.name, ok: true, skipped: true });
+        console.log(`⚠️  ข้าม (backend :3001 ไม่ได้รัน — เปิด backend แล้วรันใหม่ หรือตั้ง E2E_REQUIRE_BACKEND=1 เพื่อบังคับ)`);
+        continue;
+      }
+    }
+    const r = await runStep(step);
+    const ok = r.status === 0;
+    results.push({ name: step.name, ok });
+    console.log(ok ? `▶ ${step.name}: ผ่าน` : `▶ ${step.name}: พัง (exit ${r.status})`);
+    if (!ok) {
+      const out = `${r.stdout || ''}\n${r.stderr || ''}`.trim().split('\n');
+      console.error(out.slice(-30).join('\n'));
+      console.error(`\n❌ ล้มเหลวที่ขั้น: ${step.name} — แก้ให้ผ่านก่อน commit (กฎ AGENTS.md ข้อ 2)`);
+      process.exit(1);
+    }
+  }
+} else {
+  // สาย backend กับ frontend แยกกัน — ขั้นภายในสายยังลำดับกันเหมือนเดิม (build ก่อน test ฯลฯ)
+  const backendLine = coreSteps.filter((s) => s.name.startsWith('backend'));
+  const frontendLine = coreSteps.filter((s) => s.name.startsWith('frontend'));
+  const runLine = async (line, tag) => {
+    for (const step of line) {
+      const r = await runStep(step);
+      const ok = r.status === 0;
+      results.push({ name: step.name, ok });
+      console.log(ok ? `▶ ${step.name}: ผ่าน` : `▶ ${step.name}: พัง (exit ${r.status})`);
+      if (!ok) {
+        const out = `${r.stdout || ''}\n${r.stderr || ''}`.trim().split('\n');
+        console.error(out.slice(-30).join('\n'));
+        console.error(`\n❌ ล้มเหลวที่ขั้น: ${step.name} — แก้ให้ผ่านก่อน commit (กฎ AGENTS.md ข้อ 2)`);
+        process.exit(1); // สายตาย = จบทันที (อีกสายปล่อยให้ runner จัดการ kill ตอน process ตาย)
+      }
+    }
+    console.log(`── สาย ${tag} เสร็จ ──`);
+  };
+  await Promise.all([runLine(backendLine, 'backend'), runLine(frontendLine, 'frontend')]);
+  // e2e (ถ้ามี): รันหลังสองสายเสร็จ — ต้องรอ build จบ และ backend :3001 ต้องมีจริง
+  for (const step of e2eSteps) {
+    const alive = process.env.E2E_REQUIRE_BACKEND === '1' || (await backendAlive());
+    if (!alive) {
+      results.push({ name: step.name, ok: true, skipped: true });
+      console.log(`⚠️  ข้าม (backend :3001 ไม่ได้รัน — เปิด backend แล้วรันใหม่ หรือตั้ง E2E_REQUIRE_BACKEND=1 เพื่อบังคับ)`);
+      continue;
+    }
+    const r = await runStep(step);
+    const ok = r.status === 0;
+    results.push({ name: step.name, ok });
+    console.log(ok ? `▶ ${step.name}: ผ่าน` : `▶ ${step.name}: พัง (exit ${r.status})`);
+    if (!ok) {
+      const out = `${r.stdout || ''}\n${r.stderr || ''}`.trim().split('\n');
+      console.error(out.slice(-30).join('\n'));
+      console.error(`\n❌ ล้มเหลวที่ขั้น: ${step.name} — แก้ให้ผ่านก่อน commit (กฎ AGENTS.md ข้อ 2)`);
+      process.exit(1);
+    }
   }
 }
 

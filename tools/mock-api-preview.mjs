@@ -3,9 +3,15 @@
 // ใช้: node tools/mock-api-preview.mjs   (ฟัง 127.0.0.1:3101)
 // แล้วรัน dev ด้วย NEXT_PUBLIC_API_URL=http://localhost:3101
 // หน้าไหนมีข้อมูลจำลองจะแสดงตัวเลขสวย ๆ หน้าอื่นแสดงโครงธีมพร้อมสถานะว่าง
+// (MOCK_PORT=<พอร์ต> — override พอร์ตสำหรับเทส tools/test/mock-socket.test.mjs)
 import http from 'node:http';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PORT = 3101;
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const PORT = Number(process.env.MOCK_PORT) || 3101;
+const require = createRequire(import.meta.url);
 
 // ข้อมูลจำลองหน้าพลังงาน — ให้เห็นการ์ด/กราฟในบรรยากาศ atmo-power ครบ
 const energySummary = {
@@ -198,19 +204,126 @@ const systemUsers = [
   { id: 'u2', username: 'member01', role: 'USER', assigned_node_id: null },
 ];
 
+// ประวัติแชทจำลอง (ในหน่วยความจำ) — เก็บทั้งข้อความเข้า/ตอบ เพื่อพิสูจน์ Conversational Memory บน preview
+const chatHistory = [];
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-http
-  .createServer(async (req, res) => {
+// __upstream — ส่งต่อไป backend จริง (ใช้เฉพาะงาน dev ในเครื่อง เช่น MBTI_E2E_API_UPSTREAM ของ A5)
+// ไม่ expose นอก localhost: อนุญาตเฉพาะ request ที่มาจาก 127.0.0.1/::1 เท่านั้น (mock ฟัง 127.0.0.1 อยู่แล้ว)
+// และต้องตั้ง env MBTI_E2E_API_UPSTREAM=1 ที่ตัว mock ด้วย — ปิดสองชั้น กันยิงข้ามเครือข่าย
+const UPSTREAM = process.env.MBTI_E2E_API_UPSTREAM === '1' ? process.env.MBTI_E2E_API_UPSTREAM_URL || 'http://127.0.0.1:3001' : null;
+
+async function proxyToUpstream(req, res) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const body = Buffer.concat(chunks);
+  try {
+    const r = await fetch(UPSTREAM + req.url, {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json', ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}) },
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
+    });
+    const text = await r.text();
+    res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/json', ...CORS });
+    return res.end(text);
+  } catch (e) {
+    res.writeHead(502, { 'Content-Type': 'application/json', ...CORS });
+    return res.end(JSON.stringify({ error: 'upstream unavailable' }));
+  }
+}
+
+// ── Socket.IO ของ mock — ปิดหางงาน A1: dashboard ต่อ WebSocket หา :3101 ต้อง handshake ผ่านบนสแตก preview ──
+// ใช้ socket.io ของ core-api (frontend ติดตั้งแต่ socket.io-client อย่างเดียว) ผ่าน createRequire — ไม่เพิ่ม dependency ใหม่
+// ด่าน handshake เลียน "รูปแบบ" ของจริง (core-api/src/realtime/socket.ts): ต้องส่ง auth.token ที่ถอด payload
+// ได้และมี mfa_verified=true — แต่ mock ไม่ verify signature (token บน preview เป็น fake JWT ฝั่ง client อยู่แล้ว;
+// การตรวจ signature จริงคือหน้าที่ด่าน backend ไม่ใช่ของเครื่องมือชมธีม)
+function attachMockSocket(server) {
+  let Server;
+  try {
+    ({ Server } = require(join(ROOT, 'sovereign-os', 'core-api', 'node_modules', 'socket.io')));
+  } catch (err) {
+    console.warn(`[mock-api] ไม่พบ socket.io (${err.message.split('\n')[0]}) — รัน HTTP อย่างเดียว`);
+    return null;
+  }
+  const io = new Server(server, {
+    // จริงใจกับ CORS ของ mock เดิม (HTTP ส่ง ACAO `*`) — mock ฟัง 127.0.0.1 อยู่แล้ว ไม่ expose นอกเครื่อง
+    cors: { origin: true },
+  });
+  io.use((socket, next) => {
+    try {
+      const raw = String(socket.handshake.auth?.token || '');
+      const payload = JSON.parse(Buffer.from(raw.split('.')[1] || '', 'base64url').toString('utf8') || '{}');
+      if (payload?.mfa_verified !== true) return next(new Error('MFA verification required'));
+      return next();
+    } catch {
+      return next(new Error('Unauthorized'));
+    }
+  });
+  // ฟิลด์ทุก event ตรง EVENT_FIELD_ALLOWLIST ของ core-api/src/realtime/socket.ts เป๊ะ —
+  // อะไรที่ของจริง sanitize ทิ้ง ของ mock ไม่ส่ง (พฤติกรรมหน้าเว็บต้องเหมือนกันทั้งสองสแตก)
+  const telemetry = (over = {}) => ({
+    node_id: 'node-01', node_name: 'โหนดหลัก (mock)', battery_soc: 76, power_kw: -0.31,
+    voltage: 51.4, water_level_cm: 142, status: 'ONLINE', fridge_temp: 4.2, kitchen_temp: 27.5,
+    kitchen_humidity: 58, pantry_door: false, kitchen_weight: 12.4, solar_radiation: 412, ...over,
+  });
+  const jitter = (v, d) => Math.round((v + (Math.random() * 2 - 1) * d) * 100) / 100;
+  io.on('connection', (socket) => {
+    console.log(`[mock-api] socket connected (online: ${io.engine.clientsCount})`);
+    // snapshot แรกทันทีที่ต่อ — การ์ด/กราฟบน dashboard มีของโชว์โดยไม่ต้องรอรอบถัดไป
+    socket.emit('telemetry_update', telemetry());
+    socket.emit('threat_update', { overall: 18, categories: { cyber: 12, physical: 8, operational: 21 }, summary: 'ความเสี่ยงรวมต่ำ (mock)' });
+    socket.emit('defcon_update', { level: 0, direction: 'down', overall: 18 });
+    socket.emit('wealth_update', { totalUsd: 141200, inventoryUsd: 8750, grandTotalUsd: 212750.5, timestamp: new Date().toISOString() });
+    socket.on('disconnect', () => console.log(`[mock-api] socket disconnected (online: ${io.engine.clientsCount})`));
+  });
+  // สดทุก 15 วิ — ค่าขยับเบา ๆ รอบค่า mock ให้หน้าชมธีมรู้สึกเหมือนระบบทำงานจริง
+  setInterval(() => {
+    if (io.engine.clientsCount === 0) return;
+    io.emit('telemetry_update', telemetry({ battery_soc: jitter(76, 1.5), power_kw: jitter(-0.31, 0.08), solar_radiation: Math.round(jitter(412, 30)) }));
+  }, 15000);
+  return io;
+}
+
+const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS);
       return res.end();
     }
     const url = (req.url || '').split('?')[0];
+    // /socket.io/ — engine.io จัดการเอง (listener ของมัน attach ทีหลังเรา — ไม่ตอบ = ส่งต่อ)
+    // อย่าชน gate 401 ด้านล่าง: handshake ของ socket.io ส่ง token ทาง auth payload ไม่ใช่ Authorization header
+    if (url.startsWith('/socket.io/')) {
+      if (io) return;
+      res.writeHead(503, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ error: 'socket.io unavailable (ตรวจ sovereign-os/core-api/node_modules)' }));
+    }
+    // auth gate ระดับ mock — จริงใจกับ backend จริง: ทุก endpoint ที่ backend ปิด ต้องการ Authorization ทั้งหมด
+    // (ยกเว้นเฉพาะ __upstream ซึ่งส่ง Authorization ต่อให้ backend ตัดสินเอง)
+    // ผลข้างเคียงที่ตั้งใจ: e2e เดิมที่ยิง fetch ตรง ๆ โดยไม่แนบ token จะเห็น 401 แบบเดียวกับของจริง
+    if (!url.startsWith('/__upstream') && !req.headers.authorization) {
+      res.writeHead(401, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ error: 'Unauthorized (mock gate — แนบ Authorization ให้เหมือนของจริง)' }));
+    }
+    // __upstream — ส่งต่อไป backend จริง (ใช้เฉพาะงาน dev ในเครื่อง เช่น MBTI_E2E_API_UPSTREAM ของ A5)
+    if (UPSTREAM && url.startsWith('/__upstream/')) {
+      req.url = req.url.replace('/__upstream', '');
+      return proxyToUpstream(req, res);
+    }
+    // ai/history — ประวัติสนทนาในหน่วยความจำ (GET = list, DELETE = ล้าง) — AiChatPanel โหลดตอนเปิดหน้า
+    if (url === '/api/ai/history') {
+      if (req.method === 'DELETE') {
+        chatHistory.length = 0;
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        return res.end(JSON.stringify({ ok: true }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      return res.end(JSON.stringify({ history: chatHistory }));
+    }
     // healing/companion + ai/chat — ตอบโทนตาม mbti ที่ client ส่ง (พิสูจน์ว่า backend ใช้ค่านี้จริง)
     if ((url === '/api/healing/companion' || url === '/api/ai/chat') && req.method === 'POST') {
       const b = await readJsonBody(req);
@@ -218,6 +331,11 @@ http
       const reply = code
         ? `[mock] ผมเห็นโค้ด "${code}" จาก request ของคุณ — โทนนี้คือโทนของ ${code} โดยเฉพาะ (ถ้าเปลี่ยนโค้ด ข้อความนี้จะเปลี่ยนตาม)`
         : '[mock] ไม่พบโค้ด MBTI ใน request — นี่คือการตอบแบบกลาง (ไม่มีการปรับโทน)';
+      chatHistory.unshift(
+        { id: `u${Date.now()}`, role: 'user', content: typeof b.message === 'string' ? b.message : '' },
+        { id: `a${Date.now()}`, role: 'assistant', content: reply }
+      );
+      if (chatHistory.length > 100) chatHistory.length = 100;
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       return res.end(JSON.stringify(url === '/api/healing/companion' ? { reply, teaching: null } : { reply }));
     }
@@ -324,5 +442,7 @@ http
     // endpoint อื่น ๆ → {} (หน้าส่วนใหญ่มี guard asArray/asObject รองรับ)
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify(body));
-  })
-  .listen(PORT, '127.0.0.1', () => console.log(`[mock-api] listening on http://127.0.0.1:${PORT}`));
+  });
+
+const io = attachMockSocket(server); // io ต้องประกาศก่อน request แรก — handler อ้างถึงตอนเช็ค /socket.io/
+server.listen(PORT, '127.0.0.1', () => console.log(`[mock-api] listening on http://127.0.0.1:${PORT}${io ? ' + socket.io (ws)' : ''}`));

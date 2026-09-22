@@ -199,7 +199,7 @@ describe('agent morning Telegram reports', () => {
     });
     mockModel(prisma, 'inventoryItem', { findMany: async () => [] });
     const msgs: string[] = [];
-    setAgentNotify(async (m: string) => { msgs.push(m); });
+    setAgentNotify(async (m: string) => { msgs.push(m); return true; });
     setAgentOllama({ post: async () => ({ data: { response: 'น้ำปกติ pH 7.0' } }) });
     const now = new Date('2026-08-12T07:30:00+07:00');
     const res = await runMorningReports(now);
@@ -217,7 +217,7 @@ describe('agent morning Telegram reports', () => {
     };
     mockModel(prisma, 'agentRole', { findMany: async () => [role] });
     const msgs: string[] = [];
-    setAgentNotify(async (m: string) => { msgs.push(m); });
+    setAgentNotify(async (m: string) => { msgs.push(m); return true; });
     const now = new Date('2026-08-12T08:00:00+07:00');
     const res = await runMorningReports(now);
     assert.equal(res.reported, 0);
@@ -234,9 +234,98 @@ describe('agent morning Telegram reports', () => {
       count: 1, enabled: true, daily_report: true, report_hour: 7, last_report_date: null,
     };
     mockModel(prisma, 'agentRole', { findMany: async () => [off, early] });
-    setAgentNotify(async () => {});
+    setAgentNotify(async () => true);
     const res = await runMorningReports(new Date('2026-08-12T06:00:00+07:00'));
     assert.equal(res.reported, 0);
     assert.equal(res.skipped, 2);
+  });
+
+  // D1: ไม่มี Telegram credentials → ปิดเงียบแบบมี flag ชัดเจน (ไม่ crash cron อื่น ไม่สร้างงานเปล่า)
+  test('runMorningReports: ไม่มี token → telegramConfigured=false ปิดเงียบ ไม่สร้างงาน ไม่มาร์ควัน', async () => {
+    // setup-env ตั้ง env token ไว้ — mock systemSetting ให้ DB ว่างแล้วล้าง env ชั่วคราว
+    mockModel(prisma, 'systemSetting', { findMany: async () => [] });
+    const savedToken = process.env.TELEGRAM_BOT_TOKEN;
+    const savedChat = process.env.TELEGRAM_CHAT_ID;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    delete process.env.TELEGRAM_CHAT_ID;
+    try {
+      const role = {
+        id: 'r-1', name: 'x', emoji: '🤖', description: 'x', system_prompt: 'p', capability: 'general',
+        count: 1, enabled: true, daily_report: true, report_hour: 7, last_report_date: null,
+      };
+      const created: any[] = [];
+      mockModel(prisma, 'agentRole', {
+        findMany: async () => [role],
+        update: async (args: any) => { Object.assign(role, args.data); return role; },
+      });
+      mockModel(prisma, 'agentJob', { create: async (a: any) => { created.push(a.data); return { id: 'j', ...a.data }; } });
+      const msgs: string[] = [];
+      setAgentNotify(async (m: string) => { msgs.push(m); return true; });
+      const res = await runMorningReports(new Date('2026-08-12T08:00:00+07:00'));
+      assert.equal(res.telegramConfigured, false);
+      assert.equal(res.reported, 0);
+      assert.equal(created.length, 0); // ไม่สร้างงานเปล่า
+      assert.equal(msgs.length, 0);
+      assert.equal(role.last_report_date, null); // ไม่มาร์ควัน
+    } finally {
+      if (savedToken !== undefined) process.env.TELEGRAM_BOT_TOKEN = savedToken;
+      if (savedChat !== undefined) process.env.TELEGRAM_CHAT_ID = savedChat;
+      // ล้าง cache ของ credentials service กันรบกวน test อื่น
+      try { await (await import('../src/services/telegram-credentials.service')).clearTelegramCredentials(); } catch { /* ไม่มี helper ล้าง cache ก็ไม่เป็นไร */ }
+    }
+  });
+
+  // D1: ส่งไม่สำเร็จ (notify ตอบ false) → ห้ามมาร์ค last_report_date — รอบถัดไป (30 นาที) ต้องลองใหม่
+  test('runMorningReports: ส่ง Telegram ล้ม → ไม่มาร์ควัน รายงานไม่หาย (ลองใหม่รอบหน้า)', async () => {
+    const role = {
+      id: 'r-1', name: 'x', emoji: '🤖', description: 'x', system_prompt: 'p', capability: 'general',
+      count: 1, enabled: true, daily_report: true, report_hour: 7, last_report_date: null,
+    };
+    mockModel(prisma, 'agentRole', {
+      findMany: async () => [role],
+      update: async (args: any) => { Object.assign(role, args.data); return role; },
+    });
+    mockModel(prisma, 'agentJob', {
+      create: async (a: any) => ({ id: 'j-1', ...a.data }),
+      update: async (a: any) => ({ id: 'j-1', ...a.data }),
+    });
+    mockModel(prisma, 'device', { findMany: async () => [] });
+    setAgentNotify(async () => false); // Telegram ตอบกลับว่าส่งไม่ถึง
+    setAgentOllama({ post: async () => ({ data: { response: 'สรุป' } }) });
+    const res = await runMorningReports(new Date('2026-08-12T08:00:00+07:00'));
+    assert.equal(res.telegramConfigured, true);
+    assert.equal(res.reported, 0);
+    assert.equal(role.last_report_date, null); // ยังไม่มาร์ค — รอบหน้าลองใหม่
+  });
+
+  // D1: credentials มาจาก DB (ตั้งผ่าน UI) ก็ต้องทำงาน — พิสูจน์ hasTelegramCredentials อ่าน DB จริง
+  test('runMorningReports: token จาก DB → telegramConfigured=true ส่งและมาร์ควันตามปกติ', async () => {
+    mockModel(prisma, 'systemSetting', {
+      findMany: async () => [
+        { key: 'telegram.botToken', value: 'db-token' },
+        { key: 'telegram.chatId', value: 'db-chat' },
+      ],
+    });
+    const role = {
+      id: 'r-1', name: 'ผู้ดูแลน้ำ', emoji: '💧', description: 'x', system_prompt: 'p', capability: 'inventory',
+      count: 1, enabled: true, daily_report: true, report_hour: 7, last_report_date: null,
+    };
+    mockModel(prisma, 'agentRole', {
+      findMany: async () => [role],
+      update: async (args: any) => { Object.assign(role, args.data); return role; },
+    });
+    mockModel(prisma, 'agentJob', {
+      create: async (a: any) => ({ id: 'j-1', ...a.data }),
+      update: async (a: any) => ({ id: 'j-1', ...a.data }),
+    });
+    mockModel(prisma, 'inventoryItem', { findMany: async () => [] });
+    const msgs: string[] = [];
+    setAgentNotify(async (m: string) => { msgs.push(m); return true; });
+    setAgentOllama({ post: async () => ({ data: { response: 'น้ำปกติ' } }) });
+    const res = await runMorningReports(new Date('2026-08-12T08:00:00+07:00'));
+    assert.equal(res.telegramConfigured, true);
+    assert.equal(res.reported, 1);
+    assert.equal(msgs.length, 1);
+    assert.equal(role.last_report_date, '2026-08-12');
   });
 });

@@ -11,6 +11,9 @@
     "test:tools": "node --test \"tools/test/**/*.test.mjs\"",
     "test:db": "node tools/test-db-local.mjs",
     "coverage:core": "node tools/coverage-core.mjs",
-    "health": "node tools/system-health.mjs"
+    "health": "node tools/system-health.mjs",
+    "clean:logs": "node tools/clean-logs.mjs",
+    "preview:stack": "node tools/preview-stack.mjs",
+    "preview:check": "node tools/preview-stack.mjs --check"
   }
 }

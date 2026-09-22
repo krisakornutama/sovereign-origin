@@ -10,6 +10,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
+    "test:mbti": "playwright test --config=playwright.mbti.config.ts",
+    "test:mbti:real": "playwright test --config=playwright.mbti-real.config.ts",
     "electron": "electron .",
     "electron:build": "npm run build:static && electron-builder --win --x64"
   },

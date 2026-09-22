@@ -17,7 +17,9 @@ import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
 import SectionCard from '../components/ui/SectionCard';
 import EmptyState from '../components/ui/EmptyState';
+import { SkeletonGrid } from '../components/ui/SkeletonCard';
 import { authFetch } from '../lib/apiFetch';
+import { latestLocalResult } from '../lib/mbtiData';
 import { api } from '../lib/apiClient';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -465,6 +467,9 @@ export default function Dashboard() {
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [editMode, setEditMode] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  // D4: การ์ดชวนทำ MBTI — แสดงเฉพาะคนที่ยังไม่มีผลใน localStorage (client-only รอ hydrate)
+  const [mbtiInvite, setMbtiInvite] = useState(false);
+  useEffect(() => { setMbtiInvite(latestLocalResult() === null); }, []);
 
   useEffect(() => {
     const saved = loadLayout();
@@ -503,7 +508,13 @@ export default function Dashboard() {
   }, [isHydrated, isAuthenticated, token]);
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500 text-sm">{t('common.loading', 'กำลังโหลด...')}</div>;
+    // C6: skeleton แดชบอร์ดแทนข้อความเฉย ๆ — ให้รู้สึกว่าโครงหน้ามาแล้ว ข้อมูลกำลังตามมา
+    return (
+      <div className="min-h-screen bg-gray-950 p-4 lg:p-6 max-w-7xl mx-auto">
+        <SkeletonGrid count={6} className="!grid-cols-1 md:!grid-cols-2 xl:!grid-cols-3" />
+        <p className="sr-only">{t('dashboard.aiChat.skeletonPage', 'กำลังโหลดแดชบอร์ด...')}</p>
+      </div>
+    );
   }
   if (!isAuthenticated || !user) {
     return <div className="text-white">{t('dashboard.unauthorized', 'Unauthorized')}</div>;
@@ -540,6 +551,30 @@ export default function Dashboard() {
   };
   const visibleOrder = order.filter((k) => isVisibleForUser(k) && (editMode || !hidden[k]));
 
+  // C5 มือถือ: ลำดับที่เหมาะกับจอเล็ก (ตัวเลข/เตือนบน กราฟิกหนักลงล่าง) —
+  // ใช้เฉพาะเมื่อผู้ใช้ยังไม่เคยจัดเรียงเอง (order ยังเป็นค่า default) ไม่งั้นเคารพของที่จัดไว้
+  // บน xl กลับเป็นลำดับเดิม 100% (order-classes คืนตำแหน่งเดิมเมื่อ CSS Grid มี 12 คอลัมน์ให้)
+  const usingDefaultOrder = order.length === DEFAULT_ORDER.length && order.every((k, i) => k === DEFAULT_ORDER[i]);
+  const MOBILE_ORDER: WidgetKey[] = ['alerts', 'defcon', 'wealth', 'inventory', 'status', 'actions', 'stats', 'map', 'sensors', 'farm', 'kids'];
+  const MOBILE_RANK: Record<string, number> = {};
+  MOBILE_ORDER.forEach((k, i) => { MOBILE_RANK[k] = i; });
+  const MOBILE_XL_ORDER: Record<string, string> = {
+    alerts: 'xl:order-4',
+    defcon: 'xl:order-1',
+    wealth: 'xl:order-2',
+    inventory: 'xl:order-3',
+    status: 'xl:order-6',
+    actions: 'xl:order-7',
+    stats: 'xl:order-8',
+    map: 'xl:order-9',
+    sensors: 'xl:order-10',
+    farm: 'xl:order-5',
+    kids: 'xl:order-11',
+  };
+  // (ขณะ edit mode งดจัดใหม่ — index ของ drag-and-drop ผูกกับ visibleOrder ตรง ๆ
+  //  และบนจอใหญ่ order-classes ทำให้ผลเหมือนเดิมเป๊ะอยู่แล้ว)
+  const mobileFirst = usingDefaultOrder && !editMode;
+
   const renderDense = (key: WidgetKey) => {
     switch (key) {
       case 'defcon': {
@@ -551,7 +586,7 @@ export default function Dashboard() {
                 DEFCON / THREAT INDEX
                 <span className="text-[9px] font-normal text-gray-500 tracking-wide">· {defconLabel}</span>
               </h3>
-              <Link href="/risk-monitor" scroll={false} className="text-[10px] text-sky-400 hover:underline">รายละเอียด →</Link>
+              <Link href="/risk-monitor" scroll={false} className="text-[10px] text-sky-400 hover:underline">{t('dashboard.defcon.detailsLink', 'รายละเอียด →')}</Link>
             </div>
 
             <div className={`rounded-lg border px-2.5 py-2 flex items-center justify-between ${defconColor}`}>
@@ -577,7 +612,7 @@ export default function Dashboard() {
             </div>
 
             {threat?.summary && <div className="text-[10px] leading-relaxed text-gray-500 mt-2 line-clamp-2 border-t border-gray-800 pt-2">{threat.summary}</div>}
-            {overall == null && <div className="text-[10px] text-gray-500 mt-2">ยังไม่มีข้อมูล — เปิด <code className="text-gray-400">RISK_MONITOR_ENABLED=true</code></div>}
+            {overall == null && <div className="text-[10px] text-gray-500 mt-2">{t('dashboard.defcon.emptyBefore', 'ยังไม่มีข้อมูล — เปิด ')} <code className="text-gray-400">RISK_MONITOR_ENABLED=true</code></div>}
 
             {/* keep original widget hidden for data sync but not visually */}
             <div className="hidden"><DefconWidget /></div>
@@ -621,13 +656,13 @@ export default function Dashboard() {
                   <span className="text-emerald-400/70">GRAND ${(s.grandTotalUsd ?? 0).toLocaleString()}</span>
                 </div>
                 {s.missingPrices.length > 0 && (
-                  <div className="text-[9px] text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded px-2 py-1 mt-2">{'ยังไม่มีราคา: ' + s.missingPrices.join(', ')}</div>
+                  <div className="text-[9px] text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded px-2 py-1 mt-2">{t('dashboard.wealth.missingPrices', 'ยังไม่มีราคา: {prices}', { prices: s.missingPrices.join(', ') })}</div>
                 )}
               </>
             ) : (
               <div className="space-y-2">
                 <div className="bg-gray-950/40 border border-gray-800 rounded-xl p-1"><SankeyAlluvial wealth={null} inventory={inventoryStatus} farm={farmOverview} /></div>
-                <div className="text-[10px] text-gray-500">ยังไม่มีข้อมูล — เปิด <code>PORTFOLIO_ENABLED=true</code></div>
+                <div className="text-[10px] text-gray-500">{t('dashboard.wealth.emptyBefore', 'ยังไม่มีข้อมูล — เปิด')} <code>PORTFOLIO_ENABLED=true</code></div>
               </div>
             )}
             <div className="hidden"><WealthWidget /></div>
@@ -665,9 +700,9 @@ export default function Dashboard() {
             </div>
             <PerfGauges metrics={metrics} deviceStatus={deviceStatus} />
             <div className="grid grid-cols-3 gap-1.5 mt-2 text-[10px]">
-              <StatCard label="อุปกรณ์ทั้งหมด" value={deviceStatus?.total ?? 0} icon={<Icon name="grid" size={10} />} />
-              <StatCard label="ออนไลน์" value={<span className="text-emerald-400">{deviceStatus?.online ?? 0}</span>} icon={<Icon name="check" size={10} className="text-emerald-400" />} />
-              <StatCard label="ออฟไลน์" value={<span className="text-rose-400">{deviceStatus?.offline ?? 0}</span>} icon={<Icon name="alert-triangle" size={10} className="text-rose-400" />} />
+              <StatCard label={t('dashboard.status.totalDevices', 'อุปกรณ์ทั้งหมด')} value={deviceStatus?.total ?? 0} icon={<Icon name="grid" size={10} />} />
+              <StatCard label={t('dashboard.status.online', 'ออนไลน์')} value={<span className="text-emerald-400">{deviceStatus?.online ?? 0}</span>} icon={<Icon name="check" size={10} className="text-emerald-400" />} />
+              <StatCard label={t('dashboard.status.offline', 'ออฟไลน์')} value={<span className="text-rose-400">{deviceStatus?.offline ?? 0}</span>} icon={<Icon name="alert-triangle" size={10} className="text-rose-400" />} />
             </div>
           </div>
         );
@@ -690,7 +725,7 @@ export default function Dashboard() {
                 <StatCard
                   key={idx}
                   label={stat.label}
-                  value={(stat as any).isBoolean ? <span className={(stat as any).tone}>{stat.value === 1 ? (stat as any).trueLabel : (stat as any).falseLabel}</span> : <span className={stat.tone}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : 'N/A'}</span>}
+                  value={(stat as any).isBoolean ? <span className={(stat as any).tone}>{stat.value === 1 ? (stat as any).trueLabel : (stat as any).falseLabel}</span> : <span className={stat.tone} title={stat.value != null ? undefined : t('dashboard.sensors.noData', 'ยังไม่มีข้อมูลเซ็นเซอร์ตัวนี้')}>{stat.value != null ? stat.value.toFixed(1) + stat.unit : '—'}</span>}
                   icon={<Icon name={stat.icon} size={12} className="text-gray-500" />}
                 />
               ))}
@@ -822,7 +857,7 @@ export default function Dashboard() {
           <section className="card p-3">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-[11px] font-bold tracking-widest text-gray-200 flex items-center gap-1.5"><Icon name="knowledge" size={12} className="text-violet-400" /> ลูกๆ — การเรียนรู้</h2>
-              <Link href="/knowledge" scroll={false} className="flex items-center gap-1 text-[10px] text-sky-400 hover:underline">เปิดคลังความรู้ <Icon name="arrow-right" size={10} /></Link>
+              <Link href="/knowledge" scroll={false} className="flex items-center gap-1 text-[10px] text-sky-400 hover:underline">{t('dashboard.kids.openKnowledge', 'เปิดคลังความรู้')} <Icon name="arrow-right" size={10} /></Link>
             </div>
             {kidsSummary === null ? (
               <div className="text-gray-500 text-xs py-6 text-center">{t('dashboard.kids.moduleDisabled', 'โมดูล AI สอนลูกปิดอยู่ หรือยังไม่มีโปรไฟล์เด็ก')}</div>
@@ -862,7 +897,7 @@ export default function Dashboard() {
                             <span className="block text-gray-600">{new Date(k.lastQuiz.completed_at).toLocaleString(fmtLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         ) : (
-                          <div className="mt-1.5 text-[9px] text-gray-600 border-t border-gray-700/50 pt-1.5">ยังไม่เคยทำแบบทดสอบ</div>
+                          <div className="mt-1.5 text-[9px] text-gray-600 border-t border-gray-700/50 pt-1.5">{t('dashboard.kids.noQuizYet', 'ยังไม่เคยทำแบบทดสอบ')}</div>
                         )}
                       </div>
                     );
@@ -876,7 +911,7 @@ export default function Dashboard() {
       case 'actions': {
         return (
           <div className="flex flex-wrap gap-2 py-1">
-            <Link href="/sensors" scroll={false} className="btn-primary text-xs px-3 py-1.5">จัดการอุปกรณ์และเซ็นเซอร์</Link>
+            <Link href="/sensors" scroll={false} className="btn-primary text-xs px-3 py-1.5">{t('dashboard.actions.manageSensors', 'จัดการอุปกรณ์และเซ็นเซอร์')}</Link>
             <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5">รีเฟรชข้อมูล</button>
             <Link href="/treasury" scroll={false} className="btn-secondary text-xs px-3 py-1.5">คลัง & พอร์ต</Link>
             <Link href="/risk-monitor" scroll={false} className="btn-secondary text-xs px-3 py-1.5">เฝ้าระวังความเสี่ยง</Link>
@@ -930,7 +965,21 @@ export default function Dashboard() {
 
           {/* Dense 12-col command grid */}
           <div className="grid grid-cols-12 gap-2.5 auto-rows-min">
-            {/* Top ticker strip — dense mono */}
+            {/* D4: การ์ดชวนทำ MBTI (เฉพาะคนที่ยังไม่มีผล — ตรงข้ามกับชิปโทนหลวงพี่ในแชท) */}
+          {mbtiInvite && (
+            <div data-testid="mbti-invite-card" className="col-span-12 card panel-glow p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl" aria-hidden="true">🧠</span>
+                <div>
+                  <div className="text-sm font-bold text-gray-100">{t('dashboard.mbtiCard.title', 'รู้จักตัวเองให้ลึกขึ้น')}</div>
+                  <div className="text-xs text-gray-500">{t('dashboard.mbtiCard.desc', 'ทำแบบทดสอบบุคลิกภาพ 16 ประเภท (5–7 นาที) แล้ว AI จะปรับโทนการดูแลให้เข้ากับคุณ')}</div>
+                </div>
+              </div>
+              <Link href="/mbti" scroll={false} className="btn-primary text-xs px-4 py-2">{t('dashboard.mbtiCard.cta', 'เริ่มแบบทดสอบ →')}</Link>
+            </div>
+          )}
+
+          {/* Top ticker strip — dense mono */}
             <div className="col-span-12 bg-gray-900/60 border border-gray-800 rounded-xl px-2.5 py-1.5 flex flex-wrap gap-2 items-center text-[10px] font-mono backdrop-blur">
               <span className="flex items-center gap-1.5 text-gray-400"><Icon name="cpu" size={11} className="text-emerald-400" /> {deviceStatus?.total ?? 0} DEVICES</span>
               <span className="w-px h-3 bg-gray-700" />
@@ -948,10 +997,13 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {visibleOrder.map((key, i) => (
+            {(mobileFirst
+              ? [...visibleOrder].sort((a, b) => (MOBILE_RANK[a] ?? 99) - (MOBILE_RANK[b] ?? 99))
+              : visibleOrder
+            ).map((key, i) => (
               <WidgetShell
                 key={key}
-                className={DENSE_SPAN[key] ?? 'col-span-12'}
+                className={`${DENSE_SPAN[key] ?? 'col-span-12'} ${mobileFirst ? MOBILE_XL_ORDER[key] ?? '' : ''}`}
                 title={t(`dashboard.widget.${key}`, WIDGET_DEFS[key].label)}
                 editMode={editMode}
                 hidden={!!hidden[key]}

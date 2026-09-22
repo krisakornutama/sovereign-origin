@@ -4,7 +4,11 @@
  * - static bundle (_next/static/*): cache-first -> เปิด offline ได้ทันที
  * - navigation: network-first -> cache -> หน้า offline
  */
-const VERSION = 'sovereign-v2';
+const VERSION = 'sovereign-v3';
+
+// หน้า local-first — เปิดใช้งานได้จริงแม้ออฟไลน์ (ทำแบบทดสอบ MBTI / ดู shell แดชบอร์ด)
+// ข้อมูล API ไม่ mock — หน้าจะแสดงสถานะ offline ของตัวเองตามที่แอปจัดไว้
+const OFFLINE_PAGES = ['/dashboard', '/mbti', '/'];
 
 const OFFLINE_HTML = `<!doctype html>
 <html lang="th"><head><meta charset="utf-8">
@@ -97,8 +101,15 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(async () => {
-          const cached = (await caches.match(request)) || (await caches.match('/'));
-          return cached || new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+          // D3: เจอ cache ตรงก่อน → เผื่อ query ต่าง → หน้า local-first → หน้า offline
+          const cached = (await caches.match(request))
+            || (await caches.match(request, { ignoreSearch: true }));
+          if (cached) return cached;
+          for (const p of OFFLINE_PAGES) {
+            const page = await caches.match(p, { ignoreSearch: true });
+            if (page) return page;
+          }
+          return new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         })
     );
     return;
