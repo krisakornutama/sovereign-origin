@@ -78,3 +78,4 @@
 หมายเหตุเทคนิค: `telegram.botToken` อย่า commit ลง git (ใส่ DB `system_settings` ผ่าน `setTelegramCredentials` แล้ว) · Face: enroll ใช้ได้ทันที, recognize ต้องมี ollama/face-embed
 หมายเหตุเทคนิค: container dev mount เฉพาะ `src/` — ถ้า recreate container ต้อง `docker exec sovereign-core-api npm install helmet` ใหม่ (node_modules ไม่ persist)
 หมายเหตุ hydration: dashboard layout + history range แก้แล้ว (`05a2264` + `ffac9e2`) — ห้ามอ่าน localStorage/URL ตอน render แรก ให้ไปอ่านใน useEffect
+หมายเหตุ CSP (22/9/69): `connect-src` ใน `next.config.js` เติม `ws://localhost:3101` + `ws://127.0.0.1:3101` แล้ว — แก้ browser บล็อก WebSocket ของ socket.io ตอนรัน stack preview (A1); หมายเหตุ: mock :3101 ยังไม่มี socket.io handler จึงต่อไม่สำเร็จระดับ handshake (พฤติกรรมเดิมของ mock ไม่ใช่ CSP) — dashboard จริงใช้กับ backend :3001 ซึ่งอนุญาตอยู่แล้ว
