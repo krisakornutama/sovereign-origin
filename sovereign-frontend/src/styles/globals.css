@@ -1108,3 +1108,22 @@ html[data-theme='light'] .atmo-mind::before { opacity: 0.45; }
   font-family: 'Noto Serif Thai', var(--font-thai);
   letter-spacing: 0.08em;
 }
+
+/* ── Skeleton loading (C6): แถบเทาเข้มไล่ระดับเลื่อนผ่าน — เข้าธีมพื้นเข้มเดิม ── */
+.skele {
+  background: linear-gradient(
+    90deg,
+    rgba(75, 85, 99, 0.25) 0%,
+    rgba(156, 163, 175, 0.22) 40%,
+    rgba(75, 85, 99, 0.25) 80%
+  );
+  background-size: 200% 100%;
+  animation: skele-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skele-shimmer {
+  0%   { background-position: 180% 0; }
+  100% { background-position: -20% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skele { animation: none; }
+}

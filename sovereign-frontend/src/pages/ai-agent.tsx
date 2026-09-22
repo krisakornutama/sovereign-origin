@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -8,10 +8,12 @@ import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
 import { asArray } from '../lib/fetchJson';
 import { withMbti } from '../lib/mbtiAi';
+import { useAiChatHistory } from '../lib/useAiChatHistory';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
+import { SkeletonGrid } from '../components/ui/SkeletonCard';
 import CodingIde from '../components/coding/CodingIde';
 
 type AutonomyLevel = 'view' | 'suggest' | 'autonomous';
@@ -115,11 +117,17 @@ export default function AiAgentPage() {
 
   // สถานะ + ทำงานกับ AI
   const [status, setStatus] = useState<AiStatus | null>(null);
-  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([]);
+  // B4: ประวัติแชทใช้ hook กลาง useAiChatHistory (เจ้าของเดียวกับ AiChatPanel บน dashboard)
+  // หน้านี้โหลดหลัง auth พร้อม (enabled = isHydrated && isAuthenticated) และข้อความมี created_at แนบ
+  const aiHistory = useAiChatHistory(50, isHydrated && isAuthenticated);
+  const chatMsgs: ChatMsg[] = useMemo(
+    () => aiHistory.messages.map((m, i) => ({ id: m.id ?? `h-${i}`, role: m.role === 'user' ? 'user' : 'assistant', content: m.content, created_at: new Date().toISOString() })),
+    [aiHistory.messages]
+  );
+  const chatLoaded = aiHistory.loaded;
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
-  const [chatLoaded, setChatLoaded] = useState(false);
 const chatEndRef = useRef<HTMLDivElement>(null);
 
   // แท็บ: policy (เดิม) | team (ทีม Agent) | jobs (งานเบื้องหลัง) | coding (Coding Agent แบบ IDE — อยู่ใน CodingIde)
@@ -336,20 +344,6 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
     }
   }, []);
 
-  const loadChatHistory = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/history?limit=50`);
-      if (res.ok) {
-        const data = await res.json();
-        setChatMsgs(data.history || []);
-      }
-    } catch (err) {
-      // ประวัติใช้ไม่ได้ → เริ่มสนทนาใหม่
-    } finally {
-      setChatLoaded(true);
-    }
-  }, []);
-
   // เลื่อนลงล่างสุดอัตโนมัติเมื่อมีข้อความใหม่
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -360,7 +354,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
     if ((!text && !chatImage) || chatLoading) return;
     setChatInput('');
     setChatError('');
-    setChatMsgs((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', content: chatImage ? `[รูปภาพ] ${text}` : text, created_at: new Date().toISOString() }]);
+    aiHistory.appendLocal({ role: 'user', content: chatImage ? `[รูปภาพ] ${text}` : text });
     setChatLoading(true);
     const imageBase64 = chatImage || undefined;
     setChatImage(null);
@@ -372,7 +366,7 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setChatMsgs((prev) => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: data.reply || t('aiAgent.chat.noReply', '(ไม่มีคำตอบ)'), created_at: new Date().toISOString() }]);
+        aiHistory.appendLocal({ role: 'ai', content: data.reply || t('aiAgent.chat.noReply', '(ไม่มีคำตอบ)') });
       } else {
         setChatError(data.error || `API error ${res.status}`);
       }
@@ -388,14 +382,13 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
     loadPolicy();
     loadApprovals();
     loadStatus();
-    if (!chatLoaded) loadChatHistory();
     const interval = setInterval(() => {
       loadPolicy();
       loadApprovals();
       loadStatus();
     }, 15000);
     return () => clearInterval(interval);
-  }, [isHydrated, isAuthenticated, loadPolicy, loadApprovals, loadStatus, loadChatHistory, chatLoaded]);
+  }, [isHydrated, isAuthenticated, loadPolicy, loadApprovals, loadStatus]);
 
   const changeAutonomy = async (next: AutonomyLevel) => {
     if (!isSuperadmin) return;
@@ -453,7 +446,13 @@ setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้�
   };
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
+    // C6: skeleton หน้า AI Agent แทนข้อความเฉย ๆ
+    return (
+      <div className="min-h-screen bg-gray-950 p-4 lg:p-6 max-w-7xl mx-auto">
+        <SkeletonGrid count={4} className="!grid-cols-1 md:!grid-cols-2" />
+        <p className="sr-only">{t('dashboard.aiChat.skeletonPage', 'กำลังโหลดแดชบอร์ด...')}</p>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !user) {

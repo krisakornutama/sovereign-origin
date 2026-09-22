@@ -38,12 +38,24 @@ export default function LoginForm() {
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         // โดน rate limit → แสดง countdown ตาม Retry-After
         if (res.status === 429) {
           const retryAfter = Number(res.headers.get('Retry-After') || 0);
           if (retryAfter > 0) setCooldown(retryAfter);
+          throw new Error(
+            retryAfter > 0
+              ? t('login.rateLimited', 'ลองพยายามบ่อยเกินไป — รอ {time} แล้วลองใหม่', { time: formatCountdown(retryAfter) })
+              : t('login.rateLimitedNoHeader', 'ลองพยายามบ่อยเกินไป — พักสักครู่แล้วลองใหม่')
+          );
+        }
+        if (res.status === 401 || res.status === 403) {
+          // backend ตอบชัดเจนว่าไม่ผ่าน = user/pass ผิด (หรือบัญชีถูกปิด) — แยกจากเคสเครือข่าย
+          throw new Error(data.error || t('login.badCredentials', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'));
+        }
+        if (res.status >= 500) {
+          throw new Error(t('login.serverError', 'เซิร์ฟเวอร์ขัดข้องชั่วคราว — ลองใหม่อีกครั้งในอีกสักครู่'));
         }
         throw new Error(data.error || t('login.loginFailed', 'เข้าสู่ระบบล้มเหลว'));
       }
@@ -58,6 +70,11 @@ export default function LoginForm() {
         router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
       }
     } catch (err: any) {
+      // fetch ล้มเอง (TypeError: Failed to fetch) = ติดต่อ backend ไม่ได้ — แยกจาก error ที่เรา throw เอง
+      if (err instanceof TypeError) {
+        setError(t('login.cannotReachServer', 'ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจว่า Core API (:3001) เปิดอยู่'));
+        return;
+      }
       setError(err.message || t('login.genericError', 'เกิดข้อผิดพลาด'));
     }
   };

@@ -30,6 +30,8 @@ export default {
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {
     totalDevices: 'Total devices',
+    online: 'Online',
+    offline: 'Offline',
   },
   stats: {
     battery: 'Battery',
@@ -67,6 +69,7 @@ export default {
     pendingSummary: 'Pending:',
     choresCount: '{name} {n} chores pending',
     billsCount: '{name} {n} unpaid bills',
+    noQuizYet: 'No quiz attempt yet',
     viewHome: '→ View home',
     weekdays: {
       sunday: 'Sunday',
@@ -132,6 +135,7 @@ export default {
     trendLabel: 'Trend:',
     others: 'Others',
     waiting: 'Waiting for sensor data...',
+    noData: 'No sensor data yet',
     manage: 'Manage',
     fullChart24h: 'View full 24h chart in History',
     fullChart7d: 'View full 7-day chart in History',
@@ -186,13 +190,20 @@ export default {
     you: 'You',
     replay: 'Replay',
     goToAgent: 'Manage at the AI Agent page →',
+    mbtiInvite: '✨ Take the MBTI test and the AI will adapt its tone to you →',
+    aiOffline: '⚠️ AI is offline — check that Ollama is running on :11434, or open the AI Agent page for status',
+    apiError: 'Server error',
+    offlineHint: '⚠️ Cannot reach the Core API (:3001) — check that the backend is running, or open the AI Agent page for status',
     listening: 'Listening...',
+    send: 'Send message',
+    skeletonCard: 'Loading this section...',
+    skeletonPage: 'Loading dashboard...',
     placeholder: 'Type or press the mic to speak...',
     quickQuestions: {
-      'เช็คดินเค็ม': 'Check soil salinity',
-      'สถานะแบตเตอรี่': 'Battery status',
-      'Emergency Protocol': 'Emergency',
-      'แผน Phase 2': 'Phase 2',
+      soilSalinity: 'Check soil salinity',
+      batteryStatus: 'Battery status',
+      emergency: 'Emergency',
+      phase2: 'Phase 2 plan',
     },
   },
 
@@ -239,5 +250,12 @@ export default {
     emptyBefore: 'No data yet — enable ',
     emptyAfter: ' in .env, then click',
     fetchPrices: ' fetch prices',
+  },
+
+  // ── D4: MBTI invite card (shown only when no result exists) ──
+  mbtiCard: {
+    title: 'Know yourself a little better',
+    desc: 'Take the 16-type personality test (5–7 min) and the AI adapts its care tone to you',
+    cta: 'Start the test →',
   },
 } as const;

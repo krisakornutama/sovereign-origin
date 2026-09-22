@@ -18,6 +18,10 @@ export default {
   mfaUseBackup: 'Lost your phone? Use a backup code instead',
   mfaCancel: 'Cancel and return to sign in',
   loginFailed: 'Sign in failed',
+  badCredentials: 'Incorrect username or password',
+  serverError: 'Server temporarily unavailable — please try again shortly',
+  cannotReachServer: 'Cannot reach the server — check that the Core API (:3001) is running',
+  rateLimitedNoHeader: 'Too many attempts — wait a moment and try again',
   otpInvalid: 'Invalid OTP code',
   genericError: 'Something went wrong',
 } as const;
