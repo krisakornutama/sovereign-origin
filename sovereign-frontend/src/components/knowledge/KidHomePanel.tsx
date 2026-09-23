@@ -11,7 +11,7 @@ import {
   KidAuditRow, KidCoupon, KidHome, KidStock, WeeklyReportKid, fmtDate,
 } from './knowledge-types';
 import { PortfolioHistoryChart } from './charts';
-import { buildWeeklyReportHtml } from './weekly-report';
+import { printCertificate, printWeeklyReport } from './kid-print';
 
 interface KidHomePanelProps {
   kidHome: KidHome | null;
@@ -95,71 +95,6 @@ export default function KidHomePanel({
   const t = useLanguageStore((s) => s.t);
   const [reportLoading, setReportLoading] = useState(false);
 
-  // ── พิมพ์เกียรติบัตร PDF (หน้าต่างพิมพ์ → บันทึกเป็น PDF) ──
-  const printCertificate = (cert: { level: number; title: string; detail: string | null; created_at: string }, kid: { name: string; age: number | null; emoji: string | null }) => {
-    const name = `${kid.emoji || ''} ${kid.name}`.trim();
-    const date = new Date(cert.created_at).toLocaleDateString(fmtLocale(), { year: 'numeric', month: 'long', day: 'numeric' });
-    const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) {
-      setTeachError(t('knowledge.errors.popupBlocked', 'เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — อนุญาต popup แล้วลองใหม่'));
-      return;
-    }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t('knowledge.cert.title', 'เกียรติบัตร')} ${cert.level}</title><style>
-      body { font-family: 'Sarabun', 'Tahoma', sans-serif; background: #fff8e7; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-      .cert { width: 720px; padding: 40px; border: 4px double #c9a227; border-radius: 12px; text-align: center; background: #fffdf5; }
-      .star { font-size: 42px; }
-      h1 { color: #b8860b; font-size: 34px; margin: 8px 0 4px; }
-      .name { font-size: 40px; color: #1f2937; font-weight: bold; margin: 12px 0; }
-      .line { font-size: 15px; color: #4b5563; line-height: 1.8; }
-      .detail { font-size: 13px; color: #6b7280; margin-top: 10px; }
-      .date { margin-top: 24px; font-size: 12px; color: #9ca3af; }
-      @media print { body { background: #fff; } }
-    </style></head><body><div class="cert">
-      <div class="star">🎓</div>
-      <h1>${t('knowledge.cert.title', 'เกียรติบัตร')}</h1>
-      <div class="name">${name}</div>
-      <div class="line">${t('knowledge.cert.body', 'ได้รับเกียรตินี้เพื่อยืนยันว่า สะสมคะแนนถึงระดับ {level}', { level: cert.level })}</div>
-      <div class="line" style="font-weight:bold; color:#b8860b; font-size:20px;">${t('knowledge.cert.levelLine', '⭐ ระดับ {level} ⭐', { level: cert.level })}</div>
-      <div class="detail">${cert.detail || ''}</div>
-      <div class="date">${t('knowledge.cert.date', 'ออกให้ ณ วันที่ {date} · ครอบครัว Sovereign OS', { date })}</div>
-    </div></body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
-  };
-
-  // ── รายงานรายสัปดาห์ (PDF) — ดึงข้อมูล 7 วัน + เปิดหน้าต่างพิมพ์ ──
-  const printWeeklyReport = async () => {
-    if (reportLoading) return;
-    setReportLoading(true);
-    setTeachError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/report/weekly`);
-      if (!res.ok) throw new Error(t('knowledge.errors.reportFailed', 'สร้างรายงานไม่สำเร็จ'));
-      const data = await res.json();
-      const kids = (data.kids || []) as WeeklyReportKid[];
-      if (kids.length === 0) {
-        setTeachError(t('knowledge.errors.reportNoKids', 'ยังไม่มีโปรไฟล์เด็ก — เพิ่มโปรไฟล์ก่อนสร้างรายงาน'));
-        return;
-      }
-      const html = buildWeeklyReportHtml(kids, data.generatedAt, t);
-      const w = window.open('', '_blank', 'width=860,height=960');
-      if (!w) {
-        alert(t('knowledge.errors.popupBlocked', 'เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — อนุญาต popup แล้วลองใหม่'));
-        return;
-      }
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.print();
-    } catch (err: any) {
-      setTeachError(err.message || t('knowledge.errors.reportFailed', 'สร้างรายงานไม่สำเร็จ'));
-    } finally {
-      setReportLoading(false);
-    }
-  };
-
   return (
     <div className="card panel-glow p-5 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -175,7 +110,7 @@ export default function KidHomePanel({
         {kidHome && (
           <div className="text-right shrink-0 flex items-center gap-3">
             <button
-              onClick={printWeeklyReport}
+              onClick={() => printWeeklyReport(t, { setReportLoading, setTeachError })}
               disabled={reportLoading}
               title={t('knowledge.home.reportTitle', 'ส่งออกรายงาน 7 วันเป็น PDF (คะแนน + งานบ้าน + บิล + ยอดเงิน)')}
               className="px-2.5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-[11px] font-semibold disabled:opacity-50 inline-flex items-center gap-1"
@@ -218,7 +153,7 @@ export default function KidHomePanel({
                     <span className="shrink-0 text-amber-400"><Icon name="crown" size={13} /></span>
                     <span className="flex-1 truncate text-gray-300">{cert.title}</span>
                     <span className="shrink-0 text-gray-500">{new Date(cert.created_at).toLocaleDateString(fmtLocale())}</span>
-                    <button onClick={() => printCertificate(cert, kidHome.kid)} className="shrink-0 px-2 py-0.5 rounded bg-amber-700/60 hover:bg-amber-600 text-[10px] text-white">PDF</button>
+                    <button onClick={() => printCertificate(t, setTeachError, cert, kidHome.kid)} className="shrink-0 px-2 py-0.5 rounded bg-amber-700/60 hover:bg-amber-600 text-[10px] text-white">PDF</button>
                   </div>
                 ))}
               </div>
