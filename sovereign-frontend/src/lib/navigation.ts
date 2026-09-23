@@ -47,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'common.nav.group.business',
     items: [
       { href: '/business', label: 'ธุรกิจของฉัน', labelKey: 'common.nav.business', icon: 'package', keywords: 'ธุรกิจ ขายของ IoT สินค้า ลูกค้า ออเดอร์ ใบเสนอราคา ชำระเงิน ติดตั้ง ช่าง การเงิน กำไร สต็อก ทีม ตำแหน่ง ผู้ช่วย AI agent' },
+      { href: '/community', label: 'Catalog กลางชุมชน', labelKey: 'common.nav.community', icon: 'globe', keywords: 'community ชุมชน catalog ร้านค้า รวมสินค้า ซื้อของ สั่งซื้อ หน้าร้าน สินค้าจากร้าน' },
     ],
   },
 
