@@ -127,6 +127,24 @@ async function backendAlive() {
   });
 }
 
+// รอ server ตอบ HTTP ได้ (status ใด ๆ ก็ได้ — frontend เปิด trailingSlash: /api/health ตอบ 308,
+// home ตอบ 200/308 ก็แปลว่า next start ขึ้นและ serve แล้ว) ใช้หลัง restart prod ก่อน e2e
+function waitHttpAlive(url, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const tryOnce = () => {
+      const req = http.get(url, { timeout: 3000 }, (res) => { res.resume(); resolve(true); });
+      req.on('error', () => retry());
+      req.on('timeout', () => { req.destroy(); retry(); });
+    };
+    const retry = () => {
+      if (Date.now() > deadline) return resolve(false);
+      setTimeout(tryOnce, 2000);
+    };
+    tryOnce();
+  });
+}
+
 // B2: รัน 4 ขั้นเป็น 2 สายขนานกัน (backend build→test ∥ frontend typecheck→build)
 // — มาตรฐานเท่าเดิมทุกขั้น (ตาม AGENTS.md ข้อ 2) แต่เวลารวม = สายที่ช้าที่สุด ไม่ใช่ผลรวม
 // (เคยวัด 3.6 นาทีแบบลำดับ; เป้า < 3 นาที) · OOM retry, e2e-skip, dev-restore คงเดิมหมด
@@ -190,6 +208,27 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
     console.log(`── สาย ${tag} เสร็จ ──`);
   };
   await Promise.all([runLine(backendLine, 'backend'), runLine(frontendLine, 'frontend')]);
+  // Phase 0 (prod-truth): frontend build เพิ่งเขียนทับ .next ที่ prod :3000 กำลัง serve อยู่
+  // → prod ยังโหลด build เก่าในหน่วยความจำ + chunk hash เปลี่ยน = 404 (เคสจริง 23-09: e2e พังทั้งชุด)
+  // → restart prod ให้ serve build ใหม่ก่อน e2e (watchdog ของเครื่องกู้ให้; ไม่กู้ใน 90 วิ = เรา start เอง)
+  if (RUN_E2E && devIsProd) {
+    const pidNow = findListenerPid(DEV_PORT);
+    if (pidNow) {
+      console.log(`ℹ️  frontend build ทับ .next ของ prod :3000 (PID ${pidNow}) — restart ก่อน e2e เพื่อ serve build ใหม่`);
+      spawnSync('taskkill', ['/PID', String(pidNow), '/F'], { shell: true, stdio: 'ignore' });
+      let up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
+      if (!up) {
+        console.log('   watchdog ยังไม่กู้ — start เองแบบ detached');
+        spawn('cmd', ['/c', 'npm run start'], { cwd: FRONTEND, detached: true, stdio: 'ignore' }).unref();
+        up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
+      }
+      if (!up) {
+        console.error(`❌ prod :${DEV_PORT} กลับมาไม่ได้หลัง restart — หยุดก่อน e2e (ตรวจ frontend-watchdog/manual)`);
+        process.exit(1);
+      }
+      console.log('   prod serve build ใหม่แล้ว ✅');
+    }
+  }
   // e2e (ถ้ามี): รันหลังสองสายเสร็จ — ต้องรอ build จบ และ backend :3001 ต้องมีจริง
   for (const step of e2eSteps) {
     const alive = process.env.E2E_REQUIRE_BACKEND === '1' || (await backendAlive());
