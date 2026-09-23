@@ -2,6 +2,7 @@ name: Architecture Gate
 
 # ด่านแรกของ repo — ทำงานทุก PR ก่อน merge เสมอ (ตาม AGENTS.md ข้อ 2)
 # ตรวจ: schema-sync · file-budget (เทียบ base branch) · boundary-baseline (เส้นข้ามใหม่ = fail)
+#       frontend-gate (import-layers · line-budget · sidebar-rule) — ของใหม่ที่ละเมิด = fail
 #       + fingerprint parity (อัลกอริทึม tools ↔ runtime ต้องตรงกันทุกไบต์)
 # หมายเหตุ: env-truth ข้ามบน CI โดยธรรมชาติ (ไม่มี .env) — arch-gate จัดการ "ไม่มี .env = ข้าม" ให้แล้ว
 
@@ -35,6 +36,9 @@ jobs:
 
       - name: ตรวจ schema-sync + file-budget + boundary-baseline
         run: node tools/arch-gate.mjs --base origin/${{ github.base_ref || 'main' }}
+
+      - name: ตรวจ frontend-gate (import-layers + line-budget + sidebar-rule)
+        run: node tools/frontend-gate.mjs --base origin/${{ github.base_ref || 'main' }}
 
       - name: Build core-api (เพื่อตรวจ fingerprint parity)
         run: npm run build

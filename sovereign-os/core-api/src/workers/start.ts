@@ -13,6 +13,7 @@ import { dmsService } from '../services/dms.service';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from '../services/teach-kids.service';
 import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
+import { startTruthWatchdog } from '../services/truth-watchdog.service'; // Phase 2: แจ้งเตือน prod รันโค้ดเก่า/เกตพัง
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
 import { notifyLowStock, notifyTaxDeadlines } from '../services/business.service';
 import { processCodingQueue } from '../services/coding-agent.service';
@@ -111,6 +112,7 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   new MqttIngestionWorker();
   relayScheduler.start();
   startDimeScheduler(); // Dime! Statement — cron ตาม DIME_ENABLED/DIME_FETCH_CRON (default ปิด)
+  startTruthWatchdog(); // Phase 2: ตรวจ codeMatch/เกตพัง/stale truth — แจ้ง Telegram (soft-fail)
 
   // ── Series 🔴: Dead-Man Switch (DMS) — ตรวจบันไดวิกฤต 90s/180s + WoL (ถ้าตั้ง) ──
   // DMS_ENABLED=true + DMS_MASTER_SECRET ต้องตั้งพร้อมกัน (config.dms.enabled) — ปิดไว้โดย default

@@ -1,12 +1,12 @@
 # โมดูล sensors
 
 ## เจตนา
-
-_(เจ้าของโมดูลเติม — 1–3 บรรทัด: โมดูลนี้มีอยู่เพื่ออะไร ใครใช้)_
+ทะเบียนอุปกรณ์วัด (devices) และท่อรวมข้อมูลเทเลเมทรี — รับค่าจาก MQTT/อุปกรณ์ เก็บลง hypertable แล้วเปิดให้ทุกโมดูลอ่าน (dashboard, farm, energy ฯลฯ)
 
 ## ข้อห้าม / ระวัง
-
-_(เจ้าของโมดูลเติม — อะไรที่ห้ามแตะ/ต้องระวังเป็นพิเศษ)_
+- **`sensor_telemetry` เป็น hypertable (TimescaleDB) หัวใจของระบบ** — เขียนผ่าน raw SQL จากหลายจุด (mqttIngest, sensor-data, restaurant, wan-monitor, ups-monitor) ห้ามเปลี่ยนโครง/ชื่อคอลัมน์โดยไม่ดูทุกจุดเขียน
+- ห้ามลบ/ตัดข้อมูลย้อนหลังยกเว้น endpoint `DELETE /:metric` ที่ตั้งใจไว้ชัด (retention เป็นเรื่องของ hypertable policy ไม่ใช่คำสั่งเฉพาะกิจ)
+- ข้อมูลต้องมาจากอุปกรณ์จริงเท่านั้น — ห้าม generate ค่าจำลองเข้าท่อจริง (มี endpoint generate-code ไว้แค่ลงทะเบียนอุปกรณ์)
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
