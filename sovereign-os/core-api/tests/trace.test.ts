@@ -181,3 +181,101 @@ test('markLotsSold/Delivered/Restocked best-effort — tx พังไม่ thr
   // productIds ว่าง = ไม่ทำอะไร
   await markLotsSold(tx, 'biz-1', [], null, 'B2');
 });
+
+// ── เฟส 2 — QR generator, events endpoint, ร้านอาหารใช้ล็อต ──
+
+test('GET /:lotCode/qr — คืน QR data URL + ลิงก์ตามรอย (login)', async () => {
+  // re-mock — เทส integration ด้านบนทับ findUnique เป็น () => null (process เดียวกัน ไม่ restore)
+  mockModel(prisma, 'productLot', {
+    findUnique: async ({ where }: any) =>
+      where?.lotCode === 'LOT-SOLD99'
+        ? baseLot({ lotCode: 'LOT-SOLD99', soldCustomerId: '55555555-5555-5555-5555-555555555555', soldAt: new Date(), plot: { name: 'แปลง A', location: 'โซน A' }, events: [{ type: 'SOLD', detail: null, createdAt: new Date() }] })
+        : null,
+  });
+  const res = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/qr', { headers: auth(adminToken) });
+  assert.strictEqual(res.status, 200);
+  const body: any = await res.json();
+  assert.strictEqual(body.lotCode, 'LOT-SOLD99');
+  assert.match(body.qrDataUrl, /^data:image\/png;base64,/);
+  assert.ok(String(body.url).includes('/trace?lot=LOT-SOLD99'));
+
+  const noAuth = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/qr');
+  assert.strictEqual(noAuth.status, 401);
+
+  const missing = await fetch(server.baseUrl + '/api/trace/LOT-ZZZZZZ/qr', { headers: auth(adminToken) });
+  assert.strictEqual(missing.status, 404);
+});
+
+test('GET/POST /:lotCode/events — อ่าน + เพิ่มเหตุการณ์มือ (login/WRITE_ROLES)', async () => {
+  mockModel(prisma, 'productLot', {
+    findUnique: async ({ where }: any) => {
+      if (where?.lotCode === 'LOT-SOLD99') {
+        return { id: 'lot-sold', lotCode: 'LOT-SOLD99', crop: 'มะเขือเทศ', events: [{ type: 'HARVESTED', detail: null, createdAt: new Date() }] };
+      }
+      return null;
+    },
+  });
+  const createdEvents: any[] = [];
+  mockModel(prisma, 'traceEvent', {
+    create: async ({ data }: any) => {
+      createdEvents.push(data);
+      return { id: 'ev-manual', createdAt: new Date(), ...data };
+    },
+  });
+
+  const read = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/events', { headers: auth(adminToken) });
+  assert.strictEqual(read.status, 200);
+  const readBody: any = await read.json();
+  assert.ok(Array.isArray(readBody.events) && readBody.events.length >= 1);
+
+  const write = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/events', {
+    method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'NOTE', detail: 'แช่เย็นก่อนส่ง' }),
+  });
+  assert.strictEqual(write.status, 201);
+  assert.strictEqual(createdEvents[0].type, 'NOTE');
+
+  const badType = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/events', {
+    method: 'POST', headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'HACKED', detail: 'x' }),
+  });
+  assert.strictEqual(badType.status, 400);
+
+  const noAuth = await fetch(server.baseUrl + '/api/trace/LOT-SOLD99/events');
+  assert.strictEqual(noAuth.status, 401);
+});
+
+test('markLotsConsumedByRecipes — FIFO + ตัด quantityKg + CONSUMED/PROCESSED + best-effort', async () => {
+  const { markLotsConsumedByRecipes } = await import('../src/services/trace.service');
+  const lots = [
+    { id: 'lot-old', inventoryItemId: 'inv-1', quantityKg: 0.5, harvestedAt: new Date('2026-09-01'), soldCustomerId: null },
+    { id: 'lot-new', inventoryItemId: 'inv-1', quantityKg: 2, harvestedAt: new Date('2026-09-10'), soldCustomerId: null },
+  ];
+  const updates: any[] = [];
+  const events: any[] = [];
+  const okTx = {
+    productLot: {
+      findMany: async ({ where }: any) => lots.filter((l) => where?.inventoryItemId?.in?.includes(l.inventoryItemId) && l.soldCustomerId === null),
+      update: async ({ where, data }: any) => {
+        const lot = lots.find((l) => l.id === where.id);
+        Object.assign(lot, data);
+        updates.push({ id: where.id, ...data });
+        return lot;
+      },
+    },
+    traceEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
+  };
+  await markLotsConsumedByRecipes(okTx, [{ inventoryItemId: 'inv-1', qtyGram: 1200, menuName: 'ส้มตำ', orderNo: 'ORD-X' }]);
+  // FIFO — ล็อตเก่าโดนก่อน: 0.5kg = 500g หมดล็อต, ที่เหลือ 700g ตัดจากล็อตใหม่
+  assert.strictEqual(lots[0].quantityKg, 0);
+  assert.ok(Math.abs(lots[1].quantityKg - 1.3) < 1e-9);
+  const consumed = events.filter((e) => e.type === 'CONSUMED');
+  const processed = events.filter((e) => e.type === 'PROCESSED');
+  assert.strictEqual(consumed.length, 2, 'ทั้งสองล็อตมี CONSUMED');
+  assert.ok(consumed[0].detail.includes('ส้มตำ') && consumed[0].detail.includes('ORD-X'));
+  assert.strictEqual(processed.length, 2);
+
+  // tx พัง — กลืน error ไม่ throw (best-effort เหมือนเฟส 1)
+  const brokenTx = { productLot: { findMany: async () => { throw new Error('db down'); } }, traceEvent: { create: async () => ({}) } };
+  await markLotsConsumedByRecipes(brokenTx, [{ inventoryItemId: 'inv-1', qtyGram: 100, orderNo: 'ORD-Y' }]);
+});

@@ -7,6 +7,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hasBusinessAccess, BUSINESS_POSITIONS } from '../../lib/business';
 import * as svc from '../../services/business.service';
+import { lotsForOrderLines } from '../../services/trace.service'; // TRACEABILITY — ล็อตผลผลิตของสินค้าในออเดอร์
 import { AuditService } from '../../services/audit.service';
 
 const router = Router();
@@ -146,6 +147,19 @@ router.get('/:businessId/orders/:id', authenticate, async (req, res) => {
   if (!(await guard(req, res, 'VIEWER'))) return;
   try {
     res.json(await svc.getOrder(req.params.businessId, req.params.id));
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// ล็อตผลผลิตของสินค้าแต่ละบรรทัด (orderLines) — โชว์ประวัติตามรอย Farm→Shop ในหน้าออเดอร์
+router.get('/:businessId/orders/:id/lots', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'VIEWER'))) return;
+  try {
+    const order = await svc.getOrder(req.params.businessId, req.params.id);
+    const orderLines = await prisma.businessOrderLine.findMany({ where: { orderId: req.params.id } });
+    const lines = orderLines.map((l: any) => ({ productId: l.productId, qty: l.qty }));
+    res.json({ orderNo: order.orderNo, lines: await lotsForOrderLines(lines) });
   } catch (err: any) {
     res.status(404).json({ error: err.message });
   }

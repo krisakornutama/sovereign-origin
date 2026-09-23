@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+import { markLotsConsumedByRecipes } from '../../services/trace.service'; // TRACEABILITY เฟส 2
 
 const router = Router();
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
@@ -255,6 +256,7 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
     const pointsEarned = Math.floor(netTHB / 20);
     const actorId = (req as any).user?.id;
     const updated = await prisma.$transaction(async (tx) => {
+      const traceUsages: Array<{ inventoryItemId: string; qtyGram: number; menuName?: string | null; orderNo: string }> = []; // TRACEABILITY เฟส 2
       for (const line of order.lines) {
         const menu = await tx.menuItem.findUnique({ where: { id: line.menuId }, include: { recipes: true } });
         for (const r of menu?.recipes || []) {
@@ -263,10 +265,13 @@ router.post('/orders/:id/pay', authenticate, async (req, res) => {
             if (inv) {
               const needKg = (r.qtyGram * line.qty) / 1000;
               await tx.inventoryItem.update({ where: { id: inv.id }, data: { quantity: Math.max(0, inv.quantity - needKg) } });
+              // TRACEABILITY — เก็บการใช้วัตถุดิบเพื่อบันทึก CONSUMED/PROCESSED กลับเข้า lot (best-effort)
+              traceUsages.push({ inventoryItemId: inv.id, qtyGram: r.qtyGram * line.qty, menuName: menu?.name ?? null, orderNo: order.orderNo });
             }
           }
         }
       }
+      if (traceUsages.length > 0) await markLotsConsumedByRecipes(tx, traceUsages); // พัง = log แล้วข้าม (best-effort เหมือนเฟส 1)
       const upd = await tx.restaurantOrder.update({ where: { id: order.id }, data: { status: 'PAID', payment, pointsEarned, totalTHB: netTHB } });
       if (order.customerId) {
         // ตัดแต้มที่ใช้ + ให้แต้มจากยอดสุทธิ (increment ติดลบได้ = ตัดแต้ม)

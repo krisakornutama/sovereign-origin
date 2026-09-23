@@ -649,3 +649,35 @@ test('deliver → เหตุการณ์ DELIVERED บนล็อตที
   const deliveredEvents = store.traceEvents.filter((e: any) => e.type === 'DELIVERED');
   assert.ok(deliveredEvents.length > beforeDelivered, 'should have new DELIVERED event');
 });
+
+// ── เฟส 2 — ล็อตของสินค้าแต่ละบรรทัดในออเดอร์ (GET /orders/:id/lots) ──
+test('GET /orders/:id/lots — ล็อตต่อ orderLine + traceUrl + เหตุการณ์ · 404 เมื่อไม่พบออเดอร์', async () => {
+  const store = (globalThis as any).__traceTestStore;
+  const LOT4 = '80808080-8080-8080-8080-808080808080';
+  store.traceLots.set(LOT4, {
+    id: LOT4, lotCode: 'LOT-TEST04', inventoryItemId: PRODUCT_ID, plotId: null, crop: 'พริก', quantityKg: 8,
+    harvestedAt: new Date('2026-09-04T00:00:00Z'), soldCustomerId: null, soldAt: null, createdAt: new Date(), updatedAt: new Date(),
+  });
+  store.traceEvents.push({ id: 'ev-lots-1', lotId: LOT4, type: 'HARVESTED', detail: 'เก็บเกี่ยว 8 กก.', createdAt: new Date() });
+
+  const createRes = await post(`/${BIZ_ID}/orders`, { items: [{ productId: PRODUCT_ID, qty: 2 }] }, memberToken('SALES'));
+  assert.equal(createRes.status, 201);
+  const order = await createRes.json();
+
+  const lotsRes = await get(`/${BIZ_ID}/orders/${order.id}/lots`, memberToken('VIEWER'));
+  assert.equal(lotsRes.status, 200);
+  const body: any = await lotsRes.json();
+  assert.equal(body.orderNo, order.orderNo);
+  assert.ok(Array.isArray(body.lines) && body.lines.length >= 1);
+  const line = body.lines.find((l: any) => l.productId === PRODUCT_ID);
+  assert.ok(line, 'มีบรรทัดของ PRODUCT_ID');
+  assert.equal(line.qty, 2);
+  const lot = line.lots.find((l: any) => l.lotCode === 'LOT-TEST04');
+  assert.ok(lot, 'มีล็อต LOT-TEST04 ผูกกับสินค้า');
+  assert.ok(String(lot.traceUrl).includes('/trace?lot=LOT-TEST04'));
+  assert.ok(lot.events.some((e: any) => e.type === 'HARVESTED'));
+  assert.ok(!('inventoryItemId' in lot) && !('id' in lot), 'ไม่รั่ว id ภายใน/ลิงก์ DB');
+
+  const missing = await get(`/${BIZ_ID}/orders/nope/lots`, memberToken('VIEWER'));
+  assert.equal(missing.status, 404);
+});

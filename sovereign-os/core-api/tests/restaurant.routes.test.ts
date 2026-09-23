@@ -168,6 +168,29 @@ before(async () => {
     },
   };
 
+  // ── TRACEABILITY เฟส 2 — ล็อตผลผลิต + เหตุการณ์ (ปิดบิล → CONSUMED/PROCESSED) ──
+  const traceLots = new Map<string, any>();
+  const traceEvents: any[] = [];
+  (prisma as any).productLot = {
+    findMany: async ({ where }: any) =>
+      [...traceLots.values()].filter((l) => !where?.inventoryItemId?.in || where.inventoryItemId.in.includes(l.inventoryItemId)).filter((l) => (where?.soldCustomerId === null ? l.soldCustomerId === null : true)),
+    update: async ({ where, data }: any) => {
+      const lot = traceLots.get(where.id);
+      if (!lot) throw new Error('Record to update not found');
+      const merged = { ...lot, ...data };
+      traceLots.set(lot.id, merged);
+      return merged;
+    },
+  };
+  (prisma as any).traceEvent = {
+    create: async ({ data }: any) => {
+      const ev = { id: nid(), createdAt: new Date(), ...data };
+      traceEvents.push(ev);
+      return ev;
+    },
+  };
+  (globalThis as any).__restaurantTraceStore = { traceLots, traceEvents };
+
   (prisma as any).$transaction = async (fn: any) => fn(prisma);
   (prisma as any).$queryRawUnsafe = async (...args: any[]) => {
     telemetry.push(args);
@@ -485,6 +508,39 @@ test('POST /orders/:id/pay — ใช้แต้มโดยไม่มีล�
   assert.equal(paid.totalTHB, 50, 'ไม่มี customerId → ไม่หักแต้ม');
 });
 
+test('POST /orders/:id/pay — TRACEABILITY: วัตถุดิบที่มีล็อต = CONSUMED/PROCESSED กลับเข้า lot (FIFO ตัด quantityKg)', async () => {
+  const store = (globalThis as any).__restaurantTraceStore;
+  const rest = await (await fetch(`${ts.baseUrl}/api/restaurant/`, { method: 'POST', headers: H, body: JSON.stringify({ name: 'ร้านตามรอย' }) })).json();
+  const menu = await (await fetch(`${ts.baseUrl}/api/restaurant/menus`, { method: 'POST', headers: H, body: JSON.stringify({ restaurantId: rest.id, name: 'ยำมะละกอ', priceTHB: 60 }) })).json();
+  await fetch(`${ts.baseUrl}/api/restaurant/menus/${menu.id}/recipe`, {
+    method: 'PUT',
+    headers: H,
+    body: JSON.stringify({ lines: [{ farmCrop: 'มะละกอ', qtyGram: 400, inventoryItemId: 'inv-trace' }] }),
+  });
+  inv.set('inv-trace', { id: 'inv-trace', name: 'มะละกอ', quantity: 5, user_id: 'test-user' });
+  // ล็อตเก่า 0.5kg (FIFO โดนก่อน) + ล็อตใหม่ 2kg
+  store.traceLots.set('lot-old', { id: 'lot-old', lotCode: 'LOT-OLD001', inventoryItemId: 'inv-trace', quantityKg: 0.5, harvestedAt: new Date('2026-09-01'), soldCustomerId: null });
+  store.traceLots.set('lot-new', { id: 'lot-new', lotCode: 'LOT-NEW001', inventoryItemId: 'inv-trace', quantityKg: 2, harvestedAt: new Date('2026-09-10'), soldCustomerId: null });
+  store.traceEvents.length = 0;
+
+  const order = await (await fetch(`${ts.baseUrl}/api/restaurant/orders`, {
+    method: 'POST', headers: H,
+    body: JSON.stringify({ restaurantId: rest.id, items: [{ menuId: menu.id, qty: 2 }] }), // 400g×2 = 800g
+  })).json();
+  const res = await fetch(`${ts.baseUrl}/api/restaurant/orders/${order.id}/pay`, { method: 'POST', headers: H, body: JSON.stringify({ payment: 'CASH' }) });
+  assert.equal(res.status, 200);
+
+
+  const consumed = store.traceEvents.filter((e: any) => e.type === 'CONSUMED');
+  const processed = store.traceEvents.filter((e: any) => e.type === 'PROCESSED');
+  assert.ok(consumed.length >= 2, 'ทั้งสองล็อตต้องมี CONSUMED');
+  assert.ok(processed.length >= 2, 'ทั้งสองล็อตต้องมี PROCESSED');
+  assert.ok(consumed[0].detail.includes('ยำมะละกอ'), 'detail อ้างชื่อเมนู');
+  assert.ok(consumed[0].detail.includes(order.orderNo), 'detail อ้างเลขออเดอร์');
+  assert.equal(store.traceLots.get('lot-old').quantityKg, 0, 'ล็อตเก่า 500g ถูกใช้หมด (FIFO)');
+  assert.ok(Math.abs(store.traceLots.get('lot-new').quantityKg - 1.7) < 1e-9, 'ล็อตใหม่เหลือ 2 − 0.3 = 1.7kg');
+});
+
 // ─── Kitchen IoT + purchases ───
 
 test('POST /iot/weight — ปฏิเสธข้อมูลผิด/น้ำหนักเกินช่วง + ผ่าน → ตั้งสต็อก + บันทึก telemetry', async () => {
@@ -547,7 +603,7 @@ test('GET /reports/summary — นับเฉพาะ PAID + คิดเฉ�
   const res = await fetch(`${ts.baseUrl}/api/restaurant/reports/summary?days=999`, { headers: H });
   const body = await res.json();
   assert.ok(body.totalRevenue > 0);
-  assert.equal(body.totalOrders, 2, 'เฉพาะออเดอร์ PAID (จ่ายแล้ว 2 ในไฟล์นี้)');
+  assert.equal(body.totalOrders, 3, 'เฉพาะออเดอร์ PAID (จ่ายแล้ว 3 ในไฟล์นี้ — รวมออเดอร์ทดสอบตามรอย)');
   assert.ok(Math.abs(body.avgPerOrder - body.totalRevenue / body.totalOrders) < 1e-9);
   assert.ok(body.byRestaurant.length >= 1);
   assert.ok(body.byRestaurant.every((r: any) => typeof r.name === 'string'));
