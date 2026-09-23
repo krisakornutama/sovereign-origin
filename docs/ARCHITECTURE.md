@@ -18,7 +18,8 @@
 1. **DB จริงฉบับเดียว** — `DATABASE_URL` ใน `sovereign-os/core-api/.env` ต้องชี้ DB ที่ connect ได้จริง → ตรวจโดย **arch-gate (env-truth)**
 2. **Schema สองไฟล์แก้คู่กัน** — `schema.prisma` (postgres) + `schema.sqlite.prisma` ต้องมี model ชุดเดียวกัน → ตรวจโดย **arch-gate (schema-sync)**
 3. **ไฟล์ไม่โตเกิน 800 บรรทัด** — ไฟล์ใหม่/ที่แก้ใน branch ห้ามโตเกินเพดาน (ไฟล์เก่าไม่ย้อนหลัง) → ตรวจโดย **arch-gate (file-budget)**
-4. **ตารางมีเจ้าของ + เส้นข้ามต้องประกาศ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json` (ครอบทุกตารางยกเว้น 2 orphan จริง · shared: system_settings/security_events) · การแตะตารางคนอื่นต้องมีอยู่ใน `tools/boundary-baseline.json` แล้วเท่านั้น — **เส้นข้ามใหม่ = verify fail** (เพิ่ม baseline พร้อมเหตุผลเมื่อจำเป็นจริง · เติมเจ้าของตารางใหม่ด้วย `node tools/map-owners.mjs --apply`)
+4. **ตารางมีเจ้าของ + เส้นข้ามต้องประกาศ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json` (ครอบครบทุกตาราง · shared: system_settings/security_events) · การแตะตารางคนอื่นต้องมีอยู่ใน `tools/boundary-baseline.json` แล้วเท่านั้น — **เส้นข้ามใหม่ = verify fail** (เพิ่ม baseline พร้อมเหตุผลเมื่อจำเป็นจริง · เติมเจ้าของตารางใหม่ด้วย `node tools/map-owners.mjs --apply`)
+   - ⚠️ blind spot ที่รู้ตัว: เกตจับเฉพาะ `prisma.<delegate>` — การเขียนผ่าน **raw SQL** (`INSERT INTO sensor_telemetry` จาก mqttIngest/wan-monitor/ups-monitor ฯลฯ) มองไม่เห็น ถ้าจะเพิ่มการเขียนตารางโมดูลอื่นด้วย raw SQL ให้ระบุใน PR และ baseline เอง
 5. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full` · parity ของอัลกอริทึมสองฝั่งถูกตรวจบน CI (`tools/check-parity.mjs`) · เห็นผลได้ทันทีที่หน้า **/system-health**
 
 ## ด่านคุณภาพ (npm run verify ที่ root)

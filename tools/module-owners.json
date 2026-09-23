@@ -113,7 +113,8 @@
     "vision_alerts": "vision",
     "vision_rules": "vision",
     "water_quality_readings": "infrastructure",
-    "wealth_history": "portfolio"
+    "wealth_history": "portfolio",
+    "sensor_telemetry": "sensors"
   },
   "serviceAliases": {
     "business.service": "business",

@@ -10,7 +10,7 @@
 - **ห้าม force push** 除非ได้รับอนุญาตจากผู้ใช้
 
 ### 2. BUILD BEFORE COMMIT — ต้องผ่าน quality gate ก่อน commit
-- หลังแก้โค้ดทุกครั้ง รัน `npm run verify` ที่ **root ของ repo** (สคริปต์เดียวครบ: **Architecture Gate** (ด่านแรก ตรวจ schema-sync/file-budget/env-truth/module-boundary), backend build+test, frontend typecheck+build)
+- หลังแก้โค้ดทุกครั้ง รัน `npm run verify` ที่ **root ของ repo** (สคริปต์เดียวครบ: **Architecture Gate** (ด่านแรก ตรวจ schema-sync/file-budget/env-truth/module-boundary) + **Frontend Gate** (import-layers · เพดานบรรทัด pages≤800/components≤400 · ทุกหน้าต้องมี Sidebar), backend build+test, frontend typecheck+build)
 - ถ้า verify ไม่ผ่าน **ห้าม commit** ต้องแก้ให้ผ่านก่อน
 - แก้อะไรที่กระทบหน้าเว็บ/UI ให้รัน `npm run verify:full` (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
 - ถ้า error จำนวนมาก ให้ย้อนกลับไป backup แล้วแก้ทีละจุด

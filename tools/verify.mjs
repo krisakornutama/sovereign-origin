@@ -60,6 +60,17 @@ console.log('═══ Sovereign Quality Gate ═══');
   }
 }
 
+// Phase 2: Frontend Gate — ขยายด่านสถาปัตยกรรมคลุมฝั่ง UI (fail fast ต่อจาก arch-gate)
+// ตรวจ: import-layers (pages→lib/stores/components; ui/layout ใช้ร่วมได้) · line-budget
+//       (pages ≤800 / components ≤400) · sidebar-rule (ทุกหน้ามี Sidebar) — ของเดิมผ่านผ่าน baseline
+{
+  const fg = spawnSync('node', [join(ROOT, 'frontend-gate.mjs')], { cwd: ROOT, shell: false, stdio: 'inherit' });
+  if (fg.status !== 0) {
+    console.error('\n❌ Frontend Gate ล้ม — verify ไม่ดำเนินการต่อ (แก้ตามรายงานด้านบนก่อน)');
+    process.exit(1);
+  }
+}
+
 // next build เขียนทับ .next ที่ dev server ใช้อยู่ → dev เสี่ยง chunk พัง
 // → จับ PID ของผู้ฟัง :3000 ไว้ แล้ว "กู้ dev ให้เอง" หลัง verify จบ (auto-restart)
 // ข้อควรระวัง (เคสจริง 09-11): production `next start` ก็ฟัง :3000 — kill+wipe ตัว prod
