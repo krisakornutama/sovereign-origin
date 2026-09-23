@@ -114,7 +114,8 @@
     "vision_rules": "vision",
     "water_quality_readings": "infrastructure",
     "wealth_history": "portfolio",
-    "sensor_telemetry": "sensors"
+    "sensor_telemetry": "sensors",
+    "alert_events": "telegram"
   },
   "serviceAliases": {
     "business.service": "business",
@@ -185,7 +186,8 @@
     "teach-kids-summary.service": "teach-kids",
     "teach-kids-wallet.service": "teach-kids",
     "mqttIngest": "automation",
-    "start": "workers"
+    "start": "workers",
+    "alert-store.service": "telegram"
   },
   "sharedTables": [
     "system_settings",
