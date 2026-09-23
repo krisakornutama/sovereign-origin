@@ -360,6 +360,31 @@ router.post('/:id/herb-harvest', authenticate, requireRole(...WRITE_ROLES), asyn
   }
 });
 
+// GET /api/farm/plots/:id/advisor — เฟส 3: แนะนำการปลูก + คาดการณ์ผลผลิต (heuristic ตอบได้เสมอ)
+// ?ai=1 เพิ่มความคิดเห็นจาก Ollama (timeout+fallback — ล้ม = ยังได้คำตอบ heuristic ครบ)
+router.get('/:id/advisor', authenticate, async (req, res) => {
+  try {
+    const topN = Math.min(Math.max(parseInt(String(req.query.top)) || 3, 1), 50);
+    const wantsAi = req.query.ai === '1' || req.query.ai === 'true';
+    const { computePlotAdvisor, askFarmAdvisor } = await import('../../services/farm-advisor.service');
+    if (!wantsAi) {
+      const heuristic = await computePlotAdvisor(req.params.id, topN);
+      return res.json({ ...heuristic, aiText: null, source: 'heuristic' });
+    }
+    const result = await askFarmAdvisor(req.params.id, { topN });
+    return res.json({
+      ...result.heuristic,
+      aiText: result.aiText,
+      // source: heuristic เสมอมี — aiText มีเมื่อ AI ตอบจริง (โชว์ผู้ใช้ตามจริง)
+      source: result.source,
+    });
+  } catch (err: any) {
+    if (err?.message === 'Plot not found') return res.status(404).json({ error: err.message });
+    console.error('Farm advisor error:', err);
+    res.status(500).json({ error: 'Failed to compute advisor' });
+  }
+});
+
 // GET /api/farm/plots/:id/analysis?crop=ทุเรียน — วิเคราะห์ดินเทียบกับพืชที่ต้องการปลูก
 router.get('/:id/analysis', authenticate, async (req, res) => {
   try {

@@ -10,6 +10,7 @@ import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import VoiceCommand from '../components/dashboard/VoiceCommand';
 import CompostPanel from '../components/farm/CompostPanel';
+import PlotAdvisor from '../components/farm/PlotAdvisor';
 import type { FarmPlot } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -559,6 +560,9 @@ export default function FarmPage() {
 
                   {/* ── วิเคราะห์ดิน + NPK/ความชื้น ── */}
                   <SoilAnalyzer plot={plot} />
+
+                  {/* ── เฟส 3: แนะนำการปลูก + คาดการณ์ผลผลิต ── */}
+                  <PlotAdvisor plot={plot} cropLabelOf={(crop) => t('farm.crops.' + (CROP_KEYS[crop] ?? ''), crop)} />
 
                   {isHerbCrop(plot.crop) && canWrite && (
                     <div className="flex flex-wrap gap-1.5 items-center bg-lime-950/20 border border-lime-900/40 rounded-lg p-2">
