@@ -26,6 +26,7 @@ export const common = {
     health: 'ตรวจสุขภาพ',
     inventory: 'เสบียงและของใช้',
     farm: 'แปลงเกษตร',
+    trace: 'ตามรอยผลผลิต',
     livestock: 'ปศุสัตว์',
     learning: 'เรียนรู้เอง',
     restaurant: 'ขายของ (POS)',

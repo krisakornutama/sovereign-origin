@@ -172,6 +172,22 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
     } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
   }
 
+  // ── TRACEABILITY — ล็อตผลผลิตของสินค้าแต่ละบรรทัด (orderLines) สำหรับโชว์ประวัติตามรอย ──
+  const [traceOrder, setTraceOrder] = useState<Order | null>(null);
+  const [traceLines, setTraceLines] = useState<Array<{ productId: string; qty: number; lots: any[] }> | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
+  async function openTrace(order: Order) {
+    setTraceOrder(order);
+    setTraceLines(null);
+    setTraceLoading(true);
+    try {
+      const data = await fetchJsonObject<{ orderNo: string; lines: Array<{ productId: string; qty: number; lots: any[] }> }>(`${base}/orders/${order.id}/lots`);
+      setTraceLines(data?.lines ?? []);
+    } finally {
+      setTraceLoading(false);
+    }
+  }
+
   const tabOk = (t: Tab) => (TABS.find((x) => x.key === t)?.minRank ?? 6) >= (POSITION_RANK[myPosition] ?? 6);
 
   return (
@@ -283,9 +299,49 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
                 )}
                 {can('MANAGER') && o.status === 'PAID' && <button onClick={() => transition(o, 'deliver', 'ส่งแล้ว')} className="px-3 py-1 rounded bg-sky-600/80 hover:bg-sky-500 text-xs">ส่งของ</button>}
                 {(o.status === 'PAID' || o.status === 'DELIVERED') && <button onClick={() => setInvoiceOrder(o)} className="px-3 py-1 rounded border border-slate-500/50 text-slate-200 text-xs hover:bg-slate-500/10">ใบกำกับภาษี</button>}
+                <button onClick={() => openTrace(o)} className="px-3 py-1 rounded border border-emerald-600/40 text-emerald-300 text-xs hover:bg-emerald-500/10" title="ประวัติผลผลิตของสินค้าในออเดอร์นี้">ตามรอย</button>
                 {can('MANAGER') && (o.status === 'QUOTE' || o.status === 'ORDERED') && <button onClick={() => transition(o, 'cancel', 'ยกเลิก')} className="px-3 py-1 rounded border border-rose-500/40 text-rose-300 text-xs hover:bg-rose-500/10">ยกเลิก</button>}
               </div>
             ))}
+
+            {/* ── TRACEABILITY — แผงล็อตผลผลิตของออเดอร์ที่เลือก ── */}
+            {traceOrder && (
+              <div className="card p-4 space-y-3 border-emerald-600/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-emerald-300">🌾 ประวัติตามรอย — {traceOrder.orderNo}</span>
+                  <button onClick={() => { setTraceOrder(null); setTraceLines(null); }} className="ml-auto text-slate-400 hover:text-slate-200 text-xs">ปิด</button>
+                </div>
+                {traceLoading && <div className="text-xs text-slate-500">กำลังโหลดล็อต…</div>}
+                {!traceLoading && traceLines && traceLines.every((l) => l.lots.length === 0) && (
+                  <div className="text-xs text-slate-500">สินค้าในออเดอร์นี้ยังไม่มีล็อตผลผลิต (ไม่ได้ผูกคลัง/ไม่ได้เก็บเกี่ยวผ่านระบบ)</div>
+                )}
+                {!traceLoading && (traceLines ?? []).map((line) => (
+                  <div key={line.productId} className="border border-slate-800 rounded-lg p-3 space-y-2">
+                    <div className="text-xs text-slate-400">สินค้า {line.productId} × {line.qty}</div>
+                    {line.lots.map((lot: any) => (
+                      <div key={lot.lotCode} className="bg-slate-900/60 border border-slate-800 rounded p-2 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="mono font-bold text-emerald-300">{lot.lotCode}</span>
+                          {lot.crop && <span className="text-slate-400">{lot.crop}</span>}
+                          {lot.plotName && <span className="text-slate-500">· {lot.plotName}</span>}
+                          <span className="text-slate-500">· {lot.quantityKg} กก.</span>
+                          <a href={lot.traceUrl} target="_blank" rel="noreferrer" className="ml-auto text-cyan-300 hover:text-cyan-200">ลิงก์ตามรอย ↗</a>
+                        </div>
+                        {lot.events.length > 0 && (
+                          <div className="text-[11px] text-slate-400">
+                            {lot.events.map((ev: any, i: number) => (
+                              <span key={i} className="inline-flex items-center gap-1 mr-3">
+                                <span className="text-emerald-400/80">•</span>{ev.type}{ev.detail ? ` — ${ev.detail}` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

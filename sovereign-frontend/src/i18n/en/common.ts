@@ -24,6 +24,7 @@ export const common = {
     health: 'Health Screening',
     inventory: 'Inventory & Supplies',
     farm: 'Farm Plots',
+    trace: 'Product Trace',
     livestock: 'Livestock',
     learning: 'Self-Learning',
     restaurant: 'Restaurant POS',
