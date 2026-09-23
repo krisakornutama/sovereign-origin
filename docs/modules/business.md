@@ -1,0 +1,26 @@
+# โมดูล business — ร้านค้า/ออเดอร์/บัญชี/ชุมชน
+
+## เจตนา
+ศูนย์กลางธุรกิจ: สินค้า ออเดอร์ ลูกค้า ซัพพลายเออร์ PO บัญชี (ledger) ภาษี รวมถึงหน้าร้านออนไลน์และตลาดชุมชน (opt-in)
+
+## ตารางที่เป็นเจ้าของ
+- `businesses` — ร้าน/ธุรกิจ (opt-in เข้าชุมชน = `shopInCommunity`)
+- `business_products` · `business_customers` · `business_orders`
+- `business_members` · `business_suppliers` · `business_purchase_orders`
+- `business_installations` · `business_ledger_entries` · `business_agents`
+
+## Endpoints หลัก (mounted ที่ `/api/business`)
+- หน้าร้าน/ชุมชน: `GET /community` (สินค้ารวมของร้านที่ opt-in) · `GET /:businessId/shop` · `PUT /:businessId/shop`
+- ออเดอร์: `POST /:businessId/orders` · `GET /:businessId/orders` · `/:id/transition` · `/:id/payments` · `/:id/shipping` · `/:id/lots`
+- สินค้า/ลูกค้า: `GET|POST /:businessId/products` · `PUT /products/:id` · `GET|POST /:businessId/customers`
+- บัญชี: `GET|POST /:businessId/ledger` · `patch|delete /ledger/:id` · `GET /summary` · `GET /tax`
+- PO: `GET|POST /purchase-orders` · `POST /:id/receive`
+
+## กลไกสำคัญ
+- Route ใหญ่สุดของระบบ (455 บรรทัด) + service ใหญ่สุด (`business.service.ts` ~830 บรรทัด) — แก้ทีละจุด
+- `business-shop.service.ts` ดูแลเฉพาะหน้าร้าน/ชุมชน (`openShopOrThrow` ฯลฯ)
+- หน้า `/community` ของ frontend ยิง `GET /api/shop/community` → อ่าน catalog ผ่าน business-shop.service
+
+## ห้ามแตะ / ระวัง
+- เปลี่ยน response ของ `GET /community` ต้องเช็คหน้า `/community` + E2E `trace-community.spec.ts` ด้วยเสมอ
+- ออเดอร์ผูกกับ trace (`business_orders` ↔ lots) — ลบออเดอร์กระทบประวัติตามรอย

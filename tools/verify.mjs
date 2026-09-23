@@ -5,6 +5,7 @@
 //      npm run verify:full       (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
 //
 // กติกา: ผ่านทุกขั้นถึงจะ commit/merge ได้ (ตาม AGENTS.md ข้อ 2)
+// Phase 0: ด่านแรกของทุกโหมด = Architecture Gate (tools/arch-gate.mjs) · โหมด --e2e เพิ่ม Prod-Truth Gate
 // ────────────────────────────────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
@@ -34,10 +35,26 @@ if (RUN_DB) {
   steps.push({ name: 'backend: coverage report (no threshold)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'coverage:core'] });
 }
 if (RUN_E2E) {
+  // Prod-Truth Gate (Phase 0): พิสูจน์ว่า prod ที่รันอยู่มาจากโค้ดชุดเดียวกับดิสก์ (fingerprint เนื้อหาไฟล์)
+  // — อยู่ในกลุ่ม e2e เพราะต้องรัน "หลัง build ทั้งหมด" (e2eSteps ถูกเรียกหลังสองสาย build เสร็จ)
+  //   และต้องมี backend :3001 รันอยู่ (ใช้เงื่อนไข backend-alive เดียวกันกับ Playwright — backend ไม่ขึ้น = ข้ามพร้อมกัน)
+  // เคสจริงที่จุดกำเนิด: prod รัน build ของ 21 ก.ย. ทั้งที่โค้ดใหม่มาแล้ว 2 วัน — ไม่มีใครรู้จนไปเจอเอง
+  steps.push({ name: 'e2e: prod-truth (disk ↔ runtime fingerprint)', cwd: ROOT, cmd: 'node', args: ['prod-truth.mjs', '--dir', join(BACKEND, 'dist')], e2e: true, shell: false });
   steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'], e2e: true });
 }
 
 console.log('═══ Sovereign Quality Gate ═══');
+
+// Phase 0: Architecture Gate — ด่านแรกของทุกโหมด (fail fast ก่อนเสียเวลา build หลายนาที)
+// ตรวจ: schema-sync (postgres↔sqlite) · file-budget (เพดาน 800 บรรทัด/ไฟล์ที่เปลี่ยน)
+//       env-truth (DATABASE_URL ชี้ DB ที่ connect ได้จริง) · module-boundary (report-only)
+{
+  const gate = spawnSync('node', [join(ROOT, 'arch-gate.mjs')], { cwd: ROOT, shell: false, stdio: 'inherit' });
+  if (gate.status !== 0) {
+    console.error('\n❌ Architecture Gate ล้ม — verify ไม่ดำเนินการต่อ (แก้ตามรายงานด้านบนก่อน)');
+    process.exit(1);
+  }
+}
 
 // next build เขียนทับ .next ที่ dev server ใช้อยู่ → dev เสี่ยง chunk พัง
 // → จับ PID ของผู้ฟัง :3000 ไว้ แล้ว "กู้ dev ให้เอง" หลัง verify จบ (auto-restart)
@@ -112,7 +129,8 @@ async function backendAlive() {
 // env VERIFY_SEQUENTIAL=1 = บังคับรันลำดับแบบเดิม (debug เครื่องที่แรมน้อยจริง ๆ)
 async function runStep(step) {
   process.stdout.write(`▶ ${step.name} ...\n`);
-  const run = () => spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: true, stdio: 'pipe', encoding: 'utf8' });
+  // shell ต่อสเต็ป: shell:false เมื่อ arg มีช่องว่าง (path มี "My work") — Windows shell จะตัดคำผิด
+  const run = () => spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: step.shell !== false, stdio: 'pipe', encoding: 'utf8' });
   let r = run();
   // exit 134 = build worker ตายแบบ native OOM (Zone Allocation) — พบจริงเมื่อแรม/commit charge ของเครื่อง
   // ต่ำ (prod server + docker รันคู่กัน) · ไม่ใช่บั๊กโค้ด (CI บน GitHub แรมโล่งผ่านเสมอ) → พักแล้วลองใหม่ 2 ครั้ง
