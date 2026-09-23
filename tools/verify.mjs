@@ -22,6 +22,10 @@ const RUN_E2E = process.argv.includes('--e2e');
 const RUN_DB = process.argv.includes('--db');
 
 const steps = [
+  // Phase 0 (prod-truth): เช็ด dist ก่อน build ทุกครั้ง — tsc แบบ incremental ไม่ลบไฟล์ของ source ที่ถูกลบ
+  // ทำให้ dist สะสมของเก่า (เคสจริง: 406 ไฟล์จากที่ควรมี 209) และ fingerprint ของ dist ไม่มีวันตรงกับ
+  // ที่ prod (container) คอมไพล์จาก src ปัจจุบัน → เกต "prod รันโค้ดชุดเดียวกับดิสก์" ต้องอาศัย dist สะอาด
+  { name: 'backend: clean dist (stale-output sweep)', cwd: BACKEND, cmd: 'node', args: ['-e', 'require(\'node:fs\').rmSync(\'dist\',{recursive:true,force:true})'], shell: false },
   { name: 'backend: build (tsc)',        cwd: BACKEND,  cmd: 'npm', args: ['run', 'build'] },
   { name: 'backend: test',              cwd: BACKEND,  cmd: 'npm', args: ['test'] },
   { name: 'frontend: typecheck (tsc)',   cwd: FRONTEND, cmd: 'npm', args: ['run', 'typecheck'] },
