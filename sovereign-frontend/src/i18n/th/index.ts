@@ -11,6 +11,7 @@ import audit from './pages/audit';
 import automation from './pages/automation';
 import backup from './pages/backup';
 import changePassword from './pages/changePassword';
+import community from './pages/community';
 import dashboard from './pages/dashboard';
 import energy from './pages/energy';
 import farm from './pages/farm';
@@ -54,6 +55,7 @@ export default {
   automation,
   backup,
   changePassword,
+  community,
   dashboard,
   energy,
   farm,

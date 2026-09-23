@@ -612,6 +612,7 @@ export async function getShopSettings(businessId: string): Promise<any> {
     promptPaySet: Boolean(biz.shopPromptPay),
     taxId: biz.taxId ?? '',
     address: biz.address ?? '',
+    shopInCommunity: Boolean(biz.shopInCommunity), // เฟส 4: รวมร้านเข้า catalog กลางชุมชน /community
   };
 }
 
@@ -628,6 +629,13 @@ export async function updateShopSettings(businessId: string, input: any): Promis
   }
   if (input?.address !== undefined) data.address = input.address ? str(input.address, 200) : null;
   if (input?.shopOpen !== undefined) data.shopOpen = Boolean(input.shopOpen);
+  // เฟส 4: ร้านต้องเปิดหน้าร้านก่อนจึงเข้าร่วม catalog กลางได้ (ปิดร้าน = ถอนจาก catalog อัตโนมัติ)
+  if (input?.shopInCommunity !== undefined) {
+    if (input.shopInCommunity && !Boolean(biz.shopOpen)) {
+      throw new Error('ต้องเปิดหน้าร้าน (shopOpen) ก่อนจึงเข้าร่วม catalog กลางชุมชนได้');
+    }
+    data.shopInCommunity = Boolean(input.shopInCommunity);
+  }
   if (input?.shopPromptPay !== undefined) {
     const target = str(input.shopPromptPay, 20);
     if (target) {

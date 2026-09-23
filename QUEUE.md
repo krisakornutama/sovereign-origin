@@ -39,6 +39,8 @@
   - ingest จาก MQTT (เมตริกพลังงานลงตารางเอง best-effort) + POST /readings ใส่มือ · เพดานต่อ global/node/device (หน้าต่างเฉลี่ยได้) · เกินเพดานยิง Telegram ผ่าน pipeline เดิม (dedup 5 นาที) · /summary อ่านตารางใหม่ก่อน fallback sensor_telemetry · เทส 9/9
 - [x] เฟส 3 แนะนำการปลูก + คาดการณ์ผลผลิต — **เสร็จแล้ว 23/9/69** (`farm-advisor.service` + GET /plots/:id/advisor + PlotAdvisor บนหน้า /farm)
   - กฎเหล็กครบ: heuristic deterministic ตอบได้เสมอ (คะแนนดินจาก analyzeSoil เดิม + ประวัติเก็บเกี่ยวจาก ProductLot) · Ollama เสริมเฉพาะ ?ai=1 (timeout + fallback กลับ heuristic) · ที่มาตัวเลขชัดทุกตัว (ประวัติแปลงตัวเอง → แปลงอื่น → ค่าประมาณ) · source แสดงผู้ใช้ตามจริง · เทส 7/7
+- [x] เฟส 4 ร้านชุมชน multi-tenant — **เสร็จแล้ว 23/9/69** (สถานะจัดส่งแบบเบา + catalog กลาง /community)
+  - สถานะจัดส่ง: 4 fields ต่อ business_orders (migration manual) + POST /orders/:id/shipping เดินหน้า PREPARING→SHIPPED→DELIVERED (MANAGER+) — ลูกค้าเห็นผ่านลิงก์ลับ /shop?order=<token> · catalog กลาง: opt-in `shopInCommunity` + GET /api/shop/community สาธารณะ (rate limit) — โชว์เฉพาะชื่อ/ราคาขาย/สต็อกพอ-ไม่พอ ไม่มีต้นทุน/ออเดอร์ส่วนตัว · หน้า /community ใหม่ (i18n th/en) + checkbox/ปุ่มใน BusinessWorkspace · เทส 11/11 (เพิ่ม 2)
 
 ---
 

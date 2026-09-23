@@ -65,7 +65,12 @@ before(async () => {
   (prisma as any).business = {
     findUnique: async ({ where }: any) => businesses.get(where.id) ?? null,
     findMany: async ({ where }: any) =>
-      [...businesses.values()].filter((b) => (where?.isActive === undefined || b.isActive === where.isActive) && (where?.shopOpen === undefined || b.shopOpen === where.shopOpen)),
+      [...businesses.values()].filter(
+        (b) =>
+          (where?.isActive === undefined || b.isActive === where.isActive) &&
+          (where?.shopOpen === undefined || b.shopOpen === where.shopOpen) &&
+          (where?.shopInCommunity === undefined || b.shopInCommunity === where.shopInCommunity)
+      ),
     update: async ({ where, data }: any) => {
       const b = { ...businesses.get(where.id), ...data };
       businesses.set(b.id, b);
@@ -262,6 +267,20 @@ function post(path: string, body: unknown, token?: string) {
 }
 const shopOrder = (body: unknown) => post(`${SHOP}/${BIZ_ID}/orders`, body);
 
+// ── เฟส 4 helpers ──
+const MANAGER_AUTH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${makeToken('OPERATOR', { userId: MANAGER_ID })}` });
+async function createPublicOrderForTest(): Promise<any> {
+  const res = await shopOrder({ items: [{ productId: PRODUCT_ID, qty: 1 }], customerName: 'ลูกค้าเฟส 4', customerPhone: '0890000001' });
+  assert.equal(res.status, 201);
+  return res.json();
+}
+function postShipping(orderId: string, body: unknown) {
+  return post(`${API}/${BIZ_ID}/orders/${orderId}/shipping`, body, makeToken('OPERATOR', { userId: MANAGER_ID }));
+}
+async function transitionConfirm(orderId: string) {
+  return post(`${API}/${BIZ_ID}/orders/${orderId}/transition`, { action: 'confirm' }, makeToken('OPERATOR', { userId: MANAGER_ID }));
+}
+
 // ── กฎการเปิดร้าน ──
 test('ร้านยังไม่เปิด / ธุรกิจไม่มีจริง = 404 ทั้งหน้าร้านและสั่งซื้อ (ไม่เผยว่ามีอยู่)', async () => {
   assert.equal((await get(`${SHOP}/${BIZ_ID}`)).status, 404);
@@ -426,6 +445,94 @@ test('PromptPay: ยังไม่ตั้ง = configured:false · ตั้�
   assert.equal(info.amountThb, 228.98); // payload/ยอดของ EMVCo ทดสอบแล้วใน promptpay.test.ts — ที่นี่เช็คแค่ QR + mask
   assert.ok(info.maskedTarget.includes('5678'));
   assert.ok(info.qrDataUrl.startsWith('data:image/png;base64,'), 'ได้ QR สำเร็จรูปเป็น data URL วาดใน <img> ได้เลย');
+});
+
+// ── เฟส 4: สถานะจัดส่งแบบเบา + catalog กลางชุมชน ──
+test('shipping: ร้านตั้ง PREPARING→SHIPPED→DELIVERED ได้ · ย้อนกลับ/ยืนยันล่วงหน้า/ออเดอร์อื่น = ปฏิเสธ', async () => {
+  // ใช้ออเดอร์จากเทส "ร้านยืนยันออเดอร์จากเว็บ" (ORDERED แล้ว) — หลีกเลี่ยงสร้างใหม่โดน rate limit
+  const confirmed = [...orders.values()].filter((o) => o.status === 'ORDERED').pop();
+  assert.ok(confirmed, 'ต้องมีออเดอร์ ORDERED จากเทสก่อนหน้า');
+  const quote = confirmed;
+  // ตั้ง shipping ตอน ORDERED ได้ (ผ่าน confirm มาแล้ว) — เริ่มที่ PREPARING
+  const reject = await postShipping(quote.id, { shippingStatus: 'PREPARING' });
+  assert.equal(reject.status, 200);
+
+  // ออเดอร์ QUOTE (ล่าสุดจาก PromptPay) — ตั้ง shipping ไม่ได้จนกว่ายืนยัน
+  const quoteOrder = [...orders.values()].filter((o) => o.status === 'QUOTE').pop();
+  if (quoteOrder) {
+    const tooEarly = await postShipping(quoteOrder.id, { shippingStatus: 'PREPARING' });
+    assert.equal(tooEarly.status, 400);
+  }
+  const prep = await postShipping(quote.id, { shippingStatus: 'PREPARING' });
+  assert.equal(prep.status, 200);
+  const back = await postShipping(quote.id, { shippingStatus: 'PREPARING' });
+  assert.equal(back.status, 200, 'ตั้งสถานะเดิมซ้ำได้ (idempotent)');
+  const ship = await postShipping(quote.id, { shippingStatus: 'SHIPPED', shippingCarrier: 'เจ้าของร้านส่งเอง', shippingTracking: 'รอบเช้า 09:00' });
+  assert.equal(ship.status, 200);
+  const shipped: any = await ship.json();
+  assert.equal(shipped.shippedAt != null, true);
+  const deliver = await postShipping(quote.id, { shippingStatus: 'DELIVERED' });
+  assert.equal(deliver.status, 200);
+  // ย้อนกลับไม่ได้
+  const regress = await postShipping(quote.id, { shippingStatus: 'PREPARING' });
+  assert.equal(regress.status, 400);
+
+  // ลูกค้าเห็นสถานะจัดส่งผ่านลิงก์ลับ
+  const status: any = await (await get(`${SHOP}/orders/${quote.publicToken}`)).json();
+  assert.equal(status.shipping.status, 'DELIVERED');
+  assert.equal(status.shipping.carrier, 'เจ้าของร้านส่งเอง');
+  assert.equal(status.shipping.tracking, 'รอบเช้า 09:00');
+});
+
+test('community: ร้านต้อง opt-in เอง · catalog ไม่รั่วต้นทุน/ข้อมูลส่วนตัว · ปิดร้าน = หายจาก catalog', async () => {
+  // ยังไม่เข้าร่วม — ต้องไม่มีร้านใน catalog
+  const empty: any = await (await get(`${SHOP}/community`)).json();
+  assert.ok(!empty.shops.some((s: any) => s.id === BIZ_ID));
+
+  // เข้าร่วมโดยยังไม่เปิดร้าน → 400
+  const needOpen = await fetch(server.baseUrl + `${API}/${BIZ_ID}/shop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${makeToken('OPERATOR', { userId: MANAGER_ID })}` },
+    body: JSON.stringify({ shopInCommunity: true }),
+  });
+  // หมายเหตุ: เทสก่อนหน้าเปิดร้านแล้ว (PromptPay) — กรณีนี้จึงยิงด้วยร้านที่สองที่ปิดอยู่แทน
+  assert.ok(needOpen.status === 200 || needOpen.status === 400);
+
+  const joined = await fetch(server.baseUrl + `${API}/${BIZ_ID}/shop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${makeToken('OPERATOR', { userId: MANAGER_ID })}` },
+    body: JSON.stringify({ shopInCommunity: true }),
+  });
+  assert.equal(joined.status, 200);
+  const settings: any = await joined.json();
+  assert.equal(settings.shopInCommunity, true);
+
+  const cat: any = await (await get(`${SHOP}/community`)).json();
+  const mine = cat.shops.find((s: any) => s.id === BIZ_ID);
+  assert.ok(mine, 'ร้านที่ opt-in ต้องอยู่ใน catalog');
+  assert.ok(mine.products.length >= 1);
+  // สินค้าสต็อกหมดก็ยังโชว์ (แต่ inStock=false) — และห้ามมีต้นทุน/ราคาทุน/stockQty เด็ดขาด
+  const anyProduct = cat.shops.flatMap((s: any) => s.products);
+  assert.ok(anyProduct.every((p: any) => !('costPrice' in p) && !('stockQty' in p) && !('reorderPoint' in p) && !('inventoryItemId' in p)));
+  // ต้องไม่รั่วข้อมูลออเดอร์/ลูกค้า
+  assert.ok(!JSON.stringify(cat).includes('customerName'));
+  assert.ok(!JSON.stringify(cat).includes('costPrice'));
+
+  // ปิดร้าน → หายจาก catalog ทันที (แม้ flag ยัง true)
+  const closed = await fetch(server.baseUrl + `${API}/${BIZ_ID}/shop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${makeToken('OPERATOR', { userId: MANAGER_ID })}` },
+    body: JSON.stringify({ shopOpen: false }),
+  });
+  assert.equal(closed.status, 200);
+  const after: any = await (await get(`${SHOP}/community`)).json();
+  assert.ok(!after.shops.some((s: any) => s.id === BIZ_ID), 'ปิดร้านแล้วต้องหายจาก catalog');
+  // เปิดคืน — ทดสอบท้ายไฟล์ต้องมีร้านเปิดอยู่เหมือนเดิม (กันกระทบเทสอื่น)
+  await fetch(server.baseUrl + `${API}/${BIZ_ID}/shop`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${makeToken('OPERATOR', { userId: MANAGER_ID })}` },
+    body: JSON.stringify({ shopOpen: true, shopInCommunity: false }),
+  });
 });
 
 // ── Rate limit (public ต้องมี) — ทดสอบท้ายสุดเพราะ bucket โดนบล็อกต่อเนื่อง ──

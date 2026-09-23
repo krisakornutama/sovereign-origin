@@ -54,7 +54,7 @@ interface Installation { id: string; title: string; status: string; scheduledAt?
 interface LedgerEntry { id: string; type: string; category: string; amount: number; note?: string; createdAt: string; }
 interface Summary { income: number; expense: number; profit: number; revenue: number; cost: number; grossProfit: number; topProducts: Array<{ name: string; qty: number; profit: number }>; lowStock: Product[]; openOrders: number; todayInstallations: number; }
 interface Agent { id: string; key: string; name: string; emoji: string; enabled: boolean; latestJob?: { id: string; status: string; prompt: string; result?: string; error?: string } | null; }
-interface ShopSettings { shopOpen: boolean; shopName: string; promptPayMasked: string; promptPaySet: boolean; taxId: string; address: string; }
+interface ShopSettings { shopOpen: boolean; shopName: string; promptPayMasked: string; promptPaySet: boolean; taxId: string; address: string; shopInCommunity?: boolean; }
 
 const baht = (n: number) => `${Number(n ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} ฿`;
 const STATUS_TH: Record<string, string> = { QUOTE: 'ใบเสนอราคา', ORDERED: 'รอชำระ', PAID: 'ชำระแล้ว', DELIVERED: 'ส่งแล้ว', CANCELLED: 'ยกเลิก', TODO: 'รอทำ', IN_PROGRESS: 'กำลังทำ', DONE: 'เสร็จ' };
@@ -62,6 +62,13 @@ const STATUS_CLS: Record<string, string> = { QUOTE: 'bg-cyan-500/15 text-cyan-30
 
 function StatusBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-full text-[11px] border ${STATUS_CLS[status] ?? 'bg-slate-500/15 text-slate-300 border-slate-500/30'}`}>{STATUS_TH[status] ?? status}</span>;
+}
+
+// เฟส 4: ป้ายสถานะจัดส่ง (ร้านส่งเอง) — แสดงข้างสถานะออเดอร์
+const SHIPPING_TH: Record<string, string> = { PREPARING: 'กำลังเตรียมส่ง', SHIPPED: 'จัดส่งแล้ว', DELIVERED: 'ถึงผู้รับแล้ว' };
+const SHIPPING_CLS: Record<string, string> = { PREPARING: 'bg-amber-500/15 text-amber-300 border-amber-500/30', SHIPPED: 'bg-sky-500/15 text-sky-300 border-sky-500/30', DELIVERED: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+function ShippingBadge({ status }: { status: string }) {
+  return <span className={`px-2 py-0.5 rounded-full text-[11px] border ${SHIPPING_CLS[status] ?? 'bg-slate-500/15 text-slate-300 border-slate-500/30'}`}>{SHIPPING_TH[status] ?? status}</span>;
 }
 
 export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Business; onExit: () => void; refreshBiz?: () => void }) {
@@ -155,6 +162,14 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
     try {
       await post(`${base}/orders/${order.id}/transition`, { action });
       setNotice({ ok: true, text: `${order.orderNo} → ${label}` });
+      await load();
+    } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
+  }
+  // เฟส 4: สถานะจัดส่งแบบเบา — เดินหน้าอย่างเดียว (backend กันย้อนกลับ)
+  async function updateShipping(order: Order, status: 'PREPARING' | 'SHIPPED') {
+    try {
+      await post(`${base}/orders/${order.id}/shipping`, { shippingStatus: status, shippingCarrier: status === 'SHIPPED' ? 'เจ้าของร้านส่งเอง' : undefined });
+      setNotice({ ok: true, text: status === 'SHIPPED' ? `${order.orderNo} → จัดส่งแล้ว` : `${order.orderNo} → กำลังเตรียมส่ง` });
       await load();
     } catch (e: any) { setNotice({ ok: false, text: e.message }); await load(); }
   }
@@ -298,6 +313,14 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
                   </>
                 )}
                 {can('MANAGER') && o.status === 'PAID' && <button onClick={() => transition(o, 'deliver', 'ส่งแล้ว')} className="px-3 py-1 rounded bg-sky-600/80 hover:bg-sky-500 text-xs">ส่งของ</button>}
+                {/* เฟส 4: สถานะจัดส่งแบบเบา — ร้านส่งเอง */}
+                {can('MANAGER') && o.status !== 'CANCELLED' && o.status !== 'QUOTE' && (o as any).shippingStatus !== 'DELIVERED' && (
+                  <button onClick={() => updateShipping(o, (o as any).shippingStatus === 'PREPARING' ? 'SHIPPED' : 'PREPARING')}
+                    className="px-3 py-1 rounded border border-sky-500/40 text-sky-300 text-xs hover:bg-sky-500/10">
+                    {(o as any).shippingStatus === 'PREPARING' ? 'จัดส่งแล้ว' : 'กำลังเตรียมส่ง'}
+                  </button>
+                )}
+                {(o as any).shippingStatus && <ShippingBadge status={(o as any).shippingStatus} />}
                 {(o.status === 'PAID' || o.status === 'DELIVERED') && <button onClick={() => setInvoiceOrder(o)} className="px-3 py-1 rounded border border-slate-500/50 text-slate-200 text-xs hover:bg-slate-500/10">ใบกำกับภาษี</button>}
                 <button onClick={() => openTrace(o)} className="px-3 py-1 rounded border border-emerald-600/40 text-emerald-300 text-xs hover:bg-emerald-500/10" title="ประวัติผลผลิตของสินค้าในออเดอร์นี้">ตามรอย</button>
                 {can('MANAGER') && (o.status === 'QUOTE' || o.status === 'ORDERED') && <button onClick={() => transition(o, 'cancel', 'ยกเลิก')} className="px-3 py-1 rounded border border-rose-500/40 text-rose-300 text-xs hover:bg-rose-500/10">ยกเลิก</button>}
@@ -738,6 +761,19 @@ function ShopTab({ bizId, bizName, canManage, base, setNotice, refreshBiz }: { b
                 <a href={`/shop?id=${bizId}`} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:underline">เปิดหน้าร้านดู →</a>
               )}
             </div>
+            {settings?.shopOpen && (
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={settings?.shopInCommunity ?? false} disabled={busy}
+                    onChange={(e) => save({ shopInCommunity: e.target.checked }, e.target.checked ? 'ร้านเข้าร่วม catalog กลางชุมชนแล้ว — เห็นที่ /community' : 'ถอนร้านจาก catalog กลางชุมชนแล้ว')}
+                    className="w-4 h-4" />
+                  <span>รวมร้านเข้า catalog กลางชุมชน (/community — โชว์เฉพาะชื่อสินค้า/ราคาขาย ไม่มีต้นทุน)</span>
+                </label>
+                {settings?.shopInCommunity && (
+                  <a href="/community" target="_blank" rel="noreferrer" className="text-xs text-lime-400 hover:underline">ดู catalog กลาง →</a>
+                )}
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] text-slate-500 mb-1" htmlFor="shop-name-input">ชื่อร้านบนหน้าเว็บ (ว่าง = ใช้ชื่อธุรกิจ)</label>

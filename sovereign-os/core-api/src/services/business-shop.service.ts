@@ -152,6 +152,7 @@ export async function getPublicOrderByToken(token: string): Promise<any> {
     remaining: Math.max(0, order.total - paidAmount),
     lines: order.lines.map((l: any) => ({ name: l.product?.name ?? l.description ?? 'สินค้า', qty: l.qty, unitPrice: l.unitPrice })),
     payments: order.payments.map((p: any) => ({ amount: p.amount, method: p.method, paidAt: p.paidAt })),
+    shipping: publicShipping(order),
   };
 }
 
@@ -196,5 +197,77 @@ export async function publicPromptPayInfo(businessId: string, amountThb: number)
     qrDataUrl: await QRCode.toDataURL(payload, { margin: 1, width: 240 }),
     maskedTarget: digits.length >= 4 ? `••• ${digits.slice(-4)}` : '••••',
     amountThb,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// เฟส 4 — สถานะจัดส่งแบบเบา (ร้านส่งเอง) + catalog กลางชุมชน
+// กติกา: เสริมจาก transition เดิม ไม่แทนที่ · ลูกค้าเห็นผ่านลิงก์ลับเท่านั้น ·
+// catalog กลางเฉพาะร้านที่เปิดเอง (shopInCommunity) — โชว์เฉพาะข้อมูลที่เปิดเผยแล้ว
+// ────────────────────────────────────────────────────────────────────────────
+
+const SHIPPING_STATUSES = ['PREPARING', 'SHIPPED', 'DELIVERED'] as const;
+export type ShippingStatus = (typeof SHIPPING_STATUSES)[number];
+
+/** ร้านอัปเดตสถานะจัดส่ง — จำกัด transition ไปข้างหน้าเท่านั้น (PREPARING → SHIPPED → DELIVERED) */
+export async function updateShippingStatus(
+  businessId: string,
+  orderId: string,
+  input: { shippingStatus?: string; shippingCarrier?: string; shippingTracking?: string }
+): Promise<any> {
+  const status = str(input?.shippingStatus, 20);
+  if (!(SHIPPING_STATUSES as readonly string[]).includes(status)) {
+    throw new Error(`shippingStatus ต้องเป็นหนึ่งใน: ${SHIPPING_STATUSES.join(', ')}`);
+  }
+  const order = await prisma.businessOrder.findUnique({ where: { id: orderId } });
+  if (!order || order.businessId !== businessId) throw new Error('order not found');
+  if (order.status === 'CANCELLED') throw new Error('ออเดอร์นี้ถูกยกเลิกแล้ว — ตั้งสถานะจัดส่งไม่ได้');
+  if (order.status === 'QUOTE') throw new Error('ออเดอร์ยังไม่ยืนยัน — ยืนยันออเดอร์ก่อนอัปเดตการจัดส่ง');
+
+  const rank = (s: string | null) => (s ? SHIPPING_STATUSES.indexOf(s as ShippingStatus) : -1);
+  if (rank(status) < rank(order.shippingStatus ?? null)) {
+    throw new Error(`สถานะจัดส่งเดินหน้าไปแล้ว (${order.shippingStatus}) — ย้อนกลับไม่ได้`);
+  }
+  const data: any = { shippingStatus: status };
+  if (input?.shippingCarrier !== undefined) data.shippingCarrier = str(input.shippingCarrier, 80) || null;
+  if (input?.shippingTracking !== undefined) data.shippingTracking = str(input.shippingTracking, 120) || null;
+  if (status === 'SHIPPED' && rank(order.shippingStatus ?? null) < 1) data.shippedAt = new Date();
+  return prisma.businessOrder.update({ where: { id: orderId }, data });
+}
+
+/** ลูกค้าเห็นสถานะจัดส่งผ่านลิงก์ลับ — แนบในคำตอบเดิม */
+function publicShipping(order: any): any {
+  if (!order.shippingStatus) return null;
+  return {
+    status: order.shippingStatus,
+    carrier: order.shippingCarrier ?? null,
+    tracking: order.shippingTracking ?? null,
+    shippedAt: order.shippedAt ?? null,
+  };
+}
+
+/** catalog กลางชุมชน — รวมสินค้าจากทุกร้านที่เปิดทั้ง /shop และเข้าร่วม catalog เอง (opt-in) */
+export async function getCommunityCatalog(): Promise<any> {
+  const businesses = await prisma.business.findMany({
+    where: { isActive: true, shopOpen: true, shopInCommunity: true },
+    orderBy: { name: 'asc' },
+  });
+  const shops = await Promise.all(
+    businesses.map(async (biz: any) => {
+      const products = await prisma.businessProduct.findMany({
+        where: { businessId: biz.id, isActive: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return {
+        id: biz.id,
+        name: shopDisplayName(biz),
+        productCount: products.length,
+        products: products.map(publicProduct),
+      };
+    })
+  );
+  return {
+    shops: shops.filter((s: any) => s.products.length > 0),
+    generatedAt: new Date().toISOString(),
   };
 }

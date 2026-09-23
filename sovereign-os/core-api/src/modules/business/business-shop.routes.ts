@@ -20,6 +20,16 @@ function fail(res: any, err: any): void {
   else res.status(400).json({ error: msg });
 }
 
+// GET /api/shop/community — เฟส 4: catalog กลางชุมชน — รวมสินค้าร้านที่เข้าร่วมเอง (opt-in) — สาธารณะ
+// (ต้องมาก่อน /:businessId — ไม่งั้น "community" ถูกกินเป็น businessId)
+router.get('/community', browseLimiter, async (_req, res) => {
+  try {
+    res.json(await shop.getCommunityCatalog());
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // GET /api/shop/:businessId — หน้าร้าน (สินค้า + ชื่อร้าน) — สาธารณะ
 router.get('/:businessId', browseLimiter, async (req, res) => {
   try {

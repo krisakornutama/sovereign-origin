@@ -7,6 +7,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hasBusinessAccess, BUSINESS_POSITIONS } from '../../lib/business';
 import * as svc from '../../services/business.service';
+import * as shopSvc from '../../services/business-shop.service'; // เฟส 4: สถานะจัดส่งแบบเบา
 import { lotsForOrderLines } from '../../services/trace.service'; // TRACEABILITY — ล็อตผลผลิตของสินค้าในออเดอร์
 import { AuditService } from '../../services/audit.service';
 
@@ -171,6 +172,17 @@ router.post('/:businessId/orders', authenticate, async (req, res) => {
   try {
     res.status(201).json(await svc.createOrder(req.params.businessId, req.body));
   } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// เฟส 4: สถานะจัดส่งแบบเบา (ร้านส่งเอง) — เสริมจาก transition เดิม ไม่แทนที่ — MANAGER ขึ้นไป
+router.post('/:businessId/orders/:id/shipping', authenticate, async (req, res) => {
+  if (!(await guard(req, res, 'MANAGER'))) return;
+  try {
+    res.json(await shopSvc.updateShippingStatus(req.params.businessId, req.params.id, req.body ?? {}));
+  } catch (err: any) {
+    if (/not found/.test(err?.message ?? '')) return res.status(404).json({ error: err.message });
     res.status(400).json({ error: err.message });
   }
 });
