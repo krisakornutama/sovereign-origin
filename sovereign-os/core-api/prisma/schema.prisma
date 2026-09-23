@@ -121,6 +121,23 @@ model RelaySchedule {
   @@map("relay_schedules")
 }
 
+model AlertEvent {
+  // ประวัติ alert ทั้งหมดของระบบ (Telegram/dispatcher + watchdog) — ย้อนดูได้ว่าระบบเคยเตือนอะไรเมื่อไร
+  id          String   @id @default(uuid()) @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz
+  severity    String   // critical | warn | info
+  event_key   String   // key สำหรับ dedup/กลุ่มเหตุการณ์เดียวกัน
+  title       String
+  detail      String
+  sent        Boolean  @default(false) // ส่ง Telegram สำเร็จไหม (ยังจำใน log แม้ Telegram ล่ม)
+  suppressed  String?  // เหตุผลที่ไม่ส่ง (dedup/rate-limit/below_min_severity) — null = ไม่ถูกยับ
+  source      String   @default("dispatcher") // dispatcher | truth-watchdog | nightly
+
+  @@index([created_at(sort: Desc)])
+  @@index([event_key])
+  @@map("alert_events")
+}
+
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
   timestamp   DateTime @default(now()) @db.Timestamptz

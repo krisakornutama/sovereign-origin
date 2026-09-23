@@ -108,6 +108,23 @@ model RelaySchedule {
   @@map("relay_schedules")
 }
 
+model AlertEvent {
+  // ประวัติ alert ทั้งหมดของระบบ — โครงเดียวกับ postgres (sqlite: payload เป็น String)
+  id          String   @id @default(uuid())
+  created_at  DateTime @default(now())
+  severity    String
+  event_key   String
+  title       String
+  detail      String
+  sent        Boolean  @default(false)
+  suppressed  String?
+  source      String   @default("dispatcher")
+
+  @@index([created_at(sort: Desc)])
+  @@index([event_key])
+  @@map("alert_events")
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   timestamp   DateTime @default(now())

@@ -56,6 +56,7 @@ async function check(): Promise<void> {
       await getTelegramAlertDispatcher().send({
         severity: 'warn',
         eventKey: 'truth:code-mismatch',
+        source: 'truth-watchdog',
         text:
           `⚠️ <b>Prod รันโค้ดเก่า!</b>\n` +
           `runtime <code>${rt}</code> ≠ disk <code>${diskFp}</code>\n` +
@@ -73,6 +74,7 @@ async function check(): Promise<void> {
     await getTelegramAlertDispatcher().send({
       severity: 'warn',
       eventKey: 'truth:gate-failed',
+        source: 'truth-watchdog',
       text:
         `⚠️ <b>เกตล่าสุดมีขั้นพัง</b>${failed ? `: ${failed}` : ''}\n` +
         `→ ดูรายละเอียด: หน้า /system-health หรือ log ของ npm run verify`,
@@ -86,6 +88,7 @@ async function check(): Promise<void> {
       await getTelegramAlertDispatcher().send({
         severity: 'warn',
         eventKey: 'truth:stale',
+        source: 'truth-watchdog',
         text:
           `⚠️ <b>ไม่มีการรัน verify มา ${(ageMs / 3_600_000).toFixed(0)} ชม.</b>\n` +
           `→ ควรรัน <code>npm run verify</code> เพื่อยืนยันสุขภาพระบบ`,
