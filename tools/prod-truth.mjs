@@ -12,6 +12,7 @@
 //      (ไม่ส่ง --dir = fingerprint ฝั่งดิสก์จะอ่านจาก field build.files ถ้าเทียบไม่ได้ก็รายงานชัด)
 // ────────────────────────────────────────────────────────────────────────────
 import http from 'node:http';
+import { createRequire } from 'node:module';
 
 function get(url, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
@@ -65,8 +66,10 @@ async function main() {
   const dirIdx = args.indexOf('--dir');
   if (dirIdx >= 0) {
     const dir = args[dirIdx + 1];
-    const { computeDirFingerprint } = await import('./fingerprint-lib.mjs');
-    const disk = await computeDirFingerprint(dir);
+    // Windows path มีช่องว่าง ("My work") — ESM import() กับ path นั้นพัง → ใช้ createRequire แทน
+    const require = createRequire(import.meta.url);
+    const { computeDirFingerprintSync } = require('./fingerprint-lib.mjs');
+    const disk = await computeDirFingerprintSync(dir);
     console.log(`  · disk fingerprint    = ${disk.fingerprint} (${disk.files} ไฟล์ จาก ${dir})`);
     if (disk.fingerprint === runtimeFp) {
       console.log('✅ prod รันโค้ดชุดเดียวกับดิสก์');
