@@ -20,3 +20,31 @@
 ## ห้ามแตะ / ระวัง
 - รูปแบบ response ของ `GET /:lotCode` (public) = สัญญากับ QR ที่พิมพ์บนสินค้าจริง — เปลี่ยนได้แต่ต้องคิด backward-compat
 - เหตุการณ์ append-only: ห้ามแก้/ลบ trace_events ย้อนหลังโดยไม่มี audit เหตุผล
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`product_lots` · `trace_events`
+
+### Routes
+- `trace/trace.routes.ts` (93 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /:lotCode/events
+GET /:lotCode/qr
+POST /:lotCode/events
+GET /:lotCode
+GET /
+POST /
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`trace.service`
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- trace → inventory(inventory_items)
+
+<!-- auto:end -->

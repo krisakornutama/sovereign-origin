@@ -116,6 +116,11 @@ tools/*
 !tools/prod-truth.mjs
 !tools/fingerprint-lib.mjs
 !tools/module-owners.json
+# Phase 1 truth tooling — baseline ต้องเข้า repo (review ใน PR ก่อนยอมรับเส้นข้ามใหม่)
+!tools/boundary-baseline.json
+!tools/map-owners.mjs
+!tools/gen-module-docs.mjs
+!tools/check-parity.mjs
 !tools/
 !tools/install/
 tools/install/*

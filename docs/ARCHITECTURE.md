@@ -18,8 +18,8 @@
 1. **DB จริงฉบับเดียว** — `DATABASE_URL` ใน `sovereign-os/core-api/.env` ต้องชี้ DB ที่ connect ได้จริง → ตรวจโดย **arch-gate (env-truth)**
 2. **Schema สองไฟล์แก้คู่กัน** — `schema.prisma` (postgres) + `schema.sqlite.prisma` ต้องมี model ชุดเดียวกัน → ตรวจโดย **arch-gate (schema-sync)**
 3. **ไฟล์ไม่โตเกิน 800 บรรทัด** — ไฟล์ใหม่/ที่แก้ใน branch ห้ามโตเกินเพดาน (ไฟล์เก่าไม่ย้อนหลัง) → ตรวจโดย **arch-gate (file-budget)**
-4. **ตารางมีเจ้าของ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json`, การยื่นมือแตะตารางคนอื่นถูกรายงานทุก verify (ตอนนี้ report-only, เฟสถัดไป fail)
-5. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full`
+4. **ตารางมีเจ้าของ + เส้นข้ามต้องประกาศ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json` (ครอบทุกตารางยกเว้น 2 orphan จริง · shared: system_settings/security_events) · การแตะตารางคนอื่นต้องมีอยู่ใน `tools/boundary-baseline.json` แล้วเท่านั้น — **เส้นข้ามใหม่ = verify fail** (เพิ่ม baseline พร้อมเหตุผลเมื่อจำเป็นจริง · เติมเจ้าของตารางใหม่ด้วย `node tools/map-owners.mjs --apply`)
+5. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full` · parity ของอัลกอริทึมสองฝั่งถูกตรวจบน CI (`tools/check-parity.mjs`) · เห็นผลได้ทันทีที่หน้า **/system-health**
 
 ## ด่านคุณภาพ (npm run verify ที่ root)
 
@@ -32,18 +32,10 @@ verify:full   = เพิ่ม Prod-Truth Gate (fingerprint disk↔runtime) + E
 - เกตทั้งหมดอยู่ที่ `tools/` (arch-gate.mjs, prod-truth.mjs, fingerprint-lib.mjs, module-owners.json)
 - fingerprint = hash ของ `{relativePath, size, sha256(content)}` เรียงตาม path — คำนวณฝั่ง runtime (`src/lib/runtime-fingerprint.ts`) และฝั่ง tools ให้ผลตรงกันทุกไบต์
 
-## โมดูลหลัก 8 โมดูล (เอกสารรายโมดูลอยู่ที่ docs/modules/)
+## โมดูล (เอกสารครบทุกโมดูลที่ docs/modules/)
 
-| โมดูล | หน้าที่ | เอกสาร |
-|---|---|---|
-| auth | ล็อกอิน/MFA/rate-limit/audit | [docs/modules/auth.md](modules/auth.md) |
-| business | ร้านค้า/ออเดอร์/LEDGER/PO/ชุมชน | [docs/modules/business.md](modules/business.md) |
-| trace | ตามรอยผลผลิต (ล็อต+เหตุการณ์+QR) | [docs/modules/trace.md](modules/trace.md) |
-| farm | แปลง/ดิน/เก็บเกี่ยว/ที่ปรึกษา | [docs/modules/farm.md](modules/farm.md) |
-| inventory | สต็อกสินค้า | [docs/modules/inventory.md](modules/inventory.md) |
-| energy | พลังงาน/มิเตอร์/เกณฑ์เตือน | [docs/modules/energy.md](modules/energy.md) |
-| restaurant | ร้านอาหาร/เมนู/ออเดอร์/หน้า | [docs/modules/restaurant.md](modules/restaurant.md) |
-| treasury | การเงิน/พอร์ต/runway/โอน | [docs/modules/treasury.md](modules/treasury.md) |
+- **ครบ 60+ โมดูล** — ส่วน "ของจริงในโค้ด" (ตารางเจ้าของ · routes · endpoints · services · เส้นข้ามที่ยอมรับ) gen อัตโนมัติจากโค้ดด้วย `node tools/gen-module-docs.mjs` (ห้ามแก้มือใน marker auto)
+- 8 โมดูลหลักมีเจตนา/ข้อห้ามเขียนมือ: [auth](modules/auth.md) · [business](modules/business.md) · [trace](modules/trace.md) · [farm](modules/farm.md) · [inventory](modules/inventory.md) · [energy](modules/energy.md) · [restaurant](modules/restaurant.md) · [treasury](modules/treasury.md) — โมดูลอื่นมีช่อง "เจตนา/ข้อห้าม" ให้เจ้าของโมดูลเติม
 
 ## โครงสร้าง backend
 
@@ -55,6 +47,19 @@ sovereign-os/core-api/src/
   lib/               # runtime-fingerprint, prisma ฯลฯ
   middleware/        # authenticate, requireRole, rateLimit
 ```
+
+## เครื่องมือใน tools/ (แหล่งความจริง)
+
+| เครื่องมือ | หน้าที่ |
+|---|---|
+| `arch-gate.mjs` | ด่านแรกของ verify: schema-sync · file-budget · env-truth · boundary (baseline แบบ fail) |
+| `module-owners.json` | ตาราง→เจ้าของ + serviceAliases (แหล่งเดียว ทั้ง gate และ map-owners ใช้ร่วม) |
+| `map-owners.mjs` | เติมเจ้าของตาราง unmapped จากการใช้จริง (`--apply` เขียน) |
+| `boundary-baseline.json` | เส้นข้ามโมดูลที่ยอมรับแล้ว — นอกไฟล์นี้ = fail |
+| `prod-truth.mjs` + `fingerprint-lib.mjs` | เทียบ fingerprint ดิสก์ ↔ runtime (verify:full) |
+| `check-parity.mjs` | พิสูจน์อัลกอริทึม fingerprint สองฝั่งตรงกัน (CI รันทุก PR) |
+| `verify.mjs` | Quality gate เดียว — เขียนผลล่าสุดลง `data/system-truth.json` |
+| `gen-module-docs.mjs` | gen เอกสารโมดูลจากโค้ดจริง (ไม่ทับส่วนเขียนมือ) |
 
 ## Deployment จริง (สิ่งที่ต้องรู้ก่อนแตะ prod)
 
