@@ -1,7 +1,18 @@
 import type { Express } from 'express';
+import { join } from 'node:path';
+import { readFile as readFileCb } from 'node:fs';
 import { config } from './config';
 import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
 import { prisma } from './lib/prisma';
+
+// อ่านไฟล์ JSON แบบ "ไม่มีก็ได้" — ใช้กับ data/system-truth.json (ผลเกตล่าสุดที่ verify เขียน)
+const readJsonIfExists = async (p: string): Promise<unknown | null> =>
+  new Promise((resolve) => {
+    readFileCb(p, 'utf8', (err, data) => {
+      if (err) return resolve(null);
+      try { resolve(JSON.parse(data)); } catch { resolve(null); }
+    });
+  });
 import authRoutes from './modules/auth/auth.routes';
 import nodeRoutes from './modules/nodes/node.routes';
 import deviceRoutes from './modules/devices/device.routes';
@@ -164,6 +175,42 @@ export function mountRoutes(app: Express): void {
       res.json({ status: 'ok', ...extras });
     } catch {
       res.json({ status: 'ok' }); // enrich ล้ม = ยอมรับเฉย ๆ — สัญญา status:'ok' ต้องไม่พัง
+    }
+  });
+
+  // ── GET /api/health/truth — ความจริง runtime ฉบับเดียวสำหรับหน้า /system-health ──
+  // รวม 3 แหล่ง: (1) fingerprint ของ dist ที่โปรเซสนี้โหลดจริง (2) migration head จริงจาก DB
+  // (3) data/system-truth.json = ผลเกต (arch-gate 4 กฎ + prod-truth) ล่าสุดที่ verify เขียนไว้
+  // Public เหมือน /api/health (ไม่มี token ก็ดูสุขภาพความจริงได้) — ไม่เปิดเผยความลับใด ๆ
+  app.get('/api/health/truth', async (_req, res) => {
+    try {
+      const [fp, migrationHead, gateRaw] = await Promise.all([
+        getSelfFingerprint(),
+        prisma
+          .$queryRawUnsafe<Array<{ migration_name: string }>>(
+            'SELECT migration_name FROM "_prisma_migrations" ORDER BY migration_name DESC LIMIT 1'
+          )
+          .catch(() => null as Array<{ migration_name: string }> | null),
+      readJsonIfExists(join(process.cwd(), 'data', 'system-truth.json')).catch(() => null),
+      ]);
+      const gate = gateRaw as {
+        writtenAt?: string; steps?: Array<{ name?: string; ok?: boolean; skipped?: boolean }>;
+        prodTruth?: { ok?: boolean; diskFingerprint?: string; diskFiles?: number; diskDir?: string };
+      } | null;
+      const runtimeFp = fp.fingerprint;
+      const diskFp = gate?.prodTruth?.diskFingerprint ?? null;
+      const gateSteps = (gate?.steps ?? []).map((s) => ({ name: s.name ?? '?', ok: !!s.ok, skipped: !!s.skipped }));
+      res.json({
+        runtime: { fingerprint: runtimeFp, files: fp.files, loadedDir: getLoadedCodeDirLabel() },
+        db: { migrationHead: migrationHead?.[0]?.migration_name ?? null },
+        lastGateRun: gate
+          ? { writtenAt: gate.writtenAt ?? null, ok: gateSteps.length > 0 && gateSteps.every((s) => s.ok || s.skipped), steps: gateSteps }
+          : null,
+        disk: gate?.prodTruth ? { fingerprint: diskFp, files: gate.prodTruth.diskFiles ?? null, dir: gate.prodTruth.diskDir ?? null } : null,
+        codeMatch: diskFp ? diskFp === runtimeFp : null, // null = ยังไม่มีข้อมูลเทียบ (verify ยังไม่เคยรันบนเครื่องนี้)
+      });
+    } catch {
+      res.status(503).json({ error: 'truth unavailable' });
     }
   });
   app.use('/api/health', featureGuard('/health'), healthRoutes); // Phase 5: Health Screening

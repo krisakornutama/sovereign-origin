@@ -22,3 +22,42 @@
 ## ห้ามแตะ / ระวัง
 - `harvest` สร้างข้อมูลในโมดูล trace — แก้ schema ตาราง `product_lots` ต้องรีวิว farm ด้วย
 - `map.svg` เรนเดอร์ geometry จริง — เปลี่ยน format geometry กระทบ frontend map
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`farm_plots` · `farm_soil_readings` · `fertilizer_applications` · `herb_beds`
+
+### Routes
+- `farm/farm.routes.ts` (461 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /
+GET /overview
+GET /map.svg
+POST /
+PUT /:id
+DELETE /:id
+PUT /:id/geometry
+POST /:id/soil-readings
+GET /:id/soil-readings
+POST /:id/harvest
+POST /:id/herb-harvest
+GET /:id/advisor
+GET /:id/analysis
+POST /:id/apply-fertilizer
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`advisor.service` · `farm-advisor.service` · `farm-map.service` · `farm-soil.service`
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- farm → inventory(inventory_items)
+- farm → portfolio(wealth_history)
+- farm → trace(product_lots)
+- farm → treasury(asset_positions)
+
+<!-- auto:end -->

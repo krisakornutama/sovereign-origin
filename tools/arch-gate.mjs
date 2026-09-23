@@ -10,14 +10,17 @@
 //                         (ไฟล์เก่าที่ใหญ่อยู่แล้วไม่โดนย้อนหลัง — กฎกัน "โตต่อ" เท่านั้น)
 //   3) env-truth        — DATABASE_URL ใน .env ต้องชี้ DB ที่ connect ได้จริง
 //                         (เคสจริง: ชี้ sovereign_v2 ที่ไม่มีอยู่ — ทุก tool เจอ P1003)
-//   4) module-boundary  — รายงานโมดูลที่แตะตารางของโมดูลอื่นผ่าน prisma.<model> (report-only
-//                         ในเฟสแรก — เก็บ baseline ก่อนบังคับจริงในเฟสถัดไป)
+//   4) module-boundary  — บังคับจริง (เฟส 1): โมดูลแตะตารางของโมดูลอื่นผ่าน prisma.<model>
+//                         เทียบกับ tools/boundary-baseline.json (สแกนรอบแรก = baseline)
+//                         · เส้นข้ามที่อยู่ใน baseline แล้ว = ผ่าน (ของเดิม ไม่ย้อนหลัง)
+//                         · เส้นข้าม “ใหม่” ที่ไม่เคยมีใน baseline = FAIL — แก้/ขอเพิ่ม baseline ชัด ๆ
+//                         · --update-baseline = เขียน baseline ใหม่จากผลสแกนปัจจุบัน (ใช้เมื่อยอมรับเส้นใหม่)
 //
-// ใช้: node tools/arch-gate.mjs [--base origin/main]   (base สำหรับ file-budget; default = main)
+// ใช้: node tools/arch-gate.mjs [--base origin/main] [--update-baseline]
 // ────────────────────────────────────────────────────────────────────────────
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -123,29 +126,31 @@ async function checkEnvTruth() {
   }
 }
 
-// ── 4) module-boundary (report-only): ใครแตะตารางของใคร ──
+// ── 4) module-boundary (บังคับด้วย baseline — เฟส 1): ใครแตะตารางของใคร ──
 function checkModuleBoundary() {
   const ownersPath = join(ROOT, 'tools', 'module-owners.json');
+  const baselinePath = join(ROOT, 'tools', 'boundary-baseline.json');
   if (!existsSync(ownersPath)) {
     reports.push('module-boundary: ข้าม (ไม่มี tools/module-owners.json)');
     return;
   }
-  const owners = JSON.parse(readFileSync(ownersPath, 'utf8')).owners || {};
-  const modelToOwner = Object.fromEntries(Object.entries(owners).map(([t, mod]) => [t, mod]));
+  const ownersJson = JSON.parse(readFileSync(ownersPath, 'utf8'));
+  const owners = ownersJson.owners || {};
+  const serviceAlias = ownersJson.serviceAliases || {};   // แหล่งความจริงเดียวกับ map-owners
+  const shared = new Set(ownersJson.sharedTables || []);   // cross-cutting — ทุกโมดูลแตะได้
   // delegate prisma.<model> ↔ ตาราง: ตาม @@map — อ่านจาก schema.prisma
   const schema = readFileSync(join(BACKEND, 'prisma', 'schema.prisma'), 'utf8');
   const modelTable = {};
   for (const m of schema.matchAll(/^model\s+([A-Za-z0-9_]+)\s*\{[^}]*?@@map\("([^"]+)"\)/gms)) {
-    modelTable[m[1]] = m[2];
+    // delegate ในโค้ด = camelCase ของ model (prisma.businessOrder ← model BusinessOrder)
+    const camel = m[1].charAt(0).toLowerCase() + m[1].slice(1);
+    modelTable[camel] = m[2];
   }
-  const camelToSnake = (s) => s.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
-  // เดินไฟล์ backend ทั้ง src — จับ "prisma.<delegate>" แล้ว map เป็นตาราง → โมดูลเจ้าของ
-  // โมดูลของไฟล์ = ก้อนแรกที่ขึ้นต้นด้วย modules/ หรือ services/ (เกณฑ์หยาบพอสำหรับ baseline)
+  const camelToSnake = (s) => s.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase()); // fallback กรณี @@map ไม่ตรง snake
   const hits = {}; // `${module} → ${owner}(${table})` = count
   let scanCount = 0;
   const SRC = join(ROOT, 'sovereign-os', 'core-api', 'src');
-  // service ที่ทำงาน "ให้โมดูลนั้น" (ตามการเรียกใช้จริง) — นับรวมเป็นโมดูลเดียวกัน
-  const serviceAlias = { 'business.service': 'business', 'business-shop.service': 'business', 'trace.service': 'trace', 'advisor.service': 'farm' };
+  const aliasOf = (base) => serviceAlias[base] ?? serviceAlias[`${base}.service`] ?? `service:${base}`;
   const walk = (dir) => {
     let list = [];
     try { list = readdirSync(dir); } catch { return; }
@@ -160,28 +165,63 @@ function checkModuleBoundary() {
       const parts = rel.split(sep);
       const module =
         parts[0] === 'modules' ? parts[1]
-        : parts[0] === 'services' ? (serviceAlias[parts[1]?.replace(/\.ts$/, '')] ?? `service:${parts[1]?.replace(/\.ts$/, '')}`)
+        : parts[0] === 'services' ? aliasOf(parts[1]?.replace(/\.ts$/, ''))
+        : parts[0] === 'workers' ? aliasOf(parts[1]?.replace(/\.ts$/, ''))
         : `root:${parts[0]}`;
       const text = readFileSync(full, 'utf8');
       for (const mm of text.matchAll(/\bprisma\.([a-z][A-Za-z0-9]*)\b/g)) {
         const delegate = mm[1];
         const table = modelTable[delegate] || camelToSnake(delegate);
-        const owner = modelToOwner[table];
-        if (!owner) continue; // unmapped — baseline ยังไม่ครอบ
+        const owner = owners[table];
+        if (!owner) continue; // unmapped — ยังไม่ถูกกติกาครอบ (จัดการด้วย map-owners)
+        if (shared.has(table)) continue; // cross-cutting — ทุกโมดูลแตะได้
         if (owner === module) continue; // เจ้าของแตะของตัวเอง = ถูกต้อง
         const key = `${module} → ${owner}(${table})`;
         hits[key] = (hits[key] || 0) + 1;
       }
     }
   };
-  walk(join(ROOT, 'sovereign-os', 'core-api', 'src'));
+  walk(SRC);
   const keys = Object.keys(hits).sort();
-  if (keys.length) {
-    reports.push(`module-boundary (report-only): เจอ ${keys.length} เส้นข้ามโมดูล จาก ${scanCount} ไฟล์:`);
-    for (const k of keys.slice(0, 20)) reports.push(`   ${k} ×${hits[k]}`);
-  } else {
-    reports.push(`module-boundary: สะอาด (สแกน ${scanCount} ไฟล์)`);
+
+  // baseline: { "<key>": "<เหตุผล/ที่มา สั้น ๆ>" } — สแกนรอบแรก = สร้างอัตโนมัติ (report เดิมทั้งหมดผ่าน)
+  let baseline = {};
+  if (existsSync(baselinePath)) {
+    try { baseline = JSON.parse(readFileSync(baselinePath, 'utf8')).violations || {}; } catch { baseline = {}; }
   }
+
+  if (process.argv.includes('--update-baseline')) {
+    writeFileSync(baselinePath, JSON.stringify({
+      $comment: 'baseline เส้นข้ามโมดูลที่ “ยอมรับแล้ว” — เส้นใหม่นอกไฟล์นี้ = arch-gate fail · เพิ่มเส้นใหม่เมื่อ: โมดูลอื่นจำเป็นจริง (เช่นผ่าน service กลาง) — ระบุเหตุผลไว้ทุกครั้ง · อัปเดตทั้งไฟล์ด้วย: node tools/arch-gate.mjs --update-baseline',
+      generatedAt: new Date().toISOString().slice(0, 10),
+      violations: Object.fromEntries(keys.map((k) => [k, hits[k]])),
+    }, null, 2) + '\n', 'utf8');
+    reports.push(`module-boundary: เขียน baseline ${keys.length} เส้น (อัปเดตจากผลสแกน ${scanCount} ไฟล์)`);
+    return;
+  }
+
+  if (!existsSync(baselinePath)) {
+    // รอบแรก: สร้าง baseline ให้เอง — ของเดิมทั้งหมดผ่าน ไม่ทำให้ใคร build พังทันที
+    writeFileSync(baselinePath, JSON.stringify({
+      $comment: 'baseline เส้นข้ามโมดูลที่ “ยอมรับแล้ว” — เส้นใหม่นอกไฟล์นี้ = arch-gate fail · เพิ่มเส้นใหม่เมื่อ: โมดูลอื่นจำเป็นจริง (เช่นผ่าน service กลาง) — ระบุเหตุผลไว้ทุกครั้ง · อัปเดตทั้งไฟล์ด้วย: node tools/arch-gate.mjs --update-baseline',
+      generatedAt: new Date().toISOString().slice(0, 10),
+      violations: Object.fromEntries(keys.map((k) => [k, hits[k]])),
+    }, null, 2) + '\n', 'utf8');
+    reports.push(`module-boundary: สร้าง baseline ครั้งแรก — ยอมรับเส้นข้ามที่มีอยู่ ${keys.length} เส้น (สแกน ${scanCount} ไฟล์) · เส้นใหม่ถัดจากนี้ = fail`);
+    return;
+  }
+
+  const newOnes = keys.filter((k) => !(k in baseline));
+  const gone = Object.keys(baseline).filter((k) => !keys.includes(k));
+  if (newOnes.length) {
+    problems.push(
+      `module-boundary: เจอเส้นข้ามโมดูล “ใหม่” ${newOnes.length} เส้น (ไม่มีใน baseline):\n` +
+        newOnes.slice(0, 10).map((k) => `   ✗ ${k} ×${hits[k]}`).join('\n') +
+        `\n   → กลับไปทำผ่าน service ของเจ้าของตาราง หรือถ้าจำเป็นจริง ให้เพิ่มลง tools/boundary-baseline.json พร้อมเหตุผล`
+    );
+  }
+  const cleaned = gone.length ? ` · เส้นที่เลิกแล้ว ${gone.length} (ลบจาก baseline ได้ด้วย --update-baseline)` : '';
+  reports.push(`module-boundary: ผ่าน (เส้นข้ามที่ยอมรับแล้ว ${keys.length}/${Object.keys(baseline).length} · สแกน ${scanCount} ไฟล์${cleaned})`);
 }
 
 const results = [];

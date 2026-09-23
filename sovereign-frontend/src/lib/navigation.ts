@@ -149,6 +149,7 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'common.nav.group.system',
     items: [
       { href: '/system', label: 'สุขภาพระบบ', labelKey: 'common.nav.system', icon: 'system', keywords: 'ระบบ สุขภาพ เซิร์ฟเวอร์ router' },
+      { href: '/system-health', label: 'ความจริงระบบ', labelKey: 'common.nav.systemHealth', icon: 'system', keywords: 'ความจริง fingerprint build migration เกต verify prod truth รันโค้ดเก่า' },
       { href: '/backup', label: 'สำรองข้อมูล', labelKey: 'common.nav.backup', icon: 'backup', keywords: 'สำรอง ข้อมูล backup' },
       { href: '/users', label: 'ผู้ใช้', labelKey: 'common.nav.users', icon: 'users', keywords: 'ผู้ใช้ บัญชี สมาชิก' },
       { href: '/audit', label: 'บันทึกตรวจสอบ', labelKey: 'common.nav.audit', icon: 'audit', keywords: 'log ตรวจสอบ audit' },

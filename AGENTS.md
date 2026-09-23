@@ -73,7 +73,9 @@
 - สถาปัตยกรรมรวม + กฎที่เกตตรวจอัตโนมัติ: **docs/ARCHITECTURE.md**
 - เอกสารรายโมดูล (auth, business, trace, farm, inventory, energy, restaurant, treasury): **docs/modules/<โมดูล>.md**
 - กติกา: ก่อนแก้โมดูลไหน ให้อ่านเอกสารโมดูลนั้นก่อนเสมอ — เจตนา/ตารางที่เป็นเจ้าของ/ข้อห้ามอยู่ที่นั่น
-- แผนที่ตาราง→โมดูล: tools/module-owners.json (arch-gate รายงานการยื่นมือแตะตารางคนอื่นทุกครั้งที่ verify)
+- แผนที่ตาราง→โมดูล: tools/module-owners.json (ครอบทุกตารางยกเว้น orphan จริง · เติมใหม่ด้วย `node tools/map-owners.mjs --apply`)
+- **เส้นข้ามโมดูล (แตะตารางคนอื่น) = fail ถ้าไม่ประกาศ** — เส้นที่ยอมรับแล้วอยู่ที่ tools/boundary-baseline.json · เส้นใหม่ที่ arch-gate จับ = แก้ผ่าน service ของเจ้าของตาราง หรือเพิ่ม baseline พร้อมเหตุผล (รีวิวใน PR)
+- เอกสารโมดูลครบทุกโมดูลที่ docs/modules/ — ส่วน "ของจริงในโค้ด" gen ด้วย `node tools/gen-module-docs.mjs` (ห้ามแก้มือใน marker auto)
 
 ## โฟลว์ทำงานที่ถูกต้อง
 
