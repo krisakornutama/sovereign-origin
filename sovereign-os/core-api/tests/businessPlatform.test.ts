@@ -132,6 +132,7 @@ before(async () => {
     },
   };
   (prisma as any).businessCustomer = {
+    findUnique: async ({ where }: any) => customers.get(where?.id) ?? null,
     findMany: async () => [...customers.values()],
     create: async ({ data }: any) => {
       const c = { id: CUSTOMER_ID + '-new' + customers.size, ...data };
@@ -243,6 +244,47 @@ before(async () => {
   };
   (prisma as any).agentJob = { findMany: async () => [], create: async ({ data }: any) => ({ id: 'job-1', ...data }) };
 
+  // ── TRACEABILITY in-memory store — ล็อตผลผลิต + เหตุการณ์ตามรอย ──
+  const traceLots = new Map<string, any>();
+  const traceEvents: any[] = [];
+  const LOT_ID = '77777777-7777-7777-7777-777777777777';
+  traceLots.set(LOT_ID, {
+    id: LOT_ID, lotCode: 'LOT-TEST01', inventoryItemId: null, plotId: null, crop: 'มะเขือเทศ', quantityKg: 10,
+    harvestedAt: new Date('2026-09-01T00:00:00Z'), soldCustomerId: null, soldAt: null, createdAt: new Date(), updatedAt: new Date(),
+  });
+  (prisma as any).productLot = {
+    findUnique: async ({ where }: any) => traceLots.get(where?.id) ?? traceLots.get(where?.lotCode) ?? null,
+    findMany: async ({ where }: any) => {
+      let lots = [...traceLots.values()];
+      if (where?.inventoryItemId?.in) lots = lots.filter((l) => where.inventoryItemId.in.includes(l.inventoryItemId));
+      if (where?.soldCustomerId?.not === null) lots = lots.filter((l) => l.soldCustomerId !== null);
+      if (where?.soldCustomerId === null) lots = lots.filter((l) => l.soldCustomerId === null);
+      if (where?.soldAt?.not === null) lots = lots.filter((l) => l.soldAt !== null);
+      if (where?.events?.none) lots = lots.filter((l) => !traceEvents.some((e) => e.lotId === l.id && e.type === where.events.none.type));
+      if (where?.events?.some) lots = lots.filter((l) => traceEvents.some((e) => e.lotId === l.id && e.type === where.events.some.type && (!where.events.some.detail?.contains || (e.detail ?? '').includes(where.events.some.detail.contains))));
+      return lots;
+    },
+    update: async ({ where, data }: any) => {
+      const lot = { ...traceLots.get(where.id), ...data };
+      traceLots.set(lot.id, lot);
+      return lot;
+    },
+    create: async ({ data }: any) => {
+      const lot = { id: `lot-${traceLots.size + 1}`, ...data };
+      traceLots.set(lot.id, lot);
+      return lot;
+    },
+  };
+  (prisma as any).traceEvent = {
+    create: async ({ data }: any) => {
+      const ev = { id: `ev-${traceEvents.length + 1}`, createdAt: new Date(), ...data };
+      traceEvents.push(ev);
+      return ev;
+    },
+    findMany: async ({ where }: any) => (where?.lotId ? traceEvents.filter((e) => e.lotId === where.lotId) : traceEvents),
+  };
+  globalThis.__traceTestStore = { traceLots, traceEvents, LOT_ID, PRODUCT_ID };
+
   // $transaction (callback form) — ส่ง fakeTx ที่ใช้ delegate เดียวกัน + raw helpers
   const fakeTx: any = {
     business: (prisma as any).business, // recordSaleIncome อ่าน vatRate ของร้านตอนแยก VAT
@@ -276,6 +318,10 @@ before(async () => {
     businessLedgerEntry: (prisma as any).businessLedgerEntry,
     businessPurchaseOrder: (prisma as any).businessPurchaseOrder,
     inventoryItem: (prisma as any).inventoryItem,
+    businessCustomer: (prisma as any).businessCustomer,
+    // TRACEABILITY — fakeTx ใช้ delegate ใน prisma (ทดสอบ SOLD/DELIVERED/RESTOCKED)
+    productLot: (prisma as any).productLot,
+    traceEvent: (prisma as any).traceEvent,
   };
   mock.method(prisma, '$transaction', async (fn: any) => (typeof fn === 'function' ? fn(fakeTx) : Promise.all(fn)));
 
@@ -536,4 +582,70 @@ test('สร้างธุรกิจ → 201 + OWNER member + seed ผู้�
   const created = await (await post(`/${BIZ_ID}/agents/seed`, {}, makeToken('SUPERADMIN'))).json();
   // seed เฉพาะเมื่อยังไม่มี (ตัวจริง seed ตอน create) — mock count=0 จึงสร้างใหม่ได้
   assert.equal(created.created, 5);
+});
+
+// ── TRACEABILITY — ออเดอร์ธุรกิจผูกล็อตผลผลิต (SOLD/DELIVERED/RESTOCKED) ──
+test('confirm → ล็อตที่ผูกสินค้ากลายเป็น SOLD + เหตุการณ์ SOLD', async () => {
+  const store = (globalThis as any).__traceTestStore;
+  // ผูกล็อตกับสินค้า (inventoryItemId = PRODUCT_ID) — markLotsSold หาล็อตด้วย inventoryItemId ของบรรทัดออเดอร์
+  const lot = store.traceLots.get(store.LOT_ID);
+  lot.inventoryItemId = PRODUCT_ID;
+  lot.soldCustomerId = null;
+  lot.soldAt = null;
+  // เคลียร์เหตุการณ์เก่าจากเทสอื่น
+  store.traceEvents.length = 0;
+  // สร้างออเดอร์ QUOTE ที่มีบรรทัดของ PRODUCT_ID (ผูกลูกค้าเพื่อบันทึกผู้ซื้อบนล็อต)
+  const createRes = await post(`/${BIZ_ID}/orders`, { customerId: CUSTOMER_ID, items: [{ productId: PRODUCT_ID, qty: 1 }] }, memberToken('SALES'));
+  assert.equal(createRes.status, 201);
+  const order = await createRes.json();
+  // confirm — MANAGER ขึ้นไป
+  const confirmRes = await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'confirm' }, memberToken('MANAGER'));
+  assert.equal(confirmRes.status, 200);
+  const soldLot = [...store.traceLots.values()].find((l: any) => l.soldCustomerId === CUSTOMER_ID);
+  assert.ok(soldLot, 'lot should be marked SOLD after confirm');
+  assert.ok(store.traceEvents.some((e: any) => e.type === 'SOLD' && e.lotId === soldLot.id));
+});
+
+test('cancel ออเดอร์ที่ยืนยันแล้ว → ล็อตกลับ RESTOCKED (ปลดลูกค้า)', async () => {
+  const store = (globalThis as any).__traceTestStore;
+  // ล็อตของเทสนี้เอง (โมเดล FIFO ขายล็อตเดียวได้ครั้งเดียว — ล็อตเดิมถูกใช้ไปแล้ว)
+  const LOT2 = '78787878-7878-7878-7878-787878787878';
+  store.traceLots.set(LOT2, {
+    id: LOT2, lotCode: 'LOT-TEST02', inventoryItemId: PRODUCT_ID, plotId: null, crop: 'มะเขือเทศ', quantityKg: 5,
+    harvestedAt: new Date('2026-09-02T00:00:00Z'), soldCustomerId: null, soldAt: null, createdAt: new Date(), updatedAt: new Date(),
+  });
+  const beforeRestocked = store.traceEvents.filter((e: any) => e.type === 'RESTOCKED').length;
+  const beforeSold = store.traceEvents.filter((e: any) => e.type === 'SOLD').length;
+  // ออเดอร์ใหม่ (ผูกลูกค้า) → confirm → cancel
+  const createRes = await post(`/${BIZ_ID}/orders`, { customerId: CUSTOMER_ID, items: [{ productId: PRODUCT_ID, qty: 1 }] }, memberToken('SALES'));
+  assert.equal(createRes.status, 201);
+  const order = await createRes.json();
+  await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'confirm' }, memberToken('MANAGER'));
+  assert.ok(store.traceEvents.filter((e: any) => e.type === 'SOLD').length > beforeSold, 'confirm should add SOLD event');
+  // ยกเลิกออเดอร์นี้ — ล็อตที่เพิ่ง SOLD ต้องกลับ RESTOCKED
+  const cancelRes = await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'cancel' }, memberToken('MANAGER'));
+  assert.equal(cancelRes.status, 200);
+  const restockedEvents = store.traceEvents.filter((e: any) => e.type === 'RESTOCKED');
+  assert.ok(restockedEvents.length > beforeRestocked, 'should have new RESTOCKED event');
+  assert.ok(store.traceLots.get(LOT2).soldCustomerId === null, 'lot customer should be cleared');
+});
+
+test('deliver → เหตุการณ์ DELIVERED บนล็อตที่ขายแล้ว', async () => {
+  const store = (globalThis as any).__traceTestStore;
+  // ล็อตของเทสนี้เอง (FIFO หยิบล็อตเก่าสุดที่ยังไม่ขาย)
+  const LOT3 = '79797979-7979-7979-7979-797979797979';
+  store.traceLots.set(LOT3, {
+    id: LOT3, lotCode: 'LOT-TEST03', inventoryItemId: PRODUCT_ID, plotId: null, crop: 'มะเขือเทศ', quantityKg: 3,
+    harvestedAt: new Date('2026-09-03T00:00:00Z'), soldCustomerId: null, soldAt: null, createdAt: new Date(), updatedAt: new Date(),
+  });
+  const beforeDelivered = store.traceEvents.filter((e: any) => e.type === 'DELIVERED').length;
+  const createRes = await post(`/${BIZ_ID}/orders`, { customerId: CUSTOMER_ID, items: [{ productId: PRODUCT_ID, qty: 1 }] }, memberToken('SALES'));
+  assert.equal(createRes.status, 201);
+  const order = await createRes.json();
+  await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'confirm' }, memberToken('MANAGER'));
+  await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'mark-paid' }, memberToken('MANAGER'));
+  const deliverRes = await post(`/${BIZ_ID}/orders/${order.id}/transition`, { action: 'deliver' }, memberToken('MANAGER'));
+  assert.equal(deliverRes.status, 200);
+  const deliveredEvents = store.traceEvents.filter((e: any) => e.type === 'DELIVERED');
+  assert.ok(deliveredEvents.length > beforeDelivered, 'should have new DELIVERED event');
 });

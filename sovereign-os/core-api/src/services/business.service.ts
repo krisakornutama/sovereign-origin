@@ -14,6 +14,7 @@ import { sendTelegramAlert } from './telegram-alert.service';
 import { creditLiquidCash } from './treasury.service';
 import { businessTaxOverview, splitVatFromGross, taxCalendar } from './thai-tax.service';
 import { AuditService } from './audit.service';
+import { markLotsSold, markLotsDelivered, markLotsRestocked } from './trace.service';
 
 // ── helpers ──
 function str(v: unknown, max: number): string {
@@ -270,6 +271,8 @@ export async function transitionOrder(
         // ผูกคลังกลางไว้ → คลังต้องมีของพอด้วย (ไม่พอ = ยกเลิกทั้ง transaction กันคลังติดลบ)
         await mirrorWarehouseDelta(tx, line.productId, -line.qty, line.qty);
       }
+      // TRACEABILITY — ล็อตของสินค้าที่ขาย = SOLD (best-effort — พังไม่ดันออเดอร์)
+      await markLotsSold(tx, businessId, [...new Set(lines.map((l: any) => l.productId))], o.customerId ?? null, o.orderNo);
       return tx.businessOrder.update({ where: { id }, data: { status: 'ORDERED' } });
     }
 
@@ -282,6 +285,7 @@ export async function transitionOrder(
           await mirrorWarehouseDelta(tx, line.productId, line.qty);
         }
       }
+      await markLotsRestocked(tx, o.orderNo);
       return tx.businessOrder.update({ where: { id }, data: { status: 'CANCELLED' } });
     }
 
@@ -293,6 +297,16 @@ export async function transitionOrder(
 
     // deliver
     if (o.status !== 'PAID') throw new Error(`ส่งของได้เฉพาะหลังชำระเงินครบ (ปัจจุบัน ${o.status})`);
+    let customerName: string | null = null;
+    if (o.customerId) {
+      const cust = await tx.businessCustomer.findUnique({ where: { id: o.customerId }, select: { name: true } });
+      if (!cust) {
+        customerName = null;
+      } else {
+        customerName = cust.name;
+      }
+    }
+    await markLotsDelivered(tx, o.orderNo, customerName);
     return tx.businessOrder.update({ where: { id }, data: { status: 'DELIVERED' } });
   });
 }

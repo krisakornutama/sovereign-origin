@@ -436,7 +436,8 @@ model InventoryItem {
   created_at      DateTime  @default(now()) @db.Timestamptz
   updated_at      DateTime  @updatedAt @db.Timestamptz
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  product_lots ProductLot[]
 
   @@index([user_id])
   @@map("inventory_items")
@@ -486,6 +487,7 @@ model FarmPlot {
   soil_readings           FarmSoilReading[]
   fertilizer_applications FertilizerApplication[]
   herb_beds               HerbBed[]
+  product_lots            ProductLot[]
 
   @@index([status])
   @@index([category])
@@ -1847,19 +1849,19 @@ model LearningModelState {
 // OWNER ทุกอย่าง · MANAGER บริหาร · SALES ขาย · TECHNICIAN ติดตั้ง ·
 // STOCK_KEEPER คลัง · ACCOUNTANT การเงินอ่าน+กระทบยอด · VIEWER อ่านอย่างเดียว
 model Business {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  bizType   String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
-  vatRate   Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
-  isActive  Boolean  @default(true)
-  shopName  String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)
-  shopOpen  Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  bizType       String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
+  vatRate       Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
+  isActive      Boolean  @default(true)
+  shopName      String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)
+  shopOpen      Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
   shopPromptPay String? // เบอร์ PromptPay (08x…) หรือเลขบัตร 13 หลัก สำหรับรับชำระหน้าร้าน
-  taxId     String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
-  address   String? // ที่อยู่ร้าน — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
-  ownerId   String   @db.Uuid // ผู้สร้างธุรกิจ (User)
-  createdAt DateTime @default(now()) @db.Timestamptz
-  updatedAt DateTime @updatedAt @db.Timestamptz
+  taxId         String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
+  address       String? // ที่อยู่ร้าน — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
+  ownerId       String   @db.Uuid // ผู้สร้างธุรกิจ (User)
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  updatedAt     DateTime @updatedAt @db.Timestamptz
 
   owner          User                    @relation("BusinessOwner", fields: [ownerId], references: [id])
   members        BusinessMember[]
@@ -1931,6 +1933,7 @@ model BusinessCustomer {
 
   business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   orders   BusinessOrder[]
+  soldLots ProductLot[]    @relation("productLotsSold")
 
   @@index([businessId, phone])
   @@map("business_customers")
@@ -2085,4 +2088,44 @@ model BusinessAgent {
 
   @@unique([businessId, key])
   @@map("business_agents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRACEABILITY — รหัสล็อตผลผลิต + เหตุการณ์ตามรอย (Farm → Inventory → Shop)
+// เก็บเกี่ยว = สร้าง lot · ยืนยันออเดอร์ = SOLD · ส่งของ = DELIVERED · ยกเลิก = RESTOCKED
+// ─────────────────────────────────────────────────────────────────────────────
+model ProductLot {
+  id              String    @id @default(uuid()) @db.Uuid
+  lotCode         String    @unique // รหัสล็อต — QR/สแกนได้ เช่น LOT-A1B2C3-4
+  inventoryItemId String?   @db.Uuid // ผูกวัตถุดิบในคลัง (InventoryItem)
+  plotId          String?   @db.Uuid // แปลงต้นทาง (FarmPlot)
+  crop            String? // พืชที่ปลูก เช่น "มะเขือเทศ"
+  quantityKg      Float     @default(0)
+  harvestedAt     DateTime  @default(now()) @db.Timestamptz // วันที่เก็บเกี่ยว
+  soldCustomerId  String?   @db.Uuid // ลูกค้าผู้ซื้อ (BusinessCustomer) — null = ยังไม่ขาย
+  soldAt          DateTime? @db.Timestamptz
+  createdAt       DateTime  @default(now()) @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @db.Timestamptz
+
+  inventoryItem InventoryItem?    @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  plot          FarmPlot?         @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  soldCustomer  BusinessCustomer? @relation("productLotsSold", fields: [soldCustomerId], references: [id], onDelete: SetNull)
+  events        TraceEvent[]
+
+  @@index([inventoryItemId])
+  @@index([plotId])
+  @@map("product_lots")
+}
+
+model TraceEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  lotId     String   @db.Uuid
+  type      String // HARVESTED | PROCESSED | TESTED | SOLD | DELIVERED | RESTOCKED | NOTE
+  detail    String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  lot ProductLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([lotId])
+  @@map("trace_events")
 }
