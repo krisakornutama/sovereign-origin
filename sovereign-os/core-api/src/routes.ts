@@ -1,5 +1,7 @@
 import type { Express } from 'express';
 import { config } from './config';
+import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
+import { prisma } from './lib/prisma';
 import authRoutes from './modules/auth/auth.routes';
 import nodeRoutes from './modules/nodes/node.routes';
 import deviceRoutes from './modules/devices/device.routes';
@@ -130,10 +132,40 @@ export function mountRoutes(app: Express): void {
   app.use('/api/notes', featureGuard('/ai-agent'), notesRoutes); // Note — ปุ่มโน้ต
   app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
   app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);
-  app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON
-  // Health check — Public (ไม่ต้อง auth) — frontend hook ใช้ poll endpoint นี้
+  app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON  // Health check — Public (ไม่ต้อง auth) — frontend hook ใช้ poll endpoint นี้
   // (ต้องอยู่ก่อน mount health module: featureGuard+authenticate จะ 401 ทุก request ที่ไม่มี token)
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  // สัญญาเดิมคงไว้: { status:'ok' } — เพิ่ม build fingerprint + db migrationHead (ความจริงว่า
+  // "prod รันโค้ดชุดไหน" ใช้โดย tools/prod-truth.mjs) · fingerprint แคช background ไม่ชาร์จทุก poll
+  let healthExtras: Promise<object> | null = null;
+  const healthExtrasLazy = () => {
+    if (!healthExtras) {
+      healthExtras = (async () => {
+        const [fp, migrationHead] = await Promise.all([
+          getSelfFingerprint(),
+          prisma
+            .$queryRawUnsafe<Array<{ migration_name: string }>>(
+              'SELECT migration_name FROM "_prisma_migrations" ORDER BY migration_name DESC LIMIT 1'
+            )
+            .catch(() => null as Array<{ migration_name: string }> | null),
+        ]);
+        return {
+          build: { fingerprint: fp.fingerprint, files: fp.files, loadedDir: getLoadedCodeDirLabel() },
+          db: { migrationHead: migrationHead?.[0]?.migration_name ?? null },
+        };
+      })();
+      // ล้ม = รีเซ็ตให้ลองใหม่ request ถัดไป (เช่น DB ยังบูตไม่เสร็จ)
+      healthExtras.catch(() => { healthExtras = null; });
+    }
+    return healthExtras;
+  };
+  app.get('/api/health', async (_req, res) => {
+    try {
+      const extras = await healthExtrasLazy();
+      res.json({ status: 'ok', ...extras });
+    } catch {
+      res.json({ status: 'ok' }); // enrich ล้ม = ยอมรับเฉย ๆ — สัญญา status:'ok' ต้องไม่พัง
+    }
+  });
   app.use('/api/health', featureGuard('/health'), healthRoutes); // Phase 5: Health Screening
   app.use('/api/health/readings', featureGuard('/health'), healthReadingsRoutes); // P6: Health Reading Tracker + AI trend
   app.use('/api/infrastructure', featureGuard('/infrastructure'), infrastructureRoutes); // Phase 5: Off-Grid Infrastructure Hub

@@ -15,6 +15,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
     locale: 'th-TH',
+    // ใช้ Chrome ที่ติดตั้งในเครื่อง (channel) — เลี่ยงดาวน์โหลด browser binary ทั้งชุด
+    // (เคสจริง 23-09-26: playwright install ล้ม/ช้า + กติกาโปรเจ็กไม่กินพื้นที่ C:)
+    channel: 'chrome',
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/, timeout: 180_000 },

@@ -1,0 +1,24 @@
+# โมดูล farm — แปลง/ดิน/เก็บเกี่ยว/ที่ปรึกษา
+
+## เจตนา
+จัดการแปลงปลูก: ข้อมูลแปลง+geometry ผลวิเคราะห์ดิน การใส่ปุ๋ย การเก็บเกี่ยว (ผัก/สมุนไพร) พร้อมคำแนะนำจาก advisor
+
+## ตารางที่เป็นเจ้าของ
+- `farm_plots` — แปลง (ชื่อ, พืช, geometry, สถานะ)
+- `farm_soil_readings` — ผลตรวจดิน (pH, N-P-K ฯลฯ)
+- `fertilizer_applications` — การใส่ปุ๋ยต่อแปลง
+- `herb_beds` — แปลงสมุนไพร
+
+## Endpoints หลัก (mounted ที่ `/api/farm`)
+- แปลง: `GET /` · `POST /` · `PUT /:id` · `DELETE /:id` · `PUT /:id/geometry`
+- ดิน: `POST|GET /:id/soil-readings` · `POST /:id/apply-fertilizer`
+- เก็บเกี่ยว: `POST /:id/harvest` · `POST /:id/herb-harvest`
+- วิเคราะห์: `GET /overview` · `GET /:id/advisor` · `GET /:id/analysis` · `GET /map.svg`
+
+## กลไกสำคัญ
+- `POST /:id/harvest` สร้าง product_lot ผ่าน trace.service → ล็อตเกิดจากแปลงจริง (เชื่อม farm↔trace ตามกติกาข้ามโมดูลที่ประกาศไว้)
+- Services: farm-advisor / farm-map / farm-soil · advisor.service (alias ใน module-owners = farm)
+
+## ห้ามแตะ / ระวัง
+- `harvest` สร้างข้อมูลในโมดูล trace — แก้ schema ตาราง `product_lots` ต้องรีวิว farm ด้วย
+- `map.svg` เรนเดอร์ geometry จริง — เปลี่ยน format geometry กระทบ frontend map
