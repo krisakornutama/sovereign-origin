@@ -9,7 +9,8 @@ setup('authenticate as e2e-bot', async ({ page }) => {
   await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_BOT_PASS ?? '');
   await page.locator('button[type="submit"]').click();
   // รอ redirect ไป dashboard - เพิ่ม timeout ให้พอ
-  await page.waitForURL('**/dashboard', { timeout: 120_000 });
+  // trailingSlash เปิดอยู่ → redirect ได้ทั้ง /dashboard และ /dashboard/
+  await page.waitForURL(/\/dashboard\/?$/, { timeout: 120_000 });
   // รอให้หน้าโหลดเสร็จ
   await page.waitForLoadState('networkidle', { timeout: 30_000 });
   await expect(page).toHaveURL(/dashboard/);
