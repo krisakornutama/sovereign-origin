@@ -14,8 +14,8 @@ import { test, expect } from '@playwright/test';
 test('community → เห็นร้าน opt-in + สินค้า กดสินค้าไปหน้าร้านต้นทาง', async ({ page }) => {
   await page.goto('/community');
 
-  // หัวหน้า catalog + ร้านที่ seed (opt-in เข้าชุมชน)
-  await expect(page.getByText('Catalog กลางชุมชน')).toBeVisible({ timeout: 20_000 });
+  // หัวหน้า catalog (ใช้ role — ข้อความเดียวกันโชว์ซ้ำใน badge เล็ก)
+  await expect(page.getByRole('heading', { name: 'Catalog กลางชุมชน' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('ร้านผักสดตามรอย')).toBeVisible();
 
   // สินค้าที่ seed โชว์ใน catalog พร้อมราคาขาย
@@ -26,7 +26,8 @@ test('community → เห็นร้าน opt-in + สินค้า กด�
 
   // กดสินค้า → ไปหน้าร้านต้นทาง (ผู้ใช้จริงต้องซื้อต่อที่ร้าน)
   await tomato.click();
-  await page.waitForURL(/\/shop\?id=/);
+  // trailingSlash เปิดอยู่ → URL จริงคือ /shop/?id=...
+  await page.waitForURL(/\/shop\/?\?id=/);
 
   // หน้าร้านโหลดข้อมูลจริงจาก API สาธารณะ
   await expect(page.getByText('ร้านผักสดตามรอย')).toBeVisible({ timeout: 20_000 });
@@ -47,11 +48,11 @@ test('trace → พิมพ์รหัสล็อต เห็นไทม์
   await expect(page.getByText('LOT-T4ST2H')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('แปลงมะเขือเทศโซน A').first()).toBeVisible();
 
-  // ไทม์ไลน์ครบ 3 เหตุการณ์ตาม seed (chip ต้อง exact กันชนกับข้อความรายละเอียด)
+  // ไทม์ไลน์ครบ 3 เหตุการณ์ตาม seed (chip ชื่อเดียวกับป้ายสถานะในการ์ด → ใช้ .first())
   await expect(page.getByText('ไทม์ไลน์ตามรอย')).toBeVisible();
-  await expect(page.getByText('เก็บเกี่ยว', { exact: true })).toHaveCount(1);
-  await expect(page.getByText('แปรรูป/ทำอาหาร', { exact: true })).toHaveCount(1);
-  await expect(page.getByText('ตรวจคุณภาพ', { exact: true })).toHaveCount(1);
+  await expect(page.getByText('เก็บเกี่ยว', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('แปรรูป/ทำอาหาร', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('ตรวจคุณภาพ', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('ตรวจคุณภาพ: ไม่พบสารฆ่าแมลงตกค้าง — ผ่านเกณฑ์')).toBeVisible();
 
   // URL sync เพื่อให้ QR ติดสินค้าเปิดกลับมาที่ล็อตเดิมได้
