@@ -237,11 +237,48 @@ function checkModuleBoundary() {
   reports.push(`module-boundary: ผ่าน (เส้นข้ามที่ยอมรับแล้ว ${keys.length}/${Object.keys(baseline).length} · สแกน ${scanCount} ไฟล์${cleaned})`);
 }
 
+// ── 5) tool-files-tracked (เฟส 4): เครื่องมือที่ verify อ้างอิง ต้องถูก git track เสมอ ──
+// เคสจริง 24/9: `tools/*` เป็น ignore-whitelist แต่ frontend-gate.mjs + baseline + nightly
+// ทั้งชุด "สร้างแล้ว ใช้ได้จริง" แต่ไม่เคยถูก track — clone ใหม่/CI จะไม่มีด่านพวกนี้เลย
+// ตรวจ: ไฟล์ .mjs/.json/.ps1 ใน tools/ ที่ถูก import/อ้างอิงจาก verify.mjs + เกตทั้งหมด → ต้องอยู่ใน git index
+function checkToolFilesTracked() {
+  const TOOLS = join(ROOT, 'tools');
+  // เก็บชื่อไฟล์ที่ถูกอ้างอิงจากจุดเรียกหลัก (verify.mjs และเกต 2 ตัว + runner/report)
+  const referenced = new Set(['arch-gate.mjs', 'frontend-gate.mjs', 'prod-truth.mjs', 'verify.mjs']);
+  for (const f of ['verify.mjs', 'arch-gate.mjs', 'frontend-gate.mjs']) {
+    const p = join(TOOLS, f);
+    if (!existsSync(p)) continue;
+    const text = readFileSync(p, 'utf8');
+    for (const m of text.matchAll(/['"\(]([A-Za-z0-9._-]+\.(?:mjs|json|ps1))['"\)]/g)) {
+      if (existsSync(join(TOOLS, m[1]))) referenced.add(m[1]); // อ้างถึงของจริงใน tools/ เท่านั้น
+    }
+  }
+  let tracked;
+  try {
+    tracked = new Set(execSync('git ls-files tools/', { cwd: ROOT, encoding: 'utf8', timeout: 15_000 })
+      .split('\n').map((l) => l.trim()).filter(Boolean).map((p) => p.replace(/^tools\//, '')));
+  } catch {
+    reports.push('tool-files-tracked: ข้าม (git ไม่ตอบ)');
+    return;
+  }
+  const missing = [...referenced].filter((f) => !tracked.has(f) && !f.startsWith('test/'));
+  if (missing.length) {
+    problems.push(
+      `tool-files-tracked: เครื่องมือที่ verify อ้างอิงไม่ถูก git track ${missing.length} ไฟล์:\n` +
+        missing.map((f) => `   ✗ tools/${f}`).join('\n') +
+        `\n   → .gitignore ใน repo นี้เป็น whitelist (tools/*) — เพิ่ม '!tools/<ไฟล์>' แล้ว git add ให้ครบ`
+    );
+    return;
+  }
+  reports.push(`tool-files-tracked: ผ่าน (เครื่องมือที่อ้างอิง ${referenced.size} ไฟล์อยู่ใน git ครบ)`);
+}
+
 const results = [];
 checkSchemaSync();
 checkFileBudget();
 await checkEnvTruth(); // top-level await (ESM) — ต้องรอ ไม่งั้น report/fail หลุดไปหลัง print
 checkModuleBoundary();
+checkToolFilesTracked();
 
 console.log('═══ Architecture Gate ═══');
 for (const r of reports) console.log('  · ' + r);

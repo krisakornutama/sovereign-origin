@@ -47,6 +47,18 @@ if (existsSync(LOCK)) {
 writeFileSync(LOCK, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
 
 const t0 = Date.now();
+
+// ── Phase 4: ตรวจสุขภาพเครื่องจริงก่อนรัน — แจ้งเตือนก่อน verify จะพังเพราะสภาพแวดล้อม ──
+// (แรมต่ำ → OOM exit 134 · ดิสก์เต็ม → build พัง · docker ล่ม → เทส/e2e ล้มหรือถูกข้าม)
+let machine = { ok: true, problems: [], info: {} };
+try {
+  const mh = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], { cwd: REPO, encoding: 'utf8', timeout: 90_000, shell: true });
+  machine = JSON.parse((mh.stdout || '{}').trim());
+} catch { /* soft-fail — ตรวจไม่ได้ก็ยังรัน verify ต่อ */ }
+for (const p of machine.problems ?? []) {
+  console.log(`⚠️ เครื่อง [${p.level}] ${p.area}: ${p.message}`);
+}
+
 let ok = false;
 try {
   // สภาพแวดล้อม: ใช้ DATABASE_URL ที่ .env มีอยู่แล้ว (verify จัดการเอง) — รันผ่าน npm เหมือนมือ
@@ -83,8 +95,29 @@ const status = {
   codeMatch,
   migrationHead,
   steps: truth.steps ?? [],
+  machine: { ok: machine.ok, problems: machine.problems ?? [], ramFreeGB: machine.info?.ramFreeGB ?? null, diskFreeGB: machine.info?.diskFreeGB ?? null, containers: machine.info?.containers ?? null },
 };
 writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
+
+// ── Phase 4: history 30 วัน — ให้ /system-health วาดกราฟแนวโน้ม (ตามวันที่ รันซ้อน = แทนที่) ──
+try {
+  const histPath = join(REPO, 'sovereign-os', 'core-api', 'data', 'nightly-history.json');
+  let hist = [];
+  try { hist = JSON.parse(readFileSync(histPath, 'utf8')); } catch { /* ยังไม่มี */ }
+  const day = status.finishedAt.slice(0, 10);
+  const entry = {
+    day,
+    ok: status.ok,
+    durationMin: status.durationMin,
+    lastGateOk: status.lastGateOk,
+    codeMatch: status.codeMatch,
+    machineOk: status.machine?.ok ?? null,
+  };
+  hist = Array.isArray(hist) ? hist.filter((e) => e.day !== day) : [];
+  hist.push(entry);
+  while (hist.length > 30) hist.shift(); // เก็บ 30 วันล่าสุด
+  writeFileSync(histPath, JSON.stringify(hist, null, 2) + '\n');
+} catch { /* soft-fail — history พังไม่กระทบ nightly */ }
 try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 
 // ── สรุป Telegram (สคริปต์แยก — soft-fail) — เก็บ output ไว้พิสูจน์เสมอ (ส่ง/skip/พลาด) ──

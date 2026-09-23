@@ -184,7 +184,7 @@ export function mountRoutes(app: Express): void {
   // Public เหมือน /api/health (ไม่มี token ก็ดูสุขภาพความจริงได้) — ไม่เปิดเผยความลับใด ๆ
   app.get('/api/health/truth', async (_req, res) => {
     try {
-      const [fp, migrationHead, gateRaw] = await Promise.all([
+      const [fp, migrationHead, gateRaw, nightlyHist] = await Promise.all([
         getSelfFingerprint(),
         prisma
           .$queryRawUnsafe<Array<{ migration_name: string }>>(
@@ -192,6 +192,7 @@ export function mountRoutes(app: Express): void {
           )
           .catch(() => null as Array<{ migration_name: string }> | null),
       readJsonIfExists(join(process.cwd(), 'data', 'system-truth.json')).catch(() => null),
+      readJsonIfExists(join(process.cwd(), 'data', 'nightly-history.json')).catch(() => null),
       ]);
       const gate = gateRaw as {
         writtenAt?: string; steps?: Array<{ name?: string; ok?: boolean; skipped?: boolean }>;
@@ -208,6 +209,8 @@ export function mountRoutes(app: Express): void {
           : null,
         disk: gate?.prodTruth ? { fingerprint: diskFp, files: gate.prodTruth.diskFiles ?? null, dir: gate.prodTruth.diskDir ?? null } : null,
         codeMatch: diskFp ? diskFp === runtimeFp : null, // null = ยังไม่มีข้อมูลเทียบ (verify ยังไม่เคยรันบนเครื่องนี้)
+        // Phase 4: แนวโน้มผล verify ย้อน 30 วันจาก nightly (ok/duration/machine — ตามวันที่)
+        nightlyHistory: Array.isArray(nightlyHist) ? (nightlyHist as Array<Record<string, unknown>>) : null,
       });
     } catch {
       res.status(503).json({ error: 'truth unavailable' });
