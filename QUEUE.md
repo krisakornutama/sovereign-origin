@@ -33,6 +33,10 @@
   - restaurant `th/en/pages/restaurant.ts` ครบแล้ว (POS/admin/kitchen/reports) — เติม `th/en/common` ที่ขาด, E2E ใหม่ตรวจ `/selfreliance` `/restaurant*` `/crisis` `/skills` `/system` render + ไม่ `Application error`
 - [x] Self-Learning D — Data Lake + Engine พื้นฐาน — **เสร็จแล้ว 29/8/69 04:00** (`prisma LearningSnapshot/Prediction/ModelState` + `data-lake.service` + `learning-engine.service` qwen3:8b/heuristic + `learning.routes` 8 endpoints + `/learning` 51 routes)
   - ทดสอบสด: `POST /api/learning/collect` `4` snapshots (sensor/farm/health/inventory), `POST /predict sensor` `heuristic risk 0.8`, `POST /predictions/:id/evaluate` `accuracy 100%` → `GET /models` ขึ้นแล้ว — cron nightly พร้อม (เรียก `nightlyLearn` ได้)
+- [x] Traceability เฟส 1+2 — **เสร็จแล้ว 23/9/69** (`bb67c32` — merge เข้า main แล้ว)
+  - ล็อตผลผลิต ProductLot/TraceEvent Farm→Inventory→Shop (เฟส 1) + หน้า /trace (พิมพ์/สแกนรหัส → ไทม์ไลน์ + QR generator), ร้านอาหารปิดบิลบันทึก CONSUMED/PROCESSED กลับเข้าล็อต (FIFO), API ล็อตต่อ orderLine ในหน้าออเดอร์ธุรกิจ (เฟส 2)
+- [x] Energy เต็มรูป — **เสร็จแล้ว 23/9/69** (ตาราง energy_readings + energy_thresholds + Telegram เตือนเมื่อเกินเพดาน)
+  - ingest จาก MQTT (เมตริกพลังงานลงตารางเอง best-effort) + POST /readings ใส่มือ · เพดานต่อ global/node/device (หน้าต่างเฉลี่ยได้) · เกินเพดานยิง Telegram ผ่าน pipeline เดิม (dedup 5 นาที) · /summary อ่านตารางใหม่ก่อน fallback sensor_telemetry · เทส 9/9
 
 ---
 

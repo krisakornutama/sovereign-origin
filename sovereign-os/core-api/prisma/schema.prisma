@@ -148,6 +148,37 @@ model SensorTelemetry {
   @@ignore
 }
 
+// ── Energy เต็มรูป — ค่าวัดพลังงานต่อเนื่อง (จาก sensor/MQTT ingest) ──
+// ตารางเสริมของ sensor_telemetry: เก็บเฉพาะเมตริกพลังงาน เพื่อ query ต่ออุปกรณ์/แปลงได้เร็ว
+model EnergyReading {
+  id        String   @id @default(uuid()) @db.Uuid
+  node_id   String   @db.Uuid
+  device_id String
+  metric    String // power_kw | energy_kwh | battery_soc (รายชื่อใน ENERGY_METRICS)
+  value     Float
+  read_at   DateTime @db.Timestamptz(6) // เวลาที่เซนเซอร์รายงาน
+
+  @@index([node_id, device_id, metric, read_at])
+  @@map("energy_readings")
+}
+
+// เพดานการใช้พลังงานต่อช่วงเวลา — เกินแล้วเตือน Telegram
+// scope: "global" = ทั้งระบบ · "node" = ต่อ node_id · "device" = ต่ออุปกรณ์ (ตั้งชื่อ device เป็นชื่อแปลงได้)
+model EnergyThreshold {
+  id        String   @id @default(uuid()) @db.Uuid
+  scope     String // global | node | device
+  scopeName String // uuid ของ node / device id / "*" สำหรับ global
+  metric    String   @default("power_kw")
+  maxKw     Float // เพดานกำลังไฟเฉลี่ย (kW) ในหน้าต่างเวลา
+  windowMin Int      @default(60) // หน้าต่างเฉลี่ย (นาที)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([scope, scopeName, metric])
+  @@map("energy_thresholds")
+}
+
 enum AssetType {
   CRYPTO
   STOCK

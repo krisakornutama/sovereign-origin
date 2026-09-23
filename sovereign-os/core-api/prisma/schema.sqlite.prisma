@@ -133,6 +133,34 @@ model SensorTelemetry {
   
 }
 
+// ── Energy เต็มรูป — ค่าวัดพลังงานต่อเนื่อง + เพดานการใช้ (เตือน Telegram เมื่อเกิน) ──
+model EnergyReading {
+  id        String   @id @default(uuid())
+  node_id   String
+  device_id String
+  metric    String // power_kw | energy_kwh | battery_soc
+  value     Float
+  read_at   DateTime
+
+  @@index([node_id, device_id, metric, read_at])
+  @@map("energy_readings")
+}
+
+model EnergyThreshold {
+  id        String   @id @default(uuid())
+  scope     String // global | node | device
+  scopeName String // uuid ของ node / device id / "*" สำหรับ global
+  metric    String   @default("power_kw")
+  maxKw     Float
+  windowMin Int      @default(60)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope, scopeName, metric])
+  @@map("energy_thresholds")
+}
+
 
 model AssetPosition {
   id                          String    @id @default(uuid())

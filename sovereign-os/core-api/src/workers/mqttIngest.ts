@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { firstResponder } from '../services/first-responder.service';
 import { relayGuard } from '../services/relay-guard.service';
 import { telemetryBuffer, TELEMETRY_FLUSH_MS } from '../services/telemetry-buffer.service';
+import { isEnergyMetric, ingestReading } from '../services/energy.service';
 
 const telemetryPool = new Pool({
   host: process.env.TIMESCALE_HOST || 'localhost',
@@ -144,6 +145,12 @@ export class MqttIngestionWorker {
 
     const { nodeId, category } = parsed;
     telemetryBuffer.add(nodeId, category, value); // ข้อ 4: ลง buffer ก่อน (flush 1 นาที)
+
+    // ENERGY เต็มรูป — เมตริกพลังงานลง energy_readings ทันที (best-effort ไม่กระทบสายหลัก)
+    if (isEnergyMetric(category)) {
+      ingestReading({ node_id: nodeId, device_id: 'mqtt-auto', metric: category, value })
+        .catch((e) => console.error('energy ingest failed:', e?.message ?? e));
+    }
 
     systemEvents.emit('telemetry_update', {
       node_id: nodeId,
