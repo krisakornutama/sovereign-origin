@@ -177,6 +177,14 @@ async function runStep(step) {
     await new Promise((res) => setTimeout(res, 20_000));
     r = run();
   }
+  // Flake guard: เทสชุดใหญ่ (1249 เคส) บางครั้งโหลดชนกับ build อีกสาย → fail แบบไม่มี message
+  // (เคสจริง: featureGrants 23/9, treasuryApi 24/9 — รันซ้ำเดี่ยวผ่านทั้งคู่ · ตอน nightly โหลดหนักพิเศษ)
+  // กติกา: ขั้น test พัง → พัก 15 วิ รันใหม่ 1 ครั้ง — เทสจริงพัง = ล้ม 2 ครั้งติด ไม่ใช่การโกงเกต
+  if (r.status !== 0 && /test/.test(step.name)) {
+    console.log(`   ${step.name}: พัง (exit ${r.status}) → flake guard: พัก 15 วิ รันใหม่ 1 ครั้ง (เทสจริงพังต้องล้ม 2 ครั้งติด)`);
+    await new Promise((res) => setTimeout(res, 15_000));
+    r = run();
+  }
   return r;
 }
 
