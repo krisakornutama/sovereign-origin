@@ -11,6 +11,7 @@
 //   3) env-truth        — DATABASE_URL ใน .env ต้องชี้ DB ที่ connect ได้จริง
 //                         (เคสจริง: ชี้ sovereign_v2 ที่ไม่มีอยู่ — ทุก tool เจอ P1003)
 //   4) module-boundary  — บังคับจริง (เฟส 1): โมดูลแตะตารางของโมดูลอื่นผ่าน prisma.<model>
+//                         **หรือ raw SQL ($queryRawUnsafe/$executeRawUnsafe — เฟส 3)**
 //                         เทียบกับ tools/boundary-baseline.json (สแกนรอบแรก = baseline)
 //                         · เส้นข้ามที่อยู่ใน baseline แล้ว = ผ่าน (ของเดิม ไม่ย้อนหลัง)
 //                         · เส้นข้าม “ใหม่” ที่ไม่เคยมีใน baseline = FAIL — แก้/ขอเพิ่ม baseline ชัด ๆ
@@ -178,6 +179,18 @@ function checkModuleBoundary() {
         if (owner === module) continue; // เจ้าของแตะของตัวเอง = ถูกต้อง
         const key = `${module} → ${owner}(${table})`;
         hits[key] = (hits[key] || 0) + 1;
+      }
+      // เฟส 3: raw SQL ($queryRawUnsafe/$executeRawUnsafe) — ดึงชื่อตารางจากคำสั่ง SQL
+      // (เคสจริง: sensor_telemetry เขียนด้วย raw SQL จาก 5 จุด — prisma-delegate scan มองไม่เห็น)
+      // [^(]* กิน generic ที่มี > ซ้อน (เช่น <Array<any>>) · (['"`]) รับทั้ง backtick/quote
+      for (const rm of text.matchAll(/\$(?:queryRawUnsafe|executeRawUnsafe)[^(]*\(\s*([`"'])([\s\S]*?)\1/g)) {
+        for (const tm of rm[2].matchAll(/\b(?:from|join|into|update)\s+"?([a-z_][a-z0-9_]*)"?/gi)) {
+          const table = tm[1];
+          const owner = owners[table];
+          if (!owner || shared.has(table) || owner === module) continue;
+          const key = `${module} → ${owner}(${table})`;
+          hits[key] = (hits[key] || 0) + 1;
+        }
       }
     }
   };
