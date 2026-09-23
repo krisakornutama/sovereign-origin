@@ -3,7 +3,12 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
-- **งาน:** ENERGY เต็มรูป — ระบบวัดพลังงานโรงงาน/บ้านเล็ก (23/9/69) · สาขา: ai/energy-full → main (merge fast-forward แล้ว)
+- **งาน:** เฟส 3 FARM ADVISOR — แนะนำการปลูก + คาดการณ์ผลผลิตต่อแปลง (23/9/69) · สาขา: ai/farm-advisor → main
+  - **กฎเหล็ก:** heuristic deterministic ตอบได้เสมอ — ไม่มีเงื่อนไขไหนพึ่ง LLM ล้วน ๆ · Ollama (qwen3 ผ่าน ai-router) เป็นตัวเรียบเรียงเพิ่มเฉพาะ ?ai=1 (timeout 20 วิ ตั้ง FARM_ADVISOR_TIMEOUT_MS ได้ + fallback กลับ heuristic ทันทีเมื่อล้ม/ช้า) — ทุกคำตอบมี source ชัดเจน heuristic|ollama ไม่หลอกผู้ใช้
+  - **backend:** `farm-advisor.service.ts` — คะแนนดินต่อพืชจาก analyzeSoil เดิม (18 พืชใน CROP_IDEALS) + บูสต์ +5 ถ้าเคยเก็บเกี่ยวจริง · กก./ตร.ม. ไล่จากประวัติแปลงตัวเอง → ประวัติแปลงอื่น (ProductLot × area_sqm) → baseline เกษตรไทย · endpoint GET /api/farm/plots/:id/advisor (?top=n, ?ai=1) · ไม่มี migration (อ่านตารางที่มีอยู่ล้วน)
+  - **frontend:** `PlotAdvisor.tsx` ในการ์ดแปลงของ /farm ถัดจาก SoilAnalyzer — ปุ่มคำนวณ (heuristic) / +AI · โชว์คาดการณ์พืชที่ปลูกอยู่ + top 3 พร้อมที่มาตัวเลข (ประวัติจริง/แปลงอื่น/ค่าประมาณ) · i18n th/en ครบ
+  - **เทส:** `tests/farmAdvisor.test.ts` 7/7 (heuristic ตอบได้เสมอ, ตัวเลขตรงสูตร 55/60/32.5 กก., global-history, จัดอันดับพืชมีหลักฐานก่อนคาดเดา, AI fallback ทั้ง ECONNREFUSED และ throw, 404, DI เส้นทางเดียวกับ advisor เดิม)
+- **งานก่อนหน้า:** ENERGY เต็มรูป — ระบบวัดพลังงานโรงงาน/บ้านเล็ก (23/9/69) · สาขา: ai/energy-full → main (merge fast-forward แล้ว)
   - **ตารางใหม่:** `energy_readings` (ค่าวัดต่อเนื่อง node+device+metric) + `energy_thresholds` (เพดาน global/node/device + หน้าต่างเฉลี่ย) — manual migration `20260923100000_add_energy_full` ตามธรรมเนียม, schema ทั้ง postgres+sqlite
   - **API ใหม่:** POST/GET `/api/energy/readings` (ingest + ประวัติ) · GET/POST/PATCH/DELETE `/api/energy/thresholds` (upsert ตาม scope+scopeName+metric) · POST `/api/energy/check` (ตรวจเพดาน + เตือน) · GET `/summary` เดิมคงพฤติกรรม + เพิ่ม `source` — เขียนสิทธิ์ SUPERADMIN/NODE_ADMIN/OPERATOR ตาม convention
   - **เตือน Telegram ผ่าน pipeline เดิม:** `sendTelegramAlert` (severity warn + eventKey `energy-threshold:<id>` — dedup 5 นาทีกัน sensor flapping ในตัว) — ingest ใหม่ตรวจเพดานทันที + ปุ่มยิงเองผ่าน POST /check สำหรับ cron

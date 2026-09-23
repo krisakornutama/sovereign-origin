@@ -37,6 +37,8 @@
   - ล็อตผลผลิต ProductLot/TraceEvent Farm→Inventory→Shop (เฟส 1) + หน้า /trace (พิมพ์/สแกนรหัส → ไทม์ไลน์ + QR generator), ร้านอาหารปิดบิลบันทึก CONSUMED/PROCESSED กลับเข้าล็อต (FIFO), API ล็อตต่อ orderLine ในหน้าออเดอร์ธุรกิจ (เฟส 2)
 - [x] Energy เต็มรูป — **เสร็จแล้ว 23/9/69** (ตาราง energy_readings + energy_thresholds + Telegram เตือนเมื่อเกินเพดาน)
   - ingest จาก MQTT (เมตริกพลังงานลงตารางเอง best-effort) + POST /readings ใส่มือ · เพดานต่อ global/node/device (หน้าต่างเฉลี่ยได้) · เกินเพดานยิง Telegram ผ่าน pipeline เดิม (dedup 5 นาที) · /summary อ่านตารางใหม่ก่อน fallback sensor_telemetry · เทส 9/9
+- [x] เฟส 3 แนะนำการปลูก + คาดการณ์ผลผลิต — **เสร็จแล้ว 23/9/69** (`farm-advisor.service` + GET /plots/:id/advisor + PlotAdvisor บนหน้า /farm)
+  - กฎเหล็กครบ: heuristic deterministic ตอบได้เสมอ (คะแนนดินจาก analyzeSoil เดิม + ประวัติเก็บเกี่ยวจาก ProductLot) · Ollama เสริมเฉพาะ ?ai=1 (timeout + fallback กลับ heuristic) · ที่มาตัวเลขชัดทุกตัว (ประวัติแปลงตัวเอง → แปลงอื่น → ค่าประมาณ) · source แสดงผู้ใช้ตามจริง · เทส 7/7
 
 ---
 
