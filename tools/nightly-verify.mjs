@@ -52,7 +52,11 @@ const t0 = Date.now();
 // (แรมต่ำ → OOM exit 134 · ดิสก์เต็ม → build พัง · docker ล่ม → เทส/e2e ล้มหรือถูกข้าม)
 let machine = { ok: true, problems: [], info: {} };
 try {
-  const mh = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], { cwd: REPO, encoding: 'utf8', timeout: 90_000, shell: true });
+  const mh = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], {
+    cwd: REPO, encoding: 'utf8', timeout: 90_000,
+    // ห้าม shell:true กับ path absolute ที่มีเว้นวรรค — shell ตัดที่ช่องว่าง → "Cannot find module 'E:\\My'"
+    // (บั๊กแฝงจาก phase4a-c: ยังไม่เคยรันจริงเพราะ commit หลังตี 2 — machine-alert มาพิสูจน์ให้เห็นก่อน)
+  });
   machine = JSON.parse((mh.stdout || '{}').trim());
 } catch { /* soft-fail — ตรวจไม่ได้ก็ยังรัน verify ต่อ */ }
 for (const p of machine.problems ?? []) {
@@ -121,6 +125,6 @@ try {
 try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 
 // ── สรุป Telegram (สคริปต์แยก — soft-fail) — เก็บ output ไว้พิสูจน์เสมอ (ส่ง/skip/พลาด) ──
-const rep = spawnSync('node', [join(REPO, 'tools', 'nightly-report.mjs'), STATUS], { cwd: REPO, encoding: 'utf8', shell: true });
+const rep = spawnSync('node', [join(REPO, 'tools', 'nightly-report.mjs'), STATUS], { cwd: REPO, encoding: 'utf8' });
 writeFileSync(join(LOGDIR, 'report.log'), `${rep.stdout ?? ''}\n${rep.stderr ?? ''}`);
 process.exit(ok ? 0 : 1);
