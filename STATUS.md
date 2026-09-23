@@ -10,6 +10,7 @@
   - **CI**: .github/workflows/arch-gate.yml — รัน arch-gate + fingerprint parity ทุก PR ก่อน merge
   - **หน้า /system-health** (SUPERADMIN): fingerprint runtime vs ดิสก์ · migration head · ผลเกตล่าสุดทุกขั้น · badge "prod รันโค้ดชุดเดียวกับดิสก์ / รันโค้ดเก่า" — ข้อมูลจาก GET /api/health/truth ← data/system-truth.json (verify เขียนทุกรอบ) + เมนู "ความจริงระบบ" ใน Sidebar
   - **fail-safe ผ่านเคสจริง**: CIM query ล่มชั่วขณะทำ classify :3000 ผิด → verify kill prod + wipe .next (เว็บลง) — แก้เป็น 3 สถานะ: dev ชัดเจนเท่านั้นที่โดนกู้ · ไม่รู้ชนิด = ห้ามแตะอะไร
+  - **ผลยืนยันสุดท้าย (23/9/69)**: `npm run verify:full` ผ่าน **7/7 ขั้น** บน main หลัง merge — boundary baseline บังคับจริง · owners 113/117 · parity ตรงทุกไบต์ · e2e ครบรวมทั้ง prod restart อัตโนมัติ
 - **งาน:** PHASE 0 ARCH-HARDENING — กลไกตรวจความจริงของระบบ ไม่ย้ายโค้ดเดิมแม้บรรทัดเดียว (23/9/69) · สาขา: ai/phase0-arch-hardening → main
   - **Architecture Gate** (`tools/arch-gate.mjs` — ด่านแรกของ `npm run verify` ทุกโหมด): schema-sync (postgres↔sqlite ต้องมี model ชุดเดียวกัน) · file-budget (ไฟล์ที่แก้ใน branch เกิน 800 บรรทัด = fail) · env-truth (DATABASE_URL ต้อง connect ได้จริง — เคสจริง .env ชี้ sovereign_v2 ที่ไม่มีอยู่) · module-boundary report (ตาราง→เจ้าของ ตาม tools/module-owners.json)
   - **Prod-Truth Gate** (`tools/prod-truth.mjs` ใน verify:full): /api/health รายงาน build.fingerprint (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด — runtime + tools parity ทุกไบต์) → เทียบกับดิสก์ จบเคส "prod รัน build เก่าเงียบ ๆ" (เคสจริง 21→23 ก.ย.)
