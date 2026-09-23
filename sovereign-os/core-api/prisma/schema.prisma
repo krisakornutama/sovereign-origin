@@ -1888,6 +1888,7 @@ model Business {
   shopName      String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)
   shopOpen      Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
   shopPromptPay String? // เบอร์ PromptPay (08x…) หรือเลขบัตร 13 หลัก สำหรับรับชำระหน้าร้าน
+  shopInCommunity Boolean @default(false) // เฟส 4: รวมร้านนี้เข้า catalog กลางชุมชน /community (ต้อง shopOpen ด้วย)
   taxId         String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
   address       String? // ที่อยู่ร้าน — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
   ownerId       String   @db.Uuid // ผู้สร้างธุรกิจ (User)
@@ -1986,6 +1987,11 @@ model BusinessOrder {
   assignedToId String?  @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
   note         String?
   publicToken  String?  @unique @default(uuid()) // ลิงก์ลับต่อออเดอร์ — ลูกค้าใช้เช็คสถานะ/ชำระเงินที่ /shop โดยไม่ต้อง login
+  // ── เฟส 4: สถานะจัดส่งแบบเบา (ร้านส่งเอง) — เสริมจาก status DELIVERED ไม่แทนที่ ──
+  shippingStatus String? // PREPARING | SHIPPED | DELIVERED (null = ยังไม่เริ่มจัดส่ง)
+  shippingCarrier String? // ชื่อผู้ส่ง/ขนส่ง (เช่น "เจ้าของร้านส่งเอง", Kerry)
+  shippingTracking String? // รหัสติดตาม/หมายเหตุการส่ง (≤120 ตัวอักษร)
+  shippedAt      DateTime? @db.Timestamptz // เวลาที่ตั้งสถานะ SHIPPED
   createdAt    DateTime @default(now()) @db.Timestamptz
   updatedAt    DateTime @updatedAt @db.Timestamptz
 

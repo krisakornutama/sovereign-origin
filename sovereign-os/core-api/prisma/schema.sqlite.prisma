@@ -1839,6 +1839,7 @@ model Business {
   shopName     String?
   shopOpen     Boolean  @default(false)
   shopPromptPay String?
+  shopInCommunity Boolean @default(false)
   taxId       String?
   address     String?
   ownerId      String
@@ -1933,6 +1934,10 @@ model BusinessOrder {
   paidAmount   Float     @default(0)  assignedToId String?
   note         String?
   publicToken  String?  @unique
+  shippingStatus  String?
+  shippingCarrier String?
+  shippingTracking String?
+  shippedAt     DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
