@@ -15,6 +15,15 @@ import Icon from '../components/ui/Icon';
 // ข้อมูลจาก GET /api/health/truth (public) + รอบ verify ที่เขียน data/system-truth.json
 // ────────────────────────────────────────────────────────────────────────────
 
+interface NightlyDay {
+  day: string;
+  ok: boolean;
+  durationMin: number;
+  lastGateOk: boolean | null;
+  codeMatch: boolean | null;
+  machineOk: boolean | null;
+}
+
 interface TruthPayload {
   runtime: { fingerprint: string; files: number; loadedDir: string } | null;
   db: { migrationHead: string | null };
@@ -25,6 +34,7 @@ interface TruthPayload {
   } | null;
   disk: { fingerprint: string | null; files: number | null; dir: string | null } | null;
   codeMatch: boolean | null;
+  nightlyHistory?: NightlyDay[] | null; // Phase 4: แนวโน้ม verify ย้อน 30 วัน
 }
 
 const Fp = ({ value }: { value: string | null | undefined }) => (
@@ -33,12 +43,23 @@ const Fp = ({ value }: { value: string | null | undefined }) => (
   </code>
 );
 
+// Phase 4: สี severity ของ alert (ใช้ร่วมกับ /alert-history)
+const SEV_CLS: Record<string, string> = {
+  critical: 'bg-red-500/15 text-red-300 border-red-500/30',
+  warn: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  info: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+};
+
+interface LatestAlert { id: string; severity: string; title: string; sent: boolean; suppressed: string | null; createdAt: string }
+
 export default function SystemHealthPage() {
   const user = useAuthStore((s) => s.user);
   const t = useLanguageStore((s) => s.t);
   const [data, setData] = useState<TruthPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Phase 4: alert ล่าสุด (โหลดเงียบ ๆ — 401/พัง = แสดง placeholder ไม่โชว์ error แดง)
+  const [latestAlerts, setLatestAlerts] = useState<{ events: LatestAlert[]; error: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +79,20 @@ export default function SystemHealthPage() {
     const iv = setInterval(load, 30_000); // รีเฟรชเบา ๆ ทุก 30 วิ
     return () => clearInterval(iv);
   }, [load]);
+
+  // alert ล่าสุด 5 รายการ (soft-fail: ยังไม่ล็อกอิน/401 = ซ่อน)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authFetch('/api/telegram/alerts?limit=5');
+        if (!res.ok) throw new Error(String(res.status));
+        const j = await res.json();
+        setLatestAlerts({ events: j.events ?? [], error: false });
+      } catch {
+        setLatestAlerts({ events: [], error: true });
+      }
+    })();
+  }, []);
 
   if (!roleIsSuperadmin(user?.role)) {
     return (
@@ -157,8 +192,56 @@ export default function SystemHealthPage() {
                 </section>
               </div>
 
+              {/* Phase 4: แนวโน้ม verify ย้อน 30 วัน — เห็นความเสถียรของระบบในหน้าเดียว */}
+              {data.nightlyHistory && data.nightlyHistory.length > 0 && (
+                <section className="rounded-xl border border-gray-800 bg-gray-900/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">{t('systemHealth.trendSection', 'แนวโน้ม verify ย้อน 30 วัน')}</h2>
+                    <span className="text-xs text-gray-500">{data.nightlyHistory.filter((d) => d.ok).length}/{data.nightlyHistory.length} {t('systemHealth.trendOk', 'คืนที่ผ่าน')}</span>
+                  </div>
+                  {/* แถบวันต่อวัน: เขียว = verify ผ่าน · แดง = พัง · เทา = machine warn (ok แต่สภาพแวดล้อมเสี่ยง) · ช่องว่าง = ไม่มีข้อมูล */}
+                  <div className="flex gap-1 flex-wrap">
+                    {data.nightlyHistory.map((d) => (
+                      <div key={d.day} title={`${d.day} · ${d.ok ? 'ผ่าน' : 'พัง'} · ${d.durationMin} นาที${d.machineOk === false ? ' · เครื่องมีปัญหา' : ''}`}
+                        className={`w-5 h-8 rounded-sm border ${d.ok ? 'bg-emerald-500/40 border-emerald-500/50' : 'bg-red-500/50 border-red-500/60'} ${d.machineOk === false ? 'opacity-40' : ''}`} />
+                    ))}
+                  </div>
+                  <div className="flex gap-4 text-[11px] text-gray-500">
+                    <span>■ {t('systemHealth.trendOk', 'ผ่าน')}</span>
+                    <span>■ {t('systemHealth.trendFail', 'พัง')}</span>
+                    <span>{t('systemHealth.trendMachine', 'โปร่งใส = ผ่านแต่เครื่องมีปัญหา (ดิสก์/แรม)')}</span>
+                  </div>
+                </section>
+              )}
+
+              {/* Phase 4: alert ล่าสุด — สรุปจากตาราง alert_events (รายละเอียดเต็มที่ /alert-history) */}
+              {latestAlerts && (
+                <section className="rounded-xl border border-gray-800 bg-gray-900/60 p-5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">{t('systemHealth.alertsSection', 'แจ้งเตือนล่าสุด')}</h2>
+                    <a href="/alert-history" className="text-xs text-cyan-300 hover:underline">{t('systemHealth.seeAllAlerts', 'ดูทั้งหมด →')}</a>
+                  </div>
+                  {latestAlerts.error ? (
+                    <div className="text-xs text-gray-500">{t('systemHealth.alertsNeedLogin', 'ล็อกอิน SUPERADMIN เพื่อดูประวัติแจ้งเตือน')}</div>
+                  ) : latestAlerts.events.length === 0 ? (
+                    <div className="text-xs text-gray-500">{t('systemHealth.noAlerts', 'ไม่มี alert — ระบบเงียบสงบ')}</div>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {latestAlerts.events.slice(0, 5).map((ev) => (
+                        <li key={ev.id} className="flex items-center gap-2 text-sm">
+                          <span className={`px-1.5 py-0.5 rounded border text-[10px] ${SEV_CLS[ev.severity] ?? SEV_CLS.info}`}>{ev.severity}</span>
+                          <span className="text-gray-300 truncate max-w-md">{ev.title}</span>
+                          {!ev.sent && <span className="text-[10px] text-gray-500">({t('systemHealth.alertSuppressed', 'ยับ')}: {ev.suppressed ?? '—'})</span>}
+                          <span className="ml-auto text-[10px] text-gray-500 whitespace-nowrap">{new Date(ev.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+
               <div className="text-[11px] text-gray-600">
-                {t('systemHealth.source', 'ที่มา')}: GET /api/health/truth ← data/system-truth.json (เขียนโดย tools/verify.mjs ทุกรอบ) · รีเฟรชอัตโนมัติ 30 วิ
+                {t('systemHealth.source', 'ที่มา')}: GET /api/health/truth ← data/system-truth.json + nightly-history.json (เขียนโดย tools/verify.mjs และ nightly runner) · รีเฟรชอัตโนมัติ 30 วิ
               </div>
             </>
           )}

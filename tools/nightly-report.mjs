@@ -30,7 +30,11 @@ const code = s.codeMatch === true ? 'ตรง' : s.codeMatch === false ? '⚠�
 const text =
   `${icon} <b>Nightly Verify ${ok ? 'ผ่าน' : 'ไม่ผ่าน'}</b>${dur}\n` +
   `เกตล่าสุด: ${gate} · fingerprint: ${code}\n` +
-  `migration head: <code>${s.migrationHead ?? '—'}</code>${failedLine}`;
+  `migration head: <code>${s.migrationHead ?? '—'}</code>${failedLine}` +
+  // Phase 4: สุขภาพเครื่อง — ปัญหาที่ตรวจก่อนรัน (รู้ก่อนว่า verify อาจพังเพราะสภาพแวดล้อม)
+  (Array.isArray(s.machine?.problems) && s.machine.problems.length
+    ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')
+    : '');
 
 // ── ส่ง Telegram (credentials จาก DB — soft-fail) ──
 function dbCreds() {
