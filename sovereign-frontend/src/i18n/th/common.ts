@@ -27,6 +27,7 @@ export const common = {
     inventory: 'เสบียงและของใช้',
     farm: 'แปลงเกษตร',
     trace: 'ตามรอยผลผลิต',
+    community: 'Catalog กลางชุมชน',
     livestock: 'ปศุสัตว์',
     learning: 'เรียนรู้เอง',
     restaurant: 'ขายของ (POS)',
