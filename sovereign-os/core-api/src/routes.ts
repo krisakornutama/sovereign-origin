@@ -71,6 +71,7 @@ import clientMonitorRoutes from './modules/system/client-monitor.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
 import businessShopRoutes from './modules/business/business-shop.routes';
+import traceRoutes from './modules/trace/trace.routes';
 import { featureGuard } from './services/feature-grant.service';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ export function mountRoutes(app: Express): void {
   // (หน้า auth/devices/telemetry/sensors เป็นโครงสร้างพื้นฐาน — ใคร login แล้วใช้ได้)
   app.use('/api/auth', authRoutes);
   app.use('/api/shop', businessShopRoutes); // PUBLIC SHOP — หน้าร้านสาธารณะ (rate limit ใน router — ต้องมาก่อน /api/business)
+  app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (public ตามรหัส + login จัดการล็อต)
   app.use('/api/business', businessRoutes); // BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (สิทธิ์ต่อธุรกิจใน router)
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);

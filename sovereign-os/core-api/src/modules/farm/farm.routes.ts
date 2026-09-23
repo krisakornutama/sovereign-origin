@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { buildFarmMapSvg } from '../../services/farm-map.service';
 import { deductStock } from '../../services/inventory.service';
+import { createLotFromHarvest } from '../../services/trace.service';
 
 const router = Router();
 export { prisma };
@@ -275,7 +276,15 @@ router.post('/:id/harvest', authenticate, requireRole(...WRITE_ROLES), async (re
       },
     });
     await prisma.farmPlot.update({ where: { id: plot.id }, data: { status: 'harvested' } });
-    res.status(201).json({ success: true, inventoryId: item.id, plotId: plot.id, yieldKg });
+    // TRACEABILITY — สร้างล็อตผลผลิตอัตโนมัติ (best-effort: พัง = ยังเก็บเกี่ยวได้ แต่ไม่มีรหัสตามรอย)
+    let lotCode: string | null = null;
+    try {
+      const lot = await createLotFromHarvest({ inventoryItemId: item.id, plotId: plot.id, crop: plot.crop, quantityKg: yieldKg });
+      lotCode = lot.lotCode;
+    } catch (traceErr) {
+      console.error('Harvest trace lot failed:', traceErr);
+    }
+    res.status(201).json({ success: true, inventoryId: item.id, lotCode, plotId: plot.id, yieldKg });
   } catch (err) {
     console.error('Harvest error:', err);
     res.status(500).json({ error: 'Failed to harvest' });
@@ -336,7 +345,15 @@ router.post('/:id/herb-harvest', authenticate, requireRole(...WRITE_ROLES), asyn
       });
     }
     await prisma.farmPlot.update({ where: { id: plot.id }, data: { status: 'harvested' } });
-    res.status(201).json({ success: true, inventoryId: item.id, seedInventoryId: seedItem?.id ?? null, plotId: plot.id, qtyGram, qtyKg, saveSeed });
+    // TRACEABILITY — สร้างล็อตสมุนไพรอัตโนมัติ (best-effort เหมือน harvest ทั่วไป)
+    let herbLotCode: string | null = null;
+    try {
+      const lot = await createLotFromHarvest({ inventoryItemId: item.id, plotId: plot.id, crop: plot.crop, quantityKg: qtyKg });
+      herbLotCode = lot.lotCode;
+    } catch (traceErr) {
+      console.error('Herb harvest trace lot failed:', traceErr);
+    }
+    res.status(201).json({ success: true, inventoryId: item.id, lotCode: herbLotCode, seedInventoryId: seedItem?.id ?? null, plotId: plot.id, qtyGram, qtyKg, saveSeed });
   } catch (err) {
     console.error('Herb harvest error:', err);
     res.status(500).json({ error: 'Failed to herb-harvest' });

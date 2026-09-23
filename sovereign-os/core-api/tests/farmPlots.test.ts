@@ -31,6 +31,22 @@ before(async () => {
     update: async ({ data }: any) => ({ id: '22222222-2222-2222-2222-222222222222', ...data }),
     delete: async () => ({}),
   });
+  // TRACEABILITY — inventoryItem + productLot/traceEvent delegates สำหรับ harvest → lot
+  const createdLots: any[] = [];
+  mockModel(prisma, 'inventoryItem', {
+    create: async ({ data }: any) => ({ id: '44444444-4444-4444-4444-444444444444', ...data }),
+  });
+  mockModel(prisma, 'productLot', {
+    findUnique: async () => null, // generateLotCode — ไม่ชนซ้ำ
+    create: async ({ data }: any) => {
+      const lot = { id: `lot-${createdLots.length + 1}`, ...data };
+      createdLots.push(lot);
+      return lot;
+    },
+  });
+  mockModel(prisma, 'traceEvent', {
+    create: async ({ data }: any) => ({ id: `ev-${createdLots.length}`, ...data }),
+  });
   server = await createTestServer((app) => app.use('/api/farm/plots', farmRoutes));
   adminToken = makeToken('SUPERADMIN');
 });
@@ -131,4 +147,28 @@ test('DELETE /:id works', async () => {
     headers: auth(adminToken),
   });
   assert.strictEqual(res.status, 200);
+});
+
+test('POST /:id/harvest คืน lotCode และสร้างล็อตตามรอย (HARVESTED)', async () => {
+  const res = await fetch(server.baseUrl + '/api/farm/plots/22222222-2222-2222-2222-222222222222/harvest', {
+    method: 'POST',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ yieldKg: 12.5 }),
+  });
+  assert.strictEqual(res.status, 201);
+  const body = await res.json();
+  assert.strictEqual(body.success, true);
+  assert.match(body.lotCode, /^LOT-[A-Z2-9]{6}$/);
+});
+
+test('POST /:id/herb-harvest คืน lotCode เช่นกัน', async () => {
+  const res = await fetch(server.baseUrl + '/api/farm/plots/22222222-2222-2222-2222-222222222222/herb-harvest', {
+    method: 'POST',
+    headers: { ...auth(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ qtyGram: 500 }),
+  });
+  assert.strictEqual(res.status, 201);
+  const body = await res.json();
+  assert.strictEqual(body.success, true);
+  assert.match(body.lotCode, /^LOT-[A-Z2-9]{6}$/);
 });
