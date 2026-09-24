@@ -13,7 +13,7 @@
 // ใช้: node tools/machine-alert.mjs [--dry]
 // ────────────────────────────────────────────────────────────────────────────
 import { spawnSync, execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,15 +51,25 @@ let state = { alerts: {} };
 try { state = JSON.parse(readFileSync(STATE, 'utf8')); } catch { /* ยังไม่มี */ }
 if (!state.alerts) state.alerts = {};
 
-// ── 3) Telegram creds จาก DB (แบบเดียวกับ nightly-report) ──
+// ── 3) Telegram creds — อ่านจาก DB (แบบเดียวกับ nightly-report) + **cache ลงไฟล์** ──
+// บทเรียนจริง 25 ก.ย. 2026: docker daemon ล่ม = DB ตาย = อ่าน creds ไม่ได้ = แจ้งไม่ออกพอดีตอนที่ต้องแจ้งที่สุด
+// วิธี: อ่าน DB สำเร็จเมื่อไรเขียน cache ทับเสมอ (logs/ เป็น gitignored — ไม่มี token ลง git)
+//       อ่าน DB ไม่ได้ → ใช้ cache ล่าสุดแทน (Telegram API เป็น external — ไม่ต้องพึ่ง docker)
+const CREDS_CACHE = join(STATEDIR, 'telegram-creds.json');
 function dbCreds() {
   try {
     const out = execSync(
       `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
       { encoding: 'utf8', timeout: 20_000 }
     ).split('\n').map((l) => l.trim()).filter(Boolean);
-    return { token: out[0] ?? '', chatId: out[1] ?? '' };
-  } catch { return { token: '', chatId: '' }; }
+    const creds = { token: out[0] ?? '', chatId: out[1] ?? '' };
+    if (creds.token && creds.chatId) {
+      try { writeFileSync(CREDS_CACHE, JSON.stringify(creds) + '\n'); } catch { /* soft-fail */ }
+    }
+    return creds;
+  } catch {
+    try { return JSON.parse(readFileSync(CREDS_CACHE, 'utf8')); } catch { return { token: '', chatId: '' }; }
+  }
 }
 async function sendTelegram(token, chatId, text) {
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -77,15 +87,32 @@ async function sendTelegram(token, chatId, text) {
 
 // ── 4) จดลง alert_events (ให้ /alert-history เห็นเหมือน alert อื่น) — soft-fail ──
 const esc = (s) => String(s).replace(/'/g, "''").replace(/\r?\n/g, ' | ');
-function recordEvent({ severity, eventKey, title, detail, sent, suppressed }) {
+function insertEventSql({ severity, eventKey, title, detail, sent, suppressed }) {
+  return `docker exec sovereign-db psql -U sovereign -d sovereign -c "INSERT INTO alert_events (id, severity, event_key, title, detail, sent, suppressed, source) VALUES (gen_random_uuid()::text, '${esc(severity)}', '${esc(eventKey)}', '${esc(title)}', '${esc(detail)}', ${sent}, ${suppressed ? `'${esc(suppressed)}'` : 'NULL'}, 'machine-alert');"`;
+}
+// คิวรอ: event ที่จด DB ไม่ได้ (DB ตายพอดี) — เก็บ JSONL ไว้แล้ว flush รอบถัดไปเมื่อ DB กลับมา
+// (บทเรียนจริง 25 ก.ย.: ตอน daemon ล่ม ทั้ง Telegram-creds และ DB ตายพร้อมกัน — ประวัติต้องไม่หาย)
+const PENDING = join(STATEDIR, 'pending-events.jsonl');
+function queuePending(rec) { try { appendFileSync(PENDING, JSON.stringify(rec) + '\n'); } catch { /* เคสสุดท้ายที่ยอมปล่อย */ } }
+function flushPending() {
+  if (DRY || !existsSync(PENDING)) return;
+  let left = [];
+  try {
+    const lines = readFileSync(PENDING, 'utf8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try { execSync(insertEventSql(JSON.parse(line)), { encoding: 'utf8', timeout: 20_000, stdio: 'pipe' }); }
+      catch { left.push(line); }
+    }
+  } catch { return; }
+  try { writeFileSync(PENDING, left.length ? left.join('\n') + '\n' : ''); } catch { /* soft-fail */ }
+}
+function recordEvent(rec) {
   if (DRY) return;
   try {
-    execSync(
-      `docker exec sovereign-db psql -U sovereign -d sovereign -c "INSERT INTO alert_events (id, severity, event_key, title, detail, sent, suppressed, source) VALUES (gen_random_uuid()::text, '${esc(severity)}', '${esc(eventKey)}', '${esc(title)}', '${esc(detail)}', ${sent}, ${suppressed ? `'${esc(suppressed)}'` : 'NULL'}, 'machine-alert');"`,
-      { encoding: 'utf8', timeout: 20_000, stdio: 'pipe' }
-    );
+    execSync(insertEventSql(rec), { encoding: 'utf8', timeout: 20_000, stdio: 'pipe' });
   } catch (err) {
-    console.log('จด alert_events ไม่สำเร็จ (ข้าม — soft-fail):', err instanceof Error ? err.message.split('\n')[0] : err);
+    queuePending(rec);
+    console.log('จด alert_events ไม่สำเร็จ — เข้าคิวรอ flush (soft-fail):', err instanceof Error ? err.message.split('\n')[0] : err);
   }
 }
 
@@ -117,6 +144,11 @@ try {
   );
 } catch { /* soft-fail */ }
 
+// flush คิวเก่าก่อนเสมอ (รวมรอบเงียบ — DB ฟื้นก็ต้องไล่จดให้ครบแม้ไม่มี critical ใหม่)
+flushPending();
+// prewarm creds cache ทุกรอบ (docker exec เบามาก) — ตอนวิกฤตต้องมีของสดรออยู่แล้ว
+const { token, chatId } = dbCreds();
+
 if (!toSend.length && !toRecover.length) {
   console.log(`ไม่มี critical ใหม่ (warn ทิ้งไว้ให้ nightly สรุป) — จบรอบ`);
   process.exit(0);
@@ -127,7 +159,6 @@ const ctx = `แรมว่าง ${health.info?.ramFreeGB ?? '?'}GB · ดิ�
 const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── 6) ส่ง + จด ──
-const { token, chatId } = dbCreds();
 const canSend = Boolean(token && chatId) && !DRY;
 
 for (const { problem, repeat } of toSend) {
@@ -139,17 +170,23 @@ for (const { problem, repeat } of toSend) {
     `<i>${escHtml(ctx)} · ${new Date().toLocaleString('th-TH')}</i>`;
   let sent = false;
   if (canSend) {
-    try { sent = await sendTelegram(token, chatId, text); }
-    catch (err) { console.log('ส่งไม่สำเร็จ (soft-fail):', err instanceof Error ? err.message : err); }
-    console.log(sent ? `ส่ง Telegram แล้ว: ${title}` : `Telegram ตอบไม่สำเร็จ — จด DB ไว้ให้ (sent=false)`);
+    // ลองส่ง 3 ครั้ง (ห่าง 5 วิ) — วิกฤตต้องไม่แพ้ network แวบเดียว
+    for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+      try { sent = await sendTelegram(token, chatId, text); }
+      catch (err) { console.log('ส่งไม่สำเร็จ (soft-fail):', err instanceof Error ? err.message : err); }
+      if (!sent && attempt < 3) await new Promise((r) => setTimeout(r, 5_000));
+    }
+    console.log(sent ? `ส่ง Telegram แล้ว: ${title}` : `Telegram ส่งไม่สำเร็จ 3 ครั้ง — จะลองใหม่รอบถัดไป (ไม่มาร์ค state)`);
   } else {
     console.log(`${DRY ? '[dry] ' : 'ไม่มี Telegram creds — '}จะส่ง: ${title}\n${text}`);
   }
   recordEvent({
     severity: 'critical', eventKey: key, title, detail: `${problem.message} (${ctx})`,
-    sent, suppressed: sent ? null : (DRY ? 'dry' : 'no-creds'),
+    sent, suppressed: sent ? null : (DRY ? 'dry' : (canSend ? 'send-failed' : 'no-creds')),
   });
-  if (!DRY) state.alerts[key] = new Date().toISOString();
+  // มาร์คเฉพาะเมื่อส่งถึงจริง — ส่งไม่ออก = รอบถัดไป (10 นาที) ลองใหม่ทันที ไม่ติด cooldown
+  // (บั๊กจริง 25 ก.ย.: เคยมาร์คทั้งที่ส่งไม่ออก → alert หายเงียบเป็นชั่วโมง)
+  if (!DRY && sent) state.alerts[key] = new Date().toISOString();
 }
 
 for (const { area, lastSent } of toRecover) {

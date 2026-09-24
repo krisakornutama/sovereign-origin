@@ -49,7 +49,22 @@ await page.goto(`${WEB}/`, { waitUntil: 'networkidle', timeout: 45000 }).catch((
 const first = await page.evaluate(() => ({ hit: !!document.body.innerText.match(/เข้าสู่ระบบ|Unauthorized/)?.[0], path: location.pathname }));
 ok('session ใช้ได้ — ไม่โดนเตะ login', !first.hit, first.path + (first.hit ? ' (โดนเตะ)' : ''));
 
-const PAGES = (process.env.SWEEP_PAGES || '/dashboard,/audit,/users,/system,/sensors,/devices,/nodes,/reports').split(',');
+// default = derive จาก src/pages จริงทุกรอบ (กันล้าสมัย — เคสจริง 25 ก.ย.: สแกน /devices,/nodes ที่ถูกลบไปแล้วจนโดน 404 ทุกคืน)
+// ตัด _app/_document, route [param], และ root (หน้า login) · SWEEP_PAGES ยัง override ได้เสมอ (comma-separated)
+function derivePages() {
+  const dir = path.join(ROOT, 'sovereign-frontend', 'src', 'pages');
+  const walk = (d, prefix) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+    if (e.name.startsWith('_') || e.name.startsWith('[')) return [];
+    if (e.isDirectory()) return walk(path.join(d, e.name), `${prefix}/${e.name}`);
+    if (!e.name.endsWith('.tsx')) return [];
+    const stem = e.name.replace(/\.tsx$/, '');
+    if (stem.includes('.')) return [];
+    const base = stem === 'index' ? prefix : `${prefix}/${stem}`;
+    return base && base !== '/' ? [base] : [];
+  });
+  return walk(dir, '');
+}
+const PAGES = (process.env.SWEEP_PAGES || derivePages().join(',')).split(',');
 for (const p of PAGES) {
   // เริ่มนับใหม่ทุกหน้า — error ของหน้าก่อนต้องไม่ติดโทษหน้าถัดไป (กัน fail ลูกโซ่)
   pageErrors = []; consoleErrors = [];
