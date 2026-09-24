@@ -72,7 +72,12 @@ router.get('/models', authenticate, async (_req: Request, res: Response) => {
     ]);
     res.json({ ...inventory, routes, taskTypes: TASK_TYPES, engineUp, engineUrl: config.ollama.url });
   } catch (e) {
-    res.status(502).json({ error: describeError(e), engineUp: false, engineUrl: config.ollama.url, routes: null });
+    // Ollama ปิด/ไม่ตอบ = สถานะปกติของเครื่อง (ไม่ใช่ gateway พัง) — คืน 200 + engineUp:false
+    // ให้หน้าโชว์ ENGINE OFFLINE เอง (กัน console error รายโหลด — ui-sweep จับ console ทุกหน้า)
+    res.status(200).json({
+      models: [], loaded: [], storage: { totalBytes: 0, modelCount: 0 }, vramBytes: 0,
+      routes: null, taskTypes: TASK_TYPES, engineUp: false, engineUrl: config.ollama.url, error: describeError(e),
+    });
   }
 });
 

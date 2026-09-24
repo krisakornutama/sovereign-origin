@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { roleIsSuperadmin } from '../lib/roles';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
+import { getApiUrl } from '../lib/config';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -50,7 +51,7 @@ export default function AlertHistoryPage() {
   const load = useCallback(async () => {
     try {
       const q = sevFilter === 'ALL' ? '' : `?severity=${sevFilter}`;
-      const res = await authFetch(`/api/telegram/alerts?limit=200${q}`);
+      const res = await authFetch(`${getApiUrl()}/api/telegram/alerts?limit=200${q}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
       setError(null);
