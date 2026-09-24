@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { roleIsSuperadmin } from '../lib/roles';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { authFetch } from '../lib/apiFetch';
+import { getApiUrl } from '../lib/config';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -63,7 +64,7 @@ export default function SystemHealthPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await authFetch('/api/health/truth');
+      const res = await authFetch(`${getApiUrl()}/api/health/truth`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
       setError(null);
@@ -84,7 +85,7 @@ export default function SystemHealthPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await authFetch('/api/telegram/alerts?limit=5');
+        const res = await authFetch(`${getApiUrl()}/api/telegram/alerts?limit=5`);
         if (!res.ok) throw new Error(String(res.status));
         const j = await res.json();
         setLatestAlerts({ events: j.events ?? [], error: false });

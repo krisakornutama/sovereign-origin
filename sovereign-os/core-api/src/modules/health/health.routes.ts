@@ -491,7 +491,6 @@ router.get('/export', authenticate, async (req, res) => {
     .join('')}
   </table>
   <p class="muted">⚠️ ข้อมูลนี้บันทึกในเครื่องเท่านั้น (Local-First) — ใช้ประกอบการปรึกษาแพทย์ ไม่ใช่การวินิจฉัย</p>
-  <script>window.print();</script>
 </body></html>`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Disposition', `inline; filename="health-report-${days}d.html"`);
