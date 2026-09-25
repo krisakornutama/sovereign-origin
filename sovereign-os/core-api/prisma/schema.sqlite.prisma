@@ -22,7 +22,6 @@ model User {
 
   assigned_node Node?      @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs    AuditLog[]
-  dose_logs     DoseLog[]
   skill_matrix  SkillMatrix[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
@@ -107,6 +106,23 @@ model RelaySchedule {
   relay Relay @relation(fields: [relay_id], references: [id])
 
   @@map("relay_schedules")
+}
+
+model AlertEvent {
+  // ประวัติ alert ทั้งหมดของระบบ — โครงเดียวกับ postgres (sqlite: payload เป็น String)
+  id          String   @id @default(uuid())
+  created_at  DateTime @default(now())
+  severity    String
+  event_key   String
+  title       String
+  detail      String
+  sent        Boolean  @default(false)
+  suppressed  String?
+  source      String   @default("dispatcher")
+
+  @@index([created_at(sort: Desc)])
+  @@index([event_key])
+  @@map("alert_events")
 }
 
 model AuditLog {
@@ -1651,21 +1667,6 @@ model LivestockVisionReport {
   @@map("livestock_vision_reports")
 }
 
-// ── Dose Log — ติดตามกินยา/สมุนไพรต่อเนื่อง ──
-model DoseLog {
-  id              String   @id @default(uuid())
-  user_id         String? 
-  herbId          String
-  inventoryItemId String? 
-  dose            String? // เช่น "3g ชงน้ำ"
-  takenAt         DateTime @default(now())
-  note            String?
-
-  user User? @relation(fields: [user_id], references: [id])
-
-  @@index([user_id, takenAt])
-  @@map("dose_logs")
-}
 
 // ── Herb Bed — แปลงย่อยสมุนไพรใน FarmPlot ──
 model HerbBed {

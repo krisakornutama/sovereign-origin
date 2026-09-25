@@ -38,6 +38,7 @@ build/
 !.env.local.example
 
 # ── Runtime / logs ───────────────────────────
+/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -94,6 +95,10 @@ Docker/
 
 # ── Installers / binaries ──────────────────────
 tools/*
+# scheduled-task silent launcher (fix cmd.exe console popup) — command จริงของแต่ละ task อยู่ใน hidden-tasks/<slug>.cmd
+!tools/run-hidden.vbs
+!tools/set-tasks-hidden.ps1
+!tools/hidden-tasks/
 !tools/build-desktop.mjs
 !tools/verify.mjs
 !tools/publish-portfolio.mjs
@@ -104,7 +109,11 @@ tools/*
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
-!tools/clean-logs.mjs
+!tools/frontend-gate.mjs
+!tools/frontend-baseline.json
+!tools/nightly-verify.mjs
+!tools/nightly-report.mjs
+!tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md
 !tools/test/
 !tools/test/*.test.mjs
@@ -116,6 +125,11 @@ tools/*
 !tools/prod-truth.mjs
 !tools/fingerprint-lib.mjs
 !tools/module-owners.json
+# Phase 1 truth tooling — baseline ต้องเข้า repo (review ใน PR ก่อนยอมรับเส้นข้ามใหม่)
+!tools/boundary-baseline.json
+!tools/map-owners.mjs
+!tools/gen-module-docs.mjs
+!tools/check-parity.mjs
 !tools/
 !tools/install/
 tools/install/*
@@ -221,3 +235,5 @@ sovereign-os/core-api/prisma/data.db
 sovereign-os/core-api/prisma/prisma/
 *.db
 !**/node_modules/**/*.db
+!tools/machine-alert.mjs
+!tools/register-machine-watch.ps1

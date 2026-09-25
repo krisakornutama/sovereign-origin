@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { config } from '../config';
 import { getTelegramCredentials } from './telegram-credentials.service';
+import { recordAlertEvent } from './alert-store.service'; // Phase 3: ทุก alert ถูกจดลง alert_events (soft-fail)
 
 export type AlertSeverity = 'critical' | 'warn' | 'info';
 
@@ -22,6 +23,8 @@ export interface TelegramAlertPayload {
   severity?: AlertSeverity;
   /** key สำหรับ dedup (default: เนื้อหาข้อความ) — ใช้กัน sensor flapping / log loop */
   eventKey?: string;
+  /** ผู้ส่ง alert (dispatcher | truth-watchdog | nightly) — ลง alert_events ให้ย้อนดูได้ */
+  source?: string;
 }
 
 export interface TelegramAlertDeps {
@@ -94,18 +97,24 @@ export class TelegramAlertDispatcher {
   async send(payload: TelegramAlertPayload): Promise<{ sent: boolean; reason: string }> {
     const severity = payload.severity ?? 'info';
     const now = (this.deps.now ?? Date.now)();
+    // Phase 3: ชื่อเรื่องสั้นสำหรับ log (บรรทัดแรกของ text) — จดทุก alert ไม่ว่าส่งสำเร็จหรือถูกยับ
+    const logTitle = payload.text.split('\n')[0]?.replace(/<[^>]*>/g, '').trim() || '(ไม่มีหัวข้อ)';
+    const key = payload.eventKey ?? payload.text.replace(/\s+/g, ' ').trim(); // ประกาศก่อน logIt ใช้ (กัน TDZ)
+    const logIt = (sent: boolean, reason: string) =>
+      recordAlertEvent({ severity, eventKey: key, title: logTitle, detail: payload.text, sent, suppressed: sent ? null : reason, source: payload.source ?? 'dispatcher' });
 
     // 1) Severity filter
     if (!isSeverityEnabled(severity, this.cfg.minSeverity)) {
       this.stats.suppressedSeverity++;
+      logIt(false, `below_min_severity (${severity} < ${this.cfg.minSeverity})`);
       return { sent: false, reason: `below_min_severity (${severity} < ${this.cfg.minSeverity})` };
     }
 
     // 2) Dedup — เฉพาะ critical ข้าม dedup (emergency bypass) แต่ยังโดน rate cap
-    const key = payload.eventKey ?? payload.text.replace(/\s+/g, ' ').trim();
     const lastSent = this.dedupMap.get(key);
     if (lastSent !== undefined && now - lastSent < this.cfg.dedupWindowMs && severity !== 'critical') {
       this.stats.suppressedDedup++;
+      logIt(false, `dedup (window ${this.cfg.dedupWindowMs}ms)`);
       return { sent: false, reason: `dedup (window ${this.cfg.dedupWindowMs}ms)` };
     }
 
@@ -113,10 +122,12 @@ export class TelegramAlertDispatcher {
     this.pruneTimestamps(now);
     if (severity === 'critical' && this.criticalTimestamps.length >= this.cfg.criticalRatePerMin) {
       this.stats.suppressedRate++;
+      logIt(false, `critical_rate (${this.cfg.criticalRatePerMin}/min)`);
       return { sent: false, reason: `critical_rate (${this.cfg.criticalRatePerMin}/min)` };
     }
     if (this.allTimestamps.length >= this.cfg.globalRatePerMin) {
       this.stats.suppressedRate++;
+      logIt(false, `global_rate (${this.cfg.globalRatePerMin}/min)`);
       return { sent: false, reason: `global_rate (${this.cfg.globalRatePerMin}/min)` };
     }
 
@@ -124,9 +135,10 @@ export class TelegramAlertDispatcher {
     const html = formatTelegramAlert(payload.text, severity, this.cfg.dashboardUrl);
     try {
       const ok = await this.deps.send(html);
-      if (!ok) return { sent: false, reason: 'send_returned_false' };
+      if (!ok) { logIt(false, 'send_returned_false'); return { sent: false, reason: 'send_returned_false' }; }
     } catch (err) {
       console.error('Telegram alert send failed:', err instanceof Error ? err.message : err);
+      logIt(false, 'network_error');
       return { sent: false, reason: 'network_error' };
     }
 
@@ -134,6 +146,7 @@ export class TelegramAlertDispatcher {
     this.criticalTimestamps.push(now);
     this.allTimestamps.push(now);
     this.stats.sent++;
+    logIt(true, 'sent');
     return { sent: true, reason: 'sent' };
   }
 

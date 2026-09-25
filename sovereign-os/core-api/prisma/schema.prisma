@@ -35,7 +35,6 @@ model User {
 
   assigned_node Node?         @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
   audit_logs    AuditLog[]
-  dose_logs     DoseLog[]
   skill_matrix  SkillMatrix[]
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
@@ -120,6 +119,23 @@ model RelaySchedule {
   relay Relay @relation(fields: [relay_id], references: [id])
 
   @@map("relay_schedules")
+}
+
+model AlertEvent {
+  // ประวัติ alert ทั้งหมดของระบบ (Telegram/dispatcher + watchdog) — ย้อนดูได้ว่าระบบเคยเตือนอะไรเมื่อไร
+  id          String   @id @default(uuid()) @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz
+  severity    String   // critical | warn | info
+  event_key   String   // key สำหรับ dedup/กลุ่มเหตุการณ์เดียวกัน
+  title       String
+  detail      String
+  sent        Boolean  @default(false) // ส่ง Telegram สำเร็จไหม (ยังจำใน log แม้ Telegram ล่ม)
+  suppressed  String?  // เหตุผลที่ไม่ส่ง (dedup/rate-limit/below_min_severity) — null = ไม่ถูกยับ
+  source      String   @default("dispatcher") // dispatcher | truth-watchdog | nightly
+
+  @@index([created_at(sort: Desc)])
+  @@index([event_key])
+  @@map("alert_events")
 }
 
 model AuditLog {
@@ -1695,21 +1711,6 @@ model LivestockVisionReport {
   @@map("livestock_vision_reports")
 }
 
-// ── Dose Log — ติดตามกินยา/สมุนไพรต่อเนื่อง ──
-model DoseLog {
-  id              String   @id @default(uuid()) @db.Uuid
-  user_id         String?  @db.Uuid
-  herbId          String
-  inventoryItemId String?  @db.Uuid
-  dose            String? // เช่น "3g ชงน้ำ"
-  takenAt         DateTime @default(now()) @db.Timestamptz
-  note            String?
-
-  user User? @relation(fields: [user_id], references: [id])
-
-  @@index([user_id, takenAt])
-  @@map("dose_logs")
-}
 
 // ── Herb Bed — แปลงย่อยสมุนไพรใน FarmPlot ──
 model HerbBed {
