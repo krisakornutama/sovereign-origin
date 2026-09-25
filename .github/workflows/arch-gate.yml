@@ -1,0 +1,48 @@
+name: Architecture Gate
+
+# ด่านแรกของ repo — ทำงานทุก PR ก่อน merge เสมอ (ตาม AGENTS.md ข้อ 2)
+# ตรวจ: schema-sync · file-budget (เทียบ base branch) · boundary-baseline (เส้นข้ามใหม่ = fail)
+#       frontend-gate (import-layers · line-budget · sidebar-rule) — ของใหม่ที่ละเมิด = fail
+#       + fingerprint parity (อัลกอริทึม tools ↔ runtime ต้องตรงกันทุกไบต์)
+# หมายเหตุ: env-truth ข้ามบน CI โดยธรรมชาติ (ไม่มี .env) — arch-gate จัดการ "ไม่มี .env = ข้าม" ให้แล้ว
+
+on:
+  pull_request:
+    paths:
+      - 'sovereign-os/core-api/**'
+      - 'sovereign-frontend/**'
+      - 'tools/**'
+      - '.github/workflows/arch-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/**'
+      - '.github/workflows/arch-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  arch-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # file-budget ต้อง diff กับ base branch ได้
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: ตรวจ schema-sync + file-budget + boundary-baseline
+        run: node tools/arch-gate.mjs --base origin/${{ github.base_ref || 'main' }}
+
+      - name: ตรวจ frontend-gate (import-layers + line-budget + sidebar-rule)
+        run: node tools/frontend-gate.mjs --base origin/${{ github.base_ref || 'main' }}
+
+      - name: Build core-api (เพื่อตรวจ fingerprint parity)
+        run: npm run build
+        working-directory: sovereign-os/core-api
+
+      - name: ตรวจ fingerprint parity (tools ↔ runtime)
+        run: node tools/check-parity.mjs

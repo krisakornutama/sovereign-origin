@@ -10,6 +10,7 @@ import {
   clearTelegramCredentials,
   maskBotToken,
 } from '../../services/telegram-credentials.service';
+import { listAlertEvents, alertStats24h } from '../../services/alert-store.service'; // Phase 3: ประวัติ alert ในระบบ
 
 const router = Router();
 
@@ -119,6 +120,33 @@ router.get('/config', authenticate, async (_req, res) => {
     botTokenMasked: maskBotToken(creds.botToken),
     chatId: creds.chatId,
   });
+});
+
+// GET /api/telegram/alerts?limit=100&severity=warn — ประวัติ alert ทั้งหมดที่ระบบจดไว้
+// (ช่องทางที่ 2 นอกจาก Telegram — ย้อนดูได้ว่า watchdog/dispatcher เคยแจ้งอะไรเมื่อไร ส่งสำเร็จหรือถูกยับ)
+router.get('/alerts', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '100'), 10) || 100, 500);
+    const severity = typeof req.query.severity === 'string' ? req.query.severity : undefined;
+    const [events, stats] = await Promise.all([listAlertEvents(limit, severity), alertStats24h()]);
+    res.json({
+      events: events.map((e) => ({
+        id: e.id,
+        createdAt: e.created_at,
+        severity: e.severity,
+        eventKey: e.event_key,
+        title: e.title,
+        detail: e.detail,
+        sent: e.sent,
+        suppressed: e.suppressed,
+        source: e.source,
+      })),
+      stats24h: stats,
+    });
+  } catch (err) {
+    console.error('GET /api/telegram/alerts error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to load alert history' });
+  }
 });
 
 // PUT /api/telegram/config { botToken?, chatId? } — บันทึก override ลง DB (SUPERADMIN)

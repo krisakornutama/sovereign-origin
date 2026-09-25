@@ -17,3 +17,30 @@
 
 ## ห้ามแตะ / ระวัง
 - การอ่านมิเตอร์เป็นข้อมูล append-only — ห้ามแก้ค่าย้อนหลัง ให้เพิ่ม reading ใหม่แทน
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`energy_readings` · `energy_thresholds`
+
+### Routes
+- `energy/energy.routes.ts` (169 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /summary
+POST /readings
+GET /readings
+GET /thresholds
+POST /thresholds
+PATCH /thresholds/:id
+DELETE /thresholds/:id
+POST /check
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`energy.service`
+
+<!-- auto:end -->

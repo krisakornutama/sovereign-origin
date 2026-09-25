@@ -10,7 +10,7 @@
 - **ห้าม force push** 除非ได้รับอนุญาตจากผู้ใช้
 
 ### 2. BUILD BEFORE COMMIT — ต้องผ่าน quality gate ก่อน commit
-- หลังแก้โค้ดทุกครั้ง รัน `npm run verify` ที่ **root ของ repo** (สคริปต์เดียวครบ: **Architecture Gate** (ด่านแรก ตรวจ schema-sync/file-budget/env-truth/module-boundary), backend build+test, frontend typecheck+build)
+- หลังแก้โค้ดทุกครั้ง รัน `npm run verify` ที่ **root ของ repo** (สคริปต์เดียวครบ: **Architecture Gate** (ด่านแรก ตรวจ schema-sync/file-budget/env-truth/module-boundary) + **Frontend Gate** (import-layers · เพดานบรรทัด pages≤800/components≤400 · ทุกหน้าต้องมี Sidebar), backend build+test, frontend typecheck+build)
 - ถ้า verify ไม่ผ่าน **ห้าม commit** ต้องแก้ให้ผ่านก่อน
 - แก้อะไรที่กระทบหน้าเว็บ/UI ให้รัน `npm run verify:full` (เพิ่ม E2E Playwright — ต้องมี backend+DB รันอยู่)
 - ถ้า error จำนวนมาก ให้ย้อนกลับไป backup แล้วแก้ทีละจุด
@@ -73,7 +73,9 @@
 - สถาปัตยกรรมรวม + กฎที่เกตตรวจอัตโนมัติ: **docs/ARCHITECTURE.md**
 - เอกสารรายโมดูล (auth, business, trace, farm, inventory, energy, restaurant, treasury): **docs/modules/<โมดูล>.md**
 - กติกา: ก่อนแก้โมดูลไหน ให้อ่านเอกสารโมดูลนั้นก่อนเสมอ — เจตนา/ตารางที่เป็นเจ้าของ/ข้อห้ามอยู่ที่นั่น
-- แผนที่ตาราง→โมดูล: tools/module-owners.json (arch-gate รายงานการยื่นมือแตะตารางคนอื่นทุกครั้งที่ verify)
+- แผนที่ตาราง→โมดูล: tools/module-owners.json (ครอบทุกตารางยกเว้น orphan จริง · เติมใหม่ด้วย `node tools/map-owners.mjs --apply`)
+- **เส้นข้ามโมดูล (แตะตารางคนอื่น) = fail ถ้าไม่ประกาศ** — เส้นที่ยอมรับแล้วอยู่ที่ tools/boundary-baseline.json · เส้นใหม่ที่ arch-gate จับ = แก้ผ่าน service ของเจ้าของตาราง หรือเพิ่ม baseline พร้อมเหตุผล (รีวิวใน PR)
+- เอกสารโมดูลครบทุกโมดูลที่ docs/modules/ — ส่วน "ของจริงในโค้ด" gen ด้วย `node tools/gen-module-docs.mjs` (ห้ามแก้มือใน marker auto)
 
 ## โฟลว์ทำงานที่ถูกต้อง
 

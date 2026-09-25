@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Baseline ของ frontend-gate — สร้างจากการสแกนจริง อัปเดตเมื่อ \"ตัดสินใจยอมรับ\" เท่านั้น",
+    "กฎ: import-layers (pages→lib/stores/components, ui/layout ใช้ร่วมได้)",
+    "     line-budget (pages≤800, components≤400)",
+    "     sidebar-rule (ทุกหน้า import Sidebar; exception = public/login/redirect/ไฟล์พิเศษ)",
+    "รายการในนี้ = หนี้ที่รับไว้ชั่วคราว — ของใหม่ที่ละเมิด = verify FAIL"
+  ],
+  "violations": [
+    "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",
+    "line-budget|sovereign-frontend/src/pages/ai-agent.tsx|1064 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/dashboard.tsx|1219 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/knowledge.tsx|806 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/livestock.tsx|860 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/settings.tsx|1254 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/treasury.tsx|1187 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/components/coding/CodingIde.tsx|791 บรรทัด > เพดาน 400 (components)",
+    "line-budget|sovereign-frontend/src/components/knowledge/KidHomePanel.tsx|765 บรรทัด > เพดาน 400 (components)",
+    "line-budget|sovereign-frontend/src/components/knowledge/use-kid-home.ts|554 บรรทัด > เพดาน 400 (components)",
+    "line-budget|sovereign-frontend/src/components/sensors/SensorsHub.tsx|483 บรรทัด > เพดาน 400 (components)",
+    "line-budget|sovereign-frontend/src/components/ui/Icon.tsx|653 บรรทัด > เพดาน 400 (components)",
+    "sidebar-rule|sovereign-frontend/src/pages/community.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/index.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/portfolio.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/sensors.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/shop.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)"
+  ]
+}

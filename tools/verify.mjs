@@ -9,7 +9,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,17 @@ console.log('═══ Sovereign Quality Gate ═══');
   }
 }
 
+// Phase 2: Frontend Gate — ขยายด่านสถาปัตยกรรมคลุมฝั่ง UI (fail fast ต่อจาก arch-gate)
+// ตรวจ: import-layers (pages→lib/stores/components; ui/layout ใช้ร่วมได้) · line-budget
+//       (pages ≤800 / components ≤400) · sidebar-rule (ทุกหน้ามี Sidebar) — ของเดิมผ่านผ่าน baseline
+{
+  const fg = spawnSync('node', [join(ROOT, 'frontend-gate.mjs')], { cwd: ROOT, shell: false, stdio: 'inherit' });
+  if (fg.status !== 0) {
+    console.error('\n❌ Frontend Gate ล้ม — verify ไม่ดำเนินการต่อ (แก้ตามรายงานด้านบนก่อน)');
+    process.exit(1);
+  }
+}
+
 // next build เขียนทับ .next ที่ dev server ใช้อยู่ → dev เสี่ยง chunk พัง
 // → จับ PID ของผู้ฟัง :3000 ไว้ แล้ว "กู้ dev ให้เอง" หลัง verify จบ (auto-restart)
 // ข้อควรระวัง (เคสจริง 09-11): production `next start` ก็ฟัง :3000 — kill+wipe ตัว prod
@@ -91,6 +102,7 @@ function processCmdlineWithParent(pid) {
 
 const DEV_PORT = 3000;
 const devPidBefore = findListenerPid(DEV_PORT);
+// ค่าความจริง 3 สถานะ: true=prod · false=dev ชัดเจน · null=จับใจความไม่ได้ (fail-safe)
 const devIsProd = (() => {
   if (!devPidBefore) return false;
   const [own = '', parent = ''] = (processCmdlineWithParent(devPidBefore) || '').split('|||');
@@ -100,12 +112,16 @@ const devIsProd = (() => {
   const cmd = norm(own) + ' ' + norm(parent);
   if (/\bnext\s+dev\b/.test(cmd) || /\brun\s+dev\b/.test(cmd)) return false;   // dev ชัดเจน (ตัวเองหรือพ่อ)
   if (/\bnext\s+start\b/.test(cmd) || /\brun\s+start\b/.test(cmd) || cmd.includes('start-server')) return true; // prod
-  return false; // จับใจความไม่ได้ → ถือว่าไม่ใช่ prod (เดิมพันกับพฤติกรรมเดิมที่รู้ผล)
+  // เคสจริง 23-09: CIM query ล่มชั่วขณะ → cmdline ว่าง → เดิมตก branch นี้แล้วถูกมองเป็น dev
+  // → helper kill prod + wipe .next = เว็บลงทั้งระบบ — เปลี่ยนเป็น "ไม่รู้ = ห้ามทำลาย"
+  return null;
 })();
 if (devPidBefore) {
-  console.log(devIsProd
+  console.log(devIsProd === true
     ? `ℹ️  :${DEV_PORT} มี production server serve อยู่ (PID ${devPidBefore}) — verify จะไม่แตะพอร์ต/.next ตอนท้าย`
-    : `ℹ️  พบ dev server บน :${DEV_PORT} (PID ${devPidBefore}) — หลัง verify จะกู้ dev ให้เอง (restart)`);
+    : devIsProd === false
+      ? `ℹ️  พบ dev server บน :${DEV_PORT} (PID ${devPidBefore}) — หลัง verify จะกู้ dev ให้เอง (restart)`
+      : `⚠️  :${DEV_PORT} มี server แต่ระบุชนิดไม่ได้ (cmdline อ่านไม่ได้) — โหมด fail-safe: verify จะไม่ kill/restart อะไรทั้งสิ้น`);
 }
 
 if (RUN_E2E && !existsSync(join(FRONTEND, 'node_modules', '@playwright', 'test'))) {
@@ -161,6 +177,14 @@ async function runStep(step) {
     await new Promise((res) => setTimeout(res, 20_000));
     r = run();
   }
+  // Flake guard: เทสชุดใหญ่ (1249 เคส) บางครั้งโหลดชนกับ build อีกสาย → fail แบบไม่มี message
+  // (เคสจริง: featureGrants 23/9, treasuryApi 24/9 — รันซ้ำเดี่ยวผ่านทั้งคู่ · ตอน nightly โหลดหนักพิเศษ)
+  // กติกา: ขั้น test พัง → พัก 15 วิ รันใหม่ 1 ครั้ง — เทสจริงพัง = ล้ม 2 ครั้งติด ไม่ใช่การโกงเกต
+  if (r.status !== 0 && /test/.test(step.name)) {
+    console.log(`   ${step.name}: พัง (exit ${r.status}) → flake guard: พัก 15 วิ รันใหม่ 1 ครั้ง (เทสจริงพังต้องล้ม 2 ครั้งติด)`);
+    await new Promise((res) => setTimeout(res, 15_000));
+    r = run();
+  }
   return r;
 }
 
@@ -211,7 +235,11 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
   // Phase 0 (prod-truth): frontend build เพิ่งเขียนทับ .next ที่ prod :3000 กำลัง serve อยู่
   // → prod ยังโหลด build เก่าในหน่วยความจำ + chunk hash เปลี่ยน = 404 (เคสจริง 23-09: e2e พังทั้งชุด)
   // → restart prod ให้ serve build ใหม่ก่อน e2e (watchdog ของเครื่องกู้ให้; ไม่กู้ใน 90 วิ = เรา start เอง)
-  if (RUN_E2E && devIsProd) {
+  // (devIsProd === null = fail-safe ไม่แตะ server — แจ้งเตือนให้ผู้ใช้ restart เอง)
+  if (RUN_E2E && devIsProd === null && findListenerPid(DEV_PORT)) {
+    console.log(`⚠️  ระบุชนิดของ server :${DEV_PORT} ไม่ได้ — ไม่ restart อัตโนมัติ ถ้า e2e พังเรื่อง chunk ให้ restart :3000 เองก่อนรันใหม่`);
+  }
+  if (RUN_E2E && devIsProd === true) {
     const pidNow = findListenerPid(DEV_PORT);
     if (pidNow) {
       console.log(`ℹ️  frontend build ทับ .next ของ prod :3000 (PID ${pidNow}) — restart ก่อน e2e เพื่อ serve build ใหม่`);
@@ -253,14 +281,43 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
 const mins = ((Date.now() - t0) / 60000).toFixed(1);
 console.log(`\n✅ ผ่านครบ ${results.length}/${results.length} ขั้น (${mins} นาที) — พร้อม commit`);
 
+// ── Phase 1 (system-truth): เขียนผลเกตล่าสุดลง data/system-truth.json ──
+// หน้า /system-health อ่านผ่าน GET /api/health/truth — เห็นสถานะเกต + fingerprint ดิสก์ ณ รอบ verify ล่าสุด
+// (prod-truth เทียบดิสก์ ↔ runtime ให้แล้ว — disk.fingerprint ที่นี่จึงเป็นค่าที่ prod-truth ยืนยันแล้ว)
+// data/ เป็น mount ของ container อยู่แล้ว → backend อ่านถูกไฟล์เดียวกับที่ verify เขียน
+try {
+  const truthPath = join(BACKEND, 'data', 'system-truth.json');
+  let prodTruth = null;
+  try { prodTruth = JSON.parse(readFileSync(truthPath, 'utf8'))?.prodTruth ?? null; } catch { /* รอบแรกยังไม่มี */ }
+  let diskFp = null, diskFiles = null;
+  try {
+    const { computeDirFingerprintSync } = await import('./fingerprint-lib.mjs');
+    const disk = computeDirFingerprintSync(join(BACKEND, 'dist'));
+    diskFp = disk.fingerprint; diskFiles = disk.files;
+  } catch { /* dist ไม่มี = ไม่มีข้อมูลเทียบ */ }
+  writeFileSync(truthPath, JSON.stringify({
+    writtenAt: new Date().toISOString(),
+    ok: results.every((r) => r.ok),
+    steps: results.map((r) => ({ name: r.name, ok: r.ok, skipped: !!r.skipped })),
+    prodTruth: { diskFingerprint: diskFp, diskFiles, diskDir: 'sovereign-os/core-api/dist' },
+    _prevProdTruth: prodTruth,
+  }, null, 2) + '\n', 'utf8');
+  console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${results.every((r) => r.ok)})`);
+} catch (e) {
+  console.log(`ℹ️  เขียน system-truth ไม่สำเร็จ (${e.message?.slice(0, 80)}) — ไม่กระทบผลเกต`);
+}
+
 // ── กู้ dev server อัตโนมัติ: build ทับ .next แล้ว dev เดิมจะเสี่ยง chunk พัง ──
 // ห้าม kill จากใน process นี้ (taskkill /T อาจโดน tree ของ shell แม่)
 // → เขียนสคริปต์ helper แล้ว spawn แบบ detached: มันจะรอ 3 วิ (ให้ verify ปิดก่อน)
 //   ค่อย kill dev เก่า + เคลียร์ .next + เปิด dev ใหม่ แล้ว "รอจนฟังพอร์ตจริง"
 //   (เคสจริง: dev ใหม่ค้างไม่ bind → :3000 ตายเงียบ ๆ ทั้งระบบ — ต้อง fail loudly)
 // production serve :3000 อยู่ → ข้ามทั้งหมด (ไม่ kill, ไม่แตะ .next)
-if (devPidBefore && devIsProd) {
-  console.log('ℹ️  ข้ามการกู้ dev — production ยัง serve :3000 อยู่ (คงสภาพไว้ตามจริง)');
+if (devPidBefore && devIsProd !== false) {
+  // prod ชัดเจน หรือ "ไม่รู้ชนิด" (fail-safe) — ทั้งคู่ห้าม kill/wipe
+  console.log(devIsProd === true
+    ? 'ℹ️  ข้ามการกู้ dev — production ยัง serve :3000 อยู่ (คงสภาพไว้ตามจริง)'
+    : 'ℹ️  ข้ามการกู้ dev — ระบุชนิด server :3000 ไม่ได้ (fail-safe ห้ามทำลาย)');
 } else if (devPidBefore) {
   const pidNow = findListenerPid(DEV_PORT);
   if (pidNow !== devPidBefore) {
