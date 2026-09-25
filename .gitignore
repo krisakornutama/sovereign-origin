@@ -95,6 +95,10 @@ Docker/
 
 # ── Installers / binaries ──────────────────────
 tools/*
+# scheduled-task silent launcher (fix cmd.exe console popup) — command จริงของแต่ละ task อยู่ใน hidden-tasks/<slug>.cmd
+!tools/run-hidden.vbs
+!tools/set-tasks-hidden.ps1
+!tools/hidden-tasks/
 !tools/build-desktop.mjs
 !tools/verify.mjs
 !tools/publish-portfolio.mjs
