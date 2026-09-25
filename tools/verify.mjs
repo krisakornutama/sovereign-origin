@@ -247,7 +247,7 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
       let up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
       if (!up) {
         console.log('   watchdog ยังไม่กู้ — start เองแบบ detached');
-        spawn('cmd', ['/c', 'npm run start'], { cwd: FRONTEND, detached: true, stdio: 'ignore' }).unref();
+        spawn('cmd', ['/c', 'npm run start'], { cwd: FRONTEND, detached: true, windowsHide: true, stdio: 'ignore' }).unref();
         up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
       }
       if (!up) {
@@ -328,15 +328,28 @@ if (devPidBefore && devIsProd !== false) {
       '@echo off',
       'timeout /t 3 /nobreak >nul',
       `taskkill /PID ${devPidBefore} /F >nul 2>&1`,
+      // กัน port-drift (เคสจริง 25/9): next dev เจอพอร์ตไม่ว่างจะเด้งไปฟัง 3001+ เอง
+      // แล้วทุกอย่างที่เฝ้า :3000 (watchdog/prod-truth/e2e) มองไม่เห็น = dev หายเงียบ ๆ
+      // → รอเจ้าของพอร์ตตายจริงก่อน (สูงสุด 30 วิ) ค่อย wipe .next และ spawn ใหม่
+      `powershell -NoProfile -Command "$d=(Get-Date).AddSeconds(30); do { $c=Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if(-not $c){exit 0}; Start-Sleep 1 } while((Get-Date) -lt $d); exit 1"`,
+      'if errorlevel 1 echo [verify-restore] เตือน: :3000 ยังมีคนฟังหลัง taskkill 30 วิ — dev ใหม่อาจหนีพอร์ต (ดู dev-server.log)',
       `cd /d "${FRONTEND}"`,
       'if exist .next rmdir /s /q .next',
-      'start "sovereign-dev" /min cmd /c "npm run dev > ..\\dev-server.log 2>&1"',
+      'if exist .next echo [verify-restore] เตือน: ลบ .next ไม่สำเร็จ (ไฟล์ถูกล็อก) — dev ใหม่ใช้ cache เดิม',
+      // pin -p 3000: พอร์ตชนจริง = ล้มชัด ๆ ใน dev-server.log (next dev จะไม่เผลอหนีพอร์ตเอง)
+      // start /b (แทน start /min cmd): ไม่สร้างหน้าต่างใหม่ — รันต่อใน console ซ่อนของ helper เดียวกัน
+      'start /b cmd /c "npm run dev -- -p 3000 > ..\\dev-server.log 2>&1"',
+      // next dev สร้าง console ใหม่ให้ start-server เสมอ (detached+inherit) — สแกนซ่อนทันทีที่เจอ
+      'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0hide-next-server-window.ps1"',
       // รอ :3000 ขึ้นจริงสูงสุด 90 วิ (dev ต้อง compile) — ไม่ขึ้นใน 90 วิ = ออก non-zero + แจ้งดัง ๆ
       'powershell -NoProfile -Command "$deadline=(Get-Date).AddSeconds(90); do { $r=try{(Invoke-WebRequest -UseBasicParsing -Uri http://localhost:3000/ -TimeoutSec 3).StatusCode}catch{0}; if($r -eq 200){exit 0}; Start-Sleep 3 } while((Get-Date) -lt $deadline); Write-Host (\'[verify-restore] dev server ไม่ยอมฟัง :3000 ภายใน 90 วิ — ดู log ที่ E:\\My work\\Project Sovereign Origin\\dev-server.log\'); exit 1"',
       'if errorlevel 1 exit /b 1',
+      // กันเหลือ: ถ้า title ถูกตั้งช้า (หลัง port up) — ลองซ่อนอีกครั้งแบบสั้น
+      'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0hide-next-server-window.ps1" -Seconds 5',
     ].join('\r\n');
     writeFileSync(helperPath, helper, 'utf8');
-    const child = spawn('cmd', ['/c', helperPath], { cwd: ROOT, shell: false, detached: true, stdio: 'ignore' });
+    // windowsHide: true — ไม่งั้น detached cmd บน Windows เด้งหน้าต่าง console ขึ้นมาทุกรอบ verify (เคสจริง 25/9)
+    const child = spawn('cmd', ['/c', helperPath], { cwd: ROOT, shell: false, detached: true, windowsHide: true, stdio: 'ignore' });
     child.unref();
     console.log(`\n🔄 ตั้งเวลากู้ dev server หลัง verify จบ 3 วิ (kill PID ${devPidBefore} + เคลียร์ .next + เปิดใหม่ + รอฟังพอร์ตจริง)`);
     console.log('   ถ้ากู้ไม่ขึ้นจะมีข้อความ "[verify-restore] ... ไม่ยอมฟัง :3000" ค้างในหน้าต่าง sovereign-dev');
