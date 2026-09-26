@@ -6,7 +6,9 @@ import { NAV_GROUPS } from '../src/lib/navigation';
 const pages = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href)).filter((href) => href.startsWith('/'));
 
 // noise ที่ไม่ใช่บั๊กของเรา (env: ไม่มี Ollama / net::ERR_ABORTED จาก navigation) + vision 404 ชั่วคราว (known-faces empty)
-const IGNORE = [/ECONNREFUSED/i, /net::ERR_ABORTED/i, /favicon/i, /ResizeObserver/i, /Download the React DevTools/i, /404.*vision/i, /Failed to load resource.*404/i];
+// 27/9: เพิ่ม timeout ของเครือข่าย — เราเตอร์ LTE กระตุกทำ external API (Yahoo ราคา/RSS) ช้าลง
+// หน้าโหลดสำเร็จ + app ทำงาน = ไม่ใช่บั๊กของระบบ (เคสจริง: /health /audit fail จาก timeout นี้ตอน nightly 04:47)
+const IGNORE = [/ECONNREFUSED/i, /net::ERR_ABORTED/i, /favicon/i, /ResizeObserver/i, /Download the React DevTools/i, /404.*vision/i, /Failed to load resource.*404/i, /net::ERR_CONNECTION_TIMED_OUT/i, /net::ERR_NETWORK_CHANGED/i];
 
 test.describe('ทุกหน้าจากเมนูต้องเปิดได้', () => {
   for (const href of pages) {

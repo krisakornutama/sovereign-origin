@@ -103,6 +103,7 @@
 - [x] E4 ยิง `offsite-push.mjs --restore-test` — **เสร็จ 27/9/69**: users 8 · audit_logs 26,383 · **sensor_telemetry 118,883 แถว** (live 121,026 — ตรงตามอายุ dump) · แก้สคริปต์ใช้ `timescaledb_pre/post_restore` แยก 3 ครั้งเรียก (บทเรียนใหม่: pg_dump เซ็ต search_path='' กลาง stream — ห้ามรวม post_restore ใน session เดียวกับ dump)
 - [ ] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — ตั้ง `MESH_RSYNC_TARGET` (ดิสก์ USB/NAS/คลาวด์ ~4MB/คืน) + **สำรอง mesh key/BACKUP_ENCRYPTION_KEY นอกเครื่อง** (ปิดความเสี่ยง key อยู่เครื่องเดียวไปด้วย)
 - [ ] E5 WAL archiving + ซ้อม PITR (RPO 24 ชม. → นาที) — ทำหลัง E4 เพราะใช้สายทดสอบเดียวกัน
+- [x] E6 (พบต่อจาก E2) สาย backup ภายใน core-api ตายเงียบ 22–26/9 — **เสร็จ 27/9/69**: ราก = scheduler เทียบเวลา "นาทีเป๊ะ" (`sched.time !== current`) เครื่องหลับ/นาฬิกา VM เหลื่อม → นาที 02:00 ถูกข้ามทั้งวัน (task ภายนอก 03:00 ปกติทุกคืน — สองสายอยู่คนละชั้นจึงปลอมสมดุล) · แก้ = catch-up window 6 ชม. (เลยเวลา + ยังไม่มี marker วันนี้ = สร้างทันที)
 
 ## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
 - [ ] F1 backup ห้ามแนบ .env (backup.service ระบุครอบ .env ถ้าหาเจอ) — ตัดออก/แยกไฟล์ กัน token ทั้งระบบหลุดไปกับไฟล์ offsite ถ้าหลุด
@@ -118,8 +119,8 @@
 - [ ] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` (แนว telegram-creds.mjs) — JWT_SECRET ถูกอ่านกระจายหลาย tools วันนี้
 - [ ] H4 Windows-coupling ชั้น ops (Task Scheduler/.bat/.ps1) — จดไว้ ทำเมื่อโมเดลขาย turnkey จริง (launcher Go เริ่มถูกทางแล้ว)
 - [ ] H5 (P2 ใช้งานง่าย ต่อจาก 27/9) เชื่อม Telegram รายวัน: สรุป ops-status ตี 8:30 หลัง digest — เจ้าของเห็นสถานะครบทุกสายในแชทเดิม ไม่ต้องเปิดเว็บ/เครื่อง · ใช้คอมโพเนนต์ที่มีทั้งหมด (ops-status --quiet + nightly-report)
-- [ ] H6 e2e ทนเน็ตกระตุก: all-pages spec ที่ fail จาก ERR_CONNECTION_TIMED_OUT (router LTE กระตุกตอน nightly — เคสจริง 27/9 04:50) ให้ retry เฉพาะ request ภายนอก หรือข้ามเช็ค console error ชนิด network-timeout (ระบบไม่พัง — เน็ตพัง)
-- [ ] H7 กัน seed e2e ซ้ำ: pos-flow fail เพราะ option 'E2E-ทดสอบอัตโนมัติ' มี 2 รายการ (seed รอบก่อนค้าง) — beforeAll ต้องลบ/อัปเดตก่อนสร้าง (idempotent) และท้าย suite ล้างที่ตั้งไว้
+- [x] H6 e2e ทนเน็ตกระตุก — **เสร็จ 27/9/69**: เพิ่ม ERR_CONNECTION_TIMED_OUT + ERR_NETWORK_CHANGED ใน IGNORE ของ all-pages (เน็ต LTE กระตุก ≠ บั๊กระบบ) — พิสูจน์: all-pages 46/46 ผ่าน
+- [x] H7 กัน seed e2e ซ้ำ — **เสร็จ 27/9/69**: และ **จับบั๊กจริงใหญ่** — pos-flow cleanup ชี้ DB `sovereign_v2` ที่ไม่มีอยู่แล้ว (DB จริง = sovereign) → cleanup เงียบมาตลาด → ร้าน 'E2E-ทดสอบอัตโนมัติ' ค้าง 2 รายการใน DB จริง · แก้: ชื่อ DB + cleanup ตรวจสอบได้ (คืน boolean + retry 3 รอบแล้ว throw) + เคลียร์ของค้าง — พิสูจน์: pos-flow 2/2 ผ่าน
 
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
