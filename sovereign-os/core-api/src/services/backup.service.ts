@@ -231,7 +231,16 @@ class BackupService {
 
     const now = new Date();
     const current = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    if (sched.time !== current) return;
+
+    // catch-up window (แก้ 27/9): เทียบนาทีเป๊ะเดิมทำให้ "นาที 02:00 ถูกข้ามทั้งวัน" เมื่อเครื่อง
+    // หลับ/นาฬิกา VM เหลื่อมหลัง resume → สาย backup ภายในตายเงียบ ๆ (เคสจริง 22–26/9:
+    // marker หยุดที่ 22/9 ทั้งที่ task ภายนอก 03:00 ปกติ) — ตอนนี้: เลยเวลาแล้วและยังไม่มี
+    // marker ของวันนี้ = สร้างทันที (รอได้ถึง 6 ชม. กันยิงตอนเที่ยงคืนเผื่อเวลาเครื่องปลุกช้า)
+    const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const schedMin = toMin(sched.time);
+    const inCatchUpWindow = nowMin >= schedMin && nowMin < schedMin + 6 * 60;
+    if (!inCatchUpWindow) return;
 
     // กันการยิงซ้ำภายในวันเดียว
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
