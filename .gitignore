@@ -106,6 +106,7 @@ tools/*
 !tools/portfolio-preview-server.mjs
 !tools/set-required-checks.sh
 !tools/system-health.mjs
+!tools/machine-health.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs

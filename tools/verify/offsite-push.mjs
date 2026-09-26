@@ -55,25 +55,36 @@ if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
   // และห้าม ON_ERROR_STOP (dump ข้ามเครื่องมี ERROR ของ extension ที่ตัวรับไม่มี = ปกติ) — ตัดสินที่จำนวนแถว
   console.log('restore ลง Postgres ชั่วคราว (sovereign-restore-test)…');
   execSync('docker rm -f sovereign-restore-test 2>nul', { stdio: 'ignore', shell: 'cmd.exe' });
-  const tmpGz = path.join(OFFSITE, '.restore-test.sql.gz');
   try {
     execFileSync('docker', ['run', '-d', '--name', 'sovereign-restore-test', '-e', 'POSTGRES_PASSWORD=testrestore', '-e', 'POSTGRES_USER=sovereign', '-e', 'POSTGRES_DB=sovereign', '-p', '127.0.0.1:55432:5432', 'timescale/timescaledb:latest-pg15'], { stdio: 'ignore' });
     for (const wait of [10_000, 20_000]) { // รอหลัง boot + หลัง restart รอบ image เอง
       await new Promise((r) => setTimeout(r, wait));
       try { execSync('docker exec sovereign-restore-test pg_isready -U sovereign', { stdio: 'ignore' }); break; } catch { /* ลองรอบต่อไป */ }
     }
-    execFileSync('docker', ['exec', '-i', 'sovereign-restore-test', 'psql', '-U', 'sovereign', '-d', 'sovereign', '-q'], { input: gunzipSql(decrypt(enc)), maxBuffer: 256 * 1024 * 1024 });
+    // แยก 3 ครั้งเรียก (pre / dump / post) — บทเรียน 14/9: ไม่มี pre_restore → chunk COPY ไม่เข้า
+    // ("could not find hypertable with id N" — id ต่างข้าม instance) · บทเรียนเพิ่มวันนี้: ห้ามรวม
+    // ใน session เดียว เพราะ pg_dump เซ็ต search_path='' กลาง stream ทำ post_restore หา function
+    const psql = (args, input) => execFileSync('docker', ['exec', '-i', 'sovereign-restore-test', 'psql', '-U', 'sovereign', '-d', 'sovereign', '-q', ...args], { input, maxBuffer: 256 * 1024 * 1024 });
+    psql(['-c', 'SELECT timescaledb_pre_restore();']);
+    psql([], gunzipSql(decrypt(enc)));
+    psql(['-c', 'SELECT timescaledb_post_restore();']);
     let allOk = true;
     for (const [table, expected] of [['users', 5], ['audit_logs', 26_000]]) {
       const n = Number(execSync(`docker exec sovereign-restore-test psql -U sovereign -d sovereign -t -A -c "SELECT count(*) FROM ${table}"`).toString().trim());
       console.log(`  ${table} กู้คืนได้ = ${n} แถว`);
       if (n < expected) allOk = false;
     }
+    // hypertable จริง: sensor_telemetry ต้องไม่ว่างหลัง pre/post_restore (เคสเดิม chunk COPY พลาดเงียบ ๆ)
+    try {
+      const live = Number(execSync('docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT count(*) FROM sensor_telemetry"').toString().trim());
+      const restored = Number(execSync('docker exec sovereign-restore-test psql -U sovereign -d sovereign -t -A -c "SELECT count(*) FROM sensor_telemetry"').toString().trim());
+      console.log(`  sensor_telemetry (hypertable) = ${restored} แถว (live ปัจจุบัน ${live})`);
+      if (!(restored > 0)) allOk = false;
+    } catch { /* ตารางไม่มี/ถามไม่ได้ — ไม่ให้พา fail สายหลัก */ }
     console.log(allOk ? '✅ restore สำเร็จจากไฟล์ offsite จริง' : '❌ จำนวนแถวไม่ตรง — ไฟล์ offsite ใช้ไม่ได้เต็ม');
     if (!allOk) process.exitCode = 1;
   } finally {
     execSync('docker rm -f sovereign-restore-test 2>nul', { stdio: 'ignore', shell: 'cmd.exe' });
-    fs.unlinkSync(tmpGz);
   }
   process.exit(0);
 }
@@ -96,20 +107,38 @@ fs.writeFileSync(encPath, enc);
 const sha = crypto.createHash('sha256').update(enc).digest('hex');
 console.log(`   ${encName} (${Math.round(enc.length / 1024)} KB) sha256=${sha.slice(0, 16)}…`);
 
+// จดทุกความล้มเหลวลง log พร้อม status:failed — ห้ามตายเงียบอีก
+// (เคสจริงคืน 24–26/9: DNS ผ่านเราเตอร์ล่ม → fetch throw ไม่มี catch → สคริปต์ตายทั้งรอบ
+//  สาย offsite ขาด 3 คืนโดยไม่มีใครรู้ — คืนถัดไป dump สดใหม่แล้วลองใหม่เอง ไม่ส่งไฟล์เก่าค้าง)
+function logEntry(status, extra = {}) {
+  fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: encName, bytes: enc.length, sha256: sha, status, ...extra }) + '\n');
+}
+
 console.log('3) ส่ง Telegram (sendDocument) — creds จากระบบ (system_settings → env fallback)…');
 const tg = readTelegramCreds();
-if (!tg.token || !tg.chatId) { console.error('FATAL: ไม่มี Telegram credentials — ตั้งที่หน้า Settings หรือ infra/.env'); process.exit(1); }
+if (!tg.token || !tg.chatId) {
+  logEntry('failed', { reason: 'no-credentials' });
+  console.error('FATAL: ไม่มี Telegram credentials — จด status:failed แล้ว (watchdog อายุ backup จะแจ้งแทน)');
+  process.exit(1);
+}
 const form = new FormData();
 form.append('chat_id', tg.chatId);
 form.append('caption', `🗄 Sovereign offsite backup · ${encName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: AES-256-GCM (key บนเครื่องเท่านั้น)`);
 form.append('document', new Blob([enc]), encName);
-const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form });
-const out = await res.json();
-if (!out.ok) { console.error('FATAL: Telegram ปฏิเสธ —', out.description); process.exit(1); }
-console.log(`   ส่งสำเร็จ — message_id=${out.result.message_id}`);
+try {
+  const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(90_000) });
+  const out = await res.json();
+  if (!out.ok) throw new Error(`Telegram ปฏิเสธ — ${out.description}`);
+  console.log(`   ส่งสำเร็จ — message_id=${out.result.message_id}`);
+  logEntry('sent', { tg_message_id: out.result.message_id });
+} catch (err) {
+  const reason = String(err?.cause?.code || err?.message || err).slice(0, 200);
+  logEntry('failed', { reason });
+  console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด status:failed แล้ว (${reason}) — ไฟล์ .enc ค้างใน staging ยืนยันได้ · Task Scheduler จะเห็น exit 1`);
+  process.exit(1);
+}
 
-// log + retention staging (เก็บ 3 ไฟล์ล่าสุด)
-fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: encName, bytes: enc.length, sha256: sha, tg_message_id: out.result.message_id }) + '\n');
+// log เก่าเก็บตามจริง + retention staging (เก็บ 3 ไฟล์ล่าสุด)
 const olds = fs.readdirSync(OFFSITE).filter((f) => f.startsWith('sovereign_dump_')).sort().slice(0, -3);
 for (const f of olds) fs.unlinkSync(path.join(OFFSITE, f));
 console.log(`✅ offsite push ครบ (staging เก็บ 3 ไฟล์ล่าสุด · ลบเก่า ${olds.length} ไฟล์)`);
