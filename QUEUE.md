@@ -96,9 +96,9 @@
 > เจอจริง: สาย backup เงียบ 3–4 คืน (DB backup 22/9 · offsite คืน 23→24/9) — ราก: offsite-push ตายเมื่อ DNS ล่ม + ไม่มี watchdog อายุ backup · เรียงตามผลกระทบ · ทุกงานผ่าน verify ก่อน commit · งานที่แตะ container ต้อง cp ไป MAIN ก่อน restart
 
 ## E — ด่วน: กู้สาย backup (ทำ E1+E2 คู่กันใน branch เดียว)
-- [ ] E1 แก้ `tools/verify/offsite-push.mjs` ไม่ตายเมื่อ Telegram/DNS ล่ม — try/catch รอบส่ง + log สถานะ failed + ยิงซ้ำคืนถัดไป (dump สดใหม่ทุกคืน — ห้ามส่งไฟล์คิวเก่าทับไฟล์ใหม่ ตรวจ timestamp)
-- [ ] E2 watchdog อายุ backup ใน `tools/machine-health.mjs` — ไฟล์ล่าสุด 2 สาย (`backups/sovereign_backup_*.sql.gz` และ `offsite-log.jsonl`) เกิน 26 ชม. = critical → Telegram + **เพิ่มเช็คสุขภาพดิสก์ (Get-PhysicalDisk HealthStatus) ในรอบเดียวกัน** (เครื่องมีดิสก์กายภาพเดียว — SSD เสื่อม = ตายทั้งระบบ)
-- [ ] E4 ยิง `offsite-push.mjs --restore-test` หลังแก้ E1 — พิสูจน์สายกู้คืนด้วยไฟล์ล่าสุดที่มี (คืน 23→24/9)
+- [x] E1 แก้ `tools/verify/offsite-push.mjs` ไม่ตายเมื่อ Telegram/DNS ล่ม — try/catch รอบส่ง + log สถานะ failed พร้อมเหตุผล + exit 1 ชัดเจน — **เสร็จ 27/9/69** (คืนถัดไป dump สดใหม่ลองใหม่เอง ไม่ส่งไฟล์เก่า)
+- [x] E2 watchdog อายุ backup + สุขภาพดิสก์ใน `tools/machine-health.mjs` — **เสร็จ 27/9/69**: ยิงรอบแรกจับของจริง (DB backup เก่า 113 ชม. + offsite เงียบ 70.6 ชม. = critical ทั้งคู่) · mutation เทส 7/7 (สด/failed/เก่า 30 ชม./ไม่มีไฟล์) · ตรวจด้วย — และพบ `machine-health.mjs` **ไม่เคยถูก git track** (บั๊กคลาสเดิมครั้งที่ 3) เพิ่ม whitelist เข้า git แล้ว
+- [x] E4 ยิง `offsite-push.mjs --restore-test` — **เสร็จ 27/9/69**: users 8 · audit_logs 26,383 · **sensor_telemetry 118,883 แถว** (live 121,026 — ตรงตามอายุ dump) · แก้สคริปต์ใช้ `timescaledb_pre/post_restore` แยก 3 ครั้งเรียก (บทเรียนใหม่: pg_dump เซ็ต search_path='' กลาง stream — ห้ามรวม post_restore ใน session เดียวกับ dump)
 - [ ] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — ตั้ง `MESH_RSYNC_TARGET` (ดิสก์ USB/NAS/คลาวด์ ~4MB/คืน) + **สำรอง mesh key/BACKUP_ENCRYPTION_KEY นอกเครื่อง** (ปิดความเสี่ยง key อยู่เครื่องเดียวไปด้วย)
 - [ ] E5 WAL archiving + ซ้อม PITR (RPO 24 ชม. → นาที) — ทำหลัง E4 เพราะใช้สายทดสอบเดียวกัน
 
