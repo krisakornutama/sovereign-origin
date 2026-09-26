@@ -36,6 +36,27 @@ interface TruthPayload {
   disk: { fingerprint: string | null; files: number | null; dir: string | null } | null;
   codeMatch: boolean | null;
   nightlyHistory?: NightlyDay[] | null; // Phase 4: แนวโน้ม verify ย้อน 30 วัน
+  // P0 ใช้งานง่าย (27/9): สายปฏิบัติการ — อายุ backup สด + task/nightly จาก snapshot ฝั่ง host
+  ops?: OpsPayload | null;
+}
+
+interface OpsTask { name: string; label?: string; lastRun?: string; result: { ok: boolean; text: string } }
+interface OpsPayload {
+  checkedAt?: string;
+  backup?: {
+    dbLastAgeH: number | null;
+    dbLastFile: string | null;
+    offsiteLastAgeH: number | null;
+    offsiteLastStatus: string | null;
+    offsiteNote: string | null;
+  };
+  host?: {
+    snapshotAt: string | null;
+    watch: string[];
+    tasks: OpsTask[] | null;
+    nightly: { ok: boolean | null; finishedAt?: string; gateOk: boolean | null; codeMatch: boolean | null; failed: string[] } | null;
+    note: string | null;
+  };
 }
 
 const Fp = ({ value }: { value: string | null | undefined }) => (
@@ -192,6 +213,80 @@ export default function SystemHealthPage() {
                   )}
                 </section>
               </div>
+
+              {/* P0 ใช้งานง่าย 27/9: สายปฏิบัติการครบจุดเดียว — backup สด + task scheduler + nightly ฝั่ง host */}
+              {data.ops && (
+                <section className="rounded-xl border border-gray-800 bg-gray-900/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">{t('systemHealth.opsSection', 'สายปฏิบัติการ — backup · task · nightly')}</h2>
+                    <span className="text-xs text-gray-500">{t('systemHealth.opsAt', 'ตรวจเมื่อ')} {fmtTime(data.ops.checkedAt ?? null)}</span>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg bg-gray-950/60 border border-gray-800 p-3 space-y-1">
+                      <div className="text-xs text-gray-400">{t('systemHealth.dbBackupLine', 'DB backup (เป้า 03:00 ทุกคืน)')}</div>
+                      {(() => {
+                        const age = data.ops?.backup?.dbLastAgeH;
+                        const ok = age != null && age <= 26;
+                        return (
+                          <>
+                            <div className={`text-sm ${age == null ? 'text-gray-400' : ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                              {age == null ? t('systemHealth.noBackup', 'ไม่พบไฟล์ backup') : `${t('systemHealth.agoH', 'ล่าสุด')} ${age} ${t('systemHealth.hours', 'ชม.')}`}
+                            </div>
+                            <div className="text-[10px] text-gray-500 truncate">{data.ops?.backup?.dbLastFile ?? '—'}</div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="rounded-lg bg-gray-950/60 border border-gray-800 p-3 space-y-1">
+                      <div className="text-xs text-gray-400">{t('systemHealth.offsiteLine', 'Offsite → Telegram (เข้ารหัส AES-GCM)')}</div>
+                      {(() => {
+                        const age = data.ops?.backup?.offsiteLastAgeH;
+                        const status = data.ops?.backup?.offsiteLastStatus;
+                        const ok = age != null && age <= 26 && status !== 'failed';
+                        return (
+                          <>
+                            <div className={`text-sm ${age == null ? 'text-gray-400' : ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                              {age == null ? (data.ops?.backup?.offsiteNote ?? '—') : `${t('systemHealth.agoH', 'ล่าสุด')} ${age} ${t('systemHealth.hours', 'ชม.')} · ${status ?? '—'}`}
+                            </div>
+                            {data.ops?.backup?.offsiteNote && <div className="text-[10px] text-amber-300/80 truncate">{data.ops.backup.offsiteNote}</div>}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  {data.ops.host?.tasks && data.ops.host.tasks.length > 0 && (
+                    <div className="rounded-lg bg-gray-950/60 border border-gray-800 p-3">
+                      <div className="text-xs text-gray-400 mb-1">{t('systemHealth.tasksLine', 'Task Scheduler (ฝั่ง Windows — อัปเดตผ่าน snapshot)')}</div>
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        {data.ops.host.tasks.map((task) => (
+                          <div key={task.name} className="flex items-center gap-2 text-xs" title={`${task.result.text}${task.lastRun ? ` · ${task.lastRun}` : ''}`}>
+                            <span className={task.result.ok ? 'text-emerald-400' : 'text-red-400'}>{task.result.ok ? '✓' : '✗'}</span>
+                            <span className="text-gray-300">{task.label ?? task.name}</span>
+                            {!task.result.ok && <span className="text-[10px] text-red-300/80 truncate">{task.result.text}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {data.ops.host?.nightly && (
+                    <div className="text-xs text-gray-400">
+                      {t('systemHealth.nightlyLine', 'Nightly ล่าสุด')}:{' '}
+                      <span className={data.ops.host.nightly.ok === true ? 'text-emerald-300' : 'text-red-300'}>
+                        {data.ops.host.nightly.ok === true ? '✓ ผ่าน' : data.ops.host.nightly.ok === false ? '✗ พัง' : '—'}
+                      </span>
+                      {data.ops.host.nightly.failed.length > 0 && <span className="text-red-300/80"> · {data.ops.host.nightly.failed.join(', ')}</span>}
+                    </div>
+                  )}
+                  {data.ops.host?.watch && data.ops.host.watch.length > 0 && (
+                    <ul className="space-y-1">
+                      {data.ops.host.watch.map((w, i) => (
+                        <li key={i} className="text-xs text-amber-300/90">• {w}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {data.ops.host?.note && <div className="text-[10px] text-gray-500">{data.ops.host.note}</div>}
+                </section>
+              )}
 
               {/* Phase 4: แนวโน้ม verify ย้อน 30 วัน — เห็นความเสถียรของระบบในหน้าเดียว */}
               {data.nightlyHistory && data.nightlyHistory.length > 0 && (

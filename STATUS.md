@@ -3,6 +3,12 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** ONE-SYSTEM UX — ระบบมีหลายส่วนแต่ใช้งานเหมือนส่วนเดียว (27/9/69) · สาขา: ai/backup-resilience
+  - **เจตนา:** จุดแข็งของระบบ (watchdog/backup/truth/alert) กระจายอยู่ 6 ที่ — ผู้ใช้ต้องรู้ "ไปดูที่ไหน" เอง รอบนี้ทำให้ทุกสายมาปรากฏจุดเดียวโดยไม่ลบระบบเดิมใด
+  - **P0 คำสั่งเดียว:** `node tools/ops-status.mjs` — services + เครื่อง/backup (ดึง machine-health มาใช้ ไม่คำนวณซ้ำ) + nightly + task ทั้ง 8 พร้อม decode รหัส (0x800710E0 = แบต/หลับ) · `--quiet` เห็นเฉพาะสิ่งที่ต้องดู · `--snapshot` เขียน data/ops-status.json ให้หน้าเว็บ
+  - **P1 หน้าเว็บจุดเดียว:** /system-health เพิ่มส่วน "สายปฏิบัติการ" — อายุ backup สด (backend อ่านจาก mount ผ่าน ops-summary.service) + ผล task ทั้ง 8 + nightly ฝั่ง host (สะพานผ่าน snapshot ที่ Machine Watch รีเฟรชให้ทุก 10 นาทีโดยอัตโนมัติ — เขียนจากฝั่งที่มองเห็น Task Scheduler)
+  - **แก้บั๊กตัวเอง:** e2e retry เมื่อคืนโดน test timeout 180s ตัดตั้งแต่รอบแรก (waitForTimeout บน page ที่ปิดไปแล้ว) — ยกเพดาน setup 360s + ต่อรอบ ≤90s + หน่วงด้วย setTimeout ปกติ
+  - **บั๊กคลาสเดิมครั้งที่ 4:** machine-alert.mjs + ops-status.mjs ก็ gitignored ไม่ถูก track (เหมือน machine-health) — whitelist ครบแล้ว
 - **งาน:** BACKUP RESILIENCE — กู้สาย backup ที่เงียบ 3–4 คืน + ติดตั้งระฆัง + พิสูจน์ restore จริง (27/9/69) · สาขา: ai/backup-resilience
   - **เจอตัวจริง:** สาย DB backup เงียบตั้งแต่ 22/9 (113 ชม.) · offsite → Telegram ตั้งแต่คืน 23→24/9 (70.6 ชม.) — ราก: offsite-push ตายเมื่อ DNS ผ่านเราเตอร์ล่ม (`getaddrinfo ENOTFOUND` throw ไม่มี catch) + **ไม่มี watchdog อายุ backup** ทั้งที่ backup 03:00/offsite 20:30 รันทุกคืน
   - **E1 แก้ต้นเหตุ:** offsite-push จด `status:failed` พร้อมเหตุผลทุกจุดที่ล้ม (DNS/creds/Telegram ปฏิเสธ) — dump สดใหม่ทุกคืน ลองใหม่เอง ไม่ส่งไฟล์คิวเก่า

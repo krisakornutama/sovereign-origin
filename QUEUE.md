@@ -91,7 +91,9 @@
 
 ---
 
-# คิวใหม่: ความทนทานระบบ (เพิ่ม 27/9/69 — ยืนยันจากโค้ด + เจอตัวจริงกำลังพัง)
+# คิวใหม่: ความทนทานระบบ + ใช้งานง่ายเหมือนส่วนเดียว (เพิ่ม 27/9/69 — ยืนยันจากโค้ด + เจอตัวจริงกำลังพัง)
+
+> อัปเดต 27/9 ช่วงกลางคืน: P0+P1 ของ "ใช้งานง่าย" เสร็จแล้ว (ops-status คำสั่งเดียว + หน้า /system-health เห็นสาย task/backup) — เหลือ P2 ด้านล่าง
 
 > เจอจริง: สาย backup เงียบ 3–4 คืน (DB backup 22/9 · offsite คืน 23→24/9) — ราก: offsite-push ตายเมื่อ DNS ล่ม + ไม่มี watchdog อายุ backup · เรียงตามผลกระทบ · ทุกงานผ่าน verify ก่อน commit · งานที่แตะ container ต้อง cp ไป MAIN ก่อน restart
 
@@ -115,6 +117,7 @@
 - [ ] H2 กัน e2e fail ลูกโซ่ — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
 - [ ] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` (แนว telegram-creds.mjs) — JWT_SECRET ถูกอ่านกระจายหลาย tools วันนี้
 - [ ] H4 Windows-coupling ชั้น ops (Task Scheduler/.bat/.ps1) — จดไว้ ทำเมื่อโมเดลขาย turnkey จริง (launcher Go เริ่มถูกทางแล้ว)
+- [ ] H5 (P2 ใช้งานง่าย ต่อจาก 27/9) เชื่อม Telegram รายวัน: สรุป ops-status ตี 8:30 หลัง digest — เจ้าของเห็นสถานะครบทุกสายในแชทเดิม ไม่ต้องเปิดเว็บ/เครื่อง · ใช้คอมโพเนนต์ที่มีทั้งหมด (ops-status --quiet + nightly-report)
 
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่

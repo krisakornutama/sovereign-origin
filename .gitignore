@@ -107,6 +107,8 @@ tools/*
 !tools/set-required-checks.sh
 !tools/system-health.mjs
 !tools/machine-health.mjs
+!tools/machine-alert.mjs
+!tools/ops-status.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
