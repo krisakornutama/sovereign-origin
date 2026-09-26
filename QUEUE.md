@@ -118,6 +118,8 @@
 - [ ] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` (แนว telegram-creds.mjs) — JWT_SECRET ถูกอ่านกระจายหลาย tools วันนี้
 - [ ] H4 Windows-coupling ชั้น ops (Task Scheduler/.bat/.ps1) — จดไว้ ทำเมื่อโมเดลขาย turnkey จริง (launcher Go เริ่มถูกทางแล้ว)
 - [ ] H5 (P2 ใช้งานง่าย ต่อจาก 27/9) เชื่อม Telegram รายวัน: สรุป ops-status ตี 8:30 หลัง digest — เจ้าของเห็นสถานะครบทุกสายในแชทเดิม ไม่ต้องเปิดเว็บ/เครื่อง · ใช้คอมโพเนนต์ที่มีทั้งหมด (ops-status --quiet + nightly-report)
+- [ ] H6 e2e ทนเน็ตกระตุก: all-pages spec ที่ fail จาก ERR_CONNECTION_TIMED_OUT (router LTE กระตุกตอน nightly — เคสจริง 27/9 04:50) ให้ retry เฉพาะ request ภายนอก หรือข้ามเช็ค console error ชนิด network-timeout (ระบบไม่พัง — เน็ตพัง)
+- [ ] H7 กัน seed e2e ซ้ำ: pos-flow fail เพราะ option 'E2E-ทดสอบอัตโนมัติ' มี 2 รายการ (seed รอบก่อนค้าง) — beforeAll ต้องลบ/อัปเดตก่อนสร้าง (idempotent) และท้าย suite ล้างที่ตั้งไว้
 
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
