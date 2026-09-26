@@ -10,7 +10,8 @@
 //        เห็นซ้ำใน cooldown → ยับ (log เงียบ ไม่จด DB กัน 144 แถว/วัน)
 //        ข้าม cooldown แล้วยังวิกฤต → แจ้งซ้ำได้ (คนลืมได้)
 //        หายจริง → แจ้ง ✅ กลับมาปกติ ครั้งเดียว แล้วเคลียร์ state
-// ใช้: node tools/machine-alert.mjs [--dry]
+// ใช้: node tools/machine-alert.mjs [--dry] — flags หลัง -- (เช่น -- --snapshot) จะถูกส่งต่อให้ machine-health
+// (ตั้งแต่ 27/9: Machine Watch ยิงด้วย --snapshot — เขียน data/ops-status.json ให้หน้า /system-health แสดงสาย task/backup สดตลอด)
 // ────────────────────────────────────────────────────────────────────────────
 import { spawnSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -31,7 +32,7 @@ const COOLDOWN_MS = Number(process.env.MA_COOLDOWN_MIN ?? 60) * 60_000;
 // ── 1) ตรวจสุขภาพเครื่อง (สคริปต์เดียวกับ nightly ใช้ — ความจริงชุดเดียว) ──
 let health = null;
 try {
-  const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs'), ...process.argv.slice(1)], {
     cwd: REPO, encoding: 'utf8', timeout: 90_000,
     // ห้าม shell:true — path repo มีเว้นวรรค ("E:/My work/...") shell ตัดที่ช่องว่าง → "Cannot find module 'E:\\My'"
     // (บั๊กจริงตอนทดสอบรอบแรก — args array ไม่มี shell เข้า CreateProcess ตรง ปลอดภัยกับเว้นวรรค)
@@ -43,6 +44,14 @@ if (!health || !Array.isArray(health.problems)) {
   process.exit(0);
 }
 const criticals = health.problems.filter((p) => p.level === 'critical');
+
+// ── 1b) snapshot สำหรับหน้า /system-health (ถ้าถูกยิงด้วย --snapshot) — soft-fail เสมอ ──
+// ops-status เขียน data/ops-status.json (ผล task scheduler + nightly ที่ container/เว็บมองไม่เห็นเอง)
+if (process.argv.includes('--snapshot')) {
+  try {
+    spawnSync('node', [join(REPO, 'tools', 'ops-status.mjs'), '--snapshot'], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
+  } catch { /* snapshot พัง = หน้าเว็บข้อมูลเก่ากว่านิดเดียว ไม่กระทบการแจ้งเตือน */ }
+}
 const criticalAreas = new Set(criticals.map((p) => p.area));
 
 // ── 2) state (รอบก่อนส่งอะไรไปแล้วบ้าง) ──

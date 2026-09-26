@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { readFile as readFileCb } from 'node:fs';
 import { config } from './config';
 import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
+import { buildOpsSummary } from './services/ops-summary.service';
 import { prisma } from './lib/prisma';
 
 // อ่านไฟล์ JSON แบบ "ไม่มีก็ได้" — ใช้กับ data/system-truth.json (ผลเกตล่าสุดที่ verify เขียน)
@@ -194,6 +195,7 @@ export function mountRoutes(app: Express): void {
       readJsonIfExists(join(process.cwd(), 'data', 'system-truth.json')).catch(() => null),
       readJsonIfExists(join(process.cwd(), 'data', 'nightly-history.json')).catch(() => null),
       ]);
+      const ops = await buildOpsSummary().catch(() => null);
       const gate = gateRaw as {
         writtenAt?: string; steps?: Array<{ name?: string; ok?: boolean; skipped?: boolean }>;
         prodTruth?: { ok?: boolean; diskFingerprint?: string; diskFiles?: number; diskDir?: string };
@@ -211,6 +213,8 @@ export function mountRoutes(app: Express): void {
         codeMatch: diskFp ? diskFp === runtimeFp : null, // null = ยังไม่มีข้อมูลเทียบ (verify ยังไม่เคยรันบนเครื่องนี้)
         // Phase 4: แนวโน้มผล verify ย้อน 30 วันจาก nightly (ok/duration/machine — ตามวันที่)
         nightlyHistory: Array.isArray(nightlyHist) ? (nightlyHist as Array<Record<string, unknown>>) : null,
+        // สะพาน ops (P0 ใช้งานง่าย 27/9): อายุ backup สด + ผล task/nightly จาก snapshot ฝั่ง host
+        ops,
       });
     } catch {
       res.status(503).json({ error: 'truth unavailable' });

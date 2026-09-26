@@ -35,6 +35,10 @@ function tokenFromState(): string | null {
 }
 
 setup('authenticate as e2e-bot', async ({ page, request }) => {
+  // โครงเวลา (บทเรียน 27/9): test timeout 180s หมดตั้งแต่รอบแรก (goto 60 + waitForURL 120)
+  // → retry ที่เขียนทับด้วย page.waitForTimeout โดนปิดพร้อม page → รอบ 2–3 ไม่เคยได้รัน
+  // แก้: ยกเพดาน setup เป็น 360s + ต่อรอบจำกัดเวลาสั้นลง + หน่วงด้วย setTimeout ปกติ (ไม่พึ่ง page)
+  setup.setTimeout(360_000);
   // ── fast path: token เดิมยังมีชีวิต → ข้าม login ──
   const token = tokenFromState();
   if (token) {
@@ -56,14 +60,13 @@ setup('authenticate as e2e-bot', async ({ page, request }) => {
   // หน้า dev server/build worker ยังอุ่นไม่สุด → waitForURL 120s timeout = suite ทั้ง 63 spec ไม่ได้รันเลย) ──
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await page.goto('/', { timeout: 60_000 });
+      await page.goto('/', { timeout: 45_000 });
       await page.locator('input[autocomplete="username"]').fill(process.env.E2E_BOT_USER ?? 'e2e-bot');
       await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_BOT_PASS ?? '');
       await page.locator('button[type="submit"]').click();
-      // รอ redirect ไป dashboard - เพิ่ม timeout ให้พอ
+      // รอ redirect ไป dashboard — ต่อรอบ ≤ 90s ให้ครบ 3 รอบในเพดาน 360s
       // trailingSlash เปิดอยู่ → redirect ได้ทั้ง /dashboard และ /dashboard/
-      await page.waitForURL(/\/dashboard\/?$/, { timeout: 120_000 });
-      // รอให้หน้าโหลดเสร็จ
+      await page.waitForURL(/\/dashboard\/?$/, { timeout: 90_000 });
       await page.waitForLoadState('networkidle', { timeout: 30_000 });
       await expect(page).toHaveURL(/dashboard/);
       await page.context().storageState({ path: STATE_PATH });
@@ -71,7 +74,7 @@ setup('authenticate as e2e-bot', async ({ page, request }) => {
     } catch (e) {
       if (attempt === 3) throw e;
       console.log(`[e2e-setup] login รอบ ${attempt} พลาด (${e instanceof Error ? e.message.split('\n')[0] : e}) — ลองใหม่ใน 15 วิ`);
-      await page.waitForTimeout(15_000);
+      await new Promise((r) => setTimeout(r, 15_000));
     }
   }
 });
