@@ -88,3 +88,38 @@
 หมายเหตุ hydration: dashboard layout + history range แก้แล้ว (`05a2264` + `ffac9e2`) — ห้ามอ่าน localStorage/URL ตอน render แรก ให้ไปอ่านใน useEffect
 หมายเหตุ CSP + WebSocket สแตก preview (22/9/69): `connect-src` ใน `next.config.js` อนุญาต `ws://localhost:3101` + `ws://127.0.0.1:3101` แล้ว และ **mock :3101 มี Socket.IO handler จริงแล้ว** (ปิดหางงาน A1 ให้จบ) — `tools/mock-api-preview.mjs` attach socket.io ของ core-api node_modules (ไม่เพิ่ม dependency), ด่าน handshake เลียนรูปแบบของจริง (auth.token ต้องถอด payload ได้ + `mfa_verified:true` — mock ไม่ verify signature เพราะ token บน preview เป็น fake JWT ฝั่ง client อยู่แล้ว), snapshot 4 events ตาม EVENT_FIELD_ALLOWLIST ของ core-api ทันทีที่ต่อ + telemetry สดทุก 15 วิ; พิสูจน์แล้ว: dashboard บน :3100 ขึ้น "WebSocket connected" + mock log `socket connected (online: 1)`; เทส regression `tools/test/mock-socket.test.mjs` 6/6 (พูดโปรโตคอล EIO=4 ตรงผ่าน ws — เทคนิคเดียวกับ socketAuth.test.ts ของของจริง) — dashboard จริงบน backend :3001 ไม่กระทบ; **alerts สดบน preview (22/9/69):** mock ฉีด alert วนฉาก critical/warning/info ทุก 45 วิ (MOCK_ALERT_INTERVAL_MS ปรับได้) — REST `/api/automation/alerts` stateful + push `new_alert`/`critical_alert` ทาง socket พร้อมกันจากที่เดียวกัน, หน้า /alerts ต่อ socket รับสดแล้ว (dedupe ด้วย id, REST ยัง seed ประวัติเดิม) — พิสูจน์แล้ว alert ใหม่โชว์ทันทีไม่ต้องรอ poll
 หมายเหตุ :3000 stale build (23/9/69): หลัง `npm run verify` ที่ rebuild `.next` ทับ ถ้า `next start` เดิมยังรันอยู่ จะเสิร์ฟ HTML ชี้ chunk ของ build เก่า = 404 ทั้งหน้า (อาการ: ฟอร์มค้าง "กำลังโหลด...", console `Failed to load client middleware manifest`) — แก้: kill PID เจ้าของพอร์ต :3000 แล้ว watchdog บูตใหม่ให้เองใน ~10 วิ (watchdog ตรวจแค่ HTTP 200 ที่ `/` จึงมองไม่เห็นอาการนี้เอง)
+
+---
+
+# คิวใหม่: ความทนทานระบบ (เพิ่ม 27/9/69 — ยืนยันจากโค้ด + เจอตัวจริงกำลังพัง)
+
+> เจอจริง: สาย backup เงียบ 3–4 คืน (DB backup 22/9 · offsite คืน 23→24/9) — ราก: offsite-push ตายเมื่อ DNS ล่ม + ไม่มี watchdog อายุ backup · เรียงตามผลกระทบ · ทุกงานผ่าน verify ก่อน commit · งานที่แตะ container ต้อง cp ไป MAIN ก่อน restart
+
+## E — ด่วน: กู้สาย backup (ทำ E1+E2 คู่กันใน branch เดียว)
+- [ ] E1 แก้ `tools/verify/offsite-push.mjs` ไม่ตายเมื่อ Telegram/DNS ล่ม — try/catch รอบส่ง + log สถานะ failed + ยิงซ้ำคืนถัดไป (dump สดใหม่ทุกคืน — ห้ามส่งไฟล์คิวเก่าทับไฟล์ใหม่ ตรวจ timestamp)
+- [ ] E2 watchdog อายุ backup ใน `tools/machine-health.mjs` — ไฟล์ล่าสุด 2 สาย (`backups/sovereign_backup_*.sql.gz` และ `offsite-log.jsonl`) เกิน 26 ชม. = critical → Telegram + **เพิ่มเช็คสุขภาพดิสก์ (Get-PhysicalDisk HealthStatus) ในรอบเดียวกัน** (เครื่องมีดิสก์กายภาพเดียว — SSD เสื่อม = ตายทั้งระบบ)
+- [ ] E4 ยิง `offsite-push.mjs --restore-test` หลังแก้ E1 — พิสูจน์สายกู้คืนด้วยไฟล์ล่าสุดที่มี (คืน 23→24/9)
+- [ ] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — ตั้ง `MESH_RSYNC_TARGET` (ดิสก์ USB/NAS/คลาวด์ ~4MB/คืน) + **สำรอง mesh key/BACKUP_ENCRYPTION_KEY นอกเครื่อง** (ปิดความเสี่ยง key อยู่เครื่องเดียวไปด้วย)
+- [ ] E5 WAL archiving + ซ้อม PITR (RPO 24 ชม. → นาที) — ทำหลัง E4 เพราะใช้สายทดสอบเดียวกัน
+
+## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
+- [ ] F1 backup ห้ามแนบ .env (backup.service ระบุครอบ .env ถ้าหาเจอ) — ตัดออก/แยกไฟล์ กัน token ทั้งระบบหลุดไปกับไฟล์ offsite ถ้าหลุด
+- [ ] F2 เข้ารหัส field อ่อนไหว (AES-256-GCM เทียบเท่า mesh) — DB ถูกยก = อ่านได้หมดวันนี้ (health 32 ข้อ/รหัสเราเตอร์ plaintext/Telegram token) — ทำหลัง E3 (key นอกเครื่องมาก่อน)
+
+## G — ตัดสินใจระดับเจ้าของ (ไม่ใช่โค้ด)
+- [ ] G1 ทิศทาง e-Tax: คงสถานะ "เอกสารภายใน/ใบเสร็จธรรมดา" + ป้ายชัด หรือลงทุนเชื่อม CA/provider ตอนเปิดร้านจริง (thai-tax.service = เครื่องคำนวณเท่านั้น ไม่มี digital signature/CA ในโค้ด)
+- [ ] G2 เช็คลิสต์ก่อนเปิด /shop สู่อินเทอร์เน็ต: tunnel (ยังไม่มีในระบบเลย) + consent/PDPA + F2 ต้องเสร็จก่อน
+
+## H — คุณภาพระยะยาว (ไม่ด่วน)
+- [ ] H1 retention ตาราง non-hypertable ที่โตเงียบ — วัดจริก่อน: `audit_logs` (เขียนทุก action)/`security_events` → ตั้งตามข้อมูลจริง (sensor_telemetry จัดครบแล้ว ห้ามซ้ำ)
+- [ ] H2 กัน e2e fail ลูกโซ่ — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
+- [ ] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` (แนว telegram-creds.mjs) — JWT_SECRET ถูกอ่านกระจายหลาย tools วันนี้
+- [ ] H4 Windows-coupling ชั้น ops (Task Scheduler/.bat/.ps1) — จดไว้ ทำเมื่อโมเดลขาย turnkey จริง (launcher Go เริ่มถูกทางแล้ว)
+
+## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
+- **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
+- **Staging แยกเต็มรูป** — มี preview-stack mock :3100 สำหรับทดลองแล้ว · ทำเมื่อมีเครื่องที่สอง/ขายจริงเท่านั้น
+- **CI-บนเครื่องจริง parity** — nightly verify รันบนเครื่องจริงทุกคืนอยู่แล้ว = ด่านความจริงหลัก
+- **Trim 45+ หน้า** — feature-grant ปิดรายโมดูลได้แล้ว · ทบทวน usage ปีละครั้งพอ
+
+**ลำดับ:** E1+E2 (branch เดียว) → E4 → E3 → E5 → F1 → F2 → G1–G2 (ตัดสินใจ) → H · เกณฑ์จบแต่ละงาน: แก้แล้วต้องมีวิธีพิสูจน์ว่าดีขึ้นจริง (mutation/ยิงจริง/เทส) ไม่ใช่แค่โค้ดผ่าน
