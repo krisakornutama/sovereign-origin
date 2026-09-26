@@ -131,11 +131,15 @@ router.post('/wan/speedtest', authenticate, async (_req, res) => {
 });
 
 // GET /api/system/wan/sim — ข้อมูลซิมจากใน router (สัญญาณ RSRP/SINR · data usage · clients ครบ)
+// เราเตอร์ไม่ตอบ = สถานะฮาร์ดแวร์ ไม่ใช่บั๊กเซิร์ฟเวอร์ — คืน 200 + loggedIn:false เสมอ
+// (เคสจริง 26/9: router กระตุก → throw → 500 → ui-sweep/nightly gate ติดยาทั้งเกต ทั้งที่ระบบปกติ
+//  และตอน login ไม่ผ่าน service เองก็คืน 200 degraded อยู่แล้ว — เคส throw จึงไม่สม่ำเสมอ)
 router.get('/wan/sim', authenticate, async (_req, res) => {
   try {
     res.json(await fetchRouterSimData());
   } catch (err) {
-    res.status(500).json({ error: 'Router SIM fetch failed' });
+    console.error('WAN SIM fetch error (คืน 200 degraded):', err instanceof Error ? err.message : err);
+    res.json({ loggedIn: false, error: 'router unreachable — เช็คสาย LAN/สัญญาณ LTE' });
   }
 });
 

@@ -52,16 +52,26 @@ setup('authenticate as e2e-bot', async ({ page, request }) => {
     }
   }
 
-  // ── login ผ่าน UI (timeout 3 นาทีสำหรับ setup นี้) ──
-  await page.goto('/', { timeout: 60_000 });
-  await page.locator('input[autocomplete="username"]').fill(process.env.E2E_BOT_USER ?? 'e2e-bot');
-  await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_BOT_PASS ?? '');
-  await page.locator('button[type="submit"]').click();
-  // รอ redirect ไป dashboard - เพิ่ม timeout ให้พอ
-  // trailingSlash เปิดอยู่ → redirect ได้ทั้ง /dashboard และ /dashboard/
-  await page.waitForURL(/\/dashboard\/?$/, { timeout: 120_000 });
-  // รอให้หน้าโหลดเสร็จ
-  await page.waitForLoadState('networkidle', { timeout: 30_000 });
-  await expect(page).toHaveURL(/dashboard/);
-  await page.context().storageState({ path: STATE_PATH });
+  // ── login ผ่าน UI — ลองซ้ำได้ 3 รอบ (เคสจริง 26/9: รอบ 02:15 เครื่องเพิ่งตื่นจาก sleep
+  // หน้า dev server/build worker ยังอุ่นไม่สุด → waitForURL 120s timeout = suite ทั้ง 63 spec ไม่ได้รันเลย) ──
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.goto('/', { timeout: 60_000 });
+      await page.locator('input[autocomplete="username"]').fill(process.env.E2E_BOT_USER ?? 'e2e-bot');
+      await page.locator('input[autocomplete="current-password"]').fill(process.env.E2E_BOT_PASS ?? '');
+      await page.locator('button[type="submit"]').click();
+      // รอ redirect ไป dashboard - เพิ่ม timeout ให้พอ
+      // trailingSlash เปิดอยู่ → redirect ได้ทั้ง /dashboard และ /dashboard/
+      await page.waitForURL(/\/dashboard\/?$/, { timeout: 120_000 });
+      // รอให้หน้าโหลดเสร็จ
+      await page.waitForLoadState('networkidle', { timeout: 30_000 });
+      await expect(page).toHaveURL(/dashboard/);
+      await page.context().storageState({ path: STATE_PATH });
+      return;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      console.log(`[e2e-setup] login รอบ ${attempt} พลาด (${e instanceof Error ? e.message.split('\n')[0] : e}) — ลองใหม่ใน 15 วิ`);
+      await page.waitForTimeout(15_000);
+    }
+  }
 });
