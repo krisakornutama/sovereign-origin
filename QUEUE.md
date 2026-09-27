@@ -135,8 +135,8 @@
 # คิวหมวด I (เพิ่ม 28/9/69 — จากลิสต์เจ้าของ + ของจริงเช้านี้) — ทำอัตโนมัติต่อเนื่องตามลำดับท้ายหมวด
 
 ## I0 — ด่วน: เจอตัวจริงกำลังพังเมื่อเช้า (แก้ก่อนคิวใหญ่)
-- [ ] I0a frontend-watchdog จริง — :3000 ล่มทั้งเช้าเพราะ `frontend-watchdog.mjs` เป็น "ไฟล์ผี" (verify.mjs/nightly-gate.mjs อ้างหาแต่ไม่มีบนดิสก์เลย) — เขียน `tools/frontend-watchdog.mjs` (เช็ค :3000 ตอบจริง → ไม่ตอบ/serve build แปลก = kill PID เจ้าของพอร์ต + wipe .next เมื่อจำเป็น + boot ตามธรรมเนียม dev-restore ของ verify.mjs) + ต่อเข้า Machine Watch รอบเดียวกัน + whitelist · **พิสูจน์:** kill :3000 จริง → watchdog ชุบกลับใน 60 วิ
-- [ ] I0b security-anomaly (digest) ตายเงียบเมื่อ Docker ดับ — เคสจริง 20:35 27/9 (execSync โดน daemon ดับ throw ไม่มี catch → task 0x1 ทั้งที่ระบบปกติ) — try/catch ครบทุก query + log `docker-down` + ออกแบบ "ข้ามรอบ" (รอบถัดไปลองใหม่เอง) — ห้ามตายเงียบเหมือนเดิม
+- [x] I0a frontend-watchdog จริง — **เสร็จ 28/9/69** (`3e2ff4e`): tools/frontend-watchdog.mjs (ไฟล์ผีมีตัวจริงแล้ว) — :3000 ตาย=บูตเอง · ค้าง=kill PID เฉพาะ next server · สิ่งแปลกปลอม=fail-safe ไม่แตะ exit 1 · ผูก Machine Watch ทุก 10 นาที · **พิสูจน์ครบ 3 เส้นทางจริง:** boot 11 วิ · skip-unknown (dummy listener จับพอร์ต → ไม่ kill · exit 1) · ต่อ task แล้ว log healthy ตามรอบ
+- [x] I0b security-anomaly ทน Docker ดับ — **เสร็จ 28/9/69** (`3e2ff4e`): psqlRows ไม่ throw · ตรวจไม่ครบ = ส่ง "ตรวจไม่ครบ" + exit 1 (ล้มดัง ห้ามปลอม "✅ ปกติ") · **รันจริง:** พบ 2 กลุ่ม (e2e-bot + ผู้ใช้เก่า) → ส่ง Telegram จริง exit 0
 - [ ] I0c คืนนี้ตัดสิน nightly จริง: รอบ 02:00 เป็นรอบแรกหลัง H6/H7 merge (log 03:47 เมื่อคืนคือโค้ดเก่า) — เช้าหน้ากวาดตรวจ: /health //audit ยัง fail (console bucket ที่ ignore ครึ่ง ๆ กลาง ๆ ตาม error-context) ให้ ignore รูปแบบเต็ม · pos-flow ยัง fail (option count 2) ให้ snapshot option จริงก่อนแก้
 
 ## I1 — PITR จบให้สมบูรณ์ (WAL archiving เปิดแล้วจริง 27/9 — `wip 6720af5`: archive_mode=on · archive ไหล 0 failed · archive_timeout=300s)
