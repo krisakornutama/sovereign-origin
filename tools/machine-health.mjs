@@ -31,6 +31,8 @@ const BACKUP_MAX_AGE_H = Number(process.env.MH_BACKUP_MAX_AGE_H ?? 26); // ร�
 const DB_BACKUP_DIR = process.env.MH_DB_BACKUP_DIR || join(MAIN_ROOT, 'sovereign-os/core-api/backups');
 const OFFSITE_DIR = process.env.MH_OFFSITE_DIR || join(MAIN_ROOT, 'sovereign-os/infra/offsite');
 const OFFSITE_LOG = process.env.MH_OFFSITE_LOG || join(DB_BACKUP_DIR, 'offsite-log.jsonl');
+// E3: log ของช่องทางที่สอง (mirror — คนละดิสก์) ใช้ตัดสินว่า Telegram ล้มแล้วมีตัวชดเชยหรือไม่
+const MIRROR_LOG = process.env.MH_MIRROR_LOG || join(DB_BACKUP_DIR, 'offsite-mirror-log.jsonl');
 
 const problems = []; // { level, area, message }
 const info = {};
@@ -99,12 +101,29 @@ try {
       problems.push({ level: 'critical', area: 'offsite', message: 'offsite-log.jsonl ว่างเปล่า — ไม่เคย push สำเร็จเลย' });
       info.offsiteAgeH = null;
     } else {
-      const last = lines.at(-1);
+      // E3: อ่านสถานะช่องทางที่สองก่อน — ใช้ชดเชยการตัดสินของช่องหลัก (Telegram)
+      try {
+        if (existsSync(MIRROR_LOG)) {
+          const ml = readFileSync(MIRROR_LOG, 'utf8').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).sort((a, b) => new Date(a.ts) - new Date(b.ts));
+          const lastM = ml.filter((l) => l.status === 'sent').at(-1);
+          info.mirrorLastStatus = lastM ? 'sent' : (ml.length ? 'failed' : null);
+          if (lastM) {
+            info.mirrorAgeH = ageHours(new Date(lastM.ts).getTime());
+            if (info.mirrorAgeH > BACKUP_MAX_AGE_H) problems.push({ level: 'warn', area: 'offsite', message: `mirror (ช่องทางที่สอง) เงียบ ${info.mirrorAgeH} ชม. — สำเนาที่สองล้า แม้ช่องหลักยังส่งได้` });
+          }
+        }
+      } catch { /* mirror log อ่านไม่ได้ = ไม่พารอบตาย */ }
+      // ตัดสินเฉพาะช่อง Telegram (entry มี channel:telegram — log ก่อน E3 ไม่มี channel = เป็น telegram ทั้งไฟล์)
+      const tgEntries = lines.filter((l) => l.channel === 'telegram');
+      const last = tgEntries.length ? tgEntries.at(-1) : lines.at(-1);
       const age = ageHours(new Date(last.ts).getTime());
       info.offsiteAgeH = age;
       info.offsiteLastStatus = last.status || (last.tg_message_id ? 'sent' : 'unknown');
-      if (info.offsiteLastStatus === 'failed') problems.push({ level: 'critical', area: 'offsite', message: `offsite ล่าสุด (อายุ ${age} ชม.) สถานะ failed — ${String(last.reason || 'ไม่ทราบเหตุ').slice(0, 120)} — ไฟล์สำรองยังอยู่ในเครื่องเท่านั้น` });
-      else if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'offsite', message: `offsite เงียบ ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ส่งนอกเครื่องล่าสุดเมื่อ ${last.ts}` });
+      if (info.offsiteLastStatus === 'failed') {
+        if (info.mirrorLastStatus === 'sent') info.offsiteVerdict = 'telegram ล้มล่าสุด — mirror (ช่องทางที่สอง) ชดเชยแล้ว';
+        else problems.push({ level: 'critical', area: 'offsite', message: `offsite (telegram) ล่าสุด (อายุ ${age} ชม.) สถานะ failed — ${String(last.reason || 'ไม่ทราบเหตุ').slice(0, 120)} — และ mirror ไม่มีรอบสำเร็จชดเชย` });
+      }
+      else if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'offsite', message: `offsite (telegram) เงียบ ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ส่งล่าสุดเมื่อ ${last.ts}` });
     }
   } else {
     const staged = existsSync(OFFSITE_DIR) ? readdirSync(OFFSITE_DIR).filter((f) => f.startsWith('sovereign_dump_') && f.endsWith('.enc')) : [];

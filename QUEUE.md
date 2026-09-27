@@ -101,12 +101,12 @@
 - [x] E1 แก้ `tools/verify/offsite-push.mjs` ไม่ตายเมื่อ Telegram/DNS ล่ม — try/catch รอบส่ง + log สถานะ failed พร้อมเหตุผล + exit 1 ชัดเจน — **เสร็จ 27/9/69** (คืนถัดไป dump สดใหม่ลองใหม่เอง ไม่ส่งไฟล์เก่า)
 - [x] E2 watchdog อายุ backup + สุขภาพดิสก์ใน `tools/machine-health.mjs` — **เสร็จ 27/9/69**: ยิงรอบแรกจับของจริง (DB backup เก่า 113 ชม. + offsite เงียบ 70.6 ชม. = critical ทั้งคู่) · mutation เทส 7/7 (สด/failed/เก่า 30 ชม./ไม่มีไฟล์) · ตรวจด้วย — และพบ `machine-health.mjs` **ไม่เคยถูก git track** (บั๊กคลาสเดิมครั้งที่ 3) เพิ่ม whitelist เข้า git แล้ว
 - [x] E4 ยิง `offsite-push.mjs --restore-test` — **เสร็จ 27/9/69**: users 8 · audit_logs 26,383 · **sensor_telemetry 118,883 แถว** (live 121,026 — ตรงตามอายุ dump) · แก้สคริปต์ใช้ `timescaledb_pre/post_restore` แยก 3 ครั้งเรียก (บทเรียนใหม่: pg_dump เซ็ต search_path='' กลาง stream — ห้ามรวม post_restore ใน session เดียวกับ dump)
-- [ ] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — ตั้ง `MESH_RSYNC_TARGET` (ดิสก์ USB/NAS/คลาวด์ ~4MB/คืน) + **สำรอง mesh key/BACKUP_ENCRYPTION_KEY นอกเครื่อง** (ปิดความเสี่ยง key อยู่เครื่องเดียวไปด้วย)
+- [x] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — **เสร็จ 27/9/69** (mirror ไฟล์ .enc ไป `C:\SovereignOffsite` ต่างดิสก์ + offsite-key-recovery.txt สำรอง key นอกสาย backup + `--send-key` ปุ่มของเจ้าของ + machine-health ตัดสินรายช่อง) — พิสูจน์: รอบเทส Telegram ล้มจริงแต่ mirror รับช่วง exit 0 + restore-test จากสำเนา C: ผ่าน 141 ตาราง · sensor_telemetry 121,951 แถว (มี NAS/USB แล้วตั้ง OFFSITE_MIRROR_DIR/MESH_SCP_TARGET ไม่แก้โค้ด — ยังกันเครื่องหายทั้งเครื่องไม่ได้)
 - [ ] E5 WAL archiving + ซ้อม PITR (RPO 24 ชม. → นาที) — ทำหลัง E4 เพราะใช้สายทดสอบเดียวกัน
 - [x] E6 (พบต่อจาก E2) สาย backup ภายใน core-api ตายเงียบ 22–26/9 — **เสร็จ 27/9/69**: ราก = scheduler เทียบเวลา "นาทีเป๊ะ" (`sched.time !== current`) เครื่องหลับ/นาฬิกา VM เหลื่อม → นาที 02:00 ถูกข้ามทั้งวัน (task ภายนอก 03:00 ปกติทุกคืน — สองสายอยู่คนละชั้นจึงปลอมสมดุล) · แก้ = catch-up window 6 ชม. (เลยเวลา + ยังไม่มี marker วันนี้ = สร้างทันที)
 
 ## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
-- [ ] F1 backup ห้ามแนบ .env (backup.service ระบุครอบ .env ถ้าหาเจอ) — ตัดออก/แยกไฟล์ กัน token ทั้งระบบหลุดไปกับไฟล์ offsite ถ้าหลุด
+- [x] F1 backup ห้ามแนบ .env — **เสร็จ 27/9/69** (ตัดที่ collectStateFiles + เกราะ findSecretLeakFiles ก่อนสร้าง bundle เจอลาย = งดสร้างแล้วรายงาน · เทส survival 8/8 · พิสูจน์บนของจริง: bundle ใหม่ 13 ไฟล์ data/*.json ล้วนไม่มี .env — bundle เก่าเข้ารหัสมาตลอด ไม่ต้อง rotate เร่ง)
 - [ ] F2 เข้ารหัส field อ่อนไหว (AES-256-GCM เทียบเท่า mesh) — DB ถูกยก = อ่านได้หมดวันนี้ (health 32 ข้อ/รหัสเราเตอร์ plaintext/Telegram token) — ทำหลัง E3 (key นอกเครื่องมาก่อน)
 
 ## G — ตัดสินใจระดับเจ้าของ (ไม่ใช่โค้ด)

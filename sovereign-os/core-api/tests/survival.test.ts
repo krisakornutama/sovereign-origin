@@ -41,13 +41,27 @@ describe('Survival: Backup State Bundle + Retention', () => {
     assert.equal(files.find((f) => f.name === 'data/a.json')?.content, '{"a":1}');
   });
 
-  test('collectStateFiles: รวบรวม host-infra.env ถ้ามี', async () => {
+  test('collectStateFiles: ห้ามแนบ .env เด็ดขาด (F1) — secret ไม่เดินทางไปกับ bundle', async () => {
     const { collectStateFiles } = await import('../src/services/backup.service');
     fs.writeFileSync(path.join(tmp, 'host-infra.env'), 'SECRET=abc');
     const files = collectStateFiles(tmp);
-    const env = files.find((f) => f.name === 'host-infra.env');
-    assert.ok(env, 'ต้องพบ host-infra.env');
-    assert.equal(env?.content, 'SECRET=abc');
+    assert.equal(files.find((f) => f.name === 'host-infra.env'), undefined, 'ต้องไม่มี host-infra.env ใน bundle');
+    assert.equal(files.some((f) => f.name.endsWith('.env')), false, 'ห้ามมีไฟล์ .env รูปแบบใด');
+  });
+
+  test('findSecretLeakFiles: จับ secret ทุกลาย + ปล่อย data/*.json ปกติผ่าน (F1-guard)', async () => {
+    const { findSecretLeakFiles } = await import('../src/services/backup.service');
+    const leaks = findSecretLeakFiles([
+      { name: 'host-infra.env', content: 'JWT_SECRET=abc\nOTHER=1' },
+      { name: 'data/env-copy.txt', content: 'หมายเหตุ\nPOSTGRES_PASSWORD=x' },
+      { name: 'data/key.pem', content: '-----BEGIN PRIVATE KEY-----\nabc' },
+      // กลางบรรทัดไม่นับ — json ที่อ้างชื่อ key ธรรมดาต้องไม่โดน (กัน false positive)
+      { name: 'data/mention.json', content: '{"k":"POSTGRES_PASSWORD= ลอกมาใส่"}' },
+      { name: 'data/ok.json', content: '{"note":"ตัวเลขปกติ 123"}' },
+    ]);
+    assert.deepEqual(leaks.sort(), ['data/env-copy.txt', 'data/key.pem', 'host-infra.env']);
+    assert.equal(leaks.includes('data/ok.json'), false);
+    assert.equal(leaks.includes('data/mention.json'), false);
   });
 
   test('applyRetention: ลบไฟล์เก่าเกิน keep (เรียงตาม mtime)', async () => {

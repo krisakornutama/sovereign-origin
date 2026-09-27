@@ -19,14 +19,16 @@ const DB_CONTAINER = process.env.DB_CONTAINER || 'sovereign-db';
 const BACKUP_RETAIN = parseInt(process.env.BACKUP_RETAIN || '30', 10);
 
 // ไฟล์ state (.json.gz) ที่เก็บคู่กับ DB dump — กันการตั้งค่าหายเมื่อ container recreate
-// ครอบคลุม: data/*.json (state ทั้งหมด) + .env (secret/config) ถ้าหาเจอ
+// ครอบคลุม: data/*.json (state ทั้งหมด) เท่านั้น — ห้ามแนบ .env (F1 27/9/69):
+// secret ทั้งระบบ (JWT/DB/Telegram/IMAP) เคยไหลไปกับไฟล์ offsite + Telegram ทุกคืน
+// ใครต้องการ infra/.env ให้เก็บสำเนาเองนอกสาย backup (password manager / recovery file ของ E3)
 export function stateBundleName(now: Date): string {
   return `sovereign_state_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(
     now.getHours()
   )}${pad(now.getMinutes())}${pad(now.getSeconds())}.json.gz`;
 }
 
-/** รวบรวมไฟล์ state สำหรับ bundle — data/*.json + .env (host หรือที่ mount เข้า container) */
+/** รวบรวมไฟล์ state สำหรับ bundle — data/*.json เท่านั้น (.env ห้ามเข้า bundle ตาม F1) */
 export function collectStateFiles(cwd: string): { name: string; content: string }[] {
   const out: { name: string; content: string }[] = [];
   const dataDir = path.join(cwd, 'data');
@@ -44,18 +46,21 @@ export function collectStateFiles(cwd: string): { name: string; content: string 
   } catch {
     // data dir ไม่มี = ข้าม
   }
-  const envCandidates = [path.join(cwd, 'host-infra.env'), path.join(cwd, '..', 'infra', '.env')];
-  for (const envFile of envCandidates) {
-    try {
-      if (fs.existsSync(envFile)) {
-        out.push({ name: 'host-infra.env', content: fs.readFileSync(envFile, 'utf8') });
-        break;
-      }
-    } catch {
-      // ข้าม
-    }
-  }
+  // F1 (27/9/69): เดิมแนบ host-infra.env / infra/.env เข้า bundle — ตัดทิ้ง เพราะ bundle
+  // ออกจากเครื่อง (offsite mirror + Telegram sendDocument) — secret ไม่มีเหตุผลเดินทาง
+  // เจ้าของเก็บ infra/.env เองนอกสาย backup (password manager / recovery file จาก E3)
   return out;
+}
+
+// เกราะ F1: ลาย secret ที่ห้ามออกจากเครื่องไปกับ bundle — ตรวจก่อนเข้ารหัสเสมอ
+const SECRET_PATTERNS = [
+  /^(JWT_SECRET|POSTGRES_PASSWORD|BACKUP_ENCRYPTION_KEY|TELEGRAM_BOT_TOKEN|DIME_IMAP_PASS)\s*=/m,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+];
+
+/** คืนชื่อไฟล์ที่มีลาย secret — ผู้เรียกต้องงดสร้าง/งดส่ง bundle เมื่อผลไม่ว่าง */
+export function findSecretLeakFiles(files: { name: string; content: string }[]): string[] {
+  return files.filter((f) => SECRET_PATTERNS.some((p) => p.test(f.content))).map((f) => f.name);
 }
 
 /** ลบไฟล์เก่าเกิน BACKUP_RETAIN ตาม suffix (เรียงตาม mtime ใหม่สุดก่อน) */
@@ -172,6 +177,12 @@ class BackupService {
   /** bundle ไฟล์ state (data/*.json + .env) เก็บคู่กับ DB dump — กัน state หายเวลา container recreate */
   async createStateBundle(): Promise<{ file: string; size: number } | null> {
     const files = collectStateFiles(process.cwd());
+    // เกราะ F1 (27/9/69): เจอลาย secret = งดสร้าง state bundle แล้วรายงาน (DB dump ไม่ล้มตาม)
+    const leaked = findSecretLeakFiles(files);
+    if (leaked.length > 0) {
+      console.error(`⛔ [F1-guard] state bundle มี secret — งดสร้าง bundle: ${leaked.join(', ')}`);
+      return null;
+    }
     if (files.length === 0) return null;
     const file = stateBundleName(new Date());
     const gz = gzipSync(
