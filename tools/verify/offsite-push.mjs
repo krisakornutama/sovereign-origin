@@ -4,7 +4,10 @@
 //   node tools/verify/offsite-push.mjs --verify       → ถอดรหัสไฟล์ล่าสุด + ตรวจ SQL ใช้ได้จริง
 //   node tools/verify/offsite-push.mjs --restore-test → พิสูจน์เต็ม: restore ลง Postgres ชั่วคราว + เทียบจำนวนแถว
 // ที่มา: เครื่องนี้มีดิสก์กายภาพเดียว (C+E = Disk 0) — dump ในเครื่อง = หายพร้อมกันทั้งหมด
-// เมื่อมี NAS/ดิสก์สอง: ตั้ง MESH_RSYNC_TARGET แล้วชี้ staging นี้ (offsite/) ไป sync เพิ่มได้ทันที
+// E3 (27/9/69): ช่องทางที่สองไม่พึ่ง Telegram — mirror ไฟล์ .enc ไป OFFSITE_MIRROR_DIR (default C:\SovereignOffsite)
+//   + offsite-key-recovery.txt (key สำรองนอกสาย backup) · ช่องใดช่องหนึ่งสำเร็จ = รอบนั้นยังมีชีวิต
+//   node tools/verify/offsite-push.mjs --restore-test --from-mirror → พิสูจน์ว่า "สำเนาที่สอง" กู้ได้จริง
+//   node tools/verify/offsite-push.mjs --send-key → เจ้าของกดเอง: ส่ง recovery เข้า Telegram ตัวเอง (ไม่ผูก schedule)
 // เงื่อนไขความปลอดภัย: ไฟล์ที่ออกจากเครื่องเข้ารหัส AES-256-GCM ทุกครั้ง (key อยู่ infra/.env เครื่องนี้เท่านั้น)
 import { execFileSync, execSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -21,10 +24,72 @@ const OFFSITE = path.join(ROOT, 'sovereign-os/infra/offsite');
 const LOG = path.join(ROOT, 'sovereign-os/core-api/backups/offsite-log.jsonl');
 const key = Buffer.from(env.BACKUP_ENCRYPTION_KEY, 'base64');
 
+// ── ช่องทางที่สอง (E3): ทำไมต้องมี — Telegram คือช่องเดียวที่ไฟล์ออกเครื่องจริง
+// ตัวเดียวล้ม (DNS/เราเตอร์/บล็อก) = คืนนั้นไม่มีอะไรออกเครื่องเลย (เคสจริงคืน 24–26/9)
+// เมื่อมี NAS/USB มา: ตั้ง OFFSITE_MIRROR_DIR ชี้ที่นั่น (หรือ MESH_SCP_TARGET user@host:/path) — ไม่แก้โค้ด
+// ห้ามชี้กลับเข้า repo — ต้องเป็นดิสก์/พื้นที่ต่าง failure domain จริง ๆ
+const MIRROR_DIR = path.resolve(process.env.OFFSITE_MIRROR_DIR || 'C:/SovereignOffsite');
+const MIRROR_LOG = process.env.OFFSITE_MIRROR_LOG || path.join(ROOT, 'sovereign-os/core-api/backups/offsite-mirror-log.jsonl');
+const FROM_MIRROR = process.argv.includes('--from-mirror');
+
+function mirrorLog(status, extra = {}) {
+  try {
+    fs.appendFileSync(MIRROR_LOG, JSON.stringify({ ts: new Date().toISOString(), status, target: MIRROR_DIR, ...extra }) + '\n');
+  } catch { /* log ไม่ได้ = ข้าม ไม่พารอบตาย */ }
+}
+
+function readMeshKeyB64() {
+  try {
+    const p = path.join(ROOT, 'sovereign-os/core-api/data/mesh-key');
+    return fs.existsSync(p) ? fs.readFileSync(p).toString('base64') : null;
+  } catch { return null; }
+}
+
+/** recovery text: key ทั้งหมดที่ต้องมีเพื่อกู้ไฟล์ .enc + คำสั่งกู้ 1 บรรทัด — เจ้าของเก็บนอกเครื่อง */
+function buildRecoveryText() {
+  const mesh = readMeshKeyB64();
+  return [
+    '# Sovereign OFFSITE KEY RECOVERY — เก็บไว้นอกเครื่องนี้',
+    `สร้าง: ${new Date().toISOString()}`,
+    '',
+    '1) BACKUP_ENCRYPTION_KEY (base64):',
+    env.BACKUP_ENCRYPTION_KEY || '(ไม่พบใน infra/.env!)',
+    '',
+    '2) mesh key (sovereign-os/core-api/data/mesh-key, base64):',
+    mesh || '(ไม่มีไฟล์ mesh-key)',
+    '',
+    '3) กู้ไฟล์ .enc ล่าสุด (ทดสอบ restore เต็ม):',
+    '   node tools/verify/offsite-push.mjs --restore-test --from-mirror',
+    '',
+    'ไฟล์ .enc เข้ารหัส AES-256-GCM — key ข้างบนหาย = ไฟล์ทั้งหมดหมดค่า',
+    'แนะนำ: ก๊อปข้อความนี้ไป password manager หรือ Telegram Saved Messages —',
+    'สำเนาบนไดรฟ์เดียวกันช่วยแค่กรณีดิสก์เสีย ไม่ช่วยกรณีเครื่องหายทั้งเครื่อง',
+  ].join('\n');
+}
+
+// --send-key: ปุ่มของเจ้าของ — ส่ง recovery text เข้า Telegram ตัวเอง ไม่ผูก schedule เด็ดขาด
+// (การเก็บ key บน cloud Telegram เป็นการตัดสินใจระดับเจ้าของ ระบบไม่ตัดสินแทน)
+if (process.argv[2] === '--send-key') {
+  console.log('สร้าง recovery text…');
+  const text = buildRecoveryText();
+  const tg = readTelegramCreds();
+  if (!tg.token || !tg.chatId) { console.error('ไม่มี Telegram credentials — ตั้งที่หน้า Settings ก่อน'); process.exit(1); }
+  const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendMessage`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: tg.chatId, text }), signal: AbortSignal.timeout(30_000),
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!out.ok) { console.error('ส่งไม่สำเร็จ:', out.description || res.status); process.exit(1); }
+  console.log('✅ ส่ง recovery เข้า Telegram แล้ว — เก็บข้อความนี้ในที่ปลอดภัย (Saved Messages)');
+  process.exit(0);
+}
+
 function latestEncrypted() {
-  const files = fs.readdirSync(OFFSITE).filter((f) => f.startsWith('sovereign_dump_') && f.endsWith('.enc')).sort();
-  if (!files.length) throw new Error('ไม่มีไฟล์ offsite ใน staging — รัน push ก่อน');
-  return path.join(OFFSITE, files.at(-1));
+  // --from-mirror: ถอดจาก "สำเนาที่สอง" ไม่ใช่ staging ต้นทาง — พิสูจน์ว่า mirror กู้ได้จริง
+  const dir = FROM_MIRROR && fs.existsSync(MIRROR_DIR) ? MIRROR_DIR : OFFSITE;
+  const files = fs.readdirSync(dir).filter((f) => f.startsWith('sovereign_dump_') && f.endsWith('.enc')).sort();
+  if (!files.length) throw new Error(`ไม่มีไฟล์ offsite ใน ${dir} — รัน push ก่อน`);
+  return path.join(dir, files.at(-1));
 }
 function decrypt(encFile) {
   // layout ตรงกับ push: [iv(12)][ciphertext][tag(16) ท้ายไฟล์]
@@ -116,29 +181,67 @@ function logEntry(status, extra = {}) {
 
 console.log('3) ส่ง Telegram (sendDocument) — creds จากระบบ (system_settings → env fallback)…');
 const tg = readTelegramCreds();
+let tgOk = false;
 if (!tg.token || !tg.chatId) {
-  logEntry('failed', { reason: 'no-credentials' });
-  console.error('FATAL: ไม่มี Telegram credentials — จด status:failed แล้ว (watchdog อายุ backup จะแจ้งแทน)');
-  process.exit(1);
+  logEntry('failed', { channel: 'telegram', reason: 'no-credentials' });
+  console.error('⚠️ ไม่มี Telegram credentials — จด failed แล้ว (ไปต่อช่องทางที่สอง)');
+} else {
+  const form = new FormData();
+  form.append('chat_id', tg.chatId);
+  form.append('caption', `🗄 Sovereign offsite backup · ${encName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: AES-256-GCM (key บนเครื่องเท่านั้น)`);
+  form.append('document', new Blob([enc]), encName);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(90_000) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(`Telegram ปฏิเสธ — ${out.description}`);
+    console.log(`   ส่งสำเร็จ — message_id=${out.result.message_id}`);
+    logEntry('sent', { channel: 'telegram', tg_message_id: out.result.message_id });
+    tgOk = true;
+  } catch (err) {
+    const reason = String(err?.cause?.code || err?.message || err).slice(0, 200);
+    logEntry('failed', { channel: 'telegram', reason });
+    console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด failed แล้ว (${reason}) — ไฟล์ .enc ค้างใน staging ยืนยันได้`);
+  }
 }
-const form = new FormData();
-form.append('chat_id', tg.chatId);
-form.append('caption', `🗄 Sovereign offsite backup · ${encName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: AES-256-GCM (key บนเครื่องเท่านั้น)`);
-form.append('document', new Blob([enc]), encName);
+
+console.log('4) สำเนาช่องทางที่สอง (E3 — mirror)…');
+let mirrorOk = false;
 try {
-  const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(90_000) });
-  const out = await res.json();
-  if (!out.ok) throw new Error(`Telegram ปฏิเสธ — ${out.description}`);
-  console.log(`   ส่งสำเร็จ — message_id=${out.result.message_id}`);
-  logEntry('sent', { tg_message_id: out.result.message_id });
+  if (MIRROR_DIR.toLowerCase().startsWith(ROOT.toLowerCase())) throw new Error('mirror ต้องอยู่นอก repo — ต่าง failure domain เท่านั้น');
+  fs.mkdirSync(MIRROR_DIR, { recursive: true });
+  const mPath = path.join(MIRROR_DIR, encName);
+  fs.copyFileSync(encPath, mPath);
+  if (fs.statSync(mPath).size !== enc.length) throw new Error('ขนาดไฟล์ mirror ไม่ตรงต้นทาง');
+  fs.writeFileSync(path.join(MIRROR_DIR, 'offsite-key-recovery.txt'), buildRecoveryText());
+  mirrorLog('sent');
+  mirrorOk = true;
+  console.log(`   ✅ mirror → ${MIRROR_DIR} (+ offsite-key-recovery.txt)`);
 } catch (err) {
-  const reason = String(err?.cause?.code || err?.message || err).slice(0, 200);
-  logEntry('failed', { reason });
-  console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด status:failed แล้ว (${reason}) — ไฟล์ .enc ค้างใน staging ยืนยันได้ · Task Scheduler จะเห็น exit 1`);
-  process.exit(1);
+  mirrorLog('failed', { reason: String(err?.message || err).slice(0, 160) });
+  console.error(`   ⚠️ mirror ล้ม — ${String(err?.message || err).slice(0, 120)} (จดแล้ว ไม่ทำรอบตาย)`);
+}
+// ทางเลือก scp (อนาคตมี NAS) — ตั้ง MESH_SCP_TARGET แล้วส่งต่อไฟล์เดียวกัน best-effort
+if (env.MESH_SCP_TARGET) {
+  try {
+    execFileSync('scp', ['-o', 'ConnectTimeout=10', encPath, env.MESH_SCP_TARGET], { timeout: 120_000, stdio: 'pipe' });
+    mirrorLog('sent', { target: env.MESH_SCP_TARGET });
+    console.log(`   ✅ scp → ${env.MESH_SCP_TARGET}`);
+  } catch (err) {
+    mirrorLog('failed', { target: env.MESH_SCP_TARGET, reason: String(err?.message || err).slice(0, 160) });
+    console.error(`   ⚠️ scp ล้ม (${env.MESH_SCP_TARGET}) — จดแล้ว ไม่ทำรอบตาย`);
+  }
 }
 
 // log เก่าเก็บตามจริง + retention staging (เก็บ 3 ไฟล์ล่าสุด)
 const olds = fs.readdirSync(OFFSITE).filter((f) => f.startsWith('sovereign_dump_')).sort().slice(0, -3);
 for (const f of olds) fs.unlinkSync(path.join(OFFSITE, f));
-console.log(`✅ offsite push ครบ (staging เก็บ 3 ไฟล์ล่าสุด · ลบเก่า ${olds.length} ไฟล์)`);
+
+// กติกา E3: ช่องใดช่องหนึ่งสำเร็จ = รอบนี้มีสำเนาออกนอกเครื่อง-staging อย่างน้อย 1 ช่อง → ไม่ใช่ความล้มของสาย
+// (watchdog อายุตรวจทั้งสองช่องแยกกัน — ช่องไหนขาดประจำจะถูกจับเป็นรายช่อง)
+const exitCode = tgOk || mirrorOk ? 0 : 1;
+if (exitCode === 0) {
+  console.log(`✅ offsite push ครบ — ช่องทางสำเร็จ: ${[tgOk && 'telegram', mirrorOk && 'mirror'].filter(Boolean).join(' + ')} (staging เก็บ 3 ไฟล์ล่าสุด · ลบเก่า ${olds.length} ไฟล์)`);
+} else {
+  console.error('❌ ทุกช่องทางล้มหมด — คืนนี้ไม่มีสำเนาออกนอก staging เลย (Task Scheduler เห็น exit 1)');
+}
+process.exit(exitCode);

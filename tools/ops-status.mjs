@@ -33,6 +33,7 @@ const TASKS = [
   { name: 'Sovereign Offsite Backup', label: 'Offsite 03:30' },
   { name: 'Sovereign Security Digest', label: 'Digest 08:00' },
   { name: 'Sovereign Machine Watch', label: 'Machine Watch' },
+  { name: 'Sovereign Docker Watch', label: 'Docker Watch' },
   { name: 'Sovereign Synthetic Browser Check', label: 'Synthetic Check' },
 ];
 
