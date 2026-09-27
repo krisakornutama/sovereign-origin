@@ -240,5 +240,6 @@ sovereign-os/core-api/prisma/data.db
 sovereign-os/core-api/prisma/prisma/
 *.db
 !**/node_modules/**/*.db
+sovereign-os/infra/data/wal-archive/
 !tools/machine-alert.mjs
 !tools/register-machine-watch.ps1

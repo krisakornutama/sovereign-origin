@@ -6,12 +6,25 @@ services:
     ports:
       - "127.0.0.1:5432:5432"   # loopback เท่านั้น — DB ไม่ควรเห็นจาก LAN (audit 20 ก.ย. 2569)
     restart: unless-stopped
+    # E5 (27/9/69): WAL archiving — ต่อเนื่องจาก backup 03:00 (RPO 24 ชม. → ~นาที)
+    # archive_command แบบ list-form (ไม่ผ่าน shell): คัดลอก segment ไป bind mount บน host
+    # archive_timeout=300s: idle ก็ปิด segment ทุก 5 นาที — ยอม segment เล็กเกินแลก RPO
+    # wal_level=replica (default ของ image) เพียงพอสำหรับ archive/pg_basebackup
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=install -m 600 %p /var/lib/postgresql/wal-archive/%f
+      - -c
+      - archive_timeout=300s
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sovereign}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (see .env.example)}
       POSTGRES_DB: ${POSTGRES_DB:-sovereign}
     volumes:
       - ./data/pg:/var/lib/postgresql/data
+      - ./data/wal-archive:/var/lib/postgresql/wal-archive
       - ../scripts/init-timescaledb.sql:/docker-entrypoint-initdb.d/01_init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sovereign}"]
