@@ -129,3 +129,47 @@
 - **Trim 45+ หน้า** — feature-grant ปิดรายโมดูลได้แล้ว · ทบทวน usage ปีละครั้งพอ
 
 **ลำดับ:** E1+E2 (branch เดียว) → E4 → E3 → E5 → F1 → F2 → G1–G2 (ตัดสินใจ) → H · เกณฑ์จบแต่ละงาน: แก้แล้วต้องมีวิธีพิสูจน์ว่าดีขึ้นจริง (mutation/ยิงจริง/เทส) ไม่ใช่แค่โค้ดผ่าน
+
+---
+
+# คิวหมวด I (เพิ่ม 28/9/69 — จากลิสต์เจ้าของ + ของจริงเช้านี้) — ทำอัตโนมัติต่อเนื่องตามลำดับท้ายหมวด
+
+## I0 — ด่วน: เจอตัวจริงกำลังพังเมื่อเช้า (แก้ก่อนคิวใหญ่)
+- [ ] I0a frontend-watchdog จริง — :3000 ล่มทั้งเช้าเพราะ `frontend-watchdog.mjs` เป็น "ไฟล์ผี" (verify.mjs/nightly-gate.mjs อ้างหาแต่ไม่มีบนดิสก์เลย) — เขียน `tools/frontend-watchdog.mjs` (เช็ค :3000 ตอบจริง → ไม่ตอบ/serve build แปลก = kill PID เจ้าของพอร์ต + wipe .next เมื่อจำเป็น + boot ตามธรรมเนียม dev-restore ของ verify.mjs) + ต่อเข้า Machine Watch รอบเดียวกัน + whitelist · **พิสูจน์:** kill :3000 จริง → watchdog ชุบกลับใน 60 วิ
+- [ ] I0b security-anomaly (digest) ตายเงียบเมื่อ Docker ดับ — เคสจริง 20:35 27/9 (execSync โดน daemon ดับ throw ไม่มี catch → task 0x1 ทั้งที่ระบบปกติ) — try/catch ครบทุก query + log `docker-down` + ออกแบบ "ข้ามรอบ" (รอบถัดไปลองใหม่เอง) — ห้ามตายเงียบเหมือนเดิม
+- [ ] I0c คืนนี้ตัดสิน nightly จริง: รอบ 02:00 เป็นรอบแรกหลัง H6/H7 merge (log 03:47 เมื่อคืนคือโค้ดเก่า) — เช้าหน้ากวาดตรวจ: /health //audit ยัง fail (console bucket ที่ ignore ครึ่ง ๆ กลาง ๆ ตาม error-context) ให้ ignore รูปแบบเต็ม · pos-flow ยัง fail (option count 2) ให้ snapshot option จริงก่อนแก้
+
+## I1 — PITR จบให้สมบูรณ์ (WAL archiving เปิดแล้วจริง 27/9 — `wip 6720af5`: archive_mode=on · archive ไหล 0 failed · archive_timeout=300s)
+- [ ] I1a สคริปต์ `tools/verify/pitr-drill.mjs` อัตโนมัติเต็มรอบ **ไม่แตะ live DB นอกจากอ่าน + probe ในตารางทดสอบ**: ปัก probe row → จด epoch → pg_basebackup ลง /tmp/pitr-base ใน container → ลบ probe (transaction จริง) → scratch postgres บนพอร์ตแปลก → restore base + recovery.signal (restore_command จาก wal-archive bind mount) → recovery_target_time = epoch → promote → SELECT probe ต้องพบ
+- [ ] I1b พิสูจน์ RPO จริง: วัดช่องว่าง segment ล่าสุด → ประกาศ RPO ที่ได้ (เป้า <5 นาที ตาม archive_timeout) ลง STATUS + runbook
+- [ ] I1c machine-health เพิ่มด่าน "WAL archive ติดขัด" (failed_count>0 / ไฟล์ใน wal-archive นิ่ง >30 นาที = warn)
+- [ ] I1d จด docs/ops-runbook.md ขั้นกู้จริงเมื่อไฟดับกลางวัน (base ล่าสุด + replay ถึงนาทีสุดท้าย)
+
+## I2 — Asymmetric encryption สำหรับ backup (สาย offsite รอบสอง — ต่อจาก E3/F1)
+- [ ] I2a เปลี่ยน offsite-push: เข้ารหัสด้วย age (X25519) — **private key ไม่อยู่บนเครื่อง** (โทรศัพท์/password manager ของเจ้าของ · public key อย่างเดียวบนเครื่อง) — สาย AES เดิมคงอยู่คู่ขนานจนกว่า I2c ผ่าน
+- [ ] I2b recovery file สองรูปแบบ: คำสั่งถอดด้วย age บนมือถือ + key AES เดิมเผื่อไฟล์เก่า
+- [ ] I2c พิสูจน์ restore-test ผ่านสาย age ครบ 1–2 คืน แล้วจึงตัดสาย AES เดิม
+- [ ] I2d (ตัดสินเจ้าของ) tmpfs/RAM disk สำหรับ secret ชั่วคราว — เครื่องนี้ Modern Standby บ่อย อาจยุ่งยากกว่าประโยชน์ — เจ้าของเลือก
+
+## I3 — audit_logs partitioning + retention 90 วัน (ยกระดับจาก H1 ตามลิสต์เจ้าของ)
+- [ ] I3a วัดจริงก่อน: แถว/ขนาด/อัตราเขียนต่อวัน → ตัดสิน monthly vs weekly partitioning
+- [ ] I3b migration declarative partitioning รายเดือน (สร้าง partition ล่วงหน้า 3 เดือน + default) — ย้ายข้อมูลเดิมชุด ๆ แบบล็อกสั้น (ตารางถูกเขียนทุก action)
+- [ ] I3c task รายวัน: export partition เกิน 90 วัน เป็น .json.gz ไป backups/cold/ (เข้าสาย mirror E3 อัตโนมัติ) → detach+drop
+- [ ] I3d machine-health เพิ่มด่านขนาด audit_logs — กันโตเงียบอีกสาย
+
+## I4 — Cloudflare Tunnel เปิด /shop สู่อินเทอร์เน็ต (ตาม G2 — ต้องรอเจ้าของ: domain บน Cloudflare + token)
+- [ ] I4a container cloudflared ทะลุ CGNAT/LTE (MR505) — ตั้งผ่าน compose ตัวเดิม
+- [ ] I4b WAF/access rules: อนุญาตเฉพาะ /shop/* + webhooks — ปิด admin/internal ทุกเส้น (ห้ามพราก :3001 ออกนอก tunnel)
+- [ ] I4c rate limit + consent/PDPA — **F2 ต้องเสร็จก่อนเปิดจริง** (ลำดับเดิม)
+- [ ] I4d พิสูจน์: เปิดจากมือถือผ่าน 4G (คนละเน็ต) + Synthetic เพิ่ม probe public URL
+
+## I5 — ฟีเจอร์เชิงโครงสร้าง (เรียงตามมูลค่า/ความพร้อมของโค้ดเดิม)
+- [ ] I5a Traceability เฟส 3: หน้า /shop เล่าเรื่องสายสด Farm→Shop ต่อออเดอร์จริง (โครง ProductLot/TraceEvent + CONSUMED/PROCESSED มีอยู่แล้วจากเฟส 1–2 — เชื่อมหน้าร้านเป็นขั้นถัดไป)
+- [ ] I5b Crop Recommendation API: `/api/farm/crops/recommend` — NPK ล่าสุดต่อแปลง + Ollama qwen3 (timeout + heuristic fallback ตามสาย farm-advisor เดิม · Ollama ยังโหลด qwen3 ไม่เสร็จตาม A4 — ใช้ gemma3:4b ไปก่อนได้) + การ์ดแนะนำบนหน้า /farm
+- [ ] I5c Auto-calibration: จดชัด — มีมติ "ไม่ทำระบบใหม่" แล้ว (maintenance-radar + เตือน 90 วันอยู่) เหลือเฉพาะกรณีเจ้าของขอ cross-node drift compensation จริงค่อยวางแผนแยก
+- [ ] I5d e-Tax RD Connect: ยังค้างที่ G1 (ตัดสินเจ้าของ) — เมื่อตัดสิน: CA provider + digital signature + ยื่น API จริง (งานใหญ่ คุยแยกออกจากคิวอัตโนมัติ)
+
+## I6 — เสริมจากเช้านี้ (เจอจริง ไม่อยู่ลิสต์เดิม)
+- [ ] I6 แจ้งเตือนปลอมจาก cleanup: log nightly มี "[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จ" ทั้งที่ของจริง cleanup สำเร็จทีหลัง (ร้าน E2E ไม่ค้างใน DB) — ตัวตรวจ psql ของ nightly ต้อง retry/รอ ก่อนสรุปล้ม
+
+**ลำดับทำอัตโนมัติต่อจากนี้:** I0a+I0b (เครื่องกำลังพังจริง) → I1 PITR จบ → รอผลคืนตัดสิน I0c → **F2 เข้ารหัส field (คิวเดิม ยังเปิด)** → I2 age → I3 partition → I4 tunnel (รอ domain/token เจ้าของ) → I5 ตามลำดับย่อย
