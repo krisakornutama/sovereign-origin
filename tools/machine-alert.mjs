@@ -52,6 +52,14 @@ if (process.argv.includes('--snapshot')) {
     spawnSync('node', [join(REPO, 'tools', 'ops-status.mjs'), '--snapshot'], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
   } catch { /* snapshot พัง = หน้าเว็บข้อมูลเก่ากว่านิดเดียว ไม่กระทบการแจ้งเตือน */ }
 }
+// I0a (28/9/69): frontend-watchdog — :3000 ล่ม/แขวน = ชุบกลับเองทุกรอบ Machine Watch
+// (ตัวนี้ยิงเฉพาะเมื่อ --snapshot เพราะต้องอยู่เครื่อง host เท่านั้น · soft-fail ห้ามพา alert ตาย)
+if (process.argv.includes('--snapshot')) {
+  try {
+    const r = spawnSync('node', [join(REPO, 'tools', 'frontend-watchdog.mjs')], { cwd: REPO, encoding: 'utf8', timeout: 150_000, windowsHide: true });
+    if (r.status !== 0) console.error('frontend-watchdog แจ้งปัญหา (exit', r.status + ') — รายละเอียดใน logs/frontend-watchdog.jsonl');
+  } catch { /* ชุบไม่ได้รอบนี้ — รอบถัดไปลองใหม่ */ }
+}
 const criticalAreas = new Set(criticals.map((p) => p.area));
 
 // ── 2) state (รอบก่อนส่งอะไรไปแล้วบ้าง) ──

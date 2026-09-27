@@ -9,11 +9,22 @@ import { execFileSync } from 'node:child_process';
 import { notify } from './telegram-creds.mjs';
 
 const DB = 'sovereign';
-// execFileSync แบบ args array — ห้ามผ่าน shell: cmd.exe ตี '|' ใน -F '|' เป็น pipe (พิสูจน์แล้ว)
-const psqlRows = (sql) => execFileSync('docker',
-  ['exec', '-i', 'sovereign-db', 'psql', '-U', 'sovereign', '-d', DB, '-v', 'ON_ERROR_STOP=1', '-At', '-F', '|'],
-  { input: sql, encoding: 'utf8', timeout: 30_000, windowsHide: true }
-).split(/\r?\n/).filter(Boolean);
+// I0b (28/9/69): เคสจริง 20:35 27/9 — Docker daemon ดับ → execFileSync throw ไม่มี catch
+// → digest ตายเงียบทั้งรอบ แถมตีความผิดว่า "ไม่มีความผิดปกติ" — แก้: psqlRows ไม่ throw
+// และถ้าตรวจไม่ครบทุกกลุ่ม = ส่งแจ้ง "ตรวจไม่ได้" + exit 1 (ล้มดัง) ห้ามปลอมข้อความปกติ
+const dbErrors = [];
+function psqlRows(sql) {
+  try {
+    return execFileSync('docker',
+      ['exec', '-i', 'sovereign-db', 'psql', '-U', 'sovereign', '-d', DB, '-v', 'ON_ERROR_STOP=1', '-At', '-F', '|'],
+      { input: sql, encoding: 'utf8', timeout: 30_000, windowsHide: true }
+    ).split(/\r?\n/).filter(Boolean);
+  } catch (e) {
+    const msg = String(e?.stderr || e?.message || e);
+    dbErrors.push(/daemon|pipe|docker/i.test(msg) ? 'Docker daemon/DB ติดต่อไม่ได้' : msg.slice(0, 120));
+    return []; // กลุ่มนั้นว่างชั่วคราว — ตัดสินท้ายไฟล์ด้วย dbErrors ไม่ใช่ผลว่าง
+  }
+}
 // ระบบยังไม่ audit login ปกติ (มีแต่ RATE_LIMIT_BLOCK) — ค้น payload ด้วย ->> ; timestamp เป็น timestamptz
 const ACTOR_EXCL = `COALESCE(u.username,'') NOT IN ('mock-admin') AND COALESCE(u.username,'') NOT LIKE 'pentest-%'
   AND COALESCE(u.username,'') NOT LIKE 'trust-%' AND COALESCE(u.username,'') NOT LIKE 'gate-%' AND COALESCE(u.username,'') NOT LIKE 'ui-%'`;
@@ -81,8 +92,17 @@ const spike = psqlRows(`WITH d AS (
   ORDER BY 2 DESC LIMIT 8;`);
 add('⚠️', 'Traffic spike (> 3× ค่าเฉลี่ย 7 วัน)', spike.map(r => { const [t, c, avg] = r.split('|'); return `  - ${t} × ${c} (ปกติ ~${avg})`; }));
 
-const total = psqlRows(`SELECT count(*) FROM audit_logs WHERE "timestamp" > now() - interval '24 hours';`)[0];
+const totalRow = psqlRows(`SELECT count(*) FROM audit_logs WHERE "timestamp" > now() - interval '24 hours';`)[0];
+const total = totalRow ?? '?';
 const stamp = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' });
+
+// ตรวจไม่ครบ (Docker ดับ/DB ล่ม) = ห้ามส่ง "✅ ไม่พบความผิดปกติ" — ส่งแจ้ง degraded แล้ว exit 1
+if (dbErrors.length > 0) {
+  const errText = `⚠️ Sovereign security digest (${stamp}) — ตรวจไม่ครบ\n${dbErrors[0]}\n(Docker Watch กำลังพยายามปลุก · รอบถัดไป 08:00 จะตรวจซ้ำเอง)`;
+  console.error(errText);
+  try { await notify(errText); } catch { /* แจ้งไม่ถึง = จบด้วย exit 1 อย่างเดียว */ }
+  process.exit(1);
+}
 
 let text;
 if (findings.length === 0) {

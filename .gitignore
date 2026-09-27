@@ -111,6 +111,7 @@ tools/*
 !tools/ops-status.mjs
 !tools/docker-watchdog.mjs
 !tools/register-docker-watch.ps1
+!tools/frontend-watchdog.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
