@@ -223,3 +223,20 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 7. **อัปเดตเอกสาร:** STATUS.md (สถานะ+บันทึกวงจร) + แถว "Desktop release" ใน §๘ ของไฟล์นี้
 
 > สถานะปัจจุบัน: v1.1.0 ผ่านครบทุกขั้นแล้ว (18 ก.ย. 2026) — ตัวอย่างที่ใช้งานจริงของวงจรนี้
+
+## ๙ · กู้ฐานข้อมูลถึงนาทีใดนาทีหนึ่ง (PITR — เพิ่ม 28/9/69)
+
+**สถานะ:** WAL archiving เปิดแล้วจริง (archive_mode=on · `data/wal-archive/` บน host · RPO ~5 นาที) — ซ้อมจริงผ่าน `pitr-drill.mjs` 28/9 (probe โดนลบ → กู้กลับได้ครบ)
+
+**เมื่อเกิดเหตุ (ลบผิด/ไฟดับ/ข้อมูลเสีย):**
+1. **หยุดเขียนทันที** — อย่าให้ core-api ยิง DB ต่อ (docker stop sovereign-core-api) เพื่อคงจุดเวลาให้ตัดสินใจได้
+2. **ตัดสินเวลาเป้า:** เวลาเหตุการณ์ (ไทย −7 = UTC) — recovery จะ replay ถึง "ก่อน" เวลาที่ระบุ
+3. **ซ้อมกู้แบบอัตโนมัติ (แนะนำ):** `node tools/verify/pitr-drill.mjs` — เวอร์ชันนี้ซ้อมด้วยตารางทดสอบ pitr_probe ไม่แตะข้อมูลจริง
+4. **กู้จริง:** ตามขั้นตอนเดียวกับ pitr-drill แต่เป้าคือ live: ตั้ง recovery_target_time เป็นเวลาที่ 2 → ให้ scratch promote → ตรวจข้อมูล → dump ออก → นำกลับเข้า live (pg_restore --clean) — อย่าสลับ datadir ตรง ๆ ถ้าไม่จำเป็น
+5. **หลังกู้:** `docker start sovereign-core-api` → รัน `node tools/machine-health.mjs` ต้องเห็น wal-archive ไม่มี failed
+
+**อุปสรรคที่เจอจริง (จดกันพลาด):**
+- `docker cp` ระหว่าง container ทำไม่ได้ → ผ่าน temp บน host (`infra/data/pitr-base-tmp`)
+- ไฟล์ที่ docker cp เขียนเป็น root → postgres ปฏิเสธ datadir → ต้อง chown postgres:postgres + chmod 700 ก่อนสตาร์ตเสมอ
+- `docker exec -d` โปรเซสตายพร้อม client (Windows job object) → สตาร์ต postgres ด้วย `nohup gosu postgres postgres … &` ผ่าน `sh -c`
+- pg_dump เซ็ต search_path='' กลาง stream → ห้ามรวม timescaledb_post_restore ใน session เดียวกับ dump (บทเรียนเดิม §ห้า)

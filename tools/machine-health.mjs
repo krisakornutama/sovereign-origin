@@ -136,6 +136,16 @@ try {
   problems.push({ level: 'critical', area: 'offsite', message: `ตรวจสาย offsite ไม่ได้ (${String(e?.message || e).slice(0, 80)})` });
 }
 
+// 4c) I1c — WAL archive ติดขัด: failed>0 = warn ทันที · ไม่มีไฟล์ใหม่ >30 นาที = warn (archive_timeout 300s ต้องไหลสม่ำเสมอ)
+try {
+  const s = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT failed_count, COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time))::int, -1) FROM pg_stat_archiver"', { encoding: 'utf8', timeout: 20_000 });
+  const [failed, sinceLast] = s.trim().split('|').map(Number);
+  info.walArchiveFailed = failed;
+  info.walArchiveSecsSinceLast = sinceLast;
+  if (failed > 0) problems.push({ level: 'warn', area: 'wal-archive', message: `WAL archive ล้มเหลว ${failed} ครั้ง — สายกู้ PITR ติดขัด (กู้นาทีสุดท้ายไม่ได้)` });
+  else if (sinceLast > 1800) problems.push({ level: 'warn', area: 'wal-archive', message: `WAL archive นิ่ง ${Math.round(sinceLast / 60)} นาที — ไม่มี segment ใหม่ (archive_mode หลุด/Docker รีเซ็ต?)` });
+} catch { /* docker ล่ม — ด่าน docker จับอยู่แล้ว ไม่ซ้ำ */ }
+
 // ── 5) สุขภาพดิสก์กายภาพ — เครื่องนี้มีดิสก์เดียว (C+E = Disk 0) SSD เสื่อม = ตายทั้งระบบ ──
 try {
   const out = execSync('powershell -NoProfile -Command "Get-PhysicalDisk | Select-Object -ExpandProperty HealthStatus"', { encoding: 'utf8', timeout: 20_000 });

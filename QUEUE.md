@@ -140,10 +140,10 @@
 - [ ] I0c คืนนี้ตัดสิน nightly จริง: รอบ 02:00 เป็นรอบแรกหลัง H6/H7 merge (log 03:47 เมื่อคืนคือโค้ดเก่า) — เช้าหน้ากวาดตรวจ: /health //audit ยัง fail (console bucket ที่ ignore ครึ่ง ๆ กลาง ๆ ตาม error-context) ให้ ignore รูปแบบเต็ม · pos-flow ยัง fail (option count 2) ให้ snapshot option จริงก่อนแก้
 
 ## I1 — PITR จบให้สมบูรณ์ (WAL archiving เปิดแล้วจริง 27/9 — `wip 6720af5`: archive_mode=on · archive ไหล 0 failed · archive_timeout=300s)
-- [ ] I1a สคริปต์ `tools/verify/pitr-drill.mjs` อัตโนมัติเต็มรอบ **ไม่แตะ live DB นอกจากอ่าน + probe ในตารางทดสอบ**: ปัก probe row → จด epoch → pg_basebackup ลง /tmp/pitr-base ใน container → ลบ probe (transaction จริง) → scratch postgres บนพอร์ตแปลก → restore base + recovery.signal (restore_command จาก wal-archive bind mount) → recovery_target_time = epoch → promote → SELECT probe ต้องพบ
-- [ ] I1b พิสูจน์ RPO จริง: วัดช่องว่าง segment ล่าสุด → ประกาศ RPO ที่ได้ (เป้า <5 นาที ตาม archive_timeout) ลง STATUS + runbook
-- [ ] I1c machine-health เพิ่มด่าน "WAL archive ติดขัด" (failed_count>0 / ไฟล์ใน wal-archive นิ่ง >30 นาที = warn)
-- [ ] I1d จด docs/ops-runbook.md ขั้นกู้จริงเมื่อไฟดับกลางวัน (base ล่าสุด + replay ถึงนาทีสุดท้าย)
+- [x] I1a สคริปต์ `tools/verify/pitr-drill.mjs` — **เสร็จ 28/9/69 ซ้อมผ่านจริง**: probe 'before-delete' → basebackup → ลบ → scratch replay ถึงเวลาเป้า → **probe กลับมา + users 8 ครบ** · บทเรียนจริง: docker cp ข้าม container ไม่ได้ (ผ่าน host) · ไฟล์ root ต้อง chown+700 · `exec -d` ตายพร้อม client (nohup gosu … & แทน)
+- [x] I1b RPO จริง = ระดับนาที (archive_timeout 300s + replay สำเร็จถึง .MS) — จด runbook §๙ แล้ว
+- [x] I1c machine-health ด่าน WAL archive (failed>0 · นิ่ง >30 นาที = warn) — รันจริง: 0 failed · สด 108 วิ
+- [x] I1d runbook §๙ กู้จริงเมื่อไฟดับ (หยุดเขียน → ตัดสินเวลา → drill → กู้ผ่าน scratch → ตรวจสุขภาพ) + อุปสรรคจริงครบ
 
 ## I2 — Asymmetric encryption สำหรับ backup (สาย offsite รอบสอง — ต่อจาก E3/F1)
 - [ ] I2a เปลี่ยน offsite-push: เข้ารหัสด้วย age (X25519) — **private key ไม่อยู่บนเครื่อง** (โทรศัพท์/password manager ของเจ้าของ · public key อย่างเดียวบนเครื่อง) — สาย AES เดิมคงอยู่คู่ขนานจนกว่า I2c ผ่าน
