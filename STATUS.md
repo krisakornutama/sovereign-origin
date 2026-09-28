@@ -3,6 +3,11 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** F2 — เข้ารหัส field อ่อนไหว AES-256-GCM (28/9/69) · สาขา: ai/frontend-watchdog · commit f933780 (merge MAIN แล้ว)
+  - `field-crypto.service.ts`: encrypt/decrypt ต่อค่า — รูปแบบเก็บ `enc:v1:iv:tag:cipher` · key 32 ไบต์ที่ `core-api/data/field-crypto.key` (auto-generate ครั้งแรก · **gitignore ครอบ + ไม่เคยเข้า git ยืนยันแล้ว**)
+  - ต่อใช้จริง: Telegram botToken + รหัสเราเตอร์ MR505 — set = เข้ารหัส · read = ถอด (legacy plaintext อ่านได้และเข้ารหัสใหม่เมื่อบันทึกครั้งถัดไป)
+  - เทส 6/6 (roundtrip · tamper → throw · legacy อ่านได้) · **migrate ของจริง:** DB มีแต่ `enc:v1:` แล้ว (บั๊กกลางทาง: migrate ด้วย key คนละสำเนา data/ → กู้ด้วย rekey สคริปต์เฉพาะกิจ แล้ว)
+  - พิสูจน์ runtime: telegram/test ยิงจริง 200 success:true + `/telegram/status` configured:true source:db — container ถอดใช้ได้จริง
 - **งาน:** I0+I1 — frontend-watchdog ตัวจริง + digest ทน Docker ดับ + PITR สมบูรณ์ RPO ระดับนาที (28/9/69) · สาขา: ai/frontend-watchdog
   - **I0a:** `frontend-watchdog.mjs` (ที่ verify อ้างมาตลอดแต่ไม่เคยมีบนดิสก์ — ไฟล์ผี) มีตัวจริงแล้ว: ตาย=บูตเอง (พิสูจน์ 11 วิ) · ค้าง=kill เฉพาะ next server · แปลกปลอม=fail-safe ไม่แตะ (ทดสอบ dummy listener จริง) · ผูก Machine Watch ทุก 10 นาที
   - **I0b:** security-anomaly ไม่ throw อีก — Docker ดับ = ส่ง "ตรวจไม่ครบ" + exit 1 ห้ามปลอม "✅ ปกติ" · รันจริงพบ 2 กลุ่มส่ง Telegram จริง
