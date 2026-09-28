@@ -12,6 +12,7 @@ import { prisma } from '../lib/prisma';
 
 const KEY1 = 'RDpbLfCPsJZ7fiv';
 const SEED2 = 'yLwVl0zKqws7LgKPRQ84Mdt708T1qQ3Ha7xv3H7NyU84p21BriUWBU43odz3iP4rBL3cD02KZciXTysVXiV8ngg6vL48rPJyAUw0HurW20xqxv9aYb4M9wK1Ae0wlro510qXeU07kV57fQMc8L6aLgMLwygtc0F10a0Dg70TOoouyFhdysuRMO51yY5ZlOZZLEal1h0t9YQW0Ko7oBwmCAHoic4HYbUyVeU3sfQ1xtXcPcf1aT303wAQhv66qzW';
+import { encryptField, decryptField } from './field-crypto.service';
 
 export const ROUTER_HOST = process.env.ROUTER_HOST || '192.168.1.1';
 const PASSWORD_KEY = 'router.adminPassword';
@@ -56,18 +57,19 @@ export function parseModelResponse(body: string): Record<string, string> {
   return out;
 }
 
+// F2 (28/9/69): รหัสเราเตอร์เข้ารหัสใน DB (enc:v1:...) — อ่านถอดกลับ · ค่าเก่า plaintext ยังใช้ได้จนตั้งใหม่
 async function getAdminPassword(): Promise<string> {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: PASSWORD_KEY } });
-    return row?.value || '';
+    return decryptField(row?.value);
   } catch { return ''; }
 }
 
 export async function setAdminPassword(password: string): Promise<void> {
   await prisma.systemSetting.upsert({
     where: { key: PASSWORD_KEY },
-    update: { value: password },
-    create: { key: PASSWORD_KEY, value: password },
+    update: { value: encryptField(password) },
+    create: { key: PASSWORD_KEY, value: encryptField(password) },
   });
 }
 
