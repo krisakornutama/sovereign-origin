@@ -146,9 +146,9 @@
 - [x] I1d runbook §๙ กู้จริงเมื่อไฟดับ (หยุดเขียน → ตัดสินเวลา → drill → กู้ผ่าน scratch → ตรวจสุขภาพ) + อุปสรรคจริงครบ
 
 ## I2 — Asymmetric encryption สำหรับ backup (สาย offsite รอบสอง — ต่อจาก E3/F1)
-- [ ] I2a เปลี่ยน offsite-push: เข้ารหัสด้วย age (X25519) — **private key ไม่อยู่บนเครื่อง** (โทรศัพท์/password manager ของเจ้าของ · public key อย่างเดียวบนเครื่อง) — สาย AES เดิมคงอยู่คู่ขนานจนกว่า I2c ผ่าน
-- [ ] I2b recovery file สองรูปแบบ: คำสั่งถอดด้วย age บนมือถือ + key AES เดิมเผื่อไฟล์เก่า
-- [ ] I2c พิสูจน์ restore-test ผ่านสาย age ครบ 1–2 คืน แล้วจึงตัดสาย AES เดิม
+- [x] I2a ✅ age (X25519) เข้ารหัสคู่ขนาน — เสร็จ 28/9/69 (age.exe v1.2.1 ที่ tools/bin · identity gitignored ที่ infra/offsite · push เดียวได้ไฟล์คู่ .enc+.age · mirror พาคู่ · พิสูจน์ restore 142 ตารางจากไฟล์ .age)
+- [x] I2b ✅ recovery file สองรูปแบบ — identity เต็ม + คำสั่งถอดบนมือถือ (`age -d -i …`) + key AES เดิม — อยู่ที่ mirror ทุกรอบ push
+- [ ] I2c พิสูจน์ restore-test ผ่านสาย age ครบ 1–2 คืน แล้วจึงตัดสาย AES เดิม — **คืนแรกผ่านแล้ว (28/9) เหลืออีก 1 คืน** · หมายเหตุ: ปิดรอยต่อ F2 ฝั่ง host แล้ว (telegram-creds.mjs ถอด enc:v1: ได้ — เคยส่ง token ขยะตอน token ใน DB เข้ารหัสแล้ว)
 - [ ] I2d (ตัดสินเจ้าของ) tmpfs/RAM disk สำหรับ secret ชั่วคราว — เครื่องนี้ Modern Standby บ่อย อาจยุ่งยากกว่าประโยชน์ — เจ้าของเลือก
 
 ## I3 — audit_logs partitioning + retention 90 วัน (ยกระดับจาก H1 ตามลิสต์เจ้าของ)

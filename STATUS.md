@@ -3,6 +3,12 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** I2 — age (X25519) สาย offsite รอบสอง + ปิดรอยต่อ F2 ฝั่ง host (28/9/69) · สาขา: ai/age-offsite
+  - `tools/bin/age.exe` v1.2.1 (ดาวน์โหลดจาก GitHub release ลง E: ตามกฎ — gitignore ครอบ) · identity อยู่ `infra/offsite/age-identity.txt` (gitignored — เจ้าของต้องก๊อปไว้นอกเครื่อง: recovery file มีเนื้อครบพร้อมคำสั่งถอดบนมือถือ)
+  - push รอบเดียวได้ไฟล์คู่: `.enc` (AES เดิม) + `.age` (public key อย่างเดียว — เข้ารหัสรอบสอง) · mirror พาทั้งคู่ไป C: · age ล้ม = ข้าม ไม่กระทบสายเดิม
+  - **พิสูจน์เต็มวงจร:** `--restore-test --age` กู้ 142 ตาราง (users 8 · audit 26,430 · sensor_telemetry 122,564 แถว) จากไฟล์ .age — **นับคืนแรกของ I2c (ต้องผ่านอีก 1–2 คืนจึงตัดสาย AES เดิม)**
+  - **รอยต่อ F2 ที่จับได้:** telegram.botToken ใน DB เป็น `enc:v1:` แล้ว แต่ host-side reader (`telegram-creds.mjs` — ใช้โดย nightly-gate/machine-alert/security-anomaly/offsite-push) ยังอ่านตรง ๆ → ส่ง token ขยะ (Telegram ตอบ Not Found) · แก้: ถอด AES-256-GCM ฝั่ง host (ลอง key MAIN ก่อนแล้ว key โลคัล · GCM ยืนยัน key ถูกเอง · ถอดไม่ได้ = ถือว่าไม่มี token กันส่งขยะ) — ยืนยัน: source=db token ถอดได้ · ยิง sendDocument จริงผ่าน (message_id=847)
+  - บั๊ก restore-test ที่แก้พร้อม: พอร์ต 55432 เคยตกเข้า excluded range ของ Hyper-V (สุ่มหลังรีบูต) → ถอด `-p` ออกทั้งหมด (restore-test คุยผ่าน docker exec ล้วน ไม่ต้อง publish พอร์ต)
 - **งาน:** F2 — เข้ารหัส field อ่อนไหว AES-256-GCM (28/9/69) · สาขา: ai/frontend-watchdog · commit f933780 (merge MAIN แล้ว)
   - `field-crypto.service.ts`: encrypt/decrypt ต่อค่า — รูปแบบเก็บ `enc:v1:iv:tag:cipher` · key 32 ไบต์ที่ `core-api/data/field-crypto.key` (auto-generate ครั้งแรก · **gitignore ครอบ + ไม่เคยเข้า git ยืนยันแล้ว**)
   - ต่อใช้จริง: Telegram botToken + รหัสเราเตอร์ MR505 — set = เข้ารหัส · read = ถอด (legacy plaintext อ่านได้และเข้ารหัสใหม่เมื่อบันทึกครั้งถัดไป)
