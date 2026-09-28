@@ -40,6 +40,18 @@ function expiredPartitions() {
   return out.sort();
 }
 
+// สร้าง partition ล่วงหน้า 3 เดือนเสมอ (image ไม่มี pg_cron — รอบ nightly เป็นตัวเดินหน้าแทน · กัน INSERT ตก default)
+function ensureFuturePartitions() {
+  const now = new Date();
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
+    const y = d.getUTCFullYear(), mo = d.getUTCMonth() + 1;
+    const name = `audit_logs_${y}_${String(mo).padStart(2, '0')}`;
+    const to = mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, '0')}-01`;
+    psql(`CREATE TABLE IF NOT EXISTS ${name} PARTITION OF audit_logs FOR VALUES FROM ('${y}-${String(mo).padStart(2, '0')}-01') TO ('${to}')`);
+  }
+}
+
 async function notify(text) {
   try {
     const { readTelegramCreds } = await import('./telegram-creds.mjs');
@@ -54,6 +66,7 @@ async function notify(text) {
 
 if (PROBE) {
   console.log('── โหมด PROBE: partition จำลอง + แถวปลอม — ท่อครบวงจร ไม่แตะข้อมูลจริง ──');
+  ensureFuturePartitions();
   const probePart = 'audit_logs_2025_01';
   psql(`CREATE TABLE IF NOT EXISTS ${probePart} PARTITION OF audit_logs FOR VALUES FROM ('2025-01-01') TO ('2025-02-01')`);
   psql(`INSERT INTO audit_logs (id, timestamp, action_type, payload) SELECT gen_random_uuid(), timestamp '2025-01-05 12:00:00+00', 'I3C_PROBE', '{"probe":true}'::jsonb FROM generate_series(1, 7)`);
@@ -116,6 +129,7 @@ async function runPipeline(parts, { probe = false } = {}) {
   return didAny;
 }
 
+ensureFuturePartitions();
 const parts = expiredPartitions();
 if (!parts.length) {
   console.log(`✅ ไม่มี partition เกินเกณฑ์ ${RETENTION_DAYS} วัน — ไม่ต้องทำอะไร`);
