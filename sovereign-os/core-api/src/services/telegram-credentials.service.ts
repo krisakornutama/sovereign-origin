@@ -1,4 +1,7 @@
 import { prisma } from '../lib/prisma';
+import { encryptField, decryptField } from './field-crypto.service';
+
+// F2 (28/9/69): bot token เก็บเข้ารหัสเสมอ (enc:v1:...) — อ่านแล้วถอดกลับ · ค่าเก่า (plaintext) อ่านได้จนกว่าจะตั้งใหม่
 
 // ── Telegram credential resolver: DB (ตั้งผ่าน UI) → env (.env) ──
 // ให้ผู้ใช้กรอก bot token / chat ID ในหน้า Settings โดยไม่ต้องแก้ .env บนเครื่อง
@@ -25,7 +28,10 @@ async function loadFromDb(): Promise<{ token?: string; chatId?: string }> {
       where: { key: { in: [TELEGRAM_TOKEN_KEY, TELEGRAM_CHAT_ID_KEY] } },
     });
     const map = new Map(rows.map((r) => [r.key, r.value]));
-    cache = { token: map.get(TELEGRAM_TOKEN_KEY), chatId: map.get(TELEGRAM_CHAT_ID_KEY) };
+    cache = {
+      token: decryptField(map.get(TELEGRAM_TOKEN_KEY)),
+      chatId: map.get(TELEGRAM_CHAT_ID_KEY) || '', // chatId ไม่ใช่ secret — เก็บตรง
+    };
     cacheTime = now;
   } catch (err) {
     console.error('Telegram credentials DB read failed:', err instanceof Error ? err.message : err);
@@ -65,8 +71,8 @@ export async function setTelegramCredentials(
   await prisma.$transaction([
     prisma.systemSetting.upsert({
       where: { key: TELEGRAM_TOKEN_KEY },
-      create: { key: TELEGRAM_TOKEN_KEY, value: botToken },
-      update: { value: botToken },
+      create: { key: TELEGRAM_TOKEN_KEY, value: encryptField(botToken) },
+      update: { value: encryptField(botToken) },
     }),
     prisma.systemSetting.upsert({
       where: { key: TELEGRAM_CHAT_ID_KEY },
