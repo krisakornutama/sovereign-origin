@@ -4,6 +4,9 @@
 -- กฎ Postgres: PK ของตารางแบ่งต้องมี partition key → PK กลายเป็น (id, "timestamp") — โค้ดไม่มี findUnique ตาม id เดี่ยว (ตรวจแล้ว)
 BEGIN;
 ALTER TABLE "audit_logs" RENAME TO "audit_logs_old";
+-- RENAME TABLE ไม่เปลี่ยนชื่อ constraint/index — ต้องย้ายชื่อออกก่อน ไม่งั้นตารางใหม่ชนชื่อ
+ALTER TABLE "audit_logs_old" RENAME CONSTRAINT "audit_logs_pkey" TO "audit_logs_pkey_old";
+ALTER TABLE "audit_logs_old" RENAME CONSTRAINT "audit_logs_user_id_fkey" TO "audit_logs_user_id_fkey_old";
 
 CREATE TABLE "audit_logs" (
     "id" uuid NOT NULL,
