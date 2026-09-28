@@ -136,6 +136,13 @@ try {
   problems.push({ level: 'critical', area: 'offsite', message: `ตรวจสาย offsite ไม่ได้ (${String(e?.message || e).slice(0, 80)})` });
 }
 
+// 4b+) I3 — audit_logs partitioning สุขภาพ: INSERT ตก default = partition ขาด (ห้ามเงียบ)
+try {
+  const defCount = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT count(*) FROM audit_logs_default"', { encoding: 'utf8', timeout: 20_000 }).trim();
+  info.auditDefaultRows = Number(defCount);
+  if (info.auditDefaultRows > 0) problems.push({ level: 'warn', area: 'audit', message: `audit_logs มี ${info.auditDefaultRows} แถวตกใน default partition — partition เดือนนั้นหาย (รัน tools/verify/audit-retention.mjs เพื่อสร้างใหม่)` });
+} catch { /* Docker/DB ดับ = จับโดยด่านอื่นอยู่แล้ว */ }
+
 // 4c) I1c — WAL archive ติดขัด: failed>0 = warn ทันที · ไม่มีไฟล์ใหม่ >30 นาที = warn (archive_timeout 300s ต้องไหลสม่ำเสมอ)
 try {
   const s = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT failed_count, COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time))::int, -1) FROM pg_stat_archiver"', { encoding: 'utf8', timeout: 20_000 });

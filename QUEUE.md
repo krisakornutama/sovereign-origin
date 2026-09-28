@@ -151,7 +151,10 @@
 - [ ] I2c พิสูจน์ restore-test ผ่านสาย age ครบ 1–2 คืน แล้วจึงตัดสาย AES เดิม — **คืนแรกผ่านแล้ว (28/9) เหลืออีก 1 คืน** · หมายเหตุ: ปิดรอยต่อ F2 ฝั่ง host แล้ว (telegram-creds.mjs ถอด enc:v1: ได้ — เคยส่ง token ขยะตอน token ใน DB เข้ารหัสแล้ว)
 - [ ] I2d (ตัดสินเจ้าของ) tmpfs/RAM disk สำหรับ secret ชั่วคราว — เครื่องนี้ Modern Standby บ่อย อาจยุ่งยากกว่าประโยชน์ — เจ้าของเลือก
 
-## I3 — audit_logs partitioning + retention 90 วัน (ยกระดับจาก H1 ตามลิสต์เจ้าของ)
+## I3 — audit_logs partitioning + retention 90 วัน (ยกระดับจาก H1 ตามลิสต์เจ้าของ) — ✅ เสร็จ 28/9/69 (commit c8cb814)
+- [x] I3a ✅ วัดจริง: 26,430 แถว/2เดือน (~600/วัน) → monthly partition พอ (ต่ำเกินกว่า weekly คุ้มความซับซ้อน)
+- [x] I3b ✅ migration declarative monthly (ส.ค.26–ม.ค.27 + default) — ย้ายครบ · PK (id,timestamp) · index timestamp DESC · probe เขียนจริงตก partition ถูก
+- [x] I3c ✅ auto-purge/export: เดือนจบเกิน 90 วัน = export NDJSON.gz → ตรวจจำนวน → drop → mirror · ensure 3 เดือนล่วงหน้าทุกรอบ nightly · probe ผ่าน · ด่าน default-partition ใน machine-health
 - [ ] I3a วัดจริงก่อน: แถว/ขนาด/อัตราเขียนต่อวัน → ตัดสิน monthly vs weekly partitioning
 - [ ] I3b migration declarative partitioning รายเดือน (สร้าง partition ล่วงหน้า 3 เดือน + default) — ย้ายข้อมูลเดิมชุด ๆ แบบล็อกสั้น (ตารางถูกเขียนทุก action)
 - [ ] I3c task รายวัน: export partition เกิน 90 วัน เป็น .json.gz ไป backups/cold/ (เข้าสาย mirror E3 อัตโนมัติ) → detach+drop

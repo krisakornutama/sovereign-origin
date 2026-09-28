@@ -3,6 +3,11 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** I3 — audit_logs partitioning + retention 90 วัน (28/9/69) · สาขา: ai/audit-partition · commit c8cb814 (merge MAIN แล้ว)
+  - **I3a วัดจริง:** 26,430 แถว / 2 เดือน (~600/วัน) — ปริมาณต่ำ → monthly partition พอ · ไม่มี FK เข้า · โค้ดใช้แค่ create+findMany (PK คู่ไม่กระทบ)
+  - **I3b migration:** ย้ายครบ 26,430 แถวเข้า partition รายเดือน (ส.ค.26–ม.ค.27 + default) · PK (id, timestamp) · index timestamp DESC · เขียน probe จริงตก partition ถูกต้อง · บทเรียน: RENAME TABLE ไม่ย้ายชื่อ constraint/index → rename เก่าก่อนสร้างใหม่ (รอบแรก rollback สะอาด + P3009 แก้ด้วย migrate resolve --rolled-back)
+  - **I3c retention:** `audit-retention.mjs` — เดือนจบเกิน 90 วัน = export NDJSON.gz → **ตรวจจำนวนแถวตรงก่อน** → drop partition (ล็อกสั้น) → คัดลอกเข้า mirror C: → แจ้ง Telegram · สร้าง partition ล่วงหน้า 3 เดือนทุกรอบ (ไม่มี pg_cron ใน image — nightly เป็นตัวเดินหน้า) · **พิสูจน์ท่อด้วย --probe** (ของปลอม 7 แถว export→drop→mirror→เก็บกวาดครบ) · ผูกเข้า nightly-gate ขั้นที่ 3 (ล้ม = gate แดงแจ้งเลย)
+  - machine-health เพิ่มด่าน: แถวตกใน `audit_logs_default` > 0 = warn (partition ขาดห้ามเงียบ)
 - **งาน:** I2 — age (X25519) สาย offsite รอบสอง + ปิดรอยต่อ F2 ฝั่ง host (28/9/69) · สาขา: ai/age-offsite
   - `tools/bin/age.exe` v1.2.1 (ดาวน์โหลดจาก GitHub release ลง E: ตามกฎ — gitignore ครอบ) · identity อยู่ `infra/offsite/age-identity.txt` (gitignored — เจ้าของต้องก๊อปไว้นอกเครื่อง: recovery file มีเนื้อครบพร้อมคำสั่งถอดบนมือถือ)
   - push รอบเดียวได้ไฟล์คู่: `.enc` (AES เดิม) + `.age` (public key อย่างเดียว — เข้ารหัสรอบสอง) · mirror พาทั้งคู่ไป C: · age ล้ม = ข้าม ไม่กระทบสายเดิม
