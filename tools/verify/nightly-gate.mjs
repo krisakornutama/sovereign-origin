@@ -21,6 +21,8 @@ const NPM_CLI = path.join(path.dirname(process.execPath), 'node_modules', 'npm',
 const checks = [
   { name: 'db-doctor (env/schema/ฐานแปลกปลอม)', cmd: 'node', args: ['tools/verify/db-doctor.mjs'] },
   { name: 'full-system-check (mounts ปิดสนิท + lifecycle จริง)', cmd: 'node', args: ['tools/verify/full-system-check.mjs'] },
+  // I3c: audit_logs เก็บ 90 วัน — เดือนไหนจบเกินเกณฑ์ = export json.gz → drop partition (เจอปัญหา = gate ล้มแจ้งเลย)
+  { name: 'audit-retention (90 วัน export+drop)', cmd: 'node', args: ['tools/verify/audit-retention.mjs'] },
   { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'] },
   { name: 'ui-sweep (หน้าจอจริงผ่าน Chromium)', cmd: 'node', args: ['tools/verify/ui-sweep.mjs'] },
   // security-audit ต้องเป็นตัวสุดท้าย: brute-force test กิน per-IP login window (10/15 นาที) —
