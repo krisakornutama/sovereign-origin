@@ -38,6 +38,17 @@ function mirrorLog(status, extra = {}) {
   } catch { /* log ไม่ได้ = ข้าม ไม่พารอบตาย */ }
 }
 
+// ── สาย age (I2 28/9/69): เข้ารหัส X25519 — private key ไม่ต้องอยู่บนเครื่องนี้ (เจ้าของเก็บบนมือถือ/manager)
+// คู่ขนานกับสาย AES เดิมจนกว่า I2c: restore ผ่านสาย age ครบ 1–2 คืน จึงตัดสายเก่า
+const AGE_BIN = path.join(ROOT, 'tools/bin/age.exe');
+const AGE_IDENTITY = path.join(OFFSITE, 'age-identity.txt'); // gitignored — เจ้าของต้องก๊อปออกนอกเครื่อง (recovery มีเนื้อให้ครบ)
+function ageRecipient() {
+  try {
+    const m = fs.readFileSync(AGE_IDENTITY, 'utf8').match(/^#\s*public key:\s*(age1\w+)\s*$/im);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
+
 function readMeshKeyB64() {
   try {
     const p = path.join(ROOT, 'sovereign-os/core-api/data/mesh-key');
@@ -58,11 +69,17 @@ function buildRecoveryText() {
     '2) mesh key (sovereign-os/core-api/data/mesh-key, base64):',
     mesh || '(ไม่มีไฟล์ mesh-key)',
     '',
-    '3) กู้ไฟล์ .enc ล่าสุด (ทดสอบ restore เต็ม):',
+    '3) age identity (X25519 — สายใหม่ · ไฟล์ sovereign_dump_*.age ใช้ตัวนี้):',
+    fs.existsSync(AGE_IDENTITY) ? fs.readFileSync(AGE_IDENTITY, 'utf8').trim() : '(ยังไม่มี identity — รัน push รอบแรกแล้วจะเกิด)',
+    '',
+    '   ถอดไฟล์ .age บนมือถือ/เครื่องไหนก็ได้ (ติดตั้ง age ก่อน):',
+    '   age -d -i identity.txt sovereign_dump_XXXXXXXX_XXXXXX.sql.gz.age > dump.sql.gz',
+    '',
+    '4) กู้ไฟล์ .enc ล่าสุด (สาย AES เดิม — ทดสอบ restore เต็ม):',
     '   node tools/verify/offsite-push.mjs --restore-test --from-mirror',
     '',
-    'ไฟล์ .enc เข้ารหัส AES-256-GCM — key ข้างบนหาย = ไฟล์ทั้งหมดหมดค่า',
-    'แนะนำ: ก๊อปข้อความนี้ไป password manager หรือ Telegram Saved Messages —',
+    'ไฟล์ .enc = AES-256-GCM (ใช้ key ข้อ 1) · ไฟล์ .age = age X25519 (ใช้ identity ข้อ 3)',
+    'ของใดหาย ไฟล์รูปแบบนั้นหมดค่าทั้งชุด — ก๊อปข้อความนี้ไป password manager หรือ Telegram Saved Messages —',
     'สำเนาบนไดรฟ์เดียวกันช่วยแค่กรณีดิสก์เสีย ไม่ช่วยกรณีเครื่องหายทั้งเครื่อง',
   ].join('\n');
 }
@@ -91,6 +108,16 @@ function latestEncrypted() {
   if (!files.length) throw new Error(`ไม่มีไฟล์ offsite ใน ${dir} — รัน push ก่อน`);
   return path.join(dir, files.at(-1));
 }
+function latestAge() {
+  const dir = FROM_MIRROR && fs.existsSync(MIRROR_DIR) ? MIRROR_DIR : OFFSITE;
+  const files = fs.readdirSync(dir).filter((f) => f.startsWith('sovereign_dump_') && f.endsWith('.age')).sort();
+  if (!files.length) throw new Error(`ไม่มีไฟล์ .age ใน ${dir} — รัน push ก่อน`);
+  return path.join(dir, files.at(-1));
+}
+function decryptAge(ageFile) {
+  if (!fs.existsSync(AGE_IDENTITY)) throw new Error(`ไม่มี age identity ที่ ${AGE_IDENTITY} — กู้จาก offsite-key-recovery.txt ก่อน`);
+  return execFileSync(AGE_BIN, ['-d', '-i', AGE_IDENTITY, ageFile], { maxBuffer: 512 * 1024 * 1024 });
+}
 function decrypt(encFile) {
   // layout ตรงกับ push: [iv(12)][ciphertext][tag(16) ท้ายไฟล์]
   const raw = fs.readFileSync(encFile);
@@ -106,9 +133,11 @@ function gunzipSql(buf) {
 }
 
 if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
-  const enc = latestEncrypted();
+  const wantAge = process.argv.includes('--age'); // --age = พิสูจน์สายใหม่ (ไฟล์ .age) — ไม่ใส่ = สาย AES เดิม
+  const enc = wantAge ? latestAge() : latestEncrypted();
   const sha = crypto.createHash('sha256').update(fs.readFileSync(enc)).digest('hex');
-  const sql = gunzipSql(decrypt(enc)).toString('utf8');
+  const payload = () => gunzipSql(wantAge ? decryptAge(enc) : decrypt(enc));
+  const sql = payload().toString('utf8');
   console.log(`ถอดรหัส: ${path.basename(enc)} · sha256=${sha.slice(0, 16)}… · ${Math.round(sql.length / 1024)} KB SQL`);
   if (!/CREATE TABLE|COPY /.test(sql)) { console.error('FATAL: เนื้อไฟล์ไม่ใช่ SQL dump ที่ใช้ได้'); process.exit(1); }
   const tables = [...sql.matchAll(/^CREATE TABLE (?:public\.)?(\w+)/gm)].map((m) => m[1]);
@@ -121,7 +150,7 @@ if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
   console.log('restore ลง Postgres ชั่วคราว (sovereign-restore-test)…');
   execSync('docker rm -f sovereign-restore-test 2>nul', { stdio: 'ignore', shell: 'cmd.exe' });
   try {
-    execFileSync('docker', ['run', '-d', '--name', 'sovereign-restore-test', '-e', 'POSTGRES_PASSWORD=testrestore', '-e', 'POSTGRES_USER=sovereign', '-e', 'POSTGRES_DB=sovereign', '-p', '127.0.0.1:55432:5432', 'timescale/timescaledb:latest-pg15'], { stdio: 'ignore' });
+    execFileSync('docker', ['run', '-d', '--name', 'sovereign-restore-test', '-e', 'POSTGRES_PASSWORD=testrestore', '-e', 'POSTGRES_USER=sovereign', '-e', 'POSTGRES_DB=sovereign', 'timescale/timescaledb:latest-pg15'], { stdio: 'ignore' }); // ไม่ publish พอร์ต — คุยผ่าน docker exec เท่านั้น (55432 เคยชน excluded range ของ Hyper-V)
     for (const wait of [10_000, 20_000]) { // รอหลัง boot + หลัง restart รอบ image เอง
       await new Promise((r) => setTimeout(r, wait));
       try { execSync('docker exec sovereign-restore-test pg_isready -U sovereign', { stdio: 'ignore' }); break; } catch { /* ลองรอบต่อไป */ }
@@ -131,7 +160,7 @@ if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
     // ใน session เดียว เพราะ pg_dump เซ็ต search_path='' กลาง stream ทำ post_restore หา function
     const psql = (args, input) => execFileSync('docker', ['exec', '-i', 'sovereign-restore-test', 'psql', '-U', 'sovereign', '-d', 'sovereign', '-q', ...args], { input, maxBuffer: 256 * 1024 * 1024 });
     psql(['-c', 'SELECT timescaledb_pre_restore();']);
-    psql([], gunzipSql(decrypt(enc)));
+    psql([], payload());
     psql(['-c', 'SELECT timescaledb_post_restore();']);
     let allOk = true;
     for (const [table, expected] of [['users', 5], ['audit_logs', 26_000]]) {
@@ -171,6 +200,22 @@ fs.mkdirSync(OFFSITE, { recursive: true });
 fs.writeFileSync(encPath, enc);
 const sha = crypto.createHash('sha256').update(enc).digest('hex');
 console.log(`   ${encName} (${Math.round(enc.length / 1024)} KB) sha256=${sha.slice(0, 16)}…`);
+
+// 2b) สำเนาสาย age (I2) — เข้ารหัสรอบสองด้วย public key อย่างเดียว · ล้มได้ไม่กระทบสาย AES
+let agePath = null;
+const recipient = ageRecipient();
+if (!fs.existsSync(AGE_BIN) || !recipient) {
+  console.error('   ⚠️ ข้ามสาย age (ไม่มี age.exe/identity) — สาย AES ทำงานปกติ');
+} else {
+  try {
+    agePath = path.join(OFFSITE, encName.replace(/\.enc$/, '.age'));
+    execFileSync(AGE_BIN, ['-r', recipient, '-o', agePath, '-'], { input: gz, maxBuffer: 512 * 1024 * 1024 });
+    console.log(`2b) สำเนา age (X25519): ${path.basename(agePath)} (${Math.round(fs.statSync(agePath).size / 1024)} KB)`);
+  } catch (err) {
+    agePath = null;
+    console.error(`2b) ⚠️ age เข้ารหัสล้ม — ${String(err?.message || err).slice(0, 120)} (สาย AES ไม่กระทบ)`);
+  }
+}
 
 // จดทุกความล้มเหลวลง log พร้อม status:failed — ห้ามตายเงียบอีก
 // (เคสจริงคืน 24–26/9: DNS ผ่านเราเตอร์ล่ม → fetch throw ไม่มี catch → สคริปต์ตายทั้งรอบ
@@ -212,10 +257,11 @@ try {
   const mPath = path.join(MIRROR_DIR, encName);
   fs.copyFileSync(encPath, mPath);
   if (fs.statSync(mPath).size !== enc.length) throw new Error('ขนาดไฟล์ mirror ไม่ตรงต้นทาง');
+  if (agePath && fs.existsSync(agePath)) fs.copyFileSync(agePath, path.join(MIRROR_DIR, path.basename(agePath)));
   fs.writeFileSync(path.join(MIRROR_DIR, 'offsite-key-recovery.txt'), buildRecoveryText());
-  mirrorLog('sent');
+  mirrorLog('sent', agePath ? { age: path.basename(agePath) } : {});
   mirrorOk = true;
-  console.log(`   ✅ mirror → ${MIRROR_DIR} (+ offsite-key-recovery.txt)`);
+  console.log(`   ✅ mirror → ${MIRROR_DIR} (+ recovery${agePath ? ' + ไฟล์ .age' : ''})`);
 } catch (err) {
   mirrorLog('failed', { reason: String(err?.message || err).slice(0, 160) });
   console.error(`   ⚠️ mirror ล้ม — ${String(err?.message || err).slice(0, 120)} (จดแล้ว ไม่ทำรอบตาย)`);
