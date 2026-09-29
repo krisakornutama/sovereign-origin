@@ -246,6 +246,11 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 **สถาปัตยกรรม:** ไม่ต้อง "จ่ายเช่า host" — เครื่องนี้คือ host (backend + DB สดที่เดียวในโลก) · สิ่งที่ขาดคือช่องทางเข้าที่ทะลุ CGNAT ของเราเตอร์ LTE (MR505) — **Cloudflare Tunnel (ฟรี)** แก้ตรงนี้: cloudflared ต่อ "ออก" หา Cloudflare เท่านั้น ไม่เปิดพอร์ตเข้าเลย · domain ฟรีตลอดจาก **DigitalPlat FreeDomain** (dpdns.org / us.kg / qzz.io / xx.kg — domain.digitalplat.org)
 
 **ขั้นเจ้าของทำเอง (~15 นาที — สมัครแทนไม่ได้):**
+
+> **สถานะจริง 29/9/69:** บัญชี DigitalPlat สร้าง+ยืนยันเมลแล้ว (`krisakornutama` / owteenhoper@gmail.com · Account ID 1790697100 · Free slots: 1) · Cloudflare มีอยู่แล้ว (ล็อกอิน GitHub) และ zone `sovereign-shop.dpdns.org` ถูกเพิ่มเรียบร้อย — **NS ของบัญชีนี้: `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com`**
+> ⚠️ ตัวตรวจ availability ตอบ "unavailable" ให้ทุกชื่อเมื่อควบคุมผ่านระบบอัตโนมัติ (ตัวตรวจมนุษย์บล็อกเงียบ) — **ขั้นจดจริงต้องทำในเบราว์เซอร์ปกติของเจ้าของเอง** (แชท AI จะจดให้ไม่ได้ ไม่ใช่เพราะเทคนิค แต่เพื่อกันบัญชีโดนแฟล็ก)
+> ชื่อ `sovereign-shop` / `sovereign-origin-shop` / `sovereign-utama` บน .dpdns.org อาจถูกจดไปแล้วจริง — เตรียมชื่อสำรองไว้ 2–3 ชื่อ
+> คำเตือนลำดับ: **zone ใน Cloudflare ต้องตรงกับชื่อที่จดได้จริง** — ถ้าชื่อสุดท้ายไม่ใช่ sovereign-shop ให้กลับไป Cloudflare → Add a domain → Connect ด้วยชื่อใหม่ → ใช้ NS คู่ของ zone นั้นในแบบฟอร์มจด (NS เปลี่ยนตาม zone ไม่ซ้ำเดิม) · zone `sovereign-shop.dpdns.org` ที่สร้างไว้เป็นของทดลอง ลบทิ้งได้ภายหลัง
 1. สมัครบัญชีฟรี https://dash.cloudflare.com/sign-up (อีเมล + รหัส — ไม่ต้องใส่บัตร)
 2. https://domain.digitalplat.org → Register → ค้นชื่อ เช่น `sovereign-shop` เลือก suffix `.dpdns.org` → ยืนยันตัวตนผ่าน GitHub/Discord ตามที่หน้าสมัครถาม (กัน bot — ฟรีไม่มีบัตร)
 3. เมื่อได้ domain: ในหน้าจัดการของ DigitalPlat ตั้ง Nameserver เป็น 2 ชื่อที่ Cloudflare ให้ (Cloudflare dashboard → เว็บไซต์/domain → DNS → Nameservers) แล้วรอสถานะ Active (ปกติไม่เกิน ~1 ชม.)
