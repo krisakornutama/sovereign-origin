@@ -3,6 +3,11 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** I4 — host+domain ฟรี ขึ้นร้านสู่อินเทอร์เน็ต (29/9/69) · สาขา: ai/audit-partition
+  - สถาปัตยกรรม: เครื่องนี้คือ host (DB สดที่เดียว — static hosting จะโชว์ของเก่า) · ของที่ขาดคือช่องทางเข้าทะลุ CGNAT LTE → **Cloudflare Tunnel ฟรี** (cloudflared ต่อออกเท่านั้น ไม่เปิดพอร์ตเข้า) + **domain ฟรี DigitalPlat** (dpdns.org/us.kg/qzz.io/xx.kg) — คู่มือทีละจอของเจ้าของอยู่ docs/ops-runbook.md §สิบ (~15 นาที)
+  - **I4a:** compose มีบริการ cloudflared แล้ว — profile "public" (token ว่าง = ไม่รัน ไม่ fail งานอื่น) · ชี้ frontend :3000 ผ่าน host.docker.internal · ห้ามชี้ :3001 (เขียนกันไว้ในคอมเมนต์) · token/CORS รออยู่ท้าย infra/.env พร้อมคู่มือ (ไฟล์ gitignored)
+  - **I4c:** ตรวจแล้ว server.ts อ่าน CORS_ORIGIN จาก env อยู่แล้ว — ได้ domain แค่เติม env + recreate ครั้งเดียว ไม่แก้โค้ด
+  - คงเหลือ: เจ้าของสมัครจริง (I4-0) → WAF allowlist /shop* /trace* + rate limit (I4b ขั้น 6 ใน runbook) → พิสูจน์มือถือ 4G (I4d)
 - **งาน:** I5b+I6 — Crop Recommendation API + กันแจ้งเตือนปลอมจาก cleanup e2e (29/9/69) · สาขา: ai/audit-partition · commit 8646191
   - `/api/farm/crops/recommend` มีชีวิตจริง: บั๊กเดิมคือ farm router mount ที่ `/api/farm/plots` ทำ URL ตามสเปคไม่มีวันตรง — ย้ายเป็น router แยก mount ตรง · delegate เข้า farm-advisor.service (ไม่เขียน logic ซ้ำ) · ยิงจริง **source=ollama** (gemma3:4b ตอบ 459 ตัวอักษร — timeout ยกเป็น 100s ให้สมจริงบนเครื่อง CPU นี้ · ล้ม = fallback heuristic ตอบเสมอ)
   - I6: afterAll cleanup e2e ลองซ้ำ 3 รอบก่อนสรุปล้ม — กล่องเตือน "เคลียร์ไม่สำเร็จ" ปลอมจาก psql สะดุดรอบเดียวช่วงเครื่องเพิ่งตื่นหมดไป

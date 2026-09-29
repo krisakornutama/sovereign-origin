@@ -176,10 +176,10 @@
 - [x] I6 แจ้งเตือนปลอมจาก cleanup — **เสร็จ 28/9/69** (commit 8646191): afterAll ใน pos-flow ลอง psql ซ้ำ 3 รอบก่อนสรุปล้ม (ช่วงเครื่องเพิ่งตื่น psql สะดุดรอบเดียว = ปลอม "เคลียร์ไม่สำเร็จ" ทั้งที่ของจริงสำเร็จ)
 
 ## I4 — host + domain ฟรี: ขึ้น /shop สู่อินเทอร์เน็ต (คำขอเจ้าของ 29/9/69 — Cloudflare Tunnel + DigitalPlat)
-- [ ] I4-0 เจ้าของทำเอง ~15 นาที: สมัคร Cloudflare ฟรี + จด domain ฟรีที่ domain.digitalplat.org (dpdns.org/us.kg/qzz.io/xx.kg) + ใส่ NS ของ Cloudflare ให้ activate — คู่มือทีละจอใน docs/ops-runbook.md §สิบ
-- [ ] I4a compose บล็อก cloudflared (token จาก infra/.env ห้ามเข้า git) — ชี้ frontend :3000 เท่านั้น ห้ามพราก :3001 ออกนอกบ้าน
-- [ ] I4b WAF: อนุญาต /shop* /trace* + /api/shop/community — ปิด /dashboard* + /api/* ภายในที่เหลือ + rate limit
-- [ ] I4c CORS/helmet origin เพิ่มจาก env (แก้ infra/.env + recreate ไม่แก้โค้ด)
+- [x] I4-0 เจ้าของทำเอง ~15 นาที: สมัคร Cloudflare ฟรี + จด domain ฟรีที่ domain.digitalplat.org (dpdns.org/us.kg/qzz.io/xx.kg) + ใส่ NS ของ Cloudflare ให้ activate — คู่มือทีละจอใน docs/ops-runbook.md §สิบ — **คู่มือเขียนแล้ว 29/9/69 เหลือเจ้าของทำขั้นสมัครจริง**
+- [x] I4a compose บล็อก cloudflared — **เสร็จ 29/9/69**: บริการ `cloudflared` ภายใต้ profile "public" (token ว่าง = ไม่รัน ไม่ fail compose งานอื่น) · token อ่านจาก infra/.env `CLOUDFLARED_TOKEN` (เตรียมบรรทัดพร้อมคู่มือแล้ว · ไฟล์ gitignored ไม่เข้า git) · ชี้ frontend :3000 ผ่าน host.docker.internal เท่านั้น — คอมเมนต์ใน compose ห้ามชี้ :3001 · เริ่มจริงเมื่อเจ้าของใส่ token: `docker compose --profile public up -d cloudflared`
+- [ ] I4b WAF: อนุญาต /shop* /trace* + /api/shop/community — ปิด /dashboard* + /api/* ภายในที่เหลือ + rate limit (ขั้น 6 ใน runbook §สิบ — ทำที่หน้า Cloudflare หลังได้ domain)
+- [x] I4c CORS/helmet origin เพิ่มจาก env — **ยืนยัน 29/9/69 ว่าไม่ต้องแก้โค้ด**: server.ts อ่าน `CORS_ORIGIN` จาก env อยู่แล้ว — ได้ domain จริงแล้วเติมบรรทัดใน infra/.env (คอมเมนต์ตัวอย่างเตรียมไว้ท้ายไฟล์) + recreate core-api 1 รอบ
 - [ ] I4d พิสูจน์: เปิดจากมือถือ 4G คนละเน็ต + Synthetic probe public URL + จดวันรีเน็ว domain ฟรี (DigitalPlat ต้องยืนยันตามรอบ)
 
 **ลำดับทำอัตโนมัติต่อจากนี้:** I0a+I0b (เครื่องกำลังพังจริง) → I1 PITR จบ → รอผลคืนตัดสิน I0c → **F2 เข้ารหัส field (คิวเดิม ยังเปิด)** → I2 age → I3 partition → I4 tunnel (รอ domain/token เจ้าของ) → I5 ตามลำดับย่อย

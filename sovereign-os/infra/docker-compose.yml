@@ -201,3 +201,21 @@ services:
 networks:
   internal:
     driver: bridge
+
+  # I4a (29/9/69): Cloudflare Tunnel — ช่องทางเข้าสาธารณะสำหรับหน้าร้าน (ทะลุ CGNAT เราเตอร์ LTE ได้
+  # เพราะต่อ "ออก" เท่านั้น ไม่เปิดพอร์ตเข้า) — ใส่ CLOUDFLARED_TOKEN ใน infra/.env ก่อน (runbook §สิบ)
+  # อยู่ภายใต้ profile "public" — ไม่กระทบ compose ปกติ (token ว่าง = ไม่รัน ไม่ fail งานอื่น)
+  # เริ่มจริง: docker compose --profile public up -d cloudflared
+  # ห้ามชี้ tunnel ไปที่ :3001 หรือ API ภายใน — WAF ฝั่ง Cloudflare ต้องอนุญาตเฉพาะ /shop* /trace*
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: sovereign-cloudflared
+    profiles: ["public"]
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN:-}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - internal

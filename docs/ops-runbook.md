@@ -240,3 +240,20 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - ไฟล์ที่ docker cp เขียนเป็น root → postgres ปฏิเสธ datadir → ต้อง chown postgres:postgres + chmod 700 ก่อนสตาร์ตเสมอ
 - `docker exec -d` โปรเซสตายพร้อม client (Windows job object) → สตาร์ต postgres ด้วย `nohup gosu postgres postgres … &` ผ่าน `sh -c`
 - pg_dump เซ็ต search_path='' กลาง stream → ห้ามรวม timescaledb_post_restore ใน session เดียวกับ dump (บทเรียนเดิม §ห้า)
+
+## สิบ · ขึ้นร้านสู่อินเทอร์เน็ตด้วย host + domain ฟรี (Cloudflare Tunnel + DigitalPlat — เพิ่ม 29/9/69)
+
+**สถาปัตยกรรม:** ไม่ต้อง "จ่ายเช่า host" — เครื่องนี้คือ host (backend + DB สดที่เดียวในโลก) · สิ่งที่ขาดคือช่องทางเข้าที่ทะลุ CGNAT ของเราเตอร์ LTE (MR505) — **Cloudflare Tunnel (ฟรี)** แก้ตรงนี้: cloudflared ต่อ "ออก" หา Cloudflare เท่านั้น ไม่เปิดพอร์ตเข้าเลย · domain ฟรีตลอดจาก **DigitalPlat FreeDomain** (dpdns.org / us.kg / qzz.io / xx.kg — domain.digitalplat.org)
+
+**ขั้นเจ้าของทำเอง (~15 นาที — สมัครแทนไม่ได้):**
+1. สมัครบัญชีฟรี https://dash.cloudflare.com/sign-up (อีเมล + รหัส — ไม่ต้องใส่บัตร)
+2. https://domain.digitalplat.org → Register → ค้นชื่อ เช่น `sovereign-shop` เลือก suffix `.dpdns.org` → ยืนยันตัวตนผ่าน GitHub/Discord ตามที่หน้าสมัครถาม (กัน bot — ฟรีไม่มีบัตร)
+3. เมื่อได้ domain: ในหน้าจัดการของ DigitalPlat ตั้ง Nameserver เป็น 2 ชื่อที่ Cloudflare ให้ (Cloudflare dashboard → เว็บไซต์/domain → DNS → Nameservers) แล้วรอสถานะ Active (ปกติไม่เกิน ~1 ชม.)
+4. Cloudflare → Zero Trust → Networks → Tunnels → Create a tunnel → เลือก Cloudflared → ตั้งชื่อ `sovereign-shop` → **คัดลอก token ยาว ๆ** (`eyJ…`) ใส่ไฟล์ `sovereign-os/infra/.env` บรรทัด `CLOUDFLARED_TOKEN=eyJ…` แล้วบอก agent จะรัน compose ให้
+5. หน้า Tunnel เดิม → Public Hostname → เพิ่ม: subdomain `shop` · domain ที่จด · service `http://host.docker.internal:3000` → Save
+6. **WAF บังคับทำ (หน้า domain → Security → WAF):** Custom rule ALLOW = hostname เป็นโดเมนเรา AND URI Path starts with `/shop` (เพิ่ม `/trace` ถ้าต้องการ) · Custom rule BLOCK = hostname เดียวกัน ทุก path อื่น — เพราะ :3000 เสิร์ฟหน้า dashboard/admin ด้วย ห้ามปล่อยทะลุ · Rate limiting ฟรี 1 rule: `/api/` เกิน 20 คำขอ/10 วิ ต่อ IP = block
+7. พิสูจน์: เปิด `https://shop.<ชื่อ>.dpdns.org` จากมือถือ ปิด Wi-Fi (4G ล้วน) — เห็นหน้าร้าน = สำเร็จ · เปิด `/dashboard` ต้องโดน 403 จาก WAF
+
+**ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — ได้ domain จริงแล้วเพิ่มบรรทัด `CORS_ORIGIN=https://shop.<ชื่อ>.dpdns.org,http://localhost:3000` ใน infra/.env แล้วให้ agent recreate core-api 1 รอบ
+
+**ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________
