@@ -11,7 +11,9 @@ import { CROP_IDEALS, analyzeSoil } from './farm-soil.service';
 import { OLLAMA_URL, MODEL, OLLAMA_KEEP_ALIVE } from './advisor.service';
 import { getModelForTask } from './ai-router.service';
 
-export const FARM_ADVISOR_TIMEOUT_MS = parseInt(process.env.FARM_ADVISOR_TIMEOUT_MS || '20000', 10) || 20000;
+// เครื่องนี้รัน Ollama บน CPU (gemma3:4b ~70 วิ/คำถามสั้น รอบแรก) — 20 วิ = AI ไม่มีวันตอบสำเร็จ
+// ตั้ง 150 วิ: ปุ่ม AI เป็นการกดชัดเจนของผู้ใช้ + ยังมี heuristic ตอบทันทีเสมอถ้าล้ม
+export const FARM_ADVISOR_TIMEOUT_MS = parseInt(process.env.FARM_ADVISOR_TIMEOUT_MS || '150000', 10) || 150000;
 
 /** ผลผลิตพื้นฐานต่อตารางเมตร (กก./ตร.ม.) — ค่าประมาณเกษตรไทย ใช้เมื่อยังไม่มีประวัติเก็บเกี่ยวจริง */
 export const YIELD_BASELINE: Record<string, number> = {
