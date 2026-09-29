@@ -62,6 +62,7 @@ import { lifestyleRoutes } from './modules/lifestyle/lifestyle.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import documentsRoutes from './modules/documents/documents.routes';
 import farmRoutes from './modules/farm/farm.routes';
+import cropRecommendRoutes from './modules/farm/crop-recommend.routes'; // I5b: /api/farm/crops/recommend (mount แยก — router หลักอยู่ที่ /plots)
 import livestockRoutes from './modules/livestock/livestock.routes';
 import compostRoutes from './modules/compost/compost.routes';
 import wasteRoutes from './modules/waste/waste.routes';
@@ -238,6 +239,7 @@ export function mountRoutes(app: Express): void {
   }
   if (config.modules.isEnabled('farm')) {
     app.use('/api/farm/plots', featureGuard('/farm'), farmRoutes); // Farm Plot Manager
+    app.use('/api/farm/crops', featureGuard('/farm'), cropRecommendRoutes); // I5b: Crop Recommendation API
   app.use('/api/livestock', featureGuard('/livestock'), livestockRoutes); // Sovereign Livestock Engine
   }
   app.use('/api/property', featureGuard('/property'), propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์

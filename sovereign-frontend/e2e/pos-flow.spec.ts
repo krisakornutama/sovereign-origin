@@ -54,9 +54,7 @@ delete from restaurant_orders where "restaurantId"='${restaurantId}';
 delete from recipe_lines where "menuId"='${menuId}';
 delete from menu_items where "restaurantId"='${restaurantId}';
 delete from restaurants where id='${restaurantId}';`;
-  const ok = psql(sql);
-  if (!ok) console.error('[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จ (docker/psql อาจไม่พร้อม)');
-  return ok;
+  return psql(sql);
 }
 
 /** ลบร้านชื่อซ้ำจากรอบก่อน (ทำให้ suite รันซ้ำกี่รอบก็สะอาด) — คืน true เมื่อ psql สำเร็จ */
@@ -95,8 +93,15 @@ test.beforeAll(async () => {
   await ctx.dispose();
 });
 
-test.afterAll(() => {
-  cleanupDb();
+test.afterAll(async () => {
+  // I6 (28/9): เคสจริง — ช่วงต้นคืน psql สะดุดรอบเดียว → ข้อความ "เคลียร์ไม่สำเร็จ" ปลอมใน log
+  // ทั้งที่ร้านไม่ค้าง (รอบถัดไป cleanupByName กวาดตามชื่อ) — retry 3 รอบก่อนสรุปล้ม ตามแนว beforeAll
+  let ok = false;
+  for (let i = 0; i < 3 && !ok; i++) {
+    ok = cleanupDb();
+    if (!ok) await new Promise((r) => setTimeout(r, 5_000));
+  }
+  if (!ok) console.error('[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จหลัง retry 3 รอบ — รอบถัดไป cleanupByName จะกวาดตามชื่อแทน');
 });
 
 test('สั่งออเดอร์และจ่ายเงินผ่านหน้า POS จริง', async ({ page }) => {
