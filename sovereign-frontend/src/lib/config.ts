@@ -31,6 +31,14 @@ function setStored(key: string, value: string | null): void {
 // ---------- API URL (ใช้กับ WebSocket ด้วย) ----------
 
 export function getApiUrl(): string {
+  // I4c (29/9/69): เมื่อเปิดผ่านโดเมนสาธารณะ (Cloudflare Tunnel — sovereignoriginshop.dpdns.org)
+  // เบราว์เซอร์ผู้มาเยือนไม่มี localhost:3001 ของเครื่องเรา — ใช้ same-origin แล้วให้ tunnel
+  // เดินทาง /api/* ต่อไปยัง core-api ฝั่งหลัง firewall (WAF อนุญาตเฉพาะ endpoint สาธารณะ)
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    const isLocal = /^(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+    if (!isLocal) return window.location.origin;
+  }
   return getStored(API_URL_KEY)?.trim() || DEFAULT_API_URL;
 }
 

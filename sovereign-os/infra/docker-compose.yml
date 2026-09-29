@@ -198,10 +198,6 @@ services:
     networks:
       - internal
 
-networks:
-  internal:
-    driver: bridge
-
   # I4a (29/9/69): Cloudflare Tunnel — ช่องทางเข้าสาธารณะสำหรับหน้าร้าน (ทะลุ CGNAT เราเตอร์ LTE ได้
   # เพราะต่อ "ออก" เท่านั้น ไม่เปิดพอร์ตเข้า) — ใส่ CLOUDFLARED_TOKEN ใน infra/.env ก่อน (runbook §สิบ)
   # อยู่ภายใต้ profile "public" — ไม่กระทบ compose ปกติ (token ว่าง = ไม่รัน ไม่ fail งานอื่น)
@@ -219,3 +215,7 @@ networks:
       - "host.docker.internal:host-gateway"
     networks:
       - internal
+
+networks:
+  internal:
+    driver: bridge

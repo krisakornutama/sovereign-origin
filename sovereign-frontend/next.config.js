@@ -47,6 +47,21 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  // I4 (29/9/69): ผ่าน Cloudflare Tunnel จุดเข้าเดียวคือ :3000 (wildcard) — ยิง /api/* ต่อให้ core-api
+  // ฝั่งในเอง จบปัญหาลำดับ ingress + เบราว์เซอร์ผู้มาเยือนใช้ same-origin ทั้งหน้าเว็บและ API
+  // (หมายเหตุ: dev `next dev` ทำ proxy ให้อยู่แล้ว — กฎนี้ครอบคลุม `next start` จริง)
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/api/:path*',
+          destination: `${process.env.PRIVATE_API_ORIGIN || 'http://127.0.0.1:3001'}/api/:path*`,
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    }; 
+  },
 };
 
 module.exports = nextConfig;
