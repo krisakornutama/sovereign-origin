@@ -168,11 +168,18 @@
 
 ## I5 — ฟีเจอร์เชิงโครงสร้าง (เรียงตามมูลค่า/ความพร้อมของโค้ดเดิม)
 - [ ] I5a Traceability เฟส 3: หน้า /shop เล่าเรื่องสายสด Farm→Shop ต่อออเดอร์จริง (โครง ProductLot/TraceEvent + CONSUMED/PROCESSED มีอยู่แล้วจากเฟส 1–2 — เชื่อมหน้าร้านเป็นขั้นถัดไป)
-- [ ] I5b Crop Recommendation API: `/api/farm/crops/recommend` — NPK ล่าสุดต่อแปลง + Ollama qwen3 (timeout + heuristic fallback ตามสาย farm-advisor เดิม · Ollama ยังโหลด qwen3 ไม่เสร็จตาม A4 — ใช้ gemma3:4b ไปก่อนได้) + การ์ดแนะนำบนหน้า /farm
+- [x] I5b Crop Recommendation API — **เสร็จ 28/9/69** (commit 8646191): router แยก `crop-recommend.routes.ts` mount `/api/farm/crops` ตรงตามสเปค (เดิม farm router mount ที่ /plots ทำ URL เพี้ยน — ย้ายออกให้ถูกจุด) · delegate เข้า farm-advisor.service เดิม (NPK ล่าสุดต่อแปลง + heuristic fallback) · timeout 100s ให้เป็นจริงได้บนเครื่อง (Ollama CPU ~70 วิ) · **พิสูจน์จริง: source=ollama aiText 459 ตัวอักษรจาก gemma3:4b** — การ์ด PlotAdvisor เดิมครอบหน้า /farm แล้ว
 - [ ] I5c Auto-calibration: จดชัด — มีมติ "ไม่ทำระบบใหม่" แล้ว (maintenance-radar + เตือน 90 วันอยู่) เหลือเฉพาะกรณีเจ้าของขอ cross-node drift compensation จริงค่อยวางแผนแยก
 - [ ] I5d e-Tax RD Connect: ยังค้างที่ G1 (ตัดสินเจ้าของ) — เมื่อตัดสิน: CA provider + digital signature + ยื่น API จริง (งานใหญ่ คุยแยกออกจากคิวอัตโนมัติ)
 
 ## I6 — เสริมจากเช้านี้ (เจอจริง ไม่อยู่ลิสต์เดิม)
-- [ ] I6 แจ้งเตือนปลอมจาก cleanup: log nightly มี "[e2e] เคลียร์ข้อมูลทดสอบไม่สำเร็จ" ทั้งที่ของจริง cleanup สำเร็จทีหลัง (ร้าน E2E ไม่ค้างใน DB) — ตัวตรวจ psql ของ nightly ต้อง retry/รอ ก่อนสรุปล้ม
+- [x] I6 แจ้งเตือนปลอมจาก cleanup — **เสร็จ 28/9/69** (commit 8646191): afterAll ใน pos-flow ลอง psql ซ้ำ 3 รอบก่อนสรุปล้ม (ช่วงเครื่องเพิ่งตื่น psql สะดุดรอบเดียว = ปลอม "เคลียร์ไม่สำเร็จ" ทั้งที่ของจริงสำเร็จ)
+
+## I4 — host + domain ฟรี: ขึ้น /shop สู่อินเทอร์เน็ต (คำขอเจ้าของ 29/9/69 — Cloudflare Tunnel + DigitalPlat)
+- [ ] I4-0 เจ้าของทำเอง ~15 นาที: สมัคร Cloudflare ฟรี + จด domain ฟรีที่ domain.digitalplat.org (dpdns.org/us.kg/qzz.io/xx.kg) + ใส่ NS ของ Cloudflare ให้ activate — คู่มือทีละจอใน docs/ops-runbook.md §สิบ
+- [ ] I4a compose บล็อก cloudflared (token จาก infra/.env ห้ามเข้า git) — ชี้ frontend :3000 เท่านั้น ห้ามพราก :3001 ออกนอกบ้าน
+- [ ] I4b WAF: อนุญาต /shop* /trace* + /api/shop/community — ปิด /dashboard* + /api/* ภายในที่เหลือ + rate limit
+- [ ] I4c CORS/helmet origin เพิ่มจาก env (แก้ infra/.env + recreate ไม่แก้โค้ด)
+- [ ] I4d พิสูจน์: เปิดจากมือถือ 4G คนละเน็ต + Synthetic probe public URL + จดวันรีเน็ว domain ฟรี (DigitalPlat ต้องยืนยันตามรอบ)
 
 **ลำดับทำอัตโนมัติต่อจากนี้:** I0a+I0b (เครื่องกำลังพังจริง) → I1 PITR จบ → รอผลคืนตัดสิน I0c → **F2 เข้ารหัส field (คิวเดิม ยังเปิด)** → I2 age → I3 partition → I4 tunnel (รอ domain/token เจ้าของ) → I5 ตามลำดับย่อย

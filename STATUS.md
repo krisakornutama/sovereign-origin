@@ -3,6 +3,9 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** I5b+I6 — Crop Recommendation API + กันแจ้งเตือนปลอมจาก cleanup e2e (29/9/69) · สาขา: ai/audit-partition · commit 8646191
+  - `/api/farm/crops/recommend` มีชีวิตจริง: บั๊กเดิมคือ farm router mount ที่ `/api/farm/plots` ทำ URL ตามสเปคไม่มีวันตรง — ย้ายเป็น router แยก mount ตรง · delegate เข้า farm-advisor.service (ไม่เขียน logic ซ้ำ) · ยิงจริง **source=ollama** (gemma3:4b ตอบ 459 ตัวอักษร — timeout ยกเป็น 100s ให้สมจริงบนเครื่อง CPU นี้ · ล้ม = fallback heuristic ตอบเสมอ)
+  - I6: afterAll cleanup e2e ลองซ้ำ 3 รอบก่อนสรุปล้ม — กล่องเตือน "เคลียร์ไม่สำเร็จ" ปลอมจาก psql สะดุดรอบเดียวช่วงเครื่องเพิ่งตื่นหมดไป
 - **งาน:** I3 — audit_logs partitioning + retention 90 วัน (28/9/69) · สาขา: ai/audit-partition · commit c8cb814 (merge MAIN แล้ว)
   - **I3a วัดจริง:** 26,430 แถว / 2 เดือน (~600/วัน) — ปริมาณต่ำ → monthly partition พอ · ไม่มี FK เข้า · โค้ดใช้แค่ create+findMany (PK คู่ไม่กระทบ)
   - **I3b migration:** ย้ายครบ 26,430 แถวเข้า partition รายเดือน (ส.ค.26–ม.ค.27 + default) · PK (id, timestamp) · index timestamp DESC · เขียน probe จริงตก partition ถูกต้อง · บทเรียน: RENAME TABLE ไม่ย้ายชื่อ constraint/index → rename เก่าก่อนสร้างใหม่ (รอบแรก rollback สะอาด + P3009 แก้ด้วย migrate resolve --rolled-back)
