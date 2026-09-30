@@ -309,3 +309,8 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - **การ์ด "สนับสนุนตามศรัทธา"** ใน /shop = business_product sku `SUPPORT-FAITH` ราคาหน่วย **1฿** หมวด `SUPPORT` (กำหนดยอด = จำนวนชิ้น; ซ่อนจากรายการชิ้นงานปกติด้วย filter category SUPPORT) — seed ครั้งใหม่ต้อง INSERT ตัวนี้ด้วย (idempotent ตาม runbook)
 - **บัตรขอบคุณดิจิทัล** = คอมโพเนนต์ใน `/shop?order=<token>` โชว์เมื่อชำระครบ — ชื่อบนบัตรเก็บ `localStorage: sovereign-support-name` (ไม่ส่ง server · ไม่มี PII ใหม่ใน DB)
 - **สถิติ /about** = `GET /api/shop/transparency` (สาธารณะ, ครอบด้วย WAF `/api/shop` อยู่แล้ว): นับออเดอร์สด/ชิ้นงาน/คู่ค้า/ล็อต/ผู้มาเยือน 7 วัน — **นับล็อตต้องผ่าน `trace.countAllLots`** (boundary gate: business ห้ามแตะ product_lots ตรง)
+
+### บทเรียน deploy รอบ P16 (30/9/69) — จับได้ 3 ชั้น
+1. **CSP บล็อก CDN**: `script-src 'self'` กิน Leaflet จาก unpkg ทิ้ง (โหลดเงียบ ไม่มี console error ชัด) → แก้ด้วย **self-host** `public/vendor/leaflet/` (leaf 1.9.4 js+css) + เติม `https://*.tile.openstreetmap.org` ใน img-src · **WAF ก็ต้องอนุญาต** `starts_with /vendor/` ด้วย (default-deny กิน /vendor/* เป็น 403)
+2. **SW VERSION คงที่ข้าม build**: `sovereign-v3` ไม่เคยเปลี่ยน → client (รวม PWA มือถือ) ใช้ shell เก่าต่อได้เป็นสัปดาห์หลัง deploy · แก้ที่ราก: **bump เป็น sovereign-v4 ทุกครั้งที่ deploy เปลี่ยน UI** (activate มีลบ cache เก่ารออยู่แล้ว + skipWaiting พร้อม)
+3. **build ที่ MAIN เสมอ**: งานใน worktree ที่แก้ public/sw.js ไม่มีผลจนกว่า merge — ยืนยันฝั่งเสิร์ฟด้วย `curl localhost:3000/sw.js | grep sovereign-v` และ HTML ต้องไม่มี unpkg
