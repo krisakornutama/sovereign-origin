@@ -387,3 +387,53 @@ async function notifyPartnerBill(partner: { id: string; name: string; category: 
     await notifyPartnerNewBill(partner, title);
   } catch { /* เงียบ — ไม่กระทบบิล */ }
 }
+
+/** P17 — ภาพรวมลิงก์ส่วนตัวของคู่ค้า: บิลทั้งหมด + สถานะชำระ + งานติดตั้ง/ซ่อม — ยืนยันด้วย token ลิงก์ลับ */
+export async function partnerPortal(partnerId: string, token: string): Promise<any | null> {
+  const owner = await prisma.businessOrder.findFirst({ where: { publicToken: token, partnerId }, select: { id: true } });
+  if (!owner) return null; // token ไม่ตรง
+  const partner = await prisma.partner.findUnique({
+    where: { id: partnerId },
+    select: { name: true, category: true, status: true, created_at: true },
+  });
+  if (!partner) return null;
+  const orders = await prisma.businessOrder.findMany({
+    where: { partnerId },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    include: {
+      payments: { select: { amount: true, method: true, paidAt: true } },
+      installations: { select: { title: true, status: true, scheduledAt: true, note: true } },
+      lines: { select: { description: true, qty: true, unitPrice: true } },
+    },
+  });
+  const bills = orders.map((o: any) => {
+    const paid = o.payments.reduce((s: number, p: any) => s + p.amount, 0);
+    return {
+      orderNo: o.orderNo,
+      title: (o.note ?? '').replace(/^บิลค่าบริการ IoT คู่ค้า — /, '').split(' · ')[0].slice(0, 120),
+      subtotal: o.subtotal,
+      vat: o.vat,
+      total: o.total,
+      paid,
+      remaining: Math.max(0, o.total - paid),
+      status: o.status,
+      publicToken: o.publicToken ?? null, // ลิงก์ชำระต่อบิล (เข้า /shop?order= เดิม)
+      createdAt: o.createdAt,
+      installs: (o.installations ?? []).map((i: any) => ({ title: i.title, status: i.status, scheduledAt: i.scheduledAt, note: i.note })),
+    };
+  });
+  const installs = bills.flatMap((b) => b.installs.map((i: any) => ({ ...i, orderNo: b.orderNo })));
+  return {
+    partner: { name: partner.name, category: partner.category, status: partner.status, since: partner.created_at },
+    summary: {
+      billCount: bills.length,
+      totalBilled: bills.reduce((s, b) => s + b.total, 0),
+      totalPaid: bills.reduce((s, b) => s + b.paid, 0),
+      remaining: bills.reduce((s, b) => s + b.remaining, 0),
+      installCount: installs.length,
+      installDone: installs.filter((i) => i.status === 'DONE').length,
+    },
+    bills,
+  };
+}

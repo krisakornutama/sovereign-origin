@@ -8,7 +8,7 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { prisma } from '../../lib/prisma';
 import { applyPartner, publicPartners, partnerCounts } from '../../services/partner.service';
-import { createPartnerBill, partnerBills, foundationBusinessId, partnerBillsAuthorized } from '../../services/business-shop.service';
+import { createPartnerBill, partnerBills, foundationBusinessId, partnerBillsAuthorized, partnerPortal } from '../../services/business-shop.service';
 import { sendPartnerOtp, verifyPartnerOtp, issueVerifiedToken } from '../../services/partner-guard.service';
 
 export { prisma }; // ให้เทส mock delegate ผ่านตัวเดียวกับ production
@@ -72,7 +72,7 @@ router.post('/otp/send', applyLimiter, async (req, res) => {
 router.post('/otp/verify', applyLimiter, async (req, res) => {
   const phone = String(req.body?.contactPhone ?? '');
   const code = String(req.body?.code ?? '');
-  const r = verifyPartnerOtp(phone, code);
+  const r = await verifyPartnerOtp(phone, code);
   if (!r.ok) return res.status(400).json({ error: r.reason });
   return res.json({ verified: true, token: issueVerifiedToken(phone) });
 });
@@ -120,6 +120,17 @@ router.get('/:id/bills', applyLimiter, async (req, res) => {
     return res.json({ bills });
   } catch {
     return res.status(500).json({ error: 'โหลดบิลไม่สำเร็จ' });
+  }
+});
+
+// GET /api/partners/:id/portal?t=<token> — ภาพรวมลิงก์ส่วนตัว: บิล+ชำระ+งานติดตั้ง (P17)
+router.get('/:id/portal', applyLimiter, async (req, res) => {
+  try {
+    const portal = await partnerPortal(String(req.params.id), String(req.query.t ?? ''));
+    if (!portal) return res.status(403).json({ error: 'ลิงก์ไม่ถูกต้อง' });
+    return res.json(portal);
+  } catch {
+    return res.status(500).json({ error: 'โหลดข้อมูลไม่สำเร็จ' });
   }
 });
 
