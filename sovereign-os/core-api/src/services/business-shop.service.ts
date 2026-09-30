@@ -288,6 +288,7 @@ export async function foundationBusinessId(): Promise<string | null> {
 
 /** บิลของคู่ค้า — ตรวจสิทธิ์ด้วย token ที่นี่ (partners routes ส่งมาได้เลย ไม่แตะ business_orders ตรง) */
 export async function partnerBillsAuthorized(partnerId: string, token: string): Promise<any[] | null> {
+  if (!UUID_RE.test(String(token))) return null; // token ผิดรูปแบบ = not found ปลอดภัย (กัน prisma uuid cast error รั่ว 500)
   const owner = await prisma.businessOrder.findFirst({ where: { publicToken: token, partnerId }, select: { id: true } });
   if (!owner) return null; // token ไม่ตรง → caller ตอบ 403
   return partnerBills(partnerId);
@@ -390,6 +391,7 @@ async function notifyPartnerBill(partner: { id: string; name: string; category: 
 
 /** P17 — ภาพรวมลิงก์ส่วนตัวของคู่ค้า: บิลทั้งหมด + สถานะชำระ + งานติดตั้ง/ซ่อม — ยืนยันด้วย token ลิงก์ลับ */
 export async function partnerPortal(partnerId: string, token: string): Promise<any | null> {
+  if (!UUID_RE.test(String(token))) return null; // token ผิดรูปแบบ = not found ปลอดภัย (กัน prisma uuid cast error รั่ว 500)
   const owner = await prisma.businessOrder.findFirst({ where: { publicToken: token, partnerId }, select: { id: true } });
   if (!owner) return null; // token ไม่ตรง
   const partner = await prisma.partner.findUnique({
