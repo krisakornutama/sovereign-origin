@@ -345,7 +345,7 @@ export default function TracePage() {
           )}
 
           <footer className="text-center text-[10px] text-gray-600 pt-2">
-            Powered by <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">Sovereign OS</a> · open source
+            Powered by Sovereign OS
           </footer>
         </main>
       </div>
