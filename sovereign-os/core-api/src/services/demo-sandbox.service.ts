@@ -183,3 +183,67 @@ export function publicCatalog(): { modules: PublicCatalogModule[]; total: number
     note: 'จำนวน endpoint/บรรทัดโค้ด/ชุดทดสอบ มาจากการสแกนโค้ดจริงของระบบ — โมดูลที่มีชุดทดสอบครอบ = ตรวจคุณภาพอัตโนมัติทุกวัน',
   };
 }
+
+// ── P12: ล็อตตามรอยตัวอย่าง (sandbox — โครงเดียวกับระบบจริงแต่เป็นข้อมูลปลอม ไม่แตะ DB) ──
+export interface DemoLotInfo {
+  lotCode: string;
+  crop: string;
+  plot: string;
+  quantity: number;
+  harvestedAt: string;
+  events: Array<{ type: string; detail: string }>;
+  note: string;
+}
+
+type DemoLotSeed = Omit<DemoLotInfo, 'harvestedAt'> & { daysAgo: number };
+const DEMO_LOTS: DemoLotSeed[] = [
+  {
+    lotCode: 'LOT-D3M9C4', crop: 'มะเขือเทศ', plot: 'แปลงมะเขือเทศโซน A', quantity: 18,
+    daysAgo: 8,
+    events: [
+      { type: 'HARVESTED', detail: 'เก็บเกี่ยว 18 กก. จากแปลงโซน A — ความชื้นดินช่วงเก็บ 58-62%' },
+      { type: 'TESTED', detail: 'ตรวจคุณภาพผ่าน — ขนาดผลสม่ำเสมอ ไม่พบร่องรอยแมลง' },
+      { type: 'PROCESSED', detail: 'คัดแยกเกรด A 12 กก. / B 6 กก. บรรจุกล่องพร้อมขาย' },
+      { type: 'SOLD', detail: 'จำหน่ายผ่านหน้าร้านสาธารณะ — สถานะปัจจุบัน: ขายแล้ว' },
+    ],
+    note: 'ล็อตตัวอย่างสำหรับเดโม่ — ระบบจริงจะโชว์ล็อตของคุณเองครบทุกเหตุการณ์',
+  },
+  {
+    lotCode: 'LOT-DMS01A', crop: 'ชุดอุปกรณ์ DMS (Dead-Man Switch)', plot: 'สายการผลิตอุปกรณ์', quantity: 5,
+    daysAgo: 2,
+    events: [
+      { type: 'ASSEMBLED', detail: 'ประกอบบอร์ด ESP32-S3 + โมด็อม 4G ครบ 5 ชุด' },
+      { type: 'FLASHED', detail: 'แฟลชเฟิร์มแวร์ v0.4.0 — บูตผ่าน ส่ง heartbeat ปกติ' },
+      { type: 'TESTED', detail: 'Drill ตัดฮาร์ตบีตจำลอง: แจ้งเตือนที่ T+90s/T+180s — ผ่านทั้ง 5 ชุด' },
+      { type: 'PACKAGED', detail: 'แพ็กกล่อง + ติด QR ตามรอย (สแกนแล้วมาหน้านี้)' },
+    ],
+    note: 'อุปกรณ์จริงที่ขายมีบัตรประวัติแบบนี้ติดไปกับเครื่อง — ลูกค้าเห็นที่มาของเครื่องตัวเอง',
+  },
+  {
+    lotCode: 'LOT-SWV040', crop: 'ซอฟต์แวร์ Sovereign v0.4.0', plot: 'สายปล่อยเวอร์ชัน', quantity: 0,
+    daysAgo: 1,
+    events: [
+      { type: 'BUILT', detail: 'สร้างบิลด์ v0.4.0 — ครบทุกโมดูลในแคตตาล็อก' },
+      { type: 'TESTED', detail: 'ชุดทดสอบอัตโนมัติผ่านครบ + ผ่าน quality gate 5 ด่าน' },
+      { type: 'PUBLISHED', detail: 'ปล่อยเวอร์ชันสำหรับสินค้าซอฟต์แวร์บนหน้าร้าน' },
+    ],
+    note: 'ซอฟต์แวร์ที่ขายผูกกับล็อตเวอร์ชัน — ลูกค้ารู้ว่าได้บิลด์ไหนที่ผ่านการทดสอบอะไร',
+  },
+];
+
+export function demoLot(code: string): DemoLotInfo | null {
+  const c = String(code ?? '').trim().toUpperCase();
+  const found = DEMO_LOTS.find((l) => l.lotCode === c);
+  if (!found) return null;
+  const { daysAgo, ...rest } = found;
+  return { ...rest, harvestedAt: new Date(Date.now() - daysAgo * 86_400_000).toISOString() };
+}
+
+export function demoShop(): DemoLotInfo['events'] extends never ? never : Array<{ sku: string; name: string; price: number; warrantyMonths: number; lotCode: string | null; inStock: boolean; note: string }> {
+  return [
+    { sku: 'DMS-KIT-ESP32', name: 'ชุดประกอบ DMS — ESP32-S3 + SIM7600G 4G HAT', price: 1290, warrantyMonths: 6, lotCode: 'LOT-DMS01A', inStock: true, note: 'ประกอบเองได้ใน 1 ชม. — มาพร้อมเฟิร์มแวร์ตั้งค่าพร้อมใช้' },
+    { sku: 'DMS-READY-PI', name: 'ชุด DMS พร้อมใช้ — Raspberry Pi Zero 2 W + โมเด็ม 4G', price: 2490, warrantyMonths: 6, lotCode: 'LOT-DMS01A', inStock: true, note: 'ตั้งค่ามาแล้ว ใส่ซิมใช้ได้ทันที' },
+    { sku: 'DMS-SETUP-PRO', name: 'ชุด DMS + เชื่อมต่อระบบให้', price: 2990, warrantyMonths: 12, lotCode: 'LOT-DMS01A', inStock: true, note: 'ทีมงานตั้งค่าเชื่อมระบบเฝ้าระวังของคุณให้ครบ' },
+    { sku: 'SW-TRACE', name: 'ระบบตามรอยผลผลิต (Traceability)', price: 1490, warrantyMonths: 12, lotCode: 'LOT-SWV040', inStock: true, note: 'ซอฟต์แวร์แยกโมดูล — ลูกค้าสแกน QR ดูที่มาสินค้าได้เอง' },
+  ];
+}

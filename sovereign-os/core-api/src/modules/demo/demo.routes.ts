@@ -7,9 +7,9 @@
 //  - เส้นทางนี้อยู่ใน allowlist WAF ร่วมกับ /shop /trace
 import { Router } from 'express';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
-import { demoFarmOverview, demoLivestock, demoFinance, publicCatalog } from '../../services/demo-sandbox.service';
+import { demoFarmOverview, demoLivestock, demoFinance, publicCatalog, demoLot, demoShop } from '../../services/demo-sandbox.service';
 
-export { demoFarmOverview, demoLivestock, demoFinance, publicCatalog }; // ให้เทส mock ผ่านชั้นเดียวกัน
+export { demoFarmOverview, demoLivestock, demoFinance, publicCatalog, demoLot, demoShop }; // ให้เทส mock ผ่านชั้นเดียวกัน
 
 const router = Router();
 
@@ -47,6 +47,18 @@ router.get('/catalog', demoLimiter, async (_req, res) => {
   } catch {
     res.status(500).json({ error: 'สแกนแคตตาล็อกไม่สำเร็จ' });
   }
+});
+
+// GET /api/demo/trace/:code — ล็อตตัวอย่างตามรอย (P12 — sandbox · รหัสจริงของลูกค้าไปที่ /api/trace/:code ของ trace module)
+router.get('/trace/:code', demoLimiter, async (req, res) => {
+  const lot = demoLot(String(req.params.code));
+  if (!lot) return res.status(404).json({ error: 'ไม่พบล็อตตัวอย่างนี้' });
+  return res.json(lot);
+});
+
+// GET /api/demo/shop — สินค้าที่ขายจริงตอนนี้ (P12 — snapshot ในโค้ด ไม่แตะ DB)
+router.get('/shop', demoLimiter, async (_req, res) => {
+  res.json(demoShop());
 });
 
 export default router;
