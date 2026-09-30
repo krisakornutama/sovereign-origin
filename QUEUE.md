@@ -183,7 +183,8 @@
 - [x] P4 สนามทดลอง /demo (public) — แท็บฟาร์ม/ปศุสัตว์/การเงิน ข้อมูล sandbox คงตัวในโค้ด (demo-sandbox.service — **ไม่แตะ DB จริงแม้แต่อ่าน**) · /api/demo/* rate-limited 30/min
 - [x] P5 ฟีดแบ็ก — ตาราง feedback_notes (migration ลงจริง) · POST /api/feedback สาธารณะ (honeypot field `website` + throttle 5/ชม./IP-hash + ตัด 2000 ตัวอักษร) · หน้า /feedback-admin (SUPERADMIN) คัดกรอง 👍/👎 · digest เฉพาะ useful=true → Telegram (SMTP เป็นการ์ดอนาคต — env SMTP_* เมื่อพร้อม)
 - [x] P6 WAF อนุญาต /demo + /api/demo + /api/feedback เพิ่มใน rule เดิม (PUT สำเร็จ success:true)
-- [ ] P7 พิสูจน์บนโดเมนจริงหลัง deploy: /demo 200 · /api/demo/farm 200 · ฟีดแบ็กลง DB · ร้าน default โชว์อุปกรณ์ 3 SKU
+- [x] P7 พิสูจน์บนโดเมนจริงหลัง deploy — **เสร็จ 30/9/69**: /demo 200 (แท็บ+กราฟ+ปุ่มฟีดแบ็กจริง) · /api/demo/* 200 ทั้ง 3 · ฟีดแบ็กจาก UI จริงลง DB (ตรวจ psql พบ) · /shop โชว์อุปกรณ์ 3 SKU
+- [x] P8 ขายซอฟต์แวร์แยกชิ้น — **เสร็จ 30/9/69**: หน้าจัดการ `/software-pricing` (SUPERADMIN) ดึง**ข้อมูลฟังก์ชันจริงต่อโมดูล**จากการสแกนโค้ด (endpoints/LOC/route files/ชุดทดสอบ) + ราคาแนะนำจากสูตรโปร่งใส (base 190 + endpoints×95 + loc×0.28 + testRefs×60 ปัด 10฿ ปิด 9 — ขั้นต่ำ 290฿) · `GET /api/software/scan` · `POST publish/unpublish` (เปิดขาย = สร้าง business_product SKU `SW-<MODULE>` ผูก inventory "license" — ขึ้นหน้าร้านทันทีผ่าน /api/shop เดิม ไม่เพิ่มเส้นสาธารณะใหม่) · ล็อต release `LOT-SWV040` (build→test→publish) ให้การ์ดสายสดโชว์เวอร์ชันจริง · เทส 5 เคส (สิทธิ์ 401/403/200 · publish/unpublish) · boundary-baseline ประกาศเส้น software→inventory/business แล้ว (ผูกขายผ่าน business ตามโครงเดิม)
 
 **ลำดับเดิมต่อ:** (หมวด I คงเดิมด้านล่าง)
 
