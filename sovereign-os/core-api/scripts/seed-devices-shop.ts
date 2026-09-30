@@ -35,7 +35,7 @@ const SKUS: Array<{
     sku: 'DMS-KIT-ESP32',
     name: 'ชุดประกอบ DMS — ESP32-S3 + SIM7600G 4G HAT',
     category: 'ชุดประกอบ',
-    specs: 'บอร์ด+โมด็อม 4G+เสา+สาย — แฟลชเฟิร์มแวร์โอเพนซอร์สเองได้ · คู่มือไทยใน GitHub',
+    specs: 'บอร์ด+โมด็อม 4G+เสา+สาย — มาพร้อมเฟิร์มแวร์ที่ตั้งค่ามาให้ · คู่มือภาษาไทยในกล่อง',
     costPrice: 780, salePrice: 1290, stockQty: 10, warrantyMonths: 6,
   },
   {
@@ -123,7 +123,7 @@ async function ensureProductionLot(itemId: string) {
   });
   const events = [
     { type: 'PROCESSED', detail: 'ประกอบบอร์ด + โมด็อม 4G ครบชุด (5 ชุด)', hoursAgo: 30 },
-    { type: 'TESTED', detail: 'แฟลชเฟิร์มแวร์ v0.4.0 (sovereign-dms GitHub) — บูตผ่าน ส่ง heartbeat ปกติ', hoursAgo: 28 },
+    { type: 'TESTED', detail: 'แฟลชเฟิร์มแวร์ v0.4.0 — บูตผ่าน ส่ง heartbeat ปกติ', hoursAgo: 28 },
     { type: 'TESTED', detail: 'Drill ตัดฮาร์ตบีตจำลอง: แจ้งระดับ 1 ที่ T+90s ระดับ 2 ที่ T+180s — ผ่านทั้ง 5 ชุด', hoursAgo: 26 },
     { type: 'NOTE', detail: 'แพ็กกล่อง + ใส่ QR ตามรอย (ลิงก์หน้านี้) พร้อมส่งมอบ', hoursAgo: 24 },
   ];
@@ -165,7 +165,7 @@ async function ensureSoftwareLot(ownerId: string) {
   const events = [
     { type: 'PROCESSED', detail: 'Release build v0.4.0 — 61 โมดูล รวมหน้าร้าน/สนามทดลอง/ฟีดแบ็ก', hoursAgo: 20 },
     { type: 'TESTED', detail: 'verify 5/5 + tests 1268/1268 ผ่าน (build+typecheck+tests+gates)', hoursAgo: 18 },
-    { type: 'NOTE', detail: 'เผยแพร่เฟิร์มแวร์ DMS โอเพนซอร์สบน GitHub (sovereign-dms) — โค้ดตรวจสอบได้', hoursAgo: 16 },
+    { type: 'NOTE', detail: 'ปล่อยเวอร์ชันเฟิร์มแวร์ v0.4.0 สำหรับชุดอุปกรณ์รุ่นนี้', hoursAgo: 16 },
   ];
   for (const ev of events) {
     await prisma.traceEvent.create({

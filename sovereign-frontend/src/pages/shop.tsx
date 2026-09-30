@@ -274,7 +274,7 @@ function Storefront({ businessId }: { businessId: string }) {
         </section>
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">open source</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
       </div>
     </ShopShell>
@@ -430,7 +430,7 @@ function OrderView({ token }: { token: string }) {
         )}
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">open source</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
       </div>
     </ShopShell>

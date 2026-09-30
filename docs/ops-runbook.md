@@ -265,8 +265,9 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 ## §สิบเอ็ด — การจัดการ repo public + สนามทดลองสาธารณะ (P: Publishing 30/9/69)
 
 ### กฎการเผยแพร่ (ตัดสินครั้งเดียว — คงไว้ตลอด)
-- **repo public = `krisakornutama/sovereign-dms` เท่านั้น** (เฟิร์มแวร์+สเปค+ซิม) · อัปเดตโค้ด: แก้ที่ `E:\My work\sovereign-dms` (repo แยก) → tag ตาม CHANGELOG (เช่น `git tag v0.4.1 && git push --tags`)
-- **ห้ามเข้า repo public เด็ดขาด:** ops-runbook.md · QUEUE.md · STATUS.md · ชื่อ LAN/IP/เราเตอร์/โดเมนจริง · config.py · token ทุกชนิด (repo หลัก sovereign-origin คง private ตลอด — ไม่ต้องการประวัติ 512 commits ให้โลกเห็น)
+- **ไม่มี repo สาธารณะ — สั่งเด็ดขาด 30/9/69:** "ชิ้นส่วนอุปกรณ์ไม่ส่ง code สู่สาธารณะ — ใช้เป็นของทำขาย" → `krisakornutama/sovereign-dms` **เปลี่ยนเป็น PRIVATE** (sudo ยืนยันโดยเจ้าของ) · เฟิร์มแวร์/สเปค/ซิมเป็นทรัพย์สินการค้า อัปเดตโค้ดที่ `E:\My work\sovereign-dms` (repo แยก) → tag ตาม CHANGELOG (เช่น `git tag v0.4.1 && git push --tags`)
+- **ห้ามรั่วสู่สาธารณะเด็ดขาด:** ลิงก์ github.com บนหน้าเว็บสาธารณะ · คำว่า "open source/โอเพนซอร์ส" · ops-runbook.md · QUEUE.md · STATUS.md · ชื่อ LAN/IP/เราเตอร์/โดเมนจริง · config.py · token ทุกชนิด (repo หลัก sovereign-origin คง private ตลอด — ไม่ต้องการประวัติ 512 commits ให้โลกเห็น)
+- **บทเรียนความเชื่อถือ:** ความน่าเชื่อถือของร้านมาจาก *ของจริง+บัตรตามรอย* (WAF จริง · rate limit จริง · ล็อตการผลิตจริง) ไม่ได้มาจากการเปิดโค้ด — footer ทุกหน้าสาธารณะเหลือแค่ "Powered by Sovereign OS" + ลิงก์เดโม่
 - สนามทดลอง `/demo` ใช้ **sandbox คงตัวในโค้ด** (`demo-sandbox.service.ts`) — ห้ามเปลี่ยนให้ไปอ่าน DB จริงเด็ดขาด (แม้ read-only)
 
 ### ฟีดแบ็กจากหน้าสาธารณะ → ถึงมือเจ้าของ

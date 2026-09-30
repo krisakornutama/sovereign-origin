@@ -70,7 +70,7 @@ export default function DemoPage() {
         {tab === 'finance' && <FinanceTab data={fin} />}
 
         <footer className="pt-4 text-[11px] text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
-          <span>Powered by <a href="https://github.com/krisakornutama/sovereign-dms" className="text-gray-400 hover:text-cyan-300 underline underline-offset-2">Sovereign OS</a> · open source</span>
+          <span>Powered by Sovereign OS</span>
           <span>·</span>
           <a href="/shop" className="text-gray-400 hover:text-emerald-300 underline underline-offset-2">ร้านอุปกรณ์</a>
         </footer>
