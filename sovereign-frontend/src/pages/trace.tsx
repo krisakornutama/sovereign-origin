@@ -343,6 +343,10 @@ export default function TracePage() {
           {!lot && !error && lots.length === 0 && (
             <div className="card"><EmptyState icon={<Icon name="search" size={20} />} title={t('trace.empty', 'เริ่มตามรอยที่รหัสล็อต')} description={t('trace.emptyDesc', 'รหัสอยู่บนฉลาก QR ของสินค้า หรือจากหน้าเก็บเกี่ยว (รูปแบบ LOT-XXXXXX)')} /></div>
           )}
+
+          <footer className="text-center text-[10px] text-gray-600 pt-2">
+            Powered by <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">Sovereign OS</a> · open source
+          </footer>
         </main>
       </div>
     </div>

@@ -138,6 +138,24 @@ model AlertEvent {
   @@map("alert_events")
 }
 
+model FeedbackNote {
+  // ฟีดแบ็กสาธารณะจากหน้า /demo (P: Publishing) — คัดกรองก่อนส่งถึงเจ้าของ (digest)
+  id          String   @id @default(uuid()) @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz
+  page        String   @default("/demo") // หน้าที่กดส่ง (ใช้จัดกลุ่ม)
+  topic       String   @default("general") // general | bug | feature | question
+  message     String // ข้อความ (สูงสุด 2000 ตัวอักษร — ตัดที่ route)
+  sender_email String? // อีเมลผู้ส่ง (optional — ให้ติดต่อกลับได้)
+  useful      Boolean? // ผลคัดกรองของเจ้าของ: true=มีประโยชน์ (เข้า digest) · false=สแปม · null=ยังไม่ตัดสิน
+  sent_at     DateTime? @db.Timestamptz // เวลาที่เข้า digest ไปแล้ว (กันส่งซ้ำ)
+  user_agent  String? // ตัวตรวจสแปมพื้นฐาน (จำไว้ดูแพตเทิร์น)
+  ip_hash     String? // sha256(ip+salt) 8 ตัวแรก — จำกัดถี่ต่อ IP โดยไม่เก็บ IP เปล่า
+
+  @@index([created_at(sort: Desc)])
+  @@index([useful])
+  @@map("feedback_notes")
+}
+
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
   timestamp   DateTime @default(now()) @db.Timestamptz

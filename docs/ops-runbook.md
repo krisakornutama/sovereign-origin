@@ -262,6 +262,22 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 8. **[ทำแล้ว 30/9/69] Rate limiting:** rule "Public API rate limit: /api/ max 20 req/10s per IP" ใน phase `http_ratelimit` (action=block, mitigation_timeout=10 วิ — ค่าที่ Free plan อนุญาต · characteristics ip.src+colo) — พิสูจน์: ยิง 25 ติดตัวที่ 21+ ได้ 429
 9. **[ทำแล้ว 30/9/69] สายสด Farm→Shop (I5a):** การ์ด "สายสดจากแปลง" บนหน้าร้านดึงจาก `GET /api/trace/products?ids=<inventoryItemId,…>` (สาธารณะ) — QR ติดสินค้าอิง `PUBLIC_APP_URL` (ตั้งใน infra/.env เป็นโดเมนจริงแล้ว) · **ข้อควรระวังตอน deploy frontend:** (1) build ทับ server ที่รันอยู่ = หน้า 404 ทั้งชุด (chunk ใหม่ vs manifest เก่า) — restart :3000 หลัง build เสมอ (2) service worker cache `sovereign-v3` คงหน้าเก่า — ทดสอบหลัง deploy ต้องเคลียร์ SW/caches ก่อนสรุปผล
 
+## §สิบเอ็ด — การจัดการ repo public + สนามทดลองสาธารณะ (P: Publishing 30/9/69)
+
+### กฎการเผยแพร่ (ตัดสินครั้งเดียว — คงไว้ตลอด)
+- **repo public = `krisakornutama/sovereign-dms` เท่านั้น** (เฟิร์มแวร์+สเปค+ซิม) · อัปเดตโค้ด: แก้ที่ `E:\My work\sovereign-dms` (repo แยก) → tag ตาม CHANGELOG (เช่น `git tag v0.4.1 && git push --tags`)
+- **ห้ามเข้า repo public เด็ดขาด:** ops-runbook.md · QUEUE.md · STATUS.md · ชื่อ LAN/IP/เราเตอร์/โดเมนจริง · config.py · token ทุกชนิด (repo หลัก sovereign-origin คง private ตลอด — ไม่ต้องการประวัติ 512 commits ให้โลกเห็น)
+- สนามทดลอง `/demo` ใช้ **sandbox คงตัวในโค้ด** (`demo-sandbox.service.ts`) — ห้ามเปลี่ยนให้ไปอ่าน DB จริงเด็ดขาด (แม้ read-only)
+
+### ฟีดแบ็กจากหน้าสาธารณะ → ถึงมือเจ้าของ
+1. ผู้เยี่ยมชมกดปุ่มลอย "💬 ส่งความคิดเห็น" บนหน้าเดโม่ → เก็บตาราง `feedback_notes` (มี honeypot+throttle)
+2. เจ้าของเปิด **หน้า Admin → ฟีดแบ็กจากผู้เยี่ยมชม** (`/feedback-admin` — SUPERADMIN) → กด 👍/👎 ต่อรายการ
+3. กด **"📮 ยื่นถึงผม"** → ของที่ 👍 ที่ยังไม่ sent ถูกย่อส่ง Telegram เจ้าของ (ส่งซ้ำไม่ได้ — mark sent_at)
+- อีเมล digest (แทน Telegram): เติม SMTP_* ใน infra/.env แล้วขยาย `feedback.service.ts` — การ์ดอนาคต
+
+### สรุปสิ่งที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
+`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/health` — ที่เหลือ block ทั้งหมด (403 ที่ edge)
+
 **ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — ได้ domain จริงแล้วเพิ่มบรรทัด `CORS_ORIGIN=https://shop.<ชื่อ>.dpdns.org,http://localhost:3000` ใน infra/.env แล้วให้ agent recreate core-api 1 รอบ
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________

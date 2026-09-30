@@ -125,6 +125,24 @@ model AlertEvent {
   @@map("alert_events")
 }
 
+model FeedbackNote {
+  // ฟีดแบ็กสาธารณะจากหน้า /demo — โครงเดียวกับ postgres (sqlite: ไม่มี @db.Timestamptz)
+  id           String   @id @default(uuid())
+  created_at   DateTime @default(now())
+  page         String   @default("/demo")
+  topic        String   @default("general")
+  message      String
+  sender_email String?
+  useful       Boolean?
+  sent_at      DateTime?
+  user_agent   String?
+  ip_hash      String?
+
+  @@index([created_at(sort: Desc)])
+  @@index([useful])
+  @@map("feedback_notes")
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   timestamp   DateTime @default(now())

@@ -87,6 +87,8 @@ import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
 import businessShopRoutes from './modules/business/business-shop.routes';
 import traceRoutes from './modules/trace/trace.routes';
+import demoRoutes from './modules/demo/demo.routes';
+import feedbackRoutes from './modules/feedback/feedback.routes';
 import { featureGuard } from './services/feature-grant.service';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -102,6 +104,8 @@ export function mountRoutes(app: Express): void {
   app.use('/api/auth', authRoutes);
   app.use('/api/shop', businessShopRoutes); // PUBLIC SHOP — หน้าร้านสาธารณะ (rate limit ใน router — ต้องมาก่อน /api/business)
   app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (public ตามรหัส + login จัดการล็อต)
+  app.use('/api/demo', demoRoutes); // PUBLIC DEMO SANDBOX — สนามทดลองสาธารณะ (ข้อมูลเดโม่คงตัว — ไม่แตะ DB จริง)
+  app.use('/api/feedback', feedbackRoutes); // PUBLIC FEEDBACK — ปุ่มฟีดแบ็ก (POST สาธารณะ · admin จัดการ)
   app.use('/api/business', businessRoutes); // BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (สิทธิ์ต่อธุรกิจใน router)
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);

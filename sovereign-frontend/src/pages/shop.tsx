@@ -53,7 +53,17 @@ export default function ShopPage() {
     const shopId = params.get('id');
     if (orderToken) setRoute({ mode: 'order', key: orderToken });
     else if (shopId) setRoute({ mode: 'store', key: shopId });
-    else setRoute(null);
+    else if (mounted) {
+      // P: Publishing — ไม่ใส่ ?id/?order = หน้าร้าน default (ร้านแรกใน catalog กลาง)
+      // โดเมนเปล่าเจอร้านอุปกรณ์ทันที ไม่ต้องรู้ businessId
+      fetchJsonObject<{ shops: Array<{ id: string }> }>(`${getApiUrl()}/api/shop/community`)
+        .then((d) => {
+          const first = d?.shops?.[0]?.id;
+          if (first) setRoute({ mode: 'store', key: first });
+          else setRoute(null);
+        })
+        .catch(() => setRoute(null));
+    }
     setMounted(true);
   }, [router.asPath]);
 
@@ -263,7 +273,9 @@ function Storefront({ businessId }: { businessId: string }) {
           </button>
         </section>
 
-        <footer className="text-center text-[10px] text-gray-600 pt-2">ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS</footer>
+        <footer className="text-center text-[10px] text-gray-600 pt-2">
+          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">open source</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+        </footer>
       </div>
     </ShopShell>
   );
@@ -417,7 +429,9 @@ function OrderView({ token }: { token: string }) {
           </div>
         )}
 
-        <footer className="text-center text-[10px] text-gray-600 pt-2">ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS</footer>
+        <footer className="text-center text-[10px] text-gray-600 pt-2">
+          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="https://github.com/krisakornutama/sovereign-dms" className="hover:text-gray-400 underline underline-offset-2">open source</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+        </footer>
       </div>
     </ShopShell>
   );
