@@ -71,6 +71,16 @@ async function main() {
     lines.push('💡 ความต้องการใหม่: ยังไม่มีในรอบนี้');
   }
 
+  // 4) เงินเข้า 7 วัน (P18): ยอดแจ้งชำระรอยืนยัน (PROMPTPAY ยังไม่ถูกยืนยันด้วยบิล CASH/TRANSFER) + ยอดรับแล้ว
+  //    "รับแล้ว" = บิลยืนยันจากเจ้าของ (method ไม่ใช่ PROMPTPAY — ตามกติกา addPayment ที่ method CASH/TRANSFER = เงินเข้าจริง)
+  const ppRows = psqlRows(`SELECT COALESCE(sum(p.amount),0) FROM business_payments p JOIN business_orders o ON o.id=p."orderId" WHERE p.method='PROMPTPAY' AND o.status IN ('QUOTE','ORDERED') AND p."paidAt" >= '${sinceQ}';`);
+  const receivedRows = psqlRows(`SELECT COALESCE(sum(p.amount),0) FROM business_payments p WHERE p.method <> 'PROMPTPAY' AND p."paidAt" >= '${sinceQ}';`);
+  const billRows = psqlRows(`SELECT count(*) FROM business_orders WHERE "partnerId" IS NOT NULL AND "createdAt" >= '${sinceQ}';`);
+  lines.push('');
+  lines.push('💰 <b>เงินเข้า 7 วัน</b>');
+  lines.push(`แจ้งชำระรอยืนยัน: ${Number(ppRows[0] ?? 0).toLocaleString('th-TH')} ฿ · ยืนยันรับแล้ว: ${Number(receivedRows[0] ?? 0).toLocaleString('th-TH')} ฿ · บิลคู่ค้าใหม่ ${billRows[0] ?? 0} ใบ`);
+  if (Number(ppRows[0] ?? 0) > 0) lines.push('→ เปิดยืนยันที่ /business → แท็บออเดอร์ (การ์ด "แจ้งชำระแล้วรอยืนยัน")');
+
   if (Number(pending) > 0) {
     lines.push('');
     lines.push(`📬 ฟีดแบ็กรอคัดกรอง ${pending} รายการ — เปิด /feedback-admin กด 👍 แล้วยื่นถึงคุณได้`);

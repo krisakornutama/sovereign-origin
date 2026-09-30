@@ -129,8 +129,8 @@ export async function partnerCounts(): Promise<{ active: number; pending: number
   return { active, pending };
 }
 
-/** แจ้งคู่ค้าว่ามีบิลใหม่ (เรียกจาก business-shop.service — เจ้าของ business_orders) */
-export async function notifyPartnerNewBill(partner: { id: string; name: string; contactName: string; contactPhone: string }, title: string): Promise<void> {
+/** แจ้งคู่ค้าว่ามีบิลใหม่ (เรียกจาก business-shop.service — เจ้าของ business_orders) · payUrl = ลิงก์ลับชำระ/ดูบิล (กดเปิดจากมือถือได้ทันที) */
+export async function notifyPartnerNewBill(partner: { id: string; name: string; contactName: string; contactPhone: string }, title: string, payUrl?: string): Promise<void> {
   try {
     const { getTelegramCredentials } = await import('./telegram-credentials.service');
     const creds = await getTelegramCredentials();
@@ -140,10 +140,11 @@ export async function notifyPartnerNewBill(partner: { id: string; name: string; 
       '🧾 <b>บิลค่าบริการ IoT ใหม่</b>',
       'ร้าน: <b>' + partner.name.replace(/[<>&]/g, '') + '</b>',
       'รายการ: ' + title.replace(/[<>&]/g, ''),
-      '',
-      'ชำระ/ตรวจสถานะผ่านลิงก์ส่วนตัวที่ส่งให้ — ดูบิล+งานติดตั้งครบที่ /partners/me (ลิงก์ในหน้า admin)',
+      ...(payUrl
+        ? ['', `💳 <a href="${payUrl}">เปิดบิล / ชำระเงิน (ลิงก์ส่วนตัว)</a>`, 'ลิงก์เดียวจบ: ดูบิล+ยอด+งานติดตั้ง แล้วชำระผ่าน PromptPay ได้ทันที']
+        : ['ชำระ/ตรวจสถานะผ่านลิงก์ส่วนตัวที่ส่งให้ — ดูบิล+งานติดตั้งครบที่ /partners/me (ลิงก์ในหน้า admin)']),
     ].join('\n');
-    await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML' });
+    await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML', disable_web_page_preview: true });
   } catch (err) {
     console.error('[partner] แจ้งบิลใหม่ไม่สำเร็จ (ไม่กระทบบิล):', err instanceof Error ? err.message : err);
   }
