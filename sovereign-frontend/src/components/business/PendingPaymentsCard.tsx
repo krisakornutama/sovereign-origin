@@ -62,12 +62,18 @@ export function computePendingReports(orders: Order[]): PendingReport[] {
     });
 }
 
-/** Hook ยืนยันรับเงินจากการ์ดรวม: บันทึกบิลยอดเท่าที่ลูกค้าแจ้ง (method CASH = เงินเข้าจริงยืนยันแล้ว) */
+/** Hook ยืนยันรับเงินจากการ์ดรวม: บันทึกบิลยอดเท่าที่ลูกค้าแจ้ง (method CASH = เงินเข้าจริงยืนยันแล้ว)
+ *  บิลคู่ค้า/หน้าร้านเริ่มที่ QUOTE — addPayment รับเฉพาะ ORDERED/PAID → ต้องยืนยันออเดอร์ (confirm) ให้เองก่อนเสมอ */
 export function useConfirmReportedPayment(base: string, load: () => Promise<void>, setNotice: (n: { ok: boolean; text: string }) => void) {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   async function confirm(order: Order, amount: number) {
     setConfirmingId(order.id);
     try {
+      if (order.status === 'QUOTE') {
+        const tr = await authFetch(`${base}/orders/${order.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'confirm' }) });
+        const td = tr.headers.get('content-type')?.includes('json') ? await tr.json() : null;
+        if (!tr.ok) throw new Error(td?.error ?? 'ยืนยันออเดอร์ไม่สำเร็จ');
+      }
       const r = await authFetch(`${base}/orders/${order.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, method: 'CASH' }) });
       const data = r.headers.get('content-type')?.includes('json') ? await r.json() : null;
       if (!r.ok) throw new Error(data?.error ?? 'ล้มเหลว');
