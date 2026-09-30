@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
-import { trackPageView, trackCtaClick } from '../lib/visitorTrack';
+import { trackPageView, trackCtaClick, trackQuestion } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /shop — หน้าร้านสาธารณะ (ไม่ต้อง login) — ออกแบบตาม "สลิปบนเคาน์เตอร์ยามค่ำ"
@@ -118,7 +118,7 @@ function Storefront({ businessId }: { businessId: string }) {
 
   async function placeOrder() {
     if (!form.customerName.trim() || !form.customerPhone.trim()) {
-      setError('กรอกชื่อและเบอร์โทรก่อนสั่งซื้อ');
+      setError('กรอกชื่อและเบอร์โทรผู้สนับสนุนก่อนยืนยัน');
       return;
     }
     setBusy(true);
@@ -130,7 +130,7 @@ function Storefront({ businessId }: { businessId: string }) {
         body: JSON.stringify({ ...form, items: items.map(([productId, qty]) => ({ productId, qty })) }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? 'สั่งซื้อไม่สำเร็จ');
+      if (!res.ok) throw new Error(data?.error ?? 'ยืนยันไม่สำเร็จ ลองใหม่อีกครั้ง');
       setOrdered({ orderNo: data.orderNo, token: data.publicToken });
       setCart({});
       setForm({ customerName: '', customerPhone: '', note: '' });
@@ -142,7 +142,7 @@ function Storefront({ businessId }: { businessId: string }) {
   }
 
   if (notFound) {
-    return <ShopShell><Empty title="ร้านปิดรับออเดอร์แล้ว" text="ร้านอาจปิดให้บริการ — ติดต่อร้านผ่านช่องทางเดิมที่คุณใช้อยู่" /></ShopShell>;
+    return <ShopShell><Empty title="ปิดรับการสนับสนุนรอบนี้" text="ขณะนี้ยังไม่เปิดรับ — กดปุ่ม 💬 ความคิดเห็นเพื่อแจ้งความสนใจ แล้วทีมงานจะติดต่อกลับเมื่อเปิดรอบใหม่" /></ShopShell>;
   }
   if (!shop) {
     return <ShopShell><Loading label="กำลังเปิดสมุดร้าน…" /></ShopShell>;
@@ -152,22 +152,22 @@ function Storefront({ businessId }: { businessId: string }) {
     <ShopShell>
       <div className="space-y-6">
         <header className="space-y-1 pt-2">
-          <div className="mono text-[10px] tracking-[0.25em] uppercase text-emerald-400/80">หน้าร้านสาธารณะ</div>
+          <div className="mono text-[10px] tracking-[0.25em] uppercase text-emerald-400/80">สนับสนุนโครงการโดยตรง</div>
           <h1 className="font-ledger text-2xl md:text-3xl font-bold text-gray-50 glow-text">{shop.name}</h1>
           <p className="text-xs text-gray-400">
-            ราคารวม VAT {vatPct}% · สั่งซื้อออนไลน์ ร้านจะติดต่อกลับทางเบอร์ที่กรอก
+            เลือกชิ้นงานที่อยากสนับสนุน — ราคาสนับสนุน (รวม VAT {vatPct}%) · ทีมงานติดต่อกลับทางเบอร์ที่กรอกเพื่อจัดส่ง/ติดตั้ง
           </p>
         </header>
 
         {ordered && (
           <div className="card p-4 space-y-2 border-emerald-500/30">
             <div className="flex items-baseline gap-2">
-              <span className="font-ledger text-sm text-emerald-300">สั่งซื้อสำเร็จ</span>
+              <span className="font-ledger text-sm text-emerald-300">ยืนยันการสนับสนุนแล้ว</span>
               <span className="shop-leader" aria-hidden />
               <span className="mono text-sm text-emerald-300">{ordered.orderNo}</span>
             </div>
             <a href={`/shop?order=${ordered.token}`} className="inline-block px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium">
-              ดูสถานะ / ชำระเงิน →
+              ติดตามสถานะ / โอนสนับสนุน →
             </a>
             <div className="text-[11px] text-gray-500 break-all">
               เก็บลิงก์นี้ไว้เช็คสถานะได้โดยไม่ต้อง login: {`${typeof window !== 'undefined' ? window.location.origin : ''}/shop?order=${ordered.token}`}
@@ -176,19 +176,19 @@ function Storefront({ businessId }: { businessId: string }) {
         )}
         {error && <div className="card p-3 text-sm text-rose-300 border-rose-500/40">{error}</div>}
 
-        {/* ขั้นตอนสั่งซื้อ — เห็นก่อนกด (P14) */}
+        {/* ขั้นตอนสนับสนุน — เห็นก่อนกด (P14→P15 ภาษาองค์กรไม่แสวงหากำไร) */}
         <div className="card px-4 py-2.5 text-[11px] text-gray-400 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="font-ledger text-gray-300 text-xs mr-1">วิธีสั่งซื้อ</span>
-          <span>① กด <b className="text-emerald-300">สั่งซื้อเลย</b> ที่สินค้า</span>
-          <span>② กรอกชื่อ+เบอร์</span>
-          <span>③ ยืนยันคำสั่งซื้อ</span>
-          <span>④ รับลิงก์ชำระ <b className="text-emerald-300">PromptPay</b> ทันที — เช็คสถานะได้ตลอด</span>
+          <span className="font-ledger text-gray-300 text-xs mr-1">วิธีสนับสนุน</span>
+          <span>① กด <b className="text-emerald-300">สนับสนุนชิ้นนี้</b> ที่ชิ้นงานที่สนใจ</span>
+          <span>② กรอกชื่อ+เบอร์ติดต่อ</span>
+          <span>③ ยืนยัน</span>
+          <span>④ รับลิงก์โอน <b className="text-emerald-300">PromptPay</b> ทันที — ติดตามสถานะได้ตลอด</span>
         </div>
 
-        {/* สินค้า — รายการแบบสมุดบัญชี (เส้นประจัดบรรทัดราคา) */}
+        {/* ชิ้นงานสนับสนุน — รายการแบบสมุดบัญชี (เส้นประจัดบรรทัดยอดสนับสนุน) */}
         <section className="card px-5 py-3">
-          <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">สินค้าของร้าน</h2>
-          {shop.products.length === 0 && <div className="py-6 text-sm text-gray-500">ร้านยังไม่มีสินค้า — สินค้าจะแสดงที่นี่เมื่อร้านเพิ่ม</div>}
+          <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">ชิ้นงานที่เปิดให้สนับสนุน</h2>
+          {shop.products.length === 0 && <div className="py-6 text-sm text-gray-500">ยังไม่มีชิ้นงานที่เปิดให้สนับสนุน — จะแสดงที่นี่เมื่อเปิดรอบใหม่</div>}
           {shop.products.map((p) => (
             <div key={p.id} className={`py-3 border-b border-dashed border-gray-800/80 last:border-0 ${p.inStock ? '' : 'opacity-50'}`}>
               <div className="flex items-baseline gap-2">
@@ -211,14 +211,14 @@ function Storefront({ businessId }: { businessId: string }) {
                   <div className="mt-2 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-3 py-2 space-y-1">
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
-                      <span className="text-emerald-400 font-medium">สายสดจากแปลง</span>
+                      <span className="text-emerald-400 font-medium">บัตรหลักฐานการผลิต</span>
                       {story.plotName && <span className="text-gray-500">· {story.plotName}</span>}
                       {story.quantityKg > 0 && <span className="mono text-gray-500">· {story.quantityKg.toLocaleString('th-TH')} กก.</span>}
                     </div>
                     <div className="text-[11px] text-gray-400 leading-relaxed">
                       ล็อต <span className="mono text-gray-300">{story.lotCode}</span>
                       {harvest && <> — เก็บเมื่อ {new Date(harvest.at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}</>}
-                      {soldEvt ? <> · รอบนี้ขายแล้ว (สต็อกหน้าร้านคือรอบถัดไป)</> : story.sold ? <> · ขายแล้ว</> : null}
+                      {soldEvt ? <> · รอบนี้ผู้สนับสนุนรับครบแล้ว (รอบถัดไปเปิดเร็ว ๆ นี้)</> : story.sold ? <> · มอบหมายให้ผู้สนับสนุนแล้ว</> : null}
                     </div>
                     <a href={story.traceUrl} className="inline-block text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2">
                       ดูที่มาเต็มของล็อตนี้ →
@@ -231,11 +231,11 @@ function Storefront({ businessId }: { businessId: string }) {
                   <button type="button"
                     onClick={() => {
                       if ((cart[p.id] ?? 0) === 0) setQty(p.id, 1); // ยังไม่มีในตะกร้า = เริ่ม 1 ชิ้นทันที
-                      trackCtaClick('/shop', 'order_now', p.category === 'GENERAL' ? p.name.slice(0, 20) : p.category);
+                      trackCtaClick('/shop', 'support_now', p.category === 'GENERAL' ? p.name.slice(0, 20) : p.category);
                       document.getElementById('order-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                     className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium shadow shadow-emerald-950/40">
-                    🛒 สั่งซื้อเลย
+                    🤝 สนับสนุนชิ้นนี้
                   </button>
                   <div className="ml-auto flex items-center gap-1">
                   <button type="button" aria-label={`ลดจำนวน ${p.name}`} disabled={(cart[p.id] ?? 0) === 0}
@@ -254,11 +254,11 @@ function Storefront({ businessId }: { businessId: string }) {
           ))}
         </section>
 
-        {/* สรุปคำสั่งซื้อ — สลิปขอบฉีก (signature) */}
+        {/* สรุปยอดสนับสนุน — สลิปขอบฉีก (signature) */}
         <section id="order-summary" className="shop-tear shop-paper px-5 py-4 space-y-3">
-          <h2 className="font-ledger text-sm text-gray-300">สรุปคำสั่งซื้อ</h2>
+          <h2 className="font-ledger text-sm text-gray-300">สรุปยอดสนับสนุน</h2>
           {items.length === 0 ? (
-            <div className="text-sm text-gray-500">ยังไม่ได้เลือกสินค้า — กด + ในรายการด้านบนเพื่อเริ่ม</div>
+            <div className="text-sm text-gray-500">ยังไม่ได้เลือกชิ้นงาน — กด 🤝 สนับสนุนชิ้นนี้ ในรายการด้านบนเพื่อเริ่ม</div>
           ) : (
             <div className="space-y-1 text-sm">
               {items.map(([pid, q]) => {
@@ -283,21 +283,26 @@ function Storefront({ businessId }: { businessId: string }) {
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-2 pt-1">
-            <input placeholder="ชื่อผู้ซื้อ *" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-              className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" aria-label="ชื่อผู้ซื้อ" />
-            <input placeholder="เบอร์โทรศัพท์ *" value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
-              className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" aria-label="เบอร์โทรศัพท์" />
-            <input placeholder="หมายเหตุ (ที่อยู่/เวลาสะดวก)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}
+            <input placeholder="ชื่อผู้สนับสนุน *" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+              className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" aria-label="ชื่อผู้สนับสนุน" />
+            <input placeholder="เบอร์ติดต่อ *" value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+              className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm" aria-label="เบอร์ติดต่อ" />
+            <input placeholder="หมายเหตุ (ที่อยู่จัดส่ง/เวลาสะดวก)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}
               className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm sm:col-span-2" aria-label="หมายเหตุ" />
           </div>
           <button onClick={placeOrder} disabled={busy || items.length === 0}
             className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium text-sm text-white disabled:opacity-40">
-            {busy ? 'กำลังส่งคำสั่งซื้อ…' : 'ยืนยันคำสั่งซื้อ'}
+            {busy ? 'กำลังยืนยัน…' : 'ยืนยันการสนับสนุน'}
           </button>
+          <p className="text-[10px] text-gray-600 pt-1">
+            การสนับสนุนทุกบาทนำไปพัฒนาระบบและผลิตชิ้นงานชุดถัดไป — หลังยืนยันจะได้ลิงก์ติดตามสถานะส่วนตัว โอนผ่าน PromptPay ได้ทันที
+          </p>
         </section>
 
+        <ShopFaq />
+
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
         <FeedbackButton page="/shop" />
       </div>
@@ -454,11 +459,54 @@ function OrderView({ token }: { token: string }) {
         )}
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
         <FeedbackButton page="/shop" />
       </div>
     </ShopShell>
+  );
+}
+
+// ── คำถามที่พบบ่อย (P15) — ลดลังเลก่อนตัดสินใจสนับสนุน ──
+// คำถามที่ยังไม่มีคำตอบ = สัญญาณพัฒนาต่อ: กด "ยังไม่มีคำตอบ ถามเพิ่ม" → track question (detail=faq:<คำถาม>)
+const FAQ_ITEMS: Array<{ q: string; a: string }> = [
+  { q: 'สนับสนุนแล้วได้อะไร?', a: 'ได้ชิ้นงานที่เลือกตามที่ระบุในหน้านี้ พร้อมบัตรหลักฐานการผลิต (ตามรอยได้ทุกขั้นตอน) และลิงก์ติดตามสถานะส่วนตัวตลอดกระบวนการ' },
+  { q: 'จ่ายอย่างไร?', a: 'ยืนยันแล้วระบบสร้างลิงก์ส่วนตัวให้ทันที — สแกน QR PromptPay โอนผ่านแอปธนาคารได้เลย (QR ฝังยอดไว้แล้ว) และกดแจ้งชำระในลิงก์เดียวกัน' },
+  { q: 'รอนานไหม?', a: 'ชิ้นที่ระบุ "มีสินค้า" พร้อมส่ง/ติดตั้งตามนัดที่ติดต่อกลับ — ชิ้นที่รอบถัดไป ระบบจะบอกสถานะจริงบนลิงก์ติดตามของคุณ' },
+  { q: 'ซอฟต์แวร์ได้มาอย่างไร ใช้กับเครื่องอื่นได้ไหม?', a: 'ได้เวอร์ชันที่ผ่านการทดสอบครบ (ดูล็อต release ได้) พร้อมสิทธิ์ใช้งานและช่วยตั้งค่าเชื่อมระบบของคุณ — รายละเอียดขอบเขตแจ้งตอนติดต่อกลับ' },
+  { q: 'เงินสนับสนุนไปไหน?', a: 'ค่าวัสดุชุดถัดไป · พัฒนาฟีเจอร์ที่ผู้ใช้ขอจริง (ดูได้จากความต้องการที่เก็บจากปุ่มความคิดเห็น) · คงระบบเซิร์ฟเวอร์และการสำรองข้อมูลให้เดินต่อ' },
+];
+function ShopFaq() {
+  const [open, setOpen] = useState<number | null>(null);
+  const [asked, setAsked] = useState<number | null>(null);
+  return (
+    <section className="card px-5 py-3" aria-label="คำถามที่พบบ่อย">
+      <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">คำถามที่พบบ่อย</h2>
+      <div className="divide-y divide-dashed divide-gray-800/80">
+        {FAQ_ITEMS.map((f, i) => (
+          <div key={i} className="py-2">
+            <button type="button" className="w-full text-left flex items-baseline gap-2" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+              <span className="text-sm text-gray-200">{f.q}</span>
+              <span className="ml-auto text-gray-500 text-xs">{open === i ? '−' : '+'}</span>
+            </button>
+            {open === i && (
+              <div className="pt-1.5 space-y-1.5">
+                <p className="text-xs text-gray-400 leading-relaxed">{f.a}</p>
+                {asked === i ? (
+                  <p className="text-[11px] text-emerald-400">ขอบคุณครับ — คำถามของคุณถูกส่งให้ทีมงานแล้ว คำตอบจะถูกเพิ่มเข้าหน้านี้</p>
+                ) : (
+                  <button type="button" className="text-[11px] text-gray-500 hover:text-cyan-300 underline underline-offset-2"
+                    onClick={() => { trackQuestion('/shop', `faq:${f.q}`, 'ยังไม่มีคำตอบที่ใช่ — อยากรู้เพิ่ม'); setAsked(i); }}>
+                    ยังไม่ใช่คำตอบที่ต้องการ — ถามเพิ่ม
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-600 pt-2">คำถามอื่น ๆ กดปุ่ม 💬 มุมขวาล่างได้ตลอด</p>
+    </section>
   );
 }
 
