@@ -371,7 +371,8 @@ export async function createPartnerBill(businessId: string, input: PartnerBillIn
       data: { businessId, orderId: order.id, title: String(input.installTitle).slice(0, 160), status: 'TODO' },
     });
   }
-  await notifyPartnerBill(partner, title);
+  // P18: ลิงก์ลับของบิล (publicToken) ติดใน Telegram ด้วย — เจ้าของกดเปิดดูบิล/ชำระจากมือถือได้ทันที
+  await notifyPartnerBill(partner, title, `${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'}/shop/?order=${order.publicToken}`);
   return { orderId: order.id, orderNo: order.orderNo, publicToken: (order as any).publicToken, total };
 }
 
@@ -407,10 +408,10 @@ export async function partnerBills(partnerId: string, take = 50): Promise<Array<
 
 
 /** แจ้งคู่ค้าว่ามีบิลใหม่ (ผ่าน service ของ partner — กัน boundary) */
-async function notifyPartnerBill(partner: { id: string; name: string; category: string; contactName: string; contactPhone: string }, title: string): Promise<void> {
+async function notifyPartnerBill(partner: { id: string; name: string; category: string; contactName: string; contactPhone: string }, title: string, payUrl?: string): Promise<void> {
   try {
     const { notifyPartnerNewBill } = await import('./partner.service');
-    await notifyPartnerNewBill(partner, title);
+    await notifyPartnerNewBill(partner, title, payUrl);
   } catch { /* เงียบ — ไม่กระทบบิล */ }
 }
 
