@@ -278,6 +278,12 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 ### สรุปสิ่งที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
 `/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/health` — ที่เหลือ block ทั้งหมด (403 ที่ edge)
 
+### ขายซอฟต์แวร์แยกชิ้น (P8 — 30/9/69)
+- หน้าจัดการ: **`/software-pricing`** (SUPERADMIN) — สแกนโค้ดจริง 61 โมดูล → ตาราง endpoints/LOC/ชุดทดสอบ + ราคาแนะนำ → ตั้งชื่อ/สเปค/ราคาเอง → กด "เปิดขาย" = ขึ้นหน้าร้านทันที (SKU `SW-<MODULE>` ผูก inventory "license")
+- สูตรราคาแนะนำ (แก้ได้ที่ `software-catalog.service.ts`): base 190 + endpoints×95 + LOC×0.28 + testRefs×60 → ปัด 10฿ ปิดท้าย 9 (ขั้นต่ำ 290฿) — โมดูลที่มีเทสต์ครอบ = ราคาสูงขึ้นตามคุณภาพจริง
+- ปิดขาย = isActive=false (หายจากหน้าร้าน ราคา/ข้อมูลคงอยู่ — เปิดใหม่ได้) · หน้าร้านโชว์ผ่าน `/api/shop` เดิม — WAF ไม่ต้องแตะเพิ่ม
+- ล็อต release: แต่ละเวอร์ชันใหม่ สร้างล็อต `LOT-SWVxxx` (build→test→publish) ผ่าน seed-devices-shop.ts — การ์ดสายสดบนหน้าร้านโชว์เวอร์ชันที่ลูกค้าได้จริง
+
 **ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — ได้ domain จริงแล้วเพิ่มบรรทัด `CORS_ORIGIN=https://shop.<ชื่อ>.dpdns.org,http://localhost:3000` ใน infra/.env แล้วให้ agent recreate core-api 1 รอบ
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________

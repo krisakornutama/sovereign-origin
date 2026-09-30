@@ -25,6 +25,7 @@ const SHOP_NAME = 'ร้านอุปกรณ์ Sovereign (DMS)';
 const OWNER_USER = 'seed-trace'; // บัญชีเจ้าของจาก seed ชุดแรก (ไม่สร้างใหม่)
 const ITEM_NAME = 'ชุดอุปกรณ์ DMS (ประกอบ+ทดสอบแล้ว)';
 const VEG_BIZ_NAME = 'ร้านเกษตรผักสดชุมชน';
+const SW_ITEM_NAME = 'ซอฟต์แวร์ Sovereign (license)';
 
 const SKUS: Array<{
   sku: string; name: string; category: string; specs: string;
@@ -135,6 +136,45 @@ async function ensureProductionLot(itemId: string) {
   return lot;
 }
 
+/** ซอฟต์แวร์ (P8): inventory "license" + ล็อต release ที่ผูกกับการ์ดสายสดของสินค้าซอฟต์แวร์
+ *  สินค้าซอฟต์แวร์เองเพิ่มผ่านหน้า /software-pricing (publish per module) — ที่นี่เตรียมวัตถุดิบ+ล็อตให้พร้อม */
+async function ensureSoftwareLot(ownerId: string) {
+  let item = await prisma.inventoryItem.findFirst({ where: { name: SW_ITEM_NAME } });
+  if (!item) {
+    item = await prisma.inventoryItem.create({
+      data: { user_id: ownerId, name: SW_ITEM_NAME, category: 'OTHER', quantity: 9999, unit: 'license', unit_price_usd: 0, location: 'ดิจิทัล — ส่งมอบทางอีเมล/QR' },
+    });
+    console.log(`  + inventory item "${SW_ITEM_NAME}"`);
+  }
+  const lotCode = 'LOT-SWV040';
+  const found = await prisma.productLot.findUnique({ where: { lotCode } });
+  if (found) {
+    console.log(`  = lot ${lotCode} มีอยู่แล้ว — ข้าม`);
+    return;
+  }
+  const lot = await prisma.productLot.create({
+    data: {
+      lotCode,
+      inventoryItemId: item.id,
+      plotId: null,
+      crop: 'Sovereign OS ซอฟต์แวร์รุ่น v0.4.0',
+      quantityKg: 9999,
+      harvestedAt: hoursAgo(20),
+    },
+  });
+  const events = [
+    { type: 'PROCESSED', detail: 'Release build v0.4.0 — 61 โมดูล รวมหน้าร้าน/สนามทดลอง/ฟีดแบ็ก', hoursAgo: 20 },
+    { type: 'TESTED', detail: 'verify 5/5 + tests 1268/1268 ผ่าน (build+typecheck+tests+gates)', hoursAgo: 18 },
+    { type: 'NOTE', detail: 'เผยแพร่เฟิร์มแวร์ DMS โอเพนซอร์สบน GitHub (sovereign-dms) — โค้ดตรวจสอบได้', hoursAgo: 16 },
+  ];
+  for (const ev of events) {
+    await prisma.traceEvent.create({
+      data: { lotId: lot.id, type: ev.type, detail: ev.detail, createdAt: hoursAgo(ev.hoursAgo) },
+    });
+  }
+  console.log(`  + lot ${lotCode} (release v0.4.0 — build→test→publish)`);
+}
+
 async function main() {
   console.log('── [1/4] บัญชีเจ้าของร้าน (บัญชี seed เดิม — ต้องรัน seed-trace-community.ts ก่อนหน้านี้) ──');
   const owner = await prisma.user.findUnique({ where: { username: OWNER_USER } });
@@ -148,6 +188,9 @@ async function main() {
 
   console.log('── [4/4] ล็อตการผลิต (เหตุการณ์ประกอบ/แฟลช/ทดสอบ/แพ็ก) ──');
   await ensureProductionLot(item.id);
+
+  console.log('── [5/5] ซอฟต์แวร์: inventory license + ล็อต release v0.4.0 (P8 — ขายซอฟต์แวร์แยกชิ้น) ──');
+  await ensureSoftwareLot(owner.id);
 
   console.log('── ปิดร้านผักเดิมจากสาธารณะ (ข้อมูลครบเหมือนเดิม — เปิดคืนได้ทีเดียว) ──');
   const veg = await prisma.business.findFirst({ where: { name: VEG_BIZ_NAME } });
