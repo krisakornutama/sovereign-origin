@@ -314,3 +314,10 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 1. **CSP บล็อก CDN**: `script-src 'self'` กิน Leaflet จาก unpkg ทิ้ง (โหลดเงียบ ไม่มี console error ชัด) → แก้ด้วย **self-host** `public/vendor/leaflet/` (leaf 1.9.4 js+css) + เติม `https://*.tile.openstreetmap.org` ใน img-src · **WAF ก็ต้องอนุญาต** `starts_with /vendor/` ด้วย (default-deny กิน /vendor/* เป็น 403)
 2. **SW VERSION คงที่ข้าม build**: `sovereign-v3` ไม่เคยเปลี่ยน → client (รวม PWA มือถือ) ใช้ shell เก่าต่อได้เป็นสัปดาห์หลัง deploy · แก้ที่ราก: **bump เป็น sovereign-v4 ทุกครั้งที่ deploy เปลี่ยน UI** (activate มีลบ cache เก่ารออยู่แล้ว + skipWaiting พร้อม)
 3. **build ที่ MAIN เสมอ**: งานใน worktree ที่แก้ public/sw.js ไม่มีผลจนกว่า merge — ยืนยันฝั่งเสิร์ฟด้วย `curl localhost:3000/sw.js | grep sovereign-v` และ HTML ต้องไม่มี unpkg
+
+### เสริม P16 รอบค่ำ (30/9/69) — แจ้งเตือนทันที + QR ป้ายร้าน + บั๊ก SW cache API
+- **แจ้งเตือน Telegram ทันที**: `partner.service.ts → notifyNewPartner` (fire-and-forget · อ่าน creds เดียวกับ F2 · ล้มเงียบไม่กระทบการสมัคร) — ข้อความมีลิงก์เข้าหน้าอนุมัติ
+- **QR ป้ายร้าน**: `GET /api/partners/:id/qr` (สาธารณะ · ACTIVE เท่านั้น · ใช้ qrcode ที่มีอยู่) → QR ชี้ `/partners/?p=<id>` — หน้าแผนที่เห็น `?p=` = ซูมหมุดร้าน + เปิดการ์ด + แบนเนอร์ยืนยัน · ปุ่ม "🏷️ QR ป้ายร้าน" + "🖨️ พิมพ์ป้าย" อยู่ในแผงคู่ค้า ACTIVE ที่ /feedback-admin
+- **แผงอนุมัติ fail-safe**: ลบแถวออกจอเมื่อ server ยืนยันเท่านั้น (เดิม optimistic ลบทั้งที่ request ล้ม — ผู้ใช้กดแล้ว "หาย" ทั้งที่ DB ยัง PENDING)
+- **บั๊กใหญ่ที่จับได้: SW cache-first ครอบ GET same-origin ทุกเส้น รวม `/api/*`** — `/api/partners` ถูก cache ค่าว่างจากครั้งแรกที่เปิดหน้า (ก่อนมีข้อมูล) แล้วตอบจาก cache ตลอด = แผนที่/ข้อมูลสดค้างเก่าเสมอบนเครื่องที่เคยเข้าก่อน · แก้: SW เพิ่ม `if (url.pathname.startsWith('/api/')) return;` (network เสมอ) + bump `sovereign-v5` · **กฎ: SW ห้าม cache /api/ เด็ดขาด — เขียนโค้ดใหม่ที่ยิง API ต้องเช็คบรรทัดนี้เสมอ**
+- พิสูจน์: สมัครจริงบนโดเมน → Telegram แจ้งเข้าทันที (log เงียบ = ส่งสำเร็จ) · อนุมัติแล้วหมุด+การ์ดชื่อร้านขึ้นบนแผนที่จริง (เห็นบนจอ) · QR endpoint 200 ทั้ง local/สาธารณะ
