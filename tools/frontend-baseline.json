@@ -24,6 +24,7 @@
     "sidebar-rule|sovereign-frontend/src/pages/about.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/community.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/partners/guide.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/partners/me.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/demo.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/index.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/partners.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
