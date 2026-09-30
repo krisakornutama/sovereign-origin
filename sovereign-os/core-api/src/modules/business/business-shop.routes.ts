@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import * as shop from '../../services/business-shop.service';
+import { countAllLots } from '../../services/trace.service';
 
 const router = Router();
 
@@ -19,6 +20,32 @@ function fail(res: any, err: any): void {
   if (/not found/.test(msg)) res.status(404).json({ error: 'ไม่พบร้านนี้' });
   else res.status(400).json({ error: msg });
 }
+
+// GET /api/shop/transparency — สถิติความโปร่งใสหน้า /about — สาธารณะ ตัวเลขจาก DB จริง (ไม่มี PII)
+// (ต้องมาก่อน /:businessId — เหมือน community)
+router.get('/transparency', browseLimiter, async (_req, res) => {
+  try {
+    const products = await shop.prisma.businessProduct.count({ where: { isActive: true } });
+    const openOrders = await shop.prisma.businessOrder.count({ where: { status: { in: ['QUOTE', 'ORDERED', 'PAID'] } } });
+    const partners = await shop.prisma.partner.count({ where: { status: 'ACTIVE' } });
+    const lots = await countAllLots(); // ผ่าน service ของ trace — เจ้าของตาราง product_lots
+    const visitorSessions = await shop.prisma.visitorEvent.groupBy({
+      by: ['ip_hash'],
+      where: { kind: 'page_view', created_at: { gte: new Date(Date.now() - 7 * 864e5) } },
+      _count: { _all: true },
+    });
+    res.json({
+      supportersCount: openOrders,
+      openWorkCount: products,
+      partnersCount: partners,
+      productionLotsCount: lots,
+      weeklyVisitors: visitorSessions.length,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // GET /api/shop/community — เฟส 4: catalog กลางชุมชน — รวมสินค้าร้านที่เข้าร่วมเอง (opt-in) — สาธารณะ
 // (ต้องมาก่อน /:businessId — ไม่งั้น "community" ถูกกินเป็น businessId)

@@ -5,7 +5,8 @@
     "     line-budget (pages≤800, components≤400)",
     "     sidebar-rule (ทุกหน้า import Sidebar; exception = public/login/redirect/ไฟล์พิเศษ)",
     "รายการในนี้ = หนี้ที่รับไว้ชั่วคราว — ของใหม่ที่ละเมิด = verify FAIL",
-    "demo.tsx (sidebar-rule) ตั้งใจรับ: public demo page เหมือน /shop /community — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)"
+    "demo.tsx (sidebar-rule) ตั้งใจรับ: public demo page เหมือน /shop /community — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)",
+    "about.tsx + partners.tsx (sidebar-rule) ตั้งใจรับ: หน้าสาธารณะ P16 เหมือน /shop /demo — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)"
   ],
   "violations": [
     "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",
@@ -20,9 +21,11 @@
     "line-budget|sovereign-frontend/src/components/knowledge/use-kid-home.ts|554 บรรทัด > เพดาน 400 (components)",
     "line-budget|sovereign-frontend/src/components/sensors/SensorsHub.tsx|483 บรรทัด > เพดาน 400 (components)",
     "line-budget|sovereign-frontend/src/components/ui/Icon.tsx|653 บรรทัด > เพดาน 400 (components)",
+    "sidebar-rule|sovereign-frontend/src/pages/about.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/community.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/demo.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/index.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/partners.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/portfolio.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/sensors.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/shop.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)"

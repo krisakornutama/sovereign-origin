@@ -10,6 +10,9 @@
 // - ทุก endpoint สาธารณะโดน rate limit ที่ route layer (public ที่สุดของระบบ)
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+
+// P16 — ให้ routes เรียกสถิติผ่านตัวกลางเดียวกัน (ธรรมเนียมบ้าน: service เป็นเจ้าของ DB เสมอ)
+export { prisma };
 import { nextBusinessOrderNo } from '../lib/business';
 import { buildPromptPayPayload } from './promptpay';
 import QRCode from 'qrcode';

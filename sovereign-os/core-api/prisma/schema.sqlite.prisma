@@ -143,6 +143,31 @@ model FeedbackNote {
   @@map("feedback_notes")
 }
 
+model Partner {
+  // พาร์ทเนอร์เครือข่าย (P16) — โครงเดียวกับ postgres (sqlite: ไม่มี @db.Timestamptz)
+  id           String   @id @default(uuid())
+  created_at   DateTime @default(now())
+  name         String
+  category     String   @default("SHOP")
+  detail       String?
+  address      String?
+  phone        String?
+  lat          Float
+  lng          Float
+  contactName  String
+  contactPhone String
+  contactEmail String?
+  status       String   @default("PENDING")
+  decided_at   DateTime?
+  note         String?
+  user_agent   String?
+  ip_hash      String?
+
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+  @@map("partners")
+}
+
 model VisitorEvent {
   // พฤติกรรมผู้เยี่ยมชมสาธารณะ (P10) — โครงเดียวกับ postgres (sqlite: ไม่มี @db.Timestamptz)
   id         String   @id @default(uuid())

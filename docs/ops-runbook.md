@@ -295,3 +295,17 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 **ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — ได้ domain จริงแล้วเพิ่มบรรทัด `CORS_ORIGIN=https://shop.<ชื่อ>.dpdns.org,http://localhost:3000` ใน infra/.env แล้วให้ agent recreate core-api 1 รอบ
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________
+
+## §สิบสอง — ระบบพาร์ทเนอร์ + องค์กรไม่แสวงหากำไร (P16 30/9/69)
+
+### แผนที่คู่ค้า (/partners)
+- **ตาราง `partners`** (migration `20260930170000_add_partners`): สมัครสาธารณะ → `PENDING` → เจ้าของอนุมัติที่ `/feedback-admin` → `ACTIVE` ขึ้นแผนที่
+- **API**: `POST /api/partners` (202 · honeypot `website` · ของเพี้ยนทิ้งเงียบ) · `GET /api/partners` (ACTIVE เท่านั้น + counts · ไม่มี contactName/contactPhone รั่ว) · `PATCH /api/partners/:id` (SUPERADMIN เท่านั้น)
+- **แผนที่**: OpenStreetMap ผ่าน Leaflet **CDN** (`unpkg.com/leaflet@1.9.4`) — ตั้งใจไม่เพิ่ม dependency · ฟอร์มสมัครปักหมุดโดยคลิกแผนที่ (โหมดปักหมุด)
+- **WAF**: edge อนุญาต `/partners` `/about` `starts_with /api/partners` แล้ว (แก้ expression ใน dashboard จริง 30/9/69)
+
+### องค์กรไม่แสวงหากำไร
+- **ชื่อธุรกิจใน DB = "Sovereign Origin Foundation"** (เดิม Sovereign Devices) — seed + software-catalog service แก้ตามแล้ว (ถ้า restore กลับต้องรัน UPDATE ซ้ำ: `UPDATE businesses SET name='Sovereign Origin Foundation' WHERE name='Sovereign Devices';`)
+- **การ์ด "สนับสนุนตามศรัทธา"** ใน /shop = business_product sku `SUPPORT-FAITH` ราคาหน่วย **1฿** หมวด `SUPPORT` (กำหนดยอด = จำนวนชิ้น; ซ่อนจากรายการชิ้นงานปกติด้วย filter category SUPPORT) — seed ครั้งใหม่ต้อง INSERT ตัวนี้ด้วย (idempotent ตาม runbook)
+- **บัตรขอบคุณดิจิทัล** = คอมโพเนนต์ใน `/shop?order=<token>` โชว์เมื่อชำระครบ — ชื่อบนบัตรเก็บ `localStorage: sovereign-support-name` (ไม่ส่ง server · ไม่มี PII ใหม่ใน DB)
+- **สถิติ /about** = `GET /api/shop/transparency` (สาธารณะ, ครอบด้วย WAF `/api/shop` อยู่แล้ว): นับออเดอร์สด/ชิ้นงาน/คู่ค้า/ล็อต/ผู้มาเยือน 7 วัน — **นับล็อตต้องผ่าน `trace.countAllLots`** (boundary gate: business ห้ามแตะ product_lots ตรง)
