@@ -14,6 +14,7 @@ import TaxInvoice from './TaxInvoice';
 import { POSITION_LABELS, POSITION_RANK, TABS, baht, STATUS_TH, STATUS_CLS, StatusBadge, SHIPPING_TH, SHIPPING_CLS, ShippingBadge } from './shared';
 import type { Tab, Business, Product, Customer, Order, Installation, LedgerEntry, Summary, Agent, ShopSettings } from './shared';
 import { BusinessTaxTab } from './BusinessTaxTab';
+import { PendingPaymentsCard, computePendingReports, useConfirmReportedPayment } from './PendingPaymentsCard';
 import { BusinessShopTab } from './BusinessShopTab';
 import { AgentsTab } from './BusinessAgentsTab';
 import { LedgerRow, ProductsTab, CustomersTab, InstallationsTab, LedgerForm, AddMemberCard } from './BusinessTabs';
@@ -95,6 +96,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
   const [cart, setCart] = useState<Record<string, number>>({});
   // หัก ณ ที่จ่ายต่อออเดอร์ (ท.ป.4 ที่ลูกค้า B2B หัก) — ค่าว่าง = ไม่มี WHT
   const [whtInput, setWhtInput] = useState<Record<string, string>>({});
+  const { confirmingId, confirm: confirmReportedPayment } = useConfirmReportedPayment(base, load, setNotice);
   async function createOrder(customerId?: string) {
     const items = Object.entries(cart).filter(([, q]) => q > 0).map(([productId, qty]) => ({ productId, qty }));
     if (items.length === 0) { setNotice({ ok: false, text: 'เลือกสินค้าก่อนเปิดออเดอร์' }); return; }
@@ -217,6 +219,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
       {/* ── ออเดอร์ ── */}
       {tab === 'orders' && (
         <div className="space-y-4">
+          {can('SALES') && <PendingPaymentsCard reports={computePendingReports(orders)} onConfirm={confirmReportedPayment} busy={confirmingId} />}
           {can('SALES') && (
             <div className="card p-4 space-y-3">
               <div className="text-sm font-semibold">🧾 เปิดออเดอร์ใหม่</div>
