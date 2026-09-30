@@ -108,6 +108,7 @@ function VisitorInsights() {
 
 // P16 — แผงอนุมัติคู่ค้า: สมัครจาก /partners → อนุมัติ = ขึ้นแผนที่สาธารณะทันที
 interface PartnerRow { id: string; name: string; category: string; detail: string | null; address: string | null; phone: string | null; lat: number; lng: number; contactName: string; contactPhone: string; status: string; created_at: string; }
+interface BillResult { orderNo: string; total: number; payUrl: string; publicToken: string; }
 
 // P17 — ฟอร์มบิลค่าบริการ IoT ต่อร้าน ACTIVE: สร้างบิล+ลิงก์ PromptPay ส่งคู่ค้า
 function PartnerBillForm({ id, name }: { id: string; name: string }) {
@@ -115,7 +116,7 @@ function PartnerBillForm({ id, name }: { id: string; name: string }) {
   const [amount, setAmount] = useState('');
   const [install, setInstall] = useState('');
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ payUrl: string; orderNo: string; total: number } | null>(null);
+  const [result, setResult] = useState<{ payUrl: string; orderNo: string; total: number; publicToken: string } | null>(null);
   const [err, setErr] = useState('');
   async function make() {
     setBusy(true); setErr('');
@@ -134,12 +135,16 @@ function PartnerBillForm({ id, name }: { id: string; name: string }) {
     }
   }
   if (result) {
+    const portalUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/partners/me/?p=${id}&t=${result.publicToken}`;
     return (
       <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-3 space-y-1.5 text-xs" style={{ width: 300 }}>
         <div className="text-emerald-300 font-medium">บิล {result.orderNo} สร้างแล้ว (รวม {result.total.toLocaleString('th-TH')}฿)</div>
         <div className="break-all text-cyan-300">{result.payUrl}</div>
+        <div className="text-[10px] text-gray-500">ลิงก์พื้นที่คู่ค้า (ดูบิล+งานติดตั้งครบ):</div>
+        <div className="break-all text-cyan-300/80">{portalUrl}</div>
         <button type="button" onClick={() => navigator.clipboard?.writeText(`${name}
-ลิงก์ชำระค่าบริการ: ${result.payUrl}`)}
+ลิงก์ชำระค่าบริการ: ${result.payUrl}
+พื้นที่ของร้าน (บิล+สถานะงาน): ${portalUrl}`)}
           className="w-full text-xs px-3 py-1.5 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-600/50">📋 คัดลอกข้อความส่งคู่ค้า</button>
         <button type="button" onClick={() => { setResult(null); setTitle(''); setAmount(''); setInstall(''); }} className="text-[11px] text-gray-500 hover:text-gray-300">สร้างบิลใหม่</button>
       </div>

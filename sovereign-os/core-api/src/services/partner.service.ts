@@ -141,7 +141,7 @@ export async function notifyPartnerNewBill(partner: { id: string; name: string; 
       'ร้าน: <b>' + partner.name.replace(/[<>&]/g, '') + '</b>',
       'รายการ: ' + title.replace(/[<>&]/g, ''),
       '',
-      'ชำระ/ตรวจสถานะผ่านลิงก์ส่วนตัวที่ส่งให้ — สถานะงานติดตั้ง/ซ่อมดูได้จากลิงก์เดียวกัน',
+      'ชำระ/ตรวจสถานะผ่านลิงก์ส่วนตัวที่ส่งให้ — ดูบิล+งานติดตั้งครบที่ /partners/me (ลิงก์ในหน้า admin)',
     ].join('\n');
     await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML' });
   } catch (err) {
