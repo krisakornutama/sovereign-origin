@@ -175,6 +175,18 @@
 ## I6 — เสริมจากเช้านี้ (เจอจริง ไม่อยู่ลิสต์เดิม)
 - [x] I6 แจ้งเตือนปลอมจาก cleanup — **เสร็จ 28/9/69** (commit 8646191): afterAll ใน pos-flow ลอง psql ซ้ำ 3 รอบก่อนสรุปล้ม (ช่วงเครื่องเพิ่งตื่น psql สะดุดรอบเดียว = ปลอม "เคลียร์ไม่สำเร็จ" ทั้งที่ของจริงสำเร็จ)
 
+## P — Publishing: GitHub เผยแพร่ผลิตภัณฑ์ + ร้านอุปกรณ์ IoT + สนามทดลองสาธารณะ (คำสั่งเจ้าของ 30/9/69)
+- [x] P0 กวาดความปลอดภัยก่อนเผยแพร่ — เฟิร์มแวร์ 6 ไฟล์สะอาด (config.example.py เป็น placeholder · config.py gitignored) · รายการห้ามเผยแพร่จดใน runbook §สิบเอ็ด
+- [x] P1 repo public **krisakornutama/sovereign-dms** (MIT) — README สองภาษา (EN หลัก/TH รอง) · CHANGELOG M0–M4 (v0.4.0) · BOM+ราคาจริง · quickstart ซิม 2 นาที · ลิงก์สั่งซื้อ → หน้าร้าน · โค้ด export ด้วย git archive (สะอาดจากสมุดงานบ้าน) · push สำเร็จ commit 391bfdd
+- [x] P2 ร้านเปิดเฉพาะอุปกรณ์ — seed-devices-shop.ts (idempotent): business "Sovereign Devices" + 3 SKU (KIT 1,290฿ / READY-PI 2,490฿ / SETUP-PRO 2,990฿) + ล็อตการผลิต LOT-DMS01A (ASSEMBLED→FLASHED v0.4.0→TESTED drill→PACKAGED) · **ปิดร้านผักจากสาธารณะ** (shopOpen=false — ข้อมูล/ล็อตครบเดิม เปิดคืนได้ทีเดียว)
+- [x] P3 /shop ไม่ใส่ ?id → ดึงร้านแรกจาก /api/shop/community อัตโนมัติ (โดเมนเปล่าเจอร้านอุปกรณ์ทันที) · footer GitHub+เดโม่ บน /shop /community /trace
+- [x] P4 สนามทดลอง /demo (public) — แท็บฟาร์ม/ปศุสัตว์/การเงิน ข้อมูล sandbox คงตัวในโค้ด (demo-sandbox.service — **ไม่แตะ DB จริงแม้แต่อ่าน**) · /api/demo/* rate-limited 30/min
+- [x] P5 ฟีดแบ็ก — ตาราง feedback_notes (migration ลงจริง) · POST /api/feedback สาธารณะ (honeypot field `website` + throttle 5/ชม./IP-hash + ตัด 2000 ตัวอักษร) · หน้า /feedback-admin (SUPERADMIN) คัดกรอง 👍/👎 · digest เฉพาะ useful=true → Telegram (SMTP เป็นการ์ดอนาคต — env SMTP_* เมื่อพร้อม)
+- [x] P6 WAF อนุญาต /demo + /api/demo + /api/feedback เพิ่มใน rule เดิม (PUT สำเร็จ success:true)
+- [ ] P7 พิสูจน์บนโดเมนจริงหลัง deploy: /demo 200 · /api/demo/farm 200 · ฟีดแบ็กลง DB · ร้าน default โชว์อุปกรณ์ 3 SKU
+
+**ลำดับเดิมต่อ:** (หมวด I คงเดิมด้านล่าง)
+
 ## I4 — host + domain ฟรี: ขึ้น /shop สู่อินเทอร์เน็ต (คำขอเจ้าของ 29/9/69 — Cloudflare Tunnel + DigitalPlat)
 - [x] I4-0 เจ้าของทำเอง ~15 นาที: สมัคร Cloudflare ฟรี + จด domain ฟรีที่ domain.digitalplat.org (dpdns.org/us.kg/qzz.io/xx.kg) + ใส่ NS ของ Cloudflare ให้ activate — คู่มือทีละจอใน docs/ops-runbook.md §สิบ — **คู่มือเขียนแล้ว 29/9/69 เหลือเจ้าของทำขั้นสมัครจริง**
 - [x] I4a compose บล็อก cloudflared — **เสร็จ 29/9/69**: บริการ `cloudflared` ภายใต้ profile "public" (token ว่าง = ไม่รัน ไม่ fail compose งานอื่น) · token อ่านจาก infra/.env `CLOUDFLARED_TOKEN` (เตรียมบรรทัดพร้อมคู่มือแล้ว · ไฟล์ gitignored ไม่เข้า git) · ชี้ frontend :3000 ผ่าน host.docker.internal เท่านั้น — คอมเมนต์ใน compose ห้ามชี้ :3001 · เริ่มจริงเมื่อเจ้าของใส่ token: `docker compose --profile public up -d cloudflared`

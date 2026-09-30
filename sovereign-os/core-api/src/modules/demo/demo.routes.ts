@@ -1,0 +1,43 @@
+// src/modules/demo/demo.routes.ts
+//
+// PUBLIC DEMO (P: Publishing) — สนามทดลองสาธารณะ ไม่ต้อง login
+// หลักการ:
+//  - เสิร์ฟเฉพาะข้อมูลเดโม่จาก demo-sandbox.service (hardcode — ไม่แตะ DB จริงแม้แต่อ่าน)
+//  - rate limit ต่อ IP ที่ route layer (โดนยิงหนัก = 429 ไม่กระทบระบบหลัก)
+//  - เส้นทางนี้อยู่ใน allowlist WAF ร่วมกับ /shop /trace
+import { Router } from 'express';
+import { rateLimit } from '../../middleware/rateLimit.middleware';
+import { demoFarmOverview, demoLivestock, demoFinance } from '../../services/demo-sandbox.service';
+
+export { demoFarmOverview, demoLivestock, demoFinance }; // ให้เทส mock ผ่านชั้นเดียวกัน
+
+const router = Router();
+
+const demoLimiter = rateLimit({ windowMs: 60_000, max: 30, message: 'เปิดหน้าเดโม่ถี่เกินไป ลองใหม่อีกครั้ง' });
+
+// GET /api/demo/overview — ภาพรวมทั้งสามโมดูลในคำเดียว (หน้าแรก /demo ใช้)
+router.get('/overview', demoLimiter, async (_req, res) => {
+  res.json({
+    farm: demoFarmOverview().summary,
+    livestock: demoLivestock().summary,
+    finance: demoFinance().summary,
+    disclaimer: 'ข้อมูลตัวอย่างล้วน — ระบบจริงของคุณจะเห็นข้อมูลของคุณเอง',
+  });
+});
+
+// GET /api/demo/farm — แปลง+เซนเซอร์ (sandbox)
+router.get('/farm', demoLimiter, async (_req, res) => {
+  res.json(demoFarmOverview());
+});
+
+// GET /api/demo/livestock — ฝูงสัตว์ (sandbox)
+router.get('/livestock', demoLimiter, async (_req, res) => {
+  res.json(demoLivestock());
+});
+
+// GET /api/demo/finance — พอร์ตจำลอง (sandbox)
+router.get('/finance', demoLimiter, async (_req, res) => {
+  res.json(demoFinance());
+});
+
+export default router;
