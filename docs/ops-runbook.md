@@ -328,3 +328,9 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - **คู่มือคู่ค้า** หน้า `/partners/guide`: สิทธิประโยชน์ 4 ข้อ · ติดตั้ง QR ป้าย 4 ขั้น · ขอเชื่อม IoT 4 ขั้น — ลิงก์จากหัวหน้า /partners
 - **ฟอร์มออกบิลในแผง admin**: แถวคู่ค้า ACTIVE → "🧾 ออกบิลค่าบริการ" → ใส่รายการ/ยอด/งานติดตั้ง → ได้ลิงก์ + ปุ่มคัดลอกข้อความส่งคู่ค้า
 - บทเรียนเทสต์: limiter อ่าน env **ตอน import** — เทสต์ที่ต้องคลาย limit ตั้ง env ก่อนแล้ว dynamic import routes ใน before()
+- **P18 — Telegram แจ้งชำระ + การ์ดรวมรอยืนยัน + guard LAN (30/9/69 ดึก):**
+  - **Telegram แจ้งชำระทันที:** `payPublicOrderByToken` ใน business-shop.service ยิง TG ทุกครั้งที่ลูกค้าแจ้งชำระ (fire-and-forget · รูปแบบเดียวกับ notifyPartnerNewBill — อ่าน creds ผ่าน getTelegramCredentials ทุกครั้ง) — ห้ามแตะ flow หลัก
+  - **การ์ดรวมรอยืนยัน:** `PendingPaymentsCard.tsx` + `computePendingReports()` (แจ้ง PROMPTPAY > 0 และ paidAmount < total) + `useConfirmReportedPayment()` — เรนเดอร์ที่แท็บออเดอร์ (สิทธิ์ SALES ขึ้นไป) · ยืนยัน = POST payments method CASH ยอดเท่าที่แจ้ง (กติกาเดียวกับ markPaid ปกติ) · **แก้ไฟล์นี้ = อย่าพ่วงเข้า BusinessWorkspace (เพดาน 400 บรรทัด components — gate จับแล้ว)**
+  - **guard ชั้น 2:** business.routes.ts ตรวจ Host/x-forwarded-host ต้อง localhost/10./192.168./172.16-31 — host สาธารณะ = 403 ทันที (ชั้นหลัง WAF — WAF ยังเป็นด่านแรก) · ทดสอบ: Host: sovereignoriginshop.dpdns.org → 403
+  - **บทเรียนจอจริง:** token ที่ login ไม่ถูกบันทึก = ล็อกอินไม่สำเร็จจริง แม้หน้าเปลี่ยน (shell เมนูโชว์ตั้งแต่ก่อน auth) — เช็ค `localStorage['sovereign-auth'].state.token` ก่อนสรุปผล · e2e-bot ไม่ใช่ member ของธุรกิจ = เห็นแค่ "ผู้ดู" (แท็บร้านค้าซ่อน) — ต้องเพิ่ม business_members OWNER ชั่วคราวเท่านั้น (ถอนหลังทดสอบ)
+  - **เก็บกวาดหลังทดสอบ:** เบอร์ PromptPay ทดสอบ (UPDATE NULL) · ออเดอร์ทดสอบ + payments · business_members ชั่วคราว — ตารางเช็คใน STATUS.md
