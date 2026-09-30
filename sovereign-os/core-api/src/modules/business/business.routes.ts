@@ -10,21 +10,16 @@ import * as svc from '../../services/business.service';
 import * as shopSvc from '../../services/business-shop.service'; // เฟส 4: สถานะจัดส่งแบบเบา
 import { lotsForOrderLines } from '../../services/trace.service'; // TRACEABILITY — ล็อตผลผลิตของสินค้าในออเดอร์
 import { AuditService } from '../../services/audit.service';
+// P18-hardening — ตรวจ host ภายในจาก lib กลาง (เดิม define ซ้ำในไฟล์นี้)
+import { isPublicRequest } from '../../lib/local-host';
 
 const router = Router();
 
-// P18 (คำสั่งเจ้าของ) — ชั้น 2 ของหน้าจัดการ: ธุรกิจ = ภายในเท่านั้น
-// WAF ที่ edge บล็อก /business /api/business จากอินเทอร์เน็ตอยู่แล้ว — ชั้นนี้กันกรณี WAF ถูกปิด/เปลี่ยน:
-// ถ้าคำขอมาผ่าน tunnel สาธารณะ (host != localhost/LAN) ให้ตอบ 403 เสมอ เข้าได้เฉพาะเครือข่ายบ้าน/LAN เท่านั้น
-const LOCAL_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\]|\[::ffff:127\.0\.0\.1\]|::1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|host\.docker\.internal)$/i;
-function isLocalRequestHost(h: string): boolean {
-  const host = String(h || '').split(':')[0];
-  if (!host) return true; // ไม่มี header (เช่น internal call/test) = ยอมรับเหมือนเดิม
-  return LOCAL_HOST_RE.test(host);
-}
+// P18 (คำสั่งเจ้าของ) — ชั้น 2 ของหน้าจัดการ: ธุรกิจ = ภายในเท่านั้น (ตรรกะอยู่ที่ lib/local-host.ts)
+// WAF ที่ edge บล็อก /business /api/business จากอินเทอร์เน็ตอยู่แล้ว — ชั้นนี้กันกรณี WAF ถูกปิด/เปลี่ยน
+// isPublicRequest: cf-connecting-ip (Cloudflare ใส่เสมอบน tunnel) = สาธารณะแน่นอน → 403 กันการแอบอ้าง Host
 router.use((req, res, next) => {
-  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-  if (!isLocalRequestHost(String(host))) {
+  if (isPublicRequest(req)) {
     return res.status(403).json({ error: 'หน้าจัดการธุรกิจเข้าได้จากเครือข่ายภายในบ้านเท่านั้น' });
   }
   return next();
