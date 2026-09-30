@@ -10,9 +10,13 @@
 //      - ยืนยันผ่านแล้วเบอร์เดียวกรอกใบสมัครได้ 1 ใบ/30 นาที (verified token)
 import { createHash, randomInt, createHmac } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+import { isLocalRequestHost, requestHost } from '../lib/local-host'; // P18-hardening
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_TRIES = 3;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1_000; // P18-hardening: ขอรหัสซ้ำได้ทุก 60 วิ/เบอร์ — กัน SMS bombing เมื่อเสียบ gateway จริง
+const OTP_VERIFY_WINDOW_MS = 15 * 60_000;  // P18-hardening: cap การยืนยันต่อเบอร์ในหน้าต่างนี้
+const OTP_VERIFY_MAX = 10;                 // 10 ครั้ง/15 นาที/เบอร์ — brute ข้าม IP ก็โดน cap นี้
 const VERIFIED_TTL_MS = 30 * 60_000;
 const IP_DAILY_LIMIT = Number(process.env.PARTNER_IP_DAILY_LIMIT || 3);
 
@@ -69,6 +73,8 @@ async function tbsVerifyOtp(token: string, pin: string): Promise<boolean> {
 interface OtpEntry { hash: string; expiresAt: number; tries: number; }
 const otpStore = new Map<string, OtpEntry>();           // key = phone
 const verifiedStore = new Map<string, number>();        // phone → verifiedUntil
+const otpCooldown = new Map<string, number>();          // P18-hardening: phone → ขอรหัสได้อีกเมื่อ
+const verifyAttempts = new Map<string, number[]>();     // P18-hardening: phone → timestamps ของการยืนยัน
 
 const normPhone = (p: string) => p.replace(/[^0-9]/g, '').replace(/^0/, '66');
 export const normName = (n: string) => n.normalize('NFKD').replace(/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -102,20 +108,26 @@ export async function assertNotSpam(ip: string | null, name: string, phone: stri
 }
 
 /** ออก OTP — โหมด thaibulksms = gateway ส่งเอง (เราเก็บ token) · generic = เราสร้างโค้ดส่งเอง · dev = โค้ดลง log */
-export async function sendPartnerOtp(phoneRaw: string): Promise<{ sent: true } | { sent: true; devCode?: string } | { sent: false; error: string }> {
+export async function sendPartnerOtp(phoneRaw: string, req?: { headers: Record<string, unknown> }): Promise<{ sent: true } | { sent: true; devCode?: string } | { sent: false; error: string }> {
   const phone = normPhone(phoneRaw);
   if (phone.length < 10) return { sent: false, error: 'เบอร์ไม่ถูกต้อง' };
+
+  // P18-hardening: cooldown ต่อเบอร์ — ยิง otp/send ถี่ ๆ ไม่ได้ (กันเป่าเครดิต SMS ล่วงหน้า)
+  const cd = otpCooldown.get(phone);
+  if (cd && Date.now() < cd) return { sent: false, error: 'ขอรหัสถี่เกินไป — รอสักครู่แล้วกดขอใหม่' };
 
   if (smsMode === 'thaibulksms') {
     const r = await tbsRequestOtp(phone);
     if (!r.ok || !r.token) return { sent: false, error: r.error ?? 'ส่ง SMS ไม่สำเร็จ' };
     otpStore.set(phone, { hash: `tbs:${r.token}`, expiresAt: Date.now() + OTP_TTL_MS, tries: 0 });
+    otpCooldown.set(phone, Date.now() + OTP_RESEND_COOLDOWN_MS);
     return { sent: true };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const salted = sha256(`${phone}:${code}:${process.env.PARTNER_OTP_SALT || 'sovereign'}`);
   otpStore.set(phone, { hash: salted, expiresAt: Date.now() + OTP_TTL_MS, tries: 0 });
+  otpCooldown.set(phone, Date.now() + OTP_RESEND_COOLDOWN_MS);
 
   const message = `รหัสยืนยันสมัครคู่ค้า Sovereign Origin: ${code} (ใช้ได้ 5 นาที)`;
   const url = process.env.SMS_GATEWAY_URL;
@@ -136,7 +148,9 @@ export async function sendPartnerOtp(phoneRaw: string): Promise<{ sent: true } |
   }
   // dev fallback — โค้ดอยู่ใน docker logs ของ sovereign-core-api
   console.log(`[partner-guard] OTP สำหรับ ${phone}: ${code} (ไม่มี SMS_GATEWAY_URL — โหมด dev)`);
-  if (process.env.NODE_ENV !== 'production') return { sent: true, devCode: code };
+  // P18-hardening: devCode (รหัส OTP ก่อนส่งจริง!) คืนได้เฉพาะคำขอจาก localhost/LAN เท่านั้น —
+  // NODE_ENV=development บนเครื่องนี้ จึงต้อง gate ด้วย host ต้นทางด้วยเสมอ (กันรั่วบนโดเมนสาธารณะ)
+  if (process.env.NODE_ENV !== 'production' && (!req || isLocalRequestHost(requestHost(req)))) return { sent: true, devCode: code };
   return { sent: true };
 }
 
@@ -145,6 +159,13 @@ export async function verifyPartnerOtp(phoneRaw: string, code: string): Promise<
   const phone = normPhone(phoneRaw);
   const entry = otpStore.get(phone);
   if (!entry) return { ok: false, reason: 'ขอรหัสก่อน (กดขอรหัสยืนยัน)' };
+
+  // P18-hardening: cap การยืนยันต่อเบอร์ (นับทุกครั้งไม่ว่า IP อะไร) — brute ด้วย proxy pool ต้องโดนตรงนี้
+  const nowMs = Date.now();
+  const attempts = (verifyAttempts.get(phone) ?? []).filter((t) => nowMs - t < OTP_VERIFY_WINDOW_MS);
+  if (attempts.length >= OTP_VERIFY_MAX) return { ok: false, reason: 'พยายามมากเกินไป — รอ 15 นาทีแล้วขอรหัสใหม่' };
+  attempts.push(nowMs);
+  verifyAttempts.set(phone, attempts);
   if (Date.now() > entry.expiresAt) {
     otpStore.delete(phone);
     return { ok: false, reason: 'รหัสหมดอายุ — ขอใหม่ได้' };
