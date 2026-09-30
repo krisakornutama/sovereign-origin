@@ -8,7 +8,7 @@
 // ไม่เคยรับ shell ใหม่เลยหลัง deploy (เห็นหน้าเก่าต่อได้เป็นสัปดาห์) — หลังนี้ bump ทุกครั้งที่ deploy เปลี่ยน UI
 // P16 ต่อ (30/9/69 ค่ำ): bump เป็น v5 — **ห้าม cache /api/** (เดิม cache-first ครอบ GET same-origin ทุกเส้น
 // ทำให้ /api/partners ถูก cache ค่าว่างไว้แล้วตอบจาก cache ตลอด = ข้อมูลสดค้างเก่าเสมอ)
-const VERSION = 'sovereign-v5';
+const VERSION = 'sovereign-v6';
 
 // หน้า local-first — เปิดใช้งานได้จริงแม้ออฟไลน์ (ทำแบบทดสอบ MBTI / ดู shell แดชบอร์ด)
 // ข้อมูล API ไม่ mock — หน้าจะแสดงสถานะ offline ของตัวเองตามที่แอปจัดไว้
