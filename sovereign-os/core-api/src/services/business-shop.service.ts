@@ -186,6 +186,31 @@ export async function payPublicOrderByToken(token: string, input: any): Promise<
     await tx.businessPayment.create({
       data: { orderId: o.id, amount, method: 'PROMPTPAY', reference: token },
     });
+    // P18 ต่อ — แจ้ง Telegram ทันทีเมื่อมีลูกค้าแจ้งชำระ (fire-and-forget: ไม่กระทบการแจ้งชำระแม้ Telegram ล้ม)
+    //   คู่ค้า/ลิงก์ลับไม่มีข้อมูลติดต่อลูกค้า จึงส่งชื่อคู่ค้า (ถ้าเป็นบิลคู่ค้า) เป็นข้อมูลสูงสุดที่ปลอดภัย
+    void (async () => {
+      try {
+        const { getTelegramCredentials } = await import('./telegram-credentials.service');
+        const creds = await getTelegramCredentials();
+        if (!creds.botToken || !creds.chatId) return;
+        const axios = (await import('axios')).default;
+        let partnerLine = '';
+        if (o.partnerId) {
+          const p = await prisma.partner.findUnique({ where: { id: o.partnerId }, select: { name: true } });
+          if (p) partnerLine = `ร้าน: <b>${String(p.name).replace(/[<>&]/g, '')}</b>\n`;
+        }
+        const msg = [
+          '💰 <b>ลูกค้าแจ้งชำระเงิน</b>',
+          partnerLine + `ออเดอร์: <b>${String(o.orderNo).replace(/[<>&]/g, '')}</b>`,
+          `ยอดแจ้ง: <b>${amount.toLocaleString('th-TH')} บาท</b> (คงเหลือ ${Math.max(0, remaining - amount).toLocaleString('th-TH')} ฿)`,
+          '',
+          `ยืนยันรับเงินที่ /business → แท็บออเดอร์ (${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'} เข้าจากเครือข่ายบ้านเท่านั้น)`,
+        ].join('\n');
+        await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML' });
+      } catch (err) {
+        console.error('[shop] แจ้งชำระเงินให้ Telegram ไม่สำเร็จ (ไม่กระทบออเดอร์):', err instanceof Error ? err.message : err);
+      }
+    })();
     return { ok: true, orderNo: o.orderNo, reported: amount, remaining: Math.max(0, remaining - amount) };
   });
 }
