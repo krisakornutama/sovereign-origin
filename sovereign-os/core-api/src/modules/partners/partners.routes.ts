@@ -10,6 +10,8 @@ import { prisma } from '../../lib/prisma';
 import { applyPartner, publicPartners, partnerCounts } from '../../services/partner.service';
 import { createPartnerBill, partnerBills, foundationBusinessId, partnerBillsAuthorized, partnerPortal } from '../../services/business-shop.service';
 import { sendPartnerOtp, verifyPartnerOtp, issueVerifiedToken } from '../../services/partner-guard.service';
+// P18-hardening — ตรวจว่าคำขอมาจาก host ภายใน (localhost/LAN) — ใช้ gate devCode OTP (กันรั่วสาธารณะ)
+import { isLocalRequestHost, requestHost, isPublicRequest } from '../../lib/local-host';
 
 export { prisma }; // ให้เทส mock delegate ผ่านตัวเดียวกับ production
 export { applyPartner, publicPartners, partnerCounts };
@@ -59,13 +61,17 @@ router.post('/', applyLimiter, async (req, res) => {
 
 // ── P17 — OTP ยืนยันเบอร์ก่อนสมัคร (กันสแปมชั้น 3) ──
 
-// POST /api/partners/otp/send { contactPhone } → { sent: true, devCode? }
+// POST /api/partners/otp/send { contactPhone } → { sent: true, devCode? } — devCode เฉพาะ localhost/LAN เท่านั้น
 router.post('/otp/send', applyLimiter, async (req, res) => {
   const phone = String(req.body?.contactPhone ?? '');
   if (!phone.trim()) return res.status(400).json({ error: 'ต้องระบุเบอร์โทร' });
-  const r = await sendPartnerOtp(phone);
+  const r = await sendPartnerOtp(phone, req);
   if (!r.sent) return res.status(502).json({ error: r.error });
-  return res.json({ sent: true, ...(r as any).devCode ? { devCode: (r as any).devCode } : {} });
+  // P18-hardening: กัน devCode รั่วออกโดเมนสาธารณะอีกชั้น — ตัดทิ้งถ้า request มาจาก host ภายนอก
+  // (isPublicRequest: cf-connecting-ip ที่ Cloudflare ใส่เสมอ = สาธารณะแน่นอน กันการแอบอ้าง Host header)
+  const devCode = (r as { devCode?: string }).devCode;
+  const leak = devCode && isPublicRequest(req);
+  return res.json({ sent: true, ...(devCode && !leak ? { devCode } : {}) });
 });
 
 // POST /api/partners/otp/verify { contactPhone, code } → { verified: true, token }
