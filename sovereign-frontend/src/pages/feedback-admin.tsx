@@ -109,6 +109,60 @@ function VisitorInsights() {
 // P16 — แผงอนุมัติคู่ค้า: สมัครจาก /partners → อนุมัติ = ขึ้นแผนที่สาธารณะทันที
 interface PartnerRow { id: string; name: string; category: string; detail: string | null; address: string | null; phone: string | null; lat: number; lng: number; contactName: string; contactPhone: string; status: string; created_at: string; }
 
+// P17 — ฟอร์มบิลค่าบริการ IoT ต่อร้าน ACTIVE: สร้างบิล+ลิงก์ PromptPay ส่งคู่ค้า
+function PartnerBillForm({ id, name }: { id: string; name: string }) {
+  const [title, setTitle] = useState('');
+  const [amount, setAmount] = useState('');
+  const [install, setInstall] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ payUrl: string; orderNo: string; total: number } | null>(null);
+  const [err, setErr] = useState('');
+  async function make() {
+    setBusy(true); setErr('');
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}/bills`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, amount: Number(amount), installTitle: install || undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setResult(data);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (result) {
+    return (
+      <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-3 space-y-1.5 text-xs" style={{ width: 300 }}>
+        <div className="text-emerald-300 font-medium">บิล {result.orderNo} สร้างแล้ว (รวม {result.total.toLocaleString('th-TH')}฿)</div>
+        <div className="break-all text-cyan-300">{result.payUrl}</div>
+        <button type="button" onClick={() => navigator.clipboard?.writeText(`${name}
+ลิงก์ชำระค่าบริการ: ${result.payUrl}`)}
+          className="w-full text-xs px-3 py-1.5 rounded-lg bg-cyan-600/30 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-600/50">📋 คัดลอกข้อความส่งคู่ค้า</button>
+        <button type="button" onClick={() => { setResult(null); setTitle(''); setAmount(''); setInstall(''); }} className="text-[11px] text-gray-500 hover:text-gray-300">สร้างบิลใหม่</button>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-white/10 p-3 space-y-2" style={{ width: 300 }}>
+      <div className="text-[11px] text-gray-400">บิลค่าบริการ — {name}</div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="รายการ เช่น ค่าติดตั้งเซ็นเซอร์ 2 จุด"
+        className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs" maxLength={160} />
+      <div className="flex gap-2">
+        <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="จำนวนเงิน (บาท)"
+          inputMode="decimal" className="w-32 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs mono" />
+        <input value={install} onChange={(e) => setInstall(e.target.value)} placeholder="งานติดตั้ง/ซ่อม (ไม่บังคับ)"
+          className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs" maxLength={160} />
+      </div>
+      {err && <div className="text-[11px] text-rose-400">{err}</div>}
+      <button type="button" onClick={make} disabled={busy || !title || !Number(amount)}
+        className="w-full text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40">{busy ? 'กำลังสร้าง…' : '🧾 สร้างบิล + ลิงก์ PromptPay'}</button>
+    </div>
+  );
+}
+
 // QR ป้ายร้าน (P16): สร้าง QR ต่อร้าน ACTIVE — สแกนแล้วเปิดหมุดร้านตัวเองบนแผนที่
 function PartnerQrButton({ id, name }: { id: string; name: string }) {
   const [qr, setQr] = useState<{ qrDataUrl: string; target: string } | null>(null);
@@ -139,6 +193,7 @@ function PartnerQrButton({ id, name }: { id: string; name: string }) {
 function PartnerApprovals() {
   const [rows, setRows] = useState<PartnerRow[]>([]);
   const [msg, setMsg] = useState('');
+  const [billFor, setBillFor] = useState<string | null>(null); // P17: ฟอร์มบิลของร้านที่กำลังออกบิล
   const load = useCallback(async () => {
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/admin/list`);
@@ -196,10 +251,16 @@ function PartnerApprovals() {
           <div className="pt-2 border-t border-dashed border-gray-800 space-y-2">
             <div className="text-[11px] text-gray-500">คู่ค้าที่เปิดใช้งานแล้ว — สร้าง QR ป้ายติดหน้าร้าน (สแกน = เปิดหมุดร้านบนแผนที่)</div>
             {active.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 text-xs">
-                <span className="font-medium text-gray-200">{p.name}</span>
-                <span className="text-[10px] text-gray-500">{CAT[p.category] ?? p.category}</span>
-                <span className="ml-auto"><PartnerQrButton id={p.id} name={p.name} /></span>
+              <div key={p.id} className="space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-gray-200">{p.name}</span>
+                  <span className="text-[10px] text-gray-500">{CAT[p.category] ?? p.category}</span>
+                  <span className="ml-auto flex items-center gap-3">
+                    <PartnerQrButton id={p.id} name={p.name} />
+                    <button type="button" onClick={() => setBillFor(billFor === p.id ? null : p.id)} className="text-[11px] text-emerald-400 hover:underline underline-offset-2">🧾 ออกบิลค่าบริการ</button>
+                  </span>
+                </div>
+                {billFor === p.id && <PartnerBillForm id={p.id} name={p.name} />}
               </div>
             ))}
           </div>

@@ -148,7 +148,7 @@ model Partner {
   id           String   @id @default(uuid())
   created_at   DateTime @default(now())
   name         String
-  category     String   @default("SHOP")
+  name_normalized String // P17: กันชื่อซ้ำ
   detail       String?
   address      String?
   phone        String?

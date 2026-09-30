@@ -1,13 +1,20 @@
 import './setup-env';
+// PARTNER_APPLY_LIMIT ต้องตั้งก่อน import routes (limiter อ่านตอน import) — จึง import routes แบบ dynamic ใน before()
+process.env.PARTNER_APPLY_LIMIT = '100';
 import { test, before, after, mock } from 'node:test';
 import assert from 'node:assert';
-import partnersRoutes, { prisma } from '../src/modules/partners/partners.routes';
 import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
+
+let partnersRoutes: any;
+let prisma: any;
 
 let server: TestServer;
 let adminToken: string;
 
 before(async () => {
+  const mod = await import('../src/modules/partners/partners.routes');
+  partnersRoutes = mod.default;
+  prisma = mod.prisma;
   server = await createTestServer((app) => {
     app.use('/api/partners', partnersRoutes);
   });
@@ -23,23 +30,43 @@ function auth(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
-test('POST /api/partners — สมัครสาธารณะ 202 accepted บันทึก PENDING (ไม่มีข้อมูลผู้สมัครออกทาง response)', async () => {
+test('POST /api/partners — P17: ต้องยืนยันเบอร์ OTP ก่อน (ไม่มี token = 403) · มี token = 202 PENDING', async () => {
   let saved: any = null;
   mockModel(prisma, 'partner', {
     create: async ({ data }: any) => { saved = { id: 'p1', ...data }; return saved; },
     findMany: async () => [],
     count: async () => 0,
     update: async ({ data }: any) => ({ id: 'p1', ...data }),
+    findFirst: async () => null,
   });
+  const payload = {
+    name: 'ร้านถ่ายเสียงกลางอำเภอ', category: 'SHOP',
+    detail: 'ติดตั้งกล้องวงจรปิด+ระบบเสียงร้านค้า', address: '123 ถ.สามัคคี ต.ในเมือง',
+    phone: '0812345678', lat: 15.11, lng: 104.32,
+    contactName: 'สมชาย', contactPhone: '0898765432',
+  };
+  // ไม่มี otpToken → 403 พร้อมข้อความบอกทาง
+  const noToken = await fetch(server.baseUrl + '/api/partners', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  assert.strictEqual(noToken.status, 403);
+  // ขอ OTP (dev fallback คืน devCode) → verify → token
+  const send = await (await fetch(server.baseUrl + '/api/partners/otp/send', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contactPhone: '0898765432' }),
+  })).json() as any;
+  assert.ok(send.devCode, 'dev fallback ต้องคืน devCode เพื่อเทสต์');
+  const ver = await (await fetch(server.baseUrl + '/api/partners/otp/verify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contactPhone: '0898765432', code: send.devCode }),
+  })).json() as any;
+  assert.ok(ver.token);
+  // สมัครด้วย token → 202 + name_normalized
   const res = await fetch(server.baseUrl + '/api/partners', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: 'ร้านถ่ายเสียงกลางอำเภอ', category: 'SHOP',
-      detail: 'ติดตั้งกล้องวงจรปิด+ระบบเสียงร้านค้า', address: '123 ถ.สามัคคี ต.ในเมือง',
-      phone: '0812345678', lat: 15.11, lng: 104.32,
-      contactName: 'สมชาย', contactPhone: '0898765432',
-    }),
+    body: JSON.stringify({ ...payload, otpToken: ver.token }),
   });
   assert.strictEqual(res.status, 202);
   const body: any = await res.json();
@@ -47,6 +74,7 @@ test('POST /api/partners — สมัครสาธารณะ 202 accepted �
   assert.ok(body.id);
   assert.strictEqual(saved?.status, undefined, 'status default PENDING ที่ DB — service ไม่รับค่า status จากผู้สมัคร');
   assert.strictEqual(saved?.category, 'SHOP');
+  assert.ok(saved?.name_normalized && saved.name_normalized.length > 0, 'name_normalized ต้องถูกกรอก');
   assert.ok(saved?.ip_hash && saved.ip_hash.length === 8);
 });
 
@@ -54,6 +82,8 @@ test('POST /api/partners — honeypot + ของเพี้ยน (พิก�
   let created = 0;
   mockModel(prisma, 'partner', {
     create: async ({ data }: any) => { created += 1; return { id: 'p2', ...data }; },
+    count: async () => 0, // ไม่โดน IP limit
+    findFirst: async () => null, // ไม่โดนชื่อซ้ำ
   });
   const honeypot = await fetch(server.baseUrl + '/api/partners', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

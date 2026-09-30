@@ -276,3 +276,114 @@ export async function getCommunityCatalog(): Promise<any> {
     generatedAt: new Date().toISOString(),
   };
 }
+
+
+// ── P17 — บิลค่าบริการ/ติดตั้ง IoT สำหรับคู่ค้า (ย้ายมาไว้ที่เจ้าของ business_orders ตาม boundary gate) ──
+
+/** id ธุรกิจหลักที่ใช้ออกบิลคู่ค้า (หาจากชื่อ — เรียกจาก partners routes ผ่านตรงนี้เท่านั้น) */
+export async function foundationBusinessId(): Promise<string | null> {
+  const biz = await prisma.business.findFirst({ where: { name: 'Sovereign Origin Foundation' }, select: { id: true } });
+  return biz?.id ?? null;
+}
+
+/** บิลของคู่ค้า — ตรวจสิทธิ์ด้วย token ที่นี่ (partners routes ส่งมาได้เลย ไม่แตะ business_orders ตรง) */
+export async function partnerBillsAuthorized(partnerId: string, token: string): Promise<any[] | null> {
+  const owner = await prisma.businessOrder.findFirst({ where: { publicToken: token, partnerId }, select: { id: true } });
+  if (!owner) return null; // token ไม่ตรง → caller ตอบ 403
+  return partnerBills(partnerId);
+}
+// ── P17 — บิลค่าบริการ/ติดตั้ง IoT สำหรับคู่ค้า ──
+// เจ้าของสร้างบิลจากแผงคู่ค้า → คู่ค้าชำระผ่านลิงก์ลับ PromptPay เดิม (/shop?order=<token>)
+// งานซ่อม/ติดตั้ง = BusinessInstallation ผูกกับออเดอร์ → ตามรอยได้จากลิงก์เดียวกัน
+export interface PartnerBillInput {
+  partnerId: string;
+  title: string;          // เช่น "ค่าติดตั้งเซ็นเซอร์อุณหภูมิ 2 จุด"
+  amount: number;         // บาท (ยังไม่รวม VAT)
+  installTitle?: string;  // ถ้ามี = สร้างงานติดตั้ง/ซ่อมพร้อมบิล
+  note?: string;
+}
+
+export async function createPartnerBill(businessId: string, input: PartnerBillInput): Promise<{ orderId: string; orderNo: string; publicToken: string; total: number }> {
+  const partner = await prisma.partner.findUnique({ where: { id: input.partnerId } });
+  if (!partner) throw new Error('partner not found');
+  const amount = Math.round(Number(input.amount) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('amount ต้องเป็นตัวเลขมากกว่า 0');
+  const title = String(input.title ?? '').trim().slice(0, 160);
+  if (!title) throw new Error('title จำเป็น');
+
+  // ลูกค้า = ตัวแทนของคู่ค้า (ชื่อร้าน + เบอร์ผู้ติดต่อ — หาซ้ำได้ในธุรกิจเดียวกัน)
+  const biz = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!biz) throw new Error('business not found');
+  const custName = `คู่ค้า: ${partner.name}`.slice(0, 120);
+  const existing = await prisma.businessCustomer.findFirst({ where: { businessId, phone: partner.contactPhone } });
+  const customerId = existing ? existing.id
+    : (await prisma.businessCustomer.create({ data: { businessId, name: custName, phone: partner.contactPhone, channel: 'B2B' } })).id;
+
+  // VAT ตามร้าน · สร้าง QUOTE + publicToken (ชำระผ่านลิงก์ลับเดิมได้ทันที)
+  const vat = Math.round(amount * biz.vatRate * 100) / 100;
+  const total = Math.round((amount + vat) * 100) / 100;
+  const order = await prisma.businessOrder.create({
+    data: {
+      businessId,
+      orderNo: await nextBusinessOrderNo(businessId, 'P'), // P… = บิลคู่ค้า (P16/P17)
+      customerId,
+      channel: 'B2B',
+      status: 'QUOTE',
+      subtotal: amount,
+      vat,
+      total,
+      partnerId: partner.id,
+      publicToken: randomUUID(),
+      note: `บิลค่าบริการ IoT คู่ค้า — ${title}${input.note ? ` · ${String(input.note).slice(0, 200)}` : ''}`,
+      lines: { create: [{ productId: (await ensureServiceProduct(businessId, title, amount)).id, qty: 1, unitPrice: amount, unitCost: 0, description: title }] },
+    },
+  });
+
+  // งานติดตั้ง/ซ่อม (ถ้าระบุ) — ตามรอยผ่าน BusinessInstallation เดิม
+  if (input.installTitle) {
+    await prisma.businessInstallation.create({
+      data: { businessId, orderId: order.id, title: String(input.installTitle).slice(0, 160), status: 'TODO' },
+    });
+  }
+  await notifyPartnerBill(partner, title);
+  return { orderId: order.id, orderNo: order.orderNo, publicToken: (order as any).publicToken, total };
+}
+
+/** สินค้า "ค่าบริการ" ต่อหัวข้อ — สร้างครั้งเดียวต่อ (businessId+ราคา) ป้องกันขยะ */
+async function ensureServiceProduct(businessId: string, title: string, amount: number): Promise<{ id: string }> {
+  const sku = `SVC-${Math.round(amount)}`;
+  const existing = await prisma.businessProduct.findFirst({ where: { businessId, sku }, select: { id: true } });
+  if (existing) return existing;
+  return prisma.businessProduct.create({
+    data: { businessId, sku, name: `ค่าบริการ Sovereign (${Math.round(amount)}฿)`, category: 'SERVICE', specs: 'ค่าติดตั้ง/ซ่อม/บริการ IoT ตามใบแจ้ง', costPrice: 0, salePrice: Math.round(amount), stockQty: 9999, warrantyMonths: 0 },
+    select: { id: true },
+  });
+}
+
+/** บิลทั้งหมดของคู่ค้า (แผง admin + หน้าคู่ค้า) — ใหม่สุดก่อน */
+export async function partnerBills(partnerId: string, take = 50): Promise<Array<{ orderNo: string; title: string; total: number; status: string; publicToken: string | null; createdAt: Date; install?: { title: string; status: string } | null }>> {
+  const orders = await prisma.businessOrder.findMany({
+    where: { partnerId },
+    orderBy: { createdAt: 'desc' },
+    take,
+    include: { installations: { select: { title: true, status: true }, take: 1 } },
+  });
+  return orders.map((o: any) => ({
+    orderNo: o.orderNo,
+    title: (o.note ?? '').replace(/^บิลค่าบริการ IoT คู่ค้า — /, '').slice(0, 120),
+    total: o.total,
+    status: o.status,
+    publicToken: o.publicToken ?? null,
+    createdAt: o.createdAt,
+    install: o.installations?.[0] ? { title: o.installations[0].title, status: o.installations[0].status } : null,
+  }));
+}
+
+
+/** แจ้งคู่ค้าว่ามีบิลใหม่ (ผ่าน service ของ partner — กัน boundary) */
+async function notifyPartnerBill(partner: { id: string; name: string; category: string; contactName: string; contactPhone: string }, title: string): Promise<void> {
+  try {
+    const { notifyPartnerNewBill } = await import('./partner.service');
+    await notifyPartnerNewBill(partner, title);
+  } catch { /* เงียบ — ไม่กระทบบิล */ }
+}

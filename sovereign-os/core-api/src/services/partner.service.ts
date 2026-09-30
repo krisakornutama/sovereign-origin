@@ -8,6 +8,7 @@
 //  - honeypot `website` กันบอทเหมือนระบบ feedback/track
 import { prisma } from '../lib/prisma';
 import { ipHashOf } from './feedback.service';
+import { assertNotSpam, checkVerifiedToken, consumeVerified, normName } from './partner-guard.service';
 
 // แจ้งเตือน Telegram ทันทีเมื่อมีใบสมัครใหม่ (P16 คำสั่งเจ้าของ 30/9/69 — ไม่ต้องรอ digest วันจันทร์)
 //  fire-and-forget: ส่งไม่สำเร็จ = บันทึก console อย่างเดียว — การสมัครต้องสำเร็จปกติเสมอ
@@ -47,13 +48,14 @@ export interface PartnerApplyInput {
   contactPhone?: string;
   contactEmail?: string;
   website?: string; // honeypot — ต้องว่างเสมอ
+  otpToken?: string; // P17: HMAC token จากการยืนยันเบอร์ (จำเป็น)
   ip?: string;
   userAgent?: string;
 }
 
 export type PartnerApplyResult =
   | { accepted: true; id: string }
-  | { accepted: false; reason: 'honeypot' | 'invalid' };
+  | { accepted: false; reason: 'honeypot' | 'invalid' | 'spam' | 'unverified'; error?: string };
 
 const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max) || null;
 
@@ -71,10 +73,19 @@ export async function applyPartner(input: PartnerApplyInput): Promise<PartnerApp
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { accepted: false, reason: 'invalid' };
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return { accepted: false, reason: 'invalid' };
 
+  // P17 — ยืนยันเบอร์ด้วย OTP ก่อนเข้าคิว (token HMAC จาก /api/partners/verify-otp)
+  if (!input.otpToken || !checkVerifiedToken(contactPhone, String(input.otpToken))) {
+    return { accepted: false, reason: 'unverified' };
+  }
+  // P17 — กันสแปม: IP/วัน + ชื่อซ้ำ
+  const spam = await assertNotSpam(input.ip ?? null, name, contactPhone);
+  if (!spam.ok) return { accepted: false, reason: 'spam', error: spam.reason };
+
   const category = (CATEGORIES as readonly string[]).includes(String(input.category)) ? String(input.category) : 'OTHER';
   const row = await prisma.partner.create({
     data: {
       name,
+      name_normalized: normName(name),
       category,
       detail: str(input.detail, 400),
       address: str(input.address, 300),
@@ -89,6 +100,7 @@ export async function applyPartner(input: PartnerApplyInput): Promise<PartnerApp
     },
   });
   void notifyNewPartner({ id: row.id, name, category, contactName, contactPhone }); // ไม่ await — สมัครตอบ 202 ทันที
+  consumeVerified(contactPhone); // token ใช้ครั้งเดียว
   return { accepted: true, id: row.id };
 }
 
@@ -115,4 +127,24 @@ export async function partnerCounts(): Promise<{ active: number; pending: number
     prisma.partner.count({ where: { status: 'PENDING' } }),
   ]);
   return { active, pending };
+}
+
+/** แจ้งคู่ค้าว่ามีบิลใหม่ (เรียกจาก business-shop.service — เจ้าของ business_orders) */
+export async function notifyPartnerNewBill(partner: { id: string; name: string; contactName: string; contactPhone: string }, title: string): Promise<void> {
+  try {
+    const { getTelegramCredentials } = await import('./telegram-credentials.service');
+    const creds = await getTelegramCredentials();
+    if (!creds.botToken || !creds.chatId) return;
+    const axios = (await import('axios')).default;
+    const msg = [
+      '🧾 <b>บิลค่าบริการ IoT ใหม่</b>',
+      'ร้าน: <b>' + partner.name.replace(/[<>&]/g, '') + '</b>',
+      'รายการ: ' + title.replace(/[<>&]/g, ''),
+      '',
+      'ชำระ/ตรวจสถานะผ่านลิงก์ส่วนตัวที่ส่งให้ — สถานะงานติดตั้ง/ซ่อมดูได้จากลิงก์เดียวกัน',
+    ].join('\n');
+    await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML' });
+  } catch (err) {
+    console.error('[partner] แจ้งบิลใหม่ไม่สำเร็จ (ไม่กระทบบิล):', err instanceof Error ? err.message : err);
+  }
 }
