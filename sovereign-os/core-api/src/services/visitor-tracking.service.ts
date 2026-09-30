@@ -9,7 +9,7 @@
 import { prisma } from '../lib/prisma';
 import { ipHashOf } from './feedback.service';
 
-export const TRACK_KINDS = ['page_view', 'demo_tab', 'time_on_page', 'survey', 'question', 'feedback_open', 'outbound'] as const;
+export const TRACK_KINDS = ['page_view', 'demo_tab', 'time_on_page', 'survey', 'question', 'feedback_open', 'outbound', 'cta_click'] as const;
 export type TrackKind = (typeof TRACK_KINDS)[number];
 
 export interface TrackInput {
@@ -52,6 +52,7 @@ export interface VisitorSummary {
   totalEvents: number;
   pageViews: { page: string; count: number }[];
   demoTabs: { detail: string; count: number }[];
+  ctaClicks: { cta: string; variant: string; count: number }[]; // A/B การ์ดหน้าแรก: cta=demo|shop|trace · variant=A|B
   avgTimeOnPageSec: number | null;
   surveys: { value: string; count: number }[];
   questions: { detail: string; value: string; count: number }[];
@@ -78,6 +79,10 @@ export async function visitorSummary(days = 7): Promise<VisitorSummary> {
   };
 
   const pageViews = countBy((r) => (r.kind === 'page_view' ? r.page : '')).map((e) => ({ page: e.key, count: e.count }));
+  const ctaClicks = countBy((r) => (r.kind === 'cta_click' ? `${r.detail ?? ''}|${r.value ?? ''}` : '')).map((e) => {
+    const [detail, value] = e.key.split('|');
+    return { cta: detail ?? '', variant: value ?? '', count: e.count };
+  });
   const demoTabs = countBy((r) => (r.kind === 'demo_tab' ? r.detail ?? '' : '')).map((e) => ({ detail: e.key, count: e.count }));
   const surveys = countBy((r) => (r.kind === 'survey' ? r.value ?? '' : '')).map((e) => ({ value: e.key, count: e.count }));
   const questions = countBy((r) => (r.kind === 'question' ? `${r.detail ?? ''}|${r.value ?? ''}` : '')).map((e) => {
@@ -96,6 +101,7 @@ export async function visitorSummary(days = 7): Promise<VisitorSummary> {
     totalEvents: rows.length,
     pageViews,
     demoTabs,
+    ctaClicks,
     avgTimeOnPageSec,
     surveys,
     questions,

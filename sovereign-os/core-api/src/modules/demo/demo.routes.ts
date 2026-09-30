@@ -7,9 +7,9 @@
 //  - เส้นทางนี้อยู่ใน allowlist WAF ร่วมกับ /shop /trace
 import { Router } from 'express';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
-import { demoFarmOverview, demoLivestock, demoFinance } from '../../services/demo-sandbox.service';
+import { demoFarmOverview, demoLivestock, demoFinance, publicCatalog } from '../../services/demo-sandbox.service';
 
-export { demoFarmOverview, demoLivestock, demoFinance }; // ให้เทส mock ผ่านชั้นเดียวกัน
+export { demoFarmOverview, demoLivestock, demoFinance, publicCatalog }; // ให้เทส mock ผ่านชั้นเดียวกัน
 
 const router = Router();
 
@@ -38,6 +38,15 @@ router.get('/livestock', demoLimiter, async (_req, res) => {
 // GET /api/demo/finance — พอร์ตจำลอง (sandbox)
 router.get('/finance', demoLimiter, async (_req, res) => {
   res.json(demoFinance());
+});
+
+// GET /api/demo/catalog — โมดูลทั้งหมดที่อาจขายจริง (P12 — metadata จาก scanner ไม่มีราคา/ข้อมูลภายใน)
+router.get('/catalog', demoLimiter, async (_req, res) => {
+  try {
+    res.json(publicCatalog());
+  } catch {
+    res.status(500).json({ error: 'สแกนแคตตาล็อกไม่สำเร็จ' });
+  }
 });
 
 export default router;

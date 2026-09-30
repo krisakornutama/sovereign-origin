@@ -4,6 +4,8 @@
 // หลักการ: สนามทดลองสาธารณะ **ต้องไม่แตะ DB จริงแม้แต่อ่าน** — ข้อมูลครอบครัว/ฟาร์ม/การเงินจริง
 // แยกขาดจากโลกสาธารณะ 100% (แค่ "อ่าน" ก็ยังเปิดไม่ได้) จึง hardcode เป็นข้อมูลเดโม่ล้วน
 // ทุก endpoint เสิร์ฟจากที่นี่เท่านั้น · rate limit อยู่ที่ route layer
+// P12: `publicCatalog()` — แคตตาล็อกโมดูลทั้งหมดที่อาจขายจริง (metadata จาก scanner — ไม่มีราคา/รายได้/ข้อมูลภายใน)
+import { scanAllModules } from './software-catalog.service';
 
 export interface DemoSensorPoint {
   at: string;
@@ -131,5 +133,53 @@ export function demoFinance(): {
       byClass,
     },
     note: 'ตัวเลขจำลองคงตัว เพื่อสาธิตหน้าจอระบบ — ไม่ใช่พอร์ตจริง',
+  };
+}
+
+// ── P12: แคตตาล็อกโมดูลทั้งหมดที่อาจขายจริง (ให้ผู้ทดลองเห็นความสามารถครบระบบ) ──
+// ดึงจาก scanner จริง (software-catalog.service — สแกนโค้ดสด) แต่เปิดเฉพาะ metadata ปลอดภัย:
+// จำนวน endpoint/บรรทัดโค้ด/ชุดทดสอบ = พิสูจน์ขนาด+คุณภาพได้ โดยไม่เปิดราคาแนะนำต้นทุน/ข้อมูลรายได้
+const DEMO_MODULE_NOTES: Record<string, string> = {
+  farm: 'ปลูกอะไร รดน้ำเมื่อไหร่ ให้ผลเท่าไหร่ — เห็นครบเป็นกราฟ',
+  livestock: 'จัดการฝูงสัตว์ วัคซีน น้ำหนัก สุขภาพรายตัว',
+  trace: 'สินค้าแต่ละล็อตมาจากไหน ผ่านอะไรมาบ้าง — ลูกค้าสแกนดูได้',
+  business: 'ร้าน/ออเดอร์/ชำระเงิน PromptPay — ระบบขายของครบวงจร',
+  shop: 'หน้าร้านสาธารณะ + ตะกร้า + สถานะออเดอร์ผ่านลิงก์ลับ',
+  inventory: 'คลังของ วันหมดอายุ จุดสั่งซื้อ — หมดสต็อกไม่ทันรู้ตัว',
+  finance: 'พอร์ตลงทุน กำไร-ขาดทุน แยกตามชนิดสินทรัพย์',
+  treasury: 'กลยุทธ์เงินทุนหลายแบบ จากพื้นฐานถึงเชิงรุก',
+  restaurant: 'ระบบหลังบ้านร้านอาหาร เมนู วัตถุดิบ ยอดขาย',
+  health: 'สุขภาพคนในบ้าน น้ำหนัก ความดัน น้ำตาล',
+  documents: 'จัดเก็บเอกสาร ค้นด้วย AI สรุปเนื้อหาอัตโนมัติ',
+  vision: 'กล้อง AI แยกคน สัตว์ ยานพาหนะ — เตือนเฉพาะของสำคัญ',
+  automation: 'ตั้งเงื่อนไขให้บ้าน/ฟาร์มทำงานเอง ตามเวลาหรือเซนเซอร์',
+  energy: 'ไฟ แบตเตอรี่ พลังงานสด — รู้ก่อนว่าจะไม่พอ',
+  alerts: 'ศูนย์เตือนทุกอย่างในระบบ จ่ายตามระดับความสำคัญ',
+  dashboard: 'หน้าจอรวมทุกระบบเป็นภาพเดียว',
+};
+
+export interface PublicCatalogModule {
+  key: string;
+  name: string;
+  note: string;
+  endpoints: number;
+  loc: number;
+  testRefs: number;
+}
+
+export function publicCatalog(): { modules: PublicCatalogModule[]; total: number; note: string } {
+  const facts = scanAllModules();
+  const modules: PublicCatalogModule[] = facts.map((f) => ({
+    key: f.key,
+    name: f.key.charAt(0).toUpperCase() + f.key.slice(1),
+    note: DEMO_MODULE_NOTES[f.key] ?? '',
+    endpoints: f.endpoints,
+    loc: f.loc,
+    testRefs: f.testRefs,
+  }));
+  return {
+    modules,
+    total: modules.length,
+    note: 'จำนวน endpoint/บรรทัดโค้ด/ชุดทดสอบ มาจากการสแกนโค้ดจริงของระบบ — โมดูลที่มีชุดทดสอบครอบ = ตรวจคุณภาพอัตโนมัติทุกวัน',
   };
 }
