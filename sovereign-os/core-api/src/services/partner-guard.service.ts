@@ -157,15 +157,17 @@ export async function sendPartnerOtp(phoneRaw: string, req?: { headers: Record<s
 /** ตรวจ OTP — ผ่าน = เบอร์นี้กรอกใบสมัครได้ (30 นาที) · thaibulksms = ส่ง PIN ไป verify กับ gateway */
 export async function verifyPartnerOtp(phoneRaw: string, code: string): Promise<GuardResult> {
   const phone = normPhone(phoneRaw);
-  const entry = otpStore.get(phone);
-  if (!entry) return { ok: false, reason: 'ขอรหัสก่อน (กดขอรหัสยืนยัน)' };
 
-  // P18-hardening: cap การยืนยันต่อเบอร์ (นับทุกครั้งไม่ว่า IP อะไร) — brute ด้วย proxy pool ต้องโดนตรงนี้
+  // P18-hardening: cap การยืนยันต่อเบอร์ (นับทุกครั้งไม่ว่า IP อะไร และไม่ว่ามี OTP ค้างไหม) —
+  // brute ด้วย proxy pool ต้องโดนตรงนี้ แม้ OTP entry ถูกลบไปแล้ว (นับตั้งแต่บรรทัดแรก ก่อน early-return ใด ๆ)
   const nowMs = Date.now();
   const attempts = (verifyAttempts.get(phone) ?? []).filter((t) => nowMs - t < OTP_VERIFY_WINDOW_MS);
   if (attempts.length >= OTP_VERIFY_MAX) return { ok: false, reason: 'พยายามมากเกินไป — รอ 15 นาทีแล้วขอรหัสใหม่' };
   attempts.push(nowMs);
   verifyAttempts.set(phone, attempts);
+
+  const entry = otpStore.get(phone);
+  if (!entry) return { ok: false, reason: 'ขอรหัสก่อน (กดขอรหัสยืนยัน)' };
   if (Date.now() > entry.expiresAt) {
     otpStore.delete(phone);
     return { ok: false, reason: 'รหัสหมดอายุ — ขอใหม่ได้' };
