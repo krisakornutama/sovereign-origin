@@ -5,7 +5,7 @@
 //  - เงียบทุกกรณี — tracking ล้มต้องไม่กระทบการใช้งาน
 import { getApiUrl } from './config';
 
-type Kind = 'page_view' | 'demo_tab' | 'time_on_page' | 'survey' | 'question' | 'feedback_open' | 'outbound';
+type Kind = 'page_view' | 'demo_tab' | 'time_on_page' | 'survey' | 'question' | 'feedback_open' | 'outbound' | 'cta_click';
 
 function send(kind: Kind, page: string, detail?: string, value?: string, useBeacon = false): void {
   if (typeof window === 'undefined') return;
@@ -53,4 +53,23 @@ export function trackFeedbackOpen(page: string): void {
 
 export function trackOutbound(page: string, detail: string): void {
   send('outbound', page, detail);
+}
+
+/** กดปุ่ม CTA (A/B หน้าแรก: detail=ชื่อปุ่ม · value=variant A|B) */
+export function trackCtaClick(page: string, cta: string, variant: string): void {
+  send('cta_click', page, cta, variant);
+}
+
+/** A/B variant ของหน้าแรก — สุ่มครั้งแรกแล้วจำใน localStorage (ผู้ใช้เห็นแบบเดิมเสมอ — วัดพฤติกรรมได้ยุติ) */
+export function getHomeVariant(): 'A' | 'B' {
+  if (typeof window === 'undefined') return 'A';
+  try {
+    const saved = localStorage.getItem('sovereign-ab-home');
+    if (saved === 'A' || saved === 'B') return saved;
+    const v = Math.random() < 0.5 ? 'A' : 'B';
+    localStorage.setItem('sovereign-ab-home', v);
+    return v;
+  } catch {
+    return 'A';
+  }
 }

@@ -19,6 +19,7 @@ interface VisitorSummaryData {
   days: number; totalEvents: number; uniqueVisitors: number;
   pageViews: { page: string; count: number }[];
   demoTabs: { detail: string; count: number }[];
+  ctaClicks: { cta: string; variant: string; count: number }[];
   avgTimeOnPageSec: number | null;
   surveys: { value: string; count: number }[];
   questions: { detail: string; value: string; count: number }[];
@@ -65,6 +66,26 @@ function VisitorInsights() {
           ))}
         </div>
       </div>
+      {sum.ctaClicks.length > 0 && (
+        <div className="space-y-1 pt-2 border-t border-dashed border-gray-800">
+          <div className="text-[11px] text-gray-500">A/B การ์ดหน้าแรก (กดปุ่มไหนมากกว่า — A=เดโม่ก่อน · B=ร้านก่อน)</div>
+          {(['A', 'B'] as const).map((v) => {
+            const rows = sum.ctaClicks.filter((c) => c.variant === v);
+            if (rows.length === 0) return null;
+            const total = rows.reduce((s, c) => s + c.count, 0);
+            return (
+              <div key={v} className="flex items-center gap-2 text-xs flex-wrap">
+                <span className="mono w-6 text-cyan-300">{v}</span>
+                {rows.map((c) => (
+                  <span key={c.cta} className="text-gray-300">{c.cta} <span className="mono text-[10px] text-gray-500">×{c.count}</span></span>
+                ))}
+                <span className="ml-auto mono text-[10px] text-gray-500">รวม {total} คลิก</span>
+              </div>
+            );
+          })}
+          <div className="text-[10px] text-gray-600">ยังเก็บต่อได้ 1–2 สัปดาห์ก่อนตัดสิน — ผู้ใช้แต่ละคนเห็นแบบเดิมเสมอ (จำไว้ในเครื่อง)</div>
+        </div>
+      )}
       {(sum.surveys.length > 0 || sum.questions.length > 0) && (
         <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-dashed border-gray-800">
           <div className="space-y-1">

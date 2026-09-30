@@ -2,14 +2,19 @@
 import { useAuthStore } from '../stores/useAuthStore';
 import LoginForm from '../components/auth/LoginForm';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { isPublicHostname } from '../lib/publicAccess';
+import { getHomeVariant, trackCtaClick } from '../lib/visitorTrack';
 
 export default function Home() {
   const { isAuthenticated, isHydrated, mustChangePassword } = useAuthStore();
   const router = useRouter();
   const t = useLanguageStore((s) => s.t);
+  // A/B ลำดับการ์ด (P13): A = เดโม่ก่อน · B = ร้านก่อน — สุ่มครั้งเดียวจำค่าไว้ (วัด cta_click คู่กันในหน้า admin)
+  const [variant, setVariant] = useState<'A' | 'B'>('A');
+  useEffect(() => { setVariant(getHomeVariant()); }, []);
+  const cta = (name: string) => () => trackCtaClick('/', name, variant);
 
   // P11 (30/9/69): บนโดเมนสาธารณะถ้า browser มี session เจ้าของอยู่แล้ว เด้งเข้า dashboard ตามเดิม
   useEffect(() => {
@@ -43,33 +48,25 @@ export default function Home() {
           </header>
 
           <div className="grid gap-3">
-            <a href="/demo" className="block card p-5 hover:border-cyan-500/60 transition group">
-              <div className="flex items-baseline gap-3">
-                <span className="text-2xl">🧪</span>
-                <div>
-                  <div className="font-ledger text-lg text-cyan-300 group-hover:glow-text">เข้าสนามทดลอง</div>
-                  <div className="text-xs text-gray-500">ฟาร์ม · ปศุสัตว์ · การเงิน — ข้อมูลตัวอย่างล้วน กดเล่นได้ทุกแท็บ</div>
+            {(
+              variant === 'B'
+                ? [['shop', '🛒', 'ร้านอุปกรณ์ & ซอฟต์แวร์', 'ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต', 'hover:border-emerald-500/60', 'text-emerald-300'],
+                   ['demo', '🧪', 'เข้าสนามทดลอง', 'ฟาร์ม · ปศุสัตว์ · การเงิน · ตามรอย · ร้าน — ข้อมูลตัวอย่างล้วน', 'hover:border-cyan-500/60', 'text-cyan-300'],
+                   ['trace', '🔎', 'ตามรอยผลผลิต', 'ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ', 'hover:border-amber-500/60', 'text-amber-300']]
+                : [['demo', '🧪', 'เข้าสนามทดลอง', 'ฟาร์ม · ปศุสัตว์ · การเงิน · ตามรอย · ร้าน — ข้อมูลตัวอย่างล้วน', 'hover:border-cyan-500/60', 'text-cyan-300'],
+                   ['shop', '🛒', 'ร้านอุปกรณ์ & ซอฟต์แวร์', 'ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต', 'hover:border-emerald-500/60', 'text-emerald-300'],
+                   ['trace', '🔎', 'ตามรอยผลผลิต', 'ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ', 'hover:border-amber-500/60', 'text-amber-300']]
+            ).map(([href, icon, title, desc, borderCls, titleCls]) => (
+              <a key={href} href={`/${href}`} onClick={cta(href)} className={`block card p-5 transition group ${borderCls}`}>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-2xl">{icon}</span>
+                  <div>
+                    <div className={`font-ledger text-lg ${titleCls}`}>{title}</div>
+                    <div className="text-xs text-gray-500">{desc}</div>
+                  </div>
                 </div>
-              </div>
-            </a>
-            <a href="/shop" className="block card p-5 hover:border-emerald-500/60 transition group">
-              <div className="flex items-baseline gap-3">
-                <span className="text-2xl">🛒</span>
-                <div>
-                  <div className="font-ledger text-lg text-emerald-300">ร้านอุปกรณ์ & ซอฟต์แวร์</div>
-                  <div className="text-xs text-gray-500">ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต</div>
-                </div>
-              </div>
-            </a>
-            <a href="/trace" className="block card p-5 hover:border-amber-500/60 transition group">
-              <div className="flex items-baseline gap-3">
-                <span className="text-2xl">🔎</span>
-                <div>
-                  <div className="font-ledger text-lg text-amber-300">ตามรอยผลผลิต</div>
-                  <div className="text-xs text-gray-500">ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ</div>
-                </div>
-              </div>
-            </a>
+              </a>
+            ))}
           </div>
 
           <p className="text-center text-[11px] text-gray-600">

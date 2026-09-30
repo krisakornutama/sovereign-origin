@@ -1,7 +1,7 @@
 import './setup-env';
 import { test, before, after, mock } from 'node:test';
 import assert from 'node:assert';
-import demoRoutes from '../src/modules/demo/demo.routes';
+import demoRoutes, { publicCatalog } from '../src/modules/demo/demo.routes';
 import feedbackRoutes, { prisma, submitFeedback, sendFeedbackDigest } from '../src/modules/feedback/feedback.routes';
 import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
 
@@ -53,6 +53,24 @@ test('GET /api/demo/finance — พอร์ตจำลองมี value/pnl �
   const line = body.lines.find((l: any) => l.assetClass === 'GOLD');
   assert.ok(line.value === Math.round(line.quantity * line.price * 100) / 100);
   assert.ok(typeof body.summary.totalValue === 'number' && body.summary.totalValue > 0);
+});
+
+test('GET /api/demo/catalog — สาธารณะ ได้โมดูลทั้งหมดพร้อม metadata แต่ไม่มีราคาแนะนำรั่ว', async () => {
+  const res = await fetch(server.baseUrl + '/api/demo/catalog');
+  assert.strictEqual(res.status, 200);
+  const body: any = await res.json();
+  assert.ok(body.total >= 10, 'ต้องมีอย่างน้อย 10 โมดูล (สแกนจริง)');
+  assert.strictEqual(body.modules.length, body.total);
+  const m = body.modules[0];
+  assert.ok(m.key && typeof m.endpoints === 'number' && typeof m.loc === 'number' && typeof m.testRefs === 'number');
+  assert.ok(!('suggestedPrice' in m), 'ห้ามเปิดราคาแนะนำต้นทุนออกสาธารณะ');
+  assert.ok(!('costPrice' in m) && !('salePrice' in m));
+});
+
+test('publicCatalog โดยตรง — key ไม่ซ้ำและเรียงได้', () => {
+  const c = publicCatalog();
+  const keys = c.modules.map((m) => m.key);
+  assert.strictEqual(new Set(keys).size, keys.length);
 });
 
 test('GET /api/demo/overview — รวมสามโมดูล', async () => {
