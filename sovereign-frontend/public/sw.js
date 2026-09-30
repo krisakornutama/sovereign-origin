@@ -6,7 +6,9 @@
  */
 // P16 (30/9/69): bump เป็น v4 — เดิม VERSION คงที่ข้าม build ทำให้ client เก่า (รวม PWA มือถือ)
 // ไม่เคยรับ shell ใหม่เลยหลัง deploy (เห็นหน้าเก่าต่อได้เป็นสัปดาห์) — หลังนี้ bump ทุกครั้งที่ deploy เปลี่ยน UI
-const VERSION = 'sovereign-v4';
+// P16 ต่อ (30/9/69 ค่ำ): bump เป็น v5 — **ห้าม cache /api/** (เดิม cache-first ครอบ GET same-origin ทุกเส้น
+// ทำให้ /api/partners ถูก cache ค่าว่างไว้แล้วตอบจาก cache ตลอด = ข้อมูลสดค้างเก่าเสมอ)
+const VERSION = 'sovereign-v5';
 
 // หน้า local-first — เปิดใช้งานได้จริงแม้ออฟไลน์ (ทำแบบทดสอบ MBTI / ดู shell แดชบอร์ด)
 // ข้อมูล API ไม่ mock — หน้าจะแสดงสถานะ offline ของตัวเองตามที่แอปจัดไว้
@@ -92,6 +94,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   // cache เฉพาะ same-origin — ไม่ยุ่งกับ API/Ollama ข้าม origin
   if (url.origin !== location.origin) return;
+
+  // P16: **API ห้าม cache เด็ดขาด** — ข้อมูลสด (ร้าน/คู่ค้า/ตามรอย) ต้องมาจากเครือข่ายเสมอ
+  // (บั๊กจริง 30/9/69: cache-first ครอบ /api/partners ค่าว่างไว้ = แผนที่ว่างตลอดบนเครื่องที่เคยเข้าก่อนมีข้อมูล)
+  if (url.pathname.startsWith('/api/')) return;
 
   // หน้าเว็บ: network-first -> cache -> หน้า offline
   if (request.mode === 'navigate') {
