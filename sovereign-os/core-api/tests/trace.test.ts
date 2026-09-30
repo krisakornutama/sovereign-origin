@@ -80,6 +80,36 @@ test('GET /:lotCode — รหัสผิดรูปแบบ/ไม่พบ 
   }
 });
 
+test('GET /products?ids=… สาธารณะ — สายผลผลิต Farm→Shop ต่อสินค้า (I5a)', async () => {
+  const res = await fetch(server.baseUrl + '/api/trace/products?ids=44444444-4444-4444-4444-444444444444');
+  assert.strictEqual(res.status, 200);
+  const body: any = await res.json();
+  const lots = body.products['44444444-4444-4444-4444-444444444444'];
+  assert.ok(Array.isArray(lots) && lots.length >= 1);
+  assert.match(lots[0].lotCode, /^LOT-[A-Z2-9]{6}$/);
+  assert.ok(typeof lots[0].traceUrl === 'string' && lots[0].traceUrl.includes('/trace?lot='));
+  assert.ok(Array.isArray(lots[0].events));
+  // สาธารณะห้ามเห็น id ภายใน/ทุน — โครงเดียวกับ GET /:lotCode
+  assert.ok(!('id' in lots[0]) && !('inventoryItemId' in lots[0]));
+});
+
+test('GET /products — ids ว่าง/เพี้ยน คืน {} (หน้าร้านแค่ไม่โชว์การ์ด ไม่พัง)', async () => {
+  for (const q of ['', '?ids=', '?ids=not-a-uuid']) {
+    const res = await fetch(server.baseUrl + '/api/trace/products' + q);
+    assert.strictEqual(res.status, 200, `query "${q}" should be 200`);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.products, {});
+  }
+});
+
+test('GET /products/:inventoryItemId — สายผลผลิตของสินค้าเดียว', async () => {
+  const res = await fetch(server.baseUrl + '/api/trace/products/44444444-4444-4444-4444-444444444444');
+  assert.strictEqual(res.status, 200);
+  const body: any = await res.json();
+  assert.ok(Array.isArray(body.lots) && body.lots.length >= 1);
+  assert.strictEqual(body.lots[0].plotName, 'แปลง A');
+});
+
 test('GET / ต้อง login', async () => {
   const res = await fetch(server.baseUrl + '/api/trace');
   assert.strictEqual(res.status, 401);

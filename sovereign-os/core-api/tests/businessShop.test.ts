@@ -308,7 +308,10 @@ test('MANAGER เปิดร้าน + ตั้งชื่อร้านไ
   assert.equal(p.salePrice, 107);
   assert.equal(p.inStock, true);
   assert.ok(!('costPrice' in p), 'ห้ามโผล่ราคาทุนบนหน้าสาธารณะ');
-  assert.ok(!('reorderPoint' in p) && !('inventoryItemId' in p));
+  // I5a: inventoryItemId เปิดออกเป็น id สำหรับลิงก์ตามรอย (UUID ไม่ใช่ความลับ — ทุน/สต็อกยังปิด)
+  assert.ok(!('reorderPoint' in p));
+  assert.ok('inventoryItemId' in p);
+
   const out = shopPage.products.find((x: any) => x.id === PRODUCT2_ID);
   assert.equal(out.inStock, false);
 });
@@ -513,7 +516,8 @@ test('community: ร้านต้อง opt-in เอง · catalog ไม่�
   assert.ok(mine.products.length >= 1);
   // สินค้าสต็อกหมดก็ยังโชว์ (แต่ inStock=false) — และห้ามมีต้นทุน/ราคาทุน/stockQty เด็ดขาด
   const anyProduct = cat.shops.flatMap((s: any) => s.products);
-  assert.ok(anyProduct.every((p: any) => !('costPrice' in p) && !('stockQty' in p) && !('reorderPoint' in p) && !('inventoryItemId' in p)));
+  // I5a: inventoryItemId เปิดออกเป็น id ตามรอย (UUID ไม่ใช่ความลับ) — ทุน/สต็อก/จุดสั่งเติมยังห้ามรั่วเดิม
+  assert.ok(anyProduct.every((p: any) => !('costPrice' in p) && !('stockQty' in p) && !('reorderPoint' in p)));
   // ต้องไม่รั่วข้อมูลออเดอร์/ลูกค้า
   assert.ok(!JSON.stringify(cat).includes('customerName'));
   assert.ok(!JSON.stringify(cat).includes('costPrice'));

@@ -181,6 +181,52 @@ export async function listLots(take = 50): Promise<any[]> {
   });
 }
 
+// ── I5a เฟส 3: หน้าร้านเล่าเรื่องสายสด Farm→Shop — endpoint สาธารณะของ trace ──
+
+/** รูปร่างล็อตสำหรับการ์ดเล่าเรื่องบนหน้าร้าน — ไม่มีราคาทุน/ข้อมูลส่วนบุคคล (ชุดเดียวกับ publicLot)
+ *  ลิงก์ /trace?lot=… อิง PUBLIC_APP_URL เดียวกับ QR ที่พิมพ์บนสินค้า */
+function publicLotStory(lot: any): any {
+  return {
+    lotCode: lot.lotCode,
+    crop: lot.crop ?? null,
+    quantityKg: lot.quantityKg,
+    harvestedAt: lot.harvestedAt,
+    plotName: lot.plot?.name ?? null,
+    sold: Boolean(lot.soldCustomerId),
+    traceUrl: traceUrlForLot(lot.lotCode),
+    events: (lot.events ?? []).map(publicEvent),
+  };
+}
+
+/** สายผลผลิตของสินค้าร้าน 1 รายการ (สาธารณะ) — ล็อตล่าสุด 2 ล็อตตาม FIFO ใหม่→เก่า
+ *  ล็อตถูกขายแล้ว (sold) ยังโชว์ได้: เป็นหลักฐานว่าของรอบก่อนมาจากไหน ไม่มีข้อมูลลูกค้าติดไป */
+export async function getPublicProductTrace(inventoryItemId: string, take = 2): Promise<any[]> {
+  const id = String(inventoryItemId || '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return [];
+  const n = Math.min(Math.max(1, take), 5);
+  const lots = await prisma.productLot.findMany({
+    where: { inventoryItemId: id },
+    orderBy: { harvestedAt: 'desc' },
+    take: n,
+    include: {
+      plot: { select: { name: true, location: true } },
+      events: { orderBy: { createdAt: 'asc' } },
+    },
+  });
+  return lots.map(publicLotStory);
+}
+
+/** สายผลผลิตของสินค้าหลายรายการพร้อมกัน (สาธารณะ — ใช้จาก GET /api/trace/products) */
+export async function getPublicProductTraceBatch(inventoryItemIds: string[], take = 2): Promise<Record<string, any[]>> {
+  const ids = [...new Set((Array.isArray(inventoryItemIds) ? inventoryItemIds : []).map((i: any) => String(i ?? '').trim()).filter((i) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(i)))];
+  if (ids.length === 0) return {};
+  const out: Record<string, any[]> = {};
+  for (const id of ids) {
+    out[id] = await getPublicProductTrace(id, take);
+  }
+  return out;
+}
+
 /** เหตุการณ์ทั้งหมดของล็อต (login — ใช้ป้อน/ปรับจากหน้า /trace) — ไม่มีล็อต = throw */
 export async function listLotEvents(lotCode: string): Promise<any[]> {
   const lot = await prisma.productLot.findUnique({

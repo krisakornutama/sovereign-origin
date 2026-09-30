@@ -38,7 +38,8 @@ async function openShopOrThrow(businessId: string): Promise<any> {
   return biz;
 }
 
-/** รูปร่างสินค้าที่คืนให้สาธารณะ — ตัดทุน/จุดสั่งเติม/inventoryItemId ทิ้งหมด */
+/** รูปร่างสินค้าที่คืนให้สาธารณะ — ตัดทุน/จุดสั่งเติมทิ้ง (I5a: เปิด inventoryItemId เฉพาะ id สำหรับลิงก์ตามรอย —
+ *  UUID ภายในไม่ใช่ความลับ และ endpoint ปลายทาง /api/trace/products คืนเฉพาะข้อมูลสาธารณะ ไม่มีทุน/ข้อมูลส่วนบุคคล) */
 function publicProduct(p: any): any {
   return {
     id: p.id,
@@ -48,6 +49,7 @@ function publicProduct(p: any): any {
     salePrice: p.salePrice,
     warrantyMonths: p.warrantyMonths,
     inStock: p.stockQty > 0,
+    inventoryItemId: p.inventoryItemId ?? null,
   };
 }
 
