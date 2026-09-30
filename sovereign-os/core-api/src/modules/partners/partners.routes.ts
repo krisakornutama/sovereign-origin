@@ -8,13 +8,16 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { prisma } from '../../lib/prisma';
 import { applyPartner, publicPartners, partnerCounts } from '../../services/partner.service';
+import { createPartnerBill, partnerBills, foundationBusinessId, partnerBillsAuthorized } from '../../services/business-shop.service';
+import { sendPartnerOtp, verifyPartnerOtp, issueVerifiedToken } from '../../services/partner-guard.service';
 
 export { prisma }; // ให้เทส mock delegate ผ่านตัวเดียวกับ production
 export { applyPartner, publicPartners, partnerCounts };
 
 const router = Router();
 
-const applyLimiter = rateLimit({ windowMs: 60_000, max: 5, message: 'ส่งใบสมัครถี่เกินไป ลองใหม่อีกครั้ง' });
+// max ปรับได้ทาง env (เทสต์คลายเป็น 100 — prod คง 5/นาที)
+const applyLimiter = rateLimit({ windowMs: 60_000, max: Number(process.env.PARTNER_APPLY_LIMIT || 5), message: 'ส่งใบสมัครถี่เกินไป ลองใหม่อีกครั้ง' });
 
 function clientIp(req: Request): string {
   const fwd = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
@@ -36,14 +39,42 @@ router.post('/', applyLimiter, async (req, res) => {
       contactPhone: req.body?.contactPhone,
       contactEmail: req.body?.contactEmail,
       website: req.body?.website,
+      otpToken: req.body?.otpToken,
       ip: clientIp(req),
       userAgent: req.headers['user-agent'],
     });
-    // ทุกกรณีตอบยอมรับ (บอทไม่รู้ว่าโดนทิ้ง)
+    // P17: unverified = ไม่มี OTP token → บอกผู้ใช้จริงให้ไปยืนยันเบอร์ (บอทที่ไม่มี token ก็โดนทิ้งเหมือนกัน)
+    if (!r.accepted && r.reason === 'unverified') {
+      return res.status(403).json({ error: 'กรุณายืนยันเบอร์โทรด้วยรหัส OTP ก่อนส่งใบสมัคร' });
+    }
+    if (!r.accepted && r.reason === 'spam') {
+      return res.status(429).json({ error: r.error ?? 'ใบสมัครนี้ไม่สามารถรับได้ในขณะนี้' });
+    }
+    // honeypot/invalid = ตอบยอมรับเฉย ๆ (บอทไม่รู้ว่าโดนทิ้ง)
     return res.status(202).json({ ok: true, accepted: r.accepted, id: r.accepted ? r.id : undefined });
   } catch {
     return res.status(500).json({ error: 'ส่งใบสมัครไม่สำเร็จ' });
   }
+});
+
+// ── P17 — OTP ยืนยันเบอร์ก่อนสมัคร (กันสแปมชั้น 3) ──
+
+// POST /api/partners/otp/send { contactPhone } → { sent: true, devCode? }
+router.post('/otp/send', applyLimiter, async (req, res) => {
+  const phone = String(req.body?.contactPhone ?? '');
+  if (!phone.trim()) return res.status(400).json({ error: 'ต้องระบุเบอร์โทร' });
+  const r = await sendPartnerOtp(phone);
+  if (!r.sent) return res.status(502).json({ error: r.error });
+  return res.json({ sent: true, ...(r as any).devCode ? { devCode: (r as any).devCode } : {} });
+});
+
+// POST /api/partners/otp/verify { contactPhone, code } → { verified: true, token }
+router.post('/otp/verify', applyLimiter, async (req, res) => {
+  const phone = String(req.body?.contactPhone ?? '');
+  const code = String(req.body?.code ?? '');
+  const r = verifyPartnerOtp(phone, code);
+  if (!r.ok) return res.status(400).json({ error: r.reason });
+  return res.json({ verified: true, token: issueVerifiedToken(phone) });
 });
 
 // GET /api/partners — แผนที่/รายชื่อสาธารณะ (ACTIVE เท่านั้น · ไม่มีข้อมูลผู้สมัคร)
@@ -53,6 +84,42 @@ router.get('/', applyLimiter, async (_req, res) => {
     return res.json({ partners, counts });
   } catch {
     return res.status(500).json({ error: 'โหลดแผนที่พาร์ทเนอร์ไม่สำเร็จ' });
+  }
+});
+
+// ── P17 — บิลค่าบริการ IoT คู่ค้า ──
+// POST /api/partners/:id/bills (SUPERADMIN) — สร้างบิล + งานติดตั้ง → คืนลิงก์ลับชำระ PromptPay
+router.post('/:id/bills', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const bizId = await foundationBusinessId();
+    if (!bizId) return res.status(500).json({ error: 'ไม่พบธุรกิจหลัก' });
+    const bill = await createPartnerBill(bizId, {
+      partnerId: String(req.params.id),
+      title: String(req.body?.title ?? ''),
+      amount: Number(req.body?.amount ?? 0),
+      installTitle: req.body?.installTitle ? String(req.body.installTitle) : undefined,
+      note: req.body?.note ? String(req.body.note) : undefined,
+    });
+    return res.status(201).json({
+      ...bill,
+      payUrl: `${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'}/shop/?order=${bill.publicToken}`,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/not found/.test(msg)) return res.status(404).json({ error: 'ไม่พบคู่ค้านี้' });
+    return res.status(400).json({ error: msg });
+  }
+});
+
+// GET /api/partners/:id/bills?t=<token> — คู่ค้าดูบิลตัวเองผ่านลิงก์ลับ (token = publicToken ของบิลล่าสุด)
+router.get('/:id/bills', applyLimiter, async (req, res) => {
+  try {
+    const token = String(req.query.t ?? '');
+    const bills = await partnerBillsAuthorized(String(req.params.id), token);
+    if (!bills) return res.status(403).json({ error: 'ลิงก์ไม่ถูกต้อง' });
+    return res.json({ bills });
+  } catch {
+    return res.status(500).json({ error: 'โหลดบิลไม่สำเร็จ' });
   }
 });
 

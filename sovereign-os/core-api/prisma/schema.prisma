@@ -162,6 +162,7 @@ model Partner {
   id           String   @id @default(uuid()) @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz
   name         String // ชื่อร้าน/ช่าง/กิจการ
+  name_normalized String // P17: ชื่อ normalized (ตัดวรรณยุกต์/ช่องว่าง) — ใช้กันชื่อซ้ำ
   category     String   @default("SHOP") // SHOP | TECHNICIAN | SERVICE | OTHER
   detail       String? // อธิบายสั้น ๆ ทำอะไร
   address      String? // ที่อยู่ (แสดงบนการ์ด)
@@ -2048,6 +2049,7 @@ model BusinessOrder {
   assignedToId String?  @db.Uuid // User ฝ่ายขายผู้รับผิดชอบ
   note         String?
   publicToken  String?  @unique @default(uuid()) // ลิงก์ลับต่อออเดอร์ — ลูกค้าใช้เช็คสถานะ/ชำระเงินที่ /shop โดยไม่ต้อง login
+  partnerId    String? // P17: บิลค่าบริการ IoT ที่ผูกกับคู่ค้า (null = ออเดอร์ทั่วไป)
   // ── เฟส 4: สถานะจัดส่งแบบเบา (ร้านส่งเอง) — เสริมจาก status DELIVERED ไม่แทนที่ ──
   shippingStatus String? // PREPARING | SHIPPED | DELIVERED (null = ยังไม่เริ่มจัดส่ง)
   shippingCarrier String? // ชื่อผู้ส่ง/ขนส่ง (เช่น "เจ้าของร้านส่งเอง", Kerry)
