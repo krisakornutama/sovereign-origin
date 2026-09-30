@@ -69,6 +69,13 @@ export default function PartnersPage() {
   const [picking, setPicking] = useState(false);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState('');
+  // P17 — OTP ยืนยันเบอร์ก่อนสมัคร
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpMsg, setOtpMsg] = useState('');
+  const [otpToken, setOtpToken] = useState('');
   const [pinId, setPinId] = useState<string | null>(null); // QR ป้ายร้าน: /partners?p=<id> → เปิดหมุดร้านตัวเอง
 
   // อ่าน ?p= ใน useEffect เท่านั้น (กฎ hydration)
@@ -154,22 +161,75 @@ export default function PartnersPage() {
     mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+  async function sendOtp() {
+    if (!form.contactPhone.trim()) { setOtpMsg('กรอกเบอร์ผู้ติดต่อก่อน'); return; }
+    setOtpBusy(true);
+    setOtpMsg('');
+    try {
+      const res = await fetch(`${getApiUrl()}/api/partners/otp/send`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactPhone: form.contactPhone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setOtpSent(true);
+        setOtpMsg((data as any).devCode ? `โหมดทดลอง — รหัสของคุณ: ${(data as any).devCode}` : 'ส่งรหัสไปที่เบอร์แล้ว (ใช้ได้ 5 นาที)');
+      } else {
+        setOtpMsg(data?.error ?? 'ส่งรหัสไม่สำเร็จ');
+      }
+    } catch {
+      setOtpMsg('เชื่อมต่อไม่ได้ — ลองใหม่');
+    } finally {
+      setOtpBusy(false);
+    }
+  }
+
+  async function verifyOtp() {
+    if (otpCode.length !== 6) { setOtpMsg('กรอกรหัส 6 หลัก'); return; }
+    setOtpBusy(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/api/partners/otp/verify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactPhone: form.contactPhone, code: otpCode }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && (data as any).token) {
+        setOtpToken((data as any).token);
+        setOtpMsg('✓ ยืนยันเบอร์แล้ว — กดส่งใบสมัครได้เลย');
+      } else {
+        setOtpMsg(data?.error ?? 'รหัสไม่ถูกต้อง');
+      }
+    } catch {
+      setOtpMsg('เชื่อมต่อไม่ได้ — ลองใหม่');
+    } finally {
+      setOtpBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (sending || !pin) return;
     setSending(true);
+    setFormError('');
     try {
       const res = await fetch(`${getApiUrl()}/api/partners`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, lat: pin.lat, lng: pin.lng }),
+        body: JSON.stringify({ ...form, lat: pin.lat, lng: pin.lng, otpToken }),
       });
+      const data = await res.json().catch(() => null);
       if (res.ok) {
         setSent(true);
         trackCtaClick('/partners', 'partner_apply', 'form');
+      } else if (res.status === 403) {
+        setFormError(data?.error ?? 'กรุณายืนยันเบอร์ก่อน');
+      } else if (res.status === 429) {
+        setFormError(data?.error ?? 'สมัครไม่ได้ในขณะนี้');
+      } else {
+        setFormError(data?.error ?? 'ส่งไม่สำเร็จ — ลองใหม่');
       }
     } catch {
-      // เงียบตามธรรมเนียม honeypot — ฟอร์มปกติควรสำเร็จ
+      setFormError('เชื่อมต่อไม่ได้ — ลองใหม่');
     } finally {
       setSending(false);
     }
@@ -195,7 +255,8 @@ export default function PartnersPage() {
           <h1 className="text-2xl font-bold mb-2">🗺️ แผนที่คู่ค้าเครือข่าย</h1>
           <p className="text-sm text-gray-400 max-w-2xl mx-auto">
             ร้านค้า SME รายย่อย ช่างทุกสาย และผู้ให้บริการ ที่ร่วมเครือข่ายกับเรา — สมัครเข้าร่วมฟรี
-            ได้หมุดบนแผนที่ร่วม และช่องทางเข้าถึงระบบ/อุปกรณ์ IoT ที่ช่วยแก้ปัญหาหน้าร้านจริง
+            ได้หมุดบนแผนที่ร่วม และช่องทางเข้าถึงระบบ/อุปกรณ์ IoT ที่ช่วยแก้ปัญหาหน้าร้านจริง ·{' '}
+            <a href="/partners/guide/" className="text-cyan-300 hover:underline underline-offset-2">📖 คู่มือคู่ค้า — สิทธิประโยชน์ & วิธีใช้</a>
           </p>
           {pendingCount !== null && pendingCount > 0 && (
             <p className="text-[11px] text-gray-600 mt-2">รอตรวจสอบการสมัคร {pendingCount} รายการ</p>
@@ -282,6 +343,28 @@ export default function PartnersPage() {
                     <input className={inputCls} value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} required maxLength={20} />
                   </div>
                 </div>
+                {/* P17 — ยืนยันเบอร์ด้วย OTP ก่อนส่งใบสมัคร */}
+                <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/10 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-gray-400">ยืนยันเบอร์โทร {otpToken ? <span className="text-emerald-400">✓ ยืนยันแล้ว</span> : '*'}</span>
+                    {!otpToken && (
+                      <button type="button" onClick={sendOtp} disabled={otpBusy || !form.contactPhone.trim()}
+                        className="text-xs rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 px-3 py-1.5 disabled:opacity-40">
+                        {otpSent ? 'ส่งรหัสใหม่' : '📱 ขอรหัสยืนยัน'}
+                      </button>
+                    )}
+                  </div>
+                  {otpSent && !otpToken && (
+                    <div className="flex items-center gap-2">
+                      <input value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                        inputMode="numeric" placeholder="รหัส 6 หลัก" aria-label="รหัส OTP"
+                        className="w-32 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm mono tracking-widest outline-none focus:border-cyan-500/60" />
+                      <button type="button" onClick={verifyOtp} disabled={otpBusy || otpCode.length !== 6}
+                        className="text-xs rounded-lg border border-cyan-500/40 text-cyan-200 hover:bg-cyan-600/20 px-3 py-1.5 disabled:opacity-40">ยืนยัน</button>
+                    </div>
+                  )}
+                  {otpMsg && <p className={`text-[11px] ${otpToken ? 'text-emerald-400' : 'text-cyan-300/80'}`}>{otpMsg}</p>}
+                </div>
                 <div className="rounded-lg border border-dashed border-white/15 p-3 flex items-center justify-between gap-3">
                   <div className="text-xs text-gray-400">
                     {pin ? (
@@ -295,13 +378,15 @@ export default function PartnersPage() {
                   </button>
                 </div>
                 <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
+                {formError && <div className="rounded-lg border border-rose-500/40 bg-rose-950/20 px-3 py-2 text-xs text-rose-300" role="alert">{formError}</div>}
                 <button
                   type="submit"
-                  disabled={!form.name || !pin || !form.contactName || !form.contactPhone || sending}
+                  disabled={!form.name || !pin || !form.contactName || !form.contactPhone || !otpToken || sending}
                   className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-gray-950 font-semibold py-3 text-sm transition"
                 >
                   {sending ? 'กำลังส่ง…' : '🤝 ส่งใบสมัครเข้าร่วม'}
                 </button>
+                {!otpToken && <p className="text-[10px] text-gray-600 text-center">ต้องยืนยันเบอร์ด้วยรหัส OTP ก่อนส่งใบสมัคร (กันสแปม — เราไม่ใช้เบอร์ของคุณทำอย่างอื่น)</p>}
                 <p className="text-[10px] text-gray-600 text-center">
                   ข้อมูลผู้ติดต่อใช้เพื่อการตรวจสอบเท่านั้น — ไม่แสดงบนแผนที่สาธารณะ
                 </p>
