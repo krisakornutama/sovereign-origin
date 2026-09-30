@@ -106,6 +106,62 @@ function VisitorInsights() {
   );
 }
 
+// P16 — แผงอนุมัติคู่ค้า: สมัครจาก /partners → อนุมัติ = ขึ้นแผนที่สาธารณะทันที
+interface PartnerRow { id: string; name: string; category: string; detail: string | null; address: string | null; phone: string | null; lat: number; lng: number; contactName: string; contactPhone: string; status: string; created_at: string; }
+
+function PartnerApprovals() {
+  const [rows, setRows] = useState<PartnerRow[]>([]);
+  const [msg, setMsg] = useState('');
+  const load = useCallback(async () => {
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/admin/list`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setRows(data.partners ?? []);
+    } catch { /* เงียบ — โหลดไม่ได้ = แผงหายไปชั่วคราว */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function decide(id: string, status: 'ACTIVE' | 'REJECTED') {
+    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+    });
+    setRows((s) => s.filter((r) => r.id !== id));
+    setMsg(status === 'ACTIVE' ? 'อนุมัติแล้ว — ขึ้นแผนที่แล้ว' : 'ปฏิเสธแล้ว');
+    setTimeout(() => setMsg(''), 3500);
+  }
+  if (rows.length === 0) return null;
+  const CAT: Record<string, string> = { SHOP: '🏪 ร้านค้า', TECHNICIAN: '🔧 ช่าง', OTHER: '🤝 อื่น ๆ' };
+  return (
+    <section className="card p-4 space-y-3" aria-label="อนุมัติคู่ค้า">
+      <div className="flex items-baseline justify-between flex-wrap gap-2">
+        <h2 className="font-ledger text-sm text-gray-300">🗺️ ใบสมัครคู่ค้ารออนุมัติ ({rows.length})</h2>
+        <div className="flex items-center gap-3">
+          {msg && <span className="text-xs text-emerald-400">{msg}</span>}
+          <button onClick={load} className="text-[11px] text-gray-500 hover:text-gray-300">รีเฟรช</button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rows.map((p) => (
+          <div key={p.id} className="card p-3 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-medium text-gray-200">{p.name}</span>
+              <span className="border rounded px-1.5 py-0.5 border-gray-700 text-[10px]">{CAT[p.category] ?? p.category}</span>
+              <span className="mono text-[10px] text-gray-500">📍 {p.lat}, {p.lng}</span>
+              <span className="ml-auto text-[11px] text-gray-500">ติดต่อ: {p.contactName} · {p.contactPhone}</span>
+            </div>
+            {p.detail && <p className="text-xs text-gray-400">{p.detail}</p>}
+            {p.address && <p className="text-[11px] text-gray-500">📍 {p.address}</p>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => decide(p.id, 'ACTIVE')} className="px-3 py-1 rounded-lg text-xs border border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/40">✓ อนุมัติ (ขึ้นแผนที่)</button>
+              <button onClick={() => decide(p.id, 'REJECTED')} className="px-3 py-1 rounded-lg text-xs border border-rose-600/50 text-rose-400 hover:bg-rose-950/40">✕ ปฏิเสธ</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 interface Note {
   id: string;
   created_at: string;
@@ -197,6 +253,7 @@ export default function FeedbackAdminPage() {
           }
         />
         <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full space-y-4">
+          <PartnerApprovals />
           <VisitorInsights />
           <div className="flex gap-2" role="tablist" aria-label="กรองสถานะฟีดแบ็ก">
             {([['pending', `รอตัดสิน (${notes.filter((n) => n.useful === null).length})`], ['useful', `มีประโยชน์ (${notes.filter((n) => n.useful === true).length})`], ['spam', `สแปม (${notes.filter((n) => n.useful === false).length})`], ['all', 'ทั้งหมด']] as const).map(([k, label]) => (
