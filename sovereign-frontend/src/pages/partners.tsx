@@ -6,7 +6,7 @@ import { trackPageView, trackCtaClick } from '../lib/visitorTrack';
 
 // P16 — Partner Network: แผนที่คู่ค้า (ร้านค้า SME · ช่าง · ผู้ให้บริการ)
 //  สมัครสาธารณะ → รออนุมัติ → ขึ้นแผนที่ · ของที่ได้: หมุดบนแผนที่ร่วม + ช่องทาง IoT/ระบบช่วยร้าน
-//  แผนที่: OpenStreetMap ผ่าน Leaflet CDN — ไม่เพิ่ม dependency ใน repo
+//  แผนที่: OpenStreetMap ผ่าน Leaflet **self-host** (/vendor/leaflet — CSP script-src 'self' ผ่าน ไม่พึ่ง CDN)
 
 type Partner = {
   id: string;
@@ -41,7 +41,7 @@ function loadLeaflet(): Promise<any> {
       const css = document.createElement('link');
       css.id = 'leaflet-css';
       css.rel = 'stylesheet';
-      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      css.href = '/vendor/leaflet/leaflet.css';
       document.head.appendChild(css);
     }
     const existing = document.getElementById('leaflet-js') as HTMLScriptElement | null;
@@ -53,7 +53,7 @@ function loadLeaflet(): Promise<any> {
     }
     const s = document.createElement('script');
     s.id = 'leaflet-js';
-    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.src = '/vendor/leaflet/leaflet.js';
     s.onload = () => resolve(window.L);
     s.onerror = reject;
     document.body.appendChild(s);

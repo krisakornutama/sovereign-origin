@@ -4,7 +4,9 @@
  * - static bundle (_next/static/*): cache-first -> เปิด offline ได้ทันที
  * - navigation: network-first -> cache -> หน้า offline
  */
-const VERSION = 'sovereign-v3';
+// P16 (30/9/69): bump เป็น v4 — เดิม VERSION คงที่ข้าม build ทำให้ client เก่า (รวม PWA มือถือ)
+// ไม่เคยรับ shell ใหม่เลยหลัง deploy (เห็นหน้าเก่าต่อได้เป็นสัปดาห์) — หลังนี้ bump ทุกครั้งที่ deploy เปลี่ยน UI
+const VERSION = 'sovereign-v4';
 
 // หน้า local-first — เปิดใช้งานได้จริงแม้ออฟไลน์ (ทำแบบทดสอบ MBTI / ดู shell แดชบอร์ด)
 // ข้อมูล API ไม่ mock — หน้าจะแสดงสถานะ offline ของตัวเองตามที่แอปจัดไว้
