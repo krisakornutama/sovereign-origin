@@ -9,6 +9,30 @@
 import { prisma } from '../lib/prisma';
 import { ipHashOf } from './feedback.service';
 
+// แจ้งเตือน Telegram ทันทีเมื่อมีใบสมัครใหม่ (P16 คำสั่งเจ้าของ 30/9/69 — ไม่ต้องรอ digest วันจันทร์)
+//  fire-and-forget: ส่งไม่สำเร็จ = บันทึก console อย่างเดียว — การสมัครต้องสำเร็จปกติเสมอ
+async function notifyNewPartner(p: { id: string; name: string; category: string; contactName: string; contactPhone: string }): Promise<void> {
+  try {
+    const { getTelegramCredentials } = await import('./telegram-credentials.service');
+    const creds = await getTelegramCredentials();
+    if (!creds.botToken || !creds.chatId) return;
+    const axios = (await import('axios')).default;
+    const CAT: Record<string, string> = { SHOP: '🏪 ร้านค้า', TECHNICIAN: '🔧 ช่าง', SERVICE: '🛠️ บริการ', OTHER: '🤝 อื่น ๆ' };
+    const msg = [
+      `🤝 <b>ใบสมัครคู่ค้าใหม่</b> (${CAT[p.category] ?? p.category})`,
+      `ชื่อ: <b>${p.name.replace(/[<>&]/g, '')}</b>`,
+      `ติดต่อ: ${p.contactName.replace(/[<>&]/g, '')} · ${p.contactPhone.replace(/[<>&]/g, '')}`,
+      '',
+      `อนุมัติได้ที่: ${process.env.PUBLIC_APP_URL || ''}/feedback-admin`,
+    ].join('\n');
+    await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
+      chat_id: creds.chatId, text: msg, parse_mode: 'HTML',
+    });
+  } catch (err) {
+    console.error('[partner] แจ้งเตือนสมัครใหม่ไม่สำเร็จ (ไม่กระทบการสมัคร):', err instanceof Error ? err.message : err);
+  }
+}
+
 const CATEGORIES = ['SHOP', 'TECHNICIAN', 'SERVICE', 'OTHER'] as const;
 
 export interface PartnerApplyInput {
@@ -64,6 +88,7 @@ export async function applyPartner(input: PartnerApplyInput): Promise<PartnerApp
       ip_hash: input.ip ? ipHashOf(input.ip) : null,
     },
   });
+  void notifyNewPartner({ id: row.id, name, category, contactName, contactPhone }); // ไม่ await — สมัครตอบ 202 ทันที
   return { accepted: true, id: row.id };
 }
 
