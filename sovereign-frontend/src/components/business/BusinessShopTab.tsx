@@ -26,6 +26,22 @@ export function BusinessShopTab({ bizId, bizName, canManage, base, setNotice, re
   }, [base]);
   useEffect(() => { void load(); }, [load]);
 
+  // P18 — ปุ่มทดสอบ Telegram: ยิงข้อความทดสอบด้วย endpoint ที่ระบบแจ้งเตือนใช้จริง (SUPERADMIN เท่านั้น)
+  const [tgBusy, setTgBusy] = useState(false);
+  async function testTelegram() {
+    setTgBusy(true);
+    try {
+      const r = await fetch(`${getApiUrl()}/api/telegram/test`, { method: 'POST', headers: { Authorization: `Bearer ${useAuthStore.getState().token}` } });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.success) throw new Error(d?.error ?? `HTTP ${r.status}`);
+      setNotice({ ok: true, text: 'ยิง Telegram แล้ว — เช็คข้อความ "Sovereign Alert — test message" บนมือถือ' });
+    } catch (e: any) {
+      setNotice({ ok: false, text: `ทดสอบไม่สำเร็จ: ${e.message}` });
+    } finally {
+      setTgBusy(false);
+    }
+  }
+
   async function save(payload: any, okText: string) {
     setBusy(true);
     try {
@@ -122,6 +138,15 @@ export function BusinessShopTab({ bizId, bizName, canManage, base, setNotice, re
             {settings?.shopOpen && (
               <div className="text-[11px] text-slate-500 break-all">ลิงก์ร้าน: {publicUrl} — ส่งให้ลูกค้าผ่าน LINE/Facebook ได้เลย</div>
             )}
+            <div className="flex items-center gap-2">
+              <button onClick={testTelegram}
+                disabled={tgBusy || !canManage}
+                className="px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-300 text-xs hover:bg-cyan-500/10 disabled:opacity-40"
+                title="ยิงข้อความทดสอบเข้า Telegram ของคุณทันที — ไม่ต้องรอลูกค้าแจ้งชำระจริง">
+                {tgBusy ? 'กำลังส่ง…' : '🔔 ทดสอบ Telegram'}
+              </button>
+              <span className="text-[11px] text-slate-500">ทดสอบยิง Telegram ของคุณเอง — ถ้ามือถือเด้ง = ระบบแจ้งชำระ/บิลพร้อมใช้</span>
+            </div>
           </>
         )}
       </div>

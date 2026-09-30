@@ -219,7 +219,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
       {/* ── ออเดอร์ ── */}
       {tab === 'orders' && (
         <div className="space-y-4">
-          {can('SALES') && <PendingPaymentsCard reports={computePendingReports(orders)} onConfirm={confirmReportedPayment} busy={confirmingId} />}
+          {can('MANAGER') && <PendingPaymentsCard reports={computePendingReports(orders)} onConfirm={confirmReportedPayment} busy={confirmingId} />}
           {can('SALES') && (
             <div className="card p-4 space-y-3">
               <div className="text-sm font-semibold">🧾 เปิดออเดอร์ใหม่</div>
