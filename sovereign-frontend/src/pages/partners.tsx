@@ -69,6 +69,13 @@ export default function PartnersPage() {
   const [picking, setPicking] = useState(false);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pinId, setPinId] = useState<string | null>(null); // QR ป้ายร้าน: /partners?p=<id> → เปิดหมุดร้านตัวเอง
+
+  // อ่าน ?p= ใน useEffect เท่านั้น (กฎ hydration)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('p');
+    if (p) setPinId(p);
+  }, []);
 
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -130,7 +137,16 @@ export default function PartnersPage() {
         .addTo(map)
         .bindPopup(`<b>${p.name}</b><br/>${CATEGORY_LABEL[p.category] ?? ''}<br/>${(p.detail ?? '').slice(0, 120)}${p.address ? `<br/><small>${p.address}</small>` : ''}`)
     );
-  }, [partners, mapReady]);
+    // QR ป้ายร้าน — เปิดมาพร้อม ?p=<id>: ซูมเข้าหมุดร้านนั้น + เปิดการ์ดชื่อทันที
+    if (pinId) {
+      const idx = partners.findIndex((x) => x.id === pinId);
+      if (idx >= 0) {
+        const t = partners[idx];
+        map.setView([t.lat, t.lng], 16);
+        markersRef.current[idx]?.openPopup();
+      }
+    }
+  }, [partners, mapReady, pinId]);
 
   function startPick() {
     setPicking(true);
@@ -170,6 +186,11 @@ export default function PartnersPage() {
       </Head>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {pinId && (
+          <div className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20 px-4 py-2.5 text-center text-sm text-emerald-300" role="status">
+            📍 คุณมาจากป้าย QR ของร้านในเครือข่าย — หมุดร้านนั้นถูกเปิดให้แล้วด้านล่าง
+          </div>
+        )}
         <header className="text-center mb-8">
           <h1 className="text-2xl font-bold mb-2">🗺️ แผนที่คู่ค้าเครือข่าย</h1>
           <p className="text-sm text-gray-400 max-w-2xl mx-auto">

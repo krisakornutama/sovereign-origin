@@ -109,6 +109,33 @@ function VisitorInsights() {
 // P16 — แผงอนุมัติคู่ค้า: สมัครจาก /partners → อนุมัติ = ขึ้นแผนที่สาธารณะทันที
 interface PartnerRow { id: string; name: string; category: string; detail: string | null; address: string | null; phone: string | null; lat: number; lng: number; contactName: string; contactPhone: string; status: string; created_at: string; }
 
+// QR ป้ายร้าน (P16): สร้าง QR ต่อร้าน ACTIVE — สแกนแล้วเปิดหมุดร้านตัวเองบนแผนที่
+function PartnerQrButton({ id, name }: { id: string; name: string }) {
+  const [qr, setQr] = useState<{ qrDataUrl: string; target: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function make() {
+    setBusy(true);
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}/qr`);
+      if (res.ok) setQr(await res.json());
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (qr) {
+    return (
+      <div className="rounded-lg border border-gray-700 p-3 text-center space-y-2" style={{ width: 240 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qr.qrDataUrl} alt={`QR ป้ายร้าน ${name}`} width={200} height={200} className="mx-auto rounded bg-white p-1" />
+        <div className="text-[11px] text-gray-400 break-all">{qr.target}</div>
+        <button type="button" onClick={() => window.print()} className="w-full text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white">🖨️ พิมพ์ป้าย</button>
+        <button type="button" onClick={() => setQr(null)} className="text-[11px] text-gray-500 hover:text-gray-300">ปิด</button>
+      </div>
+    );
+  }
+  return <button type="button" onClick={make} disabled={busy} className="text-[11px] text-cyan-300 hover:underline underline-offset-2 disabled:opacity-40">{busy ? 'กำลังสร้าง…' : '🏷️ QR ป้ายร้าน'}</button>;
+}
+
 function PartnerApprovals() {
   const [rows, setRows] = useState<PartnerRow[]>([]);
   const [msg, setMsg] = useState('');
@@ -122,26 +149,34 @@ function PartnerApprovals() {
   }, []);
   useEffect(() => { load(); }, [load]);
   async function decide(id: string, status: 'ACTIVE' | 'REJECTED') {
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
-    });
-    setRows((s) => s.filter((r) => r.id !== id));
-    setMsg(status === 'ACTIVE' ? 'อนุมัติแล้ว — ขึ้นแผนที่แล้ว' : 'ปฏิเสธแล้ว');
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/partners/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRows((s) => s.filter((r) => r.id !== id)); // ลบแถวออกจากจอเมื่อ server ยืนยันเท่านั้น (บทเรียน: ผู้ใช้กดแล้วไม่ติ — แถวหายแบบ optimistic)
+      setMsg(status === 'ACTIVE' ? 'อนุมัติแล้ว — ขึ้นแผนที่แล้ว' : 'ปฏิเสธแล้ว');
+    } catch {
+      setMsg('ทำรายการไม่สำเร็จ — ลองใหม่ (รายการยังอยู่)');
+    }
     setTimeout(() => setMsg(''), 3500);
   }
   if (rows.length === 0) return null;
   const CAT: Record<string, string> = { SHOP: '🏪 ร้านค้า', TECHNICIAN: '🔧 ช่าง', OTHER: '🤝 อื่น ๆ' };
+  const pending = rows.filter((r) => r.status === 'PENDING');
+  const active = rows.filter((r) => r.status === 'ACTIVE');
+  if (pending.length === 0 && active.length === 0) return null;
   return (
-    <section className="card p-4 space-y-3" aria-label="อนุมัติคู่ค้า">
+    <section className="card p-4 space-y-3" aria-label="จัดการคู่ค้า">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h2 className="font-ledger text-sm text-gray-300">🗺️ ใบสมัครคู่ค้ารออนุมัติ ({rows.length})</h2>
+        <h2 className="font-ledger text-sm text-gray-300">🗺️ คู่ค้า — รออนุมัติ {pending.length} · เปิดใช้งาน {active.length}</h2>
         <div className="flex items-center gap-3">
           {msg && <span className="text-xs text-emerald-400">{msg}</span>}
           <button onClick={load} className="text-[11px] text-gray-500 hover:text-gray-300">รีเฟรช</button>
         </div>
       </div>
       <div className="space-y-2">
-        {rows.map((p) => (
+        {pending.map((p) => (
           <div key={p.id} className="card p-3 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-medium text-gray-200">{p.name}</span>
@@ -157,6 +192,18 @@ function PartnerApprovals() {
             </div>
           </div>
         ))}
+        {active.length > 0 && (
+          <div className="pt-2 border-t border-dashed border-gray-800 space-y-2">
+            <div className="text-[11px] text-gray-500">คู่ค้าที่เปิดใช้งานแล้ว — สร้าง QR ป้ายติดหน้าร้าน (สแกน = เปิดหมุดร้านบนแผนที่)</div>
+            {active.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 text-xs">
+                <span className="font-medium text-gray-200">{p.name}</span>
+                <span className="text-[10px] text-gray-500">{CAT[p.category] ?? p.category}</span>
+                <span className="ml-auto"><PartnerQrButton id={p.id} name={p.name} /></span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

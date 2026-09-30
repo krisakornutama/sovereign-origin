@@ -56,6 +56,22 @@ router.get('/', applyLimiter, async (_req, res) => {
   }
 });
 
+// GET /api/partners/:id/qr — QR ป้ายร้าน (P16 คำสั่งเจ้าของ): สแกนแล้วเปิดหมุดร้านตัวเองบน /partners?p=<id>
+//  สาธารณะ (ติดป้ายหน้าร้าน — ไม่เปิดเผยอะไรเกิน GET /api/partners อยู่แล้ว) · ACTIVE เท่านั้น
+router.get('/:id/qr', applyLimiter, async (req, res) => {
+  try {
+    const p = await prisma.partner.findFirst({ where: { id: String(req.params.id), status: 'ACTIVE' }, select: { name: true } });
+    if (!p) return res.status(404).json({ error: 'ไม่พบคู่ค้านี้' });
+    const QRCode = (await import('qrcode')).default;
+    const base = process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org';
+    const target = `${base}/partners/?p=${String(req.params.id)}`;
+    const qrDataUrl = await QRCode.toDataURL(target, { width: 480, margin: 2 });
+    return res.json({ name: p.name, target, qrDataUrl });
+  } catch {
+    return res.status(500).json({ error: 'สร้าง QR ไม่สำเร็จ' });
+  }
+});
+
 // GET /api/partners/admin/list — ทั้งหมดรวม PENDING (SUPERADMIN)
 router.get('/admin/list', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   try {
