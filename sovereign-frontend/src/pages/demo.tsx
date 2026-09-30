@@ -203,10 +203,35 @@ function Loading() {
   return <div className="card p-6 text-sm text-gray-500">กำลังโหลดข้อมูลตัวอย่าง…</div>;
 }
 
-// ── แท็บ 🧩 โมดูลทั้งหมด (P12): ความสามารถครบระบบจากข้อมูลสแกนจริง ──
+// ── แท็บ 🧩 โมดูลทั้งหมด (P12+P14): ครบทุกโมดูล + ปุ่มสนใจโมดูลนี้ (ฟอร์มจองเล็ก — เก็บสถิติว่าโมดูลไหนถูกขอมากสุด) ──
 function CatalogTab({ data }: { data: CatalogData | null }) {
+  const [interestKey, setInterestKey] = useState<string | null>(null); // โมดูลที่กำลังเปิดฟอร์ม
+  const [msg, setMsg] = useState('');
+  const [contact, setContact] = useState('');
+  const [website, setWebsite] = useState(''); // honeypot
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+
   if (!data) return <Loading />;
   const soldHint = ['trace', 'business', 'farm', 'livestock', 'inventory', 'finance'];
+
+  const submitInterest = async () => {
+    if (!interestKey || msg.trim().length < 3) return;
+    setBusy(true);
+    try {
+      await fetch(`${getApiUrl()}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: '/demo', topic: 'feature', message: `[สนใจโมดูล ${interestKey}] ${msg.trim()}`, senderEmail: contact || undefined, website }),
+      });
+      trackQuestion('/demo', `สนใจโมดูล ${interestKey}`, msg.trim().slice(0, 200)); // สถิติโมดูลไหนถูกขอมากสุด
+      setSent(true);
+      setTimeout(() => { setInterestKey(null); setSent(false); setMsg(''); setContact(''); }, 2500);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="card p-4 space-y-3" aria-label="แคตตาล็อกโมดูลทั้งหมด">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
@@ -215,12 +240,43 @@ function CatalogTab({ data }: { data: CatalogData | null }) {
       </div>
       <div className="grid gap-1.5 max-h-[26rem] overflow-y-auto pr-1">
         {data.modules.map((m) => (
-          <div key={m.key} className="flex items-baseline gap-2 border-b border-dashed border-gray-800/80 pb-1.5 last:border-0">
-            <span className={`text-xs w-28 shrink-0 truncate ${soldHint.includes(m.key) ? 'text-emerald-300' : 'text-gray-300'}`}>{m.name}</span>
-            <span className="text-[11px] text-gray-500 flex-1 truncate">{m.note || '—'}</span>
-            <span className="mono text-[10px] text-gray-600 shrink-0" title="endpoints · บรรทัดโค้ด · ชุดทดสอบ">
-              {m.endpoints} ep · {m.loc.toLocaleString('th-TH')} LOC · ✅{m.testRefs}
-            </span>
+          <div key={m.key} className="border-b border-dashed border-gray-800/80 pb-1.5 last:border-0">
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xs w-28 shrink-0 truncate ${soldHint.includes(m.key) ? 'text-emerald-300' : 'text-gray-300'}`}>{m.name}</span>
+              <span className="text-[11px] text-gray-500 flex-1 truncate">{m.note || '—'}</span>
+              <span className="mono text-[10px] text-gray-600 shrink-0" title="endpoints · บรรทัดโค้ด · ชุดทดสอบ">
+                {m.endpoints} ep · {m.loc.toLocaleString('th-TH')} LOC · ✅{m.testRefs}
+              </span>
+              <button type="button" onClick={() => { setInterestKey(interestKey === m.key ? null : m.key); setSent(false); }}
+                className={`shrink-0 text-[10px] px-2 py-0.5 rounded border transition ${interestKey === m.key ? 'border-cyan-500/60 text-cyan-300 bg-cyan-950/30' : 'border-gray-700 text-gray-400 hover:border-cyan-500/60 hover:text-cyan-300'}`}>
+                สนใจโมดูลนี้
+              </button>
+            </div>
+            {interestKey === m.key && (
+              <div className="mt-2 space-y-1.5 rounded-lg border border-cyan-900/60 bg-cyan-950/10 p-2.5">
+                {sent ? (
+                  <p className="text-xs text-emerald-400">บันทึกความสนใจ {m.name} แล้ว — เจ้าของร้านจะติดต่อกลับครับ 🙏</p>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-gray-400">สนใจใช้ <b className="text-cyan-300">{m.name}</b> — บอกการใช้งานที่ต้องการได้เลย (จะถูกส่งถึงผู้พัฒนาโดยตรง)</p>
+                    <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={2} maxLength={500}
+                      placeholder="เช่น อยากใช้กับไร่ผม มีแปลง 3 แปลง อยากเห็นความชื้นดินรายแปลง…"
+                      className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1.5 text-xs" />
+                    <div className="flex gap-2 items-center">
+                      <input type="text" value={contact} onChange={(e) => setContact(e.target.value)} maxLength={120}
+                        placeholder="อีเมล/เบอร์ (ถ้าอยากให้ติดต่อกลับ — ไม่บังคับ)"
+                        className="flex-1 bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1 text-xs" />
+                      {/* honeypot */}
+                      <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" />
+                      <button type="button" onClick={submitInterest} disabled={busy || msg.trim().length < 3}
+                        className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-xs">
+                        {busy ? 'กำลังส่ง…' : 'ส่งความสนใจ'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

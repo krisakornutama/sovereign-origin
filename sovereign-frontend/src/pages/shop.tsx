@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
-import { trackPageView } from '../lib/visitorTrack';
+import { trackPageView, trackCtaClick } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /shop — หน้าร้านสาธารณะ (ไม่ต้อง login) — ออกแบบตาม "สลิปบนเคาน์เตอร์ยามค่ำ"
@@ -176,6 +176,15 @@ function Storefront({ businessId }: { businessId: string }) {
         )}
         {error && <div className="card p-3 text-sm text-rose-300 border-rose-500/40">{error}</div>}
 
+        {/* ขั้นตอนสั่งซื้อ — เห็นก่อนกด (P14) */}
+        <div className="card px-4 py-2.5 text-[11px] text-gray-400 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="font-ledger text-gray-300 text-xs mr-1">วิธีสั่งซื้อ</span>
+          <span>① กด <b className="text-emerald-300">สั่งซื้อเลย</b> ที่สินค้า</span>
+          <span>② กรอกชื่อ+เบอร์</span>
+          <span>③ ยืนยันคำสั่งซื้อ</span>
+          <span>④ รับลิงก์ชำระ <b className="text-emerald-300">PromptPay</b> ทันที — เช็คสถานะได้ตลอด</span>
+        </div>
+
         {/* สินค้า — รายการแบบสมุดบัญชี (เส้นประจัดบรรทัดราคา) */}
         <section className="card px-5 py-3">
           <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">สินค้าของร้าน</h2>
@@ -218,7 +227,17 @@ function Storefront({ businessId }: { businessId: string }) {
                 );
               })()}
               {p.inStock && (
-                <div className="flex items-center justify-end gap-1 mt-1.5">
+                <div className="flex items-center mt-1.5">
+                  <button type="button"
+                    onClick={() => {
+                      if ((cart[p.id] ?? 0) === 0) setQty(p.id, 1); // ยังไม่มีในตะกร้า = เริ่ม 1 ชิ้นทันที
+                      trackCtaClick('/shop', 'order_now', p.category === 'GENERAL' ? p.name.slice(0, 20) : p.category);
+                      document.getElementById('order-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium shadow shadow-emerald-950/40">
+                    🛒 สั่งซื้อเลย
+                  </button>
+                  <div className="ml-auto flex items-center gap-1">
                   <button type="button" aria-label={`ลดจำนวน ${p.name}`} disabled={(cart[p.id] ?? 0) === 0}
                     onClick={() => setQty(p.id, (cart[p.id] ?? 0) - 1)}
                     className="h-7 w-7 rounded-md border border-gray-700 text-gray-300 hover:border-emerald-500/60 hover:text-emerald-300 disabled:opacity-30">−</button>
@@ -228,6 +247,7 @@ function Storefront({ businessId }: { businessId: string }) {
                   <button type="button" aria-label={`เพิ่มจำนวน ${p.name}`} disabled={(cart[p.id] ?? 0) >= 99}
                     onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)}
                     className="h-7 w-7 rounded-md border border-gray-700 text-gray-300 hover:border-emerald-500/60 hover:text-emerald-300 disabled:opacity-30">+</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -235,7 +255,7 @@ function Storefront({ businessId }: { businessId: string }) {
         </section>
 
         {/* สรุปคำสั่งซื้อ — สลิปขอบฉีก (signature) */}
-        <section className="shop-tear shop-paper px-5 py-4 space-y-3">
+        <section id="order-summary" className="shop-tear shop-paper px-5 py-4 space-y-3">
           <h2 className="font-ledger text-sm text-gray-300">สรุปคำสั่งซื้อ</h2>
           {items.length === 0 ? (
             <div className="text-sm text-gray-500">ยังไม่ได้เลือกสินค้า — กด + ในรายการด้านบนเพื่อเริ่ม</div>
