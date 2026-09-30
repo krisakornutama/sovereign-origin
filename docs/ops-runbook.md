@@ -277,7 +277,14 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - อีเมล digest (แทน Telegram): เติม SMTP_* ใน infra/.env แล้วขยาย `feedback.service.ts` — การ์ดอนาคต
 
 ### สรุปสิ่งที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
-`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/health` — ที่เหลือ block ทั้งหมด (403 ที่ edge)
+`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/track` · `/api/health` — ที่เหลือ block ทั้งหมด (403 ที่ edge)
+
+### เก็บพฤติกรรม/ความต้องการผู้ใช้ (P10 — 30/9/69) + หน้าแรกโหมดทดลอง (P11)
+- **ตาราง `visitor_events`** (migration 20260930150000) — **cookieless ไม่มี PII**: ไม่เก็บชื่อ/อีเมล/IP เปล่า (ip→sha256+salt 8 ตัว ใช้นับผู้มาเยือนประมาณ) · kind ต้องอยู่ allowlist: `page_view · demo_tab · time_on_page · survey · question · feedback_open · outbound`
+- **`POST /api/track`** สาธารณะ — honeypot `website` · page ต้องขึ้น `/` · ตอบ 202 เสมอ (tracking ต้องไม่กลายเป็น error ฝั่งผู้ใช้) · limiter 60/นาที · **`GET /api/analytics/summary?days=N`** = SUPERADMIN (หน้า /feedback-admin แผง "📊 พฤติกรรมผู้เยี่ยมชม 7 วัน")
+- **ตัดสินใจสถาปัตยกรรมที่ gate จับ:** `FeedbackButton` ย้ายจาก pages/demo.tsx → **components/public/** ตามกฎ import-layers (ห้าม page import page) — หน้าใดก็ import component ได้
+- **แบบสอบถามสั้นบน /demo**: "ส่วนไหนอยากใช้จริงก่อน?" (farm/livestock/finance/trace/shop/อื่น ๆ) + ช่องความต้องการอิสระ → kind `survey`/`question` — นี่คือสายข้อมูล "ความต้องการผู้ใช้" ที่เจ้าของใช้จัดลำดับการพัฒนาต่อ
+- **หน้าแรกสองบุคลิก** (`lib/publicAccess.ts`): โดเมนจริง → การ์ด 3 ใบ (เดโม่/ร้าน/ตามรอย) ไม่มีล็อกอินขวาง (ลิงก์ /login เล็กท้ายหน้า) · localhost/LAN → LoginForm เดิม · session เจ้าของบนโดเมนจริงเด้ง dashboard ตามเดิม
 
 ### ขายซอฟต์แวร์แยกชิ้น (P8 — 30/9/69)
 - หน้าจัดการ: **`/software-pricing`** (SUPERADMIN) — สแกนโค้ดจริง 61 โมดูล → ตาราง endpoints/LOC/ชุดทดสอบ + ราคาแนะนำ → ตั้งชื่อ/สเปค/ราคาเอง → กด "เปิดขาย" = ขึ้นหน้าร้านทันที (SKU `SW-<MODULE>` ผูก inventory "license")

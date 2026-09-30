@@ -7,6 +7,8 @@ import EmptyState from '../components/ui/EmptyState';
 import { authFetch } from '../lib/apiFetch';
 import { getApiUrl } from '../lib/config';
 import { useAuthStore } from '../stores/useAuthStore';
+import { FeedbackButton } from '../components/public/FeedbackButton';
+import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -120,6 +122,8 @@ export default function TracePage() {
   const [scanning, setScanning] = useState(false);
   const [qr, setQr] = useState<{ lotCode: string; qrDataUrl: string; url: string } | null>(null);
   const searchedRef = useRef(false);
+
+  useEffect(() => { trackPageView('/trace'); }, []); // P10: สถิติการเยือน (cookieless)
 
   const search = useCallback(async (raw: string) => {
     const c = raw.trim().toUpperCase();
@@ -348,6 +352,7 @@ export default function TracePage() {
             Powered by Sovereign OS
           </footer>
         </main>
+        <FeedbackButton page="/trace" />
       </div>
     </div>
   );

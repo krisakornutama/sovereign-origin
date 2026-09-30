@@ -12,7 +12,78 @@ import Icon from '../components/ui/Icon';
 // /feedback-admin — คัดกรองฟีดแบ็กจากหน้าสาธารณะ (SUPERADMIN)
 //  ตัดสิน "มีประโยชน์/สแปม" ต่อรายการ → เฉพาะที่ "มีประโยชน์" เข้า digest ไปหาเจ้าของ
 //  ปุ่ม "ยื่นถึงผม" = ส่ง digest ทันทีผ่าน Telegram (ของที่ยังไม่ sent เท่านั้น)
+//  P10: มีแผง "พฤติกรรมผู้เยี่ยมชม" — สรุปหน้ายอดนิยม/แท็บเดโม่/แบบสอบถาม (GET /api/analytics/summary)
 // ────────────────────────────────────────────────────────────────────────────
+
+interface VisitorSummaryData {
+  days: number; totalEvents: number; uniqueVisitors: number;
+  pageViews: { page: string; count: number }[];
+  demoTabs: { detail: string; count: number }[];
+  avgTimeOnPageSec: number | null;
+  surveys: { value: string; count: number }[];
+  questions: { detail: string; value: string; count: number }[];
+  feedbackOpens: number;
+}
+
+function VisitorInsights() {
+  const [sum, setSum] = useState<VisitorSummaryData | null>(null);
+  useEffect(() => {
+    authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/summary?days=7`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSum(d))
+      .catch(() => {});
+  }, []);
+  if (!sum) return null;
+  const top = (arr: { count: number }[]) => Math.max(1, ...arr.map((a) => a.count));
+  return (
+    <section className="card p-4 space-y-3" aria-label="พฤติกรรมผู้เยี่ยมชม">
+      <div className="flex items-baseline justify-between flex-wrap gap-2">
+        <h2 className="font-ledger text-sm text-gray-300">📊 พฤติกรรมผู้เยี่ยมชม 7 วันล่าสุด</h2>
+        <span className="mono text-[11px] text-gray-500">{sum.totalEvents} เหตุการณ์ · ~{sum.uniqueVisitors} ผู้มาเยือน (ประมาณ) · เปิดฟีดแบ็ก {sum.feedbackOpens} ครั้ง</span>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <div className="text-[11px] text-gray-500">หน้ายอดนิยม</div>
+          {sum.pageViews.length === 0 && <div className="text-xs text-gray-600">ยังไม่มีข้อมูล</div>}
+          {sum.pageViews.slice(0, 5).map((p) => (
+            <div key={p.page} className="flex items-center gap-2 text-xs">
+              <span className="w-24 truncate text-gray-300">{p.page}</span>
+              <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden"><div className="h-full bg-cyan-500/60" style={{ width: `${(p.count / top(sum.pageViews)) * 100}%` }} /></div>
+              <span className="mono text-[10px] text-gray-500 w-8 text-right">{p.count}</span>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-1">
+          <div className="text-[11px] text-gray-500">แท็บเดโม่ที่คนเปิด ({sum.avgTimeOnPageSec != null ? `อยู่หน้าเฉลี่ย ${sum.avgTimeOnPageSec}s` : 'ยังไม่มีข้อมูลเวลา'})</div>
+          {sum.demoTabs.length === 0 && <div className="text-xs text-gray-600">ยังไม่มีข้อมูล</div>}
+          {sum.demoTabs.slice(0, 5).map((p) => (
+            <div key={p.detail} className="flex items-center gap-2 text-xs">
+              <span className="w-24 truncate text-gray-300">{p.detail}</span>
+              <div className="flex-1 h-1.5 bg-gray-800 rounded overflow-hidden"><div className="h-full bg-emerald-500/60" style={{ width: `${(p.count / top(sum.demoTabs)) * 100}%` }} /></div>
+              <span className="mono text-[10px] text-gray-500 w-8 text-right">{p.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {(sum.surveys.length > 0 || sum.questions.length > 0) && (
+        <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-dashed border-gray-800">
+          <div className="space-y-1">
+            <div className="text-[11px] text-gray-500">แบบสอบถาม: ส่วนที่อยากใช้จริงก่อน</div>
+            {sum.surveys.map((s) => (
+              <div key={s.value} className="text-xs text-gray-300">• {s.value} <span className="mono text-[10px] text-gray-500">×{s.count}</span></div>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <div className="text-[11px] text-gray-500">ความต้องการที่ผู้ใช้เขียนเอง</div>
+            {sum.questions.slice(0, 5).map((q, i) => (
+              <div key={i} className="text-xs text-gray-300">• <span className="text-cyan-300/80">{q.detail}</span> — {q.value}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 interface Note {
   id: string;
@@ -105,6 +176,7 @@ export default function FeedbackAdminPage() {
           }
         />
         <main className="flex-1 p-4 lg:p-6 max-w-5xl mx-auto w-full space-y-4">
+          <VisitorInsights />
           <div className="flex gap-2" role="tablist" aria-label="กรองสถานะฟีดแบ็ก">
             {([['pending', `รอตัดสิน (${notes.filter((n) => n.useful === null).length})`], ['useful', `มีประโยชน์ (${notes.filter((n) => n.useful === true).length})`], ['spam', `สแปม (${notes.filter((n) => n.useful === false).length})`], ['all', 'ทั้งหมด']] as const).map(([k, label]) => (
               <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}

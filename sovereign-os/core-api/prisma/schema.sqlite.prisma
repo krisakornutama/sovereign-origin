@@ -143,6 +143,22 @@ model FeedbackNote {
   @@map("feedback_notes")
 }
 
+model VisitorEvent {
+  // พฤติกรรมผู้เยี่ยมชมสาธารณะ (P10) — โครงเดียวกับ postgres (sqlite: ไม่มี @db.Timestamptz)
+  id         String   @id @default(uuid())
+  created_at DateTime @default(now())
+  kind       String
+  page       String
+  detail     String?
+  value      String?
+  user_agent String?
+  ip_hash    String?
+
+  @@index([created_at(sort: Desc)])
+  @@index([kind])
+  @@map("visitor_events")
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   timestamp   DateTime @default(now())

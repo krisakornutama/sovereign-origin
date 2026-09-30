@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
+import { FeedbackButton } from '../components/public/FeedbackButton';
+import { trackPageView, trackDemoTab, trackSurvey, trackQuestion } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /demo — สนามทดลองสาธารณะ (ไม่ต้อง login) — P: Publishing
@@ -39,6 +41,7 @@ export default function DemoPage() {
   const [fin, setFin] = useState<FinanceData | null>(null);
 
   useEffect(() => {
+    trackPageView('/demo'); // P10: เก็บสถิติการเยือน (cookieless · ไม่มี PII)
     fetchJsonObject<FarmData>(`${API}/farm`).then((d) => d && setFarm(d));
     fetchJsonObject<LivestockData>(`${API}/livestock`).then((d) => d && setStock(d));
     fetchJsonObject<FinanceData>(`${API}/finance`).then((d) => d && setFin(d));
@@ -58,7 +61,7 @@ export default function DemoPage() {
 
         <nav className="flex gap-2" role="tablist" aria-label="เลือกโมดูลเดโม่">
           {([['farm', '🌾 ฟาร์ม'], ['livestock', '🐄 ปศุสัตว์'], ['finance', '💰 การเงิน']] as const).map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => { setTab(k); trackDemoTab('/demo', k); }}
               className={`px-3 py-1.5 rounded-lg text-sm border transition ${tab === k ? 'border-cyan-500/60 text-cyan-300 bg-cyan-950/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
               {label}
             </button>
@@ -68,6 +71,8 @@ export default function DemoPage() {
         {tab === 'farm' && <FarmTab data={farm} />}
         {tab === 'livestock' && <LivestockTab data={stock} />}
         {tab === 'finance' && <FinanceTab data={fin} />}
+
+        <VisitorSurvey />
 
         <footer className="pt-4 text-[11px] text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
           <span>Powered by Sovereign OS</span>
@@ -165,80 +170,59 @@ function Loading() {
   return <div className="card p-6 text-sm text-gray-500">กำลังโหลดข้อมูลตัวอย่าง…</div>;
 }
 
-// ── ปุ่มฟีดแบ็กลอย — ใช้ซ้ำได้ (export ให้หน้าอื่นเอาไปครอบได้ภายหลัง) ──
-export function FeedbackButton({ page = '/demo' }: { page?: string }) {
-  const [open, setOpen] = useState(false);
-  const [topic, setTopic] = useState('general');
-  const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
-  const [website, setWebsite] = useState(''); // honeypot — ซ่อนจากมนุษย์
-  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+// ── แบบสอบถามสั้น (P10) — เก็บความต้องการผู้ใช้จริง: โมดูลไหนอยากใช้ก่อน ──
+const SURVEY_MODULES = ['farm', 'livestock', 'finance', 'trace', 'shop', 'อื่น ๆ'] as const;
+function VisitorSurvey() {
+  const [picked, setPicked] = useState<string | null>(null);
+  const [want, setWant] = useState('');
+  const [sent, setSent] = useState(false);
+  const [website, setWebsite] = useState(''); // honeypot
 
-  const submit = useCallback(async () => {
-    if (message.trim().length < 3) return;
-    setState('sending');
-    try {
-      const res = await fetch(`${getApiUrl()}/api/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page, topic, message, senderEmail: email || undefined, website }),
-      });
-      if (!res.ok && res.status !== 202) throw new Error('send failed');
-      setState('done');
-      setMessage('');
-      setEmail('');
-      setTimeout(() => { setOpen(false); setState('idle'); }, 2200);
-    } catch {
-      setState('error');
-    }
-  }, [message, topic, email, website, page]);
+  if (sent) {
+    return (
+      <section className="card p-4 text-sm text-emerald-400" aria-label="แบบสอบถาม">
+        บันทึกคำตอบแล้ว — ขอบคุณครับ 🙏 เราจะนำไปพัฒนาสิ่งที่คนใช้จริงต้องการก่อน
+      </section>
+    );
+  }
+
+  const submit = () => {
+    if (!picked) return;
+    trackSurvey('/demo', picked); // ทางเลือกหลัก → kind:survey
+    if (want.trim().length >= 3) trackQuestion('/demo', `อยากได้เพิ่มใน ${picked}`, want.trim().slice(0, 300)); // อิสระ → kind:question
+    setSent(true);
+  };
 
   return (
-    <>
-      {!open && (
-        <button type="button" onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-40 px-4 py-2 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white text-sm shadow-lg shadow-cyan-950/50">
-          💬 ส่งความคิดเห็น
-        </button>
+    <section className="card p-4 space-y-3" aria-label="แบบสอบถามผู้ใช้">
+      <div>
+        <h2 className="font-ledger text-sm text-gray-300">ช่วยหน่อย — ส่วนไหนที่คุณอยากใช้จริงก่อน?</h2>
+        <p className="text-[11px] text-gray-500">ตอบ 1 ข้อ 5 วินาที — ผลจะถูกนำไปจัดลำดับการพัฒนา (ไม่เก็บข้อมูลตัวตน)</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {SURVEY_MODULES.map((m) => (
+          <button key={m} type="button" onClick={() => setPicked(m)}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition ${picked === m ? 'border-emerald-500/60 text-emerald-300 bg-emerald-950/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+            {m}
+          </button>
+        ))}
+      </div>
+      {picked && (
+        <>
+          <textarea value={want} onChange={(e) => setWant(e.target.value)} rows={2} maxLength={300}
+            placeholder="อยากได้อะไรเพิ่มในส่วนนี้ (ถ้ามี — ไม่บังคับ)" aria-label="ความต้องการเพิ่มเติม"
+            className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1.5 text-sm" />
+          {/* honeypot — ซ่อนจากมนุษย์ */}
+          <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1}
+            autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 opacity-0" />
+          <button type="button" onClick={submit}
+            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm">
+            ส่งคำตอบ
+          </button>
+        </>
       )}
-      {open && (
-        <div className="fixed bottom-5 right-5 z-40 w-[min(92vw,22rem)] card p-4 space-y-2 border-cyan-500/40" role="dialog" aria-label="ส่งความคิดเห็น">
-          <div className="flex items-center justify-between">
-            <span className="font-ledger text-sm text-cyan-300">ความคิดเห็นของคุณ</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="ปิด" className="text-gray-500 hover:text-gray-300">✕</button>
-          </div>
-          {state === 'done' ? (
-            <p className="text-sm text-emerald-400 py-2">ส่งแล้ว — ขอบคุณครับ 🙏</p>
-          ) : (
-            <>
-              <select value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="หัวข้อ"
-                className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1.5 text-sm">
-                <option value="general">ความเห็นทั่วไป</option>
-                <option value="bug">พบปัญหา</option>
-                <option value="feature">อยากได้ฟีเจอร์</option>
-                <option value="question">สอบถาม</option>
-              </select>
-              <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} maxLength={2000}
-                placeholder="เล่าให้ฟังหน่อยว่าอะไรดี อะไรควรแก้…" aria-label="ข้อความ"
-                className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1.5 text-sm" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120}
-                placeholder="อีเมล (ถ้าอยากให้ติดต่อกลับ — ไม่บังคับ)" aria-label="อีเมลผู้ส่ง"
-                className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-1.5 text-xs" />
-              {/* honeypot — ซ่อนจากมนุษย์ (bot ที่กรอกอัตโนมัติจะโดนทิ้งเงียบ ๆ) */}
-              <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1}
-                autoComplete="off" aria-hidden="true"
-                className="absolute -left-[9999px] h-0 w-0 opacity-0" />
-              <div className="flex items-center justify-between">
-                {state === 'error' ? <span className="text-[11px] text-rose-400">ส่งไม่สำเร็จ — ลองใหม่</span> : <span />}
-                <button type="button" onClick={submit} disabled={state === 'sending' || message.trim().length < 3}
-                  className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-sm">
-                  {state === 'sending' ? 'กำลังส่ง…' : 'ส่ง'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </>
+    </section>
   );
 }
+
+

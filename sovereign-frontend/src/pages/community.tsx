@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
+import { FeedbackButton } from '../components/public/FeedbackButton';
+import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ export default function CommunityPage() {
   const [query, setQuery] = useState(''); // อ่าน q หลัง mount กัน hydration mismatch
 
   useEffect(() => {
+    trackPageView('/community'); // P10: สถิติการเยือน (cookieless)
     fetchJsonObject<Catalog>(API)
       .then((d) => setCatalog(d))
       .catch((e) => setErr(e.message || t('community.loadFailed', 'โหลดไม่สำเร็จ')));
@@ -104,6 +107,7 @@ export default function CommunityPage() {
           <div>Powered by Sovereign OS · <a href="/demo" className="hover:text-slate-400 underline underline-offset-2">ลองเล่นเดโม่</a></div>
         </footer>
       </main>
+      <FeedbackButton page="/community" />
     </div>
   );
 }
