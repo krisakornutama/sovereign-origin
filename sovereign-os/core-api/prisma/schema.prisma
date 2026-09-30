@@ -156,6 +156,32 @@ model FeedbackNote {
   @@map("feedback_notes")
 }
 
+model Partner {
+  // พาร์ทเนอร์เครือข่าย (P16) — ร้านค้า SME/ช่าง/ผู้ให้บริการที่สมัครเข้ามาอยู่บนแผนที่ร่วม
+  // สมัครสาธารณะ (status=PENDING) → เจ้าของอนุมัติ (ACTIVE) ถึงโชว์บนแผนที่/รายชื่อ
+  id           String   @id @default(uuid()) @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz
+  name         String // ชื่อร้าน/ช่าง/กิจการ
+  category     String   @default("SHOP") // SHOP | TECHNICIAN | SERVICE | OTHER
+  detail       String? // อธิบายสั้น ๆ ทำอะไร
+  address      String? // ที่อยู่ (แสดงบนการ์ด)
+  phone        String? // เบอร์ติดต่อ (แสดงเมื่ออนุมัติแล้ว)
+  lat          Float // พิกัด pin บนแผนที่
+  lng          Float
+  contactName  String // ชื่อผู้ติดต่อ (ไม่แสดงสาธารณะ)
+  contactPhone String // เบอร์ผู้ติดต่อ (ไม่แสดงสาธารณะ)
+  contactEmail String? // อีเมลผู้ติดต่อ (ไม่แสดงสาธารณะ)
+  status       String   @default("PENDING") // PENDING | ACTIVE | REJECTED
+  decided_at   DateTime? @db.Timestamptz // เวลาอนุมัติ/ปฏิเสธ
+  note         String? // บันทึกภายในของเจ้าของ
+  user_agent   String?
+  ip_hash      String?
+
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+  @@map("partners")
+}
+
 model VisitorEvent {
   // พฤติกรรมผู้เยี่ยมชมสาธารณะ (P10) — cookieless ไม่มี PII: ip → sha256 8 ตัว ใช้นับ session เท่านั้น
   id         String   @id @default(uuid()) @db.Uuid

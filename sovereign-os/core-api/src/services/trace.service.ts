@@ -351,3 +351,8 @@ export async function lotsForOrderLines(lines: Array<{ productId: string; qty: n
     })),
   }));
 }
+
+/** P16 — สถิติความโปร่งสำหรับหน้า /about — นับล็อตที่เจ้าของตาราง (trace) ทำเอง แล้ว business เรียกผ่านตรงนี้ */
+export async function countAllLots(): Promise<number> {
+  return prisma.productLot.count();
+}

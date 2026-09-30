@@ -188,8 +188,8 @@ function Storefront({ businessId }: { businessId: string }) {
         {/* ชิ้นงานสนับสนุน — รายการแบบสมุดบัญชี (เส้นประจัดบรรทัดยอดสนับสนุน) */}
         <section className="card px-5 py-3">
           <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">ชิ้นงานที่เปิดให้สนับสนุน</h2>
-          {shop.products.length === 0 && <div className="py-6 text-sm text-gray-500">ยังไม่มีชิ้นงานที่เปิดให้สนับสนุน — จะแสดงที่นี่เมื่อเปิดรอบใหม่</div>}
-          {shop.products.map((p) => (
+          {shop.products.filter((p) => p.category !== 'SUPPORT').length === 0 && <div className="py-6 text-sm text-gray-500">ยังไม่มีชิ้นงานที่เปิดให้สนับสนุน — จะแสดงที่นี่เมื่อเปิดรอบใหม่</div>}
+          {shop.products.filter((p) => p.category !== 'SUPPORT').map((p) => (
             <div key={p.id} className={`py-3 border-b border-dashed border-gray-800/80 last:border-0 ${p.inStock ? '' : 'opacity-50'}`}>
               <div className="flex items-baseline gap-2">
                 <span className="font-medium text-[15px] text-gray-100">{p.name}</span>
@@ -253,6 +253,44 @@ function Storefront({ businessId }: { businessId: string }) {
             </div>
           ))}
         </section>
+
+        {/* สนับสนุนตามศรัทธา (P16) — สำหรับคนที่อยากสนับสนุนโดยไม่รับชิ้นงาน · กำหนดยอดเอง */}
+        {(() => {
+          const faith = shop.products.find((p) => p.category === 'SUPPORT');
+          if (!faith) return null;
+          const faithQty = cart[faith.id] ?? 0;
+          return (
+            <section className="card px-5 py-3" aria-label="สนับสนุนตามศรัทธา">
+              <h2 className="font-ledger text-sm text-gray-300 py-2 border-b border-gray-800">สนับสนุนตามศรัทธา — ไม่รับชิ้นงาน</h2>
+              <p className="text-xs text-gray-400 leading-relaxed py-2">
+                สำหรับผู้ที่อยากสนับสนุนโครงการโดยไม่ต้องรับชิ้นงานกลับไป — กำหนดยอดเองตามกำลังใจ
+                ทุกบาทเข้ากองทุนพัฒนาระบบและผลิตชิ้นงานชุดถัดไป (ดูการใช้เงินได้ที่หน้า{' '}
+                <a href="/about" className="text-cyan-300 hover:underline underline-offset-2">เกี่ยวกับเรา</a>)
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input type="number" min={0} max={100000} value={faithQty}
+                  onChange={(e) => setQty(faith.id, Math.min(100000, Math.max(0, Math.floor(Number(e.target.value) || 0))))}
+                  placeholder="ยอดสนับสนุน" aria-label="ยอดสนับสนุน (บาท)"
+                  className="w-28 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm mono" />
+                <span className="text-xs text-gray-500">บาท</span>
+                {[50, 100, 500].map((v) => (
+                  <button key={v} type="button" onClick={() => { setQty(faith.id, faithQty + v); trackCtaClick('/shop', 'support_faith', `chip_${v}`); }}
+                    className="px-2.5 py-1 rounded-md border border-gray-700 text-xs text-gray-300 hover:border-emerald-500/60 hover:text-emerald-300">+{v}</button>
+                ))}
+                <button type="button"
+                  onClick={() => {
+                    if (faithQty === 0) setQty(faith.id, 100);
+                    trackCtaClick('/shop', 'support_faith', 'faith');
+                    document.getElementById('order-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="px-4 py-1.5 rounded-lg border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10 text-sm font-medium">
+                  🙏 สนับสนุนตามศรัทธา
+                </button>
+              </div>
+              {faithQty > 0 && <p className="text-[11px] text-emerald-400 mt-1.5">อยู่ในสรุปยอดแล้ว {baht(faithQty)} — แก้ยอดได้ที่ช่องด้านบน</p>}
+            </section>
+          );
+        })()}
 
         {/* สรุปยอดสนับสนุน — สลิปขอบฉีก (signature) */}
         <section id="order-summary" className="shop-tear shop-paper px-5 py-4 space-y-3">
@@ -452,14 +490,10 @@ function OrderView({ token }: { token: string }) {
           </section>
         )}
 
-        {fullyPaid && (
-          <div className="card p-4 text-sm text-emerald-300 border-emerald-500/40">
-            ชำระครบแล้ว — ร้านจะจัดส่งตามนัดหมาย
-          </div>
-        )}
+        {fullyPaid && <ThankYouCard orderNo={order.orderNo} />}
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
         </footer>
         <FeedbackButton page="/shop" />
       </div>
@@ -474,8 +508,38 @@ const FAQ_ITEMS: Array<{ q: string; a: string }> = [
   { q: 'จ่ายอย่างไร?', a: 'ยืนยันแล้วระบบสร้างลิงก์ส่วนตัวให้ทันที — สแกน QR PromptPay โอนผ่านแอปธนาคารได้เลย (QR ฝังยอดไว้แล้ว) และกดแจ้งชำระในลิงก์เดียวกัน' },
   { q: 'รอนานไหม?', a: 'ชิ้นที่ระบุ "มีสินค้า" พร้อมส่ง/ติดตั้งตามนัดที่ติดต่อกลับ — ชิ้นที่รอบถัดไป ระบบจะบอกสถานะจริงบนลิงก์ติดตามของคุณ' },
   { q: 'ซอฟต์แวร์ได้มาอย่างไร ใช้กับเครื่องอื่นได้ไหม?', a: 'ได้เวอร์ชันที่ผ่านการทดสอบครบ (ดูล็อต release ได้) พร้อมสิทธิ์ใช้งานและช่วยตั้งค่าเชื่อมระบบของคุณ — รายละเอียดขอบเขตแจ้งตอนติดต่อกลับ' },
-  { q: 'เงินสนับสนุนไปไหน?', a: 'ค่าวัสดุชุดถัดไป · พัฒนาฟีเจอร์ที่ผู้ใช้ขอจริง (ดูได้จากความต้องการที่เก็บจากปุ่มความคิดเห็น) · คงระบบเซิร์ฟเวอร์และการสำรองข้อมูลให้เดินต่อ' },
+  { q: 'อยากสนับสนุนโดยไม่รับชิ้นงาน ทำได้ไหม?', a: 'ได้ — ใช้ "สนับสนุนตามศรัทธา (กำหนดยอดเอง)" ด้านล่างรายการชิ้นงาน ตั้งยอดเองตามกำลังใจ ได้บัตรขอบคุณดิจิทัลและลิงก์ตามรอยเหมือนกัน' },
+  { q: 'เงินสนับสนุนไปไหน?', a: 'ค่าวัสดุชุดถัดไป · พัฒนาฟีเจอร์ที่ผู้ใช้ขอจริง (ดูได้จากความต้องการที่เก็บจากปุ่มความคิดเห็น) · คงระบบเซิร์ฟเวอร์และการสำรองข้อมูลให้เดินต่อ', },
 ];
+
+// ── บัตรขอบคุณผู้สนับสนุนดิจิทัล (P16) — โชว์บนลิงก์ลับเมื่อชำระครบ ──
+// ชื่อที่ลงบัตรเลือกเอง จำในเครื่องนี้ (localStorage) — ไม่ส่งขึ้น server (ไม่เก็บ PII เพิ่ม)
+function ThankYouCard({ orderNo }: { orderNo: string }) {
+  const [name, setName] = useState('');
+  useEffect(() => {
+    try { setName(localStorage.getItem('sovereign-support-name') ?? ''); } catch { /* private mode */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('sovereign-support-name', name); } catch { /* private mode */ }
+  }, [name]);
+  return (
+    <section className="card p-5 border-emerald-500/40 space-y-3 text-center" aria-label="บัตรขอบคุณผู้สนับสนุน">
+      <div className="text-3xl" aria-hidden>🙏</div>
+      <h2 className="font-ledger text-base text-emerald-300">ขอบคุณ{name ? `, ${name}` : ''} — จากผู้ร่วมงานทุกคน</h2>
+      <p className="text-xs text-gray-400 leading-relaxed">
+        การสนับสนุนของคุณถูกบันทึกในระบบตามรอย (ออเดอร์ <span className="mono">{orderNo}</span>) —
+        ทุกบาทนำไปพัฒนาระบบและผลิตชิ้นงานชุดถัดไปเพื่อชุมชน
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+        <label htmlFor="thank-name" className="text-gray-500">ลงชื่อบนบัตรเป็น:</label>
+        <input id="thank-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อที่ต้องการ (เว้นว่าง = ไม่ระบุ)"
+          maxLength={60} className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-1.5 text-sm w-56" />
+      </div>
+      <a href="/trace" className="inline-block text-[11px] text-cyan-300 hover:underline underline-offset-2">🔍 ลองตามรอยชิ้นงานที่ระบบผลิต</a>
+      <p className="text-[10px] text-gray-600">เก็บลิงก์นี้ไว้ — เปิดใหม่ที่ไหนก็ได้จะเห็นบัตรขอบคุณนี้เสมอ</p>
+    </section>
+  );
+}
 function ShopFaq() {
   const [open, setOpen] = useState<number | null>(null);
   const [asked, setAsked] = useState<number | null>(null);

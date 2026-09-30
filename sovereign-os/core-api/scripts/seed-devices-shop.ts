@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// seed-devices-shop.ts — เปิดร้าน "Sovereign Devices" (อุปกรณ์ IoT/DMS) บนหน้าร้านสาธารณะ
+// seed-devices-shop.ts — เปิดร้าน "Sovereign Origin Foundation" (องค์กรไม่แสวงหากำไร · อุปกรณ์ IoT/DMS + ซอฟต์แวร์)
 //
 // สร้าง (idempotent — รันซ้ำได้ ไม่กลืนของเดิม):
 //   1) business "Sovereign Devices" (shopOpen + shopInCommunity) — เจ้าของ = seed-trace (บัญชี seed เดิม)
@@ -20,7 +20,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const BIZ_NAME = 'Sovereign Devices';
+const BIZ_NAME = 'Sovereign Origin Foundation';
 const SHOP_NAME = 'ร้านอุปกรณ์ Sovereign (DMS)';
 const OWNER_USER = 'seed-trace'; // บัญชีเจ้าของจาก seed ชุดแรก (ไม่สร้างใหม่)
 const ITEM_NAME = 'ชุดอุปกรณ์ DMS (ประกอบ+ทดสอบแล้ว)';

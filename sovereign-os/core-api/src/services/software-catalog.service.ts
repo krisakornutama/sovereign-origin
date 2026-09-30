@@ -14,7 +14,7 @@ import { prisma } from '../lib/prisma';
 
 const MODULES_DIR = join(process.cwd(), 'src', 'modules');
 const SKU_PREFIX = 'SW-';
-const DEVICES_BIZ_NAME = 'Sovereign Devices';
+const DEVICES_BIZ_NAME = 'Sovereign Origin Foundation';
 const SOFTWARE_ITEM_NAME = 'ซอฟต์แวร์ Sovereign (license)';
 
 export interface ModuleFacts {
