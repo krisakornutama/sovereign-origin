@@ -15,7 +15,9 @@ import { getApiUrl } from '../lib/config';
 //  ขอบฉีก (shop-tear) เฉพาะแผงเงิน — อย่างเดียวพอ
 // ────────────────────────────────────────────────────────────────────────────
 
-interface ShopProduct { id: string; name: string; category: string; specs?: string | null; salePrice: number; warrantyMonths: number; inStock: boolean; }
+interface ShopProduct { id: string; name: string; category: string; specs?: string | null; salePrice: number; warrantyMonths: number; inStock: boolean; inventoryItemId?: string | null; }
+interface LotEvent { type: string; detail: string | null; at: string; }
+interface LotStory { lotCode: string; crop: string | null; quantityKg: number; harvestedAt: string; plotName: string | null; sold: boolean; traceUrl: string; events: LotEvent[]; }
 interface Shop { id: string; name: string; vatRate: number; products: ShopProduct[]; }
 interface OrderStatus {
   orderNo: string; status: string; subtotal: number; vat: number; total: number;
@@ -27,6 +29,9 @@ interface OrderStatus {
 interface PromptPayInfo { configured: boolean; qrDataUrl?: string; maskedTarget?: string; amountThb?: number; }
 
 const API = `${getApiUrl()}/api/shop`;
+const TRACE_API = `${getApiUrl()}/api/trace`;
+const LOT_EVENT_TH: Record<string, string> = { HARVESTED: 'เก็บเกี่ยว', PROCESSED: 'แปรรูป', TESTED: 'ตรวจคุณภาพ', SOLD: 'ขายแล้ว', DELIVERED: 'ส่งมอบแล้ว', RESTOCKED: 'กลับเข้าคลัง', CONSUMED: 'ใช้ทำอาหาร', NOTE: 'บันทึก' };
+const lotEventTh = (t: string) => LOT_EVENT_TH[t] ?? t;
 const baht = (n: number) => `${Number(n ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} ฿`;
 const STATUS_TH: Record<string, string> = { QUOTE: 'รอร้านยืนยัน', ORDERED: 'รอชำระเงิน', PAID: 'ชำระแล้ว — ร้านกำลังเตรียมส่ง', DELIVERED: 'จัดส่งแล้ว', CANCELLED: 'ยกเลิกแล้ว' };
 const SEAL_CLS: Record<string, string> = { QUOTE: 'border-amber-400/60 text-amber-300', ORDERED: 'border-cyan-400/60 text-cyan-300', PAID: 'border-emerald-400/60 text-emerald-300', DELIVERED: 'border-emerald-400/60 text-emerald-300', CANCELLED: 'border-rose-400/60 text-rose-300' };
@@ -66,6 +71,7 @@ function Storefront({ businessId }: { businessId: string }) {
   const [busy, setBusy] = useState(false);
   const [ordered, setOrdered] = useState<{ orderNo: string; token: string } | null>(null);
   const [error, setError] = useState('');
+  const [lotStories, setLotStories] = useState<Record<string, LotStory[]>>({});
 
   useEffect(() => {
     fetchJsonObject<Shop>(`${API}/${businessId}`).then((data) => {
@@ -73,6 +79,17 @@ function Storefront({ businessId }: { businessId: string }) {
       else setShop(data);
     });
   }, [businessId]);
+
+  // I5a — สายผลผลิตสด Farm→Shop: ดึงล็อตของสินค้าที่ผูกวัตถุดิบ (best-effort — พัง = ไม่โชว์การ์ด)
+  useEffect(() => {
+    if (!shop) return;
+    const ids = [...new Set(shop.products.map((p) => p.inventoryItemId).filter(Boolean))] as string[];
+    if (ids.length === 0) return;
+    fetch(`${TRACE_API}/products?ids=${encodeURIComponent(ids.join(','))}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.products) setLotStories(data.products); })
+      .catch(() => {});
+  }, [shop]);
 
   const items = Object.entries(cart).filter(([, q]) => q > 0);
   const vatRate = shop?.vatRate ?? 0;
@@ -163,6 +180,30 @@ function Storefront({ businessId }: { businessId: string }) {
                 {p.specs && <span className="truncate max-w-[16rem]">· {p.specs}</span>}
                 <span className="ml-auto">{p.inStock ? <span className="text-emerald-400">มีสินค้า</span> : <span className="text-rose-400">สินค้าหมด</span>}</span>
               </div>
+              {(() => {
+                const story = (p.inventoryItemId && lotStories[p.inventoryItemId]?.[0]) || null;
+                if (!story) return null;
+                const harvest = story.events.find((e) => e.type === 'HARVESTED');
+                const soldEvt = story.events.find((e) => e.type === 'SOLD');
+                return (
+                  <div className="mt-2 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-3 py-2 space-y-1">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+                      <span className="text-emerald-400 font-medium">สายสดจากแปลง</span>
+                      {story.plotName && <span className="text-gray-500">· {story.plotName}</span>}
+                      {story.quantityKg > 0 && <span className="mono text-gray-500">· {story.quantityKg.toLocaleString('th-TH')} กก.</span>}
+                    </div>
+                    <div className="text-[11px] text-gray-400 leading-relaxed">
+                      ล็อต <span className="mono text-gray-300">{story.lotCode}</span>
+                      {harvest && <> — เก็บเมื่อ {new Date(harvest.at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}</>}
+                      {soldEvt ? <> · รอบนี้ขายแล้ว (สต็อกหน้าร้านคือรอบถัดไป)</> : story.sold ? <> · ขายแล้ว</> : null}
+                    </div>
+                    <a href={story.traceUrl} className="inline-block text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2">
+                      ดูที่มาเต็มของล็อตนี้ →
+                    </a>
+                  </div>
+                );
+              })()}
               {p.inStock && (
                 <div className="flex items-center justify-end gap-1 mt-1.5">
                   <button type="button" aria-label={`ลดจำนวน ${p.name}`} disabled={(cart[p.id] ?? 0) === 0}

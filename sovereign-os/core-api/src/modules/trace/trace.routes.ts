@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
-import { getPublicTrace, listLots, createLotFromHarvest, lotQrDataUrl, listLotEvents, addLotEvent, traceUrlForLot } from '../../services/trace.service';
+import { getPublicTrace, listLots, createLotFromHarvest, lotQrDataUrl, listLotEvents, addLotEvent, traceUrlForLot, getPublicProductTrace, getPublicProductTraceBatch } from '../../services/trace.service';
 
 export { prisma }; // ให้เทส mock delegate ผ่านตัวเดียวกับ production
 
@@ -43,6 +43,31 @@ router.post('/:lotCode/events', authenticate, requireRole('SUPERADMIN', 'NODE_AD
     res.status(201).json(ev);
   } catch (err: any) {
     if (err?.message === 'lot not found') return res.status(404).json({ error: 'lot not found' });
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/trace/products?ids=<uuid,uuid> — สายผลผลิต Farm→Shop ของสินค้าหลายรายการ (สาธารณะ — I5a)
+// รับ inventoryItemId (รหัสวัตถุดิบที่ล็อตผูกอยู่ — หน้าร้านได้มาจาก /api/shop แบบสาธารณะอยู่แล้วในอนาคต) —
+// ตอนนี้ frontend เรียกด้วย id ที่ได้จาก /api/shop/community (product.id = inventoryItemId บนเครื่องนี้)
+// คืน {} เมื่อ ids ไม่ถูกต้อง/ไม่มีล็อต (ไม่ throw) — หน้าเว็บเลยแค่ไม่โชว์การ์ดสายสด ไม่พัง
+router.get('/products', traceLimiter, async (req, res) => {
+  try {
+    const raw = String(req.query.ids || '');
+    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 20);
+    const take = Number(req.query.take);
+    res.json({ products: await getPublicProductTraceBatch(ids, Number.isFinite(take) ? take : 2) });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/trace/products/:inventoryItemId — สายผลผลิตของสินค้า 1 รายการ (สาธารณะ — I5a)
+router.get('/products/:inventoryItemId', traceLimiter, async (req, res) => {
+  try {
+    const take = Number(req.query.take);
+    res.json({ lots: await getPublicProductTrace(String(req.params.inventoryItemId), Number.isFinite(take) ? take : 2) });
+  } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
