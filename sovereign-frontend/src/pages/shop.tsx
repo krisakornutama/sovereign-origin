@@ -4,6 +4,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
+import { FeedbackButton } from '../components/public/FeedbackButton';
+import { trackPageView } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /shop — หน้าร้านสาธารณะ (ไม่ต้อง login) — ออกแบบตาม "สลิปบนเคาน์เตอร์ยามค่ำ"
@@ -47,6 +49,7 @@ export default function ShopPage() {
   // เป็น router.push หน้าเดียวกัน ทำให้ลิงก์ "ดูสถานะ/ชำระเงิน" หลังสั่งซื้อไม่ reload หน้า;
   // ถ้าอ่าน URL ครั้งเดียว ลูกค้าจะติดหน้าร้านทั้งที่ URL เปลี่ยนเป็นลิงก์ลับแล้ว (ต้องรีเฟรชเอง)
   useEffect(() => {
+    trackPageView('/shop'); // P10: สถิติการเยือน (cookieless)
     const query = router.asPath.split('?')[1]?.split('#')[0] ?? '';
     const params = new URLSearchParams(query);
     const orderToken = params.get('order');
@@ -276,6 +279,7 @@ function Storefront({ businessId }: { businessId: string }) {
         <footer className="text-center text-[10px] text-gray-600 pt-2">
           ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
+        <FeedbackButton page="/shop" />
       </div>
     </ShopShell>
   );
@@ -432,6 +436,7 @@ function OrderView({ token }: { token: string }) {
         <footer className="text-center text-[10px] text-gray-600 pt-2">
           ร้านค้านี้ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
         </footer>
+        <FeedbackButton page="/shop" />
       </div>
     </ShopShell>
   );

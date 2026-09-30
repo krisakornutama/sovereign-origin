@@ -156,6 +156,22 @@ model FeedbackNote {
   @@map("feedback_notes")
 }
 
+model VisitorEvent {
+  // พฤติกรรมผู้เยี่ยมชมสาธารณะ (P10) — cookieless ไม่มี PII: ip → sha256 8 ตัว ใช้นับ session เท่านั้น
+  id         String   @id @default(uuid()) @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz
+  kind       String   // page_view | demo_tab | time_on_page | survey | question | feedback_open | outbound
+  page       String   // หน้าที่เกิดเหตุ (/demo /shop …)
+  detail     String?  // เช่น ชื่อแท็บ · หัวข้อคำถาม
+  value      String?  // เช่น ตัวเลือกแบบสอบถาม · คำตอบสั้น · วินาทีที่อยู่หน้า
+  user_agent String?
+  ip_hash    String?
+
+  @@index([created_at(sort: Desc)])
+  @@index([kind])
+  @@map("visitor_events")
+}
+
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
   timestamp   DateTime @default(now()) @db.Timestamptz
