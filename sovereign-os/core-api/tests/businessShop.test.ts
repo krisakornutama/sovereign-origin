@@ -150,7 +150,11 @@ before(async () => {
     findMany: async ({ where }: any) => orderLines.get(where.orderId) ?? [],
   };
   (prisma as any).businessPayment = {
-    findMany: async ({ where }: any) => payments.get(where.orderId) ?? [],
+    findMany: async ({ where }: any) => {
+      let list = payments.get(where.orderId) ?? [];
+      if (where.rejectedAt === null) list = list.filter((p: any) => !p.rejectedAt); // P19 ต่อ — ปฏิเสธแล้วตัดจากยอด
+      return list;
+    },
     // P19 — ค้น payment จาก confirm token (ปุ่มยืนยันใน Telegram) + consume แบบ atomic
     findFirst: async ({ where, include }: any) => {
       for (const list of payments.values()) {
@@ -474,6 +478,34 @@ test('ปุ่ม TG ใช้ครั้งเดียว: กดซ้ำ/t
     assert.ok(/ใช้ไปแล้ว|ไม่พบ|ไม่ถูกต้อง/.test(r.message), `ข้อความปฏิเสธชัดเจน: ${r.message}`);
   }
   assert.equal(orders.get(tgOrderId).paidAmount, paidBefore, 'ไม่มีการบันทึกเงินซ้ำ');
+});
+
+// ── P19 ต่อ — ปุ่ม "🚫 ไม่ได้โอน" (rejectpay) ──
+test('ปุ่ม TG "ไม่ได้โอน": ปฏิเสธการแจ้งชำระ → ตัดจากยอดรอยืนยัน ลูกค้าเห็นยอดคงเหลือเดิม · กดซ้ำ/ยืนยันทีหลัง = ปฏิเสธ', async () => {
+  const svc = await import('../src/services/business-shop.service');
+  const created = await svc.createPublicOrder(BIZ_ID, { items: [{ productId: PRODUCT_ID, qty: 1 }], customerName: 'ปุ่มไม่ได้โอน', customerPhone: '0891212999' });
+  await svc.payPublicOrderByToken(created.publicToken, { amount: created.total });
+  const row = [...payments.values()].flat().find((p: any) => p.confirmToken && p.reference === created.publicToken);
+  assert.ok(row, 'แจ้งชำระต้องออก token สำหรับปุ่มคู่');
+
+  const r1 = await svc.rejectReportedPaymentByToken(row.confirmToken, 'admin-uuid');
+  assert.equal(r1.status, 'ok');
+  assert.match(r1.message, /ปฏิเสธ/);
+
+  // หน้าลิงก์ลับ: ยอดกลับเต็ม + รายการที่ถูกปฏิเสธหายจากลิสต์
+  const st: any = await (await get(`${SHOP}/orders/${created.publicToken}`)).json();
+  assert.equal(st.remaining, created.total, 'ยอดคงเหลือกลับเต็ม');
+  assert.equal(st.payments.length, 0, 'รายการที่ถูกปฏิเสธไม่แสดงเป็นยอดรับ');
+
+  // token เดียวใช้ครั้งเดียว — ปฏิเสธซ้ำ/ยืนยันทีหลัง = ไม่ได้
+  const r2 = await svc.rejectReportedPaymentByToken(row.confirmToken, 'again');
+  assert.equal(r2.status, 'error');
+  const r3 = await svc.confirmReportedPaymentByToken(row.confirmToken, 'again');
+  assert.equal(r3.status, 'error');
+
+  // ลูกค้าแจ้งชำระใหม่ได้ทันที (remaining กลับเต็ม)
+  const again = await svc.payPublicOrderByToken(created.publicToken, { amount: created.total });
+  assert.equal(again.remaining, 0);
 });
 
 // ── ร้านยืนยันออเดอร์ที่ลูกค้าสั่งจากเว็บ → หักสต็อก (รวมกับ state machine เดิม) ──

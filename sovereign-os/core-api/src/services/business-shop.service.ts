@@ -146,7 +146,8 @@ export async function getPublicOrderByToken(token: string): Promise<any> {
     },
   });
   if (!order) throw new Error('order not found');
-  const paidAmount = order.payments.reduce((s: number, p: any) => s + p.amount, 0);
+  const activePayments = order.payments.filter((p: any) => !p.rejectedAt);
+  const paidAmount = activePayments.reduce((s: number, p: any) => s + p.amount, 0);
   return {
     orderNo: order.orderNo,
     status: order.status,
@@ -157,7 +158,7 @@ export async function getPublicOrderByToken(token: string): Promise<any> {
     paidAmount,
     remaining: Math.max(0, order.total - paidAmount),
     lines: order.lines.map((l: any) => ({ name: l.product?.name ?? l.description ?? 'สินค้า', qty: l.qty, unitPrice: l.unitPrice })),
-    payments: order.payments.map((p: any) => ({ amount: p.amount, method: p.method, paidAt: p.paidAt })),
+    payments: activePayments.map((p: any) => ({ amount: p.amount, method: p.method, paidAt: p.paidAt })),
     shipping: publicShipping(order),
   };
 }
@@ -179,7 +180,7 @@ export async function payPublicOrderByToken(token: string, input: any): Promise<
     if (o.status !== 'QUOTE' && o.status !== 'ORDERED' && o.status !== 'PAID') {
       throw new Error(`ออเดอร์นี้ยกเลิกหรือส่งของไปแล้ว (ปัจจุบัน ${o.status})`);
     }
-    const payments: any[] = await tx.businessPayment.findMany({ where: { orderId: o.id } });
+    const payments: any[] = await tx.businessPayment.findMany({ where: { orderId: o.id, rejectedAt: null } });
     const paid = payments.reduce((s, p) => s + p.amount, 0);
     const remaining = o.total - paid;
     if (remaining <= 0.001) throw new Error('ออเดอร์นี้ชำระครบแล้ว');
@@ -207,7 +208,10 @@ export async function payPublicOrderByToken(token: string, input: any): Promise<
           'ตรวจยอดเงินเข้าบัญชีจริงแล้วกดปุ่มด้านล่าง — ยืนยันแล้วบันทึกถาวร',
           `หรือยืนยันที่ /business → แท็บออเดอร์ (${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'} เข้าจากเครือข่ายบ้านเท่านั้น)`,
         ].join('\n');
-        await sendTelegramMessage(msg, [{ text: '✅ ยืนยันรับเงิน', data: `confirmpay:${confirmToken}` }]);
+        await sendTelegramMessage(msg, [
+          { text: '✅ ยืนยันรับเงิน', data: `confirmpay:${confirmToken}` },
+          { text: '🚫 ไม่ได้โอน', data: `rejectpay:${confirmToken}` },
+        ]);
       } catch (err) {
         console.error('[shop] แจ้งชำระเงินให้ Telegram ไม่สำเร็จ (ไม่กระทบออเดอร์):', err instanceof Error ? err.message : err);
       }
@@ -247,6 +251,26 @@ export async function confirmReportedPaymentByToken(token: string, _actor?: stri
   } catch (err) {
     return { status: 'error', message: err instanceof Error ? err.message : 'ยืนยันไม่สำเร็จ — ลองยืนยันที่ /business แท็บออเดอร์' };
   }
+}
+
+/**
+ * P19 ต่อ — ปฏิเสธการแจ้งชำระจากปุ่ม "🚫 ไม่ได้โอน" ใน Telegram (rejectpay:<token>)
+ * การแจ้งชำระ = คำอ้างของลูกค้า (ยังไม่เคยถูกบันทึกเป็นรายรับ) — ปฏิเสธ = mark rejectedAt
+ * ตัดออกจากทุกยอด (ยอดรอยืนยัน/คงเหลือ/หน้าลิงก์ลับ/digest) เก็บแถวไว้ตามรอย
+ * token เดียวกับปุ่มยืนยัน ใช้ครั้งเดียว — ยืนยันหรือปฏิเสธ ทำอย่างใดอย่างหนึ่งเท่านั้น
+ */
+export async function rejectReportedPaymentByToken(token: string, _actor?: string): Promise<{ status: 'ok' | 'error'; message: string }> {
+  if (!UUID_RE.test(String(token))) return { status: 'error', message: 'ไม่พบรายการยืนยันนี้ — ปุ่ม/ลิงก์ไม่ถูกต้อง' };
+  const reported = await prisma.businessPayment.findFirst({ where: { confirmToken: String(token) }, include: { order: true } });
+  if (!reported) return { status: 'error', message: 'ไม่พบรายการแจ้งชำระนี้ (ถูกจัดการไปแล้วหรือไม่มีจริง)' };
+  const consumed = await prisma.businessPayment.updateMany({ where: { id: (reported as any).id, confirmToken: String(token) }, data: { confirmToken: null, rejectedAt: new Date() } });
+  if (consumed.count !== 1) return { status: 'error', message: 'ปุ่มนี้ถูกกดไปแล้ว — ตรวจสถานะที่ /business แท็บออเดอร์' };
+  const order = (reported as any).order;
+  const remaining = Math.max(0, order.total - (order.paidAmount ?? 0));
+  return {
+    status: 'ok',
+    message: `${order.orderNo} ปฏิเสธการแจ้งชำระ ${Number((reported as any).amount).toLocaleString('th-TH')} ฿ แล้ว — ลูกค้าเห็นยอดคงเหลือ ${remaining.toLocaleString('th-TH')} ฿ ตามเดิม (ถ้าโอนมาจริงภายหลัง รับเงินปกติที่ /business แท็บออเดอร์)`,
+  };
 }
 
 /** ข้อมูลสำหรับหน้าชำระเงิน — QR สำเร็จรูป (data URL) + เบอร์ปลายทางแบบ mask */
@@ -470,7 +494,7 @@ export async function partnerPortal(partnerId: string, token: string): Promise<a
     },
   });
   const bills = orders.map((o: any) => {
-    const paid = o.payments.reduce((s: number, p: any) => s + p.amount, 0);
+    const paid = o.payments.filter((p: any) => !p.rejectedAt).reduce((s: number, p: any) => s + p.amount, 0);
     return {
       orderNo: o.orderNo,
       title: (o.note ?? '').replace(/^บิลค่าบริการ IoT คู่ค้า — /, '').split(' · ')[0].slice(0, 120),

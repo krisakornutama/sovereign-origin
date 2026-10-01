@@ -33,3 +33,30 @@ GET /statements
 - dime → treasury(asset_positions)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`asset_prices`
+
+### Routes
+- `dime/dime.routes.ts` (119 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /status
+POST /fetch
+POST /import
+GET /statements
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`dime-imap.service` · `dime-parser.service` · `dime.service`
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- dime → auth(users)
+- dime → treasury(asset_positions)
+
+<!-- auto:end -->

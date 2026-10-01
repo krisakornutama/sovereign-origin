@@ -828,3 +828,39 @@ export async function notifyTaxDeadlines(
   }
   return sent;
 }
+
+/**
+ * P19 ต่อ — สรุปเช้าสำหรับเจ้าของ (ส่งเข้า Telegram ทุกวัน 08:00 เวลาไทย — ตั้งเวลาใน workers/start.ts)
+ * ยอดขายเมื่อวาน (ledger INCOME SALES ตามวันไทย) · แจ้งชำระรอยืนยัน (ตัดรายการที่ปฏิเสธแล้ว)
+ * ยอดค้างชำระรวม · บิลคู่ค้าค้างชำระ — ตัวเลขจากข้อมูลจริงเสมอ ไม่มีของ = 0 (ยังส่งเพื่อเป็น heartbeat)
+ * now เผื่อไว้เทสต์ (ค่าเริ่มต้น = ตอนนี้)
+ */
+export async function buildMorningDigest(now: Date = new Date()): Promise<string> {
+  const dayStr = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d); // YYYY-MM-DD ตามวันไทย
+  const yStr = dayStr(new Date(now.getTime() - 86_400_000));
+  const yStart = new Date(`${yStr}T00:00:00+07:00`);
+  const yEnd = new Date(`${yStr}T23:59:59.999+07:00`);
+
+  const [salesEntries, openOrders, reports] = await Promise.all([
+    prisma.businessLedgerEntry.findMany({ where: { type: 'INCOME', category: 'SALES', createdAt: { gte: yStart, lte: yEnd } } }),
+    prisma.businessOrder.findMany({ where: { status: { in: ['QUOTE', 'ORDERED', 'PAID'] } } }),
+    prisma.businessPayment.findMany({ where: { method: 'PROMPTPAY', rejectedAt: null } }),
+  ]);
+
+  const open = openOrders.filter((o: any) => o.total - (o.paidAmount ?? 0) > 0.001);
+  const outstanding = open.reduce((s: number, o: any) => s + (o.total - (o.paidAmount ?? 0)), 0);
+  const partnerOpen = open.filter((o: any) => o.partnerId);
+  const partnerOutstanding = partnerOpen.reduce((s: number, o: any) => s + (o.total - (o.paidAmount ?? 0)), 0);
+  const pendingReports = reports.filter((p: any) => open.some((o: any) => o.id === p.orderId));
+  const reportedSum = pendingReports.reduce((s: number, p: any) => s + p.amount, 0);
+  const salesSum = salesEntries.reduce((s: number, e: any) => s + e.amount, 0);
+
+  const thDate = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+  return [
+    `🌅 <b>สรุปเช้า ${thDate}</b>`,
+    `ยอดขายเมื่อวาน: <b>${salesSum.toLocaleString('th-TH')} ฿</b> (${salesEntries.length} บิล)`,
+    `💰 แจ้งชำระรอยืนยัน: <b>${reportedSum.toLocaleString('th-TH')} ฿</b> — กดปุ่มในข้อความแจ้งชำระ หรือ /business → แท็บออเดอร์`,
+    `⏳ ยอดค้างชำระรวม: <b>${outstanding.toLocaleString('th-TH')} ฿</b> (${open.length} ออเดอร์)`,
+    `🤝 บิลคู่ค้าค้างชำระ: ${partnerOpen.length} ใบ (รวม ${partnerOutstanding.toLocaleString('th-TH')} ฿)`,
+  ].join('\n');
+}

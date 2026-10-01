@@ -29,3 +29,26 @@ POST /models/:name/unload
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `ai-models/ai-models.routes.ts` (181 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /models
+POST /models/pull
+POST /models/import-gguf
+GET /jobs/:id
+POST /models/route
+DELETE /models/:name
+POST /models/:name/unload
+```
+
+<!-- auto:end -->
