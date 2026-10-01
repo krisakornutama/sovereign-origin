@@ -249,15 +249,14 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 > **สถานะจริง 29/9/69:** บัญชี DigitalPlat สร้าง+ยืนยันเมลแล้ว (`krisakornutama` / owteenhoper@gmail.com · Account ID 1790697100 · Free slots: 1) · Cloudflare มีอยู่แล้ว (ล็อกอิน GitHub) และ zone `sovereign-shop.dpdns.org` ถูกเพิ่มเรียบร้อย — **NS ของบัญชีนี้: `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com`**
 > ⚠️ ตัวตรวจ availability ตอบ "unavailable" ให้ทุกชื่อเมื่อควบคุมผ่านระบบอัตโนมัติ (ตัวตรวจมนุษย์บล็อกเงียบ) — **ขั้นจดจริงต้องทำในเบราว์เซอร์ปกติของเจ้าของเอง** (แชท AI จะจดให้ไม่ได้ ไม่ใช่เพราะเทคนิค แต่เพื่อกันบัญชีโดนแฟล็ก)
-> ชื่อ `sovereign-shop` / `sovereign-origin-shop` / `sovereign-utama` บน .dpdns.org อาจถูกจดไปแล้วจริง — เตรียมชื่อสำรองไว้ 2–3 ชื่อ
-> คำเตือนลำดับ: **zone ใน Cloudflare ต้องตรงกับชื่อที่จดได้จริง** — ถ้าชื่อสุดท้ายไม่ใช่ sovereign-shop ให้กลับไป Cloudflare → Add a domain → Connect ด้วยชื่อใหม่ → ใช้ NS คู่ของ zone นั้นในแบบฟอร์มจด (NS เปลี่ยนตาม zone ไม่ซ้ำเดิม) · zone `sovereign-shop.dpdns.org` ที่สร้างไว้เป็นของทดลอง ลบทิ้งได้ภายหลัง
+> **ยุติแล้ว 1/10/69 — จดได้ครบ 2 ชื่อ:** `sovereignoriginshop.dpdns.org` (30/9 — ACTIVE ใช้งานจริง) และ `sovereign-shop.dpdns.org` (ชื่อสั้นตามแผนเดิม — ว่างแล้วจึงจดเพิ่ม) · zone คู่ใน Cloudflare ใช้ tunnel ตัวเดียวร่วมกันได้ (แผนต่อใน "### โซนที่สอง" ท้าย §นี้)
 1. สมัครบัญชีฟรี https://dash.cloudflare.com/sign-up (อีเมล + รหัส — ไม่ต้องใส่บัตร)
 2. https://domain.digitalplat.org → Register → ค้นชื่อ เช่น `sovereign-shop` เลือก suffix `.dpdns.org` → ยืนยันตัวตนผ่าน GitHub/Discord ตามที่หน้าสมัครถาม (กัน bot — ฟรีไม่มีบัตร)
 3. เมื่อได้ domain: ในหน้าจัดการของ DigitalPlat ตั้ง Nameserver เป็น 2 ชื่อที่ Cloudflare ให้ (Cloudflare dashboard → เว็บไซต์/domain → DNS → Nameservers) แล้วรอสถานะ Active (ปกติไม่เกิน ~1 ชม.)
 4. Cloudflare → Zero Trust → Networks → Tunnels → Create a tunnel → เลือก Cloudflared → ตั้งชื่อ `sovereign-shop` → **คัดลอก token ยาว ๆ** (`eyJ…`) ใส่ไฟล์ `sovereign-os/infra/.env` บรรทัด `CLOUDFLARED_TOKEN=eyJ…` แล้วบอก agent จะรัน compose ให้
 5. หน้า Tunnel เดิม → Public Hostname → เพิ่ม: subdomain `shop` · domain ที่จด · service `http://host.docker.internal:3000` → Save
 6. **WAF บังคับทำ (หน้า domain → Security → WAF):** Custom rule ALLOW = hostname เป็นโดเมนเรา AND URI Path starts with `/shop` (เพิ่ม `/trace` ถ้าต้องการ) · Custom rule BLOCK = hostname เดียวกัน ทุก path อื่น — เพราะ :3000 เสิร์ฟหน้า dashboard/admin ด้วย ห้ามปล่อยทะลุ · Rate limiting ฟรี 1 rule: `/api/` เกิน 20 คำขอ/10 วิ ต่อ IP = block
-   **[ทำแล้ว 30/9/69 — บันทึกของจริง]** rule เดียวชื่อ "Public-only: block admin/internal paths" action=Block · expression (รูปแบบ default-deny): `not (starts_with(http.request.uri.path, "/shop") or http.request.uri.path in {"/" "/trace" "/trace/" "/favicon.ico" "/icon.png" "/icon.svg" "/manifest.json" "/sw.js" "/sw-precache.json"} or starts_with(http.request.uri.path, "/_next/static/") or starts_with(http.request.uri.path, "/api/shop") or starts_with(http.request.uri.path, "/api/trace") or http.request.uri.path in {"/api/health" "/api/health/"})` · **บทเรียน 2 ข้อ:** (1) Express redirect trailing-slash (`/api/health`→`/api/health/`) ทำให้ request ที่ตาม redirect โดน block — allowlist ต้องครอบทั้งสองรูปแบบ (2) ปุ่ม Deploy ใน dashboard คลิกแล้วเงียบ (โดน challenge platform กลืนเมื่อหน้าถูกควบคุมอัตโนมัติ) — ทางแก้: PUT ตรงไป `/api/v4/zones/<zone-id>/rulesets/phases/http_request_firewall_custom/entrypoint` จาก fetch **ในหน้า dashboard** (ใช้ cookie session มีสิทธิ์ครบ) · พิสูจน์แล้ว: public 200 ครบ / admin+auth 403 ที่ edge
+   **[ทำแล้ว 30/9/69 — บันทึกของจริง]** rule เดียวชื่อ "Public-only: block admin/internal paths" action=Block · expression (รูปแบบ default-deny): `not (starts_with(http.request.uri.path, "/shop") or http.request.uri.path in {"/" "/trace" "/trace/" "/favicon.ico" "/icon.png" "/icon.svg" "/manifest.json" "/sw.js" "/sw-precache.json" "/robots.txt" "/sitemap.xml"} or starts_with(http.request.uri.path, "/_next/static/") or starts_with(http.request.uri.path, "/api/shop") or starts_with(http.request.uri.path, "/api/trace") or http.request.uri.path in {"/api/health" "/api/health/"})` · **บทเรียน 2 ข้อ:** (1) Express redirect trailing-slash (`/api/health`→`/api/health/`) ทำให้ request ที่ตาม redirect โดน block — allowlist ต้องครอบทั้งสองรูปแบบ (2) ปุ่ม Deploy ใน dashboard คลิกแล้วเงียบ (โดน challenge platform กลืนเมื่อหน้าถูกควบคุมอัตโนมัติ) — ทางแก้: PUT ตรงไป `/api/v4/zones/<zone-id>/rulesets/phases/http_request_firewall_custom/entrypoint` จาก fetch **ในหน้า dashboard** (ใช้ cookie session มีสิทธิ์ครบ) · พิสูจน์แล้ว: public 200 ครบ / admin+auth 403 ที่ edge · **แก้ 1/10/69: เพิ่ม `/robots.txt` `/sitemap.xml` ใน expression — ตรวจ live พบว่าเดิม 2 path นี้ตอบ 403 (Google ดึง sitemap ไม่ได้ = บั๊ก SEO จริง) · ต้องลงแก้ใน dashboard ทั้งสองโซน (โซนเดิม + โซนใหม่) — ยังไม่ได้กด คิวแรกของงาน SEO**
 7. พิสูจน์: เปิด `https://shop.<ชื่อ>.dpdns.org` จากมือถือ ปิด Wi-Fi (4G ล้วน) — เห็นหน้าร้าน = สำเร็จ · เปิด `/dashboard` ต้องโดน 403 จาก WAF
 8. **[ทำแล้ว 30/9/69] Rate limiting:** rule "Public API rate limit: /api/ max 20 req/10s per IP" ใน phase `http_ratelimit` (action=block, mitigation_timeout=10 วิ — ค่าที่ Free plan อนุญาต · characteristics ip.src+colo) — พิสูจน์: ยิง 25 ติดตัวที่ 21+ ได้ 429
 9. **[ทำแล้ว 30/9/69] สายสด Farm→Shop (I5a):** การ์ด "สายสดจากแปลง" บนหน้าร้านดึงจาก `GET /api/trace/products?ids=<inventoryItemId,…>` (สาธารณะ) — QR ติดสินค้าอิง `PUBLIC_APP_URL` (ตั้งใน infra/.env เป็นโดเมนจริงแล้ว) · **ข้อควรระวังตอน deploy frontend:** (1) build ทับ server ที่รันอยู่ = หน้า 404 ทั้งชุด (chunk ใหม่ vs manifest เก่า) — restart :3000 หลัง build เสมอ (2) service worker cache `sovereign-v3` คงหน้าเก่า — ทดสอบหลัง deploy ต้องเคลียร์ SW/caches ก่อนสรุปผล
@@ -277,7 +276,7 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - อีเมล digest (แทน Telegram): เติม SMTP_* ใน infra/.env แล้วขยาย `feedback.service.ts` — การ์ดอนาคต
 
 ### สรุปสิ่งที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
-`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/track` · `/api/health` — ที่เหลือ block ทั้งหมด (403 ที่ edge)
+`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/track` · `/api/health` · `/partners` · `/about` · `/api/partners*` (เพิ่ม 30/9) · `/robots.txt` · `/sitemap.xml` (เพิ่ม 1/10 — เดิม 403 ต้องแก้ใน dashboard ทั้งสองโซน) — ที่เหลือ block ทั้งหมด (403 ที่ edge)
 
 ### เก็บพฤติกรรม/ความต้องการผู้ใช้ (P10 — 30/9/69) + หน้าแรกโหมดทดลอง (P11)
 - **ตาราง `visitor_events`** (migration 20260930150000) — **cookieless ไม่มี PII**: ไม่เก็บชื่อ/อีเมล/IP เปล่า (ip→sha256+salt 8 ตัว ใช้นับผู้มาเยือนประมาณ) · kind ต้องอยู่ allowlist: `page_view · demo_tab · time_on_page · survey · question · feedback_open · outbound`
@@ -292,7 +291,21 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 - ปิดขาย = isActive=false (หายจากหน้าร้าน ราคา/ข้อมูลคงอยู่ — เปิดใหม่ได้) · หน้าร้านโชว์ผ่าน `/api/shop` เดิม — WAF ไม่ต้องแตะเพิ่ม
 - ล็อต release: แต่ละเวอร์ชันใหม่ สร้างล็อต `LOT-SWVxxx` (build→test→publish) ผ่าน seed-devices-shop.ts — การ์ดสายสดบนหน้าร้านโชว์เวอร์ชันที่ลูกค้าได้จริง
 
-**ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — ได้ domain จริงแล้วเพิ่มบรรทัด `CORS_ORIGIN=https://shop.<ชื่อ>.dpdns.org,http://localhost:3000` ใน infra/.env แล้วให้ agent recreate core-api 1 รอบ
+**ฝั่งระบบที่ agent ทำแล้ว:** compose มีบริการ `cloudflared` พร้อม (รอ token ใน .env — ยังไม่รัน) · CORS อ่านจาก env อยู่แล้ว — โดเมนสาธารณะใช้ **same-origin** (getApiUrl คืน `window.location.origin` เมื่อ host ไม่ใช่ LAN) จึงไม่ต้องเติม CORS_ORIGIN · ค่าปัจจุบันใน .env ยังเป็น localhost/LAN ล้วน (ตรวจ 1/10) — ทำงานถูกต้องตามดีไซน์ same-origin
+
+### โซนที่สอง: `sovereign-shop.dpdns.org` (เริ่ม 1/10/69 — ชื่อสั้นตามแผนเดิมมาว่าง จดเพิ่ม)
+
+สถานะ: จดที่ DigitalPlat แล้ว · zone ใน Cloudflare พร้อม (**NS คู่เดียวกับข้างบน: `delilah.ns.cloudflare.com` + `vin.ns.cloudflare.com`** — ตรงกับอีเมล Cloudflare ที่ส่งเรียก 1/10) · tunnel/token/compose ใช้ตัวเดิม ไม่ต้องสร้างใหม่ · frontend โค้ดรองรับอัตโนมัติ (`isPublicHostname` ใช้ pattern ไม่ใช่-localhost · API same-origin · rewrites host-agnostic — แก้โค้ด 0 จุด) · CORS ไม่ต้องแตะ (same-origin ไม่ผ่าน CORS) · โดเมนยัง NXDOMAIN (รอเปลี่ยน NS — ตรวจด้วย `nslookup sovereign-shop.dpdns.org`)
+
+**ขั้นของเจ้าของ (ตามอีเมล Cloudflare 1/10):**
+1. dash.domain.digitalplat.org → เลือก `sovereign-shop.dpdns.org` → **Nameservers** → ใส่ `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com` → บันทึก
+2. Cloudflare → โซน sovereign-shop.dpdns.org → กด **"Check nameservers now"** → รอสถานะ Active
+
+**ขั้นถัดไปเมื่อ Active (เจ้าของแก้ dashboard — agent พิสูจน์ต่อ):**
+3. Zero Trust → Networks → Tunnels → tunnel เดิม → **Public Hostname → Add 2 แถว** (คัดค่า Service จากแถวของ sovereignoriginshop เป๊ะ): แถว path `^/api` → `http://host.docker.internal:3001` · แถว path `*` → `http://host.docker.internal:3000` — Cloudflare สร้าง CNAME ให้เอง (apex flatten ให้เอง)
+4. **SSL/TLS → Full (strict)** ที่โซนใหม่
+5. **WAF:** คัด custom rule "Public-only: block admin/internal paths" จากโดเมนเดิมมาใส่ — ใช้ **expression เวอร์ชันที่มี `/robots.txt` `/sitemap.xml` แล้ว** (ขั้น 6) · และ **ลงแก้ expression บนโดเมนเดิมด้วย** รอบเดียวกัน
+6. พิสูจน์ปลายทาง: `/` `/shop` `/api/health` `/sitemap.xml` = 200 · `/dashboard` = 403 · sitemap = 200 (ไม่ซ้ำบั๊กโดเมนเดิม) · แล้วทำ GSC property ที่สองตาม `docs/seo-google-search-console.md`
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________
 

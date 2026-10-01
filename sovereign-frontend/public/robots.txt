@@ -1,5 +1,6 @@
-# Sovereign Origin — sovereignoriginshop.dpdns.org
+# Sovereign Origin — sovereignoriginshop.dpdns.org (ACTIVE) + sovereign-shop.dpdns.org (รอ NS/Active 1/10)
 User-agent: *
 Allow: /
 
 Sitemap: https://sovereignoriginshop.dpdns.org/sitemap.xml
+Sitemap: https://sovereign-shop.dpdns.org/sitemap.xml
