@@ -166,11 +166,13 @@ model Partner {
   category     String   @default("SHOP") // SHOP | TECHNICIAN | SERVICE | OTHER
   detail       String? // อธิบายสั้น ๆ ทำอะไร
   address      String? // ที่อยู่ (แสดงบนการ์ด)
-  phone        String? // เบอร์ติดต่อ (แสดงเมื่ออนุมัติแล้ว)
+  phone        String? // เบอร์ติดต่อ — F2b: เข้ารหัส `enc:v1:` · ค้นหาด้วย phone_hash
+  phone_hash   String? // F2b: HMAC(normalize(phone)) — สำหรับ WHERE เท่ากันเท่านั้น
   lat          Float // พิกัด pin บนแผนที่
   lng          Float
   contactName  String // ชื่อผู้ติดต่อ (ไม่แสดงสาธารณะ)
-  contactPhone String // เบอร์ผู้ติดต่อ (ไม่แสดงสาธารณะ)
+  contactPhone String // เบอร์ผู้ติดต่อ — F2b: เข้ารหัส `enc:v1:`
+  contact_phone_hash String? // F2b: HMAC คู่ contactPhone
   contactEmail String? // อีเมลผู้ติดต่อ (ไม่แสดงสาธารณะ)
   status       String   @default("PENDING") // PENDING | ACTIVE | REJECTED
   decided_at   DateTime? @db.Timestamptz // เวลาอนุมัติ/ปฏิเสธ
@@ -180,6 +182,8 @@ model Partner {
 
   @@index([status])
   @@index([created_at(sort: Desc)])
+  @@index([phone_hash])
+  @@index([contact_phone_hash])
   @@map("partners")
 }
 
@@ -1672,7 +1676,8 @@ model Restaurant {
 model RestaurantCustomer {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
-  phone       String?
+  phone       String? // F2b: เข้ารหัส `enc:v1:`
+  phone_hash  String? // F2b: HMAC(normalize(phone)) — ค้นลูกค้าด้วยเบอร์
   knownFaceId String?  @db.Uuid
   points      Int      @default(0)
   tier        String   @default("BRONZE")
@@ -1683,6 +1688,7 @@ model RestaurantCustomer {
   orders RestaurantOrder[]
 
   @@index([phone])
+  @@index([phone_hash])
   @@map("restaurant_customers")
 }
 
@@ -1951,7 +1957,8 @@ model Business {
   shopOpen      Boolean  @default(false) // เปิดหน้าร้านสาธารณะ /shop?id=<id> ให้ลูกค้าสั่งซื้อได้
   shopPromptPay String? // เบอร์ PromptPay (08x…) หรือเลขบัตร 13 หลัก สำหรับรับชำระหน้าร้าน
   shopInCommunity Boolean @default(false) // เฟส 4: รวมร้านนี้เข้า catalog กลางชุมชน /community (ต้อง shopOpen ด้วย)
-  taxId         String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
+  taxId         String? // เลขประจำตัวผู้เสียภาษี 13 หลัก — F2b: เข้ารหัส `enc:v1:`
+  taxid_hash    String? // F2b: HMAC คู่ taxId (dedupe ผู้เสียภาษี)
   address       String? // ที่อยู่ร้าน — พิมพ์บนใบกำกับภาษี/ใบเสร็จ
   ownerId       String   @db.Uuid // ผู้สร้างธุรกิจ (User)
   createdAt     DateTime @default(now()) @db.Timestamptz
@@ -2017,6 +2024,7 @@ model BusinessCustomer {
   businessId String   @db.Uuid
   name       String
   phone      String?
+  phone_hash String? // F2b: HMAC(normalize(phone)) — ใช้ค้น dedupe ออเดอร์ (คู่ phone ที่เข้ารหัส)
   lineId     String? // LINE ID สำหรับติดต่อ
   address    String?
   taxId      String?
@@ -2030,6 +2038,7 @@ model BusinessCustomer {
   soldLots ProductLot[]    @relation("productLotsSold")
 
   @@index([businessId, phone])
+  @@index([businessId, phone_hash])
   @@map("business_customers")
 }
 
@@ -2106,7 +2115,8 @@ model BusinessSupplier {
   id         String   @id @default(uuid()) @db.Uuid
   businessId String   @db.Uuid
   name       String
-  phone      String?
+  phone      String? // F2b: เข้ารหัส `enc:v1:`
+  phone_hash String? // F2b: HMAC คู่ phone
   note       String?
   createdAt  DateTime @default(now()) @db.Timestamptz
 

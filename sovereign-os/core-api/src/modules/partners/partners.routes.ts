@@ -10,6 +10,7 @@ import { prisma } from '../../lib/prisma';
 import { applyPartner, publicPartners, partnerCounts } from '../../services/partner.service';
 import { createPartnerBill, partnerBills, foundationBusinessId, partnerBillsAuthorized, partnerPortal } from '../../services/business-shop.service';
 import { sendPartnerOtp, verifyPartnerOtp, issueVerifiedToken } from '../../services/partner-guard.service';
+import { decryptOrNull } from '../../services/field-crypto.service'; // F2b: เบอร์ใน DB เข้ารหัส — ถอดเฉพาะแผงเจ้าของ
 // P18-hardening — ตรวจว่าคำขอมาจาก host ภายใน (localhost/LAN) — ใช้ gate devCode OTP (กันรั่วสาธารณะ)
 import { isLocalRequestHost, requestHost, isPublicRequest } from '../../lib/local-host';
 
@@ -160,7 +161,14 @@ router.get('/:id/qr', applyLimiter, async (req, res) => {
 router.get('/admin/list', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   try {
     const rows = await prisma.partner.findMany({ orderBy: { created_at: 'desc' }, take: 300 });
-    return res.json({ partners: rows });
+    // F2b: phone/contactPhone ใน DB เข้ารหัส — ถอดเฉพาะแผงเจ้าของ (เส้น admin ล็อกอินแล้ว)
+    return res.json({
+      partners: rows.map((r) => ({
+        ...r,
+        phone: decryptOrNull(r.phone),
+        contactPhone: decryptOrNull(r.contactPhone),
+      })),
+    });
   } catch {
     return res.status(500).json({ error: 'โหลดรายการไม่สำเร็จ' });
   }

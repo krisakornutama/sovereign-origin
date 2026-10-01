@@ -151,11 +151,13 @@ model Partner {
   name_normalized String // P17: กันชื่อซ้ำ
   detail       String?
   address      String?
-  phone        String?
+  phone        String? // F2b: เข้ารหัส `enc:v1:` · ค้นหาด้วย phone_hash
+  phone_hash   String?
   lat          Float
   lng          Float
   contactName  String
-  contactPhone String
+  contactPhone String // F2b: เข้ารหัส `enc:v1:`
+  contact_phone_hash String?
   contactEmail String?
   status       String   @default("PENDING")
   decided_at   DateTime?
@@ -1625,9 +1627,9 @@ model Restaurant {
 
 model RestaurantCustomer {
   id           String   @id @default(uuid())
-  name         String
-  phone        String?
-  knownFaceId  String? 
+  name         String  phone       String?
+  phone_hash  String?
+  knownFaceId String?  
   points       Int      @default(0)
   tier         String   @default("BRONZE")
   consentFace  Boolean  @default(false)
@@ -1637,6 +1639,7 @@ model RestaurantCustomer {
   orders RestaurantOrder[]
 
   @@index([phone])
+  @@index([phone_hash])
   @@map("restaurant_customers")
 }
 
@@ -1899,10 +1902,10 @@ model Business {
   shopName     String?
   shopOpen     Boolean  @default(false)
   shopPromptPay String?
-  shopInCommunity Boolean @default(false)
-  taxId       String?
+  shopInCommunity Boolean @default(false)  taxId       String?
+  taxid_hash  String?
   address     String?
-  ownerId      String
+  ownerId     String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -1965,6 +1968,7 @@ model BusinessCustomer {
   businessId String
   name       String
   phone      String?
+  phone_hash String?
   lineId     String?
   address    String?
   taxId      String?
@@ -1978,6 +1982,7 @@ model BusinessCustomer {
   soldLots ProductLot[]    @relation("productLotsSold")
 
   @@index([businessId, phone])
+  @@index([businessId, phone_hash])
   @@map("business_customers")
 }
 
@@ -2049,7 +2054,8 @@ model BusinessSupplier {
   id         String   @id @default(uuid())
   businessId String
   name       String
-  phone      String?
+  phone      String? // F2b: เข้ารหัส `enc:v1:`
+  phone_hash String?
   note       String?
   createdAt  DateTime @default(now())
 

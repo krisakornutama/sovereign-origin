@@ -12,6 +12,7 @@ import { prisma } from '../lib/prisma';
 import { nextBusinessOrderNo } from '../lib/business';
 import { sendTelegramAlert } from './telegram-alert.service';
 import { creditLiquidCash } from './treasury.service';
+import { encryptField, decryptOrNull, hashField } from './field-crypto.service'; // F2b: PII เข้ารหัสก่อนลง DB
 import { businessTaxOverview, splitVatFromGross, taxCalendar } from './thai-tax.service';
 import { AuditService } from './audit.service';
 import { markLotsSold, markLotsDelivered, markLotsRestocked } from './trace.service';
@@ -161,21 +162,28 @@ export async function updateProduct(businessId: string, id: string, input: any):
 }
 
 // ── Customers ──
+// F2b: phone/taxId ลูกค้าเข้ารหัสใน DB — ถอดเฉพาะจุดโชว์ภายใน (VIEWER ขึ้นไป)
+const decCustomer = (c: any) => (c ? { ...c, phone: decryptOrNull(c.phone), taxId: decryptOrNull(c.taxId) } : c);
+
 export async function listCustomers(businessId: string): Promise<any[]> {
-  return prisma.businessCustomer.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+  const rows = await prisma.businessCustomer.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+  return rows.map(decCustomer);
 }
 
 export async function createCustomer(businessId: string, input: any): Promise<any> {
   const name = str(input?.name, 120);
   if (!name) throw new Error('name is required');
+  const phone = input?.phone ? str(input.phone, 30) : null;
+  const taxId = input?.taxId ? str(input.taxId, 20) : null;
   return prisma.businessCustomer.create({
     data: {
       businessId,
       name,
-      phone: input?.phone ? str(input.phone, 30) : null,
+      phone: phone ? encryptField(phone) : null,
+      phone_hash: phone ? hashField(phone) : null,
       lineId: input?.lineId ? str(input.lineId, 60) : null,
       address: input?.address ? str(input.address, 300) : null,
-      taxId: input?.taxId ? str(input.taxId, 20) : null,
+      taxId: taxId ? encryptField(taxId) : null,
       channel: str(input?.channel, 20) || 'ONLINE',
       notes: input?.notes ? str(input.notes, 500) : null,
     },
@@ -546,14 +554,16 @@ export async function businessTax(businessId: string, opts?: { capitalRegistered
 
 // ── Suppliers & Purchase Orders ──
 export async function listSuppliers(businessId: string): Promise<any[]> {
-  return prisma.businessSupplier.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+  const rows = await prisma.businessSupplier.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+  return rows.map((s: any) => ({ ...s, phone: decryptOrNull(s.phone) }));
 }
 
 export async function createSupplier(businessId: string, input: any): Promise<any> {
   const name = str(input?.name, 120);
   if (!name) throw new Error('name is required');
+  const phone = input?.phone ? str(input.phone, 30) : null;
   return prisma.businessSupplier.create({
-    data: { businessId, name, phone: input?.phone ? str(input.phone, 30) : null, note: input?.note ? str(input.note, 300) : null },
+    data: { businessId, name, phone: phone ? encryptField(phone) : null, phone_hash: phone ? hashField(phone) : null, note: input?.note ? str(input.note, 300) : null },
   });
 }
 
@@ -604,13 +614,13 @@ export async function getShopSettings(businessId: string): Promise<any> {
   const biz = await prisma.business.findUnique({ where: { id: businessId } });
   if (!biz) throw new Error('business not found');
   // ไม่ส่ง PromptPay แบบเต็มกลับ UI — โชว์ mask 4 ตัวท้ายพอ (ตั้งใหม่ได้เสมอ)
-  const target = String(biz.shopPromptPay ?? '').replace(/\D/g, '');
+  const ppDigits = String(decryptOrNull(biz.shopPromptPay) ?? '').replace(/\D/g, '');
   return {
     shopOpen: Boolean(biz.shopOpen),
     shopName: biz.shopName ?? '',
-    promptPayMasked: target ? `••• ${target.slice(-4)}` : '',
+    promptPayMasked: ppDigits ? `••• ${ppDigits.slice(-4)}` : '',
     promptPaySet: Boolean(biz.shopPromptPay),
-    taxId: biz.taxId ?? '',
+    taxId: decryptOrNull(biz.taxId) ?? '',
     address: biz.address ?? '',
     shopInCommunity: Boolean(biz.shopInCommunity), // เฟส 4: รวมร้านเข้า catalog กลางชุมชน /community
   };
@@ -625,7 +635,8 @@ export async function updateShopSettings(businessId: string, input: any): Promis
     const digits = str(input.taxId, 20).replace(/\D/g, '');
     // เลขประจำตัวผู้เสียภาษี 13 หลักเท่านั้น (ว่าง = เคลียร์ — เอกสารจะพิมพ์เป็นช่องกรอกแทน)
     if (digits && digits.length !== 13) throw new Error('เลขประจำตัวผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก');
-    data.taxId = digits || null;
+    data.taxId = digits ? encryptField(digits) : null; // F2b
+    data.taxid_hash = digits ? hashField(digits) : null;
   }
   if (input?.address !== undefined) data.address = input.address ? str(input.address, 200) : null;
   if (input?.shopOpen !== undefined) data.shopOpen = Boolean(input.shopOpen);
@@ -644,7 +655,7 @@ export async function updateShopSettings(businessId: string, input: any): Promis
       if (!(digits.length === 10 && digits.startsWith('0')) && digits.length !== 13) {
         throw new Error('PromptPay ต้องเป็นเบอร์มือถือ 10 หลักหรือเลขบัตรประชาชน 13 หลัก');
       }
-      data.shopPromptPay = digits;
+      data.shopPromptPay = encryptField(digits); // F2b
     } else {
       data.shopPromptPay = null;
     }

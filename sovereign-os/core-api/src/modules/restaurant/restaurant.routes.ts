@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
 import { markLotsConsumedByRecipes } from '../../services/trace.service'; // TRACEABILITY เฟส 2
+import { encryptField, decryptOrNull, hashField } from '../../services/field-crypto.service'; // F2b: เบอร์ลูกค้าเข้ารหัสก่อนลง DB
 
 const router = Router();
 const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
@@ -52,15 +53,17 @@ router.post('/customers', authenticate, async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name is required' });
+    const phone = req.body?.phone ? String(req.body.phone).slice(0, 20) : null; // F2b: เข้ารหัส + hash คู่
     const c = await prisma.restaurantCustomer.create({
       data: {
         name: name.slice(0, 80),
-        phone: req.body?.phone ? String(req.body.phone).slice(0, 20) : null,
+        phone: phone ? encryptField(phone) : null,
+        phone_hash: phone ? hashField(phone) : null,
         knownFaceId: req.body?.knownFaceId ? String(req.body.knownFaceId) : null,
         consentFace: !!req.body?.consentFace,
       },
     });
-    res.status(201).json(c);
+    res.status(201).json({ ...c, phone: decryptOrNull(c.phone) });
   } catch (err: any) { res.status(400).json({ error: err.message }); }
 });
 
@@ -72,15 +75,15 @@ router.post('/customers/face-enroll', authenticate, async (req, res) => {
     // สร้าง KnownFace — เก็บรูป base64 ลง photo_data (imagePath เดิมไม่มีใน schema)
     const face = await prisma.knownFace.create({ data: { name: String(name).slice(0, 80), photo_data: String(imageBase64).slice(0, 8000) } as any });
     const customer = await prisma.restaurantCustomer.create({
-      data: { name: String(name).slice(0, 80), phone: phone ? String(phone).slice(0, 20) : null, knownFaceId: (face as any).id, consentFace: true },
+      data: { name: String(name).slice(0, 80), phone: phone ? encryptField(phone) : null, phone_hash: phone ? hashField(phone) : null, knownFaceId: (face as any).id, consentFace: true },
     });
-    res.status(201).json({ customer, faceId: (face as any).id });
+    res.status(201).json({ customer: { ...customer, phone: decryptOrNull(customer.phone) }, faceId: (face as any).id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/customers', authenticate, async (_req, res) => {
   const list = await prisma.restaurantCustomer.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
-  res.json(list);
+  res.json(list.map((c: any) => ({ ...c, phone: decryptOrNull(c.phone) }))); // F2b: ถอดเฉพาะจุดโชว์ภายใน
 });
 
 // ── Menu + Recipe ──

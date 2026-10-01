@@ -10,6 +10,7 @@
 // - ทุก endpoint สาธารณะโดน rate limit ที่ route layer (public ที่สุดของระบบ)
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+import { encryptField, decryptOrNull, hashField } from './field-crypto.service'; // F2b: PII เข้ารหัสก่อนลง DB
 
 // P16 — ให้ routes เรียกสถิติผ่านตัวกลางเดียวกัน (ธรรมเนียมบ้าน: service เป็นเจ้าของ DB เสมอ)
 export { prisma };
@@ -103,11 +104,11 @@ export async function createPublicOrder(businessId: string, input: any): Promise
   const vat = Math.round(subtotal * biz.vatRate * 100) / 100;
   const total = Math.round((subtotal + vat) * 100) / 100;
 
-  // ลูกค้า walk-in — ผูกด้วยเบอร์โทร (หาซ้ำได้ในธุรกิจเดียวกัน)
-  const existing = await prisma.businessCustomer.findFirst({ where: { businessId, phone } });
+  // ลูกค้า walk-in — ผูกด้วยเบอร์โทร (หาซ้ำได้ในธุรกิจเดียวกัน — F2b: ค้นด้วย hash เพราะ phone ใน DB เข้ารหัส random-IV)
+  const existing = await prisma.businessCustomer.findFirst({ where: { businessId, phone_hash: hashField(phone) } });
   const customerId = existing
     ? existing.id
-    : (await prisma.businessCustomer.create({ data: { businessId, name, phone, channel: 'ONLINE' } })).id;
+    : (await prisma.businessCustomer.create({ data: { businessId, name, phone: encryptField(phone), phone_hash: hashField(phone), channel: 'ONLINE' } })).id;
 
   const order = await prisma.businessOrder.create({
     data: {
@@ -276,10 +277,11 @@ export async function rejectReportedPaymentByToken(token: string, _actor?: strin
 /** ข้อมูลสำหรับหน้าชำระเงิน — QR สำเร็จรูป (data URL) + เบอร์ปลายทางแบบ mask */
 export async function publicPromptPayInfo(businessId: string, amountThb: number): Promise<any> {
   const biz = await openShopOrThrow(businessId);
-  if (!biz.shopPromptPay) return { configured: false };
-  const payload = buildPromptPayPayload({ target: biz.shopPromptPay, amountThb });
+  const ppPlain = decryptOrNull(biz.shopPromptPay); // F2b: ค่าใน DB เข้ารหัส — ถอดก่อนสร้าง QR
+  if (!ppPlain) return { configured: false };
+  const payload = buildPromptPayPayload({ target: ppPlain, amountThb });
   if (!payload) return { configured: false };
-  const digits = String(biz.shopPromptPay).replace(/\D/g, '');
+  const digits = ppPlain.replace(/\D/g, '');
   return {
     configured: true,
     qrDataUrl: await QRCode.toDataURL(payload, { margin: 1, width: 240 }),
@@ -395,13 +397,14 @@ export async function createPartnerBill(businessId: string, input: PartnerBillIn
   const title = String(input.title ?? '').trim().slice(0, 160);
   if (!title) throw new Error('title จำเป็น');
 
-  // ลูกค้า = ตัวแทนของคู่ค้า (ชื่อร้าน + เบอร์ผู้ติดต่อ — หาซ้ำได้ในธุรกิจเดียวกัน)
+  // ลูกค้า = ตัวแทนของคู่ค้า (ชื่อร้าน + เบอร์ผู้ติดต่อ — หาซ้ำได้ในธุรกิจเดียวกัน · F2b: ค้นด้วย hash)
   const biz = await prisma.business.findUnique({ where: { id: businessId } });
   if (!biz) throw new Error('business not found');
   const custName = `คู่ค้า: ${partner.name}`.slice(0, 120);
-  const existing = await prisma.businessCustomer.findFirst({ where: { businessId, phone: partner.contactPhone } });
+  const contactPhonePlain = decryptOrNull(partner.contactPhone) ?? ''; // ถอดเบอร์คู่ค้าจากที่เข้ารหัสไว้ (ถอดไม่ได้ = ว่าง → hash '' ไม่เจอใคร ปลอดภัย)
+  const existing = await prisma.businessCustomer.findFirst({ where: { businessId, phone_hash: hashField(contactPhonePlain) } });
   const customerId = existing ? existing.id
-    : (await prisma.businessCustomer.create({ data: { businessId, name: custName, phone: partner.contactPhone, channel: 'B2B' } })).id;
+    : (await prisma.businessCustomer.create({ data: { businessId, name: custName, phone: encryptField(contactPhonePlain), phone_hash: hashField(contactPhonePlain), channel: 'B2B' } })).id;
 
   // VAT ตามร้าน · สร้าง QUOTE + publicToken (ชำระผ่านลิงก์ลับเดิมได้ทันที)
   const vat = Math.round(amount * biz.vatRate * 100) / 100;
