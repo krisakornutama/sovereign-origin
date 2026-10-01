@@ -25,3 +25,22 @@ POST /import
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `clone/clone.routes.ts` (46 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /manifest
+POST /export
+POST /import
+```
+
+<!-- auto:end -->

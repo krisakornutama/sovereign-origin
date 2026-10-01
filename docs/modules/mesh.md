@@ -26,3 +26,23 @@ POST /replicate
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `mesh/mesh.routes.ts` (35 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /status
+GET /manifest
+GET /latest
+POST /replicate
+```
+
+<!-- auto:end -->

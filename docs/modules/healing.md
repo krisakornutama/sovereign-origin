@@ -33,3 +33,30 @@ GET /progress
 `buddhist-healing.service`
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`buddhist_teachings` · `healing_logs` · `meditation_sessions`
+
+### Routes
+- `healing/healing.routes.ts` (150 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /teachings
+POST /companion
+GET /herbs
+GET /herbs-unified
+POST /herbs/check
+POST /meditation
+POST /log
+GET /progress
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`buddhist-healing.service`
+
+<!-- auto:end -->
