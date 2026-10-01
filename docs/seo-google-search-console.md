@@ -18,6 +18,7 @@
     or http.request.uri.path in {"/robots.txt" "/sitemap.xml"}
    ```
 4. กด **Deploy**
+   - ⚠️ **Deploy โดน challenge เงียบ (เจอจริง 2 ครั้ง 1/10-2/10):** ถ้า Deploy แล้วผลยัง 403 → **ทางเลือก (ง่ายกว่า):** เพิ่ม custom rule **ใหม่** ชื่อ `Allow sitemap/robots` action=**Skip** (ถ้ามี) / หรือ rule ALLOW ไว้ **บนสุดสุด** expression: `http.request.uri.path in {"/robots.txt" "/sitemap.xml"}` → Deploy rule ใหม่ (ไม่โดน rule เดิมกลืน เพราะเจอทีหลังในลำดับ) · อีกทาง: console PUT ruleset ตรง ๆ (วิธีที่เคยใช้สำเร็จ 30/9 — ดู ops-runbook §สิบ ขั้น 6)
 5. พิสูจน์ (ผู้ช่วยรันได้):
    `curl -s -o /dev/null -w "%{http_code}\n" https://sovereignoriginshop.dpdns.org/sitemap.xml` → ต้อง **200** (เดิม 403) · robots.txt เช่นกัน · ถ้ายัง 403 รอ ~1 นาทีรีลอง + เช็คว่า expression บนหน้า rule เปลี่ยนจริง
 
