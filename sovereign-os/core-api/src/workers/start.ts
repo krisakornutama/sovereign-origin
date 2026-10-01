@@ -15,7 +15,8 @@ import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
 import { startTruthWatchdog } from '../services/truth-watchdog.service'; // Phase 2: แจ้งเตือน prod รันโค้ดเก่า/เกตพัง
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
-import { notifyLowStock, notifyTaxDeadlines } from '../services/business.service';
+import { notifyLowStock, notifyTaxDeadlines, buildMorningDigest } from '../services/business.service';
+import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
 import { warRoomActive } from '../services/war-room.service';
@@ -285,6 +286,26 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runBusinessTaxDeadlineCheck();
   setInterval(runBusinessTaxDeadlineCheck, 6 * 60 * 60 * 1000);
+
+  // ── Morning digest ทุกเช้า 08:00 เวลาไทย — ยอดขายเมื่อวาน/ค้างชำระ/แจ้งชำระรอยืนยัน/บิลคู่ค้า (P19 ต่อ) ──
+  // กันส่งซ้ำด้วยวันที่ (นับในหน่วยความจำ) · เช็คทุก 10 นาที — ยิงแค่ช่วงชั่วโมง 8 (บูตใหม่ช่วงอื่นของวัน = ข้าม)
+  let morningDigestDay = '';
+  async function runMorningDigest() {
+    try {
+      const now = new Date();
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
+      const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false }).format(now));
+      if (day === morningDigestDay || hour !== 8) return;
+      morningDigestDay = day;
+      const text = await buildMorningDigest(now);
+      const ok = await sendTelegramMessage(text);
+      if (ok) console.log('🌅 Morning digest ส่งแล้ว');
+    } catch (err) {
+      console.error('Morning digest error:', err instanceof Error ? err.message : err);
+    }
+  }
+  runMorningDigest();
+  setInterval(runMorningDigest, 10 * 60 * 1000);
 
   // ── Vision AI คนแปลกหน้า: ตรวจตามกฎ (ทุก 60 วิ — ตัวกฎกันการตรวจซ้ำด้วย interval_min) ──
   async function runVisionCheckWorker() {

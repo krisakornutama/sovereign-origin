@@ -30,3 +30,29 @@ POST /generate
 - reports → automation(automation_alerts)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`daily_reports`
+
+### Routes
+- `reports/reports.routes.ts` (32 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /
+POST /generate
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`report.service`
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- reports → automation(automation_alerts)
+- reports → devices(devices)
+- reports → sensors(sensor_telemetry)
+
+<!-- auto:end -->

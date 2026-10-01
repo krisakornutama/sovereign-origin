@@ -26,3 +26,23 @@ POST /modes/:mode/deactivate
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`crisis_modes`
+
+### Routes
+- `crisis/crisis.routes.ts` (103 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /modes
+GET /modes/:mode
+POST /modes/:mode/activate
+POST /modes/:mode/deactivate
+```
+
+<!-- auto:end -->

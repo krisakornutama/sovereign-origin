@@ -2035,6 +2035,7 @@ model BusinessPayment {
   method    String   @default("CASH")
   reference String?
   confirmToken String? @unique // P19 — ปุ่ม "ยืนยันรับเงิน" ใน Telegram (ใช้ครั้งเดียวแล้วล้างทิ้ง)
+  rejectedAt   DateTime? // P19 ต่อ — ปุ่ม "🚫 ไม่ได้โอน": ปฏิเสธแล้ว = ตัดออกจากทุกยอด (เก็บแถวไว้ตามรอย)
   whtAmount Float    @default(0)
   paidAt    DateTime @default(now())
 

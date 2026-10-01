@@ -1,4 +1,4 @@
-# โมดูล predictive
+# โมดูล demo
 
 ## เจตนา
 
@@ -15,37 +15,17 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `predictive/predictive.routes.ts` (127 บรรทัด)
+- `demo/demo.routes.ts` (65 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
-GET /battery
-GET /anomalies
-GET /summary
-POST /world
+GET /overview
+GET /farm
+GET /livestock
+GET /finance
+GET /catalog
+GET /trace/:code
+GET /shop
 ```
-
-<!-- auto:end -->
-
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
-
-### Routes
-- `predictive/predictive.routes.ts` (127 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /battery
-GET /anomalies
-GET /summary
-POST /world
-```
-
-### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
-- predictive → sensors(sensor_telemetry)
 
 <!-- auto:end -->

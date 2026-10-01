@@ -30,3 +30,27 @@ PUT /:id
 - users → auth(users)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `users/users.routes.ts` (89 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /
+POST /
+DELETE /:id
+POST /:id/reset-password
+PUT /:id
+```
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- users → auth(users)
+
+<!-- auto:end -->

@@ -53,11 +53,11 @@ export function computePendingReports(orders: Order[]): PendingReport[] {
       if (o.status !== 'QUOTE' && o.status !== 'ORDERED' && o.status !== 'PAID') return false;
       const remaining = o.total - (o.paidAmount ?? 0);
       if (remaining <= 0.001) return false;
-      const reported = (o.payments ?? []).filter((p) => p.method === 'PROMPTPAY').reduce((s, p) => s + (p.amount ?? 0), 0);
+      const reported = (o.payments ?? []).filter((p) => p.method === 'PROMPTPAY' && !p.rejectedAt).reduce((s, p) => s + (p.amount ?? 0), 0);
       return reported > 0.001;
     })
     .map((o) => {
-      const reported = (o.payments ?? []).filter((p) => p.method === 'PROMPTPAY').reduce((s, p) => s + (p.amount ?? 0), 0);
+      const reported = (o.payments ?? []).filter((p) => p.method === 'PROMPTPAY' && !p.rejectedAt).reduce((s, p) => s + (p.amount ?? 0), 0);
       return { order: o, reported, remaining: Math.max(0, o.total - (o.paidAmount ?? 0)) };
     });
 }
