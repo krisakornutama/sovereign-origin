@@ -6,6 +6,7 @@
 //  โหมด: หน้าหลัก · ชุดเต็ม 93 · ควิซสั้น 32 · ผลลัพธ์ · คลัง 16 · เทียบสองคน · วิวัฒนาการ
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
+import { FounderCredit } from '../components/public/FounderCredit';
 import Sidebar from "../components/layout/Sidebar";
 import PageHeader from "../components/ui/PageHeader";
 import Icon from "../components/ui/Icon";
@@ -577,6 +578,7 @@ export default function MbtiPage() {
           {screen === "library" && libraryScreen}
           {screen === "evolution" && evolutionScreen}
         </main>
+      <FounderCredit className="pb-6" />
       </div>
     </div>
   );

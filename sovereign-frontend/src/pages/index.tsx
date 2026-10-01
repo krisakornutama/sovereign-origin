@@ -1,6 +1,7 @@
 "use client";
 import { useAuthStore } from '../stores/useAuthStore';
 import LoginForm from '../components/auth/LoginForm';
+import { FounderCredit } from '../components/public/FounderCredit';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -76,6 +77,8 @@ export default function Home() {
           <div className="pt-2 text-center">
             <a href="/login" className="text-[11px] text-gray-600 hover:text-gray-400 underline underline-offset-2">เข้าสู่ระบบ (ผู้ดูแลระบบ)</a>
           </div>
+
+          <FounderCredit />
         </main>
       </div>
     );

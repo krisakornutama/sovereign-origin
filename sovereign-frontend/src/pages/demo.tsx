@@ -4,6 +4,7 @@ import Head from 'next/head';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
+import { FounderCredit } from '../components/public/FounderCredit';
 import { trackPageView, trackDemoTab, trackSurvey, trackQuestion } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ export default function DemoPage() {
           <span>Powered by Sovereign OS</span>
           <span>·</span>
           <a href="/shop" className="text-gray-400 hover:text-emerald-300 underline underline-offset-2">ร้านอุปกรณ์</a>
+          <FounderCredit className="w-full pt-1" />
         </footer>
       </main>
       <FeedbackButton />
