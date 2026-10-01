@@ -313,7 +313,8 @@ test('GET /tax — ACCOUNTANT ขึ้นไปเท่านั้น · VIEW
   assert.equal((await get(`${API}/${BIZ_ID}/tax`)).status, 401);
   assert.equal((await get(`${API}/${BIZ_ID}/tax`, tok(VIEWER_ID))).status, 403);
   assert.equal((await get(`${API}/${BIZ_ID}/tax`, tok(NON_MEMBER_ID))).status, 403);
-  const res = await get(`${API}/${BIZ_ID}/tax`, tok(ACCOUNTANT_ID));
+  // ระบุงวดตาม fixture (2026-09) — เดิมพึ่ง "เดือนปัจจุบันจริง" แล้วพังทุกครั้งที่เครื่องข้ามเดือน (time bomb)
+  const res = await get(`${API}/${BIZ_ID}/tax?month=2026-09`, tok(ACCOUNTANT_ID));
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.vat.thisMonth.outputVat, 210);
