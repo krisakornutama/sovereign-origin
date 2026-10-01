@@ -62,3 +62,20 @@ export function decryptField(value: string | null | undefined): string {
     return '';
   }
 }
+
+// ── F2b (1/10/69): equality lookup บน field ที่เข้ารหัส ──
+// encryptField ใช้ random-IV → ค่าเดิมเข้ารหัสแต่ละครั้งได้ต่างกัน ค้นตรง ๆ ไม่ได้
+// → เก็บ "ลายนิ้วมือ" ของค่า (HMAC-SHA256) ไว้คอลัมน์คู่ (phone_hash) สำหรับ WHERE เท่านั้น
+// normalize: ตัดช่องว่าง/ขีด/จุด/วงเล็บ + lowercase — "081-234-5678" ≡ "0812345678"
+export function hashField(value: string): string {
+  if (!value) return '';
+  const norm = value.trim().replace(/[\s\-().]/g, '').toLowerCase();
+  if (!norm) return '';
+  return crypto.createHmac('sha256', loadKey()).update(norm).digest('hex');
+}
+
+/** ถอด field สำหรับโชว์ UI — ค่าว่าง/ถอดไม่ได้ = null (ไม่เด้ง error) */
+export function decryptOrNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return decryptField(value) || null;
+}

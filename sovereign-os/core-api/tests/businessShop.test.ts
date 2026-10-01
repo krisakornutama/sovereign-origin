@@ -5,6 +5,7 @@ import assert from 'node:assert';
 import businessShopRoutes from '../src/modules/business/business-shop.routes';
 import businessRoutes from '../src/modules/business/business.routes';
 import { prisma } from '../src/lib/prisma';
+import { hashField } from '../src/services/field-crypto.service'; // F2b
 import { createTestServer, makeToken, TestServer } from './helpers';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -103,7 +104,8 @@ before(async () => {
   };
   (prisma as any).businessCustomer = {
     findFirst: async ({ where }: any) =>
-      [...customers.values()].find((c) => c.businessId === where.businessId && c.phone === where.phone) ?? null,
+      // F2b: service ค้นลูกค้าด้วย phone_hash (เบอร์ใน DB เข้ารหัส random-IV ค้นตรงไม่ได้)
+      [...customers.values()].find((c) => c.businessId === where.businessId && c.phone_hash === where.phone_hash) ?? null,
     create: async ({ data }: any) => {
       const c = { id: `cust-${customerSeq++}`, ...data };
       customers.set(c.id, c);
@@ -371,7 +373,12 @@ test('สั่งซื้อผ่านหน้าร้าน → QUOTE + p
   assert.ok(o.publicToken, 'ต้องได้ลิงก์ลับสำหรับเช็คสถานะ/ชำระเงิน');
   assert.match(o.publicToken, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'token ต้องเป็น UUID — ห้ามใช้ id ภายในเป็นลิงก์ลับ');
   assert.equal(products.get(PRODUCT_ID).stockQty, stockBefore, 'สั่งจากเว็บยังไม่หักสต็อก — หักตอนร้านยืนยัน');
-  assert.ok([...customers.values()].some((c) => c.phone === '0891112222' && c.name === 'ลูกค้าเว็บ'));
+  // F2b: ลูกค้า walk-in เก็บเบอร์แบบเข้ารหัส + hash คู่ (ค้นซ้ำได้แม้ random-IV)
+  const walkIn = [...customers.values()].find((c) => c.name === 'ลูกค้าเว็บ');
+  assert.ok(walkIn, 'ได้ลูกค้า walk-in');
+  assert.match(walkIn.phone, /^enc:v1:/, 'เบอร์ลูกค้าถูกเข้ารหัสก่อนลง DB (ไม่มี plaintext)');
+  assert.notEqual(walkIn.phone, '0891112222');
+  assert.equal(walkIn.phone_hash, hashField('0891112222'), 'hash คู่ตรงกับเบอร์ (ค้น dedupe ได้)');
 
   // สินค้าไม่อยู่ในร้าน → 400
   assert.equal((await shopOrder({ items: [{ productId: '99999999-9999-9999-9999-999999999999', qty: 1 }], customerName: 'a', customerPhone: 'b' })).status, 400);

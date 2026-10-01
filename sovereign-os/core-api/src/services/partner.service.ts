@@ -9,6 +9,7 @@
 import { prisma } from '../lib/prisma';
 import { ipHashOf } from './feedback.service';
 import { assertNotSpam, checkVerifiedToken, consumeVerified, normName } from './partner-guard.service';
+import { encryptField, hashField, decryptOrNull } from './field-crypto.service';
 
 // แจ้งเตือน Telegram ทันทีเมื่อมีใบสมัครใหม่ (P16 คำสั่งเจ้าของ 30/9/69 — ไม่ต้องรอ digest วันจันทร์)
 //  fire-and-forget: ส่งไม่สำเร็จ = บันทึก console อย่างเดียว — การสมัครต้องสำเร็จปกติเสมอ
@@ -82,6 +83,8 @@ export async function applyPartner(input: PartnerApplyInput): Promise<PartnerApp
   if (!spam.ok) return { accepted: false, reason: 'spam', error: spam.reason };
 
   const category = (CATEGORIES as readonly string[]).includes(String(input.category)) ? String(input.category) : 'OTHER';
+  // F2b: ข้อมูลติดต่อเข้ารหัสก่อนลง DB (กันยก DB อ่านเบอร์ได้) + เก็บ hash คู่สำหรับค้นหา/กันสแปมซ้ำ
+  const phoneRaw = str(input.phone, 40);
   const row = await prisma.partner.create({
     data: {
       name,
@@ -89,11 +92,13 @@ export async function applyPartner(input: PartnerApplyInput): Promise<PartnerApp
       category,
       detail: str(input.detail, 400),
       address: str(input.address, 300),
-      phone: str(input.phone, 40),
+      phone: phoneRaw ? encryptField(phoneRaw) : null,
+      phone_hash: phoneRaw ? hashField(phoneRaw) : null,
       lat,
       lng,
       contactName,
-      contactPhone,
+      contactPhone: encryptField(contactPhone),
+      contact_phone_hash: hashField(contactPhone),
       contactEmail: str(input.contactEmail, 120),
       user_agent: str(input.userAgent, 200),
       ip_hash: input.ip ? ipHashOf(input.ip) : null,
@@ -117,7 +122,8 @@ export async function publicPartners(): Promise<Array<{
       address: true, phone: true, lat: true, lng: true,
     },
   });
-  return rows;
+  // F2b: phone ใน DB เข้ารหัสแล้ว — ถอดเฉพาะจุดโชว์สาธารณะ (by-design ให้เบอร์ร้านโชว์เมื่ออนุมัติ)
+  return rows.map((r) => ({ ...r, phone: decryptOrNull(r.phone) }));
 }
 
 /** จำนวนพาร์ทเนอร์ (โชว์หน้าแรก — เลขจริงจาก DB เฉพาะ ACTIVE) */
