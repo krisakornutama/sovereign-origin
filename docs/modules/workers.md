@@ -22,3 +22,20 @@ _(ยังไม่มีตารางใน owners map)_
 - workers → health(health_flags)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Services ที่ทำงานให้โมดูลนี้
+`start`
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- workers → automation(automation_alerts)
+- workers → health(health_flags)
+- workers → sensors(sensor_telemetry)
+
+<!-- auto:end -->

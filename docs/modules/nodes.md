@@ -30,3 +30,27 @@ DELETE /:id
 - nodes → auth(nodes)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `nodes/node.routes.ts` (73 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /
+POST /
+GET /:id
+PUT /:id
+DELETE /:id
+```
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- nodes → auth(nodes)
+
+<!-- auto:end -->

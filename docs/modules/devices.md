@@ -28,3 +28,25 @@ DELETE /:id
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`devices`
+
+### Routes
+- `devices/device.routes.ts` (140 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /
+POST /
+GET /status
+GET /:id
+PUT /:id
+DELETE /:id
+```
+
+<!-- auto:end -->

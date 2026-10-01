@@ -73,7 +73,7 @@ async function main() {
 
   // 4) เงินเข้า 7 วัน (P18): ยอดแจ้งชำระรอยืนยัน (PROMPTPAY ยังไม่ถูกยืนยันด้วยบิล CASH/TRANSFER) + ยอดรับแล้ว
   //    "รับแล้ว" = บิลยืนยันจากเจ้าของ (method ไม่ใช่ PROMPTPAY — ตามกติกา addPayment ที่ method CASH/TRANSFER = เงินเข้าจริง)
-  const ppRows = psqlRows(`SELECT COALESCE(sum(p.amount),0) FROM business_payments p JOIN business_orders o ON o.id=p."orderId" WHERE p.method='PROMPTPAY' AND o.status IN ('QUOTE','ORDERED') AND p."paidAt" >= '${sinceQ}';`);
+  const ppRows = psqlRows(`SELECT COALESCE(sum(p.amount),0) FROM business_payments p JOIN business_orders o ON o.id=p."orderId" WHERE p.method='PROMPTPAY' AND p."rejectedAt" IS NULL AND o.status IN ('QUOTE','ORDERED') AND p."paidAt" >= '${sinceQ}';`);
   const receivedRows = psqlRows(`SELECT COALESCE(sum(p.amount),0) FROM business_payments p WHERE p.method <> 'PROMPTPAY' AND p."paidAt" >= '${sinceQ}';`);
   const billRows = psqlRows(`SELECT count(*) FROM business_orders WHERE "partnerId" IS NOT NULL AND "createdAt" >= '${sinceQ}';`);
   lines.push('');

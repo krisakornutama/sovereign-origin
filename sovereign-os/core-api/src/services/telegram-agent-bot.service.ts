@@ -14,7 +14,7 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
-import { confirmReportedPaymentByToken } from './business-shop.service';
+import { confirmReportedPaymentByToken, rejectReportedPaymentByToken } from './business-shop.service';
 
 
 export interface ApprovalRequestInfo {
@@ -76,6 +76,8 @@ export interface TelegramAgentBotDeps {
   token?: string;
   // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>)
   confirmPay?: (token: string, actor?: string) => Promise<PaymentConfirmResult>;
+  // P19 ต่อ — ปุ่ม "🚫 ไม่ได้โอน" (rejectpay:<token เดียวกัน — ยืนยัน/ปฏิเสธทำอย่างใดอย่างหนึ่ง)
+  rejectPay?: (token: string, actor?: string) => Promise<PaymentConfirmResult>;
 }
 
 export class TelegramAgentBot {
@@ -85,6 +87,7 @@ export class TelegramAgentBot {
   private allowedChatId?: string | number;
   private token: string;
   private confirmPay: NonNullable<TelegramAgentBotDeps['confirmPay']>;
+  private rejectPay: NonNullable<TelegramAgentBotDeps['rejectPay']>;
 
   private offset = 0;
   private polling = false;
@@ -102,6 +105,7 @@ export class TelegramAgentBot {
     this.allowedChatId = deps.allowedChatId ?? process.env.TELEGRAM_CHAT_ID;
     this.token = deps.token ?? (process.env.TELEGRAM_BOT_TOKEN || '');
     this.confirmPay = deps.confirmPay || ((token, actor) => confirmReportedPaymentByToken(token, actor));
+    this.rejectPay = deps.rejectPay || ((token, actor) => rejectReportedPaymentByToken(token, actor));
   }
 
   get enabled(): boolean {
@@ -168,6 +172,14 @@ export class TelegramAgentBot {
       const ok = result.status === 'ok';
       await this.answerCallback(cb?.id, ok ? '✅ รับเงินแล้ว' : `⛔ ${result.message}`.slice(0, 200));
       await this.send([ok ? '✅ <b>ยืนยันรับเงินสำเร็จ</b>' : '⛔ <b>ยืนยันรับเงินไม่สำเร็จ</b>', escapeHtml(result.message)].join('\n'));
+      return;
+    }
+    if (raw.startsWith('rejectpay:')) {
+      const actor = await this.resolveActor();
+      const result = await this.rejectPay(raw.slice('rejectpay:'.length), actor);
+      const ok = result.status === 'ok';
+      await this.answerCallback(cb?.id, ok ? '🚫 ปฏิเสธแล้ว' : `⛔ ${result.message}`.slice(0, 200));
+      await this.send([ok ? '🚫 <b>ปฏิเสธการแจ้งชำระแล้ว</b>' : '⛔ <b>ปฏิเสธไม่สำเร็จ</b>', escapeHtml(result.message)].join('\n'));
       return;
     }
     const parsed = extractCallbackData(raw);

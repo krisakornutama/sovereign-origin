@@ -38,3 +38,35 @@ GET /overview
 ```
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`cameras` · `detection_events` · `equipment` · `radio_messages` · `run_hours_logs` · `water_quality_readings`
+
+### Routes
+- `infrastructure/infrastructure.routes.ts` (351 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /cameras
+POST /cameras
+PUT /cameras/:id
+DELETE /cameras/:id
+GET /detections
+POST /detections
+GET /water
+POST /water
+GET /radio
+POST /radio
+GET /equipment
+POST /equipment
+POST /equipment/:id/run-hours
+POST /equipment/:id/service
+DELETE /equipment/:id
+GET /overview
+```
+
+<!-- auto:end -->

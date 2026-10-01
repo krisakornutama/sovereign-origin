@@ -58,3 +58,43 @@ GET /reports/summary
 - restaurant → vision(known_faces)
 
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`menu_items` · `recipe_lines` · `restaurant_customers` · `restaurant_employees` · `restaurant_ingredients` · `restaurant_menus` · `restaurant_order_lines` · `restaurant_orders` · `restaurant_recipes` · `restaurant_waste_logs` · `restaurants`
+
+### Routes
+- `restaurant/restaurant.routes.ts` (386 บรรทัด)
+
+### Endpoints (จาก router)
+```
+POST /
+GET /
+PUT /:id/camera
+POST /customers
+POST /customers/face-enroll
+GET /customers
+POST /menus
+GET /menus
+PUT /menus/:id/recipe
+GET /menus/available
+POST /orders
+GET /orders
+POST /orders/:id/cancel
+POST /orders/:id/status
+POST /orders/:id/pay
+POST /iot/weight
+GET /kitchen-sensors
+POST /purchases
+GET /reports/summary
+```
+
+### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
+- restaurant → inventory(inventory_items)
+- restaurant → sensors(sensor_telemetry)
+- restaurant → vision(known_faces)
+
+<!-- auto:end -->
