@@ -163,6 +163,8 @@ function checkSidebar() {
     const name = file.slice(pagesDir.length + 1);
     // ไฟล์พิเศษของ Next.js — ไม่ใช่หน้าแบบมี layout
     if (name.startsWith('_')) continue;
+    // endpoint ที่ตอบ XML (sitemap สำหรับ SEO) — ไม่ใช่หน้า UI จึงไม่มี layout (2/10/69)
+    if (name === 'sitemap.xml.ts') continue;
     if (!hasSidebarImport(file)) {
       add('sidebar-rule', file, 'หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)');
     }
