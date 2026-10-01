@@ -4,11 +4,13 @@
 //   node tools/verify/offsite-push.mjs --verify       → ถอดรหัสไฟล์ล่าสุด + ตรวจ SQL ใช้ได้จริง
 //   node tools/verify/offsite-push.mjs --restore-test → พิสูจน์เต็ม: restore ลง Postgres ชั่วคราว + เทียบจำนวนแถว
 // ที่มา: เครื่องนี้มีดิสก์กายภาพเดียว (C+E = Disk 0) — dump ในเครื่อง = หายพร้อมกันทั้งหมด
-// E3 (27/9/69): ช่องทางที่สองไม่พึ่ง Telegram — mirror ไฟล์ .enc ไป OFFSITE_MIRROR_DIR (default C:\SovereignOffsite)
+// E3 (27/9/69): ช่องทางที่สองไม่พึ่ง Telegram — mirror ไฟล์สำรอง (.age ตั้งแต่ 1/10/69) ไป OFFSITE_MIRROR_DIR (default C:\SovereignOffsite)
 //   + offsite-key-recovery.txt (key สำรองนอกสาย backup) · ช่องใดช่องหนึ่งสำเร็จ = รอบนั้นยังมีชีวิต
 //   node tools/verify/offsite-push.mjs --restore-test --from-mirror → พิสูจน์ว่า "สำเนาที่สอง" กู้ได้จริง
 //   node tools/verify/offsite-push.mjs --send-key → เจ้าของกดเอง: ส่ง recovery เข้า Telegram ตัวเอง (ไม่ผูก schedule)
-// เงื่อนไขความปลอดภัย: ไฟล์ที่ออกจากเครื่องเข้ารหัส AES-256-GCM ทุกครั้ง (key อยู่ infra/.env เครื่องนี้เท่านั้น)
+// เงื่อนไขความปลอดภัย: ไฟล์ที่ออกจากเครื่องเข้ารหัสเสมอ — **I2c จบ (1/10/69): สาย age (X25519) เป็นสายเดียว**
+//   (restore-test ผ่านสาย age ครบ 2 คืนติด 28–30/9 · พิสูจน์ด้วยมืออีกครั้ง 1/10 — users 8/audit 26k/telemetry 133k)
+//   สาย AES เดิม: **เลิกสร้างไฟล์ใหม่** แต่เก็บช่องถอดไฟล์ .enc เก่า (≤ 30/9/69 ใน TG history/mirror) ไว้จนกว่าจะหมดความหมาย
 import { execFileSync, execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -22,7 +24,8 @@ const envFile = fs.readFileSync(path.join(ROOT, 'sovereign-os/infra/.env'), 'utf
 const env = Object.fromEntries(envFile.split(/\r?\n/).filter((l) => l.includes('=') && !l.startsWith('#')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]));
 const OFFSITE = path.join(ROOT, 'sovereign-os/infra/offsite');
 const LOG = path.join(ROOT, 'sovereign-os/core-api/backups/offsite-log.jsonl');
-const key = Buffer.from(env.BACKUP_ENCRYPTION_KEY, 'base64');
+// I2c: key AES ไม่ต้องมีใน .env แล้ว (เลิกเข้ารหัสสายนี้) — โหลดเฉพาะตอนถอดไฟล์ .enc เก่าเท่านั้น
+const BACKUP_KEY_B64 = env.BACKUP_ENCRYPTION_KEY || '';
 
 // ── ช่องทางที่สอง (E3): ทำไมต้องมี — Telegram คือช่องเดียวที่ไฟล์ออกเครื่องจริง
 // ตัวเดียวล้ม (DNS/เราเตอร์/บล็อก) = คืนนั้นไม่มีอะไรออกเครื่องเลย (เคสจริงคืน 24–26/9)
@@ -63,8 +66,8 @@ function buildRecoveryText() {
     '# Sovereign OFFSITE KEY RECOVERY — เก็บไว้นอกเครื่องนี้',
     `สร้าง: ${new Date().toISOString()}`,
     '',
-    '1) BACKUP_ENCRYPTION_KEY (base64):',
-    env.BACKUP_ENCRYPTION_KEY || '(ไม่พบใน infra/.env!)',
+    '1) BACKUP_ENCRYPTION_KEY (base64) — จำเป็นเฉพาะไฟล์ .enc เก่าที่ทำก่อน 1/10/69 (สายใหม่ทั้งหมดเป็น age แล้ว):',
+    env.BACKUP_ENCRYPTION_KEY || '(ไม่มีใน infra/.env — ไฟล์ใหม่ทั้งหมดเป็นสาย age ไม่ต้องใช้)',
     '',
     '2) mesh key (sovereign-os/core-api/data/mesh-key, base64):',
     mesh || '(ไม่มีไฟล์ mesh-key)',
@@ -75,10 +78,10 @@ function buildRecoveryText() {
     '   ถอดไฟล์ .age บนมือถือ/เครื่องไหนก็ได้ (ติดตั้ง age ก่อน):',
     '   age -d -i identity.txt sovereign_dump_XXXXXXXX_XXXXXX.sql.gz.age > dump.sql.gz',
     '',
-    '4) กู้ไฟล์ .enc ล่าสุด (สาย AES เดิม — ทดสอบ restore เต็ม):',
-    '   node tools/verify/offsite-push.mjs --restore-test --from-mirror',
+    '4) ทดสอบ restore เต็มจากไฟล์ล่าสุด (สาย age — ตั้งแต่ 1/10/69 ไฟล์ใหม่มีแต่ .age):',
+    '   node tools/verify/offsite-push.mjs --restore-test   (ไฟล์ .enc เก่า: --restore-test --legacy-aes)',
     '',
-    'ไฟล์ .enc = AES-256-GCM (ใช้ key ข้อ 1) · ไฟล์ .age = age X25519 (ใช้ identity ข้อ 3)',
+    'ไฟล์ใหม่ = age X25519 อย่างเดียว (ใช้ identity ข้อ 3) · ไฟล์ .enc เก่า ≤ 30/9/69 = AES-256-GCM (key ข้อ 1)',
     'ของใดหาย ไฟล์รูปแบบนั้นหมดค่าทั้งชุด — ก๊อปข้อความนี้ไป password manager หรือ Telegram Saved Messages —',
     'สำเนาบนไดรฟ์เดียวกันช่วยแค่กรณีดิสก์เสีย ไม่ช่วยกรณีเครื่องหายทั้งเครื่อง',
   ].join('\n');
@@ -119,7 +122,9 @@ function decryptAge(ageFile) {
   return execFileSync(AGE_BIN, ['-d', '-i', AGE_IDENTITY, ageFile], { maxBuffer: 512 * 1024 * 1024 });
 }
 function decrypt(encFile) {
-  // layout ตรงกับ push: [iv(12)][ciphertext][tag(16) ท้ายไฟล์]
+  // layout ตรงกับ push เก่า (≤ 30/9/69): [iv(12)][ciphertext][tag(16) ท้ายไฟล์] — ใช้กับไฟล์ .enc เก่าเท่านั้น
+  if (!BACKUP_KEY_B64) throw new Error('ไม่มี BACKUP_ENCRYPTION_KEY ใน infra/.env — จำเป็นเฉพาะไฟล์ .enc เก่า (สายใหม่ใช้ age)');
+  const key = Buffer.from(BACKUP_KEY_B64, 'base64');
   const raw = fs.readFileSync(encFile);
   const iv = raw.subarray(0, 12);
   const tag = raw.subarray(raw.length - 16);
@@ -133,12 +138,13 @@ function gunzipSql(buf) {
 }
 
 if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
-  const wantAge = process.argv.includes('--age'); // --age = พิสูจน์สายใหม่ (ไฟล์ .age) — ไม่ใส่ = สาย AES เดิม
-  const enc = wantAge ? latestAge() : latestEncrypted();
+  // I2c: ค่าเริ่มต้น = สาย age (ไฟล์ใหม่ทั้งหมด) — --legacy-aes สำหรับไฟล์ .enc เก่าที่ทำก่อน 1/10/69
+  const wantLegacy = process.argv.includes('--legacy-aes');
+  const enc = wantLegacy ? latestEncrypted() : latestAge();
   const sha = crypto.createHash('sha256').update(fs.readFileSync(enc)).digest('hex');
-  const payload = () => gunzipSql(wantAge ? decryptAge(enc) : decrypt(enc));
+  const payload = () => gunzipSql(wantLegacy ? decrypt(enc) : decryptAge(enc));
   const sql = payload().toString('utf8');
-  console.log(`ถอดรหัส: ${path.basename(enc)} · sha256=${sha.slice(0, 16)}… · ${Math.round(sql.length / 1024)} KB SQL`);
+  console.log(`ถอดรหัส${wantLegacy ? ' (สาย AES เก่า)' : ' (สาย age)'}: ${path.basename(enc)} · sha256=${sha.slice(0, 16)}… · ${Math.round(sql.length / 1024)} KB SQL`);
   if (!/CREATE TABLE|COPY /.test(sql)) { console.error('FATAL: เนื้อไฟล์ไม่ใช่ SQL dump ที่ใช้ได้'); process.exit(1); }
   const tables = [...sql.matchAll(/^CREATE TABLE (?:public\.)?(\w+)/gm)].map((m) => m[1]);
   console.log(`ตารางใน dump: ${tables.length} ตาราง (เช่น ${tables.slice(0, 4).join(', ')})`);
@@ -185,43 +191,43 @@ if (process.argv[2] === '--verify' || process.argv[2] === '--restore-test') {
 
 // ── push (default) ──
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+// ชื่อฐานคง suffix .enc ไว้เพื่อรูปแบบชื่อเดิม — ไฟล์จริงที่สร้างคือ .age (แทนที่ suffix)
 const encName = `sovereign_dump_${stamp}.sql.gz.enc`;
-const encPath = path.join(OFFSITE, encName);
 
 console.log('1) pg_dump สด…');
 const dump = execSync('docker exec sovereign-db pg_dump -U sovereign -d sovereign', { maxBuffer: 256 * 1024 * 1024 });
 console.log(`   ${(dump.length / 1024 / 1024).toFixed(1)} MB`);
-console.log('2) gzip + เข้ารหัส AES-256-GCM…');
+console.log('2) gzip + เข้ารหัส age (X25519 — สายเดียวตาม I2c)…');
 const gz = zlib.gzipSync(dump);
-const iv = crypto.randomBytes(12);
-const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-const enc = Buffer.concat([iv, Buffer.from(cipher.update(gz)), Buffer.from(cipher.final()), Buffer.from(cipher.getAuthTag())]);
 fs.mkdirSync(OFFSITE, { recursive: true });
-fs.writeFileSync(encPath, enc);
-const sha = crypto.createHash('sha256').update(enc).digest('hex');
-console.log(`   ${encName} (${Math.round(enc.length / 1024)} KB) sha256=${sha.slice(0, 16)}…`);
 
-// 2b) สำเนาสาย age (I2) — เข้ารหัสรอบสองด้วย public key อย่างเดียว · ล้มได้ไม่กระทบสาย AES
+// สาย age = สายหลัก (และสายเดียวของไฟล์ใหม่) — ไม่มี age.exe/identity = ล้มดัง exit 1 (ห้ามส่งไฟล์ไม่เข้ารหัสเด็ดขาด)
 let agePath = null;
+let sha = '';
+let encSize = 0;
 const recipient = ageRecipient();
 if (!fs.existsSync(AGE_BIN) || !recipient) {
-  console.error('   ⚠️ ข้ามสาย age (ไม่มี age.exe/identity) — สาย AES ทำงานปกติ');
-} else {
-  try {
-    agePath = path.join(OFFSITE, encName.replace(/\.enc$/, '.age'));
-    execFileSync(AGE_BIN, ['-r', recipient, '-o', agePath, '-'], { input: gz, maxBuffer: 512 * 1024 * 1024 });
-    console.log(`2b) สำเนา age (X25519): ${path.basename(agePath)} (${Math.round(fs.statSync(agePath).size / 1024)} KB)`);
-  } catch (err) {
-    agePath = null;
-    console.error(`2b) ⚠️ age เข้ารหัสล้ม — ${String(err?.message || err).slice(0, 120)} (สาย AES ไม่กระทบ)`);
-  }
+  console.error('❌ ไม่มี age.exe/identity — ปฏิเสธส่งไฟล์ไม่เข้ารหัส (เงื่อนไข: ไฟล์ที่ออกเครื่องต้องเข้ารหัสเสมอ)');
+  try { fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: encName, status: 'failed', reason: 'no-age-identity' }) + '\n'); } catch { /* ข้าม */ }
+  process.exit(1);
+}
+try {
+  agePath = path.join(OFFSITE, encName.replace(/\.enc$/, '.age'));
+  execFileSync(AGE_BIN, ['-r', recipient, '-o', agePath, '-'], { input: gz, maxBuffer: 512 * 1024 * 1024 });
+  sha = crypto.createHash('sha256').update(fs.readFileSync(agePath)).digest('hex');
+  encSize = fs.statSync(agePath).size;
+  console.log(`   ${path.basename(agePath)} (${Math.round(encSize / 1024)} KB) sha256=${sha.slice(0, 16)}…`);
+} catch (err) {
+  console.error(`❌ age เข้ารหัสล้ม — ${String(err?.message || err).slice(0, 120)} — ปฏิเสธส่ง (ไฟล์ใหม่ต้องเป็นสาย age เสมอ)`);
+  try { fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: encName, status: 'failed', reason: 'age-encrypt-failed' }) + '\n'); } catch { /* ข้าม */ }
+  process.exit(1);
 }
 
 // จดทุกความล้มเหลวลง log พร้อม status:failed — ห้ามตายเงียบอีก
 // (เคสจริงคืน 24–26/9: DNS ผ่านเราเตอร์ล่ม → fetch throw ไม่มี catch → สคริปต์ตายทั้งรอบ
 //  สาย offsite ขาด 3 คืนโดยไม่มีใครรู้ — คืนถัดไป dump สดใหม่แล้วลองใหม่เอง ไม่ส่งไฟล์เก่าค้าง)
 function logEntry(status, extra = {}) {
-  fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: encName, bytes: enc.length, sha256: sha, status, ...extra }) + '\n');
+  fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), file: path.basename(agePath || encName), bytes: encSize, sha256: sha, status, ...extra }) + '\n');
 }
 
 console.log('3) ส่ง Telegram (sendDocument) — creds จากระบบ (system_settings → env fallback)…');
@@ -233,8 +239,9 @@ if (!tg.token || !tg.chatId) {
 } else {
   const form = new FormData();
   form.append('chat_id', tg.chatId);
-  form.append('caption', `🗄 Sovereign offsite backup · ${encName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: AES-256-GCM (key บนเครื่องเท่านั้น)`);
-  form.append('document', new Blob([enc]), encName);
+  const ageName = path.basename(agePath);
+  form.append('caption', `🗄 Sovereign offsite backup · ${ageName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: age X25519 — identity ของเจ้าของ (ดู offsite-key-recovery.txt)`);
+  form.append('document', new Blob([fs.readFileSync(agePath)]), ageName);
   try {
     const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(90_000) });
     const out = await res.json();
@@ -245,7 +252,7 @@ if (!tg.token || !tg.chatId) {
   } catch (err) {
     const reason = String(err?.cause?.code || err?.message || err).slice(0, 200);
     logEntry('failed', { channel: 'telegram', reason });
-    console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด failed แล้ว (${reason}) — ไฟล์ .enc ค้างใน staging ยืนยันได้`);
+    console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด failed แล้ว (${reason}) — ไฟล์ .age ค้างใน staging ยืนยันได้`);
   }
 }
 
@@ -254,14 +261,13 @@ let mirrorOk = false;
 try {
   if (MIRROR_DIR.toLowerCase().startsWith(ROOT.toLowerCase())) throw new Error('mirror ต้องอยู่นอก repo — ต่าง failure domain เท่านั้น');
   fs.mkdirSync(MIRROR_DIR, { recursive: true });
-  const mPath = path.join(MIRROR_DIR, encName);
-  fs.copyFileSync(encPath, mPath);
-  if (fs.statSync(mPath).size !== enc.length) throw new Error('ขนาดไฟล์ mirror ไม่ตรงต้นทาง');
-  if (agePath && fs.existsSync(agePath)) fs.copyFileSync(agePath, path.join(MIRROR_DIR, path.basename(agePath)));
+  const mPath = path.join(MIRROR_DIR, path.basename(agePath));
+  fs.copyFileSync(agePath, mPath);
+  if (fs.statSync(mPath).size !== encSize) throw new Error('ขนาดไฟล์ mirror ไม่ตรงต้นทาง');
   fs.writeFileSync(path.join(MIRROR_DIR, 'offsite-key-recovery.txt'), buildRecoveryText());
-  mirrorLog('sent', agePath ? { age: path.basename(agePath) } : {});
+  mirrorLog('sent', { age: path.basename(agePath) });
   mirrorOk = true;
-  console.log(`   ✅ mirror → ${MIRROR_DIR} (+ recovery${agePath ? ' + ไฟล์ .age' : ''})`);
+  console.log(`   ✅ mirror → ${MIRROR_DIR} (+ recovery + ไฟล์ .age)`);
 } catch (err) {
   mirrorLog('failed', { reason: String(err?.message || err).slice(0, 160) });
   console.error(`   ⚠️ mirror ล้ม — ${String(err?.message || err).slice(0, 120)} (จดแล้ว ไม่ทำรอบตาย)`);
@@ -269,7 +275,7 @@ try {
 // ทางเลือก scp (อนาคตมี NAS) — ตั้ง MESH_SCP_TARGET แล้วส่งต่อไฟล์เดียวกัน best-effort
 if (env.MESH_SCP_TARGET) {
   try {
-    execFileSync('scp', ['-o', 'ConnectTimeout=10', encPath, env.MESH_SCP_TARGET], { timeout: 120_000, stdio: 'pipe' });
+    execFileSync('scp', ['-o', 'ConnectTimeout=10', agePath, env.MESH_SCP_TARGET], { timeout: 120_000, stdio: 'pipe' });
     mirrorLog('sent', { target: env.MESH_SCP_TARGET });
     console.log(`   ✅ scp → ${env.MESH_SCP_TARGET}`);
   } catch (err) {

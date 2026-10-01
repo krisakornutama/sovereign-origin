@@ -35,11 +35,14 @@ const page = await ctx.newPage();
 
 // เก็บ error ต่อหน้า — pageerror (exception ของหน้า) + console.error ที่ไม่ใช่ noise ของ infra
 // (HMR websocket, MIME manifest, stack-frame 403 ของ dev overlay — พบเองตอนทดสอบ มีอยู่ทุกหน้าใน dev)
+// I0c (1/10/69): จดบทเรียน — เดิม ignore "Content Securi" ครึ่ง ๆ กลาง ๆ = กลืนไม่หมด (บทเรียนจริงจาก /partners CSP
+// บล็อก OSM tile) — ignore รูปแบบเต็มเฉพาะ Content-Security-Policy ของเบราว์เซอร์เท่านั้น (ถ้าโค้ดงานพังจริง error อื่นยังจับ)
 const NOISE = /(ResizeObserver|hmr|_clientMiddlewareManifest|__nextjs_original-stack-frames|Download the React DevTools)/i;
+const NOISE_CSP = /violates the following Content Security Policy/i;
 const NOISE_URL = /(hmr|_clientMiddlewareManifest|__nextjs_original-stack-frames)/i;
 let pageErrors = [], consoleErrors = [], api5xx = [];
 page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 100)));
-page.on('console', (m) => { if (m.type() === 'error' && !NOISE.test(m.text()) && !NOISE_URL.test(m.location()?.url || '')) consoleErrors.push(`${m.text().slice(0, 100)} (${(m.location()?.url || '').slice(-40)})`); });
+page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !NOISE.test(t) && !NOISE_CSP.test(t) && !NOISE_URL.test(m.location()?.url || '')) consoleErrors.push(`${t.slice(0, 100)} (${(m.location()?.url || '').slice(-40)})`); });
 page.on('response', (r) => { if (r.url().includes(':3001/api') && r.status() >= 500) api5xx.push(`${r.status()} ${r.url().slice(-40)}`); });
 
 let pass = 0, fail = 0;
