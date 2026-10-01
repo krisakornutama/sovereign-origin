@@ -52,7 +52,7 @@
 
 ## โซนที่สอง: `sovereign-shop.dpdns.org` (หลังโซน Active ตาม ops-runbook §สิบ "โซนที่สอง")
 
-**สถานะ 1/10 ค่ำ:** NS เปลี่ยนแล้วตามผู้ใช้ แต่ **parent authoritative (ns1.digitalplat.org) ยังตอบ NXDOMAIN** = delegation ยังไม่ถูกประกาศที่ต้นทาง — รอ DigitalPlat ประกาศ (นาที–ชม.) แล้วเช็คซ้ำ: `nslookup -type=NS sovereign-shop.dpdns.org ns1.digitalplat.org` → ต้องขึ้น **delilah + vin** (คู่ของโซนนี้ — ต่างจากโดเมนเดิมที่เป็น archer+kallie อย่าคัดมาใส่ผิด) · ถ้าเช็คซ้ำหลายชั่วโมงยัง NXDOMAIN = กลับไปตรวจหน้า Nameserver ใน DigitalPlat ว่าบันทึกจริง
+**สถานะ 2/10/69 (ตรวจซ้ำ — แก้ข้อมูลผิดที่เคยจดว่า "เปลี่ยน NS แล้ว"):** `sovereign-shop.dpdns.org` **ยังไม่มีตัวตนใน DNS ทั้งสองระบบ** — parent DigitalPlat (ns1-4 + ns1/ns2.dpdns.org) ตอบ NXDOMAIN เทียบเท่าชื่อปลอม (control) ข้ามวันแล้ว = **ยังไม่ได้จดจริง** (มีแค่ zone ในบัญชี Cloudflare) → **ยังเข้าขั้นทำ GSC ไม่ได้** — ขั้นแรก: เจ้าของตัดสินใจว่าจะจดชื่อนี้จริง (แล้วตั้ง NS เป็น delilah+vin ตาม ops-runbook §สิบ "โซนที่สอง") หรือลบ zone ทิ้ง แล้วค่อยกลับมาทำ property นี้
 
 1. ทำขั้นตอนเดียวกับด้านบนทั้งหมดแต่ใช้ชื่อ `sovereign-shop.dpdns.org` (TXT verify บนโซนใหม่ · Submit `sitemap.xml` · Request Indexing /shop /about)
 2. sitemap.xml ใน repo มี **URL สอง host อยู่รวมกันแล้ว** (คู่ขนาน 1/10) — แต่ละ property หยิบ URL ของ host ตัวเอง · ถ้าตัดสินใจใช้โดเมนใหม่เป็นหลักภายหลัง: ตัดชุด host เก่าออก + สลับ canonical (JSON-LD `url` / og) บน /about ให้เป็นโดเมนใหม่ แล้วแจ้ง agent deploy
