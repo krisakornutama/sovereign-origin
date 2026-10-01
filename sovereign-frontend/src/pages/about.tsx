@@ -40,6 +40,24 @@ export default function AboutPage() {
       <Head>
         <title>เกี่ยวกับเรา — Sovereign Origin</title>
         <meta name="description" content="องค์กรไม่แสวงหากำไร — เทคโนโลยีเพื่อผู้ผลิตรายย่อย: วิสัยทัศน์ การใช้เงินสนับสนุน และความโปร่งใส" />
+        <meta name="author" content="กฤษกรณ์ อุตมะ" />
+        <meta property="og:title" content="Sovereign Origin — องค์กรไม่แสวงหากำไร" />
+        <meta property="og:description" content="เทคโนโลยีเพื่อผู้ผลิตรายย่อย — ก่อตั้งและดูแลโดย กฤษกรณ์ อุตมะ" />
+        <meta property="og:type" content="website" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: 'Sovereign Origin',
+          alternateName: 'Sovereign Origin Foundation',
+          url: 'https://sovereignoriginshop.dpdns.org',
+          founder: {
+            '@type': 'Person',
+            name: 'กฤษกรณ์ อุตมะ',
+            alternateName: 'Krisakorn Uttama',
+            jobTitle: 'ผู้ก่อตั้งและผู้ดูแลโครงการ',
+            sameAs: ['https://github.com/krisakornutama'],
+          },
+        }) }} />
       </Head>
 
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
@@ -61,6 +79,24 @@ export default function AboutPage() {
             <li><b className="text-gray-100">เงินสนับสนุนต้องโปร่งใส</b> — ทุกบาทกลับไปลงทุนในภารกิจ ไม่ใช่กำไรใครคนเดียว และเรารายงานสถิติเปิดให้ดูตลอด</li>
             <li><b className="text-gray-100">เครือข่ายคือแรง</b> — ร้านค้า ช่าง และผู้ให้บริการเติบโตไปด้วยกันบนแผนที่เดียวกัน</li>
           </ul>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-3">
+          <h2 className="text-lg font-semibold">👤 ผู้ก่อตั้งและผู้ดูแลโครงการ</h2>
+          <div className="flex items-start gap-3">
+            <div className="text-3xl" aria-hidden>👨‍💻</div>
+            <div className="space-y-1">
+              <div className="text-base font-semibold text-gray-100">กฤษกรณ์ อุตมะ <span className="text-xs text-gray-500 font-normal">(Krisakorn Uttama)</span></div>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                ผู้ก่อตั้งและผู้ดูแลโครงการ Sovereign Origin — ออกแบบ พัฒนา และดูแลระบบทั้งหมด:
+                ซอฟต์แวร์ อุปกรณ์ IoT หน้าร้าน และระบบตามรอยทุกชิ้นงาน
+              </p>
+              <a href="https://github.com/krisakornutama" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>
+                github.com/krisakornutama
+              </a>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-4">
@@ -123,8 +159,11 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <footer className="text-center text-[10px] text-gray-600 pt-4">
-          Sovereign Origin · <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/partners" className="hover:text-gray-400 underline underline-offset-2">แผนที่คู่ค้า</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">เดโม่</a> · <a href="/trace" className="hover:text-gray-400 underline underline-offset-2">ตามรอย</a>
+        <footer className="text-center text-[10px] text-gray-600 pt-4 space-y-1">
+          <div>Sovereign Origin · ดูแลโดย <b className="text-gray-500">กฤษกรณ์ อุตมะ</b></div>
+          <div>
+            <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/partners" className="hover:text-gray-400 underline underline-offset-2">แผนที่คู่ค้า</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">เดโม่</a> · <a href="/trace" className="hover:text-gray-400 underline underline-offset-2">ตามรอย</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
+          </div>
         </footer>
       </main>
       <FeedbackButton page="/about" />
