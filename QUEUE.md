@@ -108,6 +108,7 @@
 ## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
 - [x] F1 backup ห้ามแนบ .env — **เสร็จ 27/9/69** (ตัดที่ collectStateFiles + เกราะ findSecretLeakFiles ก่อนสร้าง bundle เจอลาย = งดสร้างแล้วรายงาน · เทส survival 8/8 · พิสูจน์บนของจริง: bundle ใหม่ 13 ไฟล์ data/*.json ล้วนไม่มี .env — bundle เก่าเข้ารหัสมาตลอด ไม่ต้อง rotate เร่ง)
 - [x] F2 ✅ เข้ารหัส field อ่อนไหว — เสร็จ 28/9/69 (AES-256-GCM · telegram token + รหัสเราเตอร์ · DB มีแต่ enc:v1: · เทส 6/6 · พิสูจน์ telegram/test ยิงจริงผ่าน · commit f933780)
+- [ ] **F2b เข้ารหัส field PII (ต่อยอด — แผนพร้อมลงมือ 1/10/69):** ขอบเขต: partners.contactPhone/contactEmail (ไม่โชว์สาธารณะ) · restaurant_customers.phone · business_customers.phone/lineId/taxId · business_suppliers.phone · businesses.shopPromptPay/taxId (ใบกำกับพิมพ์จากค่านี้ — ถอดตอนพิมพ์) · **ข้อจำกัดจริง**: มี lookup equality ด้วยเบอร์ (dedupe ออเดอร์ร้าน `findFirst({businessId, phone})` + partner→customer) — encryptField random-IV ค้นไม่เจอ → ต้องเพิ่ม `phone_hash` (HMAC key เดียวกับ data/) คู่ไป · ข้อมูลจริงน้อย migrate เร็ว (partners 1 · resto 3 · biz cust 4) · ลำดับ: column *_hash+enc → migration สคริปต์ (อ่าน plaintext→encryptField→update) → แก้ code อ่าน/เขียนทุกจุด → lookup ใช้ phone_hash → เทสต์ dedupe+พิมพ์ใบกำกับ+QR จากข้อมูลเข้ารหัส
 
 ## G — ตัดสินใจระดับเจ้าของ (ไม่ใช่โค้ด)
 - [ ] G1 ทิศทาง e-Tax: คงสถานะ "เอกสารภายใน/ใบเสร็จธรรมดา" + ป้ายชัด หรือลงทุนเชื่อม CA/provider ตอนเปิดร้านจริง (thai-tax.service = เครื่องคำนวณเท่านั้น ไม่มี digital signature/CA ในโค้ด)
@@ -137,7 +138,7 @@
 ## I0 — ด่วน: เจอตัวจริงกำลังพังเมื่อเช้า (แก้ก่อนคิวใหญ่)
 - [x] I0a frontend-watchdog จริง — **เสร็จ 28/9/69** (`3e2ff4e`): tools/frontend-watchdog.mjs (ไฟล์ผีมีตัวจริงแล้ว) — :3000 ตาย=บูตเอง · ค้าง=kill PID เฉพาะ next server · สิ่งแปลกปลอม=fail-safe ไม่แตะ exit 1 · ผูก Machine Watch ทุก 10 นาที · **พิสูจน์ครบ 3 เส้นทางจริง:** boot 11 วิ · skip-unknown (dummy listener จับพอร์ต → ไม่ kill · exit 1) · ต่อ task แล้ว log healthy ตามรอบ
 - [x] I0b security-anomaly ทน Docker ดับ — **เสร็จ 28/9/69** (`3e2ff4e`): psqlRows ไม่ throw · ตรวจไม่ครบ = ส่ง "ตรวจไม่ครบ" + exit 1 (ล้มดัง ห้ามปลอม "✅ ปกติ") · **รันจริง:** พบ 2 กลุ่ม (e2e-bot + ผู้ใช้เก่า) → ส่ง Telegram จริง exit 0
-- [ ] I0c คืนนี้ตัดสิน nightly จริง: รอบ 02:00 เป็นรอบแรกหลัง H6/H7 merge (log 03:47 เมื่อคืนคือโค้ดเก่า) — เช้าหน้ากวาดตรวจ: /health //audit ยัง fail (console bucket ที่ ignore ครึ่ง ๆ กลาง ๆ ตาม error-context) ให้ ignore รูปแบบเต็ม · pos-flow ยัง fail (option count 2) ให้ snapshot option จริงก่อนแก้
+- [x] I0c — **เสร็จ 1/10/69**: ผล nightly 30/9 พัง 2/6 = (1) /api/partners สาธารณะ by-design แต่ไม่อยู่รายการ public ของ full-system-check (2) CSP บล็อก tile.openstreetmap.org (bare host — wildcard `*.` ไม่ครอบ) → แก้ทั้งคู่ (ลงทะเบียน public + เติม bare host ใน next.config + noise ui-sweep pattern เต็ม) — full-system-check 24/24 เขียว
 
 ## I1 — PITR จบให้สมบูรณ์ (WAL archiving เปิดแล้วจริง 27/9 — `wip 6720af5`: archive_mode=on · archive ไหล 0 failed · archive_timeout=300s)
 - [x] I1a สคริปต์ `tools/verify/pitr-drill.mjs` — **เสร็จ 28/9/69 ซ้อมผ่านจริง**: probe 'before-delete' → basebackup → ลบ → scratch replay ถึงเวลาเป้า → **probe กลับมา + users 8 ครบ** · บทเรียนจริง: docker cp ข้าม container ไม่ได้ (ผ่าน host) · ไฟล์ root ต้อง chown+700 · `exec -d` ตายพร้อม client (nohup gosu … & แทน)
@@ -148,7 +149,7 @@
 ## I2 — Asymmetric encryption สำหรับ backup (สาย offsite รอบสอง — ต่อจาก E3/F1)
 - [x] I2a ✅ age (X25519) เข้ารหัสคู่ขนาน — เสร็จ 28/9/69 (age.exe v1.2.1 ที่ tools/bin · identity gitignored ที่ infra/offsite · push เดียวได้ไฟล์คู่ .enc+.age · mirror พาคู่ · พิสูจน์ restore 142 ตารางจากไฟล์ .age)
 - [x] I2b ✅ recovery file สองรูปแบบ — identity เต็ม + คำสั่งถอดบนมือถือ (`age -d -i …`) + key AES เดิม — อยู่ที่ mirror ทุกรอบ push
-- [ ] I2c พิสูจน์ restore-test ผ่านสาย age ครบ 1–2 คืน แล้วจึงตัดสาย AES เดิม — **คืนแรกผ่านแล้ว (28/9) เหลืออีก 1 คืน** · หมายเหตุ: ปิดรอยต่อ F2 ฝั่ง host แล้ว (telegram-creds.mjs ถอด enc:v1: ได้ — เคยส่ง token ขยะตอน token ใน DB เข้ารหัสแล้ว)
+- [x] I2c — **เสร็จ 1/10/69 ตัดสาย AES สำเร็จ**: พิสูจน์ restore จาก .age จริง 2 วิธี (ถอดมือ + `offsite-push --restore-test`: users 8 · audit 26k · telemetry 133k เทียบ live) → เลิกสร้าง .enc ไฟล์ใหม่ — TG/mirror/scp ส่ง .age ทั้งหมด · เก็บช่องถอดไฟล์ .enc เก่า (`--legacy-aes`) จนกว่าจะหมดความหมาย · หมายเหตุ: ปิดรอยต่อ F2 ฝั่ง host แล้ว (telegram-creds.mjs ถอด enc:v1: ได้)
 - [ ] I2d (ตัดสินเจ้าของ) tmpfs/RAM disk สำหรับ secret ชั่วคราว — เครื่องนี้ Modern Standby บ่อย อาจยุ่งยากกว่าประโยชน์ — เจ้าของเลือก
 
 ## I3 — audit_logs partitioning + retention 90 วัน (ยกระดับจาก H1 ตามลิสต์เจ้าของ) — ✅ เสร็จ 28/9/69 (commit c8cb814)
@@ -211,5 +212,5 @@
 - [x] **P18 เปิด QR PromptPay — พิสูจน์ครบ (30/9/69 ดึก):** ตั้งค่าผ่านหน้า /business → แท็บร้านค้า ได้เลย (PUT /api/business/:id/shop · masked ••• · QR สาธารณะขึ้นทันที) — ทดสอบด้วยเบอร์ทดสอบแล้วล้างคืน · เหลือเจ้าของใส่เบอร์จริงครั้งเดียว
 - [x] **P19 (1/10/69):** ปุ่ม "✅ ยืนยันรับเงิน" ใน Telegram (confirmToken single-use · กดจากมือถือปิดบิลได้ · กติกาเดียวกับเว็บ: ยืนยันออเดอร์+รับเงิน CASH+PAID+Treasury · กัน chat อื่น/กดซ้ำ) · QR ป้ายร้านใน /partners/me (ดาวน์โหลด PNG เอง) · **เบอร์ PromptPay จริงตั้งแล้ว** (QR สาธารณะขึ้นบนโดเมน — ปิดคิว P18) · พิสูจน์วงจรเงินเต็มรอบบนระบบจริง (สั่ง→แจ้ง→TG→ยืนยัน→PAID→ใบกำกับ) + เก็บกวาดครบ · เทสใหม่ 4 + แก้เทสภาษี time bomb (?month ตาม fixture) · verify 5/5 · SW v8 · deploy จริง (migrate+restart core-api+build frontend)
 - [x] **P19 ต่อ 2 (1/10/69 ค่ำ):** ปุ่ม "🚫 ไม่ได้โอน" คู่ปุ่มยืนยันใน TG (rejectedAt ตัดจากทุกยอด · token เดียวยืนยัน/ปฏิเสธเลือกอย่างเดียว · ลูกค้าแจ้งใหม่ได้ทันที) · สรุปเช้า 08:00 เวลาไทยเข้า TG (ยอดขายเมื่อวาน/แจ้งชำระรอยืนยัน/ค้างชำระ/บิลคู่ค้า) · พิสูจน์บนระบบจริงทั้งสอง + เก็บกวาดครบ · เทสต์ใหม่ 5 · SW v9 · verify 5/5
-- [ ] **P19 รอเจ้าของลองจริง:** กดปุ่ม "✅ ยืนยันรับเงิน" / "🚫 ไม่ได้โอน" ใน Telegram จากออเดอร์จริงใบแรก (โค้ดพิสูจน์ผ่านฟังก์ชันเดียวกันบนระบบจริงแล้ว — เหลือแค่ประสบการณ์กดบนมือถือ)
+- [x] **P19 ต่อ 3 (1/10/69 กลางคืน):** ปิด e2e-bot + แก้ nightly gate ครบ (partners by-design + CSP bare host) + I2c ตัดสาย AES (age สายเดียว restore พิสูจน์ 2 วิธี) + DEFCON ซ้อมจริง (75→L3→0) + F2b แผนพร้อมลงมือ · full-system-check 24/24 · SW v10 · verify 5/5 · merge 076771e "✅ ยืนยันรับเงิน" / "🚫 ไม่ได้โอน" ใน Telegram จากออเดอร์จริงใบแรก (โค้ดพิสูจน์ผ่านฟังก์ชันเดียวกันบนระบบจริงแล้ว — เหลือแค่ประสบการณ์กดบนมือถือ)
 - [ ] **P18 รอเจ้าของ — SMS จริง:** สมัคร thaibulksms.com (เติมขั้นต่ำ ~100฿) → ใส่ `SMS_PROVIDER=thaibulksms` + `SMS_API_KEY` + `SMS_API_SECRET` ใน infra/.env → recreate core-api 1 รอบ — OTP คู่ค้าส่ง SMS จริงทันที
