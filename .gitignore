@@ -244,3 +244,12 @@ sovereign-os/core-api/prisma/prisma/
 sovereign-os/infra/data/wal-archive/
 !tools/machine-alert.mjs
 !tools/register-machine-watch.ps1
+
+# ── คัดออก 1/10/69 (เก็บ archive ที่ E:/My work/SovereignArchive/pruned-20261001) ──
+# เหตุผล: skills = เศษ workspace ของ AI skill builder (ไม่มีใครอ้าง) · mesh-backup = blob เก่า + mesh-key เก่าหลุด GitHub แล้ว (rotate แล้ว ห้ามไหลกลับ)
+# index.html/dev-themes-preview.cmd = Command Center v2.0 ยุคเริ่ม (แทนด้วย launcher.html + /dashboard แล้ว) · tree txt = snapshot ผังเก่า
+/skills/
+/sovereign-mesh-backup/
+/index.html
+/dev-themes-preview.cmd
+/📊 PROJECT SOVEREIGN ORIGIN MASTER DIRECTORY TREE.txt
