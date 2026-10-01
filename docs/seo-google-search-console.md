@@ -5,7 +5,7 @@
 
 ## ⚠️ บล็อกที่ต้องแก้ก่อน (ตรวจ live 1/10/69)
 
-`https://sovereignoriginshop.dpdns.org/sitemap.xml` และ `/robots.txt` ตอบ **403 จาก WAF** (ไม่อยู่ใน allowlist ที่ลงไว้ 30/9) — **Google ดึง sitemap ไม่ได้ จนกว่าจะเพิ่ม 2 path นี้ใน expression** (แก้ใน Cloudflare dashboard ทั้งสองโซน — คู่มือข้างล่าง) — ทำเป็นคิวแรกสุดของงาน SEO นี้ ก่อน Submit sitemap ทุกกรณี · ตรวจซ้ำ 1/10 ค่ำ: ยัง 403 ทั้งสอง path
+**✅ แก้แล้ว 2/10/69 ตี 4 — พิสูจน์ 200 ทั้งคู่** (เดิมตอบ 403 จาก WAF เพราะ 2 path ไม่อยู่ใน allowlist) — แก้จริงด้วยการเติม `or http.request.uri.path in {"/robots.txt" "/sitemap.xml"}` ก่อน `)` ปิดสุดท้ายของ rule `Public-only: block admin/internal paths` ผ่าน API (PUT ruleset 200) · ตรวจซ้ำ: sitemap **200** · robots **200** · home 200 · /dashboard 403 ปกติ · คู่มือข้างล่างยังใช้ได้ถ้าต้องทำซ้ำ/โซนใหม่
 
 ## คู่มือแก้ WAF โดเมนเดิม — ทำครั้งเดียวใน dashboard (~5 นาที)
 
