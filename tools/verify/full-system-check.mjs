@@ -33,7 +33,8 @@ const ok = (name, cond, extra = '') => { console.log(`${cond ? 'PASS' : 'FAIL'} 
 // ── mount จริงจาก routes.ts ──
 const routesSrc = fs.readFileSync(path.join(ROOT, 'sovereign-os/core-api/src/routes.ts'), 'utf8');
 const mounts = [...new Set([...routesSrc.matchAll(/app\.(?:use|get)\('\/api\/([a-z0-9-]+)/g)].map(m => m[1]))];
-const PUBLIC = new Set(['auth', 'shop', 'health', 'client-monitor']);
+// partners สาธารณะ by-design (สมัคร/รายการคู่ค้า P16 — honeypot + throttle + คืนเฉพาะ ACTIVE กันอยู่) · demo/feedback/track เป็น POST-only เลยไม่โผล่ใน check GET นี้
+const PUBLIC = new Set(['auth', 'shop', 'health', 'client-monitor', 'partners']);
 
 console.log(`── 1) ทุก mount ปฏิเสธก่อน auth (${mounts.length} mounts) ──`);
 const leaks = [];
