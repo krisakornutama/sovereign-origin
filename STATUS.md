@@ -379,3 +379,4 @@
   - **แก้ task "Sovereign Docker Watch"** ที่ชี้ tools/docker-watchdog.mjs ใน worktree (จะพังเมื่อ prune) → ชี้ MAIN แล้ว
   - **ลบ branch ที่ merge แล้ว 19 ตัว** (รวม freebuff/* เก่า) — เหลือ main + ai/publishing
   - **push GitHub สำเร็จ**: `11aa461..15ca186` — ปิดสาย backup ที่ค้าง 129 commits · GitHub แจ้ง 2 vulnerabilities ใน npm deps (1 high 1 moderate — dependabot branch รอ merge 4 ตัว จด QUEUE F3) · secret scan ทั้ง repo ก่อน push = ไม่มีของจริงเหลือ (3 ไฟล์ที่ match = CI dummy/คู่มือ/fixture)
+  - **adversarial review จับบั๊กตัวเอง 3 จุด (แก้ครบ):** (1) mesh-key ที่ rotate มือเขียนเป็น raw 32 ไบต์ แต่ ensureMeshKey ต้องการ hex 64 ตัวอักษร → เขียนใหม่ให้ตรงรูปแบบ (regex ผ่าน) (2) dev-themes-preview.cmd ที่คัดไปถูก playwright.mbti.config + e2e spec อ้าง → คืนไฟล์ + ถอดออกจาก gitignore (3) แก้ QUEUE ที่บรรทัด todo "P19 รอเจ้าของลองจริง" โดน edit ก่อนหน้ากลืนหาย — คืนเป็น unchecked แล้ว · ทดสอบ docker-watchdog จาก MAIN (retarget แล้ว) ผ่านจริง
