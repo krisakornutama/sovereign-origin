@@ -151,6 +151,28 @@ before(async () => {
   };
   (prisma as any).businessPayment = {
     findMany: async ({ where }: any) => payments.get(where.orderId) ?? [],
+    // P19 — ค้น payment จาก confirm token (ปุ่มยืนยันใน Telegram) + consume แบบ atomic
+    findFirst: async ({ where, include }: any) => {
+      for (const list of payments.values()) {
+        for (const p of list) {
+          if (where.id !== undefined && p.id === where.id) return withOrder(p, include);
+          if (where.confirmToken !== undefined && p.confirmToken === where.confirmToken) return withOrder(p, include);
+        }
+      }
+      return null;
+    },
+    updateMany: async ({ where, data }: any) => {
+      let count = 0;
+      for (const list of payments.values()) {
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          const idOk = where.id === undefined || p.id === where.id;
+          const tokOk = where.confirmToken === undefined || p.confirmToken === where.confirmToken;
+          if (idOk && tokOk) { list[i] = { ...p, ...data }; count++; }
+        }
+      }
+      return { count };
+    },
     create: async ({ data }: any) => {
       const list = payments.get(data.orderId) ?? [];
       const p = { id: `pay-${list.length}`, paidAt: new Date(), ...data };
@@ -160,7 +182,14 @@ before(async () => {
     },
   };
   (prisma as any).businessLedgerEntry = {
-    findFirst: async () => (ledger.get(BIZ_ID) ?? []).find((l) => l.refOrderId) ?? null,
+    // P19 — เทียบ where จริง (refOrderId/type/category) — ตอนนี้มีหลายออเดอร์ที่ได้ INCOME แล้วต้องแยกกัน
+    findFirst: async ({ where }: any) =>
+      (ledger.get(BIZ_ID) ?? []).find(
+        (l) =>
+          (where?.refOrderId === undefined || l.refOrderId === where.refOrderId) &&
+          (where?.type === undefined || l.type === where.type) &&
+          (where?.category === undefined || l.category === where.category)
+      ) ?? null,
     create: async ({ data }: any) => {
       const list = ledger.get(data.businessId) ?? [];
       const entry = { id: `led-${ledgerSeq++}`, createdAt: new Date(), ...data };
@@ -251,6 +280,11 @@ function enrichOrder(o: any, include?: any): any {
   if (include?.customer) out.customer = customers.get(o.customerId) ?? null;
   if (include?.business) out.business = businesses.get(o.businessId) ?? null;
   return out;
+}
+
+/** P19 — payment + order (จาก include) สำหรับ confirmReportedPaymentByToken */
+function withOrder(p: any, include?: any): any {
+  return include?.order ? { ...p, order: orders.get(p.orderId) } : p;
 }
 
 const SHOP = '/api/shop';
@@ -395,6 +429,53 @@ test('แจ้งชำระ: จ่ายเกินโดนโต้ง ·
   assert.equal(st.payments[0].method, 'PROMPTPAY');
 });
 
+// ── P19 — ปุ่ม "ยืนยันรับเงิน" ใน Telegram (confirm-by-token, ใช้ครั้งเดียว) ──
+let tgToken100 = '';
+let tgTokenRest = '';
+let tgOrderId = '';
+test('ปุ่ม TG ยืนยันรับเงิน: แจ้งชำระออก token ให้ปุ่ม · กด = ยืนยันออเดอร์ (หักสต็อก) + บันทึกรับเงินยอดที่แจ้ง', async () => {
+  const { confirmReportedPaymentByToken } = await import('../src/services/business-shop.service');
+  // ใช้ออเดอร์+การแจ้งชำระจากเทสก่อนหน้า (แจ้ง 100 + 128.98 — ยังไม่มีใครยืนยัน)
+  const reported = [...payments.values()].flat().filter((p: any) => p.method === 'PROMPTPAY' && p.confirmToken);
+  assert.ok(reported.length >= 2, 'การแจ้งชำระต้องผูก confirm token สำหรับปุ่มใน Telegram');
+  const first = reported.find((p: any) => p.amount === 100);
+  const rest = reported.find((p: any) => p.amount === 128.98);
+  assert.ok(first && rest, 'ต้องมีรายการแจ้งบางส่วน (100) + ส่วนที่เหลือ (128.98)');
+  tgOrderId = first.orderId;
+  const stockBefore = products.get(PRODUCT_ID).stockQty;
+
+  // กดครั้งแรก (ยอดแจ้งบางส่วน 100) — ออเดอร์ QUOTE → ยืนยันให้เอง + หักสต็อก
+  const r1 = await confirmReportedPaymentByToken(first.confirmToken, 'admin-uuid');
+  assert.equal(r1.status, 'ok');
+  let o = orders.get(tgOrderId);
+  assert.equal(o.status, 'ORDERED', 'กดปุ่ม = ยืนยันออเดอร์ให้เอง (QUOTE→ORDERED หักสต็อก)');
+  assert.equal(products.get(PRODUCT_ID).stockQty, stockBefore - 2, 'หักสต็อก 2 ชิ้นตามบรรทัดออเดอร์');
+  assert.ok(Math.abs(o.paidAmount - 100) < 0.001, 'บันทึกรับเงินเท่ายอดที่แจ้ง');
+
+  // กดครั้งที่สอง (ส่วนที่เหลือ) — ครบยอด → PAID + เงินเข้า Treasury เจ้าของ
+  const r2 = await confirmReportedPaymentByToken(rest.confirmToken, 'admin-uuid');
+  assert.equal(r2.status, 'ok');
+  assert.match(r2.message, /ปิดออเดอร์/);
+  o = orders.get(tgOrderId);
+  assert.equal(o.status, 'PAID', 'ครบยอด → PAID อัตโนมัติ');
+  assert.ok(Math.abs(o.paidAmount - 228.98) < 0.001);
+  assert.ok((payments.get(tgOrderId) ?? []).some((p: any) => p.method === 'CASH' && String(p.reference ?? '').startsWith('tg:')), 'บันทึกบิลรับเงิน CASH อ้างที่มาจากปุ่ม TG');
+  assert.ok(treasuryEvents.some((e) => e.type === 'SHOP_INCOME' && e.note.includes(o.orderNo)), 'เงินเข้า Treasury เจ้าของ (SHOP_INCOME)');
+  tgToken100 = first.confirmToken;
+  tgTokenRest = rest.confirmToken;
+});
+
+test('ปุ่ม TG ใช้ครั้งเดียว: กดซ้ำ/token ปลอม = ปฏิเสธ ไม่บันทึกเงินซ้ำ', async () => {
+  const { confirmReportedPaymentByToken } = await import('../src/services/business-shop.service');
+  const paidBefore = orders.get(tgOrderId).paidAmount;
+  for (const t of [tgToken100, tgTokenRest, randomUUID()]) {
+    const r = await confirmReportedPaymentByToken(t, 'admin-uuid');
+    assert.equal(r.status, 'error');
+    assert.ok(/ใช้ไปแล้ว|ไม่พบ|ไม่ถูกต้อง/.test(r.message), `ข้อความปฏิเสธชัดเจน: ${r.message}`);
+  }
+  assert.equal(orders.get(tgOrderId).paidAmount, paidBefore, 'ไม่มีการบันทึกเงินซ้ำ');
+});
+
 // ── ร้านยืนยันออเดอร์ที่ลูกค้าสั่งจากเว็บ → หักสต็อก (รวมกับ state machine เดิม) ──
 test('ร้านยืนยันออเดอร์จากเว็บผ่าน router เดิม → ORDERED + หักสต็อกจริง', async () => {
   const stockBefore = products.get(PRODUCT_ID).stockQty;
@@ -407,6 +488,7 @@ test('ร้านยืนยันออเดอร์จากเว็บ�
 
 // ── รายได้ร้านเข้า Treasury ของเจ้าของอัตโนมัติ ──
 test('ร้าน mark-paid → เงินเข้า Treasury เจ้าของเป็น SHOP_INCOME (แปลง ฿→$ ด้วย USD_THB_RATE)', async () => {
+  const cashBefore = sheets.get(OWNER_ID)?.liquid_cash_usd ?? 0; // P19 — มีรายได้สะสมจากเทสต์ก่อนหน้าแล้ว เช็คเป็นผลต่าง
   const created = await (await shopOrder({ items: [{ productId: PRODUCT_ID, qty: 1 }], customerName: 'ทรสอ', customerPhone: '0890001111' })).json();
   const mgr = makeToken('OPERATOR', { userId: MANAGER_ID });
   await post(`${API}/${BIZ_ID}/orders/${created.id}/transition`, { action: 'confirm' }, mgr);
@@ -417,7 +499,7 @@ test('ร้าน mark-paid → เงินเข้า Treasury เจ้า�
   const ev = treasuryEvents.find((e) => e.type === 'SHOP_INCOME' && e.note.includes(created.orderNo));
   assert.ok(ev, 'ต้องมี SHOP_INCOME event อ้างออเดอร์ร้าน');
   assert.ok(Math.abs(ev.amount_usd - created.total / rate) < 0.0001, 'ยอดเป็นดอลลาร์ถูกต้อง');
-  assert.equal(sheets.get(OWNER_ID).liquid_cash_usd, ev.amount_usd, 'เงินสดของเจ้าของเพิ่มจริง');
+  assert.ok(Math.abs(sheets.get(OWNER_ID).liquid_cash_usd - (cashBefore + ev.amount_usd)) < 0.0001, 'เงินสดของเจ้าของเพิ่มจริง (ผลต่างเท่า event นี้)');
 });
 
 // ── PromptPay ──
