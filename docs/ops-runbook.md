@@ -249,7 +249,7 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 > **สถานะจริง 29/9/69:** บัญชี DigitalPlat สร้าง+ยืนยันเมลแล้ว (`krisakornutama` / owteenhoper@gmail.com · Account ID 1790697100 · Free slots: 1) · Cloudflare มีอยู่แล้ว (ล็อกอิน GitHub) และ zone `sovereign-shop.dpdns.org` ถูกเพิ่มเรียบร้อย — **NS ของบัญชีนี้: `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com`**
 > ⚠️ ตัวตรวจ availability ตอบ "unavailable" ให้ทุกชื่อเมื่อควบคุมผ่านระบบอัตโนมัติ (ตัวตรวจมนุษย์บล็อกเงียบ) — **ขั้นจดจริงต้องทำในเบราว์เซอร์ปกติของเจ้าของเอง** (แชท AI จะจดให้ไม่ได้ ไม่ใช่เพราะเทคนิค แต่เพื่อกันบัญชีโดนแฟล็ก)
-> **ยุติแล้ว 1/10/69 — จดได้ครบ 2 ชื่อ:** `sovereignoriginshop.dpdns.org` (30/9 — ACTIVE ใช้งานจริง) และ `sovereign-shop.dpdns.org` (ชื่อสั้นตามแผนเดิม — ว่างแล้วจึงจดเพิ่ม) · zone คู่ใน Cloudflare ใช้ tunnel ตัวเดียวร่วมกันได้ (แผนต่อใน "### โซนที่สอง" ท้าย §นี้)
+> **สถานะจริง 2/10/69 — จดจริง 1 ชื่อ, อีกชื่อเป็นแค่ zone ใน Cloudflare:** `sovereignoriginshop.dpdns.org` (30/9 — ACTIVE ใช้งานจริง NS archer+kallie) · `sovereign-shop.dpdns.org` — **มีตัวตนแค่ในบัญชี Cloudflare** (zone ทดสอบ 29/9) — **ยังไม่ได้จดจริงที่ DigitalPlat** (ตรวจ 2/10: parent ทั้ง 4 NS + ns1/ns2.dpdns.org ตอบ NXDOMAIN เทียบเท่าชื่อปลอม) — ยังไม่ต้องใช้ tunnel คู่ (แผนต่อใน "### โซนที่สอง" ท้าย §นี้)
 1. สมัครบัญชีฟรี https://dash.cloudflare.com/sign-up (อีเมล + รหัส — ไม่ต้องใส่บัตร)
 2. https://domain.digitalplat.org → Register → ค้นชื่อ เช่น `sovereign-shop` เลือก suffix `.dpdns.org` → ยืนยันตัวตนผ่าน GitHub/Discord ตามที่หน้าสมัครถาม (กัน bot — ฟรีไม่มีบัตร)
 3. เมื่อได้ domain: ในหน้าจัดการของ DigitalPlat ตั้ง Nameserver เป็น 2 ชื่อที่ Cloudflare ให้ (Cloudflare dashboard → เว็บไซต์/domain → DNS → Nameservers) แล้วรอสถานะ Active (ปกติไม่เกิน ~1 ชม.)
@@ -295,7 +295,7 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 ### โซนที่สอง: `sovereign-shop.dpdns.org` (เริ่ม 1/10/69 — ชื่อสั้นตามแผนเดิมมาว่าง จดเพิ่ม)
 
-สถานะ: จดที่ DigitalPlat แล้ว · zone ใน Cloudflare พร้อม (**NS คู่เดียวกับข้างบน: `delilah.ns.cloudflare.com` + `vin.ns.cloudflare.com`** — ตรงกับอีเมล Cloudflare ที่ส่งเรียก 1/10) · tunnel/token/compose ใช้ตัวเดิม ไม่ต้องสร้างใหม่ · frontend โค้ดรองรับอัตโนมัติ (`isPublicHostname` ใช้ pattern ไม่ใช่-localhost · API same-origin · rewrites host-agnostic — แก้โค้ด 0 จุด) · CORS ไม่ต้องแตะ (same-origin ไม่ผ่าน CORS) · โดเมนยัง NXDOMAIN (รอเปลี่ยน NS — ตรวจด้วย `nslookup sovereign-shop.dpdns.org`)
+สถานะ (**ตรวจ DNS จริง 2/10** — แก้ข้อมูลผิดที่เคยจดว่า "จดแล้ว"): **ยังไม่ได้จดจริงที่ DigitalPlat** — ชื่อมีตัวตนแค่เป็น zone ในบัญชี Cloudflare (เพิ่มไว้ทดสอบ 29/9 ซึ่งเป็นที่มาของอีเมล Cloudflare 1/10) · หลักฐาน: `nslookup -type=NS sovereign-shop.dpdns.org ns1.digitalplat.org` → NXDOMAIN ทุก NS ของ DigitalPlat เทียบเท่าชื่อปลอม (control) ข้ามวันแล้ว · ถ้าเจ้าของอยากได้ชื่อนี้จริง → จดก่อนที่ domain.digitalplat.org (ขั้น 2 ด้านบน) แล้วค่อยตั้ง NS เป็น delilah+vin ตามขั้นของเจ้าของด้านล่าง · ถ้าไม่เอา → ลบ zone ใน Cloudflare เพื่อหยุดอีเมล (โดเมนเดิม sovereignoriginshop ทำงานต่อไม่กระทบ) · tunnel/token/compose ใช้ตัวเดิมถ้าทำต่อ · frontend โค้ดรองรับอัตโนมัติ (`isPublicHostname` pattern ไม่ใช่-localhost · API same-origin · rewrites host-agnostic — แก้โค้ด 0 จุด)
 
 **ขั้นของเจ้าของ (ตามอีเมล Cloudflare 1/10):**
 1. dash.domain.digitalplat.org → เลือก `sovereign-shop.dpdns.org` → **Nameservers** → ใส่ `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com` → บันทึก
