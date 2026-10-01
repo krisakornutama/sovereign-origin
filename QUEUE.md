@@ -108,12 +108,12 @@
 ## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
 - [x] F1 backup ห้ามแนบ .env — **เสร็จ 27/9/69** (ตัดที่ collectStateFiles + เกราะ findSecretLeakFiles ก่อนสร้าง bundle เจอลาย = งดสร้างแล้วรายงาน · เทส survival 8/8 · พิสูจน์บนของจริง: bundle ใหม่ 13 ไฟล์ data/*.json ล้วนไม่มี .env — bundle เก่าเข้ารหัสมาตลอด ไม่ต้อง rotate เร่ง)
 - [x] F2 ✅ เข้ารหัส field อ่อนไหว — เสร็จ 28/9/69 (AES-256-GCM · telegram token + รหัสเราเตอร์ · DB มีแต่ enc:v1: · เทส 6/6 · พิสูจน์ telegram/test ยิงจริงผ่าน · commit f933780)
-- [ ] **F2b เข้ารหัส field PII (ต่อยอด — แผนพร้อมลงมือ 1/10/69):** ขอบเขต: partners.contactPhone/contactEmail (ไม่โชว์สาธารณะ) · restaurant_customers.phone · business_customers.phone/lineId/taxId · business_suppliers.phone · businesses.shopPromptPay/taxId (ใบกำกับพิมพ์จากค่านี้ — ถอดตอนพิมพ์) · **ข้อจำกัดจริง**: มี lookup equality ด้วยเบอร์ (dedupe ออเดอร์ร้าน `findFirst({businessId, phone})` + partner→customer) — encryptField random-IV ค้นไม่เจอ → ต้องเพิ่ม `phone_hash` (HMAC key เดียวกับ data/) คู่ไป · ข้อมูลจริงน้อย migrate เร็ว (partners 1 · resto 3 · biz cust 4) · ลำดับ: column *_hash+enc → migration สคริปต์ (อ่าน plaintext→encryptField→update) → แก้ code อ่าน/เขียนทุกจุด → lookup ใช้ phone_hash → เทสต์ dedupe+พิมพ์ใบกำกับ+QR จากข้อมูลเข้ารหัส
-- [ ] **F3 (ใหม่ 1/10/69) ปิด dependabot 4 ตัว:** GitHub แจ้ง 2 vulnerabilities ใน npm deps หลัง push (1 high 1 moderate) — dependabot branch รอ merge 4 ตัว (fast-uri · patch-and-minor สองฝั่ง · ip-address) — รัน npm audit ทั้งสองฝั่ง → merge/แก้เอง → ยืนยัน 0 vuln · ทำใน window deploy ปกติ
+- [x] **F2b เข้ารหัส field PII — เสร็จ 1/10/69** (commit `231dfe1`): scope ครบ 6 กลุ่ม field + `phone_hash` สำหรับ lookup (dedupe ออเดอร์ร้าน/partner→customer) · migration ลง DB จริงแล้ว (plaintext → enc + hash ครบทุกแถว idempotent) · deploy backend (rebuild image) · พิสูจน์ end-to-end บนระบบจริง: สั่งซื้อ 2 รอบเบอร์เดิม dedupe ผ่าน · QR PromptPay ถอดค่า enc ได้ · เทสต์เขียว 1293/0 (รวมแก้ `publicPromptPayInfo` ที่ส่งค่า enc เข้า QR ตอนแรก — จับจากเทสต์)
+- [x] **F3 — เสร็จ 1/10/69:** npm audit ทั้งสองฝั่ง merge dependabot ครบ → **0 vulnerabilities ทั้ง FE + API** (audit fix ปิด undici/fast-uri/brace-expansion/sharp + engine.io/ip-address · commit `1577991`)
 
 ## G — ตัดสินใจระดับเจ้าของ (ไม่ใช่โค้ด)
 - [ ] G1 ทิศทาง e-Tax: คงสถานะ "เอกสารภายใน/ใบเสร็จธรรมดา" + ป้ายชัด หรือลงทุนเชื่อม CA/provider ตอนเปิดร้านจริง (thai-tax.service = เครื่องคำนวณเท่านั้น ไม่มี digital signature/CA ในโค้ด)
-- [ ] G2 เช็คลิสต์ก่อนเปิด /shop สู่อินเทอร์เน็ต: tunnel (ยังไม่มีในระบบเลย) + consent/PDPA + F2 ต้องเสร็จก่อน
+- [ ] G2 เช็คลิสต์ก่อนเปิด /shop สู่อินเทอร์เน็ต: ~~tunnel~~ (มีแล้ว 30/9 — I4a) + consent/PDPA (F2) ยังไม่เสร็จ → ยังปิดไม่ได้
 
 ## H — คุณภาพระยะยาว (ไม่ด่วน)
 - [ ] H1 retention ตาราง non-hypertable ที่โตเงียบ — วัดจริก่อน: `audit_logs` (เขียนทุก action)/`security_events` → ตั้งตามข้อมูลจริง (sensor_telemetry จัดครบแล้ว ห้ามซ้ำ)
@@ -163,8 +163,8 @@
 - [ ] I3d machine-health เพิ่มด่านขนาด audit_logs — กันโตเงียบอีกสาย
 
 ## I4 — Cloudflare Tunnel เปิด /shop สู่อินเทอร์เน็ต (ตาม G2 — ต้องรอเจ้าของ: domain บน Cloudflare + token)
-- [ ] I4a container cloudflared ทะลุ CGNAT/LTE (MR505) — ตั้งผ่าน compose ตัวเดิม
-- [ ] I4b WAF/access rules: อนุญาตเฉพาะ /shop/* + webhooks — ปิด admin/internal ทุกเส้น (ห้ามพราก :3001 ออกนอก tunnel)
+- [x] I4a container cloudflared ทะลุ CGNAT/LTE (MR505) — **เสร็จ 30/9/69** (container `sovereign-cloudflared` รันจริงด้วย token ใน infra/.env · route `*`→:3000, `^/api`→:3001)
+- [x] I4b WAF/access rules — **เสร็จ 30/9/69** (รายละเอียดอยู่ที่บรรทัด I4b ด้านล่าง — สองบรรทัดนี้เป็นของเดิมก่อนสรุป)
 - [ ] I4c rate limit + consent/PDPA — **F2 ต้องเสร็จก่อนเปิดจริง** (ลำดับเดิม)
 - [ ] I4d พิสูจน์: เปิดจากมือถือผ่าน 4G (คนละเน็ต) + Synthetic เพิ่ม probe public URL
 
