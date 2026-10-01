@@ -304,7 +304,11 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 **ขั้นถัดไปเมื่อ Active (เจ้าของแก้ dashboard — agent พิสูจน์ต่อ):**
 3. Zero Trust → Networks → Tunnels → tunnel เดิม → **Public Hostname → Add 2 แถว** (คัดค่า Service จากแถวของ sovereignoriginshop เป๊ะ): แถว path `^/api` → `http://host.docker.internal:3001` · แถว path `*` → `http://host.docker.internal:3000` — Cloudflare สร้าง CNAME ให้เอง (apex flatten ให้เอง)
 4. **SSL/TLS → Full (strict)** ที่โซนใหม่
-5. **WAF:** คัด custom rule "Public-only: block admin/internal paths" จากโดเมนเดิมมาใส่ — ใช้ **expression เวอร์ชันที่มี `/robots.txt` `/sitemap.xml` แล้ว** (ขั้น 6) · และ **ลงแก้ expression บนโดเมนเดิมด้วย** รอบเดียวกัน
+5. **WAF:** สร้าง custom rule เดียวชื่อ "Public-only: block admin/internal paths" action=Block ด้วย expression เต็มพร้อมวาง (ครอบ allowlist ล่าสุด รวม `/robots.txt` `/sitemap.xml`):
+   ```
+   not (starts_with(http.request.uri.path, "/shop") or starts_with(http.request.uri.path, "/trace") or starts_with(http.request.uri.path, "/demo") or starts_with(http.request.uri.path, "/api/shop") or starts_with(http.request.uri.path, "/api/trace") or starts_with(http.request.uri.path, "/api/demo") or starts_with(http.request.uri.path, "/api/partners") or starts_with(http.request.uri.path, "/_next/static/") or http.request.uri.path in {"/" "/trace" "/trace/" "/about" "/about/" "/partners" "/partners/" "/favicon.ico" "/icon.png" "/icon.svg" "/manifest.json" "/sw.js" "/sw-precache.json" "/robots.txt" "/sitemap.xml" "/api/health" "/api/health/" "/api/feedback" "/api/feedback/" "/api/track" "/api/track/"})
+   ```
+   (แถวไหนโดน block ทั้งที่ควรผ่าน — ดู Security → Events แล้วเติมเส้นนั้น) · **ลงแก้ expression บนโดเมนเดิมด้วย** (วิธีบวกอย่างเดียว 5 นาที จดใน `docs/seo-google-search-console.md` §คู่มือแก้ WAF) รอบเดียวกัน
 6. พิสูจน์ปลายทาง: `/` `/shop` `/api/health` `/sitemap.xml` = 200 · `/dashboard` = 403 · sitemap = 200 (ไม่ซ้ำบั๊กโดเมนเดิม) · แล้วทำ GSC property ที่สองตาม `docs/seo-google-search-console.md`
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________
