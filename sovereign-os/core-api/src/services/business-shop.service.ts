@@ -15,6 +15,7 @@ import { prisma } from '../lib/prisma';
 export { prisma };
 import { nextBusinessOrderNo } from '../lib/business';
 import { buildPromptPayPayload } from './promptpay';
+import { transitionOrder, addPayment } from './business.service';
 import QRCode from 'qrcode';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -183,17 +184,16 @@ export async function payPublicOrderByToken(token: string, input: any): Promise<
     const remaining = o.total - paid;
     if (remaining <= 0.001) throw new Error('ออเดอร์นี้ชำระครบแล้ว');
     if (amount > remaining + 0.001) throw new Error(`จ่ายเกินยอดที่ค้าง (คงเหลือ ${remaining.toFixed(2)} บาท)`);
+    const confirmToken = randomUUID(); // P19 — ปุ่ม "ยืนยันรับเงิน" ใน Telegram (ใช้ครั้งเดียว กดจาก chat เจ้าของเท่านั้น)
     await tx.businessPayment.create({
-      data: { orderId: o.id, amount, method: 'PROMPTPAY', reference: token },
+      data: { orderId: o.id, amount, method: 'PROMPTPAY', reference: token, confirmToken },
     });
     // P18 ต่อ — แจ้ง Telegram ทันทีเมื่อมีลูกค้าแจ้งชำระ (fire-and-forget: ไม่กระทบการแจ้งชำระแม้ Telegram ล้ม)
+    //   P19 — แนบปุ่ม "ยืนยันรับเงิน" (confirmToken ใช้ครั้งเดียว) — เจ้าของปิดบิลจากมือถือได้เลย
     //   คู่ค้า/ลิงก์ลับไม่มีข้อมูลติดต่อลูกค้า จึงส่งชื่อคู่ค้า (ถ้าเป็นบิลคู่ค้า) เป็นข้อมูลสูงสุดที่ปลอดภัย
     void (async () => {
       try {
-        const { getTelegramCredentials } = await import('./telegram-credentials.service');
-        const creds = await getTelegramCredentials();
-        if (!creds.botToken || !creds.chatId) return;
-        const axios = (await import('axios')).default;
+        const { sendTelegramMessage } = await import('../modules/telegram/telegram.routes');
         let partnerLine = '';
         if (o.partnerId) {
           const p = await prisma.partner.findUnique({ where: { id: o.partnerId }, select: { name: true } });
@@ -204,15 +204,49 @@ export async function payPublicOrderByToken(token: string, input: any): Promise<
           partnerLine + `ออเดอร์: <b>${String(o.orderNo).replace(/[<>&]/g, '')}</b>`,
           `ยอดแจ้ง: <b>${amount.toLocaleString('th-TH')} บาท</b> (คงเหลือ ${Math.max(0, remaining - amount).toLocaleString('th-TH')} ฿)`,
           '',
-          `ยืนยันรับเงินที่ /business → แท็บออเดอร์ (${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'} เข้าจากเครือข่ายบ้านเท่านั้น)`,
+          'ตรวจยอดเงินเข้าบัญชีจริงแล้วกดปุ่มด้านล่าง — ยืนยันแล้วบันทึกถาวร',
+          `หรือยืนยันที่ /business → แท็บออเดอร์ (${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'} เข้าจากเครือข่ายบ้านเท่านั้น)`,
         ].join('\n');
-        await axios.post('https://api.telegram.org/bot' + creds.botToken + '/sendMessage', { chat_id: creds.chatId, text: msg, parse_mode: 'HTML' });
+        await sendTelegramMessage(msg, [{ text: '✅ ยืนยันรับเงิน', data: `confirmpay:${confirmToken}` }]);
       } catch (err) {
         console.error('[shop] แจ้งชำระเงินให้ Telegram ไม่สำเร็จ (ไม่กระทบออเดอร์):', err instanceof Error ? err.message : err);
       }
     })();
     return { ok: true, orderNo: o.orderNo, reported: amount, remaining: Math.max(0, remaining - amount) };
   });
+}
+
+/**
+ * P19 — ยืนยันรับเงินจากปุ่มใน Telegram (callback_data confirmpay:<token>)
+ * กติกาเดียวกับการกดบนเว็บ (PendingPaymentsCard): ออเดอร์ QUOTE → ยืนยันออเดอร์ก่อน (หักสต็อก)
+ * แล้วบันทึกรับเงิน CASH ยอดเท่าที่ลูกค้าแจ้ง — ครบยอด auto PAID + เงินเข้า Treasury เจ้าของ
+ * token ใช้ครั้งเดียว — consume ก่อนทำงานเสมอ (atomic) กันกดซ้ำ/กดพร้อมกันจนบันทึกเงินซ้ำ
+ */
+export async function confirmReportedPaymentByToken(token: string, _actor?: string): Promise<{ status: 'ok' | 'error'; message: string }> {
+  if (!UUID_RE.test(String(token))) return { status: 'error', message: 'ไม่พบรายการยืนยันนี้ — ปุ่ม/ลิงก์ไม่ถูกต้อง' };
+  const reported = await prisma.businessPayment.findFirst({ where: { confirmToken: String(token) }, include: { order: true } });
+  if (!reported) return { status: 'error', message: 'ไม่พบรายการแจ้งชำระนี้ (ถูกยืนยันไปแล้วหรือไม่มีจริง)' };
+  const consumed = await prisma.businessPayment.updateMany({ where: { id: (reported as any).id, confirmToken: String(token) }, data: { confirmToken: null } });
+  if (consumed.count !== 1) return { status: 'error', message: 'ปุ่มนี้ถูกกดไปแล้ว — ตรวจสถานะที่ /business แท็บออเดอร์' };
+  try {
+    const order = (reported as any).order;
+    if (order.status === 'QUOTE') await transitionOrder(order.businessId, order.id, 'confirm'); // หักสต็อกเหมือนยืนยันบนเว็บ
+    const updated = await addPayment(order.businessId, order.id, {
+      amount: (reported as any).amount,
+      method: 'CASH', // เงินเข้าจริงยืนยันแล้ว — กติกาเดียวกับการ์ดยืนยันบนเว็บ
+      reference: `tg:${(reported as any).reference ?? (reported as any).id}`,
+    });
+    const remain = Math.max(0, updated.total - (updated.paidAmount ?? 0));
+    return {
+      status: 'ok',
+      message:
+        remain <= 0.001
+          ? `${order.orderNo} รับเงินครบ ${Number(updated.total).toLocaleString('th-TH')} ฿ — ปิดออเดอร์แล้ว`
+          : `${order.orderNo} รับเงิน ${Number((reported as any).amount).toLocaleString('th-TH')} ฿ — คงเหลือ ${remain.toLocaleString('th-TH')} ฿`,
+    };
+  } catch (err) {
+    return { status: 'error', message: err instanceof Error ? err.message : 'ยืนยันไม่สำเร็จ — ลองยืนยันที่ /business แท็บออเดอร์' };
+  }
 }
 
 /** ข้อมูลสำหรับหน้าชำระเงิน — QR สำเร็จรูป (data URL) + เบอร์ปลายทางแบบ mask */

@@ -27,6 +27,7 @@ export default function PartnerPortalPage() {
   const [data, setData] = useState<Portal | null>(null);
   const [bad, setBad] = useState(false);
   const [query, setQuery] = useState<{ p: string; t: string } | null>(null);
+  const [qr, setQr] = useState<{ name: string; target: string; qrDataUrl: string } | null>(null);
 
   useEffect(() => {
     trackPageView('/partners/me');
@@ -43,6 +44,18 @@ export default function PartnerPortalPage() {
       setBad(true);
     }
   }, []);
+
+  // P19 — QR ป้ายหน้าร้านของคู่ค้าเอง (สแกน → หมุดร้านบนแผนที่คู่ค้า) — โหลดเมื่อรู้ id แล้วดาวน์โหลดเป็น PNG ได้
+  useEffect(() => {
+    const pid = query?.p;
+    if (!pid) return;
+    let alive = true;
+    fetch(`${getApiUrl()}/api/partners/${pid}/qr`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive) setQr(d && d.qrDataUrl ? d : null); })
+      .catch(() => { if (alive) setQr(null); });
+    return () => { alive = false; };
+  }, [query]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -83,6 +96,24 @@ export default function PartnerPortalPage() {
                 </div>
               ))}
             </section>
+
+            {qr && (
+              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 flex flex-col sm:flex-row items-center gap-4">
+                <img src={qr.qrDataUrl} alt={`QR ป้ายร้าน ${qr.name}`} width={132} height={132} className="rounded-lg bg-white p-1.5 shrink-0" />
+                <div className="space-y-1 text-center sm:text-left">
+                  <h2 className="text-sm font-semibold text-gray-300">🏷️ QR ป้ายหน้าร้านของคุณ</h2>
+                  <p className="text-xs text-gray-500">ลูกค้าสแกน → เปิดหมุดร้านคุณบนแผนที่คู่ค้าทันที · พิมพ์ติดหน้าร้าน/ใส่นามบัตรได้</p>
+                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start pt-1">
+                    <a href={qr.qrDataUrl} download={`sovereign-qr-${qr.name.replace(/[^0-9a-zA-Zก-๙]+/g, '-') || 'partner'}.png`} className="inline-block text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 font-medium">
+                      ⬇️ ดาวน์โหลด PNG
+                    </a>
+                    <a href={qr.target} target="_blank" rel="noreferrer" className="inline-block text-xs rounded-lg border border-white/15 hover:bg-white/5 text-gray-300 px-4 py-2">
+                      เปิดลิงก์ป้าย
+                    </a>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {data.summary.installCount > 0 && (
               <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-2">

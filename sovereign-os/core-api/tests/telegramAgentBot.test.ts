@@ -131,3 +131,43 @@ test('inline /reject command rejects the queued action', async () => {
   await bot.handleUpdate({ message: { from: { id: 123 }, text: '/reject xyz-9' } });
   assert.deepStrictEqual(calls, ['xyz-9']);
 });
+
+// ── P19 — ปุ่ม "ยืนยันรับเงิน" (confirmpay:<token>) ──
+test('callback confirmpay:<token> routes to confirmPay with the actor and reports the result', async () => {
+  const calls: any[] = [];
+  const sent: any[] = [];
+  const bot = new TelegramAgentBot({
+    send: async (text) => {
+      sent.push(text);
+      return true;
+    },
+    actions: { approveApproval: async () => ({ status: 'ok', result: 'x' }), rejectApproval: () => null },
+    confirmPay: async (token, actor) => {
+      calls.push({ token, actor });
+      return { status: 'ok', message: 'S20261001-0001 รับเงินครบ 228.98 ฿ — ปิดออเดอร์แล้ว' };
+    },
+    resolveActor: async () => 'admin-uuid',
+    allowedChatId: 123,
+  });
+
+  await bot.handleUpdate({ callback_query: { id: 'cb-9', from: { id: 123 }, data: 'confirmpay:abc-123' } });
+  assert.deepStrictEqual(calls, [{ token: 'abc-123', actor: 'admin-uuid' }]);
+  assert.ok(sent.some((t) => /ปิดออเดอร์แล้ว/.test(t)), 'ส่งผลลัพธ์กลับใน chat');
+});
+
+test('confirmpay callback from an unapproved chat never reaches confirmPay', async () => {
+  let called = false;
+  const bot = new TelegramAgentBot({
+    send: async () => true,
+    actions: { approveApproval: async () => ({ status: 'ok' }), rejectApproval: () => null },
+    confirmPay: async () => {
+      called = true;
+      return { status: 'ok', message: 'x' };
+    },
+    resolveActor: async () => 'admin-uuid',
+    allowedChatId: 123,
+  });
+
+  await bot.handleUpdate({ callback_query: { id: 'cb-10', from: { id: 999 }, data: 'confirmpay:abc' } });
+  assert.strictEqual(called, false, 'chat อื่นต้องถูกกันที่ประตู isAllowedChatId');
+});

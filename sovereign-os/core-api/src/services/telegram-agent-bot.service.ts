@@ -14,6 +14,7 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
+import { confirmReportedPaymentByToken } from './business-shop.service';
 
 
 export interface ApprovalRequestInfo {
@@ -59,6 +60,11 @@ export function isAllowedChatId(
 
 type ActionResultLike = { status: string; result?: string; reason?: string };
 
+export interface PaymentConfirmResult {
+  status: 'ok' | 'error';
+  message: string;
+}
+
 export interface TelegramAgentBotDeps {
   send?: (text: string, buttons?: { text: string; data: string }[]) => Promise<boolean>;
   actions?: {
@@ -68,6 +74,8 @@ export interface TelegramAgentBotDeps {
   resolveActor?: () => Promise<string | undefined>;
   allowedChatId?: string | number;
   token?: string;
+  // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>)
+  confirmPay?: (token: string, actor?: string) => Promise<PaymentConfirmResult>;
 }
 
 export class TelegramAgentBot {
@@ -76,6 +84,7 @@ export class TelegramAgentBot {
   private resolveActor: NonNullable<TelegramAgentBotDeps['resolveActor']>;
   private allowedChatId?: string | number;
   private token: string;
+  private confirmPay: NonNullable<TelegramAgentBotDeps['confirmPay']>;
 
   private offset = 0;
   private polling = false;
@@ -92,6 +101,7 @@ export class TelegramAgentBot {
     this.resolveActor = deps.resolveActor || this.lookupSuperadmin;
     this.allowedChatId = deps.allowedChatId ?? process.env.TELEGRAM_CHAT_ID;
     this.token = deps.token ?? (process.env.TELEGRAM_BOT_TOKEN || '');
+    this.confirmPay = deps.confirmPay || ((token, actor) => confirmReportedPaymentByToken(token, actor));
   }
 
   get enabled(): boolean {
@@ -150,7 +160,17 @@ export class TelegramAgentBot {
       await this.answerCallback(cb?.id, '⛔ ไม่ได้รับอนุญาต');
       return;
     }
-    const parsed = extractCallbackData(String(cb?.data || ''));
+    // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>) — เส้นทางแยกจาก approve/reject
+    const raw = String(cb?.data || '');
+    if (raw.startsWith('confirmpay:')) {
+      const actor = await this.resolveActor();
+      const result = await this.confirmPay(raw.slice('confirmpay:'.length), actor);
+      const ok = result.status === 'ok';
+      await this.answerCallback(cb?.id, ok ? '✅ รับเงินแล้ว' : `⛔ ${result.message}`.slice(0, 200));
+      await this.send([ok ? '✅ <b>ยืนยันรับเงินสำเร็จ</b>' : '⛔ <b>ยืนยันรับเงินไม่สำเร็จ</b>', escapeHtml(result.message)].join('\n'));
+      return;
+    }
+    const parsed = extractCallbackData(raw);
     if (!parsed) {
       await this.answerCallback(cb?.id, 'คำสั่งไม่รู้จัก');
       return;
