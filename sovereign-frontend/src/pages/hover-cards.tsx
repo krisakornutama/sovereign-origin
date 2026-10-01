@@ -4,6 +4,7 @@ import HoverCard from '../components/ui/HoverCard';
 import Sparkline from '../components/ui/Sparkline';
 import Icon from '../components/ui/Icon';
 import Sidebar from '../components/layout/Sidebar';
+import { FounderCredit } from '../components/public/FounderCredit';
 import PageHeader from '../components/ui/PageHeader';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
@@ -450,6 +451,7 @@ export default function HoverCardsDemo() {
             </div>
           </div>
         </main>
+      <FounderCredit className="pb-4" />
       </div>
     </div>
   );

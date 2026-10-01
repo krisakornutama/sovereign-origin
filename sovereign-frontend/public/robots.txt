@@ -1,0 +1,5 @@
+# Sovereign Origin — sovereignoriginshop.dpdns.org
+User-agent: *
+Allow: /
+
+Sitemap: https://sovereignoriginshop.dpdns.org/sitemap.xml

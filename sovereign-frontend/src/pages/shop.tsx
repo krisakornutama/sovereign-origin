@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
+import { FounderCredit } from '../components/public/FounderCredit';
 import { trackPageView, trackCtaClick, trackQuestion } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -341,6 +342,7 @@ function Storefront({ businessId }: { businessId: string }) {
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
           ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          <FounderCredit className="pt-1" />
         </footer>
         <FeedbackButton page="/shop" />
       </div>
@@ -494,6 +496,7 @@ function OrderView({ token }: { token: string }) {
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
           ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
+          <FounderCredit className="pt-1" />
         </footer>
         <FeedbackButton page="/shop" />
       </div>

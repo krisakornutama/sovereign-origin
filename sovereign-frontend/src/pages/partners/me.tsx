@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { getApiUrl } from '../../lib/config';
 import { FeedbackButton } from '../../components/public/FeedbackButton';
+import { FounderCredit } from '../../components/public/FounderCredit';
 import { trackPageView } from '../../lib/visitorTrack';
 
 // P17 — ลิงก์ส่วนตัวของคู่ค้า: /partners/me?p=<partnerId>&t=<publicToken ของบิลใดบิลหนึ่ง>
@@ -161,6 +162,7 @@ export default function PartnerPortalPage() {
             <footer className="text-center text-[10px] text-gray-600 pt-2 space-y-1">
               <div>ลิงก์นี้เป็นของร้านคุณเท่านั้น — อย่าส่งต่อให้ผู้อื่น (มีข้อมูลการเงิน)</div>
               <div>เครือข่ายคู่ค้า Sovereign Origin · <a href="/partners/" className="hover:text-gray-400 underline underline-offset-2">แผนที่คู่ค้า</a> · <a href="/partners/guide/" className="hover:text-gray-400 underline underline-offset-2">คู่มือ</a></div>
+              <FounderCredit />
             </footer>
           </div>
         )}
