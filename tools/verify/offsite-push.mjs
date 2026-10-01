@@ -237,20 +237,25 @@ if (!tg.token || !tg.chatId) {
   logEntry('failed', { channel: 'telegram', reason: 'no-credentials' });
   console.error('⚠️ ไม่มี Telegram credentials — จด failed แล้ว (ไปต่อช่องทางที่สอง)');
 } else {
-  const form = new FormData();
-  form.append('chat_id', tg.chatId);
+  // ส่งผ่าน curl (stream upload) — บทเรียน 30/9–1/10/69: Node fetch (undici) อัปโหลดไฟล์กลางค้างจน timeout 2 รอบติด
+  // ขณะที่ curl stream ไฟล์เดียวกันผ่านใน ~2–3 นาที (พิสูจน์ 1/10: message_id=1673) — timeout 20 นาที กันคืนอินเทอร์เน็ตช้า
   const ageName = path.basename(agePath);
-  form.append('caption', `🗄 Sovereign offsite backup · ${ageName}\nsha256 ${sha.slice(0, 32)}…\nถอดรหัส: age X25519 — identity ของเจ้าของ (ดู offsite-key-recovery.txt)`);
-  form.append('document', new Blob([fs.readFileSync(agePath)]), ageName);
+  const cap = `Sovereign offsite backup - ${ageName}\nsha256 ${sha.slice(0, 32)}...\ndecrypt: age X25519 - see offsite-key-recovery.txt`;
   try {
-    const res = await fetch(`https://api.telegram.org/bot${tg.token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(90_000) });
-    const out = await res.json();
-    if (!out.ok) throw new Error(`Telegram ปฏิเสธ — ${out.description}`);
-    console.log(`   ส่งสำเร็จ — message_id=${out.result.message_id}`);
-    logEntry('sent', { channel: 'telegram', tg_message_id: out.result.message_id });
+    const out = execFileSync('curl', [
+      '-sS', '-m', '1200',
+      '-F', `chat_id=${tg.chatId}`,
+      '-F', `caption=${cap}`,
+      '-F', `document=@${agePath}`,
+      `https://api.telegram.org/bot${tg.token}/sendDocument`,
+    ], { timeout: 1_250_000, encoding: 'utf8' });
+    const res2 = JSON.parse(out);
+    if (!res2.ok) throw new Error(`Telegram ปฏิเสธ — ${res2.description}`);
+    console.log(`   ส่งสำเร็จ — message_id=${res2.result.message_id}`);
+    logEntry('sent', { channel: 'telegram', tg_message_id: res2.result.message_id, transport: 'curl' });
     tgOk = true;
   } catch (err) {
-    const reason = String(err?.cause?.code || err?.message || err).slice(0, 200);
+    const reason = String(err?.message || err).slice(0, 200);
     logEntry('failed', { channel: 'telegram', reason });
     console.error(`⚠️ ส่ง Telegram ไม่สำเร็จ — จด failed แล้ว (${reason}) — ไฟล์ .age ค้างใน staging ยืนยันได้`);
   }
