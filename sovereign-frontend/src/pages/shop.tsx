@@ -585,7 +585,6 @@ function ShopShell({ children }: { children: React.ReactNode }) {
         title="หน้าร้าน — Sovereign"
         description="หน้าร้านสาธารณะของ Sovereign Origin — ชุดอุปกรณ์และซอฟต์แวร์พร้อมบัตรตามรอยการผลิต รองรับการสั่งซื้อออนไลน์"
         path="/shop"
-        noindex
       />
       <div className="max-w-3xl mx-auto p-4 md:p-6">{children}</div>
     </div>

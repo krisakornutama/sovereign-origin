@@ -58,7 +58,6 @@ export default function CommunityPage() {
         title={`${t('community.title', '🏪 Catalog กลางชุมชน')} — Sovereign OS`}
         description="สินค้าจากร้านชุมชนที่เข้าร่วมเองในเครือข่าย Sovereign Origin — ค้นหาและกดสินค้าเพื่อไปสั่งซื้อที่ร้านต้นทาง"
         path="/community"
-        noindex
       />
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <header className="space-y-1">
