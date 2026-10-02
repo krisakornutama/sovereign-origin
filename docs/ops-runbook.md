@@ -69,6 +69,15 @@ taskkill //F //PID <PID> //T
 
 **กลับมา prod:** ต้อง kill dev ก่อน build — watchdog จะไม่สลับเองถ้า :3000 ยังตอบ!
 
+### `verify:full` แตะ :3000 อย่างไร (เพิ่ม 2/10/69 — ทำให้รอบ gate ผ่านได้จริง)
+
+`npm run verify:full` = build ทับ `.next` ของ prod → ต้อง kill แล้วบูตใหม่ก่อน e2e ไม่งั้น chunk เก่า/ใหม่ผสมกัน 404
+
+- `taskkill` **ต้องมี `/T`** — `npm run start` spawn ลูก `next start` ที่เป็นตัวถือพอร์ตจริง (kill แค่พ่อ = ลูกยังถือ :3000 → server ใหม่ bind ไม่ได้)
+- watchdog มีตารางเวลาของมันเอง — verify รอ 20 วิ แล้ว **บูตเองเอง** (ไม่รอ 90 วิ) พยายามได้ 3 ครั้ง ถ้ายังไม่ขึ้นจะพิมพ์หาง log ที่ `logs/frontend-restart.log` พร้อมบอกว่าบูตจากโฟลเดอร์ไหน
+- **ถ้ารัน verify จาก worktree**: :3000 จะถูกบูตด้วย build ของ worktree เพื่อให้ e2e ทดสอบโค้ดใหม่ → **verify คืนพอร์ตให้ MAIN เองตอนจบ** (ไม่งั้นโดเมนจริง 502 วันที่ worktree ถูกลบ)
+- Prod-Truth Gate เทียบ fingerprint กับ **dist ของ deploy root (MAIN)** เสมอ ไม่ใช่ dist ของ worktree — เพราะ `core.autocrlf=true` ทำให้ checkout สองที่ได้ EOL ต่างกัน (2 ไฟล์ = 21 ไบต์) → เทียบผิดที่ = ล้มทั้งที่โค้ดเหมือนกัน
+
 ```bash
 netstat -ano | grep ":3000" | grep -i LISTENING   # kill dev ทั้งกิ่งก่อน
 taskkill //F //PID <PID> //T
