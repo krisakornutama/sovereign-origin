@@ -120,11 +120,22 @@ async function main() {
   const seo = await seoBlock();
   const seoCheck = lastCheck('seo-preflight.json');
   const restoreCheck = lastCheck('backup-restore-check.json');
+  const gscCheck = lastCheck('gsc-coverage.json');
   lines.push('');
   lines.push(`🔎 <b>SEO</b>: sitemap ${seo.sitemapOk ? `${seo.urls} URL` : '⚠️ ตอบไม่ผ่าน'} · IndexNow ${seo.pingOk ? 'ส่งแล้ว ✓' : '⚠️ ยังไม่ผ่าน'}`);
   lines.push(
     `ตรวจหน้าเว็บ: ${seoCheck ? (seoCheck.ok ? `ผ่าน ${seoCheck.checked} URL ✓` : `⚠️ ${seoCheck.problems.length} จุด`) : 'ยังไม่ได้ตรวจ'}` +
       ` · backup: ${restoreCheck ? (restoreCheck.ok ? `กู้คืนได้จริง ✓ (${restoreCheck.dump ?? '-'})` : '⚠️ กู้คืนไม่ได้') : 'ยังไม่ได้ตรวจ'}`
+  );
+  // GSC coverage: อ่านไฟล์ log ไม่ยิง API ซ้ำ · ยังไม่ได้ตั้ง credential = ขึ้นว่ายังไม่ได้ตั้งค่า (ไม่ใช่เตือน)
+  lines.push(
+    gscCheck
+      ? (gscCheck.skipped
+        ? `Google index: ยังไม่ได้ตั้งค่า GSC API (รอ Verify + credential)`
+        : (gscCheck.ok
+          ? `Google index: ${gscCheck.indexed?.length ?? 0}/${gscCheck.sitemapUrls ?? 0} หน้าติด index ✓ · impressions ${gscCheck.current?.impressions ?? 0}`
+          : `Google index: ⚠️ ${gscCheck.problems?.length ?? 0} จุด`))
+      : 'Google index: ยังไม่ได้ตรวจ'
   );
 
   const text = lines.join('\n');
