@@ -6,7 +6,7 @@ import SeoHead from '../components/public/SeoHead';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLanguageStore } from '../stores/useLanguageStore';
-import { isPublicHostname } from '../lib/publicAccess';
+import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 import { getHomeVariant, trackCtaClick } from '../lib/visitorTrack';
 
 export default function Home() {
@@ -16,6 +16,10 @@ export default function Home() {
   // A/B ลำดับการ์ด (P13): A = เดโม่ก่อน · B = ร้านก่อน — สุ่มครั้งเดียวจำค่าไว้ (วัด cta_click คู่กันในหน้า admin)
   const [variant, setVariant] = useState<'A' | 'B'>('A');
   useEffect(() => { setVariant(getHomeVariant()); }, []);
+  // P24: สลับจาก "สาธารณะ" เป็น "เครื่องเรา" หลัง mount เท่านั้น (render ครั้งแรกบน client
+  // ต้องตรงกับ SSR ไม่งั้น hydration mismatch) → เจ้าของที่เปิด localhost ยังได้ฟอร์มล็อกอิน
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const cta = (name: string) => () => trackCtaClick('/', name, variant);
 
   // P11 (30/9/69): บนโดเมนสาธารณะถ้า browser มี session เจ้าของอยู่แล้ว เด้งเข้า dashboard ตามเดิม
@@ -41,8 +45,17 @@ export default function Home() {
     },
   };
 
-  // รอจนกว่า store จะ hydrate ก่อนแสดงอะไร
-  if (!isHydrated) {
+  // P24 (3/10/69): โหมดสาธารณะต้องเรนเดอร์ได้ตอน SSR ไม่ใช่รอ hydrate
+  // — เดิม `if (!isHydrated) → Loading` ทำให้ HTML ที่ Google ดึงได้แค่ "กำลังโหลด..."
+  //   ไม่มี h1 ไม่มีเนื้อหา (เนื้อหาจริงโผล่หลัง JS รัน) · ตอนนี้ถ้า build เป็นโหมดสาธารณะ
+  //   (NEXT_PUBLIC_PUBLIC_SITE=1) ให้เรนเดอร์ branch สาธารณะทันทีทั้ง server และ client
+  //   → ไม่มี hydration mismatch · ส่วนเครื่องเจ้าของ (localhost/LAN) ยังเห็นฟอร์มล็อกอิน
+  //   ตามเดิม เพราะสลับหลัง mount เท่านั้น
+  const publicMode = isPublicHostname();
+  const showPublic = publicMode && !(mounted && isLocalHostname());
+
+  // รอจนกว่า store จะ hydrate ก่อนแสดงอะไร (ยกเว้นโหมดสาธารณะที่ไม่ต้องรู้สถานะล็อกอิน)
+  if (!isHydrated && !showPublic) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <SeoHead {...seo} />
@@ -53,7 +66,7 @@ export default function Home() {
 
   // โหมดทดลอง (คำสั่งเจ้าของ 30/9/69: "เว็บนี้มันควรจะขึ้นเลย เปิดให้ใช้สำหรับทดลอง ไม่ใช่ให้เข้ารหัสใด ๆ")
   // ผู้มาเยือนโดเมนสาธารณะที่ยังไม่ล็อกอิน → หน้าทดลองทันที ไม่มีฟอร์มขวาง
-  if (isPublicHostname() && !isAuthenticated) {
+  if (showPublic && !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100">
         <SeoHead {...seo} />

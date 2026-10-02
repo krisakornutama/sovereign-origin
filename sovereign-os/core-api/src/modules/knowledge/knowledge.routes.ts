@@ -334,8 +334,15 @@ router.post('/upload', authenticate, handledUpload(upload, 'file'), async (req, 
 
 // GET /api/knowledge/uploads/:file — เปิดไฟล์ที่อัปโหลด (PDF view ในเบราว์เซอร์)
 router.get('/uploads/:file', authenticate, (req, res) => {
+  let resolved: string;
   try {
-    const resolved = resolveInsideRoot(KNOWLEDGE_DIR, 'uploads', req.params.file);
+    resolved = resolveInsideRoot(KNOWLEDGE_DIR, 'uploads', req.params.file);
+  } catch {
+    // แก้ 3/10/69: เดิม resolveInsideRoot throw ถูกจับรวมกับ sendFile → path traversal
+    // ตอบ 500 (log รบกวนเวลามีคนสแกน) · ตอนนี้แยกออกมาตอบ 400 ตรง ๆ
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  try {
     if (!fs.existsSync(resolved)) {
       return res.status(404).json({ error: 'File not found' });
     }

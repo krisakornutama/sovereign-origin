@@ -285,32 +285,31 @@ describe('POST /api/sensors/data — validation ก่อนแตะ TimescaleD
     assert.strictEqual(rawCalls.length, 0);
   });
 
-  // ⚠️ บั๊กจริงที่เจอตอนเขียนเทสต์ (3/10/69) — ยังไม่แก้ เพราะแตะพฤติกรรมเดิมต้องได้รับอนุญาตจากเจ้าของ
-  // Number(null) = 0 · Number('') = 0 · Number([]) = 0 · Number(false) = 0 → ผ่าน Number.isFinite
-  // = ค่าที่ "ไม่ได้ส่งมา" ถูกเขียนลง TimescaleDB เป็นตัวเลข 0 (เช่น อุณหภูมิ 0°C ปลอม ๆ)
-  // เทสต์นี้ล็อก "พฤติกรรมปัจจุบัน" ไว้ เพื่อให้ถ้าวันหนึ่งแก้แล้วเทสต์นี้จะแดง = สัญญาณว่าเปลี่ยนแล้ว
-  test('⚠️ ข้อบกพร่อง: value=null เดินทางเป็นเลข 0 ได้ (Number(null)===0 ผ่าน isFinite)', async () => {
-    rawCalls.length = 0;
-    const res = await fetch(dataServer.baseUrl + '/api/sensors/data', {
-      method: 'POST',
-      headers: { ...AUTH, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metric: 'temperature', value: null }),
-    });
-    assert.strictEqual(res.status, 201, 'พฤติกรรมปัจจุบัน = รับได้ (ถ้าจะแก้ = 400)');
-    assert.strictEqual(rawCalls[0].params[3], 0, 'ถูกเขียนลง DB เป็น 0 — นี่คือรูปรับปรุง');
-  });
-
-  test('⚠️ ข้อบกพร่องเดียวกัน: value="" และ value=false ก็กลายเป็น 0 เหมือนกัน', async () => {
-    for (const bad of ['', false, []]) {
+  // แก้แล้ว 3/10/69: เดิม Number(null) = 0 · Number('') = 0 · Number([]) = 0 · Number(false) = 0
+  // ผ่าน Number.isFinite ทั้งหมด → ค่าที่ "ไม่ได้ส่งมา" ถูกเขียนลง time-series เป็น 0
+  // (อุณหภูมิ 0°C ปลอม ๆ ปนในข้อมูลจริง) — เทสต์นี้คือกันไม่ให้กลับมาเป็นบั๊ก
+  test('value ที่ "ว่างจริง" = 400 และไม่แตะ DB (null / ว่าง / boolean / array)', async () => {
+    for (const bad of [null, undefined, '', false, true, []]) {
       rawCalls.length = 0;
       const res = await fetch(dataServer.baseUrl + '/api/sensors/data', {
         method: 'POST',
         headers: { ...AUTH, 'Content-Type': 'application/json' },
         body: JSON.stringify({ metric: 'temperature', value: bad }),
       });
-      assert.strictEqual(res.status, 201, `value=${JSON.stringify(bad)}`);
-      assert.strictEqual(rawCalls[0].params[3], 0);
+      assert.strictEqual(res.status, 400, `value=${JSON.stringify(bad)} ต้อง 400`);
+      assert.strictEqual(rawCalls.length, 0, 'ห้ามเขียนลง DB');
     }
+  });
+
+  test('ยังรับค่าที่ถูกต้องได้: เลข 0 จริงต้องผ่าน (ไม่ใช่ตัวเลขที่ "ไม่ได้ส่ง")', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/data', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metric: 'rain_detect', value: 0 }),
+    });
+    assert.strictEqual(res.status, 201, '0 คือค่าจริงที่ถูกต้อง (ฝนไม่ตก)');
+    assert.strictEqual(rawCalls[0].params[3], 0);
   });
 
   test('ข้อมูลถูกต้อง = INSERT พร้อม node/device default (manual-input) และ cast uuid', async () => {

@@ -225,18 +225,23 @@ describe('POST /defcon/drill', () => {
     assert.strictEqual(drillCalls.length, 0);
   });
 
-  // ⚠️ ข้อบกพร่องเบา ๆ ที่เจอตอนเขียนเทสต์ (3/10/69) — ยังไม่แก้
-  // ส่ง index=null ชัด ๆ → Number(null) = 0 → ผ่าน → รัน drill ที่ระดับ 0 เงียบ ๆ
-  // (ส่ง body {} เปล่า = undefined → NaN → 400 ถูกต้องแล้ว · ผลกระทบเบาเพราะ 0 = de-escalation
-  //  ตามที่ doc ระบุไว้ แต่ "ลืมส่งค่า" ไม่ควรเท่ากับ "สั่งลดระดับ")
-  test('⚠️ ข้อบกพร่อง: index=null ถูกตีความเป็น 0 แล้วรัน drill เลย', async () => {
+  // แก้แล้ว 3/10/69: เดิม index=null → Number(null) = 0 ผ่าน isFinite → รัน drill ระดับ 0
+  // เงียบ ๆ (ลืมส่งค่า ≠ สั่งลดระดับ) · 0 ที่สั่งโดยตรงยังใช้ได้ตามปกติ
+  test('index=null = 400 (ลืมส่งค่าไม่ใช่สั่งลดระดับ)', async () => {
     drillCalls.length = 0;
     const res = await post(server.baseUrl + '/api/risk-monitor/defcon/drill', { index: null });
-    assert.strictEqual(res.status, 200, 'พฤติกรรมปัจจุบัน (ถ้าจะแก้ = 400)');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(drillCalls.length, 0, 'ห้ามรัน engine');
+  });
+
+  test('index=0 ที่สั่งจริง = ผ่าน (ใช้ลดระดับหลังจบ drill ตามที่ doc ระบุ)', async () => {
+    drillCalls.length = 0;
+    const res = await post(server.baseUrl + '/api/risk-monitor/defcon/drill', { index: 0 });
+    assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(drillCalls, [0]);
   });
 
-  test('body ว่างเปล่า (ไม่ได้ส่ง index เลย) = 400 ถูกต้องแล้ว', async () => {
+  test('body ว่างเปล่า (ไม่ได้ส่ง index เลย) = 400', async () => {
     drillCalls.length = 0;
     const res = await post(server.baseUrl + '/api/risk-monitor/defcon/drill', {});
     assert.strictEqual(res.status, 400);
