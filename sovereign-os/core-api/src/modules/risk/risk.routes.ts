@@ -101,7 +101,12 @@ router.post('/defcon/drill', authenticate, requireRole('SUPERADMIN'), async (req
   try {
     const engine = (req.app.locals as { defconEngine?: { check: (n: number) => Promise<{ level: number; actionsRun: { id: string }[] }> } }).defconEngine;
     if (!engine) return res.status(503).json({ error: 'DEFCON engine ไม่พร้อม' });
-    const index = Number(req.body?.index);
+    // แก้ 3/10/69: Number(null) = 0 ผ่าน isFinite → index ที่ "ลืมส่ง" กลายเป็น drill
+    // ที่ระดับ 0 (de-escalation) เงียบ ๆ ต้องเช็ค null/undefined ก่อนแปลง
+    if (req.body?.index === null || req.body?.index === undefined) {
+      return res.status(400).json({ error: 'index ต้องเป็นตัวเลข 0-100' });
+    }
+    const index = Number(req.body.index);
     if (!Number.isFinite(index) || index < 0 || index > 100) {
       return res.status(400).json({ error: 'index ต้องเป็นตัวเลข 0-100' });
     }

@@ -95,26 +95,22 @@ describe('POST /api/backup/schedule', () => {
     }
   });
 
-  // ⚠️ บั๊กจริงที่เจอตอนเขียนเทสต์ (3/10/69) — ยังไม่แก้ ต้องได้รับอนุญาตจากเจ้าของก่อน
-  // regex /^\d{2}:\d{2}$/ ตรวจแค่ "รูปทรง" ไม่ตรวจช่วงค่า → "25:00" ผ่าน
-  // แล้ว toMin('25:00') = 1500 นาที ซึ่งเกิน nowMin สูงสุด (1439) เสมอ
-  // = catch-up window ไม่มีวันเข้า → **backup ไม่เคยรันอีก** แต่ไม่มีอะไรฟ้อง
-  // (ตอนนี้ machine-health จะเตือนเมื่ออายุ backup เกิน 26 ชม. — ช้ากว่าที่ควร)
-  test('⚠️ ข้อบกพร่อง: "25:00" ผ่าน validation แล้วทำให้ scheduler ไม่มีวันรัน', async () => {
-    const res = await post(server.baseUrl + '/api/backup/schedule', { enabled: true, time: '25:00' });
-    assert.strictEqual(res.status, 200, 'พฤติกรรมปัจจุบัน = รับ (ถ้าจะแก้ = 400)');
-    const body: any = await res.json();
-    assert.strictEqual(body.schedule.time, '25:00');
-    // พิสูจน์ผลกระทบ: ชั่วโมง 25 อยู่นอกช่วงเวลาของวันเสมอ
-    const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-    assert.ok(toMin('25:00') > 23 * 60 + 59, 'toMin เกินเวลาที่เป็นไปได้ของวัน = window ไม่มีวันเข้า');
+  // แก้แล้ว 3/10/69: เดิมตรวจแค่รูป /^\\d{2}:\\d{2}$/ → "25:00" ผ่าน
+  // แล้ว toMin = 1500 นาที ซึ่งเกินเวลาที่เป็นไปได้ของวัน (สูงสุด 1439)
+  // → catch-up window ไม่มีวันเข้า = backup ไม่เคยรันอีกโดยไม่มีอะไรฟ้อง
+  test('เวลานอกช่วงของวัน = 400 (เคยทำให้ backup ไม่เคยรันอีก)', async () => {
+    for (const bad of ['25:00', '24:00', '99:99', '02:60', '02:99']) {
+      const res = await post(server.baseUrl + '/api/backup/schedule', { enabled: true, time: bad });
+      assert.strictEqual(res.status, 400, `time=${bad}`);
+    }
   });
 
-  test('⚠️ ข้อบกพร่อง: "02:60" ผ่าน แต่จะกลายเป็น 03:00 ตอนรันจริง', async () => {
-    const res = await post(server.baseUrl + '/api/backup/schedule', { enabled: true, time: '02:60' });
-    assert.strictEqual(res.status, 200, 'พฤติกรรมปัจจุบัน = รับ (ถ้าจะแก้ = 400)');
-    const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-    assert.strictEqual(toMin('02:60'), 180, '= 03:00 จริง ไม่ใช่ 02:60');
+  test('ขอบเขตที่ถูกต้องยังใช้ได้ (00:00 / 23:59)', async () => {
+    for (const ok of ['00:00', '23:59']) {
+      const res = await post(server.baseUrl + '/api/backup/schedule', { enabled: true, time: ok });
+      assert.strictEqual(res.status, 200, `time=${ok}`);
+      assert.strictEqual((await res.json()).schedule.time, ok);
+    }
   });
 
   test('เวลาถูกรูป = บันทึกและอ่านกลับได้ตรงกัน', async () => {

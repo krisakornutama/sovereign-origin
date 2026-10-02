@@ -334,12 +334,12 @@ describe('ไฟล์บนดิสก์ — กัน path traversal', () =>
         `${server.baseUrl}/api/knowledge/uploads/${encodeURIComponent('..' + path.sep + '..' + path.sep + 'outside-secret.txt')}`,
         { headers: AUTH },
       );
-      assert.notStrictEqual(res.status, 200, 'ห้ามเสิร์ฟไฟล์นอก uploads');
-      const text = await res.text();
-      assert.doesNotMatch(text, /TOP SECRET/, 'เนื้อหาไฟล์ข้างนอกต้องไม่หลุดใน response');
-      // ⚠️ ตอนนี้ตอบ 500 ไม่ใช่ 400 — resolveInsideRoot throw แล้วถูกจับกลายเป็น "Failed to serve file"
-      // ไม่ใช่ช่องโหว่ (ไฟล์ไม่ถูกส่ง) แต่เป็นสัญญาณรบกวนตัวเองใน log เวลามีคนสแกน path traversal
-      assert.strictEqual(res.status, 500, 'พฤติกรรมปัจจุบัน (ถ้าจะแก้ = 400)');
+      // แก้แล้ว 3/10/69: เดิม resolveInsideRoot throw ถูกจับรวมกับ sendFile → 500
+      // (ไฟล์ไม่หลุด แต่ log รบกวนตอนมีคนสแกน) · ตอนนี้แยกออกตอบ 400 ตรง ๆ
+      assert.strictEqual(res.status, 400);
+      const body: any = await res.json();
+      assert.match(body.error, /Invalid file path/);
+      assert.doesNotMatch(JSON.stringify(body), /TOP SECRET/);
     } finally {
       fs.rmSync(outside, { force: true });
     }
