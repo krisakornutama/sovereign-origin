@@ -231,7 +231,8 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 ## ๙. แผนที่ช่องว่างเทส core-api (วัด 18 ก.ย. 2026 ด้วย `npm run coverage:core` — ชุด mock ผ่านครบ)
 
-> วิธีวัด: **`npm run coverage:core`** = c8 + `tests/*.test.ts` แล้วพิมพ์ตัวเลขรวม + ไฟล์ 0% ใหญ่สุด + หลุมบรรทัดมากสุด (c8 อยู่ใน devDependencies ของ core-api แล้ว) · ที่มาของอันดับ = จำนวน**บรรทัดที่ยังไม่ถูกครอบ** · ตัวเลข total: lines **63.76%** · branches **75.02%** · functions **81.94%** (บรรทัดที่วัด 39,390 — ขึ้นจาก 61.64% หลังปิดหลุม health + restaurant ในรอบเดียวกัน)
+> วิธีวัด: **`npm run coverage:core`** = c8 + `tests/*.test.ts` แล้วพิมพ์ตัวเลขรวม + ไฟล์ 0% ใหญ่สุด + หลุมบรรทัดมากสุด (c8 อยู่ใน devDependencies ของ core-api แล้ว) · ที่มาของอันดับ = จำนวน**บรรทัดที่ยังไม่ถูกครอบ** · ตัวเลข total **ล่าสุด 3/10/69: lines 68.34%** (30,120/44,070) · branches 74.77% · functions 84.15% (บรรทัดที่วัด 39,390 → 44,070 หลังเพิ่มเทสต์ 4 โมดุล)
+> **ตารางข้างล่างเป็นสำเนาเก็บไว้ ณ 18/9/69** — ของจริงที่ครบ 73 กลุ่มเรียงจากต่ำสุดอยู่ที่ [`module-audit-2026-10-03.md`](module-audit-2026-10-03.md)
 
 | # | ไฟล์ | ไม่ครอบ/รวม (บรรทัด) | อะไรอยู่ข้างใน — จะเทสอะไรก่อน |
 |---|---|---|---|
@@ -248,9 +249,38 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 **ปิดแล้วในรอบนี้:** `health.routes.ts` (เดิม 505/505 · 0%) และ `restaurant.routes.ts` (เดิม 380/380 · 0%) → มีเทส HTTP จริง `tests/health.routes.test.ts` (15 เทส: validation/triage flag/consent/contraindication/export) + `tests/restaurant.routes.test.ts` (19 เทส: สิทธิ์/กันเลขผิด/PDPA/วงจรออเดอร์จนจ่าย ตัดสต็อก-แต้ม-treasury/รายงาน) — หลุมเดิมอันดับ 4 กับ 6 หลุดจากลิสต์
 
-รองลงมา (แตะได้เร็ว): `learning-engine.service.ts` 245 (0%) · `AiAgentService.ts` 256/485 (~47%) · `risk.routes.ts` 211 (0%) · `relay.routes.ts` 198 (0%)
+รองลงมา (แตะได้เร็ว): `learning-engine.service.ts` 245 (0%) · `AiAgentService.ts` 256/485 (~47%) · `relay.routes.ts` 198 (0%)
 
-กติกาตีความ: แถว "0%" = ไฟล์ไม่ถูก import ในชุด mock เลย (ครอบผ่าน HTTP mock server ด้วยแพทเทิร์น `createTestServer` เดิม — พิสูจน์แล้ว 2 โมดูลในรอบนี้) · แถว % ปานกลาง = เติมเฉพาะกิ่งที่ขาด · วัดซ้ำได้ทุกเมื่อด้วย `npm run coverage:core` (~2 นาที ไม่ต้องมี DB) — และตอนนี้รันอัตโนมัติเป็นขั้นสุดท้ายของ `npm run verify -- --db` แล้ว (ไม่บังคับ threshold)
+**ปิดเพิ่ม 3/10/69 (รอบที่ 4):** `sensors` (เดิม 0% → **84%**) · `risk.routes.ts` (เดิม 211 บรรทัด 0% → **71%**) · `backup` (เดิม 0% → **84%**) · `knowledge` (13% → **33%**) — 4 ไฟล์นี้คือ 4 โมดุลที่ลูกค้า/ระบบปฏิบัติการแตะจริง (เครื่อง sensor, DEFCON drill, สำรองข้อมูล, คลังความรู้) รายละเอียดรายเคส + บั๊กที่เจออยู่ที่ [`module-audit-2026-10-03.md`](module-audit-2026-10-03.md)
+
+กติกาตีความ: แถว "0%" = ไฟล์ไม่ถูก import ในชุด mock เลย (ครอบผ่าน HTTP mock server ด้วยแพทเทิร์น `createTestServer` เดิม — พิสูจน์แล้ว 6 โมดูล) · แถว % ปานกลาง = เติมเฉพาะกิ่งที่ขาด · วัดซ้ำได้ทุกเมื่อด้วย `npm run coverage:core` (~2 นาที ไม่ต้องมี DB)
+
+### Coverage floor — ไม่มีโมดุลใหม่ที่ลงที่ 0% ได้อีก (เพิ่ม 3/10/69)
+
+> **ก่อนหน้านี้ coverage เป็น "กระจกส่อง" ไม่มี threshold มาตลอด** = ตัวเลขลดลงเงียบ ๆ ไม่มีใครรู้ ทั้งที่ gate รันอยู่ทุกคืน · `tools/coverage-floor.mjs` + `tools/coverage-floor.json` ปิดช่องนี้แล้ว · ผูกเข้า `tools/coverage-core.mjs` → อยู่ใน `npm run verify -- --db`
+
+| กฎ | ตรวจอะไร |
+|---|---|
+| รวม | lines รวม ≥ floor (ปัจจุบัน 68.34) |
+| ห้ามถอย | กลุ่มที่มีใน baseline ห้ามต่ำกว่าเดิม |
+| **โมดุลใหม่** | กลุ่มที่ไม่มีใน baseline ต้อง ≥ **40%** ไม่งั้น violation (นี่คือกฎที่ทำให้ "ลงที่ 0%" เป็นไปไม่ได้) |
+| หายไป | กลุ่มที่เคยมีใน baseline แล้วหายจากรายงาน = violation (กันตัดไฟล์ทิ้งเพื่อหนีตัวเลข) |
+
+คำสั่งใช้ (จากรากโปรเจกต์):
+
+```bash
+node tools/coverage-floor.mjs --no-enforce   # รายงานอย่างเดียว ไม่บังคับ
+node tools/coverage-floor.mjs --update      # ยก baseline ขึ้น (ยกเฉพาะขึ้น ลดไม่ได้)
+npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่ผูก floor (แก้เทสต์สะดุด)
+```
+
+**เพิ่มโมดูลใหม่แล้วทำอะไร:** เขียนเทสต์ให้ ≥ 40% → รัน `--update` → commit · ถ้าทำไม่ได้ในรอบนั้น ให้เขียนเหตุผลไว้ใน baseline ด้วย (มีฟิลด์ `note`) ไม่ใช่ปิดเงียบ
+
+**บทเรียนจากการเขียนเทสต์รอบ 3/10/69 (อ่านก่อนเขียนเทสต์ backend):**
+- env ต้องตั้ง**ที่ระดับ module body ไม่ใช่ใน `before()`** — `backup.service` อ่าน `BACKUP_DIR` ครั้งเดียวตอน import → ตั้งใน `before()` = ชี้ไปโฟลเดอร์จริง (เคสจริง: เทสต์แรกไปอ่าน backup จริง) · ทางแก้ = `await import()` แบบ dynamic ใน `before()`
+- ที่ระบบอ่าน env เป็นตัวแปร instance เช่น `KNOWLEDGE_DIR` ให้เพิ่ม override ได้ (ไม่ตั้ง = พฤติกรรมเดิมทุกประการ) ไม่งั้นเทสต์จะไปแตะไฟล์จริงของระบบ
+- ไฟล์ที่สร้างในมิลลิวินาทีเดียวกันมี mtime เท่ากัน → service ที่เรียงไฟล์ด้วย mtime จะเรียงผิด ใช้ `fs.utimesSync` แยกเวลาในเทสต์
+- route ที่อ่าน `req.app.locals` (เช่น `defconEngine` / `riskWorker`) เทสต์ต้อง mock `app.locals` และเตรียมทั้ง 2 โหมด (มี engine / `RISK_MONITOR_ENABLED=false`)
 
 ## ๑๐. วงจรปล่อย release แอป desktop (ทำตามนี้ทุกครั้ง)
 

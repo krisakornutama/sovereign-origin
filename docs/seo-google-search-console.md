@@ -25,6 +25,30 @@
 
 **ยังค้าง 2 อย่าง (ไม่ใช่บล็อกการ Verify):** (1) ค่า TXT จาก GSC ยังไม่ได้รับ — Verify ทำไม่ได้จนเจ้าของส่งค่ามา (2) `/shop/` กับ `/community/` ยังตั้ง `noindex` อยู่ทั้งที่อยู่ใน sitemap — ต้องตัดสินใจ (ถ้า Verify ไปแล้ว GSC จะขึ้นเตือนเรื่องนี้ในรายงาน "หน้าเว็บที่ไม่ได้ทำดัชนี")
 
+### ⚠️ Google ได้ HTML ว่างจากหน้าแรก — แก้แล้ว 3/10/69 (SSR)
+
+**อาการที่เจอ:** ตรวจด้วย `curl -A Googlebot` พบว่า `/` ตอบ 200 แต่ **ไม่มี `<h1>` เลย และ HTML เล็กกว่าที่ควรเป็น** — แปลว่า page-view ที่ Google เห็นมีแต่ title/description ที่ฝังไว้ ไม่มีเนื้อหาจริง
+
+**ราก:** `isPublicHostname()` (`src/lib/publicAccess.ts`) ตอบ `false` ตอน SSR เพราะยังไม่มี `window` → หน้าแรกเรนเดอร์ branch "ฟอร์มล็อกอิน" → แถว `if (!isHydrated) return Loading` ตัดทิ้งทั้ง branch สาธารณะ → **เนื้อหาโผล่หลัง JS รันเท่านั้น** ซึ่ง Googlebot ไม่รอ
+
+**แก้แล้ว:** ธงตอน build `NEXT_PUBLIC_PUBLIC_SITE=1` (ตั้งใน `next.config.js` เปิดเฉพาะ `NODE_ENV=production` และ**ไม่ใช่** `SOVEREIGN_STATIC_EXPORT=1`) → SSR กับ client ตอบ "สาธารณะ" ตรงกัน (ไม่เกิด hydration mismatch) และเจ้าของที่เปิด `localhost` ยังเห็นฟอร์มล็อกอินตามเดิม เพราะสลับหลัง `mount` เท่านั้น
+
+**พิสูจน์แล้วบนโดเมนจริง (3/10/69 หลัง rebuild):**
+
+```bash
+curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" \
+  https://sovereignoriginshop.dpdns.org/ | grep -c '<h1'
+```
+
+| | ก่อน | หลัง |
+|---|---|---|
+| `<h1>` | **0** | **1** |
+| ขนาด HTML | 33,966 ไบต์ | 36,779 ไบต์ |
+
+**ยังเป็น 0 (ต้องตัดสินใจ — ไม่ใช่บั๊ก SSR):** `/sensors/` และ `/shop/` ต้องล็อกอินก่อนถึงมีเนื้อหา (`SensorsHub` มี guard `!isHydrated || !isAuthenticated || !token` · `ShopShell` มี `mounted` guard) ทั้งคู่ยังอยู่ใน sitemap → ตัวเลือกคือ (ก) ตัดออกจาก sitemap + noindex หรือ (ข) ทำเป็นสาธารณะจริงแบบข้อมูลตัวอย่างเหมือน `/demo` · ถ้าไม่ทำอะไร หน้าเหล่านี้จะค้างในสถานะ "ถูกทำดัชนีแต่ไม่มีเนื้อหา" ใน GSC
+
+**เช็คเองได้ทุกครั้งที่แก้หน้าสาธารณะ:** ข้างบน — ถ้า h1 = 0 บนหน้าไหนแม้ status เป็น 200 แปลว่าเนื้อหานั้นยังไม่ถึง Google
+
 ### ให้บอทรู้ทันทีที่ URL เปลี่ยน (ผูก nightly/weekly แล้ว 2/10/69)
 
 - **`tools/indexnow-shop-notify.mjs`** — ยิง IndexNow (`api.indexnow.org` → Bing/Yandex/Seznam/Naver) โดยอ่านคีย์จริงจาก `sovereign-frontend/public/<32hex>.txt` และ URL จริงจาก sitemap ที่เว็บตอบ · **ต้องเห็นไฟล์คีย์ตอบ 200 + เนื้อหาตรงก่อนถึงยิง** (กันยิงแล้วถูกปฏิเสธ) · fail-safe exit 0 เสมอ
