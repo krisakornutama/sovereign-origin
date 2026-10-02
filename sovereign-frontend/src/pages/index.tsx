@@ -2,6 +2,7 @@
 import { useAuthStore } from '../stores/useAuthStore';
 import LoginForm from '../components/auth/LoginForm';
 import { FounderCredit } from '../components/public/FounderCredit';
+import SeoHead from '../components/public/SeoHead';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -24,10 +25,27 @@ export default function Home() {
     }
   }, [isHydrated, isAuthenticated, mustChangePassword, router]);
 
+  // P22 (2/10/69): metadata ต้องอยู่ใน HTML ที่ server ส่งออกจริง — SSR คืน branch นี้เสมอ
+  //   (isHydrated=false ตอนแรก) ถ้าไม่ใส่ตรงนี้ Google จะได้หน้าเปล่าไม่มี title/canonical
+  const seo = {
+    title: 'Sovereign Origin — ระบบฟาร์ม · ปศุสัตว์ · การเงิน ทดลองใช้ได้ทันที',
+    description:
+      'เปิดให้ทดลองใช้ฟรีด้วยข้อมูลตัวอย่าง — ฟาร์ม ปศุสัตว์ การเงิน ตามรอยสินค้า และหน้าร้าน ไม่ต้องสมัคร ไม่มีล็อกอินขวาง',
+    path: '/',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'Sovereign Origin',
+      url: 'https://sovereignoriginshop.dpdns.org/',
+      inLanguage: 'th',
+    },
+  };
+
   // รอจนกว่า store จะ hydrate ก่อนแสดงอะไร
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <SeoHead {...seo} />
         <div className="text-emerald-400 text-sm tracking-wide glow-text">{t('common.loading', 'กำลังโหลด...')}</div>
       </div>
     );
@@ -38,6 +56,7 @@ export default function Home() {
   if (isPublicHostname() && !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100">
+        <SeoHead {...seo} />
         <main className="max-w-2xl mx-auto px-4 py-14 space-y-8">
           <header className="space-y-3 text-center pt-6">
             <div className="mono text-[10px] tracking-[0.3em] uppercase text-cyan-400/80">sovereign origin</div>

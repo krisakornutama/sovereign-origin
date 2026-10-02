@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
+import SeoHead from '../components/public/SeoHead';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
@@ -54,7 +54,12 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <Head><title>{t('community.title', '🏪 Catalog กลางชุมชน')} — Sovereign OS</title><meta name="robots" content="noindex" /></Head>
+      <SeoHead
+        title={`${t('community.title', '🏪 Catalog กลางชุมชน')} — Sovereign OS`}
+        description="สินค้าจากร้านชุมชนที่เข้าร่วมเองในเครือข่าย Sovereign Origin — ค้นหาและกดสินค้าเพื่อไปสั่งซื้อที่ร้านต้นทาง"
+        path="/community"
+        noindex
+      />
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <header className="space-y-1">
           <h1 className="font-ledger text-2xl">{t('community.title', '🏪 Catalog กลางชุมชน')}</h1>

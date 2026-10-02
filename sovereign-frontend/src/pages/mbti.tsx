@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { FounderCredit } from '../components/public/FounderCredit';
+import SeoHead from '../components/public/SeoHead';
 import Sidebar from "../components/layout/Sidebar";
 import PageHeader from "../components/ui/PageHeader";
 import Icon from "../components/ui/Icon";
@@ -550,6 +551,11 @@ export default function MbtiPage() {
 
   return (
     <div className="atmo-mind min-h-screen bg-gray-950 text-gray-100 flex">
+      <SeoHead
+        title="แบบทดสอบบุคลิกภาพ MBTI 16 ประเภท (ทำเอง เก็บเอง) — Sovereign Origin"
+        description="ทดสอบบุคลิกภาพ 16 ประเภทแบบ Local-First — ทำเอง เก็บผลไว้ในเบราว์เซอร์ ไม่ส่งข้อมูลออกนอกเครื่อง พร้อมคลังผลย้อนหลังและเทียบผลสองคน"
+        path="/mbti"
+      />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader

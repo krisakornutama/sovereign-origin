@@ -44,6 +44,10 @@ export default function AboutPage() {
         <meta property="og:title" content="Sovereign Origin — องค์กรไม่แสวงหากำไร" />
         <meta property="og:description" content="เทคโนโลยีเพื่อผู้ผลิตรายย่อย — ก่อตั้งและดูแลโดย กฤษกรณ์ อุตมะ" />
         <meta property="og:type" content="website" />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://sovereignoriginshop.dpdns.org/about/" />
+        <meta property="og:site_name" content="Sovereign Origin" />
+        <meta property="og:url" content="https://sovereignoriginshop.dpdns.org/about/" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'Organization',

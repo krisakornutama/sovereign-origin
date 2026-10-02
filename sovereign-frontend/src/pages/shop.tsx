@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Head from 'next/head';
+import SeoHead from '../components/public/SeoHead';
 import { useRouter } from 'next/router';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
@@ -581,10 +581,12 @@ function ShopFaq() {
 function ShopShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen text-gray-100">
-      <Head>
-        <title>หน้าร้าน — Sovereign</title>
-        <meta name="robots" content="noindex" />
-      </Head>
+      <SeoHead
+        title="หน้าร้าน — Sovereign"
+        description="หน้าร้านสาธารณะของ Sovereign Origin — ชุดอุปกรณ์และซอฟต์แวร์พร้อมบัตรตามรอยการผลิต รองรับการสั่งซื้อออนไลน์"
+        path="/shop"
+        noindex
+      />
       <div className="max-w-3xl mx-auto p-4 md:p-6">{children}</div>
     </div>
   );

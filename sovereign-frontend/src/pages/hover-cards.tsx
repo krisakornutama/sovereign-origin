@@ -5,6 +5,7 @@ import Sparkline from '../components/ui/Sparkline';
 import Icon from '../components/ui/Icon';
 import Sidebar from '../components/layout/Sidebar';
 import { FounderCredit } from '../components/public/FounderCredit';
+import SeoHead from '../components/public/SeoHead';
 import PageHeader from '../components/ui/PageHeader';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
@@ -80,6 +81,11 @@ export default function HoverCardsDemo() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+      <SeoHead
+        title="Hover Cards — Interactive Dashboard Widgets — Sovereign Origin"
+        description="ตัวอย่างการ์ดแดชบอร์ดแบบ interactive — flip 3D, expand ลง, sparkline และปุ่ม action: ส่วนหนึ่งของ design system ที่ใช้จริงในระบบ Sovereign Origin"
+        path="/hover-cards"
+      />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-6 max-w-6xl mx-auto w-full">

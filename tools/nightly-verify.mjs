@@ -77,6 +77,19 @@ try {
   writeFileSync(join(LOGDIR, 'last-run.log'), `runner error: ${err instanceof Error ? err.stack : String(err)}`);
 }
 
+// ── SEO: IndexNow (บอท Bing/Yandex/Seznam/Naver) — ให้รู้ทันทีที่ URL เปลี่ยน (คำสั่งเจ้าของ 2/10/69)
+//  รัน --strict เพื่อให้ exit code สะท้อนผลจริง แต่ไม่มีวันทำ nightly พัง: ผลแค่ไปโชว์ในรายงาน
+let indexnow = null;
+{
+  const r = spawnSync('node', [join(REPO, 'tools', 'indexnow-shop-notify.mjs'), '--strict'], {
+    cwd: REPO, encoding: 'utf8', timeout: 120_000,
+  });
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
+  indexnow = { ok: r.status === 0, last: out[out.length - 1] ?? '' };
+  writeFileSync(join(LOGDIR, 'indexnow.log'), out.join('\n') + '\n');
+  console.log(`🔎 IndexNow: ${indexnow.last || '(ไม่มีผลลัพธ์)'}`);
+}
+
 // ── สถานะรวม (ให้ report + watchdog + หน้าเว็บอ่านต่อ) ──
 // โครง system-truth.json: { ok, steps, prodTruth:{diskFingerprint,...} } — codeMatch/migrationHead
 // ต้องคำนวณเองจาก /api/health (runtime fingerprint) เทียบกับดิสก์
@@ -99,6 +112,7 @@ const status = {
   codeMatch,
   migrationHead,
   steps: truth.steps ?? [],
+  indexnow,
   machine: { ok: machine.ok, problems: machine.problems ?? [], ramFreeGB: machine.info?.ramFreeGB ?? null, diskFreeGB: machine.info?.diskFreeGB ?? null, containers: machine.info?.containers ?? null },
 };
 writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
@@ -127,4 +141,6 @@ try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 // ── สรุป Telegram (สคริปต์แยก — soft-fail) — เก็บ output ไว้พิสูจน์เสมอ (ส่ง/skip/พลาด) ──
 const rep = spawnSync('node', [join(REPO, 'tools', 'nightly-report.mjs'), STATUS], { cwd: REPO, encoding: 'utf8' });
 writeFileSync(join(LOGDIR, 'report.log'), `${rep.stdout ?? ''}\n${rep.stderr ?? ''}`);
-process.exit(ok ? 0 : 1);
+// process.exitCode ไม่ใช่ process.exit: บน Node 24/Windows การ exit ทันทีหลัง fetch
+// (health check ข้างบน) ทำให้ libuv assert → Task Scheduler ได้ 127 แม้งานผ่านจริง
+process.exitCode = ok ? 0 : 1;
