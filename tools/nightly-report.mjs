@@ -50,7 +50,7 @@ const text =
   (s.indexnow ? `\n🔎 IndexNow: ${s.indexnow.ok ? '✓' : '⚠️'} ${s.indexnow.last ?? ''}` : '') +
   (s.seo ? `\n🔎 SEO pre-flight: ${s.seo.ok ? '✓' : '⚠️'} ${s.seo.last ?? ''}` : '') +
   (s.gsc ? `\n🔎 GSC coverage: ${s.gsc.ok ? '✓' : '⚠️'} ${s.gsc.last ?? ''}` : '') +
-  (s.restore ? `\n💾 Backup กู้คืน: ${s.restore.ok ? '✓' : '🚨'} ${s.restore.last ?? ''}` : '') +
+  (s.restore ? `\n💾 Backup กู้คืน: ${s.restore.skipped ? '⏭' : s.restore.ok ? '✓' : '🚨'} ${s.restore.last ?? ''}` : '') +
   // Phase 4: สุขภาพเครื่อง — ปัญหาที่ตรวจก่อนรัน (รู้ก่อนว่า verify อาจพังเพราะสภาพแวดล้อม)
   (Array.isArray(s.machine?.problems) && s.machine.problems.length
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')
