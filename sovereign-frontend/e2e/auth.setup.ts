@@ -8,7 +8,21 @@ import { existsSync, readFileSync } from 'node:fs';
 // ใช้ GET /api/features/me เป็นตัวตรวจ token (เบา, ต้อง auth, SUPERADMIN ตอบ 200)
 
 const STATE_PATH = 'e2e/.auth/state.json';
+const RUN_CREDS_PATH = 'e2e/.auth/creds.json';
 const API_BASE = process.env.E2E_API_URL ?? 'http://localhost:3001';
+
+// รหัสของ "รอบวิ่งนี้" มาจาก e2e/global-setup.ts (สุ่มใหม่ทุกครั้ง แล้วล็อกกลับตอนจบ — ดู global-teardown)
+// ต้องอ่านก่อน .env.playwright เสมอ ไม่งั้นจะไปใช้รหัสเก่าที่บัญชีไม่รับแล้ว (ล้ม 401 เหมือนรอบ nightly ก่อน 2/10)
+function loadRunCreds(): void {
+  try {
+    if (!existsSync(RUN_CREDS_PATH)) return;
+    const j = JSON.parse(readFileSync(RUN_CREDS_PATH, 'utf8')) as { username?: string; password?: string };
+    if (j.username) process.env.E2E_BOT_USER = j.username;
+    if (j.password) process.env.E2E_BOT_PASS = j.password;
+  } catch {
+    // ไฟล์เสีย/ไม่มี = ไปใช้ทางสำรองด้านล่าง
+  }
+}
 
 // self-contained credentials: ถ้า runner ไม่ยัด env (เคสจริง 27/9 — สาย task → nightly-verify →
 // playwright ไม่มีตัวไหนโหลด .env.playwright เลย) → โหลดเองจากไฟล์ (gitignored เสมอ)
@@ -35,6 +49,7 @@ function loadEnvPlaywright(): void {
     }
   }
 }
+loadRunCreds();
 loadEnvPlaywright();
 
 function tokenFromState(): string | null {
@@ -86,8 +101,41 @@ setup('authenticate as e2e-bot', async ({ page, request }) => {
 
   // ── login ผ่าน UI — ลองซ้ำได้ 3 รอบ (เคสจริง 26/9: รอบ 02:15 เครื่องเพิ่งตื่นจาก sleep
   // หน้า dev server/build worker ยังอุ่นไม่สุด → waitForURL 120s timeout = suite ทั้ง 63 spec ไม่ได้รันเลย) ──
+  // ── ลำดับใหม่ 2/10/69: API login ก่อนเสมอ (1 ครั้ง) แล้วค่อย fallback ไป UI ──
+  // เหตุผล: account limiter = 5 ครั้ง/15 นาที ต่อ username (auth.routes.ts) — เดิม UI 3 รอบ + API 1 = 4
+  // ครั้งต่อรอบ กินเกือบเต็มโควตา พอรันซ้ำก่อนครบ 15 นาที = 429 แล้ว suite ทั้งชุดล้ม (เจอจริงรอบนี้)
+  // ตัว login ผ่าน UI ยังถูกทดสอบใน login.spec.ts (project anonymous) เหมือนเดิม
+  let apiLogin = async (why: string): Promise<boolean> => {
+    const res = await request.post(`${API_BASE}/api/auth/login`, {
+      data: { username: process.env.E2E_BOT_USER ?? 'e2e-bot', password: process.env.E2E_BOT_PASS ?? '' },
+      timeout: 15_000,
+    });
+    if (res.status() === 429) {
+      // โดนแล้ว = ทาง UI ก็จะโดนเหมือนกัน (โหมดเดียวกัน) → หยุดทันที ไม่เผาโควตาต่อ
+      throw new Error('โดน rate limit ต่อบัญชี (5 ครั้ง/15 นาที) — รอประมาณ 15 นาทีแล้วรันซ้ำ');
+    }
+    if (!res.ok()) {
+      console.log(`[e2e-setup] API login ${why} ล้ม: HTTP ${res.status()}`);
+      return false;
+    }
+    const j = (await res.json()) as { token?: string };
+    if (!j.token) return false;
+    // localStorage ใช้ไม่ได้บน about:blank (SecurityError) — API-first ไม่ได้ผ่านฟอร์ม UI
+    // จึงต้องพาไปหน้าแอปก่อน 1 ครั้ง (เดิมโหมด fallback ได้ navigate มาแล้วตอนวน UI)
+    if (!page.url().startsWith('http')) await page.goto('/', { timeout: 45_000 });
+    await page.evaluate(
+      ([key, value]) => localStorage.setItem(key, value),
+      ['sovereign-auth', JSON.stringify({ state: { token: j.token }, version: 0 })],
+    );
+    await page.context().storageState({ path: STATE_PATH });
+    console.log('[e2e-setup] API login สำเร็จ — storage state เขียนแล้ว');
+    return true;
+  };
+
+  if (await apiLogin('รอบแรก')) return;
+
   let uiSucceeded = false;
-  for (let attempt = 1; attempt <= 3 && !uiSucceeded; attempt++) {
+  for (let attempt = 1; attempt <= 2 && !uiSucceeded; attempt++) {
     try {
       await page.goto('/', { timeout: 45_000 });
       await page.locator('input[autocomplete="username"]').fill(process.env.E2E_BOT_USER ?? 'e2e-bot');
@@ -101,7 +149,7 @@ setup('authenticate as e2e-bot', async ({ page, request }) => {
       await page.context().storageState({ path: STATE_PATH });
       uiSucceeded = true;
     } catch (e) {
-      if (attempt === 3) break; // ออกจากลูป → ไหลต่อไป fallback API login ด้านล่าง (บั๊กเดิม: throw ที่นี่ทำ fallback ไม่มีวันรัน)
+      if (attempt === 2) break; // ออกจากลูป → ไหลต่อไป fallback API login ด้านล่าง (บั๊กเดิม: throw ที่นี่ทำ fallback ไม่มีวันรัน)
       console.log(`[e2e-setup] login รอบ ${attempt} พลาด (${e instanceof Error ? e.message.split('\n')[0] : e}) — ลองใหม่ใน 15 วิ`);
       await new Promise((r) => setTimeout(r, 15_000));
     }

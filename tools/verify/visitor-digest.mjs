@@ -39,7 +39,8 @@ async function seoBlock() {
       cwd: ROOT, encoding: 'utf8', timeout: 120_000, windowsHide: true,
     });
     const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-    const last = out[out.length - 1] ?? '';
+    // บรรทัดสรุปขึ้นต้นด้วย "indexnow-shop:" (ท้าย ๆ เป็นรายการ URL) — จับจากบรรทัดนั้น ไม่ใช่บรรทัดสุดท้าย
+    const last = out.find((l) => l.startsWith('indexnow-shop:')) ?? out[out.length - 1] ?? '';
     const pingOk = r.status === 0 && last.startsWith('indexnow-shop: ✓');
     let urls = 0;
     try {
@@ -50,6 +51,14 @@ async function seoBlock() {
   } catch (e) {
     return { pingOk: false, sitemapOk: false, urls: 0, err: e?.message ?? String(e) };
   }
+}
+
+/* ผลของ SEO pre-flight + การพิสูจน์ backup จากรอบ nightly ล่าสุด (อ่านไฟล์ ไม่รันซ้ำ)
+   — รายงานรายสัปดาห์ควรเห็นภาพรวม ไม่ใช่แค่ยิง IndexNow ผ่าน */
+function lastCheck(file) {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, 'logs', file), 'utf8'));
+  } catch { return null; }
 }
 
 async function main() {
@@ -107,10 +116,16 @@ async function main() {
     lines.push(`📬 ฟีดแบ็กรอคัดกรอง ${pending} รายการ — เปิด /feedback-admin กด 👍 แล้วยื่นถึงคุณได้`);
   }
 
-  // 5) SEO: sitemap + IndexNow (soft-fail)
+  // 5) SEO: sitemap + IndexNow + ผล pre-flight/backup จาก nightly ล่าสุด (soft-fail)
   const seo = await seoBlock();
+  const seoCheck = lastCheck('seo-preflight.json');
+  const restoreCheck = lastCheck('backup-restore-check.json');
   lines.push('');
   lines.push(`🔎 <b>SEO</b>: sitemap ${seo.sitemapOk ? `${seo.urls} URL` : '⚠️ ตอบไม่ผ่าน'} · IndexNow ${seo.pingOk ? 'ส่งแล้ว ✓' : '⚠️ ยังไม่ผ่าน'}`);
+  lines.push(
+    `ตรวจหน้าเว็บ: ${seoCheck ? (seoCheck.ok ? `ผ่าน ${seoCheck.checked} URL ✓` : `⚠️ ${seoCheck.problems.length} จุด`) : 'ยังไม่ได้ตรวจ'}` +
+      ` · backup: ${restoreCheck ? (restoreCheck.ok ? `กู้คืนได้จริง ✓ (${restoreCheck.dump ?? '-'})` : '⚠️ กู้คืนไม่ได้') : 'ยังไม่ได้ตรวจ'}`
+  );
 
   const text = lines.join('\n');
 

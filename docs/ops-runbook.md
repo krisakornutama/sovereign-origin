@@ -110,10 +110,12 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
   # 3) ปิดโหมด restore
   docker exec sovereign-db psql -U sovereign -d sovereign_restore -Atc "SELECT timescaledb_post_restore()"
   ```
+- **พิสูจน์เองอัตโนมัติ (2/10/69):** `node tools/verify/backup-restore-check.mjs` — กู้ dump ล่าสุดเข้า DB ชั่วคราว `sovereign_restore_check` (อ่านอย่างเดียว · ฐานจริงไม่ถูกแตะ) แล้วเทียบทีละตาราง: ตารางครบไหม · มีตารางไหนแถวมากกว่าฐานจริง (= เพี้ยน) · migration head ตรงไหม → เขียน `logs/backup-restore-check.json` · **รันทุกคืนหลัง verify:full** (ปิดได้ด้วย `NIGHTLY_SKIP_RESTORE=1`) · ผิดปกติ = แจ้ง Telegram เป็นเรื่องด่วน · ผลรอบแรก 2/10: ผ่าน 131/131 ตาราง (TimescaleDB ต้องมี pre/post_restore ตามข้างบน ไม่งั้นล้มที่ `could not find hypertable`)
 
 ## ๖. เส้นตายก่อนเปิดสู่อินเทอร์เน็ต
 
-1. ปิดบัญชี `e2e-bot` (SUPERADMIN, รหัสผ่านอยู่ใน repo)
+1. ปิดบัญชี `e2e-bot` (SUPERADMIN, รหัสผ่านอยู่ใน repo) — **2/10/69 แก้โดยไม่ผ่อนเส้นตาย:** e2e สุ่มรหัสใหม่ตอนเริ่มรัน (`e2e/global-setup.ts` → `core-api e2e-account grant`) แล้วล็อกกลับทันทีตอนจบ (`global-teardown` → `revoke`) = นอกช่วงเทสต์บัญชียังล็อกเหมือนเดิม ไม่มีรหัสที่รู้อยู่ใน repo · ดูวิธีสั่งเอง: `node sovereign-os/core-api/dist/scripts/e2e-account.js grant|revoke e2e-bot`
+   - **ข้อควรรู้:** account limiter = 5 ครั้ง/15 นาที ต่อ username (`auth.routes.ts`) — ถ้ารัน e2e ซ้ำใน 15 นาทีเดียวกันจะโดน 429 (auth.setup ลดเหลือ 1 ครั้งต่อรอบแล้ว แต่รอบที่ 2 ใน 15 นาทียังชน) → ถ้าเจอ 429 ให้รอ 15 นาที หรือ `docker restart sovereign-core-api` เพื่อล้างตัวนับในหน่วยความจำ
 2. ตั้ง CORS เป็นโดเมนจริง + เปิด HTTPS
 3. จำกัดพอร์ต 1883/18083 (MQTT) ไม่ให้โลกภายนอกเห็น
 4. **กติกาคำเคลม (บังคับทุกหน้า/ทุกช่องทาง): โฆษณาเฉพาะสิ่งที่มีโค้ดจริง** — ก่อนเขียนคำเคลมให้เทียบกับ repo จริง: มี service/เทสรองรับหรือไม่ (ตัวอย่างที่ผ่าน: Telegram = มี `telegram-alert.service` + เทสครบ, ออกใบกำกับ = `TaxInvoice.tsx`) · ตัวอย่างที่ถูกตัดแล้ว (18 ก.ย. 2026): LINE (ไม่มีโค้ดเลย), "operating system" (เป็นเว็บแอป+บริการหลังบ้าน) · ที่มาของกติกา + รายการคำที่ตรวจแล้ว: บันทึกใน STATUS.md วันเดียวกัน
