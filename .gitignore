@@ -117,6 +117,8 @@ tools/*
 !tools/frontend-watchdog.mjs
 !tools/normalize-eol.mjs
 !tools/coverage-core.mjs
+!tools/coverage-floor.mjs
+!tools/coverage-floor.json
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
 !tools/frontend-gate.mjs
