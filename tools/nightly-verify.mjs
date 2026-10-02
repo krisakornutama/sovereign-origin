@@ -146,7 +146,10 @@ let gsc = null;
     cwd: REPO, encoding: 'utf8', timeout: 120_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-  gsc = { ok: r.status === 0, last: out.find((l) => l.startsWith('gsc-coverage:')) ?? out[out.length - 1] ?? '' };
+  // เครื่องมือเขียนสถานะตัวเองไว้ใน logs/gsc-coverage.json — อ่านสถานะ "ข้าม" มาให้รายงานโชว์ ⏭ (ไม่ใช่ ✓)
+  let gscSkipped = false;
+  try { gscSkipped = JSON.parse(readFileSync(join(REPO, 'logs', 'gsc-coverage.json'), 'utf8')).skipped === true; } catch { /* ไม่มีไฟล์ = ถือว่าไม่ได้ข้าม */ }
+  gsc = { ok: r.status === 0, skipped: gscSkipped, last: out.find((l) => l.startsWith('gsc-coverage:')) ?? out[out.length - 1] ?? '' };
   writeFileSync(join(LOGDIR, 'gsc-coverage.log'), out.join('\n') + '\n');
   console.log(`🔎 GSC coverage: ${gsc.last}`);
 }
