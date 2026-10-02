@@ -31,6 +31,8 @@ const text =
   `${icon} <b>Nightly Verify ${ok ? 'ผ่าน' : 'ไม่ผ่าน'}</b>${dur}\n` +
   `เกตล่าสุด: ${gate} · fingerprint: ${code}\n` +
   `migration head: <code>${s.migrationHead ?? '—'}</code>${failedLine}` +
+  // P22 (2/10/69): ผล IndexNow ต่อบอท Bing/Yandex — ล้มไม่ทำให้ nightly พัง แต่ต้องเห็นทุกคืน
+  (s.indexnow ? `\n🔎 IndexNow: ${s.indexnow.ok ? '✓' : '⚠️'} ${s.indexnow.last ?? ''}` : '') +
   // Phase 4: สุขภาพเครื่อง — ปัญหาที่ตรวจก่อนรัน (รู้ก่อนว่า verify อาจพังเพราะสภาพแวดล้อม)
   (Array.isArray(s.machine?.problems) && s.machine.problems.length
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')

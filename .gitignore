@@ -103,6 +103,7 @@ tools/*
 !tools/verify.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
+!tools/indexnow-shop-notify.mjs
 !tools/portfolio-preview-server.mjs
 !tools/set-required-checks.sh
 !tools/system-health.mjs

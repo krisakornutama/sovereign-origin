@@ -244,6 +244,13 @@ export default function PartnersPage() {
       <Head>
         <title>แผนที่คู่ค้า — Sovereign Origin</title>
         <meta name="description" content="แผนที่ร้านค้า SME ช่าง และพันธมิตรในเครือข่าย Sovereign Origin — สมัครเข้าร่วมได้" />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://sovereignoriginshop.dpdns.org/partners/" />
+        <meta property="og:site_name" content="Sovereign Origin" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="แผนที่คู้ค้า — Sovereign Origin" />
+        <meta property="og:description" content="แผนที่ร้านค้า SME ช่าง และพันธมิตรในเครือข่าย Sovereign Origin — สมัครเข้าร่วมได้" />
+        <meta property="og:url" content="https://sovereignoriginshop.dpdns.org/partners/" />
       </Head>
 
       <main className="max-w-6xl mx-auto px-4 py-8">

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Head from 'next/head';
+import SeoHead from '../components/public/SeoHead';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
@@ -80,7 +80,11 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <Head><title>สนามทดลอง — Sovereign OS</title></Head>
+      <SeoHead
+        title="สนามทดลอง — Sovereign OS"
+        description="ลองใช้ระบบฟาร์ม ปศุสัตว์ การเงิน ตามรอย ร้านค้า และแคตตาล็อกโมดูลทั้งหมด — ข้อมูลตัวอย่างล้วน ไม่ต้องสมัคร ไม่มีล็อกอินขวาง"
+        path="/demo"
+      />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
         <header className="space-y-1 pt-2">
           <div className="mono text-[10px] tracking-[0.25em] uppercase text-cyan-400/80">สนามทดลองสาธารณะ</div>

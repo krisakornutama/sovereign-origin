@@ -37,6 +37,13 @@ export default function PartnerGuidePage() {
       <Head>
         <title>คู่มือคู่ค้า — Sovereign Origin</title>
         <meta name="description" content="คู่มือพันธมิตร: สิทธิประโยชน์การเป็นคู่ค้า วิธีติดตั้ง QR ป้ายหน้าร้าน และขั้นตอนขอเชื่อมระบบ IoT" />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://sovereignoriginshop.dpdns.org/partners/guide/" />
+        <meta property="og:site_name" content="Sovereign Origin" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="คู่มือคู้ค้า — Sovereign Origin" />
+        <meta property="og:description" content="คู่มือพันธมิตร: สิทธิประโยชน์การเป็นคู้ค้า วิธีติดตั้ง QR ป้ายหน้าร้าน และขั้นตอนขอเชื่อมระบบ IoT" />
+        <meta property="og:url" content="https://sovereignoriginshop.dpdns.org/partners/guide/" />
       </Head>
 
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">

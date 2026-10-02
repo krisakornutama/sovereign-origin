@@ -32,7 +32,9 @@ function buildXml(host: string): string {
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     PUBLIC_PATHS.map(
       (p) =>
-        `  <url><loc>https://${site}${p.path}</loc><lastmod>${lastmod}</lastmod>` +
+        // trailing slash ต้องตรงกับ next.config (trailingSlash: true) และ canonical ใน SeoHead
+        // — ถ้าไม่ใส่ Google เจอ 308 ทุก URL แล้วถือว่า sitemap ไม่ตรงหน้าจริง (พบตอน pre-flight 2/10)
+        `  <url><loc>https://${site}${p.path === '/' ? '/' : `${p.path}/`}</loc><lastmod>${lastmod}</lastmod>` +
         `<changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
     ).join('\n') +
     `\n</urlset>`
