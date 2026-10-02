@@ -243,7 +243,10 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
     const pidNow = findListenerPid(DEV_PORT);
     if (pidNow) {
       console.log(`ℹ️  frontend build ทับ .next ของ prod :3000 (PID ${pidNow}) — restart ก่อน e2e เพื่อ serve build ใหม่`);
-      spawnSync('taskkill', ['/PID', String(pidNow), '/F'], { shell: true, stdio: 'ignore' });
+      // ต้อง /T = kill ทั้งต้นไม้ — `npm run start` spawn ลูก `next start` ที่เป็นตัวถือพอร์ตจริง
+      // (เจอจริง 2/10: kill แค่พ่อ → ลูกยังถือ :3000 → server ใหม่ bind ไม่ได้ → prod ล่ม 502
+      //  และ verify:full หยุดก่อน e2e ทั้งที่ไม่ได้มีอะไรผิดกับโค้ด)
+      spawnSync('taskkill', ['/PID', String(pidNow), '/F', '/T'], { shell: true, stdio: 'ignore' });
       let up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
       if (!up) {
         console.log('   watchdog ยังไม่กู้ — start เองแบบ detached');

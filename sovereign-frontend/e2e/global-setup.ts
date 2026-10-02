@@ -15,6 +15,8 @@ const CREDS_PATH = path.resolve('e2e/.auth/creds.json');
 const CORE_API = path.resolve('..', 'sovereign-os', 'core-api');
 const DIST = path.join(CORE_API, 'dist', 'scripts', 'e2e-account.js');
 const SRC = path.join(CORE_API, 'src', 'scripts', 'e2e-account.ts');
+const FIXTURE_DIST = path.join(CORE_API, 'dist', 'scripts', 'e2e-fixture.js');
+const FIXTURE_SRC = path.join(CORE_API, 'src', 'scripts', 'e2e-fixture.ts');
 
 function accountScript(args: string[]): string {
   if (existsSync(DIST)) return execFileSync('node', [DIST, ...args], { cwd: CORE_API, encoding: 'utf8', timeout: 120_000, windowsHide: true }).trim();
@@ -22,7 +24,24 @@ function accountScript(args: string[]): string {
   return execFileSync('npx', ['tsx', SRC, ...args], { cwd: CORE_API, encoding: 'utf8', timeout: 180_000, windowsHide: true }).trim();
 }
 
+/** รันสคริปต์ฝั่ง backend (dist ถ้ามี ไม่งั้น tsx) — ใช้ร่วมกับ account + fixture */
+export function coreScript(distPath: string, srcPath: string, args: string[]): string {
+  const cmd = existsSync(distPath) ? 'node' : 'npx';
+  const argv = existsSync(distPath) ? [distPath, ...args] : ['tsx', srcPath, ...args];
+  return execFileSync(cmd, argv, { cwd: CORE_API, encoding: 'utf8', timeout: 180_000, windowsHide: true }).trim();
+}
+
 export default async function globalSetup(): Promise<void> {
+  // ข้อมูลจำลองสำหรับหน้า /community (สร้างตอนรัน · ลบตอนจบที่ global-teardown)
+  // ปกติเทสต์ไม่ต้องการข้อมูลปลอม แต่ถ้าล้มจะได้แก้ทีหลัง — จึงล้มเหลวแบบ soft
+  if (process.env.E2E_SKIP_FIXTURE !== '1') {
+    try {
+      console.log('[e2e-global] สร้างข้อมูลตัวอย่าง /community…');
+      console.log('  ' + coreScript(FIXTURE_DIST, FIXTURE_SRC, ['seed']));
+    } catch (e) {
+      console.error('[e2e-global] seed fixture ไม่สำเร็จ:', e instanceof Error ? e.message : e);
+    }
+  }
   // เคารพค่าที่ runner ยัดมา (ทดสอบเอง) — ถ้าไม่มีค่า = ปล่อยบัญชีให้เทสต์
   if (process.env.E2E_SKIP_ACCOUNT_SETUP === '1') {
     console.log('[e2e-global] E2E_SKIP_ACCOUNT_SETUP=1 — ไม่แตะบัญชี (ต้องมี E2E_BOT_USER/PASS ที่ใช้ได้เอง)');
