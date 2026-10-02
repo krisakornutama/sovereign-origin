@@ -115,6 +115,7 @@ tools/*
 !tools/vhdx-compact.ps1
 !tools/register-vhdx-compact-task.ps1
 !tools/frontend-watchdog.mjs
+!tools/normalize-eol.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
