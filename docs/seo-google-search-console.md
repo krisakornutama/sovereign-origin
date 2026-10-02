@@ -32,6 +32,44 @@
 - **เรียกเองได้:** `node tools/indexnow-shop-notify.mjs --dry-run` (พิมพ์รายการ ไม่ยิง) · `--strict` (ล้ม = exit 1)
 - **ฝั่ง Google:** endpoint ping sitemap ของ Google **ถูกปิดตั้งแต่ มิ.ย. 2023** (ยืนยันแล้ว 2/10/69) — วิธีเดียวที่เหลือคือ Submit sitemap ใน GSC + Google จะมาอ่านซ้ำเอง (IndexNow ไม่ครอบ Google)
 
+### เฝ้าว่า Google "เห็น" หน้าไหนจริง — GSC coverage (เพิ่ม 2/10/69)
+
+> **ค้างรอเจ้าของ:** ยังใช้ไม่ได้จนกว่าจะ (1) ได้ค่า TXT มา Verify และ (2) ใส่ credential ด้านล่าง
+> ระหว่างนี้เครื่องมือ **ข้ามแบบเงียบ + exit 0** = ไม่ทำให้ nightly แดง ไม่กวนทุกคืน
+
+ทำไมต้องมีอีก (นี่คือช่องว่างของ SEO pre-flight): pre-flight ตรวจว่า *หน้าเว็บ* พร้อม (200 + title + canonical + ไม่มี noindex) แต่ไม่รู้ว่า *Google เข้ามาแล้วหรือยัง* — เคยเจอบั๊กแบบ sitemap ประกาศ 10 หน้า แต่ Google ไม่เข้ามาเลย และเคยเจอหน้าที่มี traffic แล้วหลุดวง (canonical ผิด / noindex ซ้อน / ถูก WAF บล็อก) โดยไม่มีอะไรเตือน
+
+- **`tools/verify/gsc-coverage.mjs`** — ถาม Search Analytics API 2 หน้าต่าง (28 วันล่าสุด vs 28 วันก่อน) แล้วเทียบกับ sitemap จริงจากโดเมน:
+  1. API เข้าถึง property ได้ (ถ้าไม่ได้ = ค่า TXT หลุด/โดนลบ → แจ้งเตือน)
+  2. **หน้าที่เคยมี impression แล้วหายไป** = regression → แจ้งเตือน (สำคัญที่สุด)
+  3. หน้าที่ Google เข้ามาแต่ไม่อยู่ใน sitemap (orphan) → แจ้งเตือน
+  4. หน้าใน sitemap ที่ยังไม่เคยมี impression = ข้อมูลเท่านั้น ไม่ร้อง (เว็บใหม่ยังไม่มี traffic = ปกติ)
+- **ถ้ามีปัญหา** ส่ง Telegram เฉพาะตอนพัง (เหมือน seo-preflight) · ผลเขียน `logs/gsc-coverage.json` เสมอ
+- **ผูกแล้ว:** `tools/nightly-verify.mjs` (ทุกคืน 02:00 หลัง seo-preflight) + บรรทัดในสรุป Telegram
+- **เทสต์ตรรกะ:** `node tools/test/gsc-coverage.test.mjs` (9 เคส — เคยจับบั๊กจริง: เอา URL ดิบไปเทียบกับชุดที่ normalize แล้ว = ทุกหน้ากลายเป็น orphan ร้องทุกคืน)
+- **เรียกเองได้:** `node tools/verify/gsc-coverage.mjs` (พิมพ์สรุป) · `--strict` (ล้ม = exit 1) · `--test` (พิมพ์ข้อความ TG ไม่ส่งจริง) · `--days 28`
+
+**ตั้งค่า credential (ทำครั้งเดียว หลัง Verify สำเร็จ):**
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → เลือก/สร้างโปรเจกต์ → **APIs & Services → Library** → เปิด **Search Console API**
+2. เมนู OAuth consent screen → ตั้งเป็น External + เติมอีเมลตัวเองเป็น Test user
+3. **Credentials → Create Credentials → OAuth client ID → Application type: Desktop app**
+4. รัน consent ครั้งเดียวเพื่อเอา refresh token (เปิดลิงก์นี้ในเบราว์เซอร์ แล้วเลือก scope `https://www.googleapis.com/auth/webmasters.readonly`):
+
+```
+https://accounts.google.com/o/oauth2/auth?client_id=<CLIENT_ID>&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fwebmasters.readonly&response_type=code&access_type=offline&prompt=consent
+```
+
+5. เอา `code` ที่ได้ไปแลก refresh token:
+
+```bash
+curl -s -X POST https://oauth2.googleapis.com/token \
+  -d "client_id=<CLIENT_ID>&client_secret=<CLIENT_SECRET>&code=<CODE>&grant_type=authorization_code&redirect_uri=urn:ietf:wg:oauth:2.0:oob"
+```
+
+6. ใส่ 3 ค่านั้นใน `sovereign-os/infra/.env` (`GSC_CLIENT_ID` · `GSC_CLIENT_SECRET` · `GSC_REFRESH_TOKEN` · ถ้าต้อง `GSC_SITE_URL=sc-domain:sovereignoriginshop.dpdns.org`)
+7. พิสูจน์: `node tools/verify/gsc-coverage.mjs` → ต้องเห็นบรรทัด `· clicks … → … · impressions … → …` (ถ้ายังไม่มีข้อมูลจะเป็น 0 → 0 ปกติในเดือนแรก)
+
 ## คู่มือแก้ WAF โดเมนเดิม — ทำครั้งเดียวใน dashboard (~5 นาที)
 
 เป้าหมาย: ให้ `/sitemap.xml` + `/robots.txt` ผ่าน โดย **ไม่แตะส่วนอื่นของ rule เดิม** (ห้ามวาง expression ทับทั้งก้อน — rule จริงบน zone มี /partners /about /api/track ฯลฯ เพิ่มมาแล้ว ถ้าวางทับจะเผลอปิดเส้นที่เปิดไว้)
