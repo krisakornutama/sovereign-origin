@@ -111,6 +111,8 @@ tools/*
 !tools/ops-status.mjs
 !tools/docker-watchdog.mjs
 !tools/register-docker-watch.ps1
+!tools/vhdx-compact.ps1
+!tools/register-vhdx-compact-task.ps1
 !tools/frontend-watchdog.mjs
 !tools/coverage-core.mjs
 !tools/mock-api-preview.mjs

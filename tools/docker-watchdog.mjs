@@ -16,6 +16,8 @@ const MAIN_ROOT = (() => {
   return i > 3 ? REPO.slice(0, i).replace(/[\\/]+$/, '') : REPO;
 })();
 const KILL_SWITCH = join(MAIN_ROOT, 'sovereign-os/core-api/data/docker-watchdog.disabled');
+// marker จาก vhdx-compact.ps1 — daemon ที่ตื่นรอบนี้ถูกปิดตั้งใจเพื่อ compact vhdx (ข้อความ TG จะบอกแบบนั้น + ตัวเลขพื้นที่)
+const COMPACT_MARKER = join(MAIN_ROOT, '.freebuff', 'vhdx-compact.window');
 const LOG = join(MAIN_ROOT, 'logs', 'docker-watchdog.jsonl');
 
 const CONTAINERS = ['sovereign-db', 'sovereign-core-api', 'sovereign-emqx'];
@@ -106,6 +108,17 @@ const entry = { action, ok: ok && healthy, detail, healthy, ms: Date.now() - t0 
 log(entry);
 console.log(JSON.stringify(entry));
 if (action === 'daemon-restart' && ok && healthy) {
-  notify(`🤖 Sovereign Docker Watchdog — Docker daemon ดับ แล้วระบบบูตกลับมาเอง\n${detail}\nhealthz 200 · รวม ${Math.round(entry.ms / 1000)} วิ`);
+  // vhdx compact รายสัปดาห์ปิด daemon เอง — marker อายุ < 2 ชม. = ใช้ข้อความ compact + ตัวเลขพื้นที่จากสคริปต์
+  let compactNote = '';
+  try {
+    const st = fs.statSync(COMPACT_MARKER);
+    if (Date.now() - st.mtimeMs < 2 * 3_600_000) {
+      compactNote = fs.readFileSync(COMPACT_MARKER, 'utf8').trim().split(/\r?\n/)[0].slice(0, 300);
+    }
+    fs.unlinkSync(COMPACT_MARKER);
+  } catch { /* ไม่มี marker = แจ้งแบบปกติ */ }
+  notify(compactNote
+    ? `🧹 Sovereign VHDX compact รายสัปดาห์ — ปิด Docker ชั่วคราวเพื่อคืนพื้นที่ แล้วบูตกลับเอง\n${compactNote}\n${detail} · healthz 200 · รวม ${Math.round(entry.ms / 1000)} วิ`
+    : `🤖 Sovereign Docker Watchdog — Docker daemon ดับ แล้วระบบบูตกลับมาเอง\n${detail}\nhealthz 200 · รวม ${Math.round(entry.ms / 1000)} วิ`);
 }
 process.exit(entry.ok ? 0 : 1);
