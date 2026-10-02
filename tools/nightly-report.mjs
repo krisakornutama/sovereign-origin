@@ -33,6 +33,8 @@ const text =
   `migration head: <code>${s.migrationHead ?? '—'}</code>${failedLine}` +
   // P22 (2/10/69): ผล IndexNow ต่อบอท Bing/Yandex — ล้มไม่ทำให้ nightly พัง แต่ต้องเห็นทุกคืน
   (s.indexnow ? `\n🔎 IndexNow: ${s.indexnow.ok ? '✓' : '⚠️'} ${s.indexnow.last ?? ''}` : '') +
+  (s.seo ? `\n🔎 SEO pre-flight: ${s.seo.ok ? '✓' : '⚠️'} ${s.seo.last ?? ''}` : '') +
+  (s.restore ? `\n💾 Backup กู้คืน: ${s.restore.ok ? '✓' : '🚨'} ${s.restore.last ?? ''}` : '') +
   // Phase 4: สุขภาพเครื่อง — ปัญหาที่ตรวจก่อนรัน (รู้ก่อนว่า verify อาจพังเพราะสภาพแวดล้อม)
   (Array.isArray(s.machine?.problems) && s.machine.problems.length
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')

@@ -1,6 +1,8 @@
-# Sovereign Origin — sovereignoriginshop.dpdns.org (ACTIVE) + sovereign-shop.dpdns.org (รอ NS/Active 1/10)
+# Sovereign Origin — sovereignoriginshop.dpdns.org (ACTIVE 30/9/69)
+# ตัดบรรทัด Sitemap ของ sovereign-shop.dpdns.org ออก 2/10/69 — โฮสต์นั้นยังไม่มีตัวตนจริง
+#   (NXDOMAIN ที่ parent) Google จะ fetch แล้ว error ในรายงาน GSC = สัญญาณรกที่ไม่มีประโยชน์
+#   ตอนจดชื่อจริง+ตั้ง NS แล้ว (ops-runbook §สิบ "โซนที่สอง") ให้เพิ่มบรรทัด Sitemap ของโฮสต์นั้นกลับท้ายไฟล์นี้
 User-agent: *
 Allow: /
 
 Sitemap: https://sovereignoriginshop.dpdns.org/sitemap.xml
-Sitemap: https://sovereign-shop.dpdns.org/sitemap.xml

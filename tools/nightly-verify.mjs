@@ -85,9 +85,37 @@ let indexnow = null;
     cwd: REPO, encoding: 'utf8', timeout: 120_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-  indexnow = { ok: r.status === 0, last: out[out.length - 1] ?? '' };
+  indexnow = { ok: r.status === 0, last: out.find((l) => l.startsWith('indexnow-shop:')) ?? out[out.length - 1] ?? '' };
   writeFileSync(join(LOGDIR, 'indexnow.log'), out.join('\n') + '\n');
   console.log(`🔎 IndexNow: ${indexnow.last || '(ไม่มีผลลัพธ์)'}`);
+}
+
+// ── SEO pre-flight: ทุก URL ใน sitemap ยัง 200 + title/description/canonical ครบไหม (2/10/69) ──
+let seo = null;
+{
+  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'seo-preflight.mjs'), '--strict'], {
+    cwd: REPO, encoding: 'utf8', timeout: 180_000,
+  });
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
+  seo = { ok: r.status === 0, last: out.find((l) => l.startsWith('seo-preflight:')) ?? out[out.length - 1] ?? '' };
+  writeFileSync(join(LOGDIR, 'seo-preflight.log'), out.join('\n') + '\n');
+  console.log(`🔎 SEO pre-flight: ${seo.last}`);
+}
+
+// ── Backup: พิสูจน์ว่า dump ล่าสุดกู้คืนได้จริง (กู้เข้า DB ชั่วคราวแล้วลบทิ้ง ไม่แตะ DB จริง) ──
+// ปิดได้ด้วย NIGHTLY_SKIP_RESTORE=1 (ถ้าเครื่องหนัก) · ค่าดีฟอลต์ = รันทุกคืน เพราะไฟล์ backup ที่กู้ไม่ได้
+// = สำรองที่ใช้ไม่ได้ตอนฉุกเฉิน ซึ่งจะรู้ตัวทันทีไม่ได้ถ้าไม่ลอง
+let restore = null;
+if (process.env.NIGHTLY_SKIP_RESTORE === '1') {
+  console.log('⏭ ข้ามการพิสูจน์ backup (NIGHTLY_SKIP_RESTORE=1)');
+} else {
+  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'backup-restore-check.mjs'), '--strict'], {
+    cwd: REPO, encoding: 'utf8', timeout: 900_000,
+  });
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
+  restore = { ok: r.status === 0, last: out.find((l) => l.startsWith('backup-restore-check:')) ?? out[out.length - 1] ?? '' };
+  writeFileSync(join(LOGDIR, 'backup-restore-check.log'), out.join('\n') + '\n');
+  console.log(`💾 Backup restore-check: ${restore.last}`);
 }
 
 // ── สถานะรวม (ให้ report + watchdog + หน้าเว็บอ่านต่อ) ──
@@ -113,6 +141,8 @@ const status = {
   migrationHead,
   steps: truth.steps ?? [],
   indexnow,
+  seo,
+  restore,
   machine: { ok: machine.ok, problems: machine.problems ?? [], ramFreeGB: machine.info?.ramFreeGB ?? null, diskFreeGB: machine.info?.diskFreeGB ?? null, containers: machine.info?.containers ?? null },
 };
 writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
