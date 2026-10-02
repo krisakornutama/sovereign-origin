@@ -9,11 +9,20 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
-import { existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync, mkdirSync, openSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
+// โฟลเดอร์ที่ “deploy จริง” = รากโปรเจกตหลัก เสมอ (docker mount core-api จากที่นี่ ไม่ใช่จาก worktree)
+// เคสจริง 2/10/69: verify:full รันใน worktree → เทียบ fingerprint ของ build ใน worktree กับ runtime ที่
+// serve จาก MAIN = ต่างกันเสมอ เพราะ checkout สองที่ได้ EOL ต่างกัน (autocrlf=true) → ไฟล์ .ts 2 ไฟล์
+// ต่างกัน 21 ไบต์ → gate ล้มทั้งที่โค้ดเหมือนกันเป๊ะ · จึงต้องเทียบกับดิสก์ที่ deploy จริงเสมอ
+const MAIN_ROOT = (() => {
+  const i = ROOT.indexOf('.freebuff');
+  return i > 3 ? ROOT.slice(0, i).replace(/[\\/]+$/, '') : ROOT;
+})();
+const DEPLOY_BACKEND = join(MAIN_ROOT, 'sovereign-os', 'core-api');
 const FRONTEND = join(ROOT, '..', 'sovereign-frontend');
 const BACKEND = join(ROOT, '..', 'sovereign-os', 'core-api');
 const RUN_E2E = process.argv.includes('--e2e');
@@ -43,7 +52,7 @@ if (RUN_E2E) {
   // — อยู่ในกลุ่ม e2e เพราะต้องรัน "หลัง build ทั้งหมด" (e2eSteps ถูกเรียกหลังสองสาย build เสร็จ)
   //   และต้องมี backend :3001 รันอยู่ (ใช้เงื่อนไข backend-alive เดียวกันกับ Playwright — backend ไม่ขึ้น = ข้ามพร้อมกัน)
   // เคสจริงที่จุดกำเนิด: prod รัน build ของ 21 ก.ย. ทั้งที่โค้ดใหม่มาแล้ว 2 วัน — ไม่มีใครรู้จนไปเจอเอง
-  steps.push({ name: 'e2e: prod-truth (disk ↔ runtime fingerprint)', cwd: ROOT, cmd: 'node', args: ['prod-truth.mjs', '--dir', join(BACKEND, 'dist')], e2e: true, shell: false });
+  steps.push({ name: 'e2e: prod-truth (disk ↔ runtime fingerprint)', cwd: ROOT, cmd: 'node', args: ['prod-truth.mjs', '--dir', join(DEPLOY_BACKEND, 'dist')], e2e: true, shell: false });
   steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'], e2e: true });
 }
 
@@ -141,6 +150,45 @@ async function backendAlive() {
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
+}// ── กู้ prod :3000 เอง (หลัง taskkill) ──
+// เคสจริง 2/10/69: verify kill prod แล้ว "start เอง" ไม่ขึ้น — watchdog ไม่กู้ใน 90 วิ และ
+// spawn('cmd',['/c','npm run start'], stdio:'ignore') + unref ก็เงียบหายจนไม่มีอะไรให้ดู
+// → 3 ชั้นกันซ้ำ: (ก) รอพอร์ตว่างจริงก่อน (ลูก npm พ่อค้างหลัง kill = bind ไม่ได้ EADDRINUSE)
+//   (ข) บันทึก stdout/stderr ลง logs/frontend-restart.log เสมอ = ตายเพราะอะไรเห็นเอง
+//   (ค) พยายามซ้ำ 3 รอบ แต่ละรอบรอสั้น (ไม่รอ 90 วิ ตอน watchdog เพราะเรารู้วิธีบูตเองอยู่แล้ว)
+const RESTART_LOG = join(ROOT, '..', 'logs', 'frontend-restart.log');
+
+function bootProdFrontend(frontendDir) {
+  try {
+    mkdirSync(dirname(RESTART_LOG), { recursive: true });
+    // เขียนหัวก่อนเสมอ — ถ้า process ตายเงียบจะได้เห็นว่า "พยายามบูตจากโฟลเดอร์ไหน เมื่อไหร่"
+    appendFileSync(RESTART_LOG, `\n[${new Date().toISOString()}] boot prod :${DEV_PORT} ← ${frontendDir}\n`);
+  } catch { /* logs เขียนไม่ได้ = บูตต่อ */ }
+  const fd = openSync(RESTART_LOG, 'a');
+  const child = spawn('cmd', ['/c', 'npm', 'run', 'start', '--', '-p', String(DEV_PORT)], {
+    cwd: frontendDir, detached: true, windowsHide: true, stdio: ['ignore', fd, fd],
+  });
+  child.unref();
+  child.on('error', (e) => { try { appendFileSync(RESTART_LOG, `[spawn error] ${e.message}\n`); } catch { /* ignore */ } });
+  return child;
+}
+
+// รอจนไม่มีใครฟังพอร์ต (process เก่าอาจค้างอยู่หลัง kill อีกสิบวินาที)
+function waitPortFree(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (!findListenerPid(port) || Date.now() > deadline) return resolve(true);
+      setTimeout(tick, 1000);
+    };
+    tick();
+  });
+}
+
+function restartLogTail(lines = 15) {
+  try {
+    return readFileSync(RESTART_LOG, 'utf8').trim().split('\n').slice(-lines).join('\n');
+  } catch { return '(ยังไม่มี log — process อาจไม่ได้ถูก spawn เลย)'; }
 }
 
 // รอ server ตอบ HTTP ได้ (status ใด ๆ ก็ได้ — frontend เปิด trailingSlash: /api/health ตอบ 308,
@@ -239,6 +287,9 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
   if (RUN_E2E && devIsProd === null && findListenerPid(DEV_PORT)) {
     console.log(`⚠️  ระบุชนิดของ server :${DEV_PORT} ไม่ได้ — ไม่ restart อัตโนมัติ ถ้า e2e พังเรื่อง chunk ให้ restart :3000 เองก่อนรันใหม่`);
   }
+  if (RUN_E2E && MAIN_ROOT !== ROOT) {
+    console.log(`ℹ️  รันจาก worktree — prod-truth จะเทียบกับ dist ของ deploy root (${DEPLOY_BACKEND}) ไม่ใช่ dist ของ worktree`);
+  }
   if (RUN_E2E && devIsProd === true) {
     const pidNow = findListenerPid(DEV_PORT);
     if (pidNow) {
@@ -247,14 +298,20 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
       // (เจอจริง 2/10: kill แค่พ่อ → ลูกยังถือ :3000 → server ใหม่ bind ไม่ได้ → prod ล่ม 502
       //  และ verify:full หยุดก่อน e2e ทั้งที่ไม่ได้มีอะไรผิดกับโค้ด)
       spawnSync('taskkill', ['/PID', String(pidNow), '/F', '/T'], { shell: true, stdio: 'ignore' });
-      let up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
+      const home = `http://localhost:${DEV_PORT}/`;
+      // watchdog ของเครื่องมีตารางเวลาเอง — รอได้ไม่นาน ไม่งั้นเสียเวลา e2e ไปกับการรอ
+      let up = await waitHttpAlive(home, 20_000);
       if (!up) {
-        console.log('   watchdog ยังไม่กู้ — start เองแบบ detached');
-        spawn('cmd', ['/c', 'npm run start'], { cwd: FRONTEND, detached: true, windowsHide: true, stdio: 'ignore' }).unref();
-        up = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
+        for (let attempt = 1; attempt <= 3 && !up; attempt++) {
+          await waitPortFree(DEV_PORT, 20_000);
+          console.log(`   watchdog ยังไม่กู้ — boot prod เองครั้งที่ ${attempt}/3 (log: logs/frontend-restart.log)`);
+          bootProdFrontend(FRONTEND);
+          up = await waitHttpAlive(home, attempt === 3 ? 90_000 : 45_000);
+        }
       }
       if (!up) {
-        console.error(`❌ prod :${DEV_PORT} กลับมาไม่ได้หลัง restart — หยุดก่อน e2e (ตรวจ frontend-watchdog/manual)`);
+        console.error(`❌ prod :${DEV_PORT} กลับมาไม่ได้หลัง restart (ลอง 3 ครั้ง) — หยุดก่อน e2e`);
+        console.error(`   หาง log ของ process ที่พยายามบูต:\n${restartLogTail()}`);
         process.exit(1);
       }
       console.log('   prod serve build ใหม่แล้ว ✅');
@@ -279,6 +336,29 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
       process.exit(1);
     }
   }
+
+  // ── คืน prod :3000 ให้ MAIN ถ้าตอนนี้มัน serve จาก worktree ──
+  // e2e ต้องการ build ใหม่ของ worktree แต่ build นั้นอยู่ในโฟลเดอร์ชั่วคราว — ปล่อยไว้เสี่ยง
+  // โดเมนจริง 502 ตอน worktree หาย · จึง kill ตัว worktree แล้วบูต build ของ MAIN กลับเข้าที่
+  // (เช็กจากผู้ฟังพอร์ตจริง ไม่ใช่ "เราบูตหรือเปล่า" — เคสรอบก่อน watchdog กู้เองก็ต้องคืนพอร์ตเหมือนกัน)
+  {
+    const mainFe = join(MAIN_ROOT, 'sovereign-frontend');
+    const pid = findListenerPid(DEV_PORT);
+    const fromWorktree = pid ? (processCmdlineWithParent(pid) || '').includes('worktrees') : false;
+    if (!fromWorktree) {
+      // ไม่ต้องคืนพอร์ต (MAIN เสิร์ฟอยู่แล้ว หรือไม่มีใครฟัง)
+    } else if (!existsSync(join(mainFe, '.next', 'BUILD_ID'))) {
+      console.warn(`⚠️  prod :${DEV_PORT} ยัง serve จาก worktree — MAIN ยังไม่มี build (${mainFe}/.next) · watchdog จะกู้เองเมื่อ worktree หาย`);
+    } else {
+      spawnSync('taskkill', ['/PID', String(pid), '/F', '/T'], { shell: true, stdio: 'ignore' });
+      await waitPortFree(DEV_PORT, 30_000);
+      bootProdFrontend(mainFe);
+      const back = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);
+      console.log(back
+        ? `   คืน prod :${DEV_PORT} ให้ MAIN แล้ว ✅ (serve build หลักของโปรเจก)`
+        : `⚠️  คืน prod :${DEV_PORT} ให้ MAIN ไม่สำเร็จ — watchdog จะกู้เอง\n${restartLogTail()}`);
+    }
+  }
 }
 
 const mins = ((Date.now() - t0) / 60000).toFixed(1);
@@ -295,14 +375,15 @@ try {
   let diskFp = null, diskFiles = null;
   try {
     const { computeDirFingerprintSync } = await import('./fingerprint-lib.mjs');
-    const disk = computeDirFingerprintSync(join(BACKEND, 'dist'));
+    // โฟลเดอร์ที่ deploy จริง (docker mount) — ไม่ใช่ dist ของ worktree (ดู MAIN_ROOT ด้านบน)
+    const disk = computeDirFingerprintSync(join(DEPLOY_BACKEND, 'dist'));
     diskFp = disk.fingerprint; diskFiles = disk.files;
   } catch { /* dist ไม่มี = ไม่มีข้อมูลเทียบ */ }
   writeFileSync(truthPath, JSON.stringify({
     writtenAt: new Date().toISOString(),
     ok: results.every((r) => r.ok),
     steps: results.map((r) => ({ name: r.name, ok: r.ok, skipped: !!r.skipped })),
-    prodTruth: { diskFingerprint: diskFp, diskFiles, diskDir: 'sovereign-os/core-api/dist' },
+    prodTruth: { diskFingerprint: diskFp, diskFiles, diskDir: 'sovereign-os/core-api/dist (deploy root)' },
     _prevProdTruth: prodTruth,
   }, null, 2) + '\n', 'utf8');
   console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${results.every((r) => r.ok)})`);
