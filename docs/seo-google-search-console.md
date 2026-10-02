@@ -7,6 +7,31 @@
 
 **✅ แก้แล้ว 2/10/69 ตี 4 — พิสูจน์ 200 ทั้งคู่** (เดิมตอบ 403 จาก WAF เพราะ 2 path ไม่อยู่ใน allowlist) — แก้จริงด้วยการเติม `or http.request.uri.path in {"/robots.txt" "/sitemap.xml"}` ก่อน `)` ปิดสุดท้ายของ rule `Public-only: block admin/internal paths` ผ่าน API (PUT ruleset 200) · ตรวจซ้ำ: sitemap **200** · robots **200** · home 200 · /dashboard 403 ปกติ · คู่มือข้างล่างยังใช้ได้ถ้าต้องทำซ้ำ/โซนใหม่
 
+## ✅ Pre-flight ก่อน Verify — ตรวจจริง 2/10/69 (P22)
+
+ตรวจทุก URL ใน sitemap ผ่านโดเมนจริงด้วย UA ของ Googlebot: **10/10 ตอบ 200** และมีครบทุกตัว
+
+| เช็ค | ผล |
+|---|---|
+| `<title>` | 10/10 มี (เดิม home + mbti + sensors + hover-cards **ไม่มีเลย**) |
+| `meta description` | 10/10 มี |
+| `rel=canonical` | 10/10 (เดิม **ไม่มีหน้าไหนเลย**) ทุกตัวชี้ `https://sovereignoriginshop.dpdns.org/...` + trailing slash ให้ตรง `trailingSlash: true` |
+| `meta robots` | 8/10 = `index,follow` · **2 ตัวยัง `noindex`** = `/shop/` กับ `/community/` (ดูข้อค้างด้านล่าง) |
+| OG (title/desc/url/site_name) | 10/10 (เดิมมีแค่ `/about`) |
+| JSON-LD | `/` = WebSite · `/about` = Organization + founder (เดียวพอสำหรับ entity ของเจ้าของ ไม่ต้องใส่ทุกหน้า) |
+| sitemap.xml | 10 URL **มี trailing slash แล้ว** (เดิมไม่มี → ทุก URL โดน 308 เพราะ `trailingSlash: true` = Google นับว่า sitemap ไม่ตรงหน้าจริง) |
+| robots.txt | 200 · `Allow: /` + บรรทัด `Sitemap:` ถูกต้อง |
+| WAF | rule เดียว `not(public …)` action=Block · **Bot Fight Mode = ปิด** · Security Level = medium · `/dashboard/` `/api/auth/login` = **403** ตามต้องการ · ไฟล์คีย์ IndexNow อยู่ใน allowlist แล้ว |
+
+**ยังค้าง 2 อย่าง (ไม่ใช่บล็อกการ Verify):** (1) ค่า TXT จาก GSC ยังไม่ได้รับ — Verify ทำไม่ได้จนเจ้าของส่งค่ามา (2) `/shop/` กับ `/community/` ยังตั้ง `noindex` อยู่ทั้งที่อยู่ใน sitemap — ต้องตัดสินใจ (ถ้า Verify ไปแล้ว GSC จะขึ้นเตือนเรื่องนี้ในรายงาน "หน้าเว็บที่ไม่ได้ทำดัชนี")
+
+### ให้บอทรู้ทันทีที่ URL เปลี่ยน (ผูก nightly/weekly แล้ว 2/10/69)
+
+- **`tools/indexnow-shop-notify.mjs`** — ยิง IndexNow (`api.indexnow.org` → Bing/Yandex/Seznam/Naver) โดยอ่านคีย์จริงจาก `sovereign-frontend/public/<32hex>.txt` และ URL จริงจาก sitemap ที่เว็บตอบ · **ต้องเห็นไฟล์คีย์ตอบ 200 + เนื้อหาตรงก่อนถึงยิง** (กันยิงแล้วถูกปฏิเสธ) · fail-safe exit 0 เสมอ
+- **เรียกอัตโนมัติ:** `tools/nightly-verify.mjs` (ทุกคืน 02:00 หลัง verify) + `tools/verify/visitor-digest.mjs` (รายสัปดาห์) · ผลไปโชว์ในสรุป Telegram ของ nightly และ digest · log: `logs/indexnow-shop.log` + `logs/indexnow-shop-last.json`
+- **เรียกเองได้:** `node tools/indexnow-shop-notify.mjs --dry-run` (พิมพ์รายการ ไม่ยิง) · `--strict` (ล้ม = exit 1)
+- **ฝั่ง Google:** endpoint ping sitemap ของ Google **ถูกปิดตั้งแต่ มิ.ย. 2023** (ยืนยันแล้ว 2/10/69) — วิธีเดียวที่เหลือคือ Submit sitemap ใน GSC + Google จะมาอ่านซ้ำเอง (IndexNow ไม่ครอบ Google)
+
 ## คู่มือแก้ WAF โดเมนเดิม — ทำครั้งเดียวใน dashboard (~5 นาที)
 
 เป้าหมาย: ให้ `/sitemap.xml` + `/robots.txt` ผ่าน โดย **ไม่แตะส่วนอื่นของ rule เดิม** (ห้ามวาง expression ทับทั้งก้อน — rule จริงบน zone มี /partners /about /api/track ฯลฯ เพิ่มมาแล้ว ถ้าวางทับจะเผลอปิดเส้นที่เปิดไว้)
@@ -17,6 +42,7 @@
    ```
     or http.request.uri.path in {"/robots.txt" "/sitemap.xml"}
    ```
+   (ถ้าเป็นโซนใหม่/ทำซ้ำ — expression **จริง** บนโซนเดิม ณ2/10/69 อยู่ใน ops-runbook §สิบ ขั้น 5 · คัดมาวางทั้งก้อนแทนการเติมบวก ก็ได้ถ้าเป็นโซนที่ยังไม่มี rule)
 4. กด **Deploy**
    - ⚠️ **Deploy โดน challenge เงียบ (เจอจริง 2 ครั้ง 1/10-2/10):** ถ้า Deploy แล้วผลยัง 403 → **ทางเลือก (ง่ายกว่า):** เพิ่ม custom rule **ใหม่** ชื่อ `Allow sitemap/robots` action=**Skip** (ถ้ามี) / หรือ rule ALLOW ไว้ **บนสุดสุด** expression: `http.request.uri.path in {"/robots.txt" "/sitemap.xml"}` → Deploy rule ใหม่ (ไม่โดน rule เดิมกลืน เพราะเจอทีหลังในลำดับ) · อีกทาง: console PUT ruleset ตรง ๆ (วิธีที่เคยใช้สำเร็จ 30/9 — ดู ops-runbook §สิบ ขั้น 6)
 5. พิสูจน์ (ผู้ช่วยรันได้):
@@ -38,7 +64,7 @@
 ## หลังยืนยันสำเร็จ
 
 6. เมนู **Sitemaps** → กรอก `sitemap.xml` → Submit (ที่อยู่จริง = https://sovereignoriginshop.dpdns.org/sitemap.xml)
-7. **URL Inspection** → ใส่ `https://sovereignoriginshop.dpdns.org/shop` → กด "Request Indexing" — ทำซ้ำกับ /about /partners /demo
+7. **URL Inspection** → ใส่ `https://sovereignoriginshop.dpdns.org/shop/` (มี slash ท้าย ตามที่เว็บเสิร์ฟจริง) → กด "Request Indexing" — ทำซ้ำกับ /about/ /partners/ /demo/
 8. (แนะนำ) โปรไฟล์ Google ของเจ้าของ: เพิ่มเว็บไซต์เป็นลิงก์ในส่วน "เว็บไซต์/ลิงก์สังคม" ของโปรไฟล์ Google บัญชีเดียวกับที่ JSON-LD อ้าง
 
 ## ทางเลือกถ้าไม่อยากแตะ DNS
