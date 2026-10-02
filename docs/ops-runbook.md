@@ -69,6 +69,37 @@ taskkill //F //PID <PID> //T
 
 **กลับมา prod:** ต้อง kill dev ก่อน build — watchdog จะไม่สลับเองถ้า :3000 ยังตอบ!
 
+### EOL ต้องเป็น LF ทั้งโฟลเดอร์ทำงาน (เพิ่ม 2/10/69 — กติกาที่แก้บั๊กแย่กว่าที่คิด)
+
+`.gitattributes` บังคับ `* text=auto eol=lf` (ยกเว้น `.bat`/`.cmd` = CRLF และไฟล์ binary) เพราะ `core.autocrlf=true` เคยทำให้ **โฟลเดอร์ทำงานหนึ่งเดียวมีไฟล์ปนกันสองแบบ** — ตอนนี้ราก repo เป็น LF 999 ไฟล์ + CRLF 16 ไฟล์ (bat/cmd) · build จาก commit เดียวกันจึงได้ byte เดียวกัน (พิสูจน์แล้ว: MAIN กับ worktree fingerprint `85fbf786e09b4562` ตรงกัน 228 ไฟล์)
+
+- **`git status` มองไม่เห็น CRLF ที่หลงเหลือ** — เพราะ clean filter แปลง CRLF→LF ก่อนเทียบ (ไฟล์ที่เคยถูกเครื่องมือเขียนทับจะค้างเป็น LF/CRLF ผสมโดย git ยังบอกว่าสะอาด) · `git ls-files --eol` ก็ไม่ช่วย (อ่านจาก stat cache) → **ต้องใช้ตัวมือที่อ่านไฟล์จริง**
+- รันครั้งเดียวหลัง clone/checkout เก่า: `node tools/normalize-eol.mjs` (ตรวจโดยไม่แก้: `--check` · exit 1 ถ้ายังมี · ใช้เป็น CI gate ได้)
+- ไฟล์ binary (`.png`/`.ttf`) มีไบต์ `0x0D` อยู่จริงโดยธรรมชาติ = **ไม่ใช่ปัญหา** เครื่องมือข้ามให้อัตโนมัติ (เคยพังตรงนี้: วน parse attribute ผิด stride → ไปแก้ `.ttf` จนไฟล์เสีย กู้คืนด้วย `rm` + `git checkout-index -f`)
+
+### nightly verify 02:00 — รันอะไรบ้างและดูผลที่ไหน (เพิ่ม 2/10/69)
+
+Task Scheduler ชื่อ **Sovereign Nightly Verify** → `tools/nightly-verify.mjs` (ลงทะเบียนครั้งเดียว: `powershell -File tools/register-nightly-task.ps1`) · ทดสอบทันที: `Start-ScheduledTask -TaskName 'Sovereign Nightly Verify'`
+
+ลำดับในรอบหนึ่ง (รวม ~6–20 นาที):
+
+1. `machine-health.mjs` — แจ้งปัญหาเครื่อง (แรม/ดิสก์/docker) **ก่อน** verify จะพัง
+2. **เช็ค backend :3001 → ถ้าตายให้ `docker compose up -d` รอสุด 180 วิ** (เพิ่ม 2/10/69 — เคยรายงาน "ผ่าน" ทั้งที่สเปก 0 ตัวถูกรัน เพราะเครื่องรีบูตแล้ว docker ยังไม่ขึ้นตอน 02:00) · ถ้ายังไม่ขึ้น = รันแค่ `npm run verify` + รายงานว่า e2e ถูกข้ามพร้อมเหตุผล
+3. `npm run verify:full` พร้อม `E2E_REQUIRE_BACKEND=1` = **e2e ห้ามถูกข้ามเงียบ** (ถ้า backend ตายกลางทาง = ต้อง fail ให้เห็น)
+4. `IndexNow` → `SEO pre-flight` → `GSC coverage` → `backup restore-check` (fail-safe ทุกตัว ล้มไม่ทำให้รอบพัง แต่ต้องเห็นในรายงาน)
+5. เขียน `logs/nightly/status.json` + ส่ง Telegram
+
+**อ่านสัญญาณที่รายงานส่งมา:**
+
+| สัญลักษณ์ | แปลว่า |
+|---|---|
+| ✅ ผ่าน | ทุกอย่างรันครบ รวม e2e |
+| ⚠️ ผ่าน (มีขั้นข้าม) | มีบางอย่าง**ไม่ได้ตรวจ** — ดูบรรทัด "ข้าม N รายการ" พร้อมเหตุผล (ห้ามนับเป็นผ่าน) |
+| 🚨 ไม่ผ่าน | มีขั้นตอนพัง ดู `logs/nightly/last-run.log` |
+| "เกตล่าสุด: ไม่ทราบ" | gate ล้มก่อนเขียนผล = ไม่รู้ว่าขั้นไหนพัง (รายงานจะไม่อ้างผลของรอบเก่าแล้ว) |
+
+สวิตช์ทดลอง: `NIGHTLY_SKIP_RESTORE=1` (ข้าดการกู้ dump) · `NIGHTLY_REPORT_DRY=1` (พิมพ์ข้อความลง `logs/nightly/report.log` ไม่ส่ง Telegram จริง) · log ทั้งหมด: `logs/nightly/`
+
 ### `verify:full` แตะ :3000 อย่างไร (เพิ่ม 2/10/69 — ทำให้รอบ gate ผ่านได้จริง)
 
 `npm run verify:full` = build ทับ `.next` ของ prod → ต้อง kill แล้วบูตใหม่ก่อน e2e ไม่งั้น chunk เก่า/ใหม่ผสมกัน 404
