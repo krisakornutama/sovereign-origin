@@ -20,7 +20,9 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 // ต่างกัน 21 ไบต์ → gate ล้มทั้งที่โค้ดเหมือนกันเป๊ะ · จึงต้องเทียบกับดิสก์ที่ deploy จริงเสมอ
 const MAIN_ROOT = (() => {
   const i = ROOT.indexOf('.freebuff');
-  return i > 3 ? ROOT.slice(0, i).replace(/[\\/]+$/, '') : ROOT;
+  // อยู่ใน worktree = โฟลเดอร์คือ <รากโปรเจกต์>/.freebuff/worktrees/<id>/tools → รากจริงอยู่ก่อน .freebuff
+  if (i > 3) return ROOT.slice(0, i).replace(/[\\/]+$/, '');
+  return dirname(ROOT); // รันจากรากโปรเจกต์ = ROOT คือ tools/ → ขึ้นไปหนึ่งชั้น (เคยพลาดตรงนี้ = nightly ทุกคืน)
 })();
 const DEPLOY_BACKEND = join(MAIN_ROOT, 'sovereign-os', 'core-api');
 const FRONTEND = join(ROOT, '..', 'sovereign-frontend');
