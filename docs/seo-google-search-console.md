@@ -39,11 +39,11 @@ curl -s -o /dev/null -w "%{http_code}\n" https://sovereignoriginshop.dpdns.org/m
 2. **เติมเนื้อหาจริงให้ผ่าน 800 ตัวอักษร** — เกณฑ์ thin content นับจาก HTML จริง ตัด script/style/svg/nav/aside ทิ้งก่อน · ปรับด้วย `SEO_MIN_TEXT_CHARS`
    (ตัวเลขตอนนี้ยังวัดไม่ได้ เพราะหน้าตอบ 403 บอทดึงไม่ได้ — ต้องแก้ข้อ 1 ก่อนแล้วค่อยรัน preflight ดูตัวเลขจริง)
 3. **ค่อยถอด `noindex` + ใส่ sitemap** — ตอนนี้หน้าถูกตั้ง `noindex` ไว้**โดยเจตนา** เพราะการประกาศ URL ที่ตอบ 403 คือคำสัญญาที่ผิด
-   · เอา `noindex` ออกจาก `<SeoHead>` ใน `src/pages/mbti/compare.tsx` · เพิ่ม `{ path: '/mbti/compare', ... }` ใน `PUBLIC_PATHS` (`src/lib/publicAccess.ts`)
+   · เอา `noindex` ออกจาก `<SeoHead>` ใน [`sovereign-frontend/src/pages/mbti/compare.tsx`](../sovereign-frontend/src/pages/mbti/compare.tsx) · เพิ่ม `{ path: '/mbti/compare', ... }` ใน `PUBLIC_PATHS` ([`sovereign-frontend/src/lib/publicAccess.ts`](../sovereign-frontend/src/lib/publicAccess.ts))
 
 **พิสูจน์ก่อน merge:** `node tools/verify/seo-preflight.mjs` (ต้องผ่าน **12/12**) · `node tools/verify/seo-publish-audit.mjs` (ต้องไม่มีข้อผิดพลาด)
 
-> **อ้างอิงระดับโค้ด:** คอมเมนต์ใน `src/pages/mbti/compare.tsx` ยังอธิบายเรื่องนี้ไว้ (ไม่ได้ลบ · เป็นป้ายกำกับตอนแก้โค้ด)
+> **อ้างอิงระดับโค้ด:** คอมเมนต์ใน [`sovereign-frontend/src/pages/mbti/compare.tsx`](../sovereign-frontend/src/pages/mbti/compare.tsx) ยังอธิบายเรื่องนี้ไว้ (ไม่ได้ลบ · เป็นป้ายกำกับตอนแก้โค้ด)
 > แต่ **เอกสารชิ้นนี้คือที่ที่คนต้องมาทำงาน** เพราะต้องใช้สิทธิ์ dashboard ที่อยู่นอกโค้ด
 > ระหว่างนี้ **ห้ามแก้หน้าเอง** — `noindex` เป็นการตั้งใจชั่วคราวที่ถูกต้อง ณ สภาพปัจจุบัน (หน้าตอบ 403 = ไม่ควรประกาศ)
 
