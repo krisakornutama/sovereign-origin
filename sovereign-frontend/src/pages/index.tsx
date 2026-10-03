@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import LoginForm from '../components/auth/LoginForm';
 import { FounderCredit } from '../components/public/FounderCredit';
 import SeoHead from '../components/public/SeoHead';
+import PageIntro from '../components/public/PageIntro';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -105,6 +106,22 @@ export default function Home() {
           <p className="text-center text-[11px] text-gray-600">
             เจอปัญหาหรืออยากเสนอฟีเจอร์ → ปุ่ม 💬 มุมขวาล่างของทุกหน้าทดลอง
           </p>
+
+          {/* เนื้อหาอธิบายแบบ static (เกณฑ์ thin content: หน้านี้ต้องมีข้อความให้บอทอ่าน) */}
+          <PageIntro
+            heading="Sovereign Origin คืออะไร"
+            paragraphs={[
+              'ระบบปฏิบัติการสำหรับฟาร์ม ปศุสัตว์ คลังสินค้า ร้านค้า และการตามสอบสินค้า รวมไว้ในชุดเดียวกัน ทำงานบนเครื่องของคุณเองเป็นหลัก ไม่ต้องพึ่งคลาวด์ต่างประเทศ และเก็บข้อมูลไว้ในระบบของคุณ',
+              'หน้าที่เปิดให้ทดลองนี้ใช้ข้อมูลตัวอย่างทั้งหมด ยกเว้นราคาและสถานะสินค้าในหน้าร้านที่เป็นข้อมูลจริง เมื่อสนับสนุนโครงการแล้วจึงจะเข้ามาใช้งานระบบจริงหลังระบบภายใน',
+              'โครงการนี้ไม่แสวงหากำไรส่วนตัว เงินที่ได้รับจะนำไปพัฒนาระบบและผลิตชุดอุปกรณ์ชิ้นถัดไป และมีการเปิดเผยข้อมูลความโปร่งใสของโครงการให้ตรวจสอบได้',
+            ]}
+            links={[
+              { href: '/about', label: 'เกี่ยวกับเรา' },
+              { href: '/partners', label: 'คู่ค้า' },
+              { href: '/partners/guide', label: 'คู่มือคู้ค้า' },
+              { href: '/community', label: 'Catalog กลางชุมชน' },
+            ]}
+          />
 
           <div className="pt-2 text-center">
             <a href="/login" className="text-[11px] text-gray-600 hover:text-gray-400 underline underline-offset-2">เข้าสู่ระบบ (ผู้ดูแลระบบ)</a>

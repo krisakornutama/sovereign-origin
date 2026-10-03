@@ -9,6 +9,7 @@ import { getApiUrl } from '../lib/config';
 import { useAuthStore } from '../stores/useAuthStore';
 import { FeedbackButton } from '../components/public/FeedbackButton';
 import SeoHead from '../components/public/SeoHead';
+import PageIntro from '../components/public/PageIntro';
 import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -229,6 +230,21 @@ export default function TracePage() {
             title={t('trace.title', 'ตามรอยผลผลิต')}
             subtitle={t('trace.subtitle', 'พิมพ์หรือสแกนรหัสล็อต LOT-XXXXXX เพื่อดูที่มาตั้งแต่แปลงจนถึงมือผู้บริโภค — สาธารณะ ไม่ต้อง login')}
             icon={<Icon name="search" size={18} />}
+          />
+
+          {/* เนื้อหาอธิบายแบบ static (เกณฑ์ thin content) — หน้านี้แสดงผลล็อตหลังค้นหา
+              ถ้าไม่มีส่วนนี้ HTML ตอน SSR จะสั้นเกินเกณฑ์และบอทอ่านไม่ออกว่าหน้านี้ทำอะไร */}
+          <PageIntro
+            heading="ตามรอยผลผลิตคืออะไร"
+            paragraphs={[
+              'ทุกชุดสินค้าที่ผลิตจะมีรหัสล็อต เช่น LOT-XXXXXX ผูกไว้กับแปลงต้นทาง วันที่เก็บเกี่ยว และเหตุการณ์ทุกขั้นตอนตั้งแต่เก็บเกี่ยว แปรรูป ตรวจคุณภาพ จนถึงการขายและส่งมอบ',
+              'หน้านี้เปิดเป็นสาธารณะ ไม่ต้องสมัครและไม่ต้องล็อกอิน พิมพ์รหัสล็อตหรือสแกน QR ที่ติดบนฉลากสินค้าเพื่อดูไทม์ไลน์ย้อนกลับได้ทันที ลูกค้าจึงตรวจสอบได้เองว่าสินค้ามาจากไหนและผ่านการตรวจคุณภาพหรือไม่',
+              'ข้อมูลที่แสดงเป็นประวัติการผลิตจริงในระบบ ไม่ใช่ข้อมูลตัวอย่าง · ถ้าสนใจนำระบบตามรอยไปใช้กับฟาร์มของคุณเอง ดูรายละเอียดที่หน้าสนามทดลอง',
+            ]}
+            links={[
+              { href: '/demo', label: 'สนามทดลอง' },
+              { href: '/shop', label: 'หน้าร้าน' },
+            ]}
           />
 
           {/* ── ช่องค้นหา + สแกนกล้อง ── */}
