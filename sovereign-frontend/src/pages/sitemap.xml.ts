@@ -12,8 +12,9 @@ const ALLOWED_HOSTS = new Set(['sovereignoriginshop.dpdns.org', 'sovereign-shop.
 const FALLBACK_HOST = 'sovereignoriginshop.dpdns.org';
 
 // รายการหน้าสาธารณะอยู่ที่ lib/publicAccess.ts จุดเดียว (import ตรง ๆ ไม่ก๊อป)
-// เพราะรายการนี้ใช้สองทาง: ประกาศใน sitemap + ซ่อน Sidebar/เมนูภายในตอนยังไม่ล็อกอิน
-// เคยมีบั๊กจริงจากการมีสองชุด: ประกาศแต่ไม่ซ่อน (เปิดโครงสร้างภายในให้บอท) และซ่อนแต่หลุด sitemap
+// หมายเหตุ 3/10/69: รายการนี้ใช้ทางเดียวคือ "ประกาศให้ Google" แล้วเท่านั้น
+// มันไม่ได้คุมการซ่อน Sidebar/เมนูภายในอีกต่อไป (ซ่อนด้วยสิทธิ์ = ต้องล็อกอินไหม — ดู useHideInternalNav.ts)
+// เคยมีบั๊กจริงจากการใช้รายการนี้สองทาง: ประกาศแต่ไม่ซ่อน (เปิดโครงสร้างภายในให้บอท) และซ่อนแต่หลุด sitemap
 
 function buildXml(host: string): string {
   const site = ALLOWED_HOSTS.has(host) ? host : FALLBACK_HOST;
