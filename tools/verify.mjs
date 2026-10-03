@@ -41,6 +41,11 @@ const steps = [
   { name: 'backend: test',              cwd: BACKEND,  cmd: 'npm', args: ['test'] },
   { name: 'frontend: typecheck (tsc)',   cwd: FRONTEND, cmd: 'npm', args: ['run', 'typecheck'] },
   { name: 'frontend: build (next)',      cwd: FRONTEND, cmd: 'npm', args: ['run', 'build'] },
+  // เทสต์ตรรกะของเครื่องมือใน tools/ (coverage floor · seo h1 · gsc coverage · verify-asset)
+  // — ต้องอยู่ใน gate ไม่ใช่รันเองตอนจำเป็น ไม่งั้นกติกาที่ปกป้องระบบ (เช่น "หน้าต้องมี h1")
+  //   จะกลับไปพังเงียบได้โดยไม่มีใครรู้ (เคสจริง: /sensors/ + /shop/ ค้างที่ h1=0 นานเพราะ
+  //   ไม่มีเทสต์คุมกติกานี้ — ตอนนี้มี tools/test/seo-h1.test.mjs เป็นกันหมด)
+  { name: 'tools: unit tests (node --test)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'test:tools'] },
 ];
 if (RUN_DB) {
   // real-DB suite: สร้างฐาน sovereign_test + TCP forwarder (แก้ปัญหา WSL relay กิน startup packet) ให้เอง
@@ -266,6 +271,9 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
   // สาย backend กับ frontend แยกกัน — ขั้นภายในสายยังลำดับกันเหมือนเดิม (build ก่อน test ฯลฯ)
   const backendLine = coreSteps.filter((s) => s.name.startsWith('backend'));
   const frontendLine = coreSteps.filter((s) => s.name.startsWith('frontend'));
+  // สายที่ 3: เทสต์เครื่องมือ — ต้องมีสายนี้เป็นของตัวเอง ไม่งั้นขั้น tools จะไม่ถูกรันเลย
+  // (runLine กรองด้วย startsWith เฉพาะ backend/frontend = ขั้นที่ไม่ขึ้นต้นไหนจะหายเงียบ)
+  const toolsLine = coreSteps.filter((s) => s.name.startsWith('tools'));
   const runLine = async (line, tag) => {
     for (const step of line) {
       const r = await runStep(step);
@@ -281,7 +289,11 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
     }
     console.log(`── สาย ${tag} เสร็จ ──`);
   };
-  await Promise.all([runLine(backendLine, 'backend'), runLine(frontendLine, 'frontend')]);
+  await Promise.all([
+    runLine(backendLine, 'backend'),
+    runLine(frontendLine, 'frontend'),
+    runLine(toolsLine, 'tools'),
+  ]);
   // Phase 0 (prod-truth): frontend build เพิ่งเขียนทับ .next ที่ prod :3000 กำลัง serve อยู่
   // → prod ยังโหลด build เก่าในหน่วยความจำ + chunk hash เปลี่ยน = 404 (เคสจริง 23-09: e2e พังทั้งชุด)
   // → restart prod ให้ serve build ใหม่ก่อน e2e (watchdog ของเครื่องกู้ให้; ไม่กู้ใน 90 วิ = เรา start เอง)
