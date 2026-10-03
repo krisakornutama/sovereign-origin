@@ -25,18 +25,22 @@
  *    ไม่มีวันใช้มันกรองข้อผิดพลาดออก — ถ้าหน้าสาธารณะใบใดไปเรียก useAuthStore
  *    ข้อ 1-3 ยังตรวจมันครบเหมือนกันทุกประการ
  *
- * กติกาที่ fail (--strict → exit 1):
+ * กติกาที่ fail (exit 1 เสมอ ไม่ต้องใส่ --strict):
  *   - หน้าที่ประกาศ index,follow แต่ไม่อยู่ใน sitemap  = "พร้อมประกาศแต่ไม่ถูกส่ง" (บั๊กรุ่นแรก)
  *   - หน้าที่อยู่ใน sitemap แต่เป็น noindex            = ขัดกันเอง ต้องเลือกอย่างใดอย่างหนึ่ง
  *   - URL ใน sitemap ที่ไม่มีไฟล์หน้าจริง             = รายการตาย
- *   - เครื่องมืออ่านรายการหน้าสาธารณะไม่ได้           = fail เสมอ แม้ไม่ใส่ --strict
+ *   - เครื่องมืออ่านรายการหน้าสาธารณะไม่ได้            = fail เสมอ
+ *   (ต่างจากรุ่นแรกที่ต้องใส่ --strict ถึงจะ exit 1 — รุ่นนี้ถือว่าข้อผิดพลาดคือของจริง
+ *    ไม่ควรผ่านได้เพราะคนลืมใส่ flag · --strict ยังรับไว้เพื่อไม่ให้สคริปต์เดิมพัง แต่ไม่มีผล)
  *
  * กติกาที่ "รายงาน" แต่ไม่ fail (เจ้าของต้องตัดสินใจเอง — แก้ต้องแตะโค้ดหน้า):
  *   - หน้า auth-free ที่ประกาศ noindex แล้วไม่อยู่ใน sitemap = ตั้งใจไม่ให้ Google (เช่น /partners/me)
  *   - หน้า auth-free ที่ไม่มี robots เลยและไม่อยู่ใน sitemap = ยังไม่เคยตัดสินใจ → อาจหลุด
  *     (--fail-candidates จะทำให้สองกองนี้กลายเป็น fail ด้วย ถ้าต้องการบังคับ)
  *
- * ใช้: node tools/verify/seo-publish-audit.mjs [--strict] [--fail-candidates] [--public-list <ไฟล์>]
+ * ใช้: node tools/verify/seo-publish-audit.mjs [--fail-candidates] [--public-list <ไฟล์>]
+ *   --strict  = รับไว้เพื่อความเข้ากันได้ (ไม่มีผล · ข้อผิดพลาด fail อยู่แล้ว)
+ *   --fail-candidates = ยกกอง "รอตัดสินใจ" ให้ fail ด้วย (เจ้าของต้องการให้บังคับ)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -199,7 +203,6 @@ const names = (list) => list.map((r) => r.route).join(', ') || '—';
 
 async function main() {
   const argv = process.argv.slice(2);
-  const strict = argv.includes('--strict');
   const failCandidates = argv.includes('--fail-candidates');
   const listArg = argv.indexOf('--public-list');
   // resolve ไม่ใช่ join: ถ้าผู้ใช้ใส่พาธแบบสัมบูรณ์ (C:\... หรือ /abs) join จะเอาไปต่อท้าย cwd จนพาธพัง
