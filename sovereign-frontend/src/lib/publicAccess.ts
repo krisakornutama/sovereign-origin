@@ -27,11 +27,6 @@ export function isPublicHostname(): boolean {
   return !isLocal;
 }
 
-/** true เมื่อ build นี้ถูกทำเป็น "โหมดสาธารณะ" ตอน build (ใช้แสดงหมายเหตุ/ทดสอบ) */
-export function isBuiltPublicMode(): boolean {
-  return BUILD_PUBLIC_MODE;
-}
-
 // ── รายการหน้าที่ประกาศให้ Google: จุดเดียวที่ sitemap ใช้ ──
 // หมายเหตุ 3/10/69: รายการนี้ไม่ได้ใช้คุม "ซ่อนเมนูภายใน" อีกต่อไป
 // (การซ่อนเป็นเรื่องสิทธิ์ = ต้องล็อกอินไหม ไม่ใช่เรื่องอยู่บนหน้าไหน — ดู useHideInternalNav.ts)
