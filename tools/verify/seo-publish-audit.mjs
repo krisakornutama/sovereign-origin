@@ -61,14 +61,42 @@ export function routeOf(file, pagesDir = PAGES) {
   return trimmed === '' ? '/' : '/' + trimmed;
 }
 
+/** ตัดคอมเมนต์ออกก่อนอ่าน — ไม่งั้น “คำว่า noindex ในคอมเมนต์” จะถูกมองเป็นโค้ดจริง
+ *  `//` นับเป็นคอมเมนต์เฉพาะที่ไม่ได้ตามด้วย `:` (กัน URL อย่าง https:// ถูกตัดทิ้ง) */
+function stripComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+/** attribute string ของทุกเปิดแท็ก JSX ที่ชื่อนี้ — จบที่ `>` แรกที่ไม่อยู่ใน quote
+ *  (จำเป็น: title="a > b" ต้องไม่ตัดแท็กกลางคัน) */
+function openTags(src, name) {
+  return [...src.matchAll(new RegExp(`<${name}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'g'))].map((m) => m[1]);
+}
+
 /** หน้านี้ประกาศว่าจะเปิดให้ Google เข้ามาดูหรือไม่ (อ่านจากโค้ด ไม่เดา)
- *  - ใช้ <SeoHead> = ประกาศว่าเป็นหน้าสาธารณะ (ค่าเริ่มต้น index,follow)
- *  - มี noindex ทั้งแบบ meta ตรง ๆ และแบบส่ง prop ให้ SeoHead = ไม่ต้องประกาศ */
+ *
+ * กติกา: อ่าน **แอตทริบิวต์ของแท็กจริง** ไม่ใช่ “มีคำว่า noindex อยู่ใกล้ ๆ”
+ * มีแค่สองทางที่ noindex ไปถึงหน้าจริง (ดู SeoHead.tsx):
+ *   ① <SeoHead ... noindex />            → prop ในเปิดแท็ก
+ *   ② <meta name="robots" content="noindex" />  (ใช้ตรง ๆ เช่น partners/me)
+ *
+ * บั๊กที่เคยเกิด (4/10/69): รุ่นก่อนใช้ /<SeoHead\b[\s\S]{0,600}?\bnoindex\b/
+ * ซึ่งจับคำในคอมเมนต์ได้ → หน้าที่ใช้ index จริงถูกอ่านว่า noindex = หน้าหายจากการพิจารณา
+ * โดยไม่มีเหตุผล ซึ่งเป็นบั๊กชนิดเดียวกับที่เครื่องมือนี้ถูกรีบเขียนใหม่เพื่อแก้
+ *
+ * ข้อจำกัดที่รู้ไว้: ถ้าหน้าไหนส่ง props แบบ spread (`<SeoHead {...SEO} />`) และซ่อน noindex
+ * ไว้ในอ็อบเจกต์ เครื่องมือนี้มองไม่เห็น — ปัจจุบันไม่มีหน้าไหนเขียนแบบนั้น (ตรวจแล้ว 4 จุด)
+ * ถ้าวันหนึ่งมี ให้เขียน noindex ตรง ๆ แทน จะได้ไม่หลุด */
 export function classify(src) {
-  if (/content="noindex"/.test(src)) return 'noindex';
-  if (/<SeoHead\b[\s\S]{0,600}?\bnoindex\b/.test(src)) return 'noindex';
-  if (/content="index,follow"/.test(src)) return 'index';
-  if (/<SeoHead\b/.test(src)) return 'index';
+  const code = stripComments(src);
+  const seoTags = openTags(code, 'SeoHead');
+  const metaTags = openTags(code, 'meta');
+  const isRobots = (t) => /\bname\s*=\s*["']robots["']/.test(t);
+
+  if (seoTags.some((t) => /(^|\s)noindex(\s|=|\/|$)/.test(t))) return 'noindex';
+  if (metaTags.some((t) => isRobots(t) && /\bcontent\s*=\s*["']noindex/.test(t))) return 'noindex';
+  if (metaTags.some((t) => isRobots(t) && /\bcontent\s*=\s*["']index/.test(t))) return 'index';
+  if (seoTags.length) return 'index';
   return 'none';
 }
 
