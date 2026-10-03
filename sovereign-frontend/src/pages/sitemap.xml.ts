@@ -6,25 +6,14 @@
 // รูปแบบ canonical ของ Pages Router: เขียน response ใน getServerSideProps (บังคับ dynamic
 // ไม่ให้ build prerender) — component หลักคืน null (response จบก่อน render)
 import type { GetServerSidePropsContext, NextPage } from 'next';
+import { PUBLIC_PATHS } from '../lib/publicAccess';
 
 const ALLOWED_HOSTS = new Set(['sovereignoriginshop.dpdns.org', 'sovereign-shop.dpdns.org']);
 const FALLBACK_HOST = 'sovereignoriginshop.dpdns.org';
 
-const PUBLIC_PATHS: Array<{ path: string; changefreq: string; priority: string }> = [
-  { path: '/', changefreq: 'weekly', priority: '1.0' },
-  { path: '/shop', changefreq: 'weekly', priority: '0.9' },
-  { path: '/about', changefreq: 'monthly', priority: '0.8' },
-  { path: '/partners', changefreq: 'weekly', priority: '0.8' },
-  { path: '/partners/guide', changefreq: 'monthly', priority: '0.6' },
-  { path: '/community', changefreq: 'weekly', priority: '0.7' },
-  { path: '/demo', changefreq: 'monthly', priority: '0.7' },
-  { path: '/mbti', changefreq: 'monthly', priority: '0.5' },
-  { path: '/sensors', changefreq: 'daily', priority: '0.5' },
-  // P24 ต่อ 4 (3/10/69): เพิ่ม /trace เพราะแก้หน้าให้เรนเดอร์เนื้อหาจริงตอน SSR + ใส่ SeoHead แล้ว
-  //   (ก่อนหน้านี้ h1=0 ไม่มี title/canonical/description = ห้ามประกาศ เพราะเป็นหน้าว่างสำหรับบอท)
-  { path: '/trace', changefreq: 'weekly', priority: '0.6' },
-  { path: '/hover-cards', changefreq: 'monthly', priority: '0.3' },
-];
+// รายการหน้าสาธารณะอยู่ที่ lib/publicAccess.ts จุดเดียว (import ตรง ๆ ไม่ก๊อป)
+// เพราะรายการนี้ใช้สองทาง: ประกาศใน sitemap + ซ่อน Sidebar/เมนูภายในตอนยังไม่ล็อกอิน
+// เคยมีบั๊กจริงจากการมีสองชุด: ประกาศแต่ไม่ซ่อน (เปิดโครงสร้างภายในให้บอท) และซ่อนแต่หลุด sitemap
 
 function buildXml(host: string): string {
   const site = ALLOWED_HOSTS.has(host) ? host : FALLBACK_HOST;

@@ -12,6 +12,7 @@ import { ALL_PAGES } from '../lib/navigation';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
+import { useHideInternalNav } from '../lib/useHideInternalNav';
 import { themeClassForPath } from './ui/PageHeader';
 import { useCircadianAtmo, atmoNavStyle } from '../lib/useCircadian';
 import Icon from './ui/Icon';
@@ -69,6 +70,9 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
+  // หน้าสาธารณะ + ยังไม่ล็อกอิน = ค้นหาภายในไม่ได้ (รายการคือทุกหน้าในระบบ)
+  // ต้องกันที่ตัว palette เอง ไม่ใช่แค่ซ่อนปุ่ม — ผู้เยี่ยมกด Ctrl+K ได้
+  const hideInternalNav = useHideInternalNav();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -129,7 +133,7 @@ export default function CommandPalette({ open, setOpen }: { open: boolean; setOp
     else if (e.key === 'Enter') { if (results[active]) go(results[active].href); }
   };
 
-  if (!open) return null;
+  if (!open || hideInternalNav) return null;
 
   return (
     <div
