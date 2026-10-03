@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { FounderCredit } from '../components/public/FounderCredit';
+import PageIntro from '../components/public/PageIntro';
 import SeoHead from '../components/public/SeoHead';
 import Sidebar from "../components/layout/Sidebar";
 import PageHeader from "../components/ui/PageHeader";
@@ -577,7 +578,16 @@ export default function MbtiPage() {
             </div>
           }
         />
-        <main className="flex-1 p-4 lg:p-6 w-full">
+        <main className="flex-1 p-4 lg:p-6 w-full space-y-5">
+          {/* เนื้อหาอธิบายแบบ static (เกณฑ์ thin content) — อยู่ทุกหน้าจอ ไม่ใช่แค่หน้าแนะนำ */}
+          <PageIntro
+            heading="แบบทดสอบบุคลิกภาพ 16 ประเภท แบบ Local-First"
+            paragraphs={[
+              'แบบทดสอบนี้เป็นแบบ forced-choice เลือกอย่างใดอย่างหนึ่งในสองข้อ ไม่มีคำตอบถูกหรือผิด ครบทั้ง 4 มิติ ได้แก่ มุ่งออก–มุ่งเข้า จับต้องได้–นามธรรม ตรรกะ–ความรู้สึก และจัดระเบียบ–ล่องลอย จึงได้ผลตัวอักษร 4 ตัวแบบ MBTI พร้อมตัวย่อและคำอธิบายแต่ละประเภท',
+              'สิ่งที่ต่างจากแบบทดสอบทั่วไปคือ ผลของคุณถูกเก็บไว้ในเบราว์เซอร์ของเครื่องคุณเท่านั้น ไม่มีการส่งคำตอบออกไปยังเซิร์ฟเวอร์ และไม่มีการสมัครสมาชิก ล้างข้อมูลในเบราว์เซอร์เมื่อไรก็หายไปทันที',
+              'เมื่อทำเสร็จสามารถเปิดคลังทั้ง 16 ประเภท ดูกราฟการเปลี่ยนแปลงของผลย้อนหลัง และเทียบผลของตัวเองกับคนที่รักหรือสมาชิกในครอบครัวได้',
+            ]}
+          />
           {screen === "intro" && introScreen}
           {screen === "quiz" && quizScreen}
           {screen === "result" && resultScreen()}
