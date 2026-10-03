@@ -3,6 +3,50 @@
 เป้าหมาย: ให้ Google เชื่อมโดเมนกับชื่อผู้ก่อตั้ง — โดเมนใช้งาน: `sovereignoriginshop.dpdns.org` (ACTIVE 30/9) + `sovereign-shop.dpdns.org` (ชื่อสั้น จด 1/10 — รอ NS/Active ตาม ops-runbook §สิบ "โซนที่สอง")
 (เว็บไซต์เตรียมฝั่งโค้ดครบแล้ว: JSON-LD `founder` + meta author บน /about · sitemap.xml · robots.txt)
 
+## 🚨 งานที่ต้องให้เจ้าของทำเอง — `/mbti/compare` ตอบ 403 ทุกคน (รวม Googlebot)
+
+> อันนี้คือข้อเดียวในเอกสารนี้ที่**ยังทำให้ผู้ใช้จริงพังอยู่ตอนนี้** ทุกอย่างอื่นข้างล่างผ่านหมดแล้ว
+> ต้องใช้สิทธิ์ Cloudflare dashboard ของเจ้าของเท่านั้น · **อยู่นอกโค้ด repo · AI แก้ให้ไม่ได้**
+
+**อาการที่คนเจอ:** `/mbti` อยู่ใน sitemap และ Google เข้ามาดูอยู่จริง · หน้านั้นลิงก์ไป `/mbti/compare` **3 จุด**
+ผู้เยี่ยมชมที่กด "เปรียบเทียบผลลัพธ์" จะเจอ **หน้าบล็อก 403** ไม่ใช่หน้าเว็บ
+
+**ต้นเหตุ:** rule ของ Cloudflare ชื่อ `Public-only: block admin/internal paths` เป็น **allowlist (default-deny)**
+`/mbti/compare` ไม่ได้อยู่ในรายการ → โดน 403 **ทุกคน รวมถึง Googlebot**
+(พิสูจน์แล้วว่าเป็น default-deny จริง: URL ที่ไม่อยู่ใน allowlist แม้แต่ที่ไม่มีอยู่จริงก็ตอบ 403 เหมือนกัน)
+
+### สิ่งที่ต้องเพิ่ม — 1 บรรทัด
+
+| | |
+|---|---|
+| โดเมน | `sovereignoriginshop.dpdns.org` |
+| ที่ไหน | Security → WAF → Custom rules → rule `Public-only: block admin/internal paths` |
+| วิธี | Edit expression → เติมต่อท้าย **ก่อนวงเล็บปิดสุดท้าย `)`** |
+| **ค่าที่เติม** | `or http.request.uri.path in {"/mbti/compare*"}` |
+
+⚠️ **เติมบวกเฉย ๆ ห้ามวาง expression ทับทั้งก้อน** — rule จริงบนโซนมี `/partners` `/about` `/api/track` ฯลฯ เพิ่มมาแล้ว ถ้าวางทับจะเผลอปิดเส้นที่เปิดไว้
+วิธีเดียวกับที่เคยใช้แก้ `/robots.txt` + `/sitemap.xml` สำเร็จ 2/10/69 · คู่มือฉบับเต็มอยู่หัวข้อ "คู่มือแก้ WAF" ด้านล่าง
+
+**พิสูจน์ว่าแก้แล้ว** (ต้องได้ **200** · ปัจจุบันได้ 403):
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://sovereignoriginshop.dpdns.org/mbti/compare
+```
+
+### หลังแก้ WAF แล้ว ยังประกาศไม่ได้ทันที — ต้องทำอีก 3 อย่างตามลำดับ
+
+1. **เติม `<h1>`** — หน้านี้**ยังไม่มี h1 เลย** (หัวข้อที่เห็นเป็น h2/h3 ไม่มี h1 ที่ระดับหน้า) · `seo-preflight` บังคับ h1 = 1 อันพอดี (0 = หน้าว่าง)
+2. **เติมเนื้อหาจริงให้ผ่าน 800 ตัวอักษร** — เกณฑ์ thin content นับจาก HTML จริง ตัด script/style/svg/nav/aside ทิ้งก่อน · ปรับด้วย `SEO_MIN_TEXT_CHARS`
+   (ตัวเลขตอนนี้ยังวัดไม่ได้ เพราะหน้าตอบ 403 บอทดึงไม่ได้ — ต้องแก้ข้อ 1 ก่อนแล้วค่อยรัน preflight ดูตัวเลขจริง)
+3. **ค่อยถอด `noindex` + ใส่ sitemap** — ตอนนี้หน้าถูกตั้ง `noindex` ไว้**โดยเจตนา** เพราะการประกาศ URL ที่ตอบ 403 คือคำสัญญาที่ผิด
+   · เอา `noindex` ออกจาก `<SeoHead>` ใน `src/pages/mbti/compare.tsx` · เพิ่ม `{ path: '/mbti/compare', ... }` ใน `PUBLIC_PATHS` (`src/lib/publicAccess.ts`)
+
+**พิสูจน์ก่อน merge:** `node tools/verify/seo-preflight.mjs` (ต้องผ่าน **12/12**) · `node tools/verify/seo-publish-audit.mjs` (ต้องไม่มีข้อผิดพลาด)
+
+> **อ้างอิงระดับโค้ด:** คอมเมนต์ใน `src/pages/mbti/compare.tsx` ยังอธิบายเรื่องนี้ไว้ (ไม่ได้ลบ · เป็นป้ายกำกับตอนแก้โค้ด)
+> แต่ **เอกสารชิ้นนี้คือที่ที่คนต้องมาทำงาน** เพราะต้องใช้สิทธิ์ dashboard ที่อยู่นอกโค้ด
+> ระหว่างนี้ **ห้ามแก้หน้าเอง** — `noindex` เป็นการตั้งใจชั่วคราวที่ถูกต้อง ณ สภาพปัจจุบัน (หน้าตอบ 403 = ไม่ควรประกาศ)
+
 ## ⚠️ บล็อกที่ต้องแก้ก่อน (ตรวจ live 1/10/69)
 
 **✅ แก้แล้ว 2/10/69 ตี 4 — พิสูจน์ 200 ทั้งคู่** (เดิมตอบ 403 จาก WAF เพราะ 2 path ไม่อยู่ใน allowlist) — แก้จริงด้วยการเติม `or http.request.uri.path in {"/robots.txt" "/sitemap.xml"}` ก่อน `)` ปิดสุดท้ายของ rule `Public-only: block admin/internal paths` ผ่าน API (PUT ruleset 200) · ตรวจซ้ำ: sitemap **200** · robots **200** · home 200 · /dashboard 403 ปกติ · คู่มือข้างล่างยังใช้ได้ถ้าต้องทำซ้ำ/โซนใหม่
@@ -23,7 +67,8 @@
 | robots.txt | 200 · `Allow: /` + บรรทัด `Sitemap:` ถูกต้อง |
 | WAF | rule เดียว `not(public …)` action=Block · **Bot Fight Mode = ปิด** · Security Level = medium · `/dashboard/` `/api/auth/login` = **403** ตามต้องการ · ไฟล์คีย์ IndexNow อยู่ใน allowlist แล้ว |
 
-**ยังค้าง 2 อย่าง (ไม่ใช่บล็อกการ Verify):** (1) ค่า TXT จาก GSC ยังไม่ได้รับ — Verify ทำไม่ได้จนเจ้าของส่งค่ามา (2) `/shop/` กับ `/community/` ยังตั้ง `noindex` อยู่ทั้งที่อยู่ใน sitemap — ต้องตัดสินใจ (ถ้า Verify ไปแล้ว GSC จะขึ้นเตือนเรื่องนี้ในรายงาน "หน้าเว็บที่ไม่ได้ทำดัชนี")
+**ยังค้าง 1 อย่าง (ไม่ใช่บล็อกการ Verify):** ค่า TXT จาก GSC ยังไม่ได้รับ — Verify ทำไม่ได้จนเจ้าของส่งค่ามา
+~~ข้อ 2: `/shop/` กับ `/community/` ยังตั้ง `noindex` อยู่ทั้งที่อยู่ใน sitemap~~ — **แก้แล้ว 3/10/69** ทั้งคู่เป็น `index,follow` · `seo-publish-audit` ยืนยันว่า contradiction = 0 (ไม่มีหน้าใน sitemap ที่เป็น noindex แล้ว)
 
 ### ⚠️ Google ได้ HTML ว่างจากหน้าแรก — แก้แล้ว 3/10/69 (SSR)
 
@@ -141,11 +186,14 @@ curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.h
 → ถ้าหน้าใดประกาศ `index,follow` ในโค้ดแล้วลืมใส่ sitemap จะไม่มีอะไรจับเลย (ไม่ error ไม่ warning)
 `tools/verify/seo-publish-audit.mjs` ตรวจจากโค้ด (เร็ว จับได้ก่อน merge):
 หน้าที่ประกาศ index แต่ไม่อยู่ใน `PUBLIC_PATHS` · sitemap ที่มี URL แต่ไม่มีไฟล์จริง · noindex ที่หลุดเข้า sitemap
-เทสต์ 6 เคสที่ `tools/test/seo-publish-audit.test.mjs` (`classify()` ต้องไม่พลาด SeoHead noindex prop)
+เทสต์ 54 เคสที่ `tools/test/seo-publish-audit.test.mjs` (`classify()` ต้องไม่พลาด SeoHead noindex prop · ไม่อ่าน `noindex={false}` เป็น noindex · ไม่พลาดคำในคอมเมนต์)
 
-**ผลตรวจจริง 3/10/69:** 11 หน้าที่ประกาศ index ตรงกับ sitemap 11 URL พอดี
-`/partners/me` = noindex และไม่อยู่ใน sitemap (ถูกต้อง — พื้นที่ส่วนตัวของคู้ค้า) · หน้าอื่นที่ตอบ 200
-(`/portfolio` `/login`) ถูก WAF บล็อก 403 ตามเดิม ไม่ต้องประกาศ
+**ผลตรวจจริง 4/10/69 (สถานะล่าสุด — รันเองได้ด้วย `node tools/verify/seo-publish-audit.mjs`):**
+หน้าบนดิสก์ **64 route** → ประกาศแล้ว **11** (= sitemap 11 URL ตรงกันพอดี) · หลังระบบล็อกอิน **49**
+· **ตัดสินใจไม่ประกาศแล้ว 4 หน้า** (noindex โดยเจตนา = ถูกต้อง ไม่ใช่งานค้าง): `/partners/me` (พื้นที่ส่วนตัวของคู้ค้า) · `/portfolio` · `/terrain-demo` · `/mbti/compare` (รอแก้ WAF ตามหัวข้อบน)
+· **ยังไม่เคยตัดสินใจ 0 หน้า** · **ข้อผิดพลาด 0** → เครื่องมือรายงาน "ผ่าน (ไม่มีหน้าค้าง)"
+
+*(รุ่นแรกของเครื่องมือรายงานผิด — หน้าที่ยังไม่ประกาศอะไรเลยกับหน้าที่ประกาศ noindex หายไปจากการตรวจ เกิดจริงกับ `/partners/me`)*
 
 ### ให้บอทรู้ทันทีที่ URL เปลี่ยน (ผูก nightly/weekly แล้ว 2/10/69)
 
