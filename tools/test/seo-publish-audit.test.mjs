@@ -98,12 +98,13 @@ check('ไฟล์ route ที่ไม่ใช่หน้าแยกไว
 const real = await audit();
 const bucketTotal = Object.values(real.buckets).reduce((n, l) => n + l.length, 0);
 check('ทุก route ถูกจัดเข้ากองครบ (ไม่มีหน้าหาย)', bucketTotal === real.routes.length, `${bucketTotal}/${real.routes.length}`);
-const me = real.candidates.find((c) => c.route === '/partners/me');
-check('/partners/me ถูกรายงานเป็นหน้าที่รอตัดสินใจ', !!me, me ? me.why : 'ไม่พบในรายงานเลย');
-check('/partners/me ระบุเหตุผลว่า noindex', !!me && me.why.includes('noindex') && me.robots === 'noindex');
+const me = real.excluded.find((c) => c.route === '/partners/me');
+check('/partners/me ถูกรายงานว่าตัดสินใจไม่ประกาศแล้ว', !!me, me ? me.why : 'ไม่พบในรายงานเลย');
+check('/partners/me ไม่ถูกนับเป็นหน้าค้าง (noindex = ตัดสินใจแล้ว)', !real.candidates.some((c) => c.route === '/partners/me'));
 check('/partners/me ไม่ถูกนับเป็นข้อผิดพลาด (ตั้งใจไม่ประกาศ = ถูกต้อง)', !real.findings.some((f) => f.includes('/partners/me')));
 check('ไม่มีข้อผิดพลาดในสถานะปัจจุบัน', real.findings.length === 0, real.findings.join(' | '));
-check('หน้า auth-free ที่ยังไม่ประกาศถูกลิสต์ครบ', real.candidates.length === 4, real.candidates.map((c) => c.route).join(', '));
+check('ไม่มีหน้าที่ยังไม่ได้ตัดสินใจเหลือ (undecided = 0)', real.candidates.length === 0, real.candidates.map((c) => c.route).join(', '));
+check('หน้าที่สั่ง noindex ถูกลิสต์ครบ', real.excluded.length === 4, real.excluded.map((c) => c.route).join(', '));
 
 // ─────────────────────────────────────────────────────────────
 // 6) กติกาที่จับบั๊กได้จริง — ทดสอบกับ fixture สังเคราะห์
@@ -114,7 +115,8 @@ try {
   const p = join(TMP, 'pages');
   writeFileSync(join(p, 'index.tsx'), '<SeoHead title="t" path="/" />');                       // index · อยู่ในรายการ
   writeFileSync(join(p, 'about.tsx'), '<SeoHead title="t" path="/about" />');                    // index · ไม่อยู่ในรายการ → ต้องจับ
-  writeFileSync(join(p, 'secret.tsx'), '<meta name="robots" content="noindex" />');               // noindex · อยู่ในรายการ → ต้องจับ
+  writeFileSync(join(p, 'secret.tsx'), '<meta name="robots" content="noindex" />');               // noindex · อยู่ในรายการ → ต้องจับ (ขัดกัน)
+  writeFileSync(join(p, 'private.tsx'), '<meta name="robots" content="noindex" />');              // noindex · ไม่อยู่ในรายการ → ตัดสินใจแล้ว
   writeFileSync(join(p, 'hidden.tsx'), 'useAuthStore((s) => s.isAuthenticated); <SeoHead path="/hidden" />'); // auth แต่ประกาศ index ไม่อยู่ในรายการ → ต้องจับ
   writeFileSync(join(p, 'dashboard.tsx'), "import { useAuthStore } from '../stores/useAuthStore';");  // none + auth → หน้าในระบบ
   const list = tmpFile('list.ts', "export const PUBLIC_PATHS = [{ path: '/' }, { path: '/secret' }, { path: '/gone' }];");
@@ -128,6 +130,8 @@ try {
   check('ป้าย auth กรองข้อผิดพลาดไม่ได้ (/hidden ยังถูกจับ)', has('/hidden ประกาศ index'));
   check('รวมแล้ว 4 ข้อผิดพลาด', r.findings.length === 4, `${r.findings.length}`);
   check('หน้าในระบบ (auth + ไม่มี robots) ไม่ถูกทำเป็นข้อผิดพลาด', r.buckets.internal.length === 1 && r.candidates.length === 0);
+  check('noindex ที่ไม่อยู่ใน sitemap ถูกนับเป็น “ตัดสินใจแล้ว” ไม่ใช่งานค้าง', r.excluded.length === 1 && r.excluded[0].route === '/private');
+  check('noindex ที่อยู่ใน sitemap เป็นข้อผิดพลาด ไม่ใช่งานที่ตัดสินใจแล้ว', !r.excluded.some((c) => c.route === '/secret'));
   check('รายการตายไม่ทำให้การจัดกองครบพัง', Object.values(r.buckets).reduce((n, l) => n + l.length, 0) === r.routes.length);
 } finally {
   rmSync(TMP, { recursive: true, force: true });
