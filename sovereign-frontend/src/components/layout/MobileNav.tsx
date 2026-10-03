@@ -7,6 +7,7 @@ import { openCommandPalette } from '../CommandPalette';
 import { useFeatureStore } from '../../stores/useFeatureStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
+import { useHideInternalNav } from '../../lib/useHideInternalNav';
 import Icon from '../ui/Icon';
 import { NAV_GROUPS } from '../../lib/navigation';
 import { themeClassForPath } from '../ui/PageHeader';
@@ -33,6 +34,8 @@ export default function MobileNav() {
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
+  // หน้าสาธารณะ + ยังไม่ล็อกอิน = ไม่ให้เห็นแถบเมนูภายใน (เหตุผล/กติกา: lib/useHideInternalNav.ts)
+  const hideInternalNav = useHideInternalNav();
 
   useEffect(() => {
     if (user && !isSuperadmin) loadFeatures();
@@ -65,6 +68,8 @@ export default function MobileNav() {
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
   }, []);
+
+  if (hideInternalNav) return null;
 
   return (
     <>
