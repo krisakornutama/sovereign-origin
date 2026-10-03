@@ -20,6 +20,9 @@ const PUBLIC_PATHS: Array<{ path: string; changefreq: string; priority: string }
   { path: '/demo', changefreq: 'monthly', priority: '0.7' },
   { path: '/mbti', changefreq: 'monthly', priority: '0.5' },
   { path: '/sensors', changefreq: 'daily', priority: '0.5' },
+  // P24 ต่อ 4 (3/10/69): เพิ่ม /trace เพราะแก้หน้าให้เรนเดอร์เนื้อหาจริงตอน SSR + ใส่ SeoHead แล้ว
+  //   (ก่อนหน้านี้ h1=0 ไม่มี title/canonical/description = ห้ามประกาศ เพราะเป็นหน้าว่างสำหรับบอท)
+  { path: '/trace', changefreq: 'weekly', priority: '0.6' },
   { path: '/hover-cards', changefreq: 'monthly', priority: '0.3' },
 ];
 

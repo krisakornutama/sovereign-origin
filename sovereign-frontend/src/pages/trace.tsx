@@ -8,6 +8,8 @@ import { authFetch } from '../lib/apiFetch';
 import { getApiUrl } from '../lib/config';
 import { useAuthStore } from '../stores/useAuthStore';
 import { FeedbackButton } from '../components/public/FeedbackButton';
+import SeoHead from '../components/public/SeoHead';
+import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -39,6 +41,14 @@ interface LotSummary {
   plot?: { name?: string | null } | null;
   events?: Array<{ type: string }>;
 }
+
+// metadata กลางของหน้า — ต้องอยู่ใน SSR ไม่ใช่ฝังใน layout ของหน้าไหน (บทเรียนจาก /shop)
+const SEO = {
+  title: 'ตามรอยผลผลิต — ค้นหาล็อตสินค้าที่มา Sovereign Origin',
+  description:
+    'ค้นหาล็อตสินค้าด้วยรหัส LOT-XXXXXX แล้วดูที่มาทั้งสาย — เก็บเกี่ยว แปรรูป ตรวจคุณภาพ ขายออก ส่งมอบ ตั้งแต่แปลงปลูกจนถึงมือผู้บริโภค เปิดดูได้สาธารณะไม่ต้องล็อกอิน',
+  path: '/trace',
+};
 
 const EVENT_STYLE: Record<string, { cls: string; icon: string }> = {
   HARVESTED: { cls: 'bg-lime-500/15 text-lime-300 border-lime-500/30', icon: 'farm' },
@@ -125,6 +135,15 @@ export default function TracePage() {
 
   useEffect(() => { trackPageView('/trace'); }, []); // P10: สถิติการเยือน (cookieless)
 
+  // P24 ต่อ 4 (3/10/69): หน้านี้เป็นหน้าสาธารณะอยู่แล้ว (ค้นล็อตไม่ต้อง login) แต่เดิม
+  //   ถูก `if (!isHydrated) return loading` บังตอน SSR → HTML ที่ Googlebot ได้ = 0 <h1>
+  //   และไม่มี SeoHead เลย (ไม่มี title/canonical/description) = ห้ามประกาศใน sitemap
+  //   แก้แบบเดียวกับหน้าแรก: โหมดสาธารณะเรนเดอร์เนื้อหาจริงตอน SSR ส่วนเครื่องเจ้าของ
+  //   (localhost/LAN) ยังรอ hydrate ตามเดิม → ไม่มี hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const showPublic = isPublicHostname() && !(mounted && isLocalHostname());
+
   const search = useCallback(async (raw: string) => {
     const c = raw.trim().toUpperCase();
     if (!c) return;
@@ -195,12 +214,13 @@ export default function TracePage() {
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleString(fmtLocale(), { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
-  if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
+  if (!isHydrated && !showPublic) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500"><SeoHead {...SEO} />{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   return (
     <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100 flex">
+      <SeoHead {...SEO} />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
