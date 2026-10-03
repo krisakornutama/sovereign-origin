@@ -32,11 +32,10 @@ export function isBuiltPublicMode(): boolean {
   return BUILD_PUBLIC_MODE;
 }
 
-// ── รายการหน้าสาธารณะ: จุดเดียวที่ทั้ง sitemap และการซ่อนเมนูภายในใช้ร่วมกัน ──
-// เหตุผลที่ต้องรวมไว้ที่เดียว: เคยมีบั๊กจริง 2 อย่างจากรายการซ้ำสองชุด
-//  (1) ประกาศใน sitemap แต่ไม่ได้ซ่อน Sidebar → เปิดโครงสร้างภายในให้บอท
-//  (2) ซ่อน Sidebar แต่หลุด sitemap → ประกาศได้แต่ไม่ถูกส่ง
-// sitemap.xml.ts import รายการนี้ตรง ๆ (ไม่ก๊อป) → หลุดได้ทางเดียว
+// ── รายการหน้าที่ประกาศให้ Google: จุดเดียวที่ sitemap ใช้ ──
+// หมายเหตุ 3/10/69: รายการนี้ไม่ได้ใช้คุม "ซ่อนเมนูภายใน" อีกต่อไป
+// (การซ่อนเป็นเรื่องสิทธิ์ = ต้องล็อกอินไหม ไม่ใช่เรื่องอยู่บนหน้าไหน — ดู useHideInternalNav.ts)
+// การมีรายการนี้เป็นตัวกำหนดว่าอะไร "อยากให้ Google เข้ามา" เท่านั้น อย่าย้อนกลับมาใช้เป็น allowlist ของการมองเห็น
 export interface PublicPath {
   path: string;
   changefreq: 'daily' | 'weekly' | 'monthly';
@@ -58,16 +57,3 @@ export const PUBLIC_PATHS: PublicPath[] = [
   { path: '/trace', changefreq: 'weekly', priority: '0.6' },
   { path: '/hover-cards', changefreq: 'monthly', priority: '0.3' },
 ];
-
-const PUBLIC_PATH_SET = new Set(PUBLIC_PATHS.map((p) => p.path));
-
-/** normalize pathname ให้เทียบกับรายการได้เสมอ (หน้าจริงลงท้าย / เพราะ trailingSlash: true) */
-export function normalizePath(pathname: string): string {
-  const p = pathname.split('?')[0].split('#')[0];
-  return p.replace(/\/+$/, '') || '/';
-}
-
-/** หน้านี้เป็นหน้าสาธารณะไหม (ผู้มาเยือมที่ยังไม่ล็อกอินต้องไม่เห็นเมนูภายใน) */
-export function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATH_SET.has(normalizePath(pathname));
-}
