@@ -6,6 +6,7 @@ import Sidebar from "../../components/layout/Sidebar";
 import PageHeader from "../../components/ui/PageHeader";
 import Icon from "../../components/ui/Icon";
 import { useLanguageStore } from "../../stores/useLanguageStore";
+import SeoHead from "../../components/public/SeoHead";
 
 function generateDemoHeightData(w: number, h: number): number[] {
   const data: number[] = [];
@@ -64,6 +65,19 @@ export default function TerrainDemoPage() {
 
   return (
     <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100 flex">
+      {/* ── สถานะ SEO (ตัดสินใจ 4/10/69): ไม่ประกาศ — noindex ถาวร ──
+          * เหตุผล: หน้านี้คือ “นาภาพสาธารณะ” แต่เป็นสาธารณะในความหมายที่ผิด
+          *   - หัวข้อในหน้าเขียนเองว่า “Design System” = เครื่องมือสำหรับคนทำ/ทดสอบ UI ไม่ใช่เนื้อหาสำหรับผู้มาเยือม
+          *   - ควบคุมด้วย sidebar ของระบบ (หน้าที่ควรอยู่หลังล็อกอิน)
+          *   - ในโค้ดทั้งแอปไม่มีลิงก์เข้ามาที่หน้านี้เลย (orphan จริง — ไม่มีใครเข้าถึง)
+          *   - เนื้อหาคือค่าตัวเลขสังเคราะห์ที่คำนวณในเบราว์เซอร์ ไม่ใช่ข้อมูลของระบบจริงที่ควรถูกค้น
+          * → การประกาศหน้านี้จะทำให้ Google เจอหน้าที่ทุกคนเห็นเหมือนกันว่าข้อมูลซ้ำกัน ไม่ใช่เนื้อหาที่มีคุณค่า */}
+      <SeoHead
+        title="3D Terrain Viewer (Design System) — Sovereign Origin"
+        description="เครื่องมือทดสอบภาพ terrain 3 มิติ สำหรับทดสอบ UI ภายในของระบบ"
+        path="/terrain-demo"
+        noindex
+      />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-6xl mx-auto w-full">
