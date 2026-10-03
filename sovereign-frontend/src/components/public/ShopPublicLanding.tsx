@@ -11,6 +11,7 @@
 //   2. ใช้เฉพาะตอน "ยังไม่รู้ว่าเปิดร้านไหน" = ตอน SSR และตอน fetch ไม่ได้ผล
 //   3. พอฝั่ง client รู้รหัสร้านแล้ว ShopPage สลับไปแสดงหน้าร้านจริง (h1 เดียวเหมือนเดิม)
 import { FounderCredit } from './FounderCredit';
+import SeoHead from './SeoHead';
 
 const SAMPLE_PRODUCTS = [
   { name: 'ชุดอุปกรณ์วัดความชื้นดิน', spec: 'SHT31 + ESP32 · ส่งค่าทุก 10 วินาที', price: '฿1,290' },
@@ -29,6 +30,13 @@ const STEPS = [
 export default function ShopPublicLanding() {
   return (
     <div className="bg-gray-950 min-h-screen text-gray-100">
+      {/* SeoHead ต้องอยู่ในคอมโพเนนต์นี้เอง — หน้าร้านเดิมใส่ไว้ใน ShopShell แต่ branch
+          นี้ return ออกมานอก ShopShell ถ้าไม่ใส่เองจะหลุด title/canonical (seo-preflight จับได้) */}
+      <SeoHead
+        title="หน้าร้านชิ้นงานและอุปกรณ์ — Sovereign Origin"
+        description="หน้าร้านสาธารณะของ Sovereign Origin — ชุดอุปกรณ์และซอฟต์แวร์พร้อมบัตรตามรอยการผลิต รองรับการสั่งซื้อออนไลน์ผ่าน PromptPay"
+        path="/shop"
+      />
       <main className="max-w-3xl mx-auto px-4 py-12 space-y-10">
         <header className="space-y-3">
           <div className="mono text-[10px] tracking-[0.3em] uppercase text-emerald-400/80">หน้าร้านสนับสนุน</div>
