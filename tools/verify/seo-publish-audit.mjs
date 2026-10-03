@@ -36,14 +36,13 @@
  * กติกาที่ "รายงาน" แต่ไม่ fail (เจ้าของต้องตัดสินใจเอง — แก้ต้องแตะโค้ดหน้า):
  *   - หน้า auth-free ที่ประกาศ noindex แล้วไม่อยู่ใน sitemap = ตั้งใจไม่ให้ Google (เช่น /partners/me)
  *   - หน้า auth-free ที่ไม่มี robots เลยและไม่อยู่ใน sitemap = ยังไม่เคยตัดสินใจ → อาจหลุด
- *     (--fail-candidates จะทำให้สองกองนี้กลายเป็น fail ด้วย ถ้าต้องการบังคับ)
  *
- * ใช้: node tools/verify/seo-publish-audit.mjs [--fail-candidates] [--public-list <ไฟล์>]
- *   --strict  = รับไว้เพื่อความเข้ากันได้ (ไม่มีผล · ข้อผิดพลาด fail อยู่แล้ว)
- *   --fail-candidates = ยกกอง "รอตัดสินใจ" ให้ fail ด้วย (เจ้าของต้องการให้บังคับ)
+ * ใช้: node tools/verify/seo-publish-audit.mjs
+ *   ไม่มี flag ที่เปลี่ยนพฤติกรรม · --strict รับไว้เพื่อความเข้ากันได้ (ไม่มีผล · ข้อผิดพลาด fail อยู่แล้ว)
+ *   จุดเข้าอื่นของเครื่องมือ (เช่น loadPublicPaths(accessFile)) เป็นของโมดูล ใช้จากเทสต์ได้ แต่ไม่เปิดเป็น CLI
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -234,15 +233,9 @@ export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
 const names = (list) => list.map((r) => r.route).join(', ') || '—';
 
 async function main() {
-  const argv = process.argv.slice(2);
-  const failCandidates = argv.includes('--fail-candidates');
-  const listArg = argv.indexOf('--public-list');
-  // resolve ไม่ใช่ join: ถ้าผู้ใช้ใส่พาธแบบสัมบูรณ์ (C:\... หรือ /abs) join จะเอาไปต่อท้าย cwd จนพาธพัง
-  const accessFile = listArg >= 0 && argv[listArg + 1] ? resolve(process.cwd(), argv[listArg + 1]) : ACCESS;
-
   let report;
   try {
-    report = await audit({ accessFile });
+    report = await audit();
   } catch (err) {
     // ดักที่ชั้นนี้โดยเฉพาะ: เครื่องมืออ่านไม่ได้ = fail เสมอ แม้ไม่ใส่ --strict
     // เพราะการรายงาน "ผ่าน" ตอนที่ยังไม่ได้ตรวจอะไรเลย คือความล้มเหลวที่แย่กว่า error
@@ -270,12 +263,11 @@ async function main() {
   for (const c of candidates) console.log(`  ⚠ ${c.route} — ${c.why} (${c.file})`);
 
   for (const f of findings) console.log(`✗ ${f}`);
-  const problems = findings.length + (failCandidates ? candidates.length : 0);
   console.log(
-    `\nseo-publish-audit: ${problems ? `มีปัญหา ${problems} จุด` : 'ผ่าน'}` +
+    `\nseo-publish-audit: ${findings.length ? `มีปัญหา ${findings.length} จุด` : 'ผ่าน'}` +
       `${candidates.length ? ` (ยังไม่ตัดสินใจ ${candidates.length} หน้า — ดูด้านบน)` : ' (ไม่มีหน้าค้าง)'}`,
   );
-  process.exitCode = problems ? 1 : 0;
+  process.exitCode = findings.length ? 1 : 0;
 }
 
 // รันเฉพาะตอนเรียกตรง ๆ (ไม่ใช่ตอนถูก import ไปเทสต์)
