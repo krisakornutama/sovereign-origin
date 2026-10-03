@@ -12,6 +12,7 @@
 //   3) หน้าที่ประกาศ index แต่ไม่อยู่ใน sitemap = ต้องจับ (บั๊กรุ่นแรก)
 //   4) หน้าที่อยู่ใน sitemap แต่เป็น noindex = ต้องจับ (ขัดกันเอง)
 //   5) ป้าย auth-free ใช้ตอนพิมพ์อย่างเดียว ห้ามกรองข้อผิดพลาดออก
+//   6) noindex={false} = เจ้าของสั่งให้ประกาศ · ต้องไม่ถูกอ่านเป็น "ตัดสินใจไม่ประกาศ"
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -163,6 +164,36 @@ check('noindex หลายบรรทัดในแท็ก = noindex',
   classify('<SeoHead\n  title="t"\n  path="/x"\n  noindex\n/>') === 'noindex');
 check('meta robots noindex จริง = noindex',
   classify('<Head><meta name="robots" content="noindex" /></Head>') === 'noindex');
+
+// ─────────────────────────────────────────────────────────────
+// 9) noindex={false} = เจ้าของสั่งให้ "ประกาศ" → ห้ามถูกอ่านเป็น "ตัดสินใจไม่ประกาศแล้ว"
+//    ทิศทางของบั๊กนี้ตรงข้ามกับเจตนาของเครื่องมือ: หน้าที่เจ้าของเปิดให้ Google เข้า
+//    ถูกยกเป็น deliberate (ตัดสินใจแล้ว) เงียบ ๆ ไม่มีใครเห็น = บั๊กชนิดเดียวกับที่
+//    regex 600 ตัวอักษรเคยทำ (หน้าที่ใช้ index จริงหายจากการพิจารณา)
+// ─────────────────────────────────────────────────────────────
+check('noindex={false} = ไม่ประกาศ noindex (เจ้าของสั่งให้เปิดให้ Google เข้า)',
+  classify('<SeoHead title="t" path="/x" noindex={false} />') === 'index');
+check('noindex={false} ที่มี meta noindex ทับ = noindex (ตัวที่ยืนยันได้ชนะ)',
+  classify('<SeoHead path="/x" noindex={false} /><meta name="robots" content="noindex" />') === 'noindex');
+check('noindex={!cond} ที่เดาค่าไม่ได้ ≠ หลักฐานว่าสั่งไม่ประกาศ (ต้องโดนจับดัง ๆ แทนที่จะเงียบ)',
+  classify('<SeoHead title="t" path="/x" noindex={isSecret} />') === 'index');
+check('data-noindex="false" ไม่ใช่ noindex (ชื่อแอตทริบิวต์คนละตัว)',
+  classify('<SeoHead title="t" data-noindex="false" />') === 'index');
+// กันการ "แก้จนพังของจริง": 3 หน้าที่สั่ง noindex บนดิสก์ใช้ noindex ลอย ๆ ต้องยังถูกจับ
+check('noindex ลอย ๆ (แบบที่ 3 หน้าจริงใช้) ยังเป็น noindex',
+  classify('<SeoHead title="t" path="/x" noindex />') === 'noindex');
+
+// ─────────────────────────────────────────────────────────────
+// 10) robots meta ที่มีช่องว่างนำหน้าใน content
+//     `content=" noindex, nofollow"` คือรูปแบบที่เขียนกันปกติ (คนเว้นวรรคหลังเครื่องหมายคำพูด)
+//     เดิม regex เดียวกันกับกรณี prop บังคับให้ต้องไม่มีช่องว่าง → อ่านเป็น none = หน้าหลุดเงียบ
+// ─────────────────────────────────────────────────────────────
+check('content=" noindex, nofollow" (เว้นวรรคนำหน้า) = noindex',
+  classify('<Head><meta name="robots" content=" noindex, nofollow" /></Head>') === 'noindex');
+check('content=" index, follow" (เว้นวรรคนำหน้า) = index',
+  classify('<Head><meta name="robots" content=" index, follow" /></Head>') === 'index');
+check('noindex มาหลัง <SeoHead> ยังชนะ (ไม่ต้องเป็นแท็กแรก)',
+  classify('<SeoHead path="/x" /><meta name="robots" content="  noindex" />') === 'noindex');
 
 console.log(fails === 0 ? '\nผ่านทั้งหมด' : `\nFAIL ${fails} เคส`);
 process.exitCode = fails === 0 ? 0 : 1;
