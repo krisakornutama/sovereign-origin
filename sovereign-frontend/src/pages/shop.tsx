@@ -7,6 +7,8 @@ import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
 import { FounderCredit } from '../components/public/FounderCredit';
 import { trackPageView, trackCtaClick, trackQuestion } from '../lib/visitorTrack';
+import ShopPublicLanding from '../components/public/ShopPublicLanding';
+import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /shop — หน้าร้านสาธารณะ (ไม่ต้อง login) — ออกแบบตาม "สลิปบนเคาน์เตอร์ยามค่ำ"
@@ -71,7 +73,9 @@ export default function ShopPage() {
     setMounted(true);
   }, [router.asPath]);
 
-  if (!route) return <ShopShell>{mounted ? <Empty title="ไม่พบหน้าร้าน" text="กรุณาใช้ลิงก์จากร้านค้า — ลิงก์จะมีรหัสร้านหรือรหัสออเดอร์ต่อท้าย" /> : <Loading label="กำลังเปิดหน้าร้าน…" />}</ShopShell>;
+  // P24 (3/10/69): ยังไม่รู้รหัสร้าน (ตอน SSR หรือ fetch ไม่ได้ผล) ให้หน้าแนะนำที่มี h1 + เนื้อหาสำหรับผู้มาเยือน
+  const showPublic = isPublicHostname() && !(mounted && isLocalHostname());
+  if (!route) return showPublic ? <ShopPublicLanding /> : <ShopShell>{mounted ? <Empty title="ไม่พบหน้าร้าน" text="กรุณาใช้ลิงก์จากร้านค้า — ลิงก์จะมีรหัสร้านหรือรหัสออเดอร์ต่อท้าย" /> : <Loading label="กำลังเปิดหน้าร้าน…" />}</ShopShell>;
   if (route.mode === 'order') return <OrderView key={route.key} token={route.key} />;
   return <Storefront key={route.key} businessId={route.key} />;
 }
