@@ -5,6 +5,14 @@
  * แต่ไม่ตรวจกลับ — ถ้าหน้าใดหน้าหนึ่ง "พร้อมประกาศ" แล้วหลุด sitemap หรือถูกทิ้งไว้เป็น noindex
  * จะไม่มีอะไรจับได้เลย (ไม่มี error ไม่มี warning · คนคิดว่าประกาศอยู่แล้ว)
  *
+ * ── โครงสร้าง: ไฟล์นี้เป็น "ตัวอ่านข้อมูล" · กติกาทั้งหมดอยู่ที่ seo-rules.mjs ──
+ * กติกาการตัดสิน (อ่านซอร์สหน้าแล้วรู้ว่า index/noindex/none · หน้านี้อยู่กองไหน · ข้อความ error)
+ * ย้ายไปอยู่ใน `seo-rules.mjs` เพราะเป็นส่วนที่เปลี่ยนบ่อยและพังง่ายที่สุด — ที่นั่นไม่มีดิสก์ ไม่มี process
+ * ทำให้ทดสอบกติกาเดี่ยว ๆ ได้โดยไม่ต้องเดินทั้งระบบ (กติกาที่แยกไปเป็นไฟล์แต่ยังทดสอบเฉพาะกับเครื่องมือรวม
+ * คือย้ายแล้วไม่ได้อะไรผล — บั๊ก "จับคำว่า noindex ในคอมเมนต์" เคยผ่านตาไปเพราะกันด้วยข้อความยาว 600 ตัวอักษร)
+ * ไฟล์นี้เหลือหน้าที่ 4 อย่าง: อ่านไฟล์ · import โมดูลจริง · เดิน src/pages · พิมพ์รายงาน
+ * ชื่อฟังก์ชันที่ export ไว้เดิมยังใช้ได้ครบ (classify/isAuthFree/routeOf ถูก re-export ต่อ — ไฟล์เทสต์เดิมไม่ต้องแก้)
+ *
  * ── บั๊กที่เคยทำให้เครื่องมือนี้ "ผ่าน" ทั้งที่มีหน้าหลุด ──
  * รุ่นแรกอ่านรายการหน้าสาธารณะด้วย regex จากซอร์ส (.ts) แล้วคิดเฉพาะหน้าที่ "ประกาศ index"
  * ผลคือ หน้าที่ยังไม่ประกาศอะไรเลย (robots=none) หรือประกาศ noindex จะ **หายไปจากการตรวจ**
@@ -44,66 +52,25 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  assertAllBucketed,
+  classify,
+  classifyRoute,
+  findDeadPaths,
+  isAuthFree,
+  routeOf as routeOfRule,
+} from './seo-rules.mjs';
+
+// re-export ต่อ: ไฟล์เทสต์และผู้เรียกเดิม import ชื่อเดิมจากไฟล์นี้ · เปลี่ยนที่อยู่ของกติกา ไม่ใช่ชื่อที่คนใช้
+export { classify, isAuthFree };
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const PAGES = join(ROOT, 'sovereign-frontend', 'src', 'pages');
 const ACCESS = join(ROOT, 'sovereign-frontend', 'src', 'lib', 'publicAccess.ts');
 
-/** หน้าข้อผิดพลาดของ Next — ไม่ใช่เนื้อหาที่จะประกาศ จึงไม่ต้องตัดสินใจเรื่อง sitemap */
-const SPECIAL_ROUTES = new Set(['/404', '/500']);
-
-/** route ของไฟล์หน้า: src/pages/about.tsx → /about · src/pages/partners/guide.tsx → /partners/guide
- *  · src/pages/index.tsx → / · src/pages/terrain-demo/index.tsx → /terrain-demo */
+/** route ของไฟล์หน้า — ค่าเริ่มต้นผูกกับ src/pages ของโปรเจกต์ จึงอยู่ตรงนี้ ส่วนกติกาแปลง path เป็น route อยู่ที่ seo-rules.mjs */
 export function routeOf(file, pagesDir = PAGES) {
-  const rel = relative(pagesDir, file).replace(/\\/g, '/').replace(/\.tsx?$/, '');
-  const trimmed = rel.replace(/(^|\/)index$/, '').replace(/\/+$/, '');
-  return trimmed === '' ? '/' : '/' + trimmed;
-}
-
-/** ตัดคอมเมนต์ออกก่อนอ่าน — ไม่งั้น “คำว่า noindex ในคอมเมนต์” จะถูกมองเป็นโค้ดจริง
- *  `//` นับเป็นคอมเมนต์เฉพาะที่ไม่ได้ตามด้วย `:` (กัน URL อย่าง https:// ถูกตัดทิ้ง) */
-function stripComments(src) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-}
-
-/** attribute string ของทุกเปิดแท็ก JSX ที่ชื่อนี้ — จบที่ `>` แรกที่ไม่อยู่ใน quote
- *  (จำเป็น: title="a > b" ต้องไม่ตัดแท็กกลางคัน) */
-function openTags(src, name) {
-  return [...src.matchAll(new RegExp(`<${name}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'g'))].map((m) => m[1]);
-}
-
-/** หน้านี้ประกาศว่าจะเปิดให้ Google เข้ามาดูหรือไม่ (อ่านจากโค้ด ไม่เดา)
- *
- * กติกา: อ่าน **แอตทริบิวต์ของแท็กจริง** ไม่ใช่ “มีคำว่า noindex อยู่ใกล้ ๆ”
- * มีแค่สองทางที่ noindex ไปถึงหน้าจริง (ดู SeoHead.tsx):
- *   ① <SeoHead ... noindex />            → prop ในเปิดแท็ก
- *   ② <meta name="robots" content="noindex" />  (ใช้ตรง ๆ เช่น partners/me)
- *
- * บั๊กที่เคยเกิด (4/10/69): รุ่นก่อนใช้ /<SeoHead\b[\s\S]{0,600}?\bnoindex\b/
- * ซึ่งจับคำในคอมเมนต์ได้ → หน้าที่ใช้ index จริงถูกอ่านว่า noindex = หน้าหายจากการพิจารณา
- * โดยไม่มีเหตุผล ซึ่งเป็นบั๊กชนิดเดียวกับที่เครื่องมือนี้ถูกรีบเขียนใหม่เพื่อแก้
- *
- * ข้อจำกัดที่รู้ไว้: ถ้าหน้าไหนส่ง props แบบ spread (`<SeoHead {...SEO} />`) และซ่อน noindex
- * ไว้ในอ็อบเจกต์ เครื่องมือนี้มองไม่เห็น — ปัจจุบันไม่มีหน้าไหนเขียนแบบนั้น (ตรวจแล้ว 4 จุด)
- * ถ้าวันหนึ่งมี ให้เขียน noindex ตรง ๆ แทน จะได้ไม่หลุด */
-export function classify(src) {
-  const code = stripComments(src);
-  const seoTags = openTags(code, 'SeoHead');
-  const metaTags = openTags(code, 'meta');
-  const isRobots = (t) => /\bname\s*=\s*["']robots["']/.test(t);
-
-  if (seoTags.some((t) => /(^|\s)noindex(\s|=|\/|$)/.test(t))) return 'noindex';
-  if (metaTags.some((t) => isRobots(t) && /\bcontent\s*=\s*["']noindex/.test(t))) return 'noindex';
-  if (metaTags.some((t) => isRobots(t) && /\bcontent\s*=\s*["']index/.test(t))) return 'index';
-  if (seoTags.length) return 'index';
-  return 'none';
-}
-
-/** หน้านี้เปิดดูได้โดยไม่ต้องล็อกอินไหม — ใช้เป็น**ป้ายกำกับตอนพิมพ์รายงาน**เท่านั้น
- *  หน้าที่ไม่อ้าง auth store = ไม่ได้อ่านสถานะล็อกอิน = ไม่อยู่หลังระบบ
- *  ⚠ ห้ามใช้ค่านี้กรองข้อผิดพลาดออก — เกณฑ์ข้อ 1-3 ตรวจทุกหน้าเท่ากันหมด */
-export function isAuthFree(src) {
-  return !/\buseAuthStore\b/.test(src);
+  return routeOfRule(file, pagesDir);
 }
 
 /** อ่านรายการหน้าสาธารณะจาก**โมดูลจริง** (import) ไม่ใช่ regex
@@ -161,7 +128,7 @@ export function enumerateRoutes(pagesDir = PAGES) {
 }
 
 /** ตรวจทั้งระบบ — คืน findings (ต้องแก้/ต้อง fail) + candidates (ต้องให้เจ้าของตัดสินใจ)
- *  ทุก route จะอยู่ใน buckets กองใดกองหนึ่งเสมอ (ตรวจสมบูรณ์ท้ายฟังก์ชัน) */
+ *  หน้าที่อ่านไฟล์แล้วส่งต่อให้กติกาใน seo-rules.mjs ตัดสินทุกหน้า · ที่นี่แค่เก็บผลลงกอง */
 export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
   const sitemapPaths = await loadPublicPaths(accessFile); // throw ถ้าอ่านไม่ได้
   const sitemapSet = new Set(sitemapPaths);
@@ -180,52 +147,27 @@ export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
     internal: [],       // อยู่หลังระบบล็อกอิน → ไม่ต้องประกาศ
   };
 
-  const seen = new Set();
   for (const entry of routes) {
     const src = readFileSync(entry.file, 'utf8');
-    const robots = classify(src);
-    const authFree = isAuthFree(src);
-    const announced = sitemapSet.has(entry.route);
-    const row = { route: entry.route, robots, authFree, file: relative(ROOT, entry.file) };
-
-    if (SPECIAL_ROUTES.has(entry.route)) { buckets.internal.push({ ...row, why: 'หน้าข้อผิดพลาดของ Next' }); continue; }
-    if (announced && robots === 'noindex') {
-      findings.push(`${entry.route} อยู่ใน sitemap แต่หน้าเป็น noindex — ขัดกันเอง ต้องเลือกอย่างใดอย่างหนึ่ง (${row.file})`);
-      buckets.contradiction.push(row); continue;
-    }
-    if (announced) {
-      (robots === 'none' ? buckets.noDirective : buckets.announced).push(row); continue;
-    }
-    if (robots === 'index') {
-      findings.push(`${entry.route} ประกาศ index,follow แต่ไม่อยู่ใน sitemap — Google จะไม่รู้จักหน้านี้เลย (${row.file})`);
-      buckets.missed.push(row); continue;
-    }
-    if (robots === 'noindex') {
-      // noindex = “ตัดสินใจแล้วว่าไม่ประกาศ” ไม่ใช่ “ยังไม่ตัดสินใจ”
-      // (แยกสองอย่างนี้ออกจากกัน 4/10/69 — ก่อนหน้านี้หน้าที่สั่งไม่ประกาศอย่างชัดเจน
-      //  ถูกนับปนกับหน้าที่ยังไม่เคยตัดสินใจ ทำให้เจ้าของเห็นงานค้างที่ไม่มีจริง)
-      excluded.push({ ...row, why: 'ประกาศ noindex ไว้อย่างชัดเจน = ตัดสินใจไม่ประกาศแล้ว' });
-      buckets.deliberate.push(row); continue;
-    }
-    // robots = none
-    if (authFree) {
-      candidates.push({ ...row, why: 'auth-free + ไม่มี robots meta + ไม่อยู่ใน sitemap (ยังไม่เคยตัดสินใจ)' });
-      buckets.undecided.push(row); continue;
-    }
-    buckets.internal.push({ ...row, why: 'อยู่หลังระบบล็อกอิน' });
+    const verdict = classifyRoute({
+      route: entry.route,
+      robots: classify(src),
+      authFree: isAuthFree(src),
+      announced: sitemapSet.has(entry.route),
+      file: relative(ROOT, entry.file),
+    });
+    buckets[verdict.bucket].push(verdict.bucketRow);
+    if (verdict.finding) findings.push(verdict.finding);
+    if (verdict.candidate) candidates.push(verdict.candidate);
+    if (verdict.excluded) excluded.push(verdict.excluded);
   }
 
-  // สมบูรณ์: ทุก route ต้องถูกจัดเข้ากอง ไม่มีหน้าไหนหายไปเงียบ ๆ
-  const classified = Object.values(buckets).reduce((n, list) => n + list.length, 0);
-  if (classified !== routes.length) {
-    throw new Error(`ข้อมูลไม่ครบ: จัดเข้ากองได้ ${classified} หน้า แต่บนดิสก์มี ${routes.length} หน้า — หยุดตรวจ`);
-  }
+  // สมบูรณ์: ทุก route ต้องถูกจัดเข้ากอง ไม่มีหน้าไหนหายไปเงียบ ๆ (throw ถ้าไม่ครบ)
+  assertAllBucketed(buckets, routes.length);
 
-  // รายการตาย: URL ใน sitemap ที่ไม่มีไฟล์หน้าจริง
   const byRoute = new Map(routes.map((r) => [r.route, r]));
-  for (const p of sitemapPaths) {
-    if (!byRoute.has(p)) findings.push(`sitemap มี ${p} แต่ไม่มีไฟล์ src/pages${p === '/' ? '/index' : p}.tsx`);
-  }
+  // รายการตาย: URL ใน sitemap ที่ไม่มีไฟล์หน้าจริง
+  findings.push(...findDeadPaths(sitemapPaths, routes));
 
   return { sitemapPaths, routes, nonPageRoutes, byRoute, buckets, findings, candidates, excluded };
 }
