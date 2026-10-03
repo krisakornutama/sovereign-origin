@@ -143,5 +143,26 @@ try {
 check('ไม่อ้าง auth store = auth-free', isAuthFree('export default function P(){return <div/>}') === true);
 check('อ้าง auth store = หน้าในระบบ', isAuthFree("import { useAuthStore } from 'x';") === false);
 
+// ─────────────────────────────────────────────────────────────
+// 8) classify() ต้องอ่าน “แอตทริบิวต์” ไม่ใช่ “คำ” ที่อยู่ใกล้ ๆ
+//    เคสนี้มาจากบั๊กจริง: รุ่นก่อนใช้ /<SeoHead\b[\s\S]{0,600}?\bnoindex\b/
+//    ซึ่งจับคำที่อยู่ในคอมเมนต์ได้ด้วย → หน้าที่ใช้ index จริงถูกอ่านว่า noindex
+//    = หน้าหายจากการพิจารณาโดยไม่มีเหตุผล (บั๊กเดียวกับที่เครื่องมือนี้ถูกรีบเขียนใหม่เพื่อแก้)
+// ─────────────────────────────────────────────────────────────
+check('คำว่า noindex ในคอมเมนต์หลัง <SeoHead> ≠ noindex',
+  classify('<SeoHead title="t" path="/x" />\n{/* ห้ามใส่ noindex ตรงนี้ */}') === 'index');
+check('content="noindex" ในคอมเมนต์ก่อน <SeoHead> ≠ noindex',
+  classify('{/* อย่าเขียน content="noindex" ตรงนี้ */}\n<SeoHead title="t" path="/x" />') === 'index');
+check('คำว่า noindex ในสตริงข้อมูลที่ไม่เกี่ยวกัน ≠ noindex',
+  classify('const hint = "อย่าใส่ noindex";\n<SeoHead title="t" path="/x" />') === 'index');
+check('noindex prop จริง = noindex (ต้องยังจับได้)',
+  classify('<SeoHead title="t" path="/x" noindex />') === 'noindex');
+check('noindex={true} ก็ต้องจับได้',
+  classify('<SeoHead title="t" path="/x" noindex={true} />') === 'noindex');
+check('noindex หลายบรรทัดในแท็ก = noindex',
+  classify('<SeoHead\n  title="t"\n  path="/x"\n  noindex\n/>') === 'noindex');
+check('meta robots noindex จริง = noindex',
+  classify('<Head><meta name="robots" content="noindex" /></Head>') === 'noindex');
+
 console.log(fails === 0 ? '\nผ่านทั้งหมด' : `\nFAIL ${fails} เคส`);
 process.exitCode = fails === 0 ? 0 : 1;
