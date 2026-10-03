@@ -141,7 +141,8 @@ export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
   const { routes, nonPageRoutes } = enumerateRoutes(pagesDir);
 
   const findings = [];
-  const candidates = [];
+  const candidates = [];   // ยังไม่เคยตัดสินใจ (robots=none) — งานค้างจริง
+  const excluded = [];     // ตัดสินใจไม่ประกาศแล้ว (noindex) — ไม่ใช่งานค้าง
   const buckets = {
     announced: [],      // ประกาศใน sitemap + robots=index → ถูกต้อง
     noDirective: [],    // ประกาศใน sitemap แต่ไม่มี robots meta (default index → ใช้ได้ แต่ควรเขียนให้ชัด)
@@ -173,7 +174,10 @@ export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
       buckets.missed.push(row); continue;
     }
     if (robots === 'noindex') {
-      candidates.push({ ...row, why: 'auth-free + noindex + ไม่อยู่ใน sitemap (ตั้งใจไม่ให้ index)' });
+      // noindex = “ตัดสินใจแล้วว่าไม่ประกาศ” ไม่ใช่ “ยังไม่ตัดสินใจ”
+      // (แยกสองอย่างนี้ออกจากกัน 4/10/69 — ก่อนหน้านี้หน้าที่สั่งไม่ประกาศอย่างชัดเจน
+      //  ถูกนับปนกับหน้าที่ยังไม่เคยตัดสินใจ ทำให้เจ้าของเห็นงานค้างที่ไม่มีจริง)
+      excluded.push({ ...row, why: 'ประกาศ noindex ไว้อย่างชัดเจน = ตัดสินใจไม่ประกาศแล้ว' });
       buckets.deliberate.push(row); continue;
     }
     // robots = none
@@ -196,7 +200,7 @@ export async function audit({ pagesDir = PAGES, accessFile = ACCESS } = {}) {
     if (!byRoute.has(p)) findings.push(`sitemap มี ${p} แต่ไม่มีไฟล์ src/pages${p === '/' ? '/index' : p}.tsx`);
   }
 
-  return { sitemapPaths, routes, nonPageRoutes, byRoute, buckets, findings, candidates };
+  return { sitemapPaths, routes, nonPageRoutes, byRoute, buckets, findings, candidates, excluded };
 }
 
 const names = (list) => list.map((r) => r.route).join(', ') || '—';
@@ -219,7 +223,7 @@ async function main() {
     return;
   }
 
-  const { sitemapPaths, routes, nonPageRoutes, buckets, findings, candidates } = report;
+  const { sitemapPaths, routes, nonPageRoutes, buckets, findings, candidates, excluded } = report;
   console.log(`หน้าบนดิสก์: ${routes.length} route (${nonPageRoutes.length} ไฟล์ route ที่ไม่ใช่หน้า: ${names(nonPageRoutes.map((r) => ({ route: r.route })))})`);
   console.log(`sitemap (PUBLIC_PATHS): ${sitemapPaths.length} URL`);
 
@@ -231,14 +235,17 @@ async function main() {
   if (buckets.missed.length) console.log(`— ประกาศ index แต่หลุด sitemap (${buckets.missed.length}) — ${names(buckets.missed)}`);
   if (buckets.contradiction.length) console.log(`— อยู่ใน sitemap แต่เป็น noindex (${buckets.contradiction.length}) — ${names(buckets.contradiction)}`);
 
-  console.log(`\nต้องให้เจ้าของตัดสินใจ (auth-free ที่ยังไม่ถูกประกาศ) — ${candidates.length} หน้า`);
+  console.log(`\nตัดสินใจแล้วว่าไม่ประกาศ (noindex) — ${excluded.length} หน้า`);
+  for (const c of excluded) console.log(`  · ${c.route} — ${c.why} (${c.file})`);
+
+  console.log(`\nยังไม่เคยตัดสินใจ (auth-free ที่ไม่มี robots meta และไม่อยู่ใน sitemap) — ${candidates.length} หน้า`);
   for (const c of candidates) console.log(`  ⚠ ${c.route} — ${c.why} (${c.file})`);
 
   for (const f of findings) console.log(`✗ ${f}`);
   const problems = findings.length + (failCandidates ? candidates.length : 0);
   console.log(
     `\nseo-publish-audit: ${problems ? `มีปัญหา ${problems} จุด` : 'ผ่าน'}` +
-      `${candidates.length && !failCandidates ? ` (เตือน: หน้าที่รอตัดสินใจ ${candidates.length} หน้า — ดูด้านบน)` : ''}`,
+      `${candidates.length ? ` (ยังไม่ตัดสินใจ ${candidates.length} หน้า — ดูด้านบน)` : ' (ไม่มีหน้าค้าง)'}`,
   );
   process.exitCode = problems ? 1 : 0;
 }
