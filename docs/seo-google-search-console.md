@@ -92,6 +92,47 @@ curl -s -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.h
 
 **กติกาที่ใช้:** *อย่าประกาศ URL ใน sitemap จนกว่าหน้านั้นจะผ่านกติกา h1 ข้างบน* — sitemap คือคำมั่นว่า "หน้านี้มีเนื้อหา" ถ้าประกาศแล้วแต่หน้าว่าง Google จะนับเป็นหน้าเสียที่ไม่มีอะไรให้อ่าน
 
+### ✅ ซ่อนเมนูภายในจากหน้าสาธารณะ 3/10/69 — เหลือเฉพาะผู้ที่ล็อกอินแล้ว
+**ปัญหาที่เจอ:** `/trace` `/mbti` `/hover-cards` ประกาศใน sitemap แต่หน้าเหล่านี้ import `<Sidebar />`
+→ HTML ที่ Googlebot ดึงได้มีเมนูภายในทั้งหมด (Dashboard · Users · Settings · Backup · Audit)
+พร้อมลิงก์ไปหน้าภายในของระบบ — WAF บล็อกหน้าเหล่านั้นไว้ 403 จึงไม่รั่วข้อมูล
+แต่ "ไม่รั่ว" ≠ "ไม่ควรเห็น" และเปิดโครงสร้างภายในให้ crawl เกินจำเป็น
+
+**แก้:** `lib/useHideInternalNav.ts` = กติกาเดียว `isPublicPath(pathname) && !isAuthenticated → ซ่อน`
+ใช้กับ Sidebar · MobileNav (มือถือ) · CommandPalette (Ctrl+K — กันที่ตัว palette เพราะผู้เยี่ยมกดได้)
+หน้าในระบบไม่ถูกแตะเลย → เจ้าของที่ล็อกอินแล้วเห็นเมนูครบทุกหน้าเหมือนเดิม
+
+**กันหลุดอีก:** ย้ายรายการหน้าสาธารณะไปไว้ที่ `lib/publicAccess.ts` (`PUBLIC_PATHS`) จุดเดียว
+`sitemap.xml.ts` import ตรง ๆ — ก่อนหน้านี้มีรายการสองชุดแยกกัน (ประกาศใน sitemap แต่ไม่ได้ซ่อนเมนู = บั๊กที่เจอ)
+
+**พิสูจน์บนโดเมนจริง (UA Googlebot):** `/trace/` `/mbti/` `/hover-cards/` `/demo/` `/`
+→ ลิงก์เมนูภายใน **0 รายการ** ในทุกหน้า (ก่อนแก้หน้าสาธารณะ 3 หน้านี้มี Sidebar ปนอยู่)
+
+### ✅ เกณฑ์ thin content 3/10/69 — ไม่ใช่ดูแค่ h1
+`h1` มี 1 อันแต่ข้อความรวมไม่ถึง **800 ตัวอักษร** = หน้าแทบไม่มีอะไรให้อ่าน (thin content · เกณฑ์เดียวกับที่ Google ใช้)
+`seo-preflight.mjs` นับจาก HTML จริง โดยตัด `script/style/svg/nav/aside` ทิ้งก่อน
+(สาระสำคัญ: ตัด `nav` เพราะก่อนหน้านี้ตัวเลขหน้าสาธารณะ "ดูมีเนื้อหา" เพราะนับข้อความเมนูภายในไปด้วย)
+
+**ปรับเกณฑ์ได้:** `SEO_MIN_TEXT_CHARS=800` (env) · เปลี่ยนกติกา = แก้ที่นี่ ไม่ต้องแก้โค้ด
+
+**เกณฑ์นี้จับอะไรได้จริงรอบแรก:** หลังซ่อน Sidebar ตัวเลขหน้าจริงลดลงทั้ง 4 หน้า
+`/` 527 · `/community` 299 · `/mbti` 697 · `/trace` 267 → แก้ที่ต้นเหตุด้วยการ **เพิ่มเนื้อหาจริง**
+(`components/public/PageIntro.tsx` + `DemoExplain.tsx` เรนเดอร์ตอน SSR) ไม่ลดเกณฑ์
+ผลหลังแก้: `/` 1,104 · `/community` 948 · `/mbti` 1,304 · `/trace` 812 · `/demo` 3,608 ตัวอักษร → ผ่าน 11/11
+
+**เทสต์:** `tools/test/seo-h1.test.mjs` 16 เคส (thin · ตัวแก้เกณฑ์ · ไม่นับ nav · ไม่นับซ้ำหน้าตาย) · ผูกเข้า `npm run verify` สายที่ 3
+
+### ✅ audit กลับ: หน้าที่ประกาศ index แต่หลุด sitemap 3/10/69
+`seo-preflight.mjs` ตรวจจาก sitemap ไปข้างหน้า (ประกาศแล้วต้องดี) แต่ไม่เคยตรวจกลับ
+→ ถ้าหน้าใดประกาศ `index,follow` ในโค้ดแล้วลืมใส่ sitemap จะไม่มีอะไรจับเลย (ไม่ error ไม่ warning)
+`tools/verify/seo-publish-audit.mjs` ตรวจจากโค้ด (เร็ว จับได้ก่อน merge):
+หน้าที่ประกาศ index แต่ไม่อยู่ใน `PUBLIC_PATHS` · sitemap ที่มี URL แต่ไม่มีไฟล์จริง · noindex ที่หลุดเข้า sitemap
+เทสต์ 6 เคสที่ `tools/test/seo-publish-audit.test.mjs` (`classify()` ต้องไม่พลาด SeoHead noindex prop)
+
+**ผลตรวจจริง 3/10/69:** 11 หน้าที่ประกาศ index ตรงกับ sitemap 11 URL พอดี
+`/partners/me` = noindex และไม่อยู่ใน sitemap (ถูกต้อง — พื้นที่ส่วนตัวของคู้ค้า) · หน้าอื่นที่ตอบ 200
+(`/portfolio` `/login`) ถูก WAF บล็อก 403 ตามเดิม ไม่ต้องประกาศ
+
 ### ให้บอทรู้ทันทีที่ URL เปลี่ยน (ผูก nightly/weekly แล้ว 2/10/69)
 
 - **`tools/indexnow-shop-notify.mjs`** — ยิง IndexNow (`api.indexnow.org` → Bing/Yandex/Seznam/Naver) โดยอ่านคีย์จริงจาก `sovereign-frontend/public/<32hex>.txt` และ URL จริงจาก sitemap ที่เว็บตอบ · **ต้องเห็นไฟล์คีย์ตอบ 200 + เนื้อหาตรงก่อนถึงยิง** (กันยิงแล้วถูกปฏิเสธ) · fail-safe exit 0 เสมอ
