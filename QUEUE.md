@@ -239,6 +239,6 @@
     - ⚠️ **เติมบวกเฉย ๆ ห้ามวาง expression ทับทั้งก้อน** (rule จริงมี `/partners` `/about` `/api/track` ฯลฯ อยู่แล้ว · วางทับจะปิดเส้นที่เปิดไว้) · วิธีเดียวกับที่แก้ `/robots.txt`+`/sitemap.xml` สำเร็จ 2/10/69
   - **พิสูจน์:** `curl -s -o /dev/null -w "%{http_code}\n" https://sovereignoriginshop.dpdns.org/mbti/compare` → ต้องได้ **200** (ตอนนี้ได้ 403)
   - **หลังแก้ WAF ยังประกาศไม่ได้ทันที** — ต้องทำต่อ: (1) เติม `<h1>` (หน้านี้**ยังไม่มี h1 เลย** · preflight บังคับ 1 อันพอดี) (2) เติมเนื้อหาจริงให้ผ่านเกณฑ์ **800 ตัวอักษร** (`SEO_MIN_TEXT_CHARS`) (3) ค่อยถอด `noindex` + เพิ่ม `/mbti/compare` ใน `PUBLIC_PATHS` → `seo-preflight` ต้องผ่าน **12/12**
-  - **คู่มือฉบับเต็ม + ลำดับขั้น:** [`docs/seo-google-search-console.md`](docs/seo-google-search-console.md) หัวข้อ "🚨 งานที่ต้องให้เจ้าของทำเอง" · อ้างอิงระดับโค้ดอยู่ในคอมเมนต์ `src/pages/mbti/compare.tsx`
+  - **คู่มือฉบับเต็ม + ลำดับขั้น:** [`docs/seo-google-search-console.md`](docs/seo-google-search-console.md) หัวข้อ "🚨 งานที่ต้องให้เจ้าของทำเอง" · อ้างอิงระดับโค้ดอยู่ในคอมเมนต์ [`sovereign-frontend/src/pages/mbti/compare.tsx`](../sovereign-frontend/src/pages/mbti/compare.tsx)
   - **AI แก้ให้ไม่ได้** — อยู่นอก repo + ต้องสิทธิ์ dashboard · ระหว่างนี้ห้ามแก้หน้าเอง (`noindex` ถูกต้อง ณ สภาพปัจจุบัน เพราะประกาศ URL ที่ตอบ 403 คือคำสัญญาที่ผิด)
 - [ ] **P24 รอเจ้าของ — ค่า TXT จาก GSC** (ต่อจาก P22/P24 รอบก่อน: ยัง Verify ไม่ได้ เพราะข้อความที่ส่งมาก่อนหน้าเป็น placeholder ไม่ใช่ค่าจริง)
