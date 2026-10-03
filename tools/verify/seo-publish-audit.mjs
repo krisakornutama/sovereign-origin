@@ -39,7 +39,7 @@
  * ใช้: node tools/verify/seo-publish-audit.mjs [--strict] [--fail-candidates] [--public-list <ไฟล์>]
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -202,7 +202,8 @@ async function main() {
   const strict = argv.includes('--strict');
   const failCandidates = argv.includes('--fail-candidates');
   const listArg = argv.indexOf('--public-list');
-  const accessFile = listArg >= 0 && argv[listArg + 1] ? join(process.cwd(), argv[listArg + 1]) : ACCESS;
+  // resolve ไม่ใช่ join: ถ้าผู้ใช้ใส่พาธแบบสัมบูรณ์ (C:\... หรือ /abs) join จะเอาไปต่อท้าย cwd จนพาธพัง
+  const accessFile = listArg >= 0 && argv[listArg + 1] ? resolve(process.cwd(), argv[listArg + 1]) : ACCESS;
 
   let report;
   try {
