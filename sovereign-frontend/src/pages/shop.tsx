@@ -51,26 +51,39 @@ export default function ShopPage() {
   // อ่าน URL ใหม่ทุกครั้งที่ asPath เปลี่ยน (ไม่ใช่แค่ mount) — _app.tsx แปลงคลิก <a> ภายใน
   // เป็น router.push หน้าเดียวกัน ทำให้ลิงก์ "ดูสถานะ/ชำระเงิน" หลังสั่งซื้อไม่ reload หน้า;
   // ถ้าอ่าน URL ครั้งเดียว ลูกค้าจะติดหน้าร้านทั้งที่ URL เปลี่ยนเป็นลิงก์ลับแล้ว (ต้องรีเฟรชเอง)
+  // P24 ต่อ 4 (3/10/69): แยก "นับ pageview + อ่านลิงก์ชัดเจน" ออกจาก "โหลดร้าน default"
+  //   เดิมทั้งสองอย่างอยู่ effect เดียวที่ deps = [router.asPath] แต่มี guard `else if (mounted)`
+  //   → รอบแรกบน mount mounted=false เสมอ = ไม่ fetch · และ asPath ไม่เปลี่ยน = effect ไม่รันซ้ำ
+  //   ผล = เจตนา "โดเมนเปล่าเจอร้านอุปกรณ์ทันที" ไม่เคยเกิด (พิสูจน์จาก network log: ไม่มี request เลย)
+  //   และการแก้แบบใส่ `mounted` ลง deps ตรง ๆ = trackPageView ยิงซ้ำ 2 ครั้ง (analytics เพี้ยน)
+  //   → ตอนนี้แต่ละเรื่องมีเจ้าของ effect ของตัวเอง: A = pageview + ?id/?order · B = ร้าน default
   useEffect(() => {
-    trackPageView('/shop'); // P10: สถิติการเยือน (cookieless)
+    trackPageView('/shop'); // P10: สถิติการเยือน (cookieless) — ยิงครั้งเดียวต่อการเปลี่ยน URL
     const query = router.asPath.split('?')[1]?.split('#')[0] ?? '';
     const params = new URLSearchParams(query);
     const orderToken = params.get('order');
     const shopId = params.get('id');
     if (orderToken) setRoute({ mode: 'order', key: orderToken });
     else if (shopId) setRoute({ mode: 'store', key: shopId });
-    else if (mounted) {
-      // P: Publishing — ไม่ใส่ ?id/?order = หน้าร้าน default (ร้านแรกใน catalog กลาง)
-      // โดเมนเปล่าเจอร้านอุปกรณ์ทันที ไม่ต้องรู้ businessId
-      fetchJsonObject<{ shops: Array<{ id: string }> }>(`${getApiUrl()}/api/shop/community`)
-        .then((d) => {
-          const first = d?.shops?.[0]?.id;
-          if (first) setRoute({ mode: 'store', key: first });
-          else setRoute(null);
-        })
-        .catch(() => setRoute(null));
-    }
     setMounted(true);
+  }, [router.asPath]);
+
+  // ร้าน default — รันเมื่อ URL ไม่มี ?id/?order เท่านั้น (มีลิงก์ชัดเจน = effect A จัดการ)
+  useEffect(() => {
+    const query = router.asPath.split('?')[1]?.split('#')[0] ?? '';
+    const params = new URLSearchParams(query);
+    if (params.get('order') || params.get('id')) return;
+    let cancelled = false; // unmount/เปลี่ยน URL ก่อนตอบ = อย่าเขียน state ทิ้งหลัง
+    // P: Publishing — ไม่ใส่ ?id/?order = หน้าร้าน default (ร้านแรกใน catalog กลาง)
+    // โดเมนเปล่าเจอร้านอุปกรณ์ทันที ไม่ต้องรู้ businessId
+    fetchJsonObject<{ shops: Array<{ id: string }> }>(`${getApiUrl()}/api/shop/community`)
+      .then((d) => {
+        if (cancelled) return;
+        const first = d?.shops?.[0]?.id;
+        setRoute(first ? { mode: 'store', key: first } : null);
+      })
+      .catch(() => { if (!cancelled) setRoute(null); });
+    return () => { cancelled = true; };
   }, [router.asPath]);
 
   // P24 (3/10/69): ยังไม่รู้รหัสร้าน (ตอน SSR หรือ fetch ไม่ได้ผล) ให้หน้าแนะนำที่มี h1 + เนื้อหาสำหรับผู้มาเยือน

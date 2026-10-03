@@ -7,6 +7,9 @@
    ไม่ตรง canonical, WAF บล็อก 4 หน้า) ล้มนอกเหนือจากที่โค้ดบอก:
      1) ทุก URL ใน sitemap ตอบ 200  (WAF บล็อก = Google crawl ไม่ได้)
      2) มี <title> ไม่ว่าง · มี meta description
+     2b) **มี <h1> 1 อันพอดี** — จุดที่พังจริง 3/10/69: /sensors/ + /shop/ ตอบ 200 มี title
+         canonical description ครบ แต่ h1=0 เพราะหน้ารอ hydrate = Google ได้ metadata ล้วน
+         ไม่มีเนื้อหา (เช็คเดิมมองไม่เห็น เพราะไม่เคยถามว่า "หน้ามีเนื้อหาจริงไหม")
      3) มี rel=canonical และตรงกับ URL จริง (กันเนื้อหาซ้ำสองโดเมน)
      4) ไม่มี noindex ซ้อนกับการอยู่ใน sitemap (GSC ขึ้นเตือนตรงนี้)
      5) robots.txt 200 และชี้ Sitemap ของโฮสต์ที่ใช้งานจริง
@@ -17,7 +20,7 @@
    แจ้ง Telegram เฉพาะตอน "มีปัญหา" (ปกติเงียบ ไม่กวนทุกคืน) */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { notify } from './telegram-creds.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -45,6 +48,29 @@ async function grab(pathname, { head = false } = {}) {
   }
 }
 
+/** ตัวตรวจหน้าเดียว — แยกเป็นฟังก์ชันบริสุทธิ์เพื่อให้เทสต์ได้ (tools/test/seo-h1.test.mjs)
+ *  เหตุผล: กติกา h1 คือสิ่งที่กันบั๊ก "หน้าว่าง" ซ้ำ — ถ้าไม่มีเทสต์ คนแก้ regex พลาด
+ *  จะกลับไปเงียบเหมือนเดิมโดยไม่มีใครรู้ (เช่นนับ <h1class=... ติดไปด้วย) */
+export function checkPage({ status, text }, url) {
+  const title = pick(text, /<title[^>]*>([^<]*)<\/title>/);
+  const desc = pick(text, /<meta[^>]+name="description"[^>]+content="([^"]*)"/);
+  const canon = pick(text, /<link rel="canonical" href="([^"]+)"/);
+  const robots = pick(text, /<meta name="robots" content="([^"]+)"/);
+  // นับ <h1> = ตัวบอกว่า "หน้านี้มีเนื้อหาจริง" ไม่ใช่แค่ metadata ที่ฝังไว้
+  // ใช้ [\s>] เพราะ <h1class=... ไม่ใช่ h1 (นับผิดได้ถ้าใช้แค่ <h1)
+  const h1 = (text.match(/<h1[\s>]/g) || []).length;
+  const bad = [];
+  if (status !== 200) bad.push(`ตอบ ${status || 'ไม่ตอบ'}`);
+  if (!title || !title.trim()) bad.push('ไม่มี <title>');
+  if (!desc) bad.push('ไม่มี meta description');
+  if (!canon) bad.push('ไม่มี rel=canonical');
+  else if (canon.replace(/\/$/, '') !== String(url).replace(/\/$/, '')) bad.push(`canonical ไม่ตรง URL (${canon})`);
+  if (robots && /noindex/i.test(robots)) bad.push(`noindex แต่อยู่ใน sitemap (${robots})`);
+  if (h1 === 0) bad.push('ไม่มี <h1> — หน้าว่าง (Google ได้แค่ metadata ไม่มีเนื้อหา)');
+  else if (h1 > 1) bad.push(`มี <h1> ${h1} อัน (ควรมี 1)`);
+  return { bad, h1 };
+}
+
 async function main() {
   // ── 1) sitemap = รายการหน้าที่ประกาศว่าอยากให้ Google เข้า ──
   const sm = await grab('/sitemap.xml');
@@ -59,19 +85,9 @@ async function main() {
   for (const u of urls) {
     const p = new URL(u);
     const r = await grab(p.pathname + p.search);
-    const title = pick(r.text, /<title[^>]*>([^<]*)<\/title>/);
-    const desc = pick(r.text, /<meta[^>]+name="description"[^>]+content="([^"]*)"/);
-    const canon = pick(r.text, /<link rel="canonical" href="([^"]+)"/);
-    const robots = pick(r.text, /<meta name="robots" content="([^"]+)"/);
-    const bad = [];
-    if (r.status !== 200) bad.push(`ตอบ ${r.status || 'ไม่ตอบ'}`);
-    if (!title || !title.trim()) bad.push('ไม่มี <title>');
-    if (!desc) bad.push('ไม่มี meta description');
-    if (!canon) bad.push('ไม่มี rel=canonical');
-    else if (canon.replace(/\/$/, '') !== u.replace(/\/$/, '')) bad.push(`canonical ไม่ตรง URL (${canon})`);
-    if (robots && /noindex/i.test(robots)) bad.push(`noindex แต่อยู่ใน sitemap (${robots})`);
+    const { bad, h1 } = checkPage(r, u);
     if (bad.length) problems.push(`${u.replace(BASE, '')}: ${bad.join(' · ')}`);
-    rows.push({ url: u.replace(BASE, ''), status: r.status, ok: bad.length === 0, issues: bad });
+    rows.push({ url: u.replace(BASE, ''), status: r.status, h1, ok: bad.length === 0, issues: bad });
   }
 
   // ── 5) robots.txt ──
@@ -128,4 +144,5 @@ function finish(data, checked) {
   process.exitCode = STRICT && !ok ? 1 : 0;
 }
 
-await main();
+// รันเฉพาะตอนเรียกตรง ๆ (ไม่ใช่ตอนถูก import ไปเทสต์)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
