@@ -31,3 +31,43 @@ export function isPublicHostname(): boolean {
 export function isBuiltPublicMode(): boolean {
   return BUILD_PUBLIC_MODE;
 }
+
+// ── รายการหน้าสาธารณะ: จุดเดียวที่ทั้ง sitemap และการซ่อนเมนูภายในใช้ร่วมกัน ──
+// เหตุผลที่ต้องรวมไว้ที่เดียว: เคยมีบั๊กจริง 2 อย่างจากรายการซ้ำสองชุด
+//  (1) ประกาศใน sitemap แต่ไม่ได้ซ่อน Sidebar → เปิดโครงสร้างภายในให้บอท
+//  (2) ซ่อน Sidebar แต่หลุด sitemap → ประกาศได้แต่ไม่ถูกส่ง
+// sitemap.xml.ts import รายการนี้ตรง ๆ (ไม่ก๊อป) → หลุดได้ทางเดียว
+export interface PublicPath {
+  path: string;
+  changefreq: 'daily' | 'weekly' | 'monthly';
+  priority: string;
+}
+
+export const PUBLIC_PATHS: PublicPath[] = [
+  { path: '/', changefreq: 'weekly', priority: '1.0' },
+  { path: '/shop', changefreq: 'weekly', priority: '0.9' },
+  { path: '/about', changefreq: 'monthly', priority: '0.8' },
+  { path: '/partners', changefreq: 'weekly', priority: '0.8' },
+  { path: '/partners/guide', changefreq: 'monthly', priority: '0.6' },
+  { path: '/community', changefreq: 'weekly', priority: '0.7' },
+  { path: '/demo', changefreq: 'monthly', priority: '0.7' },
+  { path: '/mbti', changefreq: 'monthly', priority: '0.5' },
+  { path: '/sensors', changefreq: 'daily', priority: '0.5' },
+  // P24 ต่อ 4 (3/10/69): เพิ่ม /trace เพราะแก้หน้าให้เรนเดอร์เนื้อหาจริงตอน SSR + ใส่ SeoHead แล้ว
+  //   (ก่อนหน้านี้ h1=0 ไม่มี title/canonical/description = ห้ามประกาศ เพราะเป็นหน้าว่างสำหรับบอท)
+  { path: '/trace', changefreq: 'weekly', priority: '0.6' },
+  { path: '/hover-cards', changefreq: 'monthly', priority: '0.3' },
+];
+
+const PUBLIC_PATH_SET = new Set(PUBLIC_PATHS.map((p) => p.path));
+
+/** normalize pathname ให้เทียบกับรายการได้เสมอ (หน้าจริงลงท้าย / เพราะ trailingSlash: true) */
+export function normalizePath(pathname: string): string {
+  const p = pathname.split('?')[0].split('#')[0];
+  return p.replace(/\/+$/, '') || '/';
+}
+
+/** หน้านี้เป็นหน้าสาธารณะไหม (ผู้มาเยือมที่ยังไม่ล็อกอินต้องไม่เห็นเมนูภายใน) */
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATH_SET.has(normalizePath(pathname));
+}
