@@ -18,7 +18,7 @@ import { existsSync, readFileSync } from 'node:fs';
 // ถ้ายิงจริงจะเป็นการสร้าง order ขยะใน DB ทุกรอบเทสต์
 // ────────────────────────────────────────────────────────────────────────────
 
-const BASE = process.env.E2E_BASE_URL || 'http://localhost:3100';
+const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const API = 'http://localhost:3001';
 
 const SHOP = {
