@@ -32,7 +32,7 @@ export default defineConfig({
     },
     {
       name: 'anonymous',
-      testMatch: /login\.spec\.ts/,
+      testMatch: /login\.spec\.ts|shop-checkout-anon\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],
