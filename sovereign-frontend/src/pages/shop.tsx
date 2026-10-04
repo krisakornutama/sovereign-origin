@@ -8,6 +8,7 @@ import { FeedbackButton } from '../components/public/FeedbackButton';
 import { FounderCredit } from '../components/public/FounderCredit';
 import { trackPageView, trackCtaClick, trackQuestion } from '../lib/visitorTrack';
 import ShopPublicLanding from '../components/public/ShopPublicLanding';
+import ShopCheckoutPanel from '../components/public/ShopCheckoutPanel';
 import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -354,6 +355,14 @@ function Storefront({ businessId }: { businessId: string }) {
             การสนับสนุนทุกบาทนำไปพัฒนาระบบและผลิตชิ้นงานชุดถัดไป — หลังยืนยันจะได้ลิงก์ติดตามสถานะส่วนตัว โอนผ่าน PromptPay ได้ทันที
           </p>
         </section>
+
+        {/* ทางเลือก — ชำระผ่านบัตร (Stripe) แทนการโอน QR */}
+        <ShopCheckoutPanel
+          businessId={businessId}
+          packages={shop.products}
+          customerName={form.customerName}
+          customerPhone={form.customerPhone}
+        />
 
         <ShopFaq />
 
