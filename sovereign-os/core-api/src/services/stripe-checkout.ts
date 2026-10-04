@@ -43,6 +43,15 @@ export const THB_CURRENCY_CODE = 'thb';
  */
 export const CLIENT_REFERENCE_ID_MAX_LENGTH = 200;
 
+/**
+ * ทำความสะอาด client_reference_id ก่อนใช้ — ที่เดียวที่จริง ๆ
+ * ทั้งฝั่งสร้าง session (routes) และฝั่งรับ webhook (payment-verification)
+ * ใช้ค่านี้ต่อไปเป็น key หา order → ต้องเหมือนกันทุกเส้นทาง
+ */
+export function normalizeRefCode(raw: unknown): string {
+  return String(raw ?? '').trim();
+}
+
 // ── อินพุต/เอาต์พุตของส่วนที่คิดเงิน ────────────────────────────────────────
 
 export interface CheckoutSessionRequest {
