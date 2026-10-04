@@ -28,6 +28,16 @@ export type NotAppliedReason =
   /** order ไม่ได้อยู่ PENDING อีกแล้ว — คำตัดสินหลัง CAS ไม่สำเร็จ */
   | 'order_not_pending';
 
+/**
+ * reason ที่ route ผลิตเองหลัง CAS ไม่สำเร็จ (order ไม่ PENDING)
+ *
+ * ให้มาเป็น "ค่าคงที่ที่มีชนิด" แทน string ตรง ๆ เพื่อให้:
+ *   · จุดเขียนใน route ถูกบังคับด้วยชนิด NotAppliedReason เสมอ
+ *   · สะกดผิดแล้วคอมไพล์ไม่ผ่าน ไม่ใช่คอมไพล์ผ่านแล้วพังตอนรัน
+ * ถ้าวันหนึ่งต้องการเพิ่ม reason ที่ route ผลิตเอง ให้เพิ่มใน union ข้างบนก่อนเสมอ
+ */
+export const REASON_ORDER_NOT_PENDING: NotAppliedReason = 'order_not_pending';
+
 export interface NotAppliedDecision {
   kind: 'not_applied';
   reason: NotAppliedReason;
