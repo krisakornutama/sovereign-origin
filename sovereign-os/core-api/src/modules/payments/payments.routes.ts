@@ -12,16 +12,24 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+import { prisma } from '../../lib/prisma';
 import {
   buildCheckoutSessionParams,
   createFakeStripeTransport,
   createLiveStripeTransport,
+  toThbMinorUnit,
+  THB_CURRENCY_CODE,
   CLIENT_REFERENCE_ID_MAX_LENGTH,
   type StripeCheckoutTransport,
 } from '../../services/stripe-checkout';
+import { verifyStripeSignature } from '../../services/stripe-webhook.service';
 
 export interface PaymentsRouterDeps {
   transport: StripeCheckoutTransport;
+  /** ใช้ตอน webhook เท่านั้น (ตอน checkout ไม่แตะ DB) — ใส่ตอนเทสต์ได้ */
+  prisma?: any;
+  /** signing secret ของ webhook endpoint (whsec_…) · คนละตัวกับ STRIPE_SECRET_KEY */
+  webhookSecret?: string;
 }
 
 export interface PaymentsRouterDefault {
@@ -93,9 +101,119 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     }
   });
 
+  // ── Webhook ────────────────────────────────────────────────────────────
+  // POST /api/payments/webhook — Stripe ส่งมาเอง ไม่มี bearer token
+  // การยืนยันตัวตนทำหน้าที่แทน authenticate: ตรวจลายเซ็นจาก signing secret
+  // ไม่งั้นใครก็ยิงมาบอกว่า "จ่ายแล้ว" ได้
+  //
+  // body ต้องเป็น BYTE ต้นฉบับ (server.ts mount express.raw ไว้ก่อน express.json
+  // สำหรับ path นี้) เพราะลายเซ็นคำนวณจาก byte จริง
+  router.post('/webhook', async (req, res) => {
+    const secret = deps.webhookSecret ?? config.stripe.webhookSecret;
+    if (!secret) {
+      return res.status(400).json({ error: 'webhook signing secret is not configured' });
+    }
+
+    const raw = rawBodyOf(req);
+    const verified = verifyStripeSignature({
+      header: req.headers['stripe-signature'] as string | undefined,
+      rawBody: raw,
+      secret,
+    });
+    if (!verified.ok) {
+      return res.status(400).json({ error: `invalid stripe signature: ${verified.reason}` });
+    }
+
+    let event: any;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      return res.status(400).json({ error: 'webhook body is not valid JSON' });
+    }
+    if (event?.type !== 'checkout.session.completed') {
+      // event อื่นไม่ใช่ธุระของเรา — ตอบ 200 เพื่อไม่ให้ Stripe retry
+      return res.status(200).json({ success: true, ignored: true, type: event?.type ?? null });
+    }
+
+    const session = event?.data?.object ?? {};
+    const refCode = String(session.client_reference_id ?? '').trim();
+    if (!refCode) {
+      return res.status(400).json({ error: 'missing client_reference_id — จับคู่ order ไม่ได้' });
+    }
+
+    const db = deps.prisma ?? prisma;
+    const order = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
+    if (!order) return res.status(404).json({ error: `no transfer order for ref_code ${refCode}` });
+
+    // ── ยอดเงิน: ตัวเลขที่เชื่อคือของ ORDER ไม่ใช่ของ session ─────────────
+    // session.amount_total มาจากฝั่ง Stripe (ผู้โจมตีแก้เองได้ถ้าไม่ตรวจลายเซ็น
+    // แต่แม้ผ่านลายเซ็นแล้ว เราก็ยังต้องเทียบกับ "ราคาที่ order คาดไว้"
+    // คาดหวังมาจาก TransferOrder.amount_thb (เก็บเป็นบาท) → แปลงเป็นสตางค์
+    if (String(session.currency) !== THB_CURRENCY_CODE) {
+      return res.status(400).json({
+        error: `currency mismatch: order is ${THB_CURRENCY_CODE}, session charged ${session.currency}`,
+      });
+    }
+    const expectedThb = Number(order.amount_thb);
+    let expectedMinor: number;
+    try {
+      expectedMinor = toThbMinorUnit(expectedThb);
+    } catch {
+      return res.status(400).json({ error: `order ${refCode} has no usable THB amount` });
+    }
+    if (Number(session.amount_total) !== expectedMinor) {
+      // ปฏิเสธอย่างดัง ๆ — ห้ามใช้ยอดใน session มาเป็นความจริงแทน order
+      return res.status(400).json({
+        error: `amount mismatch: order ${refCode} expects ${expectedMinor} satang (THB ${(expectedMinor / 100).toFixed(2)}), session paid ${session.amount_total}`,
+      });
+    }
+
+    // ── กันส่งซ้ำ: conditional update แบบ claimPending ของ transfer.service ──
+    // เขียนได้ก็ต่อเมื่อยัง PENDING → Stripe ส่งซ้ำจะได้ count 0
+    const claimed = await db.transferOrder.updateMany({
+      where: { ref_code: refCode, status: 'PENDING' },
+      data: {
+        status: 'VERIFIED',
+        txid: String(session.id ?? ''),
+        verified_by: 'stripe-webhook',
+        verified_at: new Date(),
+      },
+    });
+    if (claimed.count !== 1) {
+      // ตอบ 200 เพื่อไม่ให้ Stripe retry ซ้ำ (ตอนนี้ order อยู่ในสถานะที่ยืนยันแล้ว
+      // หรือถูกยกเลิก — ไม่ย้อนสถานะกลับ)
+      const fresh = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
+      return res.status(200).json({
+        success: true,
+        alreadyApplied: true,
+        refCode,
+        status: fresh?.status ?? null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      alreadyApplied: false,
+      refCode,
+      sessionId: String(session.id ?? ''),
+      status: 'VERIFIED',
+    });
+  });
+
   return router;
+}
+
+/** byte ต้นฉบับของ body — ต้องเซ็นบน byte จริง ห้าม stringify ใหม่ */
+function rawBodyOf(req: any): string {
+  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8');
+  if (typeof req.body === 'string') return req.body;
+  return JSON.stringify(req.body ?? {});
 }
 
 // ตัวที่ routes.ts เอาไป mount — ใช้ transport ตาม config (ค่า default = ของปลอม)
 const defaults = resolvePaymentsTransport();
-export default createPaymentsRouter(defaults);
+export default createPaymentsRouter({
+  transport: defaults.transport,
+  prisma,
+  webhookSecret: config.stripe.webhookSecret,
+});
