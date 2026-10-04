@@ -17,12 +17,12 @@ import {
   buildCheckoutSessionParams,
   createFakeStripeTransport,
   createLiveStripeTransport,
-  toThbMinorUnit,
-  THB_CURRENCY_CODE,
+  normalizeRefCode,
   CLIENT_REFERENCE_ID_MAX_LENGTH,
   type StripeCheckoutTransport,
 } from '../../services/stripe-checkout';
 import { verifyStripeSignature } from '../../services/stripe-webhook.service';
+import { decideCompletion } from '../../services/payment-verification.service';
 
 export interface PaymentsRouterDeps {
   transport: StripeCheckoutTransport;
@@ -40,8 +40,11 @@ export interface PaymentsRouterDefault {
 /**
  * เลือก transport ตาม config — ค่า default คือของปลอม (ไม่ออกเน็ต)
  * โยกไปตัวจริงได้ก็ต่อเมื่อเจ้าของตั้ง STRIPE_LIVE_ENABLED=true อย่างชัดเจน
+ *
+ * เป็นของไฟล์นี้เพราะเป็น "การเดินสายให้" ระหว่าง config กับ transport
+ * ซึ่งเป็นหน้าที่ของชั้นที่ mount route (services ต้องไม่รู้จัก env/config)
  */
-export function resolvePaymentsTransport(): PaymentsRouterDefault {
+function resolvePaymentsTransport(): PaymentsRouterDefault {
   if (config.stripe.liveEnabled) {
     return {
       transport: createLiveStripeTransport({ enabled: true, secretKey: config.stripe.secretKey }),
@@ -65,7 +68,7 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       // ใช้เป็น client_reference_id ตามที่ Stripe ระบุไว้ตรง ๆ ว่า
       // "a cart ID, or similar, and can be used to reconcile the session
       //  with your internal systems" — webhook ในอนาคตจะจับคู่ด้วยค่านี้
-      const refCode = String(body.refCode ?? '').trim();
+      const refCode = normalizeRefCode(body.refCode);
       if (!refCode) {
         return res.status(400).json({ error: 'refCode is required — ใช้ ref_code ของ order เป็น join key' });
       }
@@ -136,79 +139,27 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     } catch {
       return reject(res, 'webhook body is not valid JSON', 400);
     }
-    if (event?.type !== 'checkout.session.completed') {
-      // event อื่นไม่ใช่ธุระของเรา — ไม่มีทางกลายเป็นจริงในการส่งครั้งหนัง
-      return notApplied(
-        res,
-        'unsupported_event_type',
-        `ไม่ใช่ event ที่เราดูแล: ${event?.type ?? 'ไม่ระบุ'}`,
-        { type: event?.type ?? null },
-      );
-    }
 
-    const session = event?.data?.object ?? {};
-    const refCode = String(session.client_reference_id ?? '').trim();
-    if (!refCode) {
-      return notApplied(
-        res,
-        'missing_client_reference_id',
-        'ไม่มี client_reference_id — จับคู่ order ไม่ได้ (ไม่เดา ไม่สร้าง order ใหม่)',
-        { sessionId: String(session.id ?? '') || null },
-      );
-    }
-
+    // ── ตัดสินใจว่าจะ apply ไหม ──────────────────────────────────────────
+    // ตรรกะทั้งหมดอยู่ใน payment-verification.service (pure) — ที่นี่ทำแค่
+    // เตรียมข้อมูลให้มัน: หา order จาก refCode ที่ตัดสินใจบอกกลับมา
+    const refCode = normalizeRefCode(event?.data?.object?.client_reference_id);
     const db = deps.prisma ?? prisma;
-    const order = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
-    if (!order) {
-      return notApplied(
-        res,
-        'order_not_found',
-        `ไม่พบ order สำหรับ ref_code ${refCode} — ตรวจว่า client_reference_id ถูกต้องไหม`,
-        { refCode },
-      );
+    const order = refCode ? await db.transferOrder.findFirst({ where: { ref_code: refCode } }) : null;
+
+    const decision = decideCompletion(event, order);
+    if (decision.kind === 'not_applied') {
+      return notApplied(res, decision.reason, decision.message, decision.detail);
     }
 
-    // ── ยอดเงิน: ตัวเลขที่เชื่อคือของ ORDER ไม่ใช่ของ session ─────────────
-    // session.amount_total มาจากฝั่ง Stripe (ผู้โจมตีแก้เองได้ถ้าไม่ตรวจลายเซ็น
-    // แต่แม้ผ่านลายเซ็นแล้ว เราก็ยังต้องเทียบกับ "ราคาที่ order คาดไว้"
-    // คาดหวังมาจาก TransferOrder.amount_thb (เก็บเป็นบาท) → แปลงเป็นสตางค์
-    if (String(session.currency) !== THB_CURRENCY_CODE) {
-      return notApplied(
-        res,
-        'currency_mismatch',
-        `สกุลเงินไม่ตรง: order เป็น ${THB_CURRENCY_CODE} แต่ session จ่าย ${session.currency}`,
-        { refCode, expectedCurrency: THB_CURRENCY_CODE, receivedCurrency: session.currency ?? null },
-      );
-    }
-    const expectedThb = Number(order.amount_thb);
-    let expectedMinor: number;
-    try {
-      expectedMinor = toThbMinorUnit(expectedThb);
-    } catch {
-      return notApplied(
-        res,
-        'order_amount_unusable',
-        `order ${refCode} ไม่มียอดบาทที่ใช้ได้ (${order.amount_thb})`,
-        { refCode, amountThb: order.amount_thb ?? null },
-      );
-    }
-    if (Number(session.amount_total) !== expectedMinor) {
-      // ห้ามใช้ยอดใน session มาเป็นความจริงแทน order
-      return notApplied(
-        res,
-        'amount_mismatch',
-        `ยอดไม่ตรง: order ${refCode} คาด ${expectedMinor} สตางค์ (THB ${(expectedMinor / 100).toFixed(2)}) แต่จ่ายมา ${session.amount_total}`,
-        { refCode, expectedSatang: expectedMinor, receivedSatang: session.amount_total ?? null },
-      );
-    }
-
-    // ── กันส่งซ้ำ: conditional update แบบ claimPending ของ transfer.service ──
+    // ── เขียน DB: conditional update แบบ claimPending ของ transfer.service ──
     // เขียนได้ก็ต่อเมื่อยัง PENDING → Stripe ส่งซ้ำจะได้ count 0
+    // (CAS ต้องรู้ว่า "เขียนสำเร็จไหม" จึงอยู่ที่ชั้นนี้ ไม่ใช่ใน service)
     const claimed = await db.transferOrder.updateMany({
-      where: { ref_code: refCode, status: 'PENDING' },
+      where: { ref_code: decision.refCode, status: 'PENDING' },
       data: {
         status: 'VERIFIED',
-        txid: String(session.id ?? ''),
+        txid: decision.sessionId,
         verified_by: 'stripe-webhook',
         verified_at: new Date(),
       },
@@ -217,16 +168,16 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       // ตอนนี้ order อยู่ในสถานะที่ยืนยันแล้ว หรือถูกยกเลิก — ไม่ย้อนสถานะกลับ
       // ครั้งนี้ไม่ได้เขียนอะไร แต่ "เงินจ่ายแล้ว" เป็นความจริงอยู่แล้ว
       // จึงไม่ใช่เคสผิดปกติเท่า mismatch — log ระดับ info พอ
-      const fresh = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
+      const fresh = await db.transferOrder.findFirst({ where: { ref_code: decision.refCode } });
       console.warn(
-        `[payments] webhook: ส่งซ้ำ order ${refCode} (สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
+        `[payments] webhook: ส่งซ้ำ order ${decision.refCode} (สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
       );
       return res.status(200).json({
         success: true,
         applied: false,
         alreadyApplied: true,
         reason: 'order_not_pending',
-        refCode,
+        refCode: decision.refCode,
         status: fresh?.status ?? null,
       });
     }
@@ -235,8 +186,8 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       success: true,
       applied: true,
       alreadyApplied: false,
-      refCode,
-      sessionId: String(session.id ?? ''),
+      refCode: decision.refCode,
+      sessionId: decision.sessionId,
       status: 'VERIFIED',
     });
   });
