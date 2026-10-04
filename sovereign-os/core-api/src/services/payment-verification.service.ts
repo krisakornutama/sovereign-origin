@@ -158,6 +158,17 @@ export function decideCompletion(
 /** สถานะ BusinessOrder ที่ยังรอชำระ — เขียนทับได้เฉพาะสถานะเหล่านี้เท่านั้น */
 export const STOREFRONT_PAYABLE_STATUSES = ['QUOTE', 'ORDERED'] as const;
 
+/**
+ * method ที่บันทึกลง business_payments เมื่อจ่ายผ่าน Stripe
+ *
+ * ทำไมต้องแยกจาก PROMPTPAY: buildMorningDigest กรอง
+ * `businessPayment.findMany({ where: { method: 'PROMPTPAY' } })`
+ * เพื่อสรุปยอด "แจ้งชำระรอยืนยัน" — ถ้าใส่ PROMPTPAY
+ * เงินที่จ่ายด้วยบัตรจะไปปนในยอดโอน QR ของจริง (ตัวเลขคนละเรื่องกัน)
+ * บัตรเป็นเงินเข้าทันที ไม่ต้องรอร้านยืนยัน
+ */
+export const STRIPE_PAYMENT_METHOD = 'CARD';
+
 export interface StorefrontApplyDecision {
   kind: 'apply';
   /** publicToken ของ order (UUID @unique ทั้งระบบ) — ใช้เป็น where ตอน CAS */
