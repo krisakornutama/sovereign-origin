@@ -47,6 +47,10 @@
 - เวลาตั้ง scheduled task / script backup / ติดตั้งอะไรเพิ่ม ให้ target เป็น path บน E: เท่านั้น
 - ถ้าเครื่องมือบังคับให้เขียน C: และเลี่ยงไม่ได้ ต้องแจ้งผู้ใช้ก่อน แล้วหาทางทำบน E: แทนเสมอ
 
+### 8. งานพิสูจน์พฤติกรรมต้องจบด้วยเทสต์ที่ commit ไว้
+- ห้ามส่งมอบงานโดยอ้างแค่ "รันสคริปต์ชั่วคราวแล้วผ่าน" — ต้องมีเทสต์ใน `tests/` ที่จับของแย่นั้นไว้ ไม่งั้นรอบหน้าจะพังซ้ำโดยไม่มีใครเห็น
+- เขียนเทสต์แบบ red-first: ต้องเห็นแดงก่อนแก้ และรายงาน exit code แดง/เขียว
+
 ---
 
 ## โครงสร้างโปรเจ็ก
@@ -60,11 +64,29 @@
 - **Layout pattern**: `<div><Sidebar /><main>...</main></div>` เหมือนกันทุกหน้า
 
 ### Backend (`sovereign-os/core-api/`)
-- **Runtime**: Node.js + Express
-- **Database**: Prisma + SQLite
+- **Runtime**: Node.js + Express **4** (ไม่ใช่ 5 — async handler ที่ throw จะค้างไม่ตอบ ดูหัวข้อเคล็ดลับ)
+- **Database**: Prisma + **PostgreSQL/TimeScaleDB** (ไม่ใช่ SQLite — `prisma/schema.sqlite.prisma` เป็นของเก่าที่ละไว้) · container `sovereign-db` port 5432 · DATABASE_URL ใน `.env`
 - **Port**: 3001
 - **Routes**: `src/modules/*/`
 - **Services**: `src/services/`
+- **Deploy = `docker restart sovereign-core-api`**: container mount `src` จาก MAIN แล้วรัน `prisma generate && npm run build && npm start` ทุกครั้งที่บูต (**ไม่ต้อง rebuild image**) — route ใหม่ตอบ **404** ให้ restart ก่อนไปสงสัยโค้ด · ถ้า tsc ในคอนเทนเนอร์ล้ม `npm start` จะไม่รัน = API ล่มทั้งตัว จึงรัน `npm run build` ที่ MAIN ให้ผ่านก่อนเสมอ
+
+---
+
+## เคล็ดลับที่ไม่มีในโค้ด (เจอแล้วเสียเวลา/เสียเงิน)
+
+- **ทดสอบกับ DB จริงโดยไม่แตะข้อมูล dev**: ต่อ DATABASE_URL ด้วย `?schema=<ชื่อชั่วคราว>` แล้ว `npx prisma db push --skip-generate --accept-data-loss` → รันสคริปต์ → `DROP SCHEMA ... CASCADE` ทิ้ง (`public` ไม่โดนแตะ) · mock prisma จับ type mismatch ของ schema ไม่ได้เลย
+- **`@db.Uuid` ไม่มีทางจับด้วย tsc**: Prisma generate type คอลัมน์ UUID เป็น `string | null` เหมือนกัน การเขียนค่าผิดรูปแบบ (เช่น `'stripe-webhook'`) ผ่าน compile แต่รันจริงโยน **P2023**
+- **Express 4 ไม่ส่ง error ออกจาก async handler**: handler ที่ `throw` หรือ await ที่ reject จะ **ค้างไม่ตอบ** (ไม่ใช่ 500) คนเรียกจะรอจน timeout — webhook Stripe จะ retry ไม่จบ ต้อง `try/catch` ใน handler เอง
+- **`NEXT_PUBLIC_*` ถูกฝังตอน build**: เปลี่ยน env ตอน `next start` ไม่มีผล ถ้าจะทดสอบ UI จริงต้อง rebuild — ซึ่งจะไปทับ `.next` ที่ `:3000` กำลัง serve (ทุก chunk 404) ห้ามทำโดยไม่ได้รับอนุญาต
+- **Playwright `storageState` ผูกกับ origin**: รันบนพอร์ตอื่นจาก `baseURL` = localStorage ว่าง = login หลุด ให้ replay token ชุดเดิมผ่าน `addInitScript` และ throw ถ้าหมดอายุ/ยังไม่ MFA
+- **กับดัก Playwright 2 ข้อ**: `getByRole('alert')` ชนกับ `__next-route-announcer` ของ Next (scope selector ให้แคบ) · handler ของ `page.route` ต้องเป็น `async` + `await r.fulfill()` ไม่งั้น fulfill จะจบทันที
+- **`node tools/gen-module-docs.mjs` ไม่มี `--dry-run`** — รันแล้วเขียนทั้ง 67 ไฟล์ทันที อย่าเรียกมั่ว
+- **รัน `npm run verify` ที่ MAIN เท่านั้น**: worktree ไม่มี `node_modules` ของ root/core-api (มีแค่ frontend) และ `tools/verify.mjs` คอมไพล์จากโฟลเดอร์ที่ตัวเองอยู่ ⇒ รันใน worktree ล้มทันที · ตัวสคริปต์ตรวจจับเองว่า `:3000` มี prod เสิร์ฟอยู่และ **ไม่แตะพอร์ต/.next** · `.freebuff/` ใน worktree ใหม่ยังไม่มี — `mkdir -p` ก่อนเขียน log
+- **เส้นสาธารณะเป็นทางเดียว: domain → cloudflared → `:3000` → rewrite `/api/*` → `:3001`** (backend bind `127.0.0.1` จึงไม่มีทางอื่น) · WAF ของโซนเป็น **default-deny** ⇒ path สาธารณะใหม่ต้องถูกเติมใน allowlist ไม่งั้นได้ **403 ที่ edge ก่อนถึงแอป** · `trailingSlash: true` ทำให้ `POST /api/x` → **308** `/api/x/` — ผู้เรียกที่ไม่ตาม redirect (เช่น Stripe) ต้องใช้ URL ที่มี `/` ปิดท้าย
+- **webhook ตอน secret ว่างตอบ 401 ไม่ใช่ 400**: `STRIPE_WEBHOOK_SECRET` ไม่ตั้ง/เป็นช่องว่างล้วน → 401 + `rejected:true` (400 สงวนไว้ให้ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่าน) — **อย่าแก้เป็น 400** เพราะ non-2xx คือเจตนาให้ Stripe retry (เทสต์คุมที่ `tests/paymentsFreshClone.test.ts`)
+- **ตรวจ DNS ด้วย DoH 2 เจ้าก่อนเชื่อคำว่า "เว็บล่ม/เว็บปกติ"**: `https://dns.google/resolve?name=<host>&type=A` และ `https://cloudflare-dns.com/dns-query` (header `accept: application/dns-json`) — ได้ authority SOA โดยไม่มี Answer = ไม่มี record จริง · SOA serial บอกโซนถูกแก้ล่าสุดเมื่อไร · คู่ NS บอกว่าโดเมนยังอยู่กับ Cloudflare ไหม (tunnel ใช้ได้เฉพาะเมื่อ NS เป็นของ Cloudflare)
+- **สแกนความลับก่อน push โดยไม่ทำค่าหลุดลง transcript**: นับเฉพาะรูปแบบยาวผ่าน `git log -p <range> | grep -cE 'sk_live_[A-Za-z0-9]{20,}'` (พิมพ์แค่ตัวเลข ไม่พิมพ์บรรทัดที่ match) · `grep -c` ที่ไม่เจอคืน exit 1 = ผลสะอาด ไม่ใช่ error
 
 ---
 

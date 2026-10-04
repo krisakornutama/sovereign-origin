@@ -23,6 +23,14 @@ function looksLikeKnowledgeDir(dir: string): boolean {
 
 /** คืน absolute path ของโฟลเดอร์คลังความรู้ (มีไฟล์จริง) — สร้างให้ถ้าไม่มี */
 export function knowledgeDir(): string {
+  // ทดแทนด้วย env KNOWLEDGE_DIR — เพิ่ม 3/10/69 เพื่อให้เทสต์ชี้ไปโฟลเดอร์ชั่วคราวได้
+  // (เดิมโมดูลนี้ผูกกับพาธในเครื่องอย่างเดียว = เขียนเทสต์แล้วแตะไฟล์ความรู้ของจริงทันที)
+  // ไม่ตั้งค่านี้ใน production = พฤติกรรมเดิมทุกประการ
+  const override = process.env.KNOWLEDGE_DIR;
+  if (override) {
+    fs.mkdirSync(override, { recursive: true });
+    return override;
+  }
   // __dirname = src/services → ขึ้น 2 ชั้น = core-api root
   const root = path.resolve(__dirname, '..', '..');
   const candidates = [

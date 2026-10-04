@@ -103,6 +103,7 @@ tools/*
 !tools/verify.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
+!tools/indexnow-shop-notify.mjs
 !tools/portfolio-preview-server.mjs
 !tools/set-required-checks.sh
 !tools/system-health.mjs
@@ -111,8 +112,13 @@ tools/*
 !tools/ops-status.mjs
 !tools/docker-watchdog.mjs
 !tools/register-docker-watch.ps1
+!tools/vhdx-compact.ps1
+!tools/register-vhdx-compact-task.ps1
 !tools/frontend-watchdog.mjs
+!tools/normalize-eol.mjs
 !tools/coverage-core.mjs
+!tools/coverage-floor.mjs
+!tools/coverage-floor.json
 !tools/mock-api-preview.mjs
 !tools/preview-stack.mjs
 !tools/frontend-gate.mjs

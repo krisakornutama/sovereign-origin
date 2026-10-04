@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 // ────────────────────────────────────────────────────────────────────────────
 // E2E ของ Sovereign Frontend — รันด้วย `npm run e2e` (หรือ `npm run verify:full` ที่ root)
-// ต้องมี backend (:3001) + DB รันอยู่ก่อน และ user e2e-bot (สร้างครั้งแรกด้วย psql)
+// ต้องมี backend (:3001) + DB รันอยู่ก่อน — บัญชี e2e เปิด/ล็อกอัตโนมัติที่ globalSetup/globalTeardown
+// (สุ่มรหัสตอนรัน · ไม่มีรหัสที่รู้อยู่ใน repo · ล็อกกลับทันทีหลังจบ = ไม่ขัดกับ runbook §๖)
 // ────────────────────────────────────────────────────────────────────────────
 export default defineConfig({
   testDir: './e2e',
@@ -11,6 +12,8 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [['list']],
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
@@ -23,13 +26,13 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/, timeout: 180_000 },
     {
       name: 'authenticated',
-      testMatch: /pages\.spec\.ts|pos-flow\.spec\.ts|spa-nav\.spec\.ts|trace-community\.spec\.ts/,
+      testMatch: /pages\.spec\.ts|pos-flow\.spec\.ts|spa-nav\.spec\.ts|trace-community\.spec\.ts|shop-checkout\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/state.json' },
       dependencies: ['setup'],
     },
     {
       name: 'anonymous',
-      testMatch: /login\.spec\.ts/,
+      testMatch: /login\.spec\.ts|shop-checkout-anon\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],

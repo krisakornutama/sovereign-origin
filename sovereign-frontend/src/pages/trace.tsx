@@ -8,6 +8,9 @@ import { authFetch } from '../lib/apiFetch';
 import { getApiUrl } from '../lib/config';
 import { useAuthStore } from '../stores/useAuthStore';
 import { FeedbackButton } from '../components/public/FeedbackButton';
+import SeoHead from '../components/public/SeoHead';
+import PageIntro from '../components/public/PageIntro';
+import { isPublicHostname, isLocalHostname } from '../lib/publicAccess';
 import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
@@ -39,6 +42,14 @@ interface LotSummary {
   plot?: { name?: string | null } | null;
   events?: Array<{ type: string }>;
 }
+
+// metadata กลางของหน้า — ต้องอยู่ใน SSR ไม่ใช่ฝังใน layout ของหน้าไหน (บทเรียนจาก /shop)
+const SEO = {
+  title: 'ตามรอยผลผลิต — ค้นหาล็อตสินค้าที่มา Sovereign Origin',
+  description:
+    'ค้นหาล็อตสินค้าด้วยรหัส LOT-XXXXXX แล้วดูที่มาทั้งสาย — เก็บเกี่ยว แปรรูป ตรวจคุณภาพ ขายออก ส่งมอบ ตั้งแต่แปลงปลูกจนถึงมือผู้บริโภค เปิดดูได้สาธารณะไม่ต้องล็อกอิน',
+  path: '/trace',
+};
 
 const EVENT_STYLE: Record<string, { cls: string; icon: string }> = {
   HARVESTED: { cls: 'bg-lime-500/15 text-lime-300 border-lime-500/30', icon: 'farm' },
@@ -125,6 +136,15 @@ export default function TracePage() {
 
   useEffect(() => { trackPageView('/trace'); }, []); // P10: สถิติการเยือน (cookieless)
 
+  // P24 ต่อ 4 (3/10/69): หน้านี้เป็นหน้าสาธารณะอยู่แล้ว (ค้นล็อตไม่ต้อง login) แต่เดิม
+  //   ถูก `if (!isHydrated) return loading` บังตอน SSR → HTML ที่ Googlebot ได้ = 0 <h1>
+  //   และไม่มี SeoHead เลย (ไม่มี title/canonical/description) = ห้ามประกาศใน sitemap
+  //   แก้แบบเดียวกับหน้าแรก: โหมดสาธารณะเรนเดอร์เนื้อหาจริงตอน SSR ส่วนเครื่องเจ้าของ
+  //   (localhost/LAN) ยังรอ hydrate ตามเดิม → ไม่มี hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const showPublic = isPublicHostname() && !(mounted && isLocalHostname());
+
   const search = useCallback(async (raw: string) => {
     const c = raw.trim().toUpperCase();
     if (!c) return;
@@ -195,12 +215,13 @@ export default function TracePage() {
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleString(fmtLocale(), { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
-  if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>;
+  if (!isHydrated && !showPublic) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500"><SeoHead {...SEO} />{t('common.loading', 'กำลังโหลด...')}</div>;
   }
 
   return (
     <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100 flex">
+      <SeoHead {...SEO} />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
@@ -209,6 +230,21 @@ export default function TracePage() {
             title={t('trace.title', 'ตามรอยผลผลิต')}
             subtitle={t('trace.subtitle', 'พิมพ์หรือสแกนรหัสล็อต LOT-XXXXXX เพื่อดูที่มาตั้งแต่แปลงจนถึงมือผู้บริโภค — สาธารณะ ไม่ต้อง login')}
             icon={<Icon name="search" size={18} />}
+          />
+
+          {/* เนื้อหาอธิบายแบบ static (เกณฑ์ thin content) — หน้านี้แสดงผลล็อตหลังค้นหา
+              ถ้าไม่มีส่วนนี้ HTML ตอน SSR จะสั้นเกินเกณฑ์และบอทอ่านไม่ออกว่าหน้านี้ทำอะไร */}
+          <PageIntro
+            heading="ระบบตามรอยผลผลิตทำงานอย่างไร"
+            paragraphs={[
+              'ทุกชุดสินค้าที่ผลิตจะมีรหัสล็อต เช่น LOT-XXXXXX ผูกไว้กับแปลงต้นทาง วันที่เก็บเกี่ยว และเหตุการณ์ทุกขั้นตอนตั้งแต่เก็บเกี่ยว แปรรูป ตรวจคุณภาพ จนถึงการขายและส่งมอบ',
+              'หน้านี้เปิดเป็นสาธารณะ ไม่ต้องสมัครและไม่ต้องล็อกอิน พิมพ์รหัสล็อตหรือสแกน QR ที่ติดบนฉลากสินค้าเพื่อดูไทม์ไลน์ย้อนกลับได้ทันที ลูกค้าจึงตรวจสอบได้เองว่าสินค้ามาจากไหนและผ่านการตรวจคุณภาพหรือไม่',
+              'ข้อมูลที่แสดงเป็นประวัติการผลิตจริงในระบบ ไม่ใช่ข้อมูลตัวอย่าง · ถ้าสนใจนำระบบตามรอยไปใช้กับฟาร์มของคุณเอง ดูรายละเอียดที่หน้าสนามทดลอง',
+            ]}
+            links={[
+              { href: '/demo', label: 'สนามทดลอง' },
+              { href: '/shop', label: 'หน้าร้าน' },
+            ]}
           />
 
           {/* ── ช่องค้นหา + สแกนกล้อง ── */}

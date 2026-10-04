@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
+import SeoHead from '../components/public/SeoHead';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
 import { FounderCredit } from '../components/public/FounderCredit';
+import PageIntro from '../components/public/PageIntro';
 import { trackPageView } from '../lib/visitorTrack';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
@@ -54,12 +55,32 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <Head><title>{t('community.title', '🏪 Catalog กลางชุมชน')} — Sovereign OS</title><meta name="robots" content="noindex" /></Head>
+      <SeoHead
+        title={`${t('community.title', '🏪 Catalog กลางชุมชน')} — Sovereign OS`}
+        description="สินค้าจากร้านชุมชนที่เข้าร่วมเองในเครือข่าย Sovereign Origin — ค้นหาและกดสินค้าเพื่อไปสั่งซื้อที่ร้านต้นทาง"
+        path="/community"
+      />
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <header className="space-y-1">
           <h1 className="font-ledger text-2xl">{t('community.title', '🏪 Catalog กลางชุมชน')}</h1>
           <p className="text-sm text-slate-400">{t('community.subtitle', 'สินค้าจากร้านชุมชนที่เข้าร่วมเอง — กดสินค้าเพื่อไปสั่งซื้อที่หน้าร้านต้นทาง')}</p>
         </header>
+
+        {/* เนื้อหาอธิบายแบบ static — หน้านี้โหลดรายการสินค้าจาก API หลัง JS รัน
+            ถ้าไม่มีส่วนนี้ บอทจะอ่านได้แค่หัวข้อ (เกณฑ์ thin content ใน seo-preflight จับได้) */}
+        <PageIntro
+          heading="ทำไมถึงต้องมีแคตตาล็อกกลาง"
+          paragraphs={[
+            'แคตตาล็อกกลางคือหน้ารวมสินค้าจากร้านที่สมัครเข้าร่วมเครือข่ายเอง แต่ละร้านเปิดเผยจากหน้าตั้งค่าร้านของตัวเอง ไม่มีใครถูกเพิ่มเข้ามาโดยที่ร้านไม่รู้',
+            'หน้านี้แสดงเฉพาะชื่อสินค้า ราคาขาย หมวดหมู่ และสถานะว่ามีของหรือไม่ ไม่แสดงต้นทุน ยอดขาย หรือข้อมูลออเดอร์ของร้าน · กดชื่อสินค้าเพื่อไปหน้าร้านต้นทางแล้วสั่งซื้อที่นั่น',
+            'ถ้าคุณมีร้านและอยากให้สินค้าของคุณปรากฏในแคตตาล็อกกลาง เปิดเข้าร่วมได้จากหน้าตั้งค่าร้านโดยไม่มีค่าใช้จ่าย',
+            'ค้นหาในหน้านี้ทำงานกับชื่อสินค้าและหมวดหมู่ที่ร้านกรอกไว้ เมื่อกดสินค้าแล้วระบบจะพาคุณไปยังหน้าร้านต้นทางของร้านนั้นโดยตรง เพื่อดูรายละเอียด สต็อก และช่องทางสนับสนุนของร้าน',
+          ]}
+          links={[
+            { href: '/shop', label: 'หน้าร้าน' },
+            { href: '/partners', label: 'คู่ค้า' },
+          ]}
+        />
 
         <div className="flex gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('community.searchPlaceholder', 'ค้นหาสินค้า/หมวด…')}

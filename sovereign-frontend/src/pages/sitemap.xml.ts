@@ -6,22 +6,15 @@
 // รูปแบบ canonical ของ Pages Router: เขียน response ใน getServerSideProps (บังคับ dynamic
 // ไม่ให้ build prerender) — component หลักคืน null (response จบก่อน render)
 import type { GetServerSidePropsContext, NextPage } from 'next';
+import { PUBLIC_PATHS } from '../lib/publicAccess';
 
 const ALLOWED_HOSTS = new Set(['sovereignoriginshop.dpdns.org', 'sovereign-shop.dpdns.org']);
 const FALLBACK_HOST = 'sovereignoriginshop.dpdns.org';
 
-const PUBLIC_PATHS: Array<{ path: string; changefreq: string; priority: string }> = [
-  { path: '/', changefreq: 'weekly', priority: '1.0' },
-  { path: '/shop', changefreq: 'weekly', priority: '0.9' },
-  { path: '/about', changefreq: 'monthly', priority: '0.8' },
-  { path: '/partners', changefreq: 'weekly', priority: '0.8' },
-  { path: '/partners/guide', changefreq: 'monthly', priority: '0.6' },
-  { path: '/community', changefreq: 'weekly', priority: '0.7' },
-  { path: '/demo', changefreq: 'monthly', priority: '0.7' },
-  { path: '/mbti', changefreq: 'monthly', priority: '0.5' },
-  { path: '/sensors', changefreq: 'daily', priority: '0.5' },
-  { path: '/hover-cards', changefreq: 'monthly', priority: '0.3' },
-];
+// รายการหน้าสาธารณะอยู่ที่ lib/publicAccess.ts จุดเดียว (import ตรง ๆ ไม่ก๊อป)
+// หมายเหตุ 3/10/69: รายการนี้ใช้ทางเดียวคือ "ประกาศให้ Google" แล้วเท่านั้น
+// มันไม่ได้คุมการซ่อน Sidebar/เมนูภายในอีกต่อไป (ซ่อนด้วยสิทธิ์ = ต้องล็อกอินไหม — ดู useHideInternalNav.ts)
+// เคยมีบั๊กจริงจากการใช้รายการนี้สองทาง: ประกาศแต่ไม่ซ่อน (เปิดโครงสร้างภายในให้บอท) และซ่อนแต่หลุด sitemap
 
 function buildXml(host: string): string {
   const site = ALLOWED_HOSTS.has(host) ? host : FALLBACK_HOST;
@@ -32,7 +25,9 @@ function buildXml(host: string): string {
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     PUBLIC_PATHS.map(
       (p) =>
-        `  <url><loc>https://${site}${p.path}</loc><lastmod>${lastmod}</lastmod>` +
+        // trailing slash ต้องตรงกับ next.config (trailingSlash: true) และ canonical ใน SeoHead
+        // — ถ้าไม่ใส่ Google เจอ 308 ทุก URL แล้วถือว่า sitemap ไม่ตรงหน้าจริง (พบตอน pre-flight 2/10)
+        `  <url><loc>https://${site}${p.path === '/' ? '/' : `${p.path}/`}</loc><lastmod>${lastmod}</lastmod>` +
         `<changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
     ).join('\n') +
     `\n</urlset>`

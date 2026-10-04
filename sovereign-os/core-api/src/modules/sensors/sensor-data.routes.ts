@@ -22,10 +22,17 @@ router.post('/data', authenticate, async (req, res) => {
     if (!metric || typeof metric !== 'string' || metric.length > 60) {
       return res.status(400).json({ error: 'metric ต้องเป็น string ยาว 1-60 ตัวอักษร' });
     }
-    const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) {
+    // แก้ 3/10/69: Number(null) = 0 · Number('') = 0 · Number(false) = 0 · Number([]) = 0
+    // ผ่าน Number.isFinite ทั้งหมด → ค่าที่ "ไม่ได้ส่งมา" ถูกเขียนลง time-series เป็น 0
+    // (อุณหภูมิ 0°C ปลอม ๆ ปนในข้อมูลจริง) — รับเฉพาะ "ตัวเลข" หรือ "สตริงที่แปลงเป็นตัวเลขได้"
+    // เท่านั้น ที่เหลือปฏิเสธ ไม่ใช่พึ่ง isFinite อย่างเดียว
+    const isNumber = typeof value === 'number' && Number.isFinite(value);
+    const isNumericString =
+      typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+    if (!isNumber && !isNumericString) {
       return res.status(400).json({ error: 'value ต้องเป็นตัวเลข' });
     }
+    const numericValue = Number(value);
     const nodeId = node_id || req.user?.assigned_node_id || config.defaults.telemetryNodeId;
     const deviceId = device_id || 'manual-input';
     await prisma.$queryRawUnsafe(

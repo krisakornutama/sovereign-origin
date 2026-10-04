@@ -39,7 +39,13 @@ router.post('/restore', authenticate, requireRole('SUPERADMIN'), async (req, res
 router.post('/schedule', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const enabled = !!req.body?.enabled;
   const time = String(req.body?.time || '02:00');
-  if (!/^\d{2}:\d{2}$/.test(time)) return res.status(400).json({ error: 'Invalid time format (HH:mm)' });
+  // แก้ 3/10/69: เดิมตรวจแค่รูป /^\\d{2}:\\d{2}$/ → "25:00" ผ่าน แล้ว toMin = 1500 นาที
+  // ซึ่งเกินเวลาที่เป็นไปได้ของวัน (สูงสุด 23:59 = 1439) → catch-up window ไม่มีวันเข้า
+  // = backup ไม่เคยรันอีก โดยไม่มีอะไรฟ้อง (รอ machine-health เตือนที่ 26 ชม.) · ต้องตรวจช่วงค่าจริง
+  const m = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) {
+    return res.status(400).json({ error: 'Invalid time format (HH:mm, 00:00–23:59)' });
+  }
   backupService.setSchedule(enabled, time);
   res.json({ success: true, schedule: backupService.getSchedule() });
 });
