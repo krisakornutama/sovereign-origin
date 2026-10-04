@@ -23,6 +23,8 @@ import {
 import { verifyStripeSignature } from '../../services/stripe-webhook.service';
 import {
   decideCompletion,
+  decideStorefrontCompletion,
+  STOREFRONT_PAYABLE_STATUSES,
   REASON_ORDER_NOT_PENDING,
   type NotAppliedReason,
 } from '../../services/payment-verification.service';
@@ -67,10 +69,18 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     try {
       const body = (req.body ?? {}) as Record<string, unknown>;
 
-      // refCode = ref_code ของ order ที่มีอยู่แล้ว (TransferOrder.ref_code)
+      // refCode = รหัสอ้างอิงของ order ที่มีอยู่แล้ว (ดูหมายเหตุด้านล่างว่ารับได้อะไรบ้าง)
       // ใช้เป็น client_reference_id ตามที่ Stripe ระบุไว้ตรง ๆ ว่า
       // "a cart ID, or similar, and can be used to reconcile the session
       //  with your internal systems" — webhook จะจับคู่ด้วยค่านี้
+      //
+      // รับได้สองแบบ (webhook เป็นคนตัดสินว่าจะจับคู่แบบไหน):
+      //   · TransferOrder.ref_code  — คำสั่งโอน/รับเงินในส่วนกระเป๋าเงิน
+      //   · BusinessOrder.publicToken — ออเดอร์หน้าร้าน (ของที่ขายหน้าบ้าน)
+      // route นี้ไม่แตะ DB เลย (ไม่เดาว่ามี order จริง) — เป็นหน้าที่ของ webhook ตอนจ่ายจริง
+      //
+      // ทำไมไม่ใช้ orderNo: มันไม่ unique ข้ามร้าน (B20261004-0001 เกิดซ้ำได้ทุกร้าน)
+      // ใช้ publicToken (UUID @unique) จึงชี้ของชุดเดียวทั้งระบบ
       //
       // กติกา (ว่างไม่ได้ / ยาวเกิน 200) เป็นของ stripe-checkout ไม่ใช่ของ route
       // route ไม่ตรวจซ้ำ ไม่เขียนข้อความของตัวเอง — ปล่อยให้ builder ตัดสิน
@@ -146,6 +156,13 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     const db = deps.prisma ?? prisma;
     const order = refCode ? await db.transferOrder.findFirst({ where: { ref_code: refCode } }) : null;
 
+    // ออเดอร์หน้าร้าน — จับคู่ด้วย publicToken เมื่อไม่ใช่คำสั่งโอน
+    // (ลอง ref_code ก่อนเสมอ เพื่อให้เส้นทางเดิมที่ทำงานอยู่แล้วไม่เปลี่ยนพฤติกรรม)
+    const shopOrder = !order && refCode
+      ? await db.businessOrder.findFirst({ where: { publicToken: refCode } })
+      : null;
+    if (shopOrder) return applyStorefrontOrder(res, db, event, shopOrder);
+
     const decision = decideCompletion(event, order);
     if (decision.kind === 'not_applied') {
       return notApplied(res, decision.reason, decision.message, decision.detail);
@@ -195,6 +212,52 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
 }
 
 /** byte ต้นฉบับของ body — ต้องเซ็นบน byte จริง ห้าม stringify ใหม่ */
+/**
+ * mark ออเดอร์หน้าร้านว่าจ่ายแล้ว — CAS บน BusinessOrder
+ *
+ * เหตุผลที่แยกจากของ TransferOrder: ตารางคนละตาราง, คอลัมน์คนละชื่อ (publicToken/total
+ * ไม่ใช่ ref_code/amount_thb) และสถานะปลายทางต่างกัน (PAID ไม่ใช่ VERIFIED)
+ * การยุบรวมเป็นฟังก์ชันเดียวจะต้องมี if/else ซ้อนทั้งสองทางในทุกจุด
+ */
+async function applyStorefrontOrder(res: any, db: any, event: any, shopOrder: any) {
+  const decision = decideStorefrontCompletion(event, shopOrder);
+  if (decision.kind === 'not_applied') {
+    return notApplied(res, decision.reason, decision.message, decision.detail);
+  }
+
+  // conditional update: เขียนได้ก็ต่อเมื่อยังรอชำระ — Stripe ส่งซ้ำจะได้ count 0
+  // (toFixed(2) กัน float เป็น 9899.999999999998 แล้ว UI โชว์ยอดเพี้ยน)
+  const claimed = await db.businessOrder.updateMany({
+    where: { publicToken: decision.publicToken, status: { in: [...STOREFRONT_PAYABLE_STATUSES] } },
+    data: { status: 'PAID', paidAmount: Number((decision.expectedSatang / 100).toFixed(2)) },
+  });
+
+  if (claimed.count !== 1) {
+    const fresh = await db.businessOrder.findFirst({ where: { publicToken: decision.publicToken } });
+    console.warn(
+      `[payments] webhook: ส่งซ้ำออเดอร์หน้าร้าน ${decision.publicToken} ` +
+      `(สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
+    );
+    return res.status(200).json({
+      success: true,
+      applied: false,
+      alreadyApplied: true,
+      reason: REASON_ORDER_NOT_PENDING,
+      refCode: decision.publicToken,
+      status: fresh?.status ?? null,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    applied: true,
+    alreadyApplied: false,
+    refCode: decision.publicToken,
+    sessionId: decision.sessionId,
+    status: 'PAID',
+  });
+}
+
 function rawBodyOf(req: any): string {
   if (Buffer.isBuffer(req.body)) return req.body.toString('utf8');
   if (typeof req.body === 'string') return req.body;
