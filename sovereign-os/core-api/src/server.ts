@@ -52,6 +52,9 @@ app.use(cors({
   // เปิดให้ browser อ่าน Retry-After ได้ (ใช้แสดง countdown ตอนโดน rate limit)
   exposedHeaders: ['Retry-After'],
 }));
+// Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
+// express.json() ทั้งแอปจะ parse ทิ้ง (แบบเดียวกับ client-monitor ที่ใช้ parser เฉพาะ route)
+app.use('/api/payments/webhook', express.raw({ type: 'application/json', limit: '256kb' }));
 app.use(express.json({ limit: '25mb' })); // 25MB — รองรับแพ็กเกจ Export & Clone (ฐานข้อมูลเต็ม) + การนำเข้า
 app.use(auditStateChange);
 
