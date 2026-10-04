@@ -70,6 +70,32 @@ export function normalizeRefCode(raw: unknown): string {
   return String(raw ?? '').trim();
 }
 
+/**
+ * กติกา client_reference_id ทั้งชุด — จุดเดียวที่ตัดสินว่าผ่านหรือไม่
+ *
+ * เคยมีสองเจ้าของ (route กับ builder) ต่างกติกาคำบรรยายกัน → ถ้าอันหนึ่งแก้
+ * อีกอันยังใช้ค่าเก่า ใครก็จะได้ข้อความ/พฤติกรรมที่ไม่ตรงกันโดยไม่มีใครรู้
+ * ตอนนี้ทั้งสองทางเรียกฟังก์ชันนี้ และ route ไม่เขียนคำบรรยายของตัวเองอีก
+ *
+ * คืนค่าที่ normalize แล้ว (trim) เพื่อให้ผู้เรียกใช้ค่าเดียวกันนี้ต่อ
+ *
+ * @throws RangeError ถ้าว่าง หรือยาวเกินเพดานของ Stripe
+ */
+export function assertValidRefCode(raw: unknown): string {
+  const refCode = normalizeRefCode(raw);
+  if (!refCode) {
+    throw new RangeError(
+      'client_reference_id is required — ใช้ ref_code ของ order เป็น join key',
+    );
+  }
+  if (refCode.length > CLIENT_REFERENCE_ID_MAX_LENGTH) {
+    throw new RangeError(
+      `client_reference_id must be at most ${CLIENT_REFERENCE_ID_MAX_LENGTH} characters (got ${refCode.length})`,
+    );
+  }
+  return refCode;
+}
+
 // ── อินพุต/เอาต์พุตของส่วนที่คิดเงิน ────────────────────────────────────────
 
 export interface CheckoutSessionRequest {
@@ -218,15 +244,9 @@ export function buildCheckoutSessionParams(input: CheckoutSessionRequest): Strip
   if (description) params.line_items[0].price_data.product_data.description = description;
   if (input.productMetadata) params.line_items[0].price_data.product_data.metadata = input.productMetadata;
 
-  const clientRef = String(input.clientReferenceId ?? '').trim();
-  if (clientRef) {
-    if (clientRef.length > CLIENT_REFERENCE_ID_MAX_LENGTH) {
-      throw new RangeError(
-        `client_reference_id must be at most ${CLIENT_REFERENCE_ID_MAX_LENGTH} characters (got ${clientRef.length})`,
-      );
-    }
-    params.client_reference_id = clientRef;
-  }
+  // กติกา refCode ทั้งชุดถูกตรวจใน assertValidRefCode จุดเดียว — ไม่ตรวจซ้ำที่นี่
+  // (เคยตรวจสองที่ คนละทาง คำบรรยายคนละชุด)
+  params.client_reference_id = assertValidRefCode(input.clientReferenceId);
 
   params.success_url = successUrl;
   if (input.cancelUrl) params.cancel_url = input.cancelUrl;

@@ -18,7 +18,6 @@ import {
   createFakeStripeTransport,
   createLiveStripeTransport,
   normalizeRefCode,
-  CLIENT_REFERENCE_ID_MAX_LENGTH,
   type StripeCheckoutTransport,
 } from '../../services/stripe-checkout';
 import { verifyStripeSignature } from '../../services/stripe-webhook.service';
@@ -71,18 +70,14 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       // refCode = ref_code ของ order ที่มีอยู่แล้ว (TransferOrder.ref_code)
       // ใช้เป็น client_reference_id ตามที่ Stripe ระบุไว้ตรง ๆ ว่า
       // "a cart ID, or similar, and can be used to reconcile the session
-      //  with your internal systems" — webhook ในอนาคตจะจับคู่ด้วยค่านี้
+      //  with your internal systems" — webhook จะจับคู่ด้วยค่านี้
+      //
+      // กติกา (ว่างไม่ได้ / ยาวเกิน 200) เป็นของ stripe-checkout ไม่ใช่ของ route
+      // route ไม่ตรวจซ้ำ ไม่เขียนข้อความของตัวเอง — ปล่อยให้ builder ตัดสิน
+      // แล้ว catch ด้านล่างแปลงเป็น 400 พร้อมข้อความของเจ้าของกติกา
       const refCode = normalizeRefCode(body.refCode);
-      if (!refCode) {
-        return res.status(400).json({ error: 'refCode is required — ใช้ ref_code ของ order เป็น join key' });
-      }
-      if (refCode.length > CLIENT_REFERENCE_ID_MAX_LENGTH) {
-        return res.status(400).json({
-          error: `refCode must be at most ${CLIENT_REFERENCE_ID_MAX_LENGTH} characters (got ${refCode.length})`,
-        });
-      }
 
-      // ส่งต่อให้ buildCheckoutSessionParams ตรวจที่เหลือ (ยอด/สินค้า/successUrl/จำนวน)
+      // ส่งต่อให้ buildCheckoutSessionParams ตรวจที่เหลือ (refCode/ยอด/สินค้า/successUrl/จำนวน)
       const params = buildCheckoutSessionParams({
         amountBaht: body.amountBaht as number,
         productName: String(body.productName ?? ''),

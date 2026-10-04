@@ -86,6 +86,10 @@ const base: CheckoutSessionRequest = {
   productName: 'Sovereign Origin — สมาชิกปี',
   // success_url บังคับ (Stripe ทำเครื่องหมายว่า required conditionally สำหรับ hosted session)
   successUrl: 'https://sovereign.example.com/checkout/success',
+  // client_reference_id บังคับเช่นกัน (เป็น join key ที่ webhook ใช้จับคู่ order)
+  // เคยไม่มีใน fixture นี้ เพราะ builder เคยประกาศเป็น optional — ตอนนี้เจ้าของกติกา
+  // (assertValidRefCode) บังคับ ทุกเทสต์ที่เรียก builder จึงต้องมีค่านี้
+  clientReferenceId: 'XFR-TEST',
 };
 
 test('payload ต้องส่ง unit_amount เป็นสตางค์ ไม่ใช่บาท', () => {
@@ -145,6 +149,20 @@ test('payload ต้องส่ง success_url ออกไปจริงเ�
 });
 
 // ── client_reference_id: เพดาน 200 ตัวอักษร (กำหนดไว้ในเอกสาร Stripe) ──
+
+// ── เจ้าของกติกา refCode: ต้องบังคับเอง ไม่ใช่ปล่อยให้ route ตรวจ ──────────
+
+test('client_reference_id ที่ไม่มีเลย → ต้องปฏิเสธ (ไม่ใช่สร้าง session ที่ไม่มี join key)', () => {
+  // ช่องโหว่เดิม: builder ประกาศ clientReferenceId เป็น optional และตรวจแค่ความยาว
+  // → เรียกโดยไม่ส่ง refCode ก็ผ่าน ได้ session ที่ webhook จะจับคู่ order ไม่ได้ตลอด
+  for (const bad of [undefined, '', '   ']) {
+    assert.throws(
+      () => buildCheckoutSessionParams({ ...base, clientReferenceId: bad as any }),
+      /client_reference_id/,
+      `ค่า ${JSON.stringify(bad)} ต้องถูกปฏิเสธ`,
+    );
+  }
+});
 
 test('client_reference_id ยาว 200 ตัวอักษรได้ (ขอบเขตพอดี)', () => {
   const ref = 'R'.repeat(200);

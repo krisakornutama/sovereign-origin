@@ -10,7 +10,11 @@ import assert from 'node:assert';
 import type { Express } from 'express';
 import { createTestServer, makeToken, type TestServer } from './helpers';
 import { createPaymentsRouter } from '../src/modules/payments/payments.routes';
-import { createFakeStripeTransport } from '../src/services/stripe-checkout';
+import {
+  createFakeStripeTransport,
+  buildCheckoutSessionParams,
+  CLIENT_REFERENCE_ID_MAX_LENGTH,
+} from '../src/services/stripe-checkout';
 import { makeRefCode } from '../src/services/transfer.service';
 
 const API = '/api/payments';
@@ -127,6 +131,33 @@ test('refCode ยาวเกิน 200 ตัวอักษรต้อง 400
   assert.strictEqual(transport.calls.length, before);
 });
 
+test('ข้อความ 400 ต้องมาจากเจ้าของกติกาตัวเดียวกับ builder (ไม่ใช่คำบรรยายคนละชุด)', async () => {
+  // เดิม route มีข้อความของตัวเองคนละชุดกับ builder → สองเจ้าของกติกาเดียวกัน
+  // แก้โดย route ต้อง "ยืม" ข้อความจากเจ้าของ ไม่ใช่เขียนคำบรรยายใหม่
+  const over = 'X'.repeat(CLIENT_REFERENCE_ID_MAX_LENGTH + 1);
+
+  // ข้อความที่เจ้าของกติกาจะพูด (ได้มาจาก builder โดยตรง ไม่ต้องคัดลอกข้อความ)
+  let ownerMessage = '';
+  try {
+    buildCheckoutSessionParams({
+      amountBaht: VALID.amountBaht, productName: VALID.productName,
+      successUrl: VALID.successUrl, clientReferenceId: over,
+    });
+  } catch (e: any) {
+    ownerMessage = String(e.message);
+  }
+  assert.ok(ownerMessage, 'เจ้าของกติกาต้องพูดออกมาเอง');
+
+  const res = await post({ ...VALID, refCode: over });
+  const body = await res.json();
+
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(
+    String(body.error), ownerMessage,
+    'ข้อความจาก route ต้องตรงกับเจ้าของกติกาทุกตัวอักษร ไม่ใช่แค่คนละถ้อยคำ',
+  );
+});
+
 test('ยอด 0 บาทต้อง 400 และต้องไม่สร้าง session', async () => {
   const before = transport.calls.length;
   const res = await post({ ...VALID, amountBaht: 0 });
@@ -149,7 +180,8 @@ test('ไม่มี refCode ต้อง 400 (webhook จะไม่มีอ
   const body = await res.json();
 
   assert.strictEqual(res.status, 400);
-  assert.match(String(body.error), /refCode/);
+  // ข้อความมาจากเจ้าของกติกา จึงเรียก field ตามชื่อของ Stripe ("client_reference_id")
+  assert.match(String(body.error), /client_reference_id/);
   assert.strictEqual(transport.calls.length, before);
 });
 
