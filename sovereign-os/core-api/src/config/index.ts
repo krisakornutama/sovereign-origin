@@ -275,6 +275,18 @@ export const config = {
     // (เดิมฝัง /35 ตายตัว — ปรับได้ผ่าน env ไม่ต้องแก้โค้ด)
     thbPerUsd: parseFloat(process.env.THB_PER_USD || '35'),
   },
+  // ── Stripe Checkout (THB) ──
+  // ทุกค่าเป็น optional ตามธรรมเนียมไฟล์นี้ (อ่านตรง ๆ + default · ไม่ throw ตอน boot)
+  // เครื่องที่ไม่มี Stripe เลยต้อง start ได้ → enabled/liveEnabled default = false
+  // STRIPE_LIVE_ENABLED=true คือสวิตช์เดียวที่ยอมให้ client ตัวจริงยิง Stripe (ดู services/stripe-checkout.ts)
+  stripe: {
+    enabled: (process.env.STRIPE_ENABLED || 'false') === 'true',
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    // Stripe บังคับรหัสสกุลเงินตัวพิมพ์เล็ก
+    currency: process.env.STRIPE_CURRENCY || 'thb',
+    liveEnabled: (process.env.STRIPE_LIVE_ENABLED || 'false') === 'true',
+  },
   // ── AI Model Manager (Ollama Control System) ──
   // จุดต่อ engine หลัก — ใน docker-compose ตั้งเป็น http://sovereign-ollama:11434
   // บน host ใช้ default http://127.0.0.1:11434 (เดิม env OLLAMA_URL ใช้อยู่แล้วทั่วระบบ)
