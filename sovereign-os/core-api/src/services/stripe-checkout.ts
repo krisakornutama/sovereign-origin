@@ -26,6 +26,13 @@ export const THB_MINOR_UNIT_DIVISOR = 100;
 /** Stripe บังคับให้ส่งรหัสสกุลเงินเป็นตัวพิมพ์เล็ก */
 export const THB_CURRENCY_CODE = 'thb';
 
+/**
+ * เพดานความยาว client_reference_id ตามเอกสาร Stripe:
+ * "A unique string to reference the Checkout Session… The maximum length is 200 characters."
+ * ตัวเลขนี้มาจากเอกสาร ไม่ใช่ค่าที่เราเลือก — ถ้าเปลี่ยนให้เช็คเอกสารใหม่
+ */
+export const CLIENT_REFERENCE_ID_MAX_LENGTH = 200;
+
 // ── อินพุต/เอาต์พุตของส่วนที่คิดเงิน ────────────────────────────────────────
 
 export interface CheckoutSessionRequest {
@@ -34,10 +41,19 @@ export interface CheckoutSessionRequest {
   productName: string;
   productDescription?: string;
   productMetadata?: Record<string, string>;
-  /** รหัสอ้างอิงกลับไปหา order ของเรา — ใช้ค่า TransferOrder.ref_code */
+  /** รหัสอ้างอิงกลับไปหา order ของเรา — ใช้ค่า TransferOrder.ref_code (ยาวไม่เกิน 200) */
   clientReferenceId?: string;
   quantity?: number;
-  successUrl?: string;
+  /**
+   * บังคับต้องมี — Stripe ทำเครื่องหมาย success_url ว่า "required conditionally"
+   * และบอกว่า "not allowed if ui_mode is embedded_page or elements"
+   * เราสร้าง hosted session (ไม่ได้ตั้ง ui_mode → ค่า default ของ Stripe)
+   * แต่เงื่อนไขจริงอยู่ฝั่ง Stripe/บัญชี เราตรวจจากฝั่งเราไม่ได้ว่าเป็นแบบไหน
+   * และ Dashboard อาจมี default อยู่แล้ว → ตัดสินใจปฏิเสธเมื่อไม่มีค่า
+   * ดีกว่าปล่อยให้สร้าง session ที่ Stripe ไม่รับ
+   */
+  successUrl: string;
+  /** ไม่บังคับ — Stripe ระบุว่า cancel_url เป็น optional จริง ๆ (ไม่มี requirement_text) */
   cancelUrl?: string;
 }
 
@@ -87,6 +103,13 @@ function roundBahtToSatang(amountBaht: number): number {
 
 /**
  * แปลงยอดบาทเป็นสตางค์ (integer) ตามที่ Stripe ต้องการ
+ *
+ * หมายเหตุเรื่องยอด 0 — นี่คือ "นโยบายของเรา" ไม่ใช่ข้อบังคับของ Stripe:
+ * เอกสาร Stripe ระบุว่า unit_amount เป็น "a non-negative integer" → 0 ผ่านได้
+ * แต่เราเลือกโยน error เพราะ Checkout Session ที่เรียกเก็บ 0 บาทไม่มีความหมาย
+ * ทางธุรกิจ และการปล่อยให้ผ่านทำให้ "สินค้าฟรี" ปนกับ "ข้อมูลผิด" ในเทสต์
+ * ถ้าวันหนึ่งอยากให้ยอด 0 ผ่านได้จริง ให้เปลี่ยนที่นี่ที่เดียว
+ *
  * @throws ถ้าไม่ใช่ตัวเลขจำนวนเต็มบวก หรือปัดลงแล้วไม่เหลือแม้แต่ 1 สตางค์
  */
 export function toThbMinorUnit(amountBaht: number): number {
@@ -113,6 +136,9 @@ export function buildCheckoutSessionParams(input: CheckoutSessionRequest): Strip
   const name = String(input.productName ?? '').trim();
   if (!name) throw new TypeError('productName is required');
 
+  const successUrl = String(input.successUrl ?? '').trim();
+  if (!successUrl) throw new TypeError('successUrl is required for a hosted Checkout Session');
+
   const quantity = input.quantity ?? 1;
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new RangeError(`quantity must be a positive integer (got ${input.quantity})`);
@@ -137,8 +163,18 @@ export function buildCheckoutSessionParams(input: CheckoutSessionRequest): Strip
   const description = String(input.productDescription ?? '').trim();
   if (description) params.line_items[0].price_data.product_data.description = description;
   if (input.productMetadata) params.line_items[0].price_data.product_data.metadata = input.productMetadata;
-  if (input.clientReferenceId) params.client_reference_id = input.clientReferenceId;
-  if (input.successUrl) params.success_url = input.successUrl;
+
+  const clientRef = String(input.clientReferenceId ?? '').trim();
+  if (clientRef) {
+    if (clientRef.length > CLIENT_REFERENCE_ID_MAX_LENGTH) {
+      throw new RangeError(
+        `client_reference_id must be at most ${CLIENT_REFERENCE_ID_MAX_LENGTH} characters (got ${clientRef.length})`,
+      );
+    }
+    params.client_reference_id = clientRef;
+  }
+
+  params.success_url = successUrl;
   if (input.cancelUrl) params.cancel_url = input.cancelUrl;
 
   return params;
