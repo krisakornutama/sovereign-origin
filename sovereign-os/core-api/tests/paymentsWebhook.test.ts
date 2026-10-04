@@ -493,3 +493,26 @@ test('หน้าร้าน: โอนผ่านคำสั่งโอน
   assert.strictEqual(r.body.applied, true);
   assert.strictEqual(payments.length, 0, 'เส้นทางเดิมต้องไม่มีผลข้างเคียง');
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// 6) TransferOrder.verified_by เป็นคอลัมน์ @db.Uuid — ค่าที่เขียนต้องเป็น uuid หรือ null
+//
+// เทสต์ด้วย mock จับเรื่องนี้ไม่ได้เลย (โค้ดเดิมเขียนค่า 'stripe-webhook' ผ่านทุกเทสต์)
+// แต่ของจริงคือ schema.prisma:375 = `verified_by String? @db.Uuid` การเขียนค่าที่ไม่ใช่
+// uuid ทำให้ Prisma โยน P2023 → express 4 ไม่ส่ง error ออกจาก async handler → request ค้าง
+// → Stripe retry ไม่จบ → คำสั่งโอนไม่เคยเป็น VERIFIED และเงินที่จ่ายจริงไม่เข้า ledger
+//
+// เทสต์นี้จึงผูก "ค่าที่เขียน" เข้ากับข้อจำกัดของ schema โดยตรง
+// ────────────────────────────────────────────────────────────────────────────
+
+test('TransferOrder: verified_by ต้องเป็น uuid หรือ null (คอลัมน์เป็น @db.Uuid)', async () => {
+  const ref = seedOrder('XFR-UUID', 250);
+  const p = completion(ref, 'cs_uuid', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200, 'webhook ต้องตอบ 2xx ไม่ใช่ค้าง');
+  const v = orders.get(ref)?.verified_by ?? null;
+  assert.ok(
+    v === null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v)),
+    `verified_by ต้องเป็น uuid หรือ null แต่ได้ ${JSON.stringify(v)} — คอลัมน์เป็น @db.Uuid (schema.prisma:375)`,
+  );
+});
