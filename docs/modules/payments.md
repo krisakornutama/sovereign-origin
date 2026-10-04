@@ -63,6 +63,20 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 - **ห้ามแก้ `.env`** — เป็นของเจ้าของ และห้าม commit ค่าจริง
 - ลำดับของ `if` ใน `decideCompletion` คือสัญญา — branch แรกที่ match คือคำตอบ
   การสลับลำดับเปลี่ยน reason ที่ลูกค้าเห็นและที่ log
+
+## เงื่อนไขก่อนรับเงินจริง (ตรวจจากของจริง 4/10/69)
+
+โค้ดและเทสต์ของโมดูลนี้พร้อมแล้ว แต่ **ยังรับเงินจริงไม่ได้จนครบ 4 ข้อ** — ด่านที่พังบ่อยไม่ใช่โค้ด:
+
+1. **endpoint ต้องเข้าถึงได้จากอินเทอร์เน็ต** — backend ผูก `127.0.0.1:3001` ⇒ Stripe ยิงตรงไม่ได้ ต้องผ่าน Cloudflare tunnel → `:3000` → Next rewrite `/api/*` → `:3001` · ขั้นตอน+สถานะจริงอยู่ใน `docs/ops-runbook.md` (§สิบ “สถานะ 4/10/69”)
+2. **`STRIPE_WEBHOOK_SECRET` ต้องมีค่า** — ไม่มี/เป็นช่องว่างล้วน = ปฏิเสธทุก delivery ด้วย **401** + `rejected:true` โดยไม่แตะ DB (เทสต์คุมอยู่ที่ `tests/paymentsFreshClone.test.ts`) · **400** สงวนไว้ให้ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่านแล้ว
+3. **WAF ต้องอนุญาต path นี้** — rule default-deny ของโซนบล็อกทุก path ที่ไม่อยู่ใน allowlist ⇒ ถ้าไม่เติม `/api/payments/webhook` จะได้ **403 ที่ edge** ก่อนถึงแอป
+4. **`STRIPE_LIVE_ENABLED=true` เป็นข้อสุดท้ายเสมอ** — ค่า default คือ `false` ⇒ transport เป็นของปลอม ไม่มี request ออกไป Stripe แม้ key ใน `.env` เป็น `rk_live` แล้ว · เปิดก่อนมีข้อ 1-3 = เงินเข้าจริงแต่ออเดอร์ไม่ถูกบันทึก
+
+**URL ของ endpoint ต้องมี `/` ปิดท้าย** — ใช้ `/api/payments/webhook/` เพราะ frontend ตั้ง `trailingSlash: true` ⇒ แบบไม่มี `/` ตอบ **308** และ Stripe ไม่ตาม redirect ของ delivery (วัดจริง: `no_slash=308`, `with_slash=401`)
+
+**การ deploy โมดูลนี้ = restart container** — `sovereign-core-api` mount `src` จาก MAIN และรัน `prisma generate && tsc && node dist/server.js` ทุกครั้งที่บูต ⇒ โค้ดใหม่ขึ้นเมื่อ container restart เท่านั้น (ถ้า `/api/payments/*` ตอบ 404 ให้ restart ก่อนไปสงสัยโค้ด · และรัน `npm run build` ใน MAIN ให้ผ่านก่อน restart เพราะถ้า tsc ในคอนเทนเนอร์ล้ม API จะไม่ขึ้นเลย)
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
