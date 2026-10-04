@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 // ถ้าวันหนึ่งปุ่มชำระหลุดมาให้คนไม่ล็อกอินเห็น เทสต์นี้จะแดงทันที
 // ────────────────────────────────────────────────────────────────────────────
 
-const BASE = process.env.E2E_BASE_URL || 'http://localhost:3100';
+const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const API = 'http://localhost:3001';
 
 const SHOP = {
