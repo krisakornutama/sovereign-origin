@@ -22,7 +22,11 @@ import {
   type StripeCheckoutTransport,
 } from '../../services/stripe-checkout';
 import { verifyStripeSignature } from '../../services/stripe-webhook.service';
-import { decideCompletion } from '../../services/payment-verification.service';
+import {
+  decideCompletion,
+  REASON_ORDER_NOT_PENDING,
+  type NotAppliedReason,
+} from '../../services/payment-verification.service';
 
 export interface PaymentsRouterDeps {
   transport: StripeCheckoutTransport;
@@ -176,7 +180,7 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
         success: true,
         applied: false,
         alreadyApplied: true,
-        reason: 'order_not_pending',
+        reason: REASON_ORDER_NOT_PENDING,
         refCode: decision.refCode,
         status: fresh?.status ?? null,
       });
@@ -215,8 +219,20 @@ function rawBodyOf(req: any): string {
 // แล้วเงินที่ลูกค้าจ่ายจริงจะหายไปเงียบ ๆ — order ไม่มีวันเป็น VERIFIED
 // นี่แย่กว่า retry ดัง ๆ มาก เพราะเงินหายโดยไม่มีใครรู้
 
-/** ตอบ 2xx + บอกตรง ๆ ว่า "ไม่ได้จ่าย" — สำหรับ delivery ที่ไม่มีทางสำเร็จในการส่งครั้งหนัง */
-function notApplied(res: any, reason: string, message: string, extra: Record<string, unknown> = {}) {
+/**
+ * ตอบ 2xx + บอกตรง ๆ ว่า "ไม่ได้จ่าย" — สำหรับ delivery ที่ไม่มีทางสำเร็จในการส่งครั้งหนัง
+ *
+ * reason พิมพ์เป็น NotAppliedReason (ไม่ใช่ string) โดยเจตนา
+ * คือจุดที่ทำให้ union ใน payment-verification.service "มีผลจริง":
+ * ถ้าจุดเขียนนี้เป็น string ไป สะกดผิดแล้วคอมไพล์ผ่าน
+ * และ client ที่อ่าน reason จะพังโดยไม่มีใครเห็นตอน build
+ */
+function notApplied(
+  res: any,
+  reason: NotAppliedReason,
+  message: string,
+  extra: Record<string, unknown> = {},
+) {
   // log เสียงดัง: การตอบ 2xx ทำให้ event นี้ไม่โผล่ในหน้า Stripe อีก
   // ถ้าไม่ log เงินค้างจะเงียบไปตลอดจนกว่าจะมีคนไปเจอเอง
   // ต้อง stringify เอง — ถ้าส่ง object เข้าไป console จะกลายเป็น [object Object]
