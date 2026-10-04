@@ -333,6 +333,28 @@ npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่�
 8. **[ทำแล้ว 30/9/69] Rate limiting:** rule "Public API rate limit: /api/ max 20 req/10s per IP" ใน phase `http_ratelimit` (action=block, mitigation_timeout=10 วิ — ค่าที่ Free plan อนุญาต · characteristics ip.src+colo) — พิสูจน์: ยิง 25 ติดตัวที่ 21+ ได้ 429
 9. **[ทำแล้ว 30/9/69] สายสด Farm→Shop (I5a):** การ์ด "สายสดจากแปลง" บนหน้าร้านดึงจาก `GET /api/trace/products?ids=<inventoryItemId,…>` (สาธารณะ) — QR ติดสินค้าอิง `PUBLIC_APP_URL` (ตั้งใน infra/.env เป็นโดเมนจริงแล้ว) · **ข้อควรระวังตอน deploy frontend:** (1) build ทับ server ที่รันอยู่ = หน้า 404 ทั้งชุด (chunk ใหม่ vs manifest เก่า) — restart :3000 หลัง build เสมอ (2) service worker cache `sovereign-v3` คงหน้าเก่า — ทดสอบหลัง deploy ต้องเคลียร์ SW/caches ก่อนสรุปผล
 
+### สถานะ 4/10/69 — ทำไมร้านยังรับเงินจริงไม่ได้ (ตรวจจากของจริงทุกบรรทัด)
+
+รอบนี้ตรวจว่า "เงินจะเข้าบัญชีได้ไหม" แล้วเจอ **4 ด่าน** ที่ยังปิดอยู่ — ฝั่ง Stripe ไม่ใช่ปัญหา (บัญชีผูก THB → KRUNG THAI •••6505 เรียบร้อยแล้ว Stripe โอนเอง ~7 วันทำการ)
+
+**ด่าน 1 — โดเมนหลุดจาก Cloudflare (เว็บสาธารณะล่มอยู่):** `sovereignoriginshop.dpdns.org` ตอบ **NS = `dns1.digitalplat.org` / `dns2.digitalplat.org`** และ **ไม่มี A record** ทั้ง apex และ `www` → `curl https://…/ ` = exit 6 / code 000 · ตรวจซ้ำ 2 ที่ (Cloudflare DoH + Google DoH) ได้ authoritative ตรงกัน SOA serial `2026100409` (= แก้ล่าสุด 4/10/69) · ยังมี TXT `google-site-verification=…` อยู่ในโซน DigitalPlat ⇒ **zone ยังอยู่ แต่ย้ายออกจาก Cloudflare** · **tunnel ไม่ได้พัง** — `cloudflared` (tunnelID `ecce3206-c35c-4e73-88a1-40514a7f37d8`) ยังรันและยังถือ Public Hostname ของโดเมนนี้ (config version 2, อัปเดต 3/10 10:29) ⇒ **ตั้ง NS กลับเป็นคู่ของ Cloudflare แล้วเว็บกลับมาเอง ไม่ต้องแตะ tunnel** · ⚠️ TXT ของ Google ต้องย้ายไปอยู่ใน Cloudflare zone ด้วย ไม่งั้น GSC verify หลุดเมื่อ NS เปลี่ยน
+
+**ด่าน 2 — API ที่รันอยู่ไม่มีโมดูล payments (แยกจากบั๊กโค้ด):** container `sovereign-core-api` mount `src` จากโฟลเดอร์ MAIN และรัน `npx prisma generate && npm run build && npm start` ทุกครั้งที่บูต ⇒ **`docker restart sovereign-core-api` = deploy จริง ไม่ต้อง rebuild image** · 4/10/69 container ยังเป็น build 1/10 13:31 แต่โมดูล payments เกิด 4/10 11:52 → `/api/payments/*` ตอบ **404** · หลัง restart (healthy ที่ t+40s) ตอบ **401** ⇒ ถ้าเจอ payments 404 อีก **ให้ restart container ก่อนไปสงสัยโค้ด** · ลำดับที่ถูก: `npx prisma generate && npm run build` ใน MAIN ให้ผ่านก่อน แล้วค่อย restart (ถ้า build ล้มในคอนเทนเนอร์ `npm start` ไม่รัน = API ล่มทั้งตัว)
+
+**ด่าน 3 — ไม่มี `STRIPE_WEBHOOK_SECRET`:** ยังไม่ตั้ง ⇒ ทุก delivery ถูกปฏิเสธ (โดยเจตนา) · ต้องสร้าง endpoint ใน **Workbench → Webhooks** และคัด `whsec_…` มาใส่ `.env` (เฉพาะค่านี้ · ห้ามส่ง `sk_`/`rk_`/เลขบัญชีในแชท) · สัญญาที่พิสูจน์แล้ว: secret ไม่ตั้ง/ลายเซ็นไม่ผ่าน → **401** + `rejected:true` (ไม่ใช่ 400) ส่วน **400** ใช้เฉพาะ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่าน — เทสต์ที่คุมสัญญานี้คือ [`tests/paymentsFreshClone.test.ts`](../sovereign-os/core-api/tests/paymentsFreshClone.test.ts) (assert ข้อความ `webhook signing secret is not configured`) · ตอบ non-2xx ไว้ถูกแล้ว ห้ามเปลี่ยนเป็น 2xx: secret อาจเพิ่งหมุน แล้ว Stripe จะส่งซ้ำให้
+
+**ด่าน 4 — WAF default-deny ยังไม่รู้จัก path ของ webhook:** rule "Public-only: block admin/internal paths" (ข้อ 6 ด้านบน) อนุญาตเฉพาะ path ที่อยู่ใน allowlist ซึ่ง **ยังไม่มี `/api/payments/*`** ⇒ เมื่อโดเมนกลับมา Stripe จะได้ **403 ที่ edge** ต้องเติม **บวกอย่างเดียว** ต่อท้ายในวงเล็บ allowlist (ครอบทั้งมี/ไม่มี `/` ปิดท้ายด้วย `starts_with`):
+```
+or starts_with(http.request.uri.path, "/api/payments/webhook")
+```
+เกณฑ์ตรวจ: `curl -s -o /dev/null -w '%{http_code}' -X POST https://sovereignoriginshop.dpdns.org/api/payments/webhook/` → ต้องได้ **401** (ไม่ใช่ 403) — ถ้าได้ 403 = ยังไม่ขึ้น rule
+
+**⚠️ URL ของ endpoint ต้องมี `/` ปิดท้ายเสมอ:** `next.config.js` ตั้ง `trailingSlash: true` ⇒ `POST /api/payments/webhook` ผ่านประตู `:3000` ตอบ **308** แล้ว redirect ไป `/api/payments/webhook/` · **Stripe ไม่ตาม redirect ของ delivery** (นับเป็น fail) — วัดจริง 4/10/69: `no_slash=308`, `with_slash=401` (ที่ :3001 ตรง ๆ ตอบ 401 ทั้งสองรูปแบบเพราะ Express ไม่ strict routing แต่ Stripe วิ่งผ่าน :3000 เท่านั้น) ⇒ ใช้ `https://sovereignoriginshop.dpdns.org/api/payments/webhook/`
+
+**ลำดับที่ถูกก่อนเปิดรับเงิน (ห้ามสลับ):** ตั้ง NS กลับ → เติม WAF allowlist → สร้าง endpoint + เอา `whsec` ใส่ `.env` → ตั้งเบอร์ `shopPromptPay` ของร้านให้ตรงบัญชีรับเงิน → **สุดท้าย**ค่อยเปิด `STRIPE_LIVE_ENABLED=true` แล้วซื้อทดสอบ 1 บาท · **ห้ามเปิด live ก่อนมี `whsec`**: เงินเข้าจริงแต่ออเดอร์ไม่ถูกบันทึก และ Stripe จะ retry ไม่จบ
+
+> **หมายเหตุเครื่องมือ:** `PROMPTPAY_TARGET` เป็นของ **treasury** (คำสั่งโอน/QR ส่วนตัว) — **ไม่เกี่ยวกับ PromptPay ของร้าน** ซึ่งเก็บที่ `businesses.shopPromptPay` (เข้ารหัส · ตั้งจากหน้า `/business` → แท็บร้าน) ⇒ ตั้งร้านให้ใช้เบอร์ที่ถูกต้องจาก UI ไม่ต้องแก้ `.env`
+
 ## §สิบเอ็ด — การจัดการ repo public + สนามทดลองสาธารณะ (P: Publishing 30/9/69)
 
 ### กฎการเผยแพร่ (ตัดสินครั้งเดียว — คงไว้ตลอด)
