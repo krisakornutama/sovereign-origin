@@ -12,16 +12,19 @@
 
 | ไฟล์ | เป็นเจ้าของ | ห้ามยุ่ง |
 |---|---|---|
-| `services/payment-verification.service.ts` | **ศัพท์และกติกา** ว่า delivery จะถูก apply ไหม · `NotAppliedReason` (reason code ที่ API ตอบและ log) · ลำดับการตรวจ | ต้อง pure: ไม่แตะ HTTP · ไม่แตะ DB · ไม่อ่าน config/env · ไม่ยิงเน็ต เพิ่มเงื่อนไขใหม่ตรงนี้ ไม่ใช่ใน route · ถ้าเพิ่ม reason ที่ route ผลิตเอง ให้เพิ่มใน union ก่อน แล้วค่อยใช้ `REASON_ORDER_NOT_PENDING` แบบเดียวกัน |
+| `services/payment-verification.service.ts` | **ศัพท์และกติกา** ว่า delivery จะถูก apply ไหม · `NotAppliedReason` (reason code ที่ API ตอบและ log) · ลำดับการตรวจ | ต้อง pure: ไม่แตะ HTTP · ไม่แตะ DB · ไม่อ่าน config/env · ไม่ยิงเน็ต เพิ่มเงื่อนไขใหม่ตรงนี้ ไม่ใช่ใน route · กฎของทั้งสองตารางอยู่ที่ `checkCompletion()` จุดเดียว ส่วนที่ต่างกัน (ชื่อคอลัมน์/ถ้อยคำ) อยู่ใน `OrderRules` เท่านั้น — ห้ามคัดลอกขั้นตรวจไปเขียนซ้ำ · ถ้าเพิ่ม reason ที่ route ผลิตเอง ให้เพิ่มใน union ก่อน แล้วค่อยใช้ `REASON_ORDER_NOT_PENDING` แบบเดียวกัน |
+| `services/payment-apply.service.ts` | **การเขียนลงฐานข้อมูลทั้งหมด** ที่มาจาก Stripe: CAS (`transferOrder`/`businessOrder`) + แถวเงิน `businessPayment` ใน `$transaction` เดียวกัน | รับ `PrismaClient` ตัวจริงเท่านั้น (ห้าม `any` — ชื่อคอลัมน์ที่ผิดต้องเป็น compile error) · ห้ามแตะ HTTP/response · ห้ามเขียน DB จากที่อื่นของโมดูลนี้ (ถ้าจะเพิ่มจุดเขียน ให้มาที่นี่ทั้งหมด) |
 | `services/stripe-checkout.ts` | ขอบเขตของ Stripe ฝั่งเรา: บาท↔สตางค์ (`toThbMinorUnit`), ค่าคงที่ที่มาจากเอกสาร Stripe, `normalizeRefCode`, payload builder, transport (fake/live) | ห้าม import `config` — โมดูลนี้ต้องทดสอบได้ด้วยเทสต์ล้วน |
 | `services/stripe-webhook.service.ts` | ตรวจลายเซ็น Stripe (pure) | ไม่รู้จัก order / DB / business |
-| `modules/payments/payments.routes.ts` | **เฉพาะชั้น HTTP**: auth, raw body, สถานะ/รูปร่าง response, การเขียน DB (CAS) และการเดินสาย config→transport | ห้ามใส่ตรรกะทางธุรกิจ — ถ้าเริ่มเป็น `if (...) return 400` หลาย ๆ ที่ แปลว่าตรรกะหลุดมาอยู่ผิดชั้น |
+| `modules/payments/payments.routes.ts` | **เฉพาะชั้น HTTP**: auth, raw body, สถานะ/รูปร่าง response, และการเดินสาย config→transport | ห้ามใส่ตรรกะทางธุรกิจ — ถ้าเริ่มเป็น `if (...) return 400` หลาย ๆ ที่ แปลว่าตรรกะหลุดมาอยู่ผิดชั้น · **ห้ามเขียน DB ตรง ๆ ในไฟล์นี้** — ทุกจุดที่แตะ order/payment เพื่อบันทึกการจ่ายของ Stripe ต้องอยู่ที่ `payment-apply.service` (CAS ที่ซ่อนใน route คือจุดที่ทำให้ `any` หลุดเข้ามาและบั๊กที่เทสต์ด้วย mock ไม่จับ) |
 
 **ทิศทางข้อมูล (ทางเดียว):**
-`HTTP → verify ลายเซ็น → หา order → decideCompletion() → CAS เขียน DB → ตอบ`
+`HTTP → verify ลายเซ็น → หา order → decideCompletion()/decideStorefrontCompletion() → payment-apply (CAS + แถวเงิน) → ตอบ`
 
-`decideCompletion()` คืน `apply` หรือ `not_applied` เท่านั้น — ไม่เขียนอะไรลง DB
-เพราะ CAS ต้องรู้ว่า "เขียนสำเร็จไหม" ซึ่งเป็นเรื่องของชั้น HTTP
+`decide*()` คืน `apply` หรือ `not_applied` เท่านั้น — ไม่เขียนอะไรลง DB
+เพราะ CAS ต้องรู้ว่า "เขียนสำเร็จไหม" ซึ่งเป็นเรื่องของชั้นเขียนข้อมูล
+(`payment-apply.service`) ไม่ใช่ชั้น HTTP — การแยกแบบนี้ทำให้ทั้งสองทาง
+(TransferOrder / ออเดอร์หน้าร้าน) ใช้กติกาเดียวกันและถูก type-check ตอน compile
 
 ## เพดานยอดที่บังคับ (ทั้งสองมาจากเอกสาร Stripe)
 
