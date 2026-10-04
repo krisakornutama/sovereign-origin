@@ -25,6 +25,7 @@ import {
   decideCompletion,
   decideStorefrontCompletion,
   STOREFRONT_PAYABLE_STATUSES,
+  STRIPE_PAYMENT_METHOD,
   REASON_ORDER_NOT_PENDING,
   type NotAppliedReason,
 } from '../../services/payment-verification.service';
@@ -225,11 +226,34 @@ async function applyStorefrontOrder(res: any, db: any, event: any, shopOrder: an
     return notApplied(res, decision.reason, decision.message, decision.detail);
   }
 
-  // conditional update: เขียนได้ก็ต่อเมื่อยังรอชำระ — Stripe ส่งซ้ำจะได้ count 0
-  // (toFixed(2) กัน float เป็น 9899.999999999998 แล้ว UI โชว์ยอดเพี้ยน)
-  const claimed = await db.businessOrder.updateMany({
-    where: { publicToken: decision.publicToken, status: { in: [...STOREFRONT_PAYABLE_STATUSES] } },
-    data: { status: 'PAID', paidAmount: Number((decision.expectedSatang / 100).toFixed(2)) },
+  // conditional update + บันทึกแถวเงิน ต้องเป็นเรื่องเดียวกัน (transaction)
+  //
+  // ทำไมต้องมีแถวใน business_payments: getPublicOrderByToken คิด
+  // "ยอดที่ชำระแล้ว" จากผลรวมของแถวในตารางนี้ ไม่ใช่จาก order.paidAmount
+  // ถ้าเขียนแค่ order → ลูกค้าที่จ่ายบัตรแล้วยังเห็น "ค้างชำระ" เต็มจำนวน
+  // พร้อม QR PromptPay ซ้ำ = เงินเข้าแล้วแต่หน้าจอบอกว่ายังไม่จ่าย
+  //
+  // กันเงินซ้ำด้วย CAS ไม่ใช่ด้วยการเช็คแถวก่อนเขียน: Stripe ส่ง delivery
+  // เดิมซ้ำได้ และ "เช็คแล้วค่อยเขียน" แข่งกับตัวเองเองได้
+  // CAS แบบ claimPending คือผู้ชนะมีคนเดียวโดยโครงสร้างข้อมูล ไม่ต้องเชื่อเวลา
+  const paidThb = Number((decision.expectedSatang / 100).toFixed(2)); // กัน float เป็น 9899.999999999998
+
+  const claimed = await db.$transaction(async (tx: any) => {
+    const res = await tx.businessOrder.updateMany({
+      where: { publicToken: decision.publicToken, status: { in: [...STOREFRONT_PAYABLE_STATUSES] } },
+      data: { status: 'PAID', paidAmount: paidThb },
+    });
+    // ไม่ได้เป็นเจ้าของ (ส่งซ้ำ/ถูกยกเลิก) = ห้ามแตะเงิน
+    if (res.count !== 1) return res;
+    await tx.businessPayment.create({
+      data: {
+        orderId: decision.orderId,
+        amount: paidThb,
+        method: STRIPE_PAYMENT_METHOD,
+        reference: decision.sessionId, // cs_… = เลขอ้างอิงฝั่ง Stripe ย้อนหาได้
+      },
+    });
+    return res;
   });
 
   if (claimed.count !== 1) {

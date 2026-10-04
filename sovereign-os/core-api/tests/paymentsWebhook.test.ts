@@ -33,6 +33,8 @@ interface StoreRow { id: string; publicToken: string; status: string; total: num
 const storefront = new Map<string, StoreRow>();
 let storefrontApplied = 0;
 let updateManyCalls = 0;
+// แถวที่ถูกเขียนลง business_payments — ใช้พิสูจน์ว่า "จ่ายครั้งเดียว = แถวเดียว"
+const payments: any[] = [];
 // นับเฉพาะครั้งที่ "เขียนจริง" (count===1) — ไม่ใช่จำนวนครั้งที่เรียก
 // เพราะการเรียก updateMany ซ้ำเป็นเรื่องปกติของ conditional update (แบบ claimPending)
 // สิ่งที่ต้องพิสูจน์คือ "ใช้ได้ผลจริงครั้งเดียว" ไม่ใช่ "เรียกครั้งเดียว"
@@ -67,6 +69,14 @@ const prisma: any = {
       return { count: 1 };
     },
   },
+  businessPayment: {
+    create: async ({ data }: any) => {
+      payments.push({ ...data });
+      return { id: `pay_${payments.length}`, ...data };
+    },
+  },
+  // prisma จริงมี $transaction — จำลองเป็นเรียกตรง ๆ (จุดเดียวที่ต้อง atomic คือ CAS + บันทึกเงิน)
+  $transaction: async (fn: any) => fn(prisma),
 };
 
 let server: Server;
@@ -86,7 +96,7 @@ before(async () => {
 });
 after(async () => { await new Promise<void>((r) => server.close(() => r())); });
 
-beforeEach(() => { orders.clear(); storefront.clear(); updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; });
+beforeEach(() => { orders.clear(); storefront.clear(); payments.length = 0; updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; });
 
 // ── ช่วยสร้างลายเซ็นแบบ Stripe ──────────────────────────────────────────────
 function sign(payload: string, secret = WEBHOOK_SECRET, ts = Math.floor(Date.now() / 1000)): string {
@@ -439,4 +449,47 @@ test('หน้าร้าน: checkout-session รับ publicToken เป็
   assert.strictEqual(res.status, 201);
   assert.strictEqual(body.success, true);
   assert.strictEqual(body.refCode, 'tok-abc-123', 'refCode ต้องส่งต่อได้ ไม่ถูกแปลง');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 5) เงินที่จ่ายจริงต้องมีแถวใน business_payments
+//
+// เหตุผลที่ไม่ใช่ "ของสวยงาม": getPublicOrderByToken คิดยอดที่ชำระแล้ว
+// จาก "ผลรวมของแถวใน business_payments" ไม่ใช่จาก order.paidAmount
+// → ถ้าไม่เขียนแถว ลูกค้าที่จ่ายบัตรแล้วจะยังเห็น "ค้างชำระ" เต็มจำนวน
+//   พร้อม QR PromptPay ซ้ำ = เงินเข้าแล้วแต่หน้าจอบอกว่ายังไม่จ่าย
+//
+// method ต้องไม่ใช่ PROMPTPAY: buildMorningDigest กรองทีเดียว
+// (method:'PROMPTPAY') เพื่อสรุป "แจ้งชำระรอยืนยัน" — บัตรไม่ใช่โอน QR
+// ถ้าใส่ PROMPTPAY ยอดนี้จะไปปนกับยอดโอนจริงในสรุปเช้า
+// ────────────────────────────────────────────────────────────────────────────
+
+test('หน้าร้าน: จ่ายสำเร็จ → ต้องมีแถวเงิน 1 แถว ยอดเท่า order.total', async () => {
+  const tok = seedStorefront('tok-pay-1', 9900, 'ORDERED');
+  const p = completion(tok, 'cs_pay_1', 990000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, true);
+  assert.strictEqual(payments.length, 1, 'ต้องมีแถวเงินพอดี 1 แถว');
+  assert.strictEqual(payments[0].amount, 9900, 'ยอดต้องเป็นเต็มจำนวน ไม่ใช่สตางค์');
+  assert.strictEqual(payments[0].method, 'CARD', 'ต้องแยกจาก PROMPTPAY ไม่งั้นสรุปเช้าจะปน');
+  assert.strictEqual(payments[0].reference, 'cs_pay_1', 'เก็บเลขอ้างอิงฝั่ง Stripe ไว้ตามรอยย้อนได้');
+});
+
+test('หน้าร้าน: Stripe ส่งซ้ำ → ต้องไม่เพิ่มแถวเงินซ้ำ (เงินเข้าครั้งเดียว)', async () => {
+  const tok = seedStorefront('tok-pay-2', 2500, 'ORDERED');
+  const p = completion(tok, 'cs_pay_2', 250000);
+  await deliver(p, sign(p));
+  const again = await deliver(p, sign(p));
+  assert.strictEqual(again.status, 200);
+  assert.strictEqual(again.body.alreadyApplied, true);
+  assert.strictEqual(payments.length, 1, 'ส่งซ้ำแล้วต้องยังมีแถวเดียว ไม่ใช่สองแถว');
+});
+
+test('หน้าร้าน: โอนผ่านคำสั่งโอน (TransferOrder) → ต้องไม่แตะ business_payments', async () => {
+  const ref = seedOrder('XFR-NOPAY', 250);
+  const p = completion(ref, 'cs_no_pay', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.body.applied, true);
+  assert.strictEqual(payments.length, 0, 'เส้นทางเดิมต้องไม่มีผลข้างเคียง');
 });
