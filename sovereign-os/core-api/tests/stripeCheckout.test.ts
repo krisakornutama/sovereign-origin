@@ -220,11 +220,45 @@ test('config ต้องไม่ throw ตอน boot แม้ไม่มี
   process.env.DATABASE_URL ||= 'postgresql://test:test@127.0.0.1:5432/test';
   // ล้างค่าสวิตช์ทิ้งก่อน import — ถ้า .env ของเครื่องตั้งไว้ เทสต์นี้จะแดง
   // (ซึ่งถูกต้อง: เครื่องที่ตั้งยิงของจริงไว้ควรได้ยืนยันว่าตั้งใจ)
-  delete process.env.STRIPE_ENABLED;
   delete process.env.STRIPE_LIVE_ENABLED;
 
   const { config } = await import('../src/config');
-  assert.strictEqual(config.stripe.enabled, false);
   assert.strictEqual(config.stripe.liveEnabled, false, 'ค่า default ต้องไม่ยอมยิง Stripe จริง');
-  assert.strictEqual(config.stripe.currency, 'thb');
+});
+
+// ── กัน "silent no-op": ตัวแปรที่อ่านเข้ามาแล้วไม่มีใครใช้ ──────────────────
+
+test('config.stripe ต้องไม่มี field ไหนที่ไม่มีผู้อ่าน (silent no-op)', async () => {
+  // ทั้งสองตัวที่เคยอยู่ตรงนี้ถูกลบไปเพราะ "ไม่มีใครอ่าน":
+  //   STRIPE_ENABLED  — ตั้ง true ก็ไม่มีผล มีแต่ STRIPE_LIVE_ENABLED เท่านั้นที่เปิด transport จริง
+  //   STRIPE_CURRENCY — ตัว builder hardcode เป็น thb (services/stripe-checkout.ts) ไม่เคยอ่าน config
+  // ทั้งคู่ทำให้คนที่ตั้งค่าแล้ว "เชื่อว่าเปิดแล้ว" ทั้งที่ระบบยังทำงานแบบ mock เงียบ ๆ
+  // เทสต์นี้ล็อก "พื้นที่" ของ config ไว้: ใครใส่ field ที่ไม่มีผู้อ่านกลับมา ต้องแดง
+  process.env.JWT_SECRET ||= 'test-secret-0123456789abcdef';
+  process.env.DATABASE_URL ||= 'postgresql://test:test@127.0.0.1:5432/test';
+
+  const { config } = await import('../src/config');
+  assert.deepStrictEqual(Object.keys(config.stripe).sort(), [
+    'liveEnabled',
+    'publishableKey',
+    'secretKey',
+    'webhookSecret',
+  ]);
+});
+
+test('STRIPE_PUBLISHABLE_KEY ที่ยังไม่มีผู้อ่าน ต้องเขียนกำกับไว้ในโค้ด ไม่ใช่ปล่อยเงียบ', () => {
+  // publishableKey ยังไม่มี paywall ฝั่งหน้าเว็บ (ยังไม่อยู่ในขอบเขต) → ไม่มีใครอ่าน
+  // เก็บไว้เพราะเป็น credential ของเจ้าของ และเป็นตัวที่ frontend จะต้องใช้
+  // เงื่อนไข: ถ้าวันหนึ่ง field นี้ยังไม่มีผู้อ่าน ต้องมีคำอธิบายใน config/index.ts กำกับ
+  // (ถ้าไม่มี = กลายเป็น silent no-op ตัวที่สาม ซึ่งคือสิ่งที่เพิ่งลบไปสองตัว)
+  const fs = require('node:fs') as typeof import('node:fs');
+  const src = fs.readFileSync(new URL('../src/config/index.ts', import.meta.url), 'utf8');
+  const at = src.indexOf('publishableKey:');
+  assert.ok(at > -1, 'ต้องยังมี field publishableKey อยู่');
+  // ดูหน้าต่างรอบ ๆ field (คำอธิบายอยู่บรรทัดก่อนหน้าเป็นปกติ)
+  const around = src.slice(Math.max(0, at - 800), at + 800);
+  assert.match(around, /ยังไม่มีใครอ่าน/,
+    'publishableKey ต้องมีคำอธิบายว่ายังไม่มีผู้อ่าน + จองไว้ให้ paywall ฝั่งหน้าเว็บ');
+  assert.match(around, /paywall/,
+    'คำอธิบายต้องบอกว่าจองไว้ให้อะไร (paywall ฝั่งหน้าเว็บ)');
 });
