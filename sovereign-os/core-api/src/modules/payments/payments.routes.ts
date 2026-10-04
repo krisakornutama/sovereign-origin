@@ -109,7 +109,9 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
   // body ต้องเป็น BYTE ต้นฉบับ (server.ts mount express.raw ไว้ก่อน express.json
   // สำหรับ path นี้) เพราะลายเซ็นคำนวณจาก byte จริง
   router.post('/webhook', async (req, res) => {
-    const secret = deps.webhookSecret ?? config.stripe.webhookSecret;
+    // ตัดช่องว่างทิ้งก่อนตรวจ — ถ้าเหลือแต่ช่องว่างถือว่า "ยังไม่ได้ตั้ง"
+    // ไม่งั้น secret ที่เป็นช่องว่างจะกลายเป็น secret ที่ใครก็เดาได้ (copy/paste เหลือช่องว่าง)
+    const secret = String(deps.webhookSecret ?? config.stripe.webhookSecret ?? '').trim();
     if (!secret) {
       return res.status(400).json({ error: 'webhook signing secret is not configured' });
     }
