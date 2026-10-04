@@ -27,6 +27,11 @@ const AUTH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer
 // ── prisma ปลอม: เก็บ order ใน memory ตามรูปแบบเทสต์อื่นของระบบ ─────────────
 interface Row { ref_code: string; status: string; amount_thb: number | null; amount_usd: number; txid?: string | null; verified_by?: string | null; verified_at?: Date | null }
 const orders = new Map<string, Row>();
+// ── ออเดอร์หน้าร้าน (BusinessOrder) — จับคู่ด้วย publicToken (UUID @unique ทั้งระบบ)
+//    ไม่ใช้ orderNo เพราะ orderNo ไม่ unique ข้ามร้าน (B20261004-0001 ซ้ำได้ทุกร้าน)
+interface StoreRow { id: string; publicToken: string; status: string; total: number; paidAmount: number }
+const storefront = new Map<string, StoreRow>();
+let storefrontApplied = 0;
 let updateManyCalls = 0;
 // นับเฉพาะครั้งที่ "เขียนจริง" (count===1) — ไม่ใช่จำนวนครั้งที่เรียก
 // เพราะการเรียก updateMany ซ้ำเป็นเรื่องปกติของ conditional update (แบบ claimPending)
@@ -43,6 +48,22 @@ const prisma: any = {
       if (!row || (where?.status && row.status !== where.status)) return { count: 0 };
       Object.assign(row, data);
       appliedCount += 1;
+      return { count: 1 };
+    },
+  },
+  businessOrder: {
+    findFirst: async ({ where }: any) => storefront.get(where?.publicToken) ?? null,
+    updateMany: async ({ where, data }: any) => {
+      const row = storefront.get(where?.publicToken);
+      if (!row) return { count: 0 };
+      // conditional update: เขียนได้ก็ต่อเมื่อยังรอชำระ (QUOTE/ORDERED) — กันส่งซ้ำเหมือน claimPending
+      // รองรับทั้งรูปแบบ Prisma จริง ({ in: [...] }) และแบบเท่าตรง ๆ (สตริง/อาร์เรย์)
+      const want = where?.status;
+      const list = Array.isArray(want) ? want : Array.isArray(want?.in) ? want.in : null;
+      const ok = list ? list.includes(row.status) : row.status === want;
+      if (!ok) return { count: 0 };
+      Object.assign(row, data);
+      storefrontApplied += 1;
       return { count: 1 };
     },
   },
@@ -65,7 +86,7 @@ before(async () => {
 });
 after(async () => { await new Promise<void>((r) => server.close(() => r())); });
 
-beforeEach(() => { orders.clear(); updateManyCalls = 0; appliedCount = 0; });
+beforeEach(() => { orders.clear(); storefront.clear(); updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; });
 
 // ── ช่วยสร้างลายเซ็นแบบ Stripe ──────────────────────────────────────────────
 function sign(payload: string, secret = WEBHOOK_SECRET, ts = Math.floor(Date.now() / 1000)): string {
@@ -91,6 +112,11 @@ async function deliver(payload: string, header?: string) {
 function seedOrder(refCode: string, amountThb: number, status = 'PENDING') {
   orders.set(refCode, { ref_code: refCode, status, amount_thb: amountThb, amount_usd: amountThb / 35 });
   return refCode;
+}
+
+function seedStorefront(publicToken: string, total: number, status = 'ORDERED') {
+  storefront.set(publicToken, { id: `bo_${publicToken}`, publicToken, status, total, paidAmount: 0 });
+  return publicToken;
 }
 
 // ── 1) ลายเซ็น ────────────────────────────────────────────────────────────────
@@ -359,4 +385,58 @@ test('เส้นปกติต้องไม่เปลี่ยน: 200 + 
   assert.strictEqual(r.body.sessionId, 'cs_1');
   assert.strictEqual(r.body.refCode, ref);
   assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 4) ออเดอร์หน้าร้าน (BusinessOrder) — checkout ส่ง publicToken มาแทน ref_code
+//
+// เหตุผลที่ต้องมี: ซอฟต์แวร์/แพ็กเกจที่ขายหน้าร้านเป็น BusinessOrder ไม่ใช่ TransferOrder
+// และ orderNo ไม่ unique ข้ามร้าน → ต้องใช้ publicToken (UUID @unique) เป็นตัวจับคู่
+// ────────────────────────────────────────────────────────────────────────────
+
+test('หน้าร้าน: publicToken + ยอดตรง → applied:true และ order เป็น PAID', async () => {
+  const tok = seedStorefront('tok-abc-123', 9900, 'ORDERED');
+  const p = completion(tok, 'cs_shop_1', 990000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, true);
+  assert.strictEqual(r.body.status, 'PAID');
+  assert.strictEqual(storefront.get(tok)!.status, 'PAID');
+  assert.strictEqual(storefrontApplied, 1);
+});
+
+test('หน้าร้าน: ยอดไม่ตรง → ไม่ apply และ order ยังรอชำระ (เงินหายเงียบ = ห้าม)', async () => {
+  const tok = seedStorefront('tok-mismatch', 9900, 'ORDERED');
+  const p = completion(tok, 'cs_shop_2', 100); // จ่าย 1 บาท แต่ order 9,900
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, false);
+  assert.strictEqual(r.body.reason, 'amount_mismatch');
+  assert.strictEqual(storefront.get(tok)!.status, 'ORDERED', 'order ต้องไม่ถูกแตะ');
+  assert.strictEqual(storefrontApplied, 0);
+});
+
+test('หน้าร้าน: ส่งซ้ำหลังจ่ายแล้ว → applied:false alreadyApply ไม่เขียนซ้ำ', async () => {
+  const tok = seedStorefront('tok-dup', 500, 'PAID');
+  const p = completion(tok, 'cs_shop_3', 50000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, false);
+  assert.strictEqual(r.body.alreadyApplied, true);
+  assert.strictEqual(storefrontApplied, 0);
+});
+
+test('หน้าร้าน: checkout-session รับ publicToken เป็น refCode ได้ (ไม่ต้องแตะสัญญา)', async () => {
+  const res = await fetch(`${baseUrl}${API}/checkout-session`, {
+    method: 'POST',
+    headers: AUTH(),
+    body: JSON.stringify({
+      amountBaht: 250, productName: 'แพ็กเกจทดลอง', refCode: 'tok-abc-123',
+      successUrl: 'https://example.test/ok',
+    }),
+  });
+  const body = await res.json() as any;
+  assert.strictEqual(res.status, 201);
+  assert.strictEqual(body.success, true);
+  assert.strictEqual(body.refCode, 'tok-abc-123', 'refCode ต้องส่งต่อได้ ไม่ถูกแปลง');
 });

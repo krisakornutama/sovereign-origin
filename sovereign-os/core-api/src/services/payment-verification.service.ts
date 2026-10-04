@@ -141,3 +141,113 @@ export function decideCompletion(
   // 6) ผ่านทุกอย่าง → อนุญาตให้เขียน (CAS ที่ route ทำต่อ)
   return { kind: 'apply', refCode, sessionId: String(session.id ?? ''), expectedSatang };
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ออเดอร์หน้าร้าน (BusinessOrder) — คนละตารางกับ TransferOrder จึงแยกชุดตรรกะ
+//
+// ทำไมต้องแยก: ของที่ขายหน้าร้าน (ซอฟต์แวร์/แพ็กเกจ) เป็น BusinessOrder ไม่ใช่ TransferOrder
+// และยอดที่เชื่อได้อยู่ที่ `total` ไม่ใช่ `amount_thb` — ใช้ decideCompletion เดิม
+// ด้วย shape ของ TransferOrder จะอ่านยอดได้ undefined → ปฏิเสธทุกครั้ง
+//
+// ทำไมถึงไม่แก้ decideCompletion เดิมให้รับได้ทั้งสองแบบ: union ของ order จะทำให้
+// จุดที่อ่าน `amount_thb` กลายเป็น `number | undefined` โดยไม่มีใครเห็นตอน compile
+// (เหตุผลเดียวกับที่ reason ถูกพิมพ์เป็น NotAppliedReason ไม่ใช่ string)
+//
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** สถานะ BusinessOrder ที่ยังรอชำระ — เขียนทับได้เฉพาะสถานะเหล่านี้เท่านั้น */
+export const STOREFRONT_PAYABLE_STATUSES = ['QUOTE', 'ORDERED'] as const;
+
+export interface StorefrontApplyDecision {
+  kind: 'apply';
+  /** publicToken ของ order (UUID @unique ทั้งระบบ) — ใช้เป็น where ตอน CAS */
+  publicToken: string;
+  orderId: string;
+  sessionId: string;
+  /** ยอดที่ order คาดไว้ (สตางค์) */
+  expectedSatang: number;
+}
+
+export type StorefrontCompletionDecision = StorefrontApplyDecision | NotAppliedDecision;
+
+/**
+ * ตัดสินใจว่า delivery นี้ "จะ mark ออเดอร์หน้าร้านเป็น PAID ไหม" — pure เหมือนตัวบน
+ *
+ * ลำดับการตรวจเหมือน decideCompletion ทุกข้อ เพราะความหมายเดียวกัน:
+ *   เราเชื่อตัวเลขของ ORDER ไม่ใช่ของ session (session.amount_total แก้เองได้
+ *   ถ้าไม่เช็คลายเซ็น) และไม่เดา order ที่ไม่มีอยู่จริง
+ */
+export function decideStorefrontCompletion(
+  event: any,
+  order: { id?: unknown; publicToken?: unknown; status?: unknown; total?: unknown } | null,
+): StorefrontCompletionDecision {
+  if (event?.type !== HANDLED_EVENT_TYPE) {
+    return {
+      kind: 'not_applied',
+      reason: 'unsupported_event_type',
+      message: `ไม่ใช่ event ที่เราดูแล: ${event?.type ?? 'ไม่ระบุ'}`,
+      detail: { type: event?.type ?? null },
+    };
+  }
+
+  const session = event?.data?.object ?? {};
+
+  const publicToken = normalizeRefCode(session.client_reference_id);
+  if (!publicToken) {
+    return {
+      kind: 'not_applied',
+      reason: 'missing_client_reference_id',
+      message: 'ไม่มี client_reference_id — จับคู่ออเดอร์ไม่ได้ (ไม่เดา ไม่สร้างออเดอร์ใหม่)',
+      detail: { sessionId: String(session.id ?? '') || null },
+    };
+  }
+
+  if (!order) {
+    return {
+      kind: 'not_applied',
+      reason: 'order_not_found',
+      message: `ไม่พบออเดอร์หน้าร้านสำหรับ publicToken ${publicToken} — ตรวจว่า client_reference_id ถูกต้องไหม`,
+      detail: { publicToken },
+    };
+  }
+
+  if (String(session.currency) !== THB_CURRENCY_CODE) {
+    return {
+      kind: 'not_applied',
+      reason: 'currency_mismatch',
+      message: `สกุลเงินไม่ตรง: ออเดอร์เป็น ${THB_CURRENCY_CODE} แต่ session จ่าย ${session.currency}`,
+      detail: { publicToken, expectedCurrency: THB_CURRENCY_CODE, receivedCurrency: session.currency ?? null },
+    };
+  }
+
+  let expectedSatang: number;
+  try {
+    expectedSatang = toThbMinorUnit(Number(order.total));
+  } catch {
+    return {
+      kind: 'not_applied',
+      reason: 'order_amount_unusable',
+      message: `ออเดอร์ ${publicToken} ไม่มียอดรวมที่ใช้ได้ (${order.total})`,
+      detail: { publicToken, total: order.total ?? null },
+    };
+  }
+
+  if (Number(session.amount_total) !== expectedSatang) {
+    return {
+      kind: 'not_applied',
+      reason: 'amount_mismatch',
+      message:
+        `ยอดไม่ตรง: ออเดอร์ ${publicToken} คาด ${expectedSatang} สตางค์ ` +
+        `(THB ${(expectedSatang / 100).toFixed(2)}) แต่จ่ายมา ${session.amount_total}`,
+      detail: { publicToken, expectedSatang, receivedSatang: session.amount_total ?? null },
+    };
+  }
+
+  return {
+    kind: 'apply',
+    publicToken,
+    orderId: String(order.id ?? ''),
+    sessionId: String(session.id ?? ''),
+    expectedSatang,
+  };
+}
