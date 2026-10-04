@@ -52,3 +52,21 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 
 _(ยังไม่มีตารางใน owners map)_
 <!-- auto:end -->
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+_(ยังไม่มีตารางใน owners map)_
+
+### Routes
+- `payments/payments.routes.ts` (253 บรรทัด)
+
+### Endpoints (จาก router)
+```
+POST /checkout-session
+POST /webhook
+```
+
+<!-- auto:end -->
