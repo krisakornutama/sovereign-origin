@@ -483,6 +483,8 @@ test('หน้าร้าน: Stripe ส่งซ้ำ → ต้องไม
   const again = await deliver(p, sign(p));
   assert.strictEqual(again.status, 200);
   assert.strictEqual(again.body.alreadyApplied, true);
+  // ค่านี้คือ "สัญญา" ที่ client อ่าน — ถ้าหลุด/กลายเป็น undefined จะไม่มีใครเห็นตอนรัน
+  assert.strictEqual(again.body.reason, 'order_not_pending');
   assert.strictEqual(payments.length, 1, 'ส่งซ้ำแล้วต้องยังมีแถวเดียว ไม่ใช่สองแถว');
 });
 

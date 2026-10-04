@@ -24,16 +24,19 @@ import { verifyStripeSignature } from '../../services/stripe-webhook.service';
 import {
   decideCompletion,
   decideStorefrontCompletion,
-  STOREFRONT_PAYABLE_STATUSES,
-  STRIPE_PAYMENT_METHOD,
   REASON_ORDER_NOT_PENDING,
   type NotAppliedReason,
 } from '../../services/payment-verification.service';
+import {
+  applyStorefrontOrderCompletion,
+  applyTransferOrderCompletion,
+} from '../../services/payment-apply.service';
+import type { PrismaClient } from '@prisma/client';
 
 export interface PaymentsRouterDeps {
   transport: StripeCheckoutTransport;
   /** ใช้ตอน webhook เท่านั้น (ตอน checkout ไม่แตะ DB) — ใส่ตอนเทสต์ได้ */
-  prisma?: any;
+  prisma?: PrismaClient;
   /** signing secret ของ webhook endpoint (whsec_…) · คนละตัวกับ STRIPE_SECRET_KEY */
   webhookSecret?: string;
 }
@@ -162,54 +165,22 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     const shopOrder = !order && refCode
       ? await db.businessOrder.findFirst({ where: { publicToken: refCode } })
       : null;
-    if (shopOrder) return applyStorefrontOrder(res, db, event, shopOrder);
+    if (shopOrder) return respondStorefrontOrder(res, db, event, shopOrder);
 
     const decision = decideCompletion(event, order);
     if (decision.kind === 'not_applied') {
       return notApplied(res, decision.reason, decision.message, decision.detail);
     }
 
-    // ── เขียน DB: conditional update แบบ claimPending ของ transfer.service ──
-    // เขียนได้ก็ต่อเมื่อยัง PENDING → Stripe ส่งซ้ำจะได้ count 0
-    // (CAS ต้องรู้ว่า "เขียนสำเร็จไหม" จึงอยู่ที่ชั้นนี้ ไม่ใช่ใน service)
-    const claimed = await db.transferOrder.updateMany({
-      where: { ref_code: decision.refCode, status: 'PENDING' },
-      data: {
-        status: 'VERIFIED',
-        txid: decision.sessionId,
-        // verified_by เป็นคอลัมน์ @db.Uuid (schema.prisma:375) = uuid ของ "คน" ที่กดยืนยัน
-        // (transfer.service เขียน userId ลงตรงนี้) — webhook ไม่ใช่คน จึงเป็น null
-        //
-        // เดิมเขียนค่า 'stripe-webhook' ซึ่งผ่านทุกเทสต์ที่ใช้ mock แต่พังกับของจริง:
-        // Prisma โยน P2023 → express 4 ไม่ส่ง error ออกจาก async handler → request ค้าง
-        // → Stripe retry ไม่จบ → คำสั่งโอนไม่เคยเป็น VERIFIED
-        // ใครยืนยันจริงแล้วดูจาก verified_at + txid (cs_…) แทน
-        verified_by: null,
-        verified_at: new Date(),
-      },
-    });
-    if (claimed.count !== 1) {
-      // ตอนนี้ order อยู่ในสถานะที่ยืนยันแล้ว หรือถูกยกเลิก — ไม่ย้อนสถานะกลับ
-      // ครั้งนี้ไม่ได้เขียนอะไร แต่ "เงินจ่ายแล้ว" เป็นความจริงอยู่แล้ว
-      // จึงไม่ใช่เคสผิดปกติเท่า mismatch — log ระดับ info พอ
-      const fresh = await db.transferOrder.findFirst({ where: { ref_code: decision.refCode } });
+    const outcome = await applyTransferOrderCompletion(db, decision);
+    if (!outcome.applied) {
       console.warn(
-        `[payments] webhook: ส่งซ้ำ order ${decision.refCode} (สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
+        `[payments] webhook: ส่งซ้ำ order ${decision.refCode} (สถานะ ${outcome.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
       );
-      return res.status(200).json({
-        success: true,
-        applied: false,
-        alreadyApplied: true,
-        reason: REASON_ORDER_NOT_PENDING,
-        refCode: decision.refCode,
-        status: fresh?.status ?? null,
-      });
+      return alreadyApplied(res, decision.refCode, outcome.status);
     }
 
-    return res.status(200).json({
-      success: true,
-      applied: true,
-      alreadyApplied: false,
+    return applied(res, {
       refCode: decision.refCode,
       sessionId: decision.sessionId,
       status: 'VERIFIED',
@@ -221,71 +192,56 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
 
 /** byte ต้นฉบับของ body — ต้องเซ็นบน byte จริง ห้าม stringify ใหม่ */
 /**
- * mark ออเดอร์หน้าร้านว่าจ่ายแล้ว — CAS บน BusinessOrder
+ * ตอบออเดอร์หน้าร้าน — route นี้แค่แปลงคำตัดสินของ service เป็น HTTP
+ * (การเขียน DB อยู่ที่ payment-apply.service ตามหน้าที่ของมัน)
  *
  * เหตุผลที่แยกจากของ TransferOrder: ตารางคนละตาราง, คอลัมน์คนละชื่อ (publicToken/total
  * ไม่ใช่ ref_code/amount_thb) และสถานะปลายทางต่างกัน (PAID ไม่ใช่ VERIFIED)
  * การยุบรวมเป็นฟังก์ชันเดียวจะต้องมี if/else ซ้อนทั้งสองทางในทุกจุด
  */
-async function applyStorefrontOrder(res: any, db: any, event: any, shopOrder: any) {
+async function respondStorefrontOrder(res: any, db: PrismaClient, event: any, shopOrder: any) {
   const decision = decideStorefrontCompletion(event, shopOrder);
   if (decision.kind === 'not_applied') {
     return notApplied(res, decision.reason, decision.message, decision.detail);
   }
 
-  // conditional update + บันทึกแถวเงิน ต้องเป็นเรื่องเดียวกัน (transaction)
-  //
-  // ทำไมต้องมีแถวใน business_payments: getPublicOrderByToken คิด
-  // "ยอดที่ชำระแล้ว" จากผลรวมของแถวในตารางนี้ ไม่ใช่จาก order.paidAmount
-  // ถ้าเขียนแค่ order → ลูกค้าที่จ่ายบัตรแล้วยังเห็น "ค้างชำระ" เต็มจำนวน
-  // พร้อม QR PromptPay ซ้ำ = เงินเข้าแล้วแต่หน้าจอบอกว่ายังไม่จ่าย
-  //
-  // กันเงินซ้ำด้วย CAS ไม่ใช่ด้วยการเช็คแถวก่อนเขียน: Stripe ส่ง delivery
-  // เดิมซ้ำได้ และ "เช็คแล้วค่อยเขียน" แข่งกับตัวเองเองได้
-  // CAS แบบ claimPending คือผู้ชนะมีคนเดียวโดยโครงสร้างข้อมูล ไม่ต้องเชื่อเวลา
-  const paidThb = Number((decision.expectedSatang / 100).toFixed(2)); // กัน float เป็น 9899.999999999998
-
-  const claimed = await db.$transaction(async (tx: any) => {
-    const res = await tx.businessOrder.updateMany({
-      where: { publicToken: decision.publicToken, status: { in: [...STOREFRONT_PAYABLE_STATUSES] } },
-      data: { status: 'PAID', paidAmount: paidThb },
-    });
-    // ไม่ได้เป็นเจ้าของ (ส่งซ้ำ/ถูกยกเลิก) = ห้ามแตะเงิน
-    if (res.count !== 1) return res;
-    await tx.businessPayment.create({
-      data: {
-        orderId: decision.orderId,
-        amount: paidThb,
-        method: STRIPE_PAYMENT_METHOD,
-        reference: decision.sessionId, // cs_… = เลขอ้างอิงฝั่ง Stripe ย้อนหาได้
-      },
-    });
-    return res;
-  });
-
-  if (claimed.count !== 1) {
-    const fresh = await db.businessOrder.findFirst({ where: { publicToken: decision.publicToken } });
+  const outcome = await applyStorefrontOrderCompletion(db, decision);
+  if (!outcome.applied) {
     console.warn(
       `[payments] webhook: ส่งซ้ำออเดอร์หน้าร้าน ${decision.publicToken} ` +
-      `(สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
+      `(สถานะ ${outcome.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
     );
-    return res.status(200).json({
-      success: true,
-      applied: false,
-      alreadyApplied: true,
-      reason: REASON_ORDER_NOT_PENDING,
-      refCode: decision.publicToken,
-      status: fresh?.status ?? null,
-    });
+    return alreadyApplied(res, decision.publicToken, outcome.status);
   }
 
+  return applied(res, {
+    refCode: decision.publicToken,
+    sessionId: decision.sessionId,
+    status: 'PAID',
+  });
+}
+
+/** ตอบ 2xx: apply แล้ว (ทั้งสองทางใช้รูปเดียวกัน เพื่อไม่ให้สัญญาของ client แตกทาง) */
+function applied(res: any, ok: { refCode: string; sessionId: string; status: string }) {
   return res.status(200).json({
     success: true,
     applied: true,
     alreadyApplied: false,
-    refCode: decision.publicToken,
-    sessionId: decision.sessionId,
-    status: 'PAID',
+    refCode: ok.refCode,
+    sessionId: ok.sessionId,
+    status: ok.status,
+  });
+}
+
+/** ตอบ 2xx: ส่งซ้ำ/มีเจ้าของเป็นคนอื่นแล้ว → ไม่ย้อนสถานะ ไม่เขียนเงินซ้ำ */
+function alreadyApplied(res: any, key: string, status: string | null) {
+  return res.status(200).json({
+    success: true,
+    applied: false,
+    alreadyApplied: true,
+    reason: REASON_ORDER_NOT_PENDING,
+    refCode: key,
+    status,
   });
 }
 
