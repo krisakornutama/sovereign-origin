@@ -177,7 +177,14 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       data: {
         status: 'VERIFIED',
         txid: decision.sessionId,
-        verified_by: 'stripe-webhook',
+        // verified_by เป็นคอลัมน์ @db.Uuid (schema.prisma:375) = uuid ของ "คน" ที่กดยืนยัน
+        // (transfer.service เขียน userId ลงตรงนี้) — webhook ไม่ใช่คน จึงเป็น null
+        //
+        // เดิมเขียนค่า 'stripe-webhook' ซึ่งผ่านทุกเทสต์ที่ใช้ mock แต่พังกับของจริง:
+        // Prisma โยน P2023 → express 4 ไม่ส่ง error ออกจาก async handler → request ค้าง
+        // → Stripe retry ไม่จบ → คำสั่งโอนไม่เคยเป็น VERIFIED
+        // ใครยืนยันจริงแล้วดูจาก verified_at + txid (cs_…) แทน
+        verified_by: null,
         verified_at: new Date(),
       },
     });
