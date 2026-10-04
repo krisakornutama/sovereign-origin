@@ -33,6 +33,24 @@ export const THB_MINOR_UNIT_DIVISOR = 100;
  */
 export const THB_MAX_MINOR_UNIT = 99_999_999;
 
+/**
+ * เพดานยอดรวมของ session (หน่วยเล็กสุด) — ตัวเลขนี้มาจากเอกสาร Stripe จริง
+ *
+ * แหล่ง: docs.stripe.com/currencies → หัวข้อ "Maximum charge amounts"
+ *   · "Other payment methods … 8 digits for all other currencies,
+ *      for a maximum charge of 999,999.99 (99999999)"
+ *   · ยกเว้น 12 หลัก (IDR), 10 หลัก (COP), 9 หลัก (INR) — THB ไม่อยู่ในรายการนั้น
+ *     จึงตกอยู่ในกลุ่ม "all other currencies" = 8 หลัก
+ *   · บัตร (Visa/Mastercard/debit ที่ไทยรับ) รองรับ 12 หลัก = 999,999,999,999
+ *     ซึ่ง "หลวม" กว่า 8 หลัก → ตัวที่บังคับจริงคือ 99,999,999
+ *   · บัญชีนี้มี promptpay_payments เปิดอยู่ ซึ่งเป็น non-card → ใช้เพดาน 8 หลัก
+ *
+ * หมายเหตุ: ตัวเลขนี้บังเอิญเท่ากับ THB_MAX_MINOR_UNIT พอดี (ทั้งคู่คือ 999,999.99)
+ * แต่เป็นคนละเรื่องกัน: อันบนคือ "ต่อหน่วย" อันนี้คือ "ทั้ง session"
+ * ถ้าอนาคต Stripe เปลี่ยนเพดานยอดรวม ตัวนี้ต้องแก้แยกจากอันบน
+ */
+export const THB_MAX_CHARGE_MINOR_UNIT = 99_999_999;
+
 /** Stripe บังคับให้ส่งรหัสสกุลเงินเป็นตัวพิมพ์เล็ก */
 export const THB_CURRENCY_CODE = 'thb';
 
@@ -171,6 +189,16 @@ export function buildCheckoutSessionParams(input: CheckoutSessionRequest): Strip
   }
 
   const unitAmount = toThbMinorUnit(input.amountBaht);
+
+  // เพดานต่อหน่วยไม่พอ: ต่อหน่วยที่เต็มเพดาน คูณ quantity แล้วยอดรวมจะเกิน
+  // ที่ Stripe ยอมรับ → จับที่นี่ (จุดเดียวกับที่คิด unit_amount) ก่อนสร้าง payload
+  const totalSatang = unitAmount * quantity;
+  if (totalSatang > THB_MAX_CHARGE_MINOR_UNIT) {
+    throw new RangeError(
+      `total ${totalSatang} satang (${unitAmount} × ${quantity}) exceeds Stripe's maximum charge ` +
+      `of ${THB_MAX_CHARGE_MINOR_UNIT} satang (THB ${(THB_MAX_CHARGE_MINOR_UNIT / 100).toFixed(2)})`,
+    );
+  }
 
   const params: StripeCheckoutSessionParams = {
     mode: 'payment',

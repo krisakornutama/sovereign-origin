@@ -12,7 +12,7 @@
 
 | ไฟล์ | เป็นเจ้าของ | ห้ามยุ่ง |
 |---|---|---|
-| `services/payment-verification.service.ts` | **ศัพท์และกติกา** ว่า delivery จะถูก apply ไหม · `NotAppliedReason` (reason code ที่ API ตอบและ log) · ลำดับการตรวจ | ต้อง pure: ไม่แตะ HTTP · ไม่แตะ DB · ไม่อ่าน config/env · ไม่ยิงเน็ต เพิ่มเงื่อนไขใหม่ตรงนี้ ไม่ใช่ใน route |
+| `services/payment-verification.service.ts` | **ศัพท์และกติกา** ว่า delivery จะถูก apply ไหม · `NotAppliedReason` (reason code ที่ API ตอบและ log) · ลำดับการตรวจ | ต้อง pure: ไม่แตะ HTTP · ไม่แตะ DB · ไม่อ่าน config/env · ไม่ยิงเน็ต เพิ่มเงื่อนไขใหม่ตรงนี้ ไม่ใช่ใน route · ถ้าเพิ่ม reason ที่ route ผลิตเอง ให้เพิ่มใน union ก่อน แล้วค่อยใช้ `REASON_ORDER_NOT_PENDING` แบบเดียวกัน |
 | `services/stripe-checkout.ts` | ขอบเขตของ Stripe ฝั่งเรา: บาท↔สตางค์ (`toThbMinorUnit`), ค่าคงที่ที่มาจากเอกสาร Stripe, `normalizeRefCode`, payload builder, transport (fake/live) | ห้าม import `config` — โมดูลนี้ต้องทดสอบได้ด้วยเทสต์ล้วน |
 | `services/stripe-webhook.service.ts` | ตรวจลายเซ็น Stripe (pure) | ไม่รู้จัก order / DB / business |
 | `modules/payments/payments.routes.ts` | **เฉพาะชั้น HTTP**: auth, raw body, สถานะ/รูปร่าง response, การเขียน DB (CAS) และการเดินสาย config→transport | ห้ามใส่ตรรกะทางธุรกิจ — ถ้าเริ่มเป็น `if (...) return 400` หลาย ๆ ที่ แปลว่าตรรกะหลุดมาอยู่ผิดชั้น |
@@ -22,6 +22,20 @@
 
 `decideCompletion()` คืน `apply` หรือ `not_applied` เท่านั้น — ไม่เขียนอะไรลง DB
 เพราะ CAS ต้องรู้ว่า "เขียนสำเร็จไหม" ซึ่งเป็นเรื่องของชั้น HTTP
+
+## เพดานยอดที่บังคับ (ทั้งสองมาจากเอกสาร Stripe)
+
+| ค่าคงที่ | คุมอะไร | ที่มา |
+|---|---|---|
+| `THB_MAX_MINOR_UNIT` | ยอด **ต่อหน่วย** (99,999,999 สตางค์) | เอกสาร `unit_amount` — Maximum |
+| `THB_MAX_CHARGE_MINOR_UNIT` | ยอด **รวมทั้ง session** = ต่อหน่วย × quantity | docs.stripe.com/currencies → "Maximum charge amounts": non-card "8 digits for all other currencies, for a maximum charge of 999,999.99" (THB ไม่อยู่ในรายการยกเว้น 12/10/9 หลัก) |
+
+ตัวเลขทั้งสองเท่ากันโดยบังเอิญ แต่เป็นคนละเรื่อง — ถ้า Stripe เปลี่ยนเพดานยอดรวม
+ต้องแก้ `THB_MAX_CHARGE_MINOR_UNIT` แยก อย่าแตะตัวบน
+
+**ทำไมไม่ใช่แค่เชื่อต่อหน่วยพอ:** ต่อหน่วยที่เต็มพอดี × quantity แล้วยอดรวม
+เกินเพดานของ Stripe — ระบบจะสร้าง payload ที่ถูกปฏิเสธตอนยิงจริง ทั้งที่ order
+ถูกสร้างไว้แล้ว จึงต้องตรวจที่จุดเดียวกับที่คิด `unit_amount`
 
 ## สัญญาการตอบกลับของ webhook
 

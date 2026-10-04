@@ -192,6 +192,36 @@ test('เพดานบน: ยอดมหาศาล (1e15) → ต้อง
     /exceeds Stripe|99999999|must not exceed/i);
 });
 
+// ── เพดานยอดรวมของ session: unit × quantity ─────────────────────────────
+// เพดานต่อหน่วยไม่พอ: unit 99,999.99 ที่ quantity 1000 = ~1 ล้านบาท ผ่านเพดาน
+// ต่อหน่วย แต่ Stripe ปฏิเสธตอนยิงจริง หลัง order ถูกสร้างแล้ว
+
+test('เพดานยอดรวม: ครบเพดานพอดี → ผ่าน', () => {
+  // 25,000 สตางค์ × 3,999 = 99,975,000 ≤ 99,999,999
+  const p = buildCheckoutSessionParams({ ...base, amountBaht: 250, quantity: 3999 });
+  assert.strictEqual(p.line_items[0].quantity, 3999);
+  // เท่าเพดานพอดี: 1 หน่วยที่ยอดเต็มเพดาน
+  const p2 = buildCheckoutSessionParams({ ...base, amountBaht: 999_999.99, quantity: 1 });
+  assert.strictEqual(p2.line_items[0].price_data.unit_amount, THB_MAX_MINOR_UNIT);
+});
+
+test('เพดานยอดรวม: เกินแค่ 1 สตางค์ → ต้องยก error', () => {
+  // 25,000 × 4,000 = 100,000,000 = เกิน 99,999,999 พอดี
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 250, quantity: 4000 }),
+    /total|รวม|99999999/i);
+});
+
+test('เพดานยอดรวม: unit พอดีเพดาน แต่ quantity 2 → ต้องเกิน', () => {
+  // กรณีที่หลุดได้ง่ายที่สุด: ทุกอย่างผ่านเพดานต่อหน่วย แต่ยอดรวมโหด
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 999_999.99, quantity: 2 }),
+    /total|รวม|99999999/i);
+});
+
+test('เพดานยอดรวม: ต้องจับก่อน Stripe — endpoint จะได้ 400 ไม่ใช่ 201', () => {
+  // 250 บาท × 4000 = 1,000,000 บาท → เกิน ฿999,999.99
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 250, quantity: 4000 }));
+});
+
 // ── Transport seam ─────────────────────────────────────────────────────────
 
 test('fake transport คืน session ปลอมและไม่แตะเครือข่าย', async () => {
