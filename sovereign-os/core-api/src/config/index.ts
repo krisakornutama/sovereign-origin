@@ -283,6 +283,9 @@ export const config = {
     enabled: (process.env.STRIPE_ENABLED || 'false') === 'true',
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
     secretKey: process.env.STRIPE_SECRET_KEY || '',
+    // signing secret ของ webhook endpoint (ขึ้นต้นด้วย whsec_) — คนละตัวกับ secretKey
+    // ใช้ยืนยันว่าข้อความที่ยิงเข้ามามาจาก Stripe จริง (ดู services/stripe-webhook.service.ts)
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
     // Stripe บังคับรหัสสกุลเงินตัวพิมพ์เล็ก
     currency: process.env.STRIPE_CURRENCY || 'thb',
     liveEnabled: (process.env.STRIPE_LIVE_ENABLED || 'false') === 'true',
