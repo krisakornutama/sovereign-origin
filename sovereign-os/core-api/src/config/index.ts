@@ -275,6 +275,30 @@ export const config = {
     // (เดิมฝัง /35 ตายตัว — ปรับได้ผ่าน env ไม่ต้องแก้โค้ด)
     thbPerUsd: parseFloat(process.env.THB_PER_USD || '35'),
   },
+  // ── Stripe Checkout (THB) ──
+  // ทุกค่าเป็น optional ตามธรรมเนียมไฟล์นี้ (อ่านตรง ๆ + default · ไม่ throw ตอน boot)
+  // เครื่องที่ไม่มี Stripe เลยต้อง start ได้ → liveEnabled default = false
+  // STRIPE_LIVE_ENABLED=true คือสวิตช์เดียวที่ยอมให้ client ตัวจริงยิง Stripe (ดู services/stripe-checkout.ts)
+  //
+  // กฎของบล็อกนี้: ทุก field ต้องมี "คนอ่าน" อย่างน้อยหนึ่งที่ หรือมีคำอธิบายข้างบนว่าทำไมยังไม่มี
+  //  ตัวที่เคยอยู่ตรงนี้แล้วถูกลบ เพราะอ่านเข้ามาแล้วไม่มีใครใช้ = silent no-op:
+  //    · STRIPE_ENABLED  — ตั้ง true ก็ไม่มีผล มีแต่ STRIPE_LIVE_ENABLED เท่านั้นที่เปิด transport จริง
+  //    · STRIPE_CURRENCY — ตัว builder hardcode เป็น thb (services/stripe-checkout.ts) ไม่เคยอ่าน config
+  //  คนที่ตั้งสองตัวนี้จะเชื่อว่าเปิดใช้งานแล้ว ทั้งที่ระบบยังเดินแบบ mock เงียบ ๆ
+  //  (tests/stripeCheckout.test.ts มีเทสต์ล็อกพื้นที่ของบล็อกนี้ไว้)
+  stripe: {
+    // ⚠️ ยังไม่มีใครอ่าน — reserved จองไว้ให้ paywall ฝั่งหน้าเว็บ (Stripe.js ต้องใช้ key ตัวนี้)
+    //    คีย์นี้ปลอดภัยต่อการโชว์หน้าเว็บ (ต่างจาก secretKey) แต่ตอนนี้ยังไม่มีหน้าเว็บที่เรียก
+    //    ค่าจริงของเจ้าของเก็บอยู่ใน .env แล้ว จึงไม่ได้ลบ — ถ้าวันหนึ่งยังไม่มีผู้อ่าน
+    //    แปลว่า field นี้กลับมาเป็น silent no-op ตัวที่สาม ต้องมีคำอธิบายข้อนี้กำกับ
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    // key ฝั่ง server — ใช้สร้าง Checkout Session (อ่านที่ modules/payments/payments.routes.ts)
+    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    // signing secret ของ webhook endpoint (ขึ้นต้นด้วย whsec_) — คนละตัวกับ secretKey
+    // ใช้ยืนยันว่าข้อความที่ยิงเข้ามามาจาก Stripe จริง (ดู services/stripe-webhook.service.ts)
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    liveEnabled: (process.env.STRIPE_LIVE_ENABLED || 'false') === 'true',
+  },
   // ── AI Model Manager (Ollama Control System) ──
   // จุดต่อ engine หลัก — ใน docker-compose ตั้งเป็น http://sovereign-ollama:11434
   // บน host ใช้ default http://127.0.0.1:11434 (เดิม env OLLAMA_URL ใช้อยู่แล้วทั่วระบบ)

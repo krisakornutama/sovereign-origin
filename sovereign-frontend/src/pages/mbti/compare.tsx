@@ -13,6 +13,7 @@ import Icon from "../../components/ui/Icon";
 import { MBTI_TYPES, MBTI_QUESTIONS, MBTI_SHORT_QUESTIONS, scoreMbti, compareMbti, typeInfo, latestLocalResult, DIM_LABELS, familyOf, FAM_RGB, loadProfiles, saveProfile, deleteProfile, type MbtiResult, type MbtiProfile, type MbtiTypeInfo } from "../../lib/mbtiData";
 import Seal from "../../components/mbti/Seal";
 import QuizCard from "../../components/mbti/QuizCard";
+import SeoHead from "../../components/public/SeoHead";
 
 const RELATION_STYLE: Record<string, { chip: string; label: string; icon: string }> = {
   same:    { chip: "text-emerald-300 bg-emerald-900/40 border-emerald-700/60", label: "เหมือนกัน", icon: "🤝" },
@@ -69,6 +70,21 @@ export default function MbtiComparePage() {
 
   return (
     <div className="atmo-mind min-h-screen bg-gray-950 text-gray-100 flex">
+      {/* ── สถานะ SEO (ตัดสินใจ 4/10/69): ไม่ประกาศ — noindex ชั่วคราว ──
+          * หน้านี้ “ควรเป็นสาธารณะ” จริง: ถูกลิงก์จาก /mbti (หน้าที่ประกาศอยู่แล้ว) ถึง 3 จุด
+          * แต่ **ยังประกาศไม่ได้** เพราะ WAF ที่ Cloudflare (rule “Public-only”) ยังไม่ได้เปิดเส้นทางนี้
+          * → ผู้เข้ามาได้ 403 ทุกคน รวมถึง Googlebot (พิสูจน์แล้ว 4/10/69)
+          *   ถ้าใส่ใน sitemap ตอนนี้ = ส่ง URL ที่ตอบ 403 ให้ Google = เสียกว่าไม่ประกาศ
+          *   และ seo-preflight (ยิงโดเมนจริง) จะ fail ทันที
+          * ปลดล็อกได้เมื่อ: เพิ่ม “/mbti/compare*” ใน allowlist ของ WAF → แล้วค่อยกลับมาประกาศ
+          *   (พร้อมเติม SeoHead index + h1 + เนื้อหา ≥ 800 ตัวอักษรให้ผ่านเกณฑ์ชุดเดียวกับหน้าอื่น)
+          * ระหว่างนี้ noindex คือคำตอบที่ถูกและปลอดภัยกว่าปล่อยให้ Google เดินชนกำแพง */}
+      <SeoHead
+        title="เทียบบุคลิกภาพสองคน — Sovereign Origin"
+        description="เครื่องมือเปรียบเทียบผล MBTI ของสองคน คู่สมรส ลูก หรือหุ้นส่วน"
+        path="/mbti/compare"
+        noindex
+      />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader

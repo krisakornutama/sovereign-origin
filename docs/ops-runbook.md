@@ -69,6 +69,46 @@ taskkill //F //PID <PID> //T
 
 **กลับมา prod:** ต้อง kill dev ก่อน build — watchdog จะไม่สลับเองถ้า :3000 ยังตอบ!
 
+### EOL ต้องเป็น LF ทั้งโฟลเดอร์ทำงาน (เพิ่ม 2/10/69 — กติกาที่แก้บั๊กแย่กว่าที่คิด)
+
+`.gitattributes` บังคับ `* text=auto eol=lf` (ยกเว้น `.bat`/`.cmd` = CRLF และไฟล์ binary) เพราะ `core.autocrlf=true` เคยทำให้ **โฟลเดอร์ทำงานหนึ่งเดียวมีไฟล์ปนกันสองแบบ** — ตอนนี้ราก repo เป็น LF 999 ไฟล์ + CRLF 16 ไฟล์ (bat/cmd) · build จาก commit เดียวกันจึงได้ byte เดียวกัน (พิสูจน์แล้ว: MAIN กับ worktree fingerprint `85fbf786e09b4562` ตรงกัน 228 ไฟล์)
+
+- **`git status` มองไม่เห็น CRLF ที่หลงเหลือ** — เพราะ clean filter แปลง CRLF→LF ก่อนเทียบ (ไฟล์ที่เคยถูกเครื่องมือเขียนทับจะค้างเป็น LF/CRLF ผสมโดย git ยังบอกว่าสะอาด) · `git ls-files --eol` ก็ไม่ช่วย (อ่านจาก stat cache) → **ต้องใช้ตัวมือที่อ่านไฟล์จริง**
+- รันครั้งเดียวหลัง clone/checkout เก่า: `node tools/normalize-eol.mjs` (ตรวจโดยไม่แก้: `--check` · exit 1 ถ้ายังมี · ใช้เป็น CI gate ได้)
+- ไฟล์ binary (`.png`/`.ttf`) มีไบต์ `0x0D` อยู่จริงโดยธรรมชาติ = **ไม่ใช่ปัญหา** เครื่องมือข้ามให้อัตโนมัติ (เคยพังตรงนี้: วน parse attribute ผิด stride → ไปแก้ `.ttf` จนไฟล์เสีย กู้คืนด้วย `rm` + `git checkout-index -f`)
+
+### nightly verify 02:00 — รันอะไรบ้างและดูผลที่ไหน (เพิ่ม 2/10/69)
+
+Task Scheduler ชื่อ **Sovereign Nightly Verify** → `tools/nightly-verify.mjs` (ลงทะเบียนครั้งเดียว: `powershell -File tools/register-nightly-task.ps1`) · ทดสอบทันที: `Start-ScheduledTask -TaskName 'Sovereign Nightly Verify'`
+
+ลำดับในรอบหนึ่ง (รวม ~6–20 นาที):
+
+1. `machine-health.mjs` — แจ้งปัญหาเครื่อง (แรม/ดิสก์/docker) **ก่อน** verify จะพัง
+2. **เช็ค backend :3001 → ถ้าตายให้ `docker compose up -d` รอสุด 180 วิ** (เพิ่ม 2/10/69 — เคยรายงาน "ผ่าน" ทั้งที่สเปก 0 ตัวถูกรัน เพราะเครื่องรีบูตแล้ว docker ยังไม่ขึ้นตอน 02:00) · ถ้ายังไม่ขึ้น = รันแค่ `npm run verify` + รายงานว่า e2e ถูกข้ามพร้อมเหตุผล
+3. `npm run verify:full` พร้อม `E2E_REQUIRE_BACKEND=1` = **e2e ห้ามถูกข้ามเงียบ** (ถ้า backend ตายกลางทาง = ต้อง fail ให้เห็น)
+4. `IndexNow` → `SEO pre-flight` → `GSC coverage` → `backup restore-check` (fail-safe ทุกตัว ล้มไม่ทำให้รอบพัง แต่ต้องเห็นในรายงาน)
+5. เขียน `logs/nightly/status.json` + ส่ง Telegram
+
+**อ่านสัญญาณที่รายงานส่งมา:**
+
+| สัญลักษณ์ | แปลว่า |
+|---|---|
+| ✅ ผ่าน | ทุกอย่างรันครบ รวม e2e |
+| ⚠️ ผ่าน (มีขั้นข้าม) | มีบางอย่าง**ไม่ได้ตรวจ** — ดูบรรทัด "ข้าม N รายการ" พร้อมเหตุผล (ห้ามนับเป็นผ่าน) |
+| 🚨 ไม่ผ่าน | มีขั้นตอนพัง ดู `logs/nightly/last-run.log` |
+| "เกตล่าสุด: ไม่ทราบ" | gate ล้มก่อนเขียนผล = ไม่รู้ว่าขั้นไหนพัง (รายงานจะไม่อ้างผลของรอบเก่าแล้ว) |
+
+สวิตช์ทดลอง: `NIGHTLY_SKIP_RESTORE=1` (ข้าดการกู้ dump) · `NIGHTLY_REPORT_DRY=1` (พิมพ์ข้อความลง `logs/nightly/report.log` ไม่ส่ง Telegram จริง) · log ทั้งหมด: `logs/nightly/`
+
+### `verify:full` แตะ :3000 อย่างไร (เพิ่ม 2/10/69 — ทำให้รอบ gate ผ่านได้จริง)
+
+`npm run verify:full` = build ทับ `.next` ของ prod → ต้อง kill แล้วบูตใหม่ก่อน e2e ไม่งั้น chunk เก่า/ใหม่ผสมกัน 404
+
+- `taskkill` **ต้องมี `/T`** — `npm run start` spawn ลูก `next start` ที่เป็นตัวถือพอร์ตจริง (kill แค่พ่อ = ลูกยังถือ :3000 → server ใหม่ bind ไม่ได้)
+- watchdog มีตารางเวลาของมันเอง — verify รอ 20 วิ แล้ว **บูตเองเอง** (ไม่รอ 90 วิ) พยายามได้ 3 ครั้ง ถ้ายังไม่ขึ้นจะพิมพ์หาง log ที่ `logs/frontend-restart.log` พร้อมบอกว่าบูตจากโฟลเดอร์ไหน
+- **ถ้ารัน verify จาก worktree**: :3000 จะถูกบูตด้วย build ของ worktree เพื่อให้ e2e ทดสอบโค้ดใหม่ → **verify คืนพอร์ตให้ MAIN เองตอนจบ** (ไม่งั้นโดเมนจริง 502 วันที่ worktree ถูกลบ)
+- Prod-Truth Gate เทียบ fingerprint กับ **dist ของ deploy root (MAIN)** เสมอ ไม่ใช่ dist ของ worktree — เพราะ `core.autocrlf=true` ทำให้ checkout สองที่ได้ EOL ต่างกัน (2 ไฟล์ = 21 ไบต์) → เทียบผิดที่ = ล้มทั้งที่โค้ดเหมือนกัน
+
 ```bash
 netstat -ano | grep ":3000" | grep -i LISTENING   # kill dev ทั้งกิ่งก่อน
 taskkill //F //PID <PID> //T
@@ -110,10 +150,12 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
   # 3) ปิดโหมด restore
   docker exec sovereign-db psql -U sovereign -d sovereign_restore -Atc "SELECT timescaledb_post_restore()"
   ```
+- **พิสูจน์เองอัตโนมัติ (2/10/69):** `node tools/verify/backup-restore-check.mjs` — กู้ dump ล่าสุดเข้า DB ชั่วคราว `sovereign_restore_check` (อ่านอย่างเดียว · ฐานจริงไม่ถูกแตะ) แล้วเทียบทีละตาราง: ตารางครบไหม · มีตารางไหนแถวมากกว่าฐานจริง (= เพี้ยน) · migration head ตรงไหม → เขียน `logs/backup-restore-check.json` · **รันทุกคืนหลัง verify:full** (ปิดได้ด้วย `NIGHTLY_SKIP_RESTORE=1`) · ผิดปกติ = แจ้ง Telegram เป็นเรื่องด่วน · ผลรอบแรก 2/10: ผ่าน 131/131 ตาราง (TimescaleDB ต้องมี pre/post_restore ตามข้างบน ไม่งั้นล้มที่ `could not find hypertable`)
 
 ## ๖. เส้นตายก่อนเปิดสู่อินเทอร์เน็ต
 
-1. ปิดบัญชี `e2e-bot` (SUPERADMIN, รหัสผ่านอยู่ใน repo)
+1. ปิดบัญชี `e2e-bot` (SUPERADMIN, รหัสผ่านอยู่ใน repo) — **2/10/69 แก้โดยไม่ผ่อนเส้นตาย:** e2e สุ่มรหัสใหม่ตอนเริ่มรัน (`e2e/global-setup.ts` → `core-api e2e-account grant`) แล้วล็อกกลับทันทีตอนจบ (`global-teardown` → `revoke`) = นอกช่วงเทสต์บัญชียังล็อกเหมือนเดิม ไม่มีรหัสที่รู้อยู่ใน repo · ดูวิธีสั่งเอง: `node sovereign-os/core-api/dist/scripts/e2e-account.js grant|revoke e2e-bot`
+   - **ข้อควรรู้:** account limiter = 5 ครั้ง/15 นาที ต่อ username (`auth.routes.ts`) — ถ้ารัน e2e ซ้ำใน 15 นาทีเดียวกันจะโดน 429 (auth.setup ลดเหลือ 1 ครั้งต่อรอบแล้ว แต่รอบที่ 2 ใน 15 นาทียังชน) → ถ้าเจอ 429 ให้รอ 15 นาที หรือ `docker restart sovereign-core-api` เพื่อล้างตัวนับในหน่วยความจำ
 2. ตั้ง CORS เป็นโดเมนจริง + เปิด HTTPS
 3. จำกัดพอร์ต 1883/18083 (MQTT) ไม่ให้โลกภายนอกเห็น
 4. **กติกาคำเคลม (บังคับทุกหน้า/ทุกช่องทาง): โฆษณาเฉพาะสิ่งที่มีโค้ดจริง** — ก่อนเขียนคำเคลมให้เทียบกับ repo จริง: มี service/เทสรองรับหรือไม่ (ตัวอย่างที่ผ่าน: Telegram = มี `telegram-alert.service` + เทสครบ, ออกใบกำกับ = `TaxInvoice.tsx`) · ตัวอย่างที่ถูกตัดแล้ว (18 ก.ย. 2026): LINE (ไม่มีโค้ดเลย), "operating system" (เป็นเว็บแอป+บริการหลังบ้าน) · ที่มาของกติกา + รายการคำที่ตรวจแล้ว: บันทึกใน STATUS.md วันเดียวกัน
@@ -189,7 +231,8 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 ## ๙. แผนที่ช่องว่างเทส core-api (วัด 18 ก.ย. 2026 ด้วย `npm run coverage:core` — ชุด mock ผ่านครบ)
 
-> วิธีวัด: **`npm run coverage:core`** = c8 + `tests/*.test.ts` แล้วพิมพ์ตัวเลขรวม + ไฟล์ 0% ใหญ่สุด + หลุมบรรทัดมากสุด (c8 อยู่ใน devDependencies ของ core-api แล้ว) · ที่มาของอันดับ = จำนวน**บรรทัดที่ยังไม่ถูกครอบ** · ตัวเลข total: lines **63.76%** · branches **75.02%** · functions **81.94%** (บรรทัดที่วัด 39,390 — ขึ้นจาก 61.64% หลังปิดหลุม health + restaurant ในรอบเดียวกัน)
+> วิธีวัด: **`npm run coverage:core`** = c8 + `tests/*.test.ts` แล้วพิมพ์ตัวเลขรวม + ไฟล์ 0% ใหญ่สุด + หลุมบรรทัดมากสุด (c8 อยู่ใน devDependencies ของ core-api แล้ว) · ที่มาของอันดับ = จำนวน**บรรทัดที่ยังไม่ถูกครอบ** · ตัวเลข total **ล่าสุด 3/10/69: lines 68.34%** (30,120/44,070) · branches 74.77% · functions 84.15% (บรรทัดที่วัด 39,390 → 44,070 หลังเพิ่มเทสต์ 4 โมดุล)
+> **ตารางข้างล่างเป็นสำเนาเก็บไว้ ณ 18/9/69** — ของจริงที่ครบ 73 กลุ่มเรียงจากต่ำสุดอยู่ที่ [`module-audit-2026-10-03.md`](module-audit-2026-10-03.md)
 
 | # | ไฟล์ | ไม่ครอบ/รวม (บรรทัด) | อะไรอยู่ข้างใน — จะเทสอะไรก่อน |
 |---|---|---|---|
@@ -206,9 +249,38 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 
 **ปิดแล้วในรอบนี้:** `health.routes.ts` (เดิม 505/505 · 0%) และ `restaurant.routes.ts` (เดิม 380/380 · 0%) → มีเทส HTTP จริง `tests/health.routes.test.ts` (15 เทส: validation/triage flag/consent/contraindication/export) + `tests/restaurant.routes.test.ts` (19 เทส: สิทธิ์/กันเลขผิด/PDPA/วงจรออเดอร์จนจ่าย ตัดสต็อก-แต้ม-treasury/รายงาน) — หลุมเดิมอันดับ 4 กับ 6 หลุดจากลิสต์
 
-รองลงมา (แตะได้เร็ว): `learning-engine.service.ts` 245 (0%) · `AiAgentService.ts` 256/485 (~47%) · `risk.routes.ts` 211 (0%) · `relay.routes.ts` 198 (0%)
+รองลงมา (แตะได้เร็ว): `learning-engine.service.ts` 245 (0%) · `AiAgentService.ts` 256/485 (~47%) · `relay.routes.ts` 198 (0%)
 
-กติกาตีความ: แถว "0%" = ไฟล์ไม่ถูก import ในชุด mock เลย (ครอบผ่าน HTTP mock server ด้วยแพทเทิร์น `createTestServer` เดิม — พิสูจน์แล้ว 2 โมดูลในรอบนี้) · แถว % ปานกลาง = เติมเฉพาะกิ่งที่ขาด · วัดซ้ำได้ทุกเมื่อด้วย `npm run coverage:core` (~2 นาที ไม่ต้องมี DB) — และตอนนี้รันอัตโนมัติเป็นขั้นสุดท้ายของ `npm run verify -- --db` แล้ว (ไม่บังคับ threshold)
+**ปิดเพิ่ม 3/10/69 (รอบที่ 4):** `sensors` (เดิม 0% → **84%**) · `risk.routes.ts` (เดิม 211 บรรทัด 0% → **71%**) · `backup` (เดิม 0% → **84%**) · `knowledge` (13% → **33%**) — 4 ไฟล์นี้คือ 4 โมดุลที่ลูกค้า/ระบบปฏิบัติการแตะจริง (เครื่อง sensor, DEFCON drill, สำรองข้อมูล, คลังความรู้) รายละเอียดรายเคส + บั๊กที่เจออยู่ที่ [`module-audit-2026-10-03.md`](module-audit-2026-10-03.md)
+
+กติกาตีความ: แถว "0%" = ไฟล์ไม่ถูก import ในชุด mock เลย (ครอบผ่าน HTTP mock server ด้วยแพทเทิร์น `createTestServer` เดิม — พิสูจน์แล้ว 6 โมดูล) · แถว % ปานกลาง = เติมเฉพาะกิ่งที่ขาด · วัดซ้ำได้ทุกเมื่อด้วย `npm run coverage:core` (~2 นาที ไม่ต้องมี DB)
+
+### Coverage floor — ไม่มีโมดุลใหม่ที่ลงที่ 0% ได้อีก (เพิ่ม 3/10/69)
+
+> **ก่อนหน้านี้ coverage เป็น "กระจกส่อง" ไม่มี threshold มาตลอด** = ตัวเลขลดลงเงียบ ๆ ไม่มีใครรู้ ทั้งที่ gate รันอยู่ทุกคืน · `tools/coverage-floor.mjs` + `tools/coverage-floor.json` ปิดช่องนี้แล้ว · ผูกเข้า `tools/coverage-core.mjs` → อยู่ใน `npm run verify -- --db`
+
+| กฎ | ตรวจอะไร |
+|---|---|
+| รวม | lines รวม ≥ floor (ปัจจุบัน 68.34) |
+| ห้ามถอย | กลุ่มที่มีใน baseline ห้ามต่ำกว่าเดิม |
+| **โมดุลใหม่** | กลุ่มที่ไม่มีใน baseline ต้อง ≥ **40%** ไม่งั้น violation (นี่คือกฎที่ทำให้ "ลงที่ 0%" เป็นไปไม่ได้) |
+| หายไป | กลุ่มที่เคยมีใน baseline แล้วหายจากรายงาน = violation (กันตัดไฟล์ทิ้งเพื่อหนีตัวเลข) |
+
+คำสั่งใช้ (จากรากโปรเจกต์):
+
+```bash
+node tools/coverage-floor.mjs --no-enforce   # รายงานอย่างเดียว ไม่บังคับ
+node tools/coverage-floor.mjs --update      # ยก baseline ขึ้น (ยกเฉพาะขึ้น ลดไม่ได้)
+npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่ผูก floor (แก้เทสต์สะดุด)
+```
+
+**เพิ่มโมดูลใหม่แล้วทำอะไร:** เขียนเทสต์ให้ ≥ 40% → รัน `--update` → commit · ถ้าทำไม่ได้ในรอบนั้น ให้เขียนเหตุผลไว้ใน baseline ด้วย (มีฟิลด์ `note`) ไม่ใช่ปิดเงียบ
+
+**บทเรียนจากการเขียนเทสต์รอบ 3/10/69 (อ่านก่อนเขียนเทสต์ backend):**
+- env ต้องตั้ง**ที่ระดับ module body ไม่ใช่ใน `before()`** — `backup.service` อ่าน `BACKUP_DIR` ครั้งเดียวตอน import → ตั้งใน `before()` = ชี้ไปโฟลเดอร์จริง (เคสจริง: เทสต์แรกไปอ่าน backup จริง) · ทางแก้ = `await import()` แบบ dynamic ใน `before()`
+- ที่ระบบอ่าน env เป็นตัวแปร instance เช่น `KNOWLEDGE_DIR` ให้เพิ่ม override ได้ (ไม่ตั้ง = พฤติกรรมเดิมทุกประการ) ไม่งั้นเทสต์จะไปแตะไฟล์จริงของระบบ
+- ไฟล์ที่สร้างในมิลลิวินาทีเดียวกันมี mtime เท่ากัน → service ที่เรียงไฟล์ด้วย mtime จะเรียงผิด ใช้ `fs.utimesSync` แยกเวลาในเทสต์
+- route ที่อ่าน `req.app.locals` (เช่น `defconEngine` / `riskWorker`) เทสต์ต้อง mock `app.locals` และเตรียมทั้ง 2 โหมด (มี engine / `RISK_MONITOR_ENABLED=false`)
 
 ## ๑๐. วงจรปล่อย release แอป desktop (ทำตามนี้ทุกครั้ง)
 
@@ -261,6 +333,28 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 8. **[ทำแล้ว 30/9/69] Rate limiting:** rule "Public API rate limit: /api/ max 20 req/10s per IP" ใน phase `http_ratelimit` (action=block, mitigation_timeout=10 วิ — ค่าที่ Free plan อนุญาต · characteristics ip.src+colo) — พิสูจน์: ยิง 25 ติดตัวที่ 21+ ได้ 429
 9. **[ทำแล้ว 30/9/69] สายสด Farm→Shop (I5a):** การ์ด "สายสดจากแปลง" บนหน้าร้านดึงจาก `GET /api/trace/products?ids=<inventoryItemId,…>` (สาธารณะ) — QR ติดสินค้าอิง `PUBLIC_APP_URL` (ตั้งใน infra/.env เป็นโดเมนจริงแล้ว) · **ข้อควรระวังตอน deploy frontend:** (1) build ทับ server ที่รันอยู่ = หน้า 404 ทั้งชุด (chunk ใหม่ vs manifest เก่า) — restart :3000 หลัง build เสมอ (2) service worker cache `sovereign-v3` คงหน้าเก่า — ทดสอบหลัง deploy ต้องเคลียร์ SW/caches ก่อนสรุปผล
 
+### สถานะ 4/10/69 — ทำไมร้านยังรับเงินจริงไม่ได้ (ตรวจจากของจริงทุกบรรทัด)
+
+รอบนี้ตรวจว่า "เงินจะเข้าบัญชีได้ไหม" แล้วเจอ **4 ด่าน** ที่ยังปิดอยู่ — ฝั่ง Stripe ไม่ใช่ปัญหา (บัญชีผูก THB → KRUNG THAI •••6505 เรียบร้อยแล้ว Stripe โอนเอง ~7 วันทำการ)
+
+**ด่าน 1 — โดเมนหลุดจาก Cloudflare (เว็บสาธารณะล่มอยู่):** `sovereignoriginshop.dpdns.org` ตอบ **NS = `dns1.digitalplat.org` / `dns2.digitalplat.org`** และ **ไม่มี A record** ทั้ง apex และ `www` → `curl https://…/ ` = exit 6 / code 000 · ตรวจซ้ำ 2 ที่ (Cloudflare DoH + Google DoH) ได้ authoritative ตรงกัน SOA serial `2026100409` (= แก้ล่าสุด 4/10/69) · ยังมี TXT `google-site-verification=…` อยู่ในโซน DigitalPlat ⇒ **zone ยังอยู่ แต่ย้ายออกจาก Cloudflare** · **tunnel ไม่ได้พัง** — `cloudflared` (tunnelID `ecce3206-c35c-4e73-88a1-40514a7f37d8`) ยังรันและยังถือ Public Hostname ของโดเมนนี้ (config version 2, อัปเดต 3/10 10:29) ⇒ **ตั้ง NS กลับเป็นคู่ของ Cloudflare แล้วเว็บกลับมาเอง ไม่ต้องแตะ tunnel** · ⚠️ TXT ของ Google ต้องย้ายไปอยู่ใน Cloudflare zone ด้วย ไม่งั้น GSC verify หลุดเมื่อ NS เปลี่ยน
+
+**ด่าน 2 — API ที่รันอยู่ไม่มีโมดูล payments (แยกจากบั๊กโค้ด):** container `sovereign-core-api` mount `src` จากโฟลเดอร์ MAIN และรัน `npx prisma generate && npm run build && npm start` ทุกครั้งที่บูต ⇒ **`docker restart sovereign-core-api` = deploy จริง ไม่ต้อง rebuild image** · 4/10/69 container ยังเป็น build 1/10 13:31 แต่โมดูล payments เกิด 4/10 11:52 → `/api/payments/*` ตอบ **404** · หลัง restart (healthy ที่ t+40s) ตอบ **401** ⇒ ถ้าเจอ payments 404 อีก **ให้ restart container ก่อนไปสงสัยโค้ด** · ลำดับที่ถูก: `npx prisma generate && npm run build` ใน MAIN ให้ผ่านก่อน แล้วค่อย restart (ถ้า build ล้มในคอนเทนเนอร์ `npm start` ไม่รัน = API ล่มทั้งตัว)
+
+**ด่าน 3 — ไม่มี `STRIPE_WEBHOOK_SECRET`:** ยังไม่ตั้ง ⇒ ทุก delivery ถูกปฏิเสธ (โดยเจตนา) · ต้องสร้าง endpoint ใน **Workbench → Webhooks** และคัด `whsec_…` มาใส่ `.env` (เฉพาะค่านี้ · ห้ามส่ง `sk_`/`rk_`/เลขบัญชีในแชท) · สัญญาที่พิสูจน์แล้ว: secret ไม่ตั้ง/ลายเซ็นไม่ผ่าน → **401** + `rejected:true` (ไม่ใช่ 400) ส่วน **400** ใช้เฉพาะ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่าน — เทสต์ที่คุมสัญญานี้คือ [`tests/paymentsFreshClone.test.ts`](../sovereign-os/core-api/tests/paymentsFreshClone.test.ts) (assert ข้อความ `webhook signing secret is not configured`) · ตอบ non-2xx ไว้ถูกแล้ว ห้ามเปลี่ยนเป็น 2xx: secret อาจเพิ่งหมุน แล้ว Stripe จะส่งซ้ำให้
+
+**ด่าน 4 — WAF default-deny ยังไม่รู้จัก path ของ webhook:** rule "Public-only: block admin/internal paths" (ข้อ 6 ด้านบน) อนุญาตเฉพาะ path ที่อยู่ใน allowlist ซึ่ง **ยังไม่มี `/api/payments/*`** ⇒ เมื่อโดเมนกลับมา Stripe จะได้ **403 ที่ edge** ต้องเติม **บวกอย่างเดียว** ต่อท้ายในวงเล็บ allowlist (ครอบทั้งมี/ไม่มี `/` ปิดท้ายด้วย `starts_with`):
+```
+or starts_with(http.request.uri.path, "/api/payments/webhook")
+```
+เกณฑ์ตรวจ: `curl -s -o /dev/null -w '%{http_code}' -X POST https://sovereignoriginshop.dpdns.org/api/payments/webhook/` → ต้องได้ **401** (ไม่ใช่ 403) — ถ้าได้ 403 = ยังไม่ขึ้น rule
+
+**⚠️ URL ของ endpoint ต้องมี `/` ปิดท้ายเสมอ:** `next.config.js` ตั้ง `trailingSlash: true` ⇒ `POST /api/payments/webhook` ผ่านประตู `:3000` ตอบ **308** แล้ว redirect ไป `/api/payments/webhook/` · **Stripe ไม่ตาม redirect ของ delivery** (นับเป็น fail) — วัดจริง 4/10/69: `no_slash=308`, `with_slash=401` (ที่ :3001 ตรง ๆ ตอบ 401 ทั้งสองรูปแบบเพราะ Express ไม่ strict routing แต่ Stripe วิ่งผ่าน :3000 เท่านั้น) ⇒ ใช้ `https://sovereignoriginshop.dpdns.org/api/payments/webhook/`
+
+**ลำดับที่ถูกก่อนเปิดรับเงิน (ห้ามสลับ):** ตั้ง NS กลับ → เติม WAF allowlist → สร้าง endpoint + เอา `whsec` ใส่ `.env` → ตั้งเบอร์ `shopPromptPay` ของร้านให้ตรงบัญชีรับเงิน → **สุดท้าย**ค่อยเปิด `STRIPE_LIVE_ENABLED=true` แล้วซื้อทดสอบ 1 บาท · **ห้ามเปิด live ก่อนมี `whsec`**: เงินเข้าจริงแต่ออเดอร์ไม่ถูกบันทึก และ Stripe จะ retry ไม่จบ
+
+> **หมายเหตุเครื่องมือ:** `PROMPTPAY_TARGET` เป็นของ **treasury** (คำสั่งโอน/QR ส่วนตัว) — **ไม่เกี่ยวกับ PromptPay ของร้าน** ซึ่งเก็บที่ `businesses.shopPromptPay` (เข้ารหัส · ตั้งจากหน้า `/business` → แท็บร้าน) ⇒ ตั้งร้านให้ใช้เบอร์ที่ถูกต้องจาก UI ไม่ต้องแก้ `.env`
+
 ## §สิบเอ็ด — การจัดการ repo public + สนามทดลองสาธารณะ (P: Publishing 30/9/69)
 
 ### กฎการเผยแพร่ (ตัดสินครั้งเดียว — คงไว้ตลอด)
@@ -306,12 +400,12 @@ tasklist | grep -i node | grep -c .   # >0 = watchdog/node มีชีวิต
 **ขั้นถัดไปเมื่อ Active (เจ้าของแก้ dashboard — agent พิสูจน์ต่อ):**
 3. Zero Trust → Networks → Tunnels → tunnel เดิม → **Public Hostname → Add 2 แถว** (คัดค่า Service จากแถวของ sovereignoriginshop เป๊ะ): แถว path `^/api` → `http://host.docker.internal:3001` · แถว path `*` → `http://host.docker.internal:3000` — Cloudflare สร้าง CNAME ให้เอง (apex flatten ให้เอง)
 4. **SSL/TLS → Full (strict)** ที่โซนใหม่
-5. **WAF:** สร้าง custom rule เดียวชื่อ "Public-only: block admin/internal paths" action=Block ด้วย expression เต็มพร้อมวาง (ครอบ allowlist ล่าสุด รวม `/robots.txt` `/sitemap.xml`):
+5. **WAF:** สร้าง custom rule เดียวชื่อ "Public-only: block admin/internal paths" action=Block ด้วย expression เต็มพร้อมวาง (คัดจาก expression **จริง** บนโซนเดิม ณ 2/10/69 — ครอบ allowlist ล่าสุด รวม `/robots.txt` `/sitemap.xml` หน้าสาธารณะ 4 หน้า และไฟล์คีย์ IndexNow):
    ```
-   not (starts_with(http.request.uri.path, "/shop") or starts_with(http.request.uri.path, "/trace") or starts_with(http.request.uri.path, "/demo") or starts_with(http.request.uri.path, "/api/shop") or starts_with(http.request.uri.path, "/api/trace") or starts_with(http.request.uri.path, "/api/demo") or starts_with(http.request.uri.path, "/api/partners") or starts_with(http.request.uri.path, "/_next/static/") or http.request.uri.path in {"/" "/trace" "/trace/" "/about" "/about/" "/partners" "/partners/" "/favicon.ico" "/icon.png" "/icon.svg" "/manifest.json" "/sw.js" "/sw-precache.json" "/robots.txt" "/sitemap.xml" "/api/health" "/api/health/" "/api/feedback" "/api/feedback/" "/api/track" "/api/track/"})
+   not (starts_with(http.request.uri.path, "/shop") or starts_with(http.request.uri.path, "/demo") or starts_with(http.request.uri.path, "/partners") or starts_with(http.request.uri.path, "/about") or starts_with(http.request.uri.path, "/vendor/") or starts_with(http.request.uri.path, "/api/shop") or starts_with(http.request.uri.path, "/api/trace") or starts_with(http.request.uri.path, "/api/partners") or starts_with(http.request.uri.path, "/api/demo") or starts_with(http.request.uri.path, "/api/feedback") or starts_with(http.request.uri.path, "/api/track") or http.request.uri.path in {"/" "/trace" "/trace/" "/partners" "/about" "/favicon.ico" "/icon.png" "/icon.svg" "/manifest.json" "/sw.js" "/sw-precache.json" "/api/health" "/api/health/"} or starts_with(http.request.uri.path, "/_next/static/") or http.request.uri.path in {"/robots.txt" "/sitemap.xml" "/community" "/community/" "/mbti" "/mbti/" "/sensors" "/sensors/" "/hover-cards" "/hover-cards/" "/60bbc7d06ef7aa163fcc6f406145cfeb.txt"})
    ```
    (แถวไหนโดน block ทั้งที่ควรผ่าน — ดู Security → Events แล้วเติมเส้นนั้น) · **ลงแก้ expression บนโดเมนเดิมด้วย** (วิธีบวกอย่างเดียว 5 นาที จดใน `docs/seo-google-search-console.md` §คู่มือแก้ WAF) รอบเดียวกัน
-6. พิสูจน์ปลายทาง: `/` `/shop` `/api/health` `/sitemap.xml` = 200 · `/dashboard` = 403 · sitemap = 200 (ไม่ซ้ำบั๊กโดเมนเดิม) · แล้วทำ GSC property ที่สองตาม `docs/seo-google-search-console.md`
+6. พิสูจน์ปลายทาง: `/` `/shop` `/api/health` `/sitemap.xml` = 200 · `/dashboard` = 403 · sitemap = 200 (ไม่ซ้ำบั๊กโดเมนเดิม) · **ครบทั้ง 10 URL ใน sitemap ต้อง 200 ด้วย** (4 หน้า `/community /mbti /sensors /hover-cards` เคยโดน 403 เพราะไม่อยู่ใน allowlist — ถ้าโซนใหม่ลืม 4 path นี้ Google จะ crawl ได้แค่ครึ่งเดียว) · แล้วทำ GSC property ที่สองตาม `docs/seo-google-search-console.md`
 
 **ห้ามพลาด:** ห้ามชี้ Public Hostname ไป :3001 หรือ API ภายใน (admin/auth ทั้งหมดอยู่ข้างใน) · Domain ฟรีต้องยืนยันตามรอบที่ DigitalPlat ส่งเมลมา ไม่งั้นโดนคืนชื่อ — จดวันจดที่นี่: ________
 

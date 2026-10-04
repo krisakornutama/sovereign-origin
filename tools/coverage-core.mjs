@@ -12,6 +12,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const API = join(ROOT, '..', 'sovereign-os', 'core-api');
 const REPORT_DIR = 'coverage';
 const RUN_DB = process.argv.includes('--db'); // --db = รวมชุด real-DB (RUN_DB_TESTS=1) ในรอบวัด
+const args = process.argv.slice(2);
 
 const env = {
   ...process.env,
@@ -78,3 +79,17 @@ console.log(`\n── หลุมบรรทัดมากสุด 10 (ไ�
 for (const h of holes.slice(0, 10)) console.log(`  ${String(h.miss).padStart(5)}/${String(h.size).padEnd(5)} (${h.pct}%)  ${h.path}`);
 
 console.log('\n✅ วัดเสร็จ — รายงานเต็ม: sovereign-os/core-api/coverage/index.html (npx c8 report --reporter=html)');
+
+// ── Coverage Floor (เพิ่ม 3/10/69) ───────────────────────────────────────────
+// เดิม coverage เป็นแค่กระจกส่อง (no threshold) = ลดลงเท่าไรก็ไม่มีใครรู้
+// ตอนนี้มีแก้รหนี: รวมต้องไม่ต่ำกว่า floor · โมดุลใหม่ต้อง ≥ 40% · commit ที่ถอยหลัง = ล้ม
+// ปิดได้ชั่วคราวด้วย --no-floor (เช่นรอบวัดเพื่อสำรวจอย่างเดียว)
+if (args.includes('--no-floor')) {
+  console.log('ℹ️  ข้าม coverage floor (--no-floor)');
+} else {
+  const floor = spawnSync('node', [join(ROOT, 'coverage-floor.mjs')], { stdio: 'inherit', shell: process.platform === 'win32' });
+  if (floor.status !== 0) {
+    console.error('\n❌ coverage floor ไม่ผ่าน — gate แดง (ยก baseline ด้วย node tools/coverage-floor.mjs --update เมื่อถอยเพราะตั้งใจ)');
+    process.exit(1);
+  }
+}

@@ -8,6 +8,7 @@ import { authFetch } from '../../lib/apiFetch';
 import { NAV_GROUPS } from '../../lib/navigation';
 import { useFeatureStore } from '../../stores/useFeatureStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useHideInternalNav } from '../../lib/useHideInternalNav';
 import { openCommandPalette } from '../CommandPalette';
 import Icon from '../ui/Icon';
 import { useLanguageStore } from '../../stores/useLanguageStore';
@@ -25,6 +26,9 @@ export default function Sidebar() {
   const loadFeatures = useFeatureStore((s) => s.load);
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
+  // หน้าสาธารณะ + ยังไม่ล็อกอิน = ไม่ให้เห็นเมนูภายใน (บอท/ผู้เยี่ยมชมไม่ควรเห็นโครงสร้างระบบ)
+  // hook ต้องเรียกทุก render (ไม่เรียกแบบมีเงื่อนไข) — คืน null ทีหลังจาก hooks ครบแล้ว
+  const hideInternalNav = useHideInternalNav();
   // โมดูลที่เปิดใช้งาน (จาก GET /api/modules) — fetch ไม่สำเร็จ = แสดงทุกเมนู
   const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
 
@@ -93,6 +97,8 @@ export default function Sidebar() {
 
   // หน้าปัจจุบัน (มี hash ด้วย) — ใช้เป็น active state สำหรับ sub-view
   const asPath = router.asPath || pathname;
+
+  if (hideInternalNav) return null;
 
   return (
     <aside ref={asideRef} className="w-60 shrink-0 bg-gray-900/60 border-r border-gray-800 p-3 space-y-5 hidden md:flex flex-col overflow-y-auto h-screen sticky top-0">

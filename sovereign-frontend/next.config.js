@@ -41,6 +41,17 @@ const nextConfig = {
     : { distDir: '.next' }),
   images: { unoptimized: true },
   trailingSlash: true,
+  // P24 (3/10/69): โหมดสาธารณะสำหรับ HTML ที่ server ส่ง (SSR/static)
+  // ปัญหาที่แก้: isPublicHostname() คืน false ตอน SSR (ไม่มี window) + หน้าแรกรอ isHydrated
+  //  → Googlebot ดึงหน้าแรกได้แค่ title/description ไม่มี h1 ไม่มีเนื้อหา
+  // เปิดเฉพาะ build ของเว็บ production — ไม่ใช่ dev (dev คงฟอร์มล็อกอินไว้เหมือนเดิม)
+  // และไม่ใช่ desktop export (แอปเปิด file:// → hostname ว่าง → จะไปโชว์หน้าสาธารณะแทนฟอร์ม)
+  env: {
+    NEXT_PUBLIC_PUBLIC_SITE:
+      process.env.NODE_ENV === 'production' && process.env.SOVEREIGN_STATIC_EXPORT !== '1'
+        ? '1'
+        : '0',
+  },
   // จำกัด worker ขั้น "Collecting page data" — เดิม spawn ตามจำนวน CPU (เครื่องนี้ 15 ตัว) ซึ่งพังแบบ
   // exit 134 (Zone Allocation / native OOM) เมื่อแรมว่างน้อย (prod server + docker รันคู่กัน) · CI บน
   // GitHub แรมโล่งจึงไม่เคยเจอ — cap ที่ 3 ทำให้ build ผ่านทั้งเครื่องพร้อมงานและไม่ช้ากว่าเดิมมาก

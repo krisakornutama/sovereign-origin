@@ -337,6 +337,51 @@ function publicShipping(order: any): any {
 }
 
 /** catalog กลางชุมชน — รวมสินค้าจากทุกร้านที่เปิดทั้ง /shop และเข้าร่วม catalog เอง (opt-in) */
+// ── Fixture สำหรับ e2e (2/10/69) ─────────────────────────────────────────────────
+// หน้า /community เป็นหน้าสาธารณะที่ส่งให้ Google แล้ว = ข้อมูลปลอมห้ามค้างในฐานจริง
+// e2e จึงสร้างตอนเริ่มรันและลบตอนจบ (e2e/global-setup|teardown) — เรียกผ่าน service นี้เพื่อให้
+// การเข้าถึงตาราง businesses/business_products อยู่ในโมดูลเจ้าของเสมอ (arch-gate)
+const E2E_FIXTURE_SHOP_ID = 'f1000000-0000-4000-8000-000000000001';
+const E2E_FIXTURE_PRODUCTS = [
+  { id: 'f1000000-0000-4000-8000-000000000002', sku: 'E2E-TOMATO-1KG', name: 'มะเขือเทศออร์แกนิก 1 กก.', salePrice: 45, stockQty: 12 },
+  { id: 'f1000000-0000-4000-8000-000000000003', sku: 'E2E-GREENS-300G', name: 'ผักสลัดฟาร์มรวม 300 กรัม', salePrice: 35, stockQty: 20 },
+];
+const E2E_FIXTURE_SHOP_NAME = 'ร้านผักสดตามรอย';
+
+/** สร้างร้าน+สินค้าตัวอย่าง (idempotent) — เรียกจาก e2e global-setup เท่านั้น */
+export async function seedCommunityFixture(ownerId: string): Promise<{ shopId: string; products: number }> {
+  const biz = await prisma.business.upsert({
+    where: { id: E2E_FIXTURE_SHOP_ID },
+    update: { isActive: true, shopOpen: true, shopInCommunity: true, shopName: E2E_FIXTURE_SHOP_NAME },
+    create: {
+      id: E2E_FIXTURE_SHOP_ID,
+      name: E2E_FIXTURE_SHOP_NAME,
+      shopName: E2E_FIXTURE_SHOP_NAME,
+      bizType: 'GENERAL_TRADE',
+      isActive: true,
+      shopOpen: true,
+      shopInCommunity: true,
+      ownerId,
+    },
+    select: { id: true },
+  });
+  for (const p of E2E_FIXTURE_PRODUCTS) {
+    await prisma.businessProduct.upsert({
+      where: { id: p.id },
+      update: { businessId: biz.id, name: p.name, salePrice: p.salePrice, stockQty: p.stockQty, isActive: true },
+      create: { id: p.id, businessId: biz.id, sku: p.sku, name: p.name, category: 'PRODUCE', salePrice: p.salePrice, stockQty: p.stockQty, isActive: true },
+    });
+  }
+  return { shopId: biz.id, products: E2E_FIXTURE_PRODUCTS.length };
+}
+
+/** ลบข้อมูลตัวอย่างออกจากฐานจริง — ต้องเรียกเสมอ (กันข้อมูลปลอมหลุดขึ้นหน้าสาธารณะ) */
+export async function clearCommunityFixture(): Promise<{ products: number; shops: number }> {
+  const products = await prisma.businessProduct.deleteMany({ where: { businessId: E2E_FIXTURE_SHOP_ID } });
+  const shops = await prisma.business.deleteMany({ where: { id: E2E_FIXTURE_SHOP_ID } });
+  return { products: products.count, shops: shops.count };
+}
+
 export async function getCommunityCatalog(): Promise<any> {
   const businesses = await prisma.business.findMany({
     where: { isActive: true, shopOpen: true, shopInCommunity: true },

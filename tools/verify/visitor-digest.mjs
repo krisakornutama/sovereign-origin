@@ -4,7 +4,7 @@
 //   node tools/verify/visitor-digest.mjs --test    → เหมือนกันแต่พิมพ์ข้อความออกจอ ไม่ส่ง Telegram
 // แนวเดียวกับ security-anomaly.mjs: psql ผ่าน docker exec · DB ติดต่อไม่ได้ = ล้มดัง (exit 1) ห้ามปลอมข้อความปกติ
 // ความต้องการใหม่ (kind=question/survey) นับเฉพาะ "หลัง digest ครั้งก่อน" (จด timestamp ไว้ที่ data/visitor-digest-last.json)
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,36 @@ function lastDigestAt() {
 }
 
 function esc(s) { return String(s ?? '').replace(/[<>&]/g, ''); }
+
+/* SEO (P22 2/10/69) — วงรายสัปดาห์: ยิง IndexNow ให้บอทรู้ทันทีที่ URL เปลี่ยน + เช็คว่า sitemap ยังตอบได้
+   soft-fail ทั้งก้อน — digest รายงานผู้เข้าชม ต้องไม่ล้มเพราะเว็บไม่ตอบ */
+async function seoBlock() {
+  try {
+    const r = spawnSync('node', [join(ROOT, 'tools', 'indexnow-shop-notify.mjs'), '--strict'], {
+      cwd: ROOT, encoding: 'utf8', timeout: 120_000, windowsHide: true,
+    });
+    const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
+    // บรรทัดสรุปขึ้นต้นด้วย "indexnow-shop:" (ท้าย ๆ เป็นรายการ URL) — จับจากบรรทัดนั้น ไม่ใช่บรรทัดสุดท้าย
+    const last = out.find((l) => l.startsWith('indexnow-shop:')) ?? out[out.length - 1] ?? '';
+    const pingOk = r.status === 0 && last.startsWith('indexnow-shop: ✓');
+    let urls = 0;
+    try {
+      const res = await fetch('https://sovereignoriginshop.dpdns.org/sitemap.xml', { signal: AbortSignal.timeout(15_000) });
+      if (res.ok) urls = [...(await res.text()).matchAll(/<loc>/g)].length;
+    } catch { /* sitemap ตอบไม่ได้ = รายงานว่าไม่ผ่าน */ }
+    return { pingOk, sitemapOk: urls > 0, urls };
+  } catch (e) {
+    return { pingOk: false, sitemapOk: false, urls: 0, err: e?.message ?? String(e) };
+  }
+}
+
+/* ผลของ SEO pre-flight + การพิสูจน์ backup จากรอบ nightly ล่าสุด (อ่านไฟล์ ไม่รันซ้ำ)
+   — รายงานรายสัปดาห์ควรเห็นภาพรวม ไม่ใช่แค่ยิง IndexNow ผ่าน */
+function lastCheck(file) {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, 'logs', file), 'utf8'));
+  } catch { return null; }
+}
 
 async function main() {
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -85,6 +115,28 @@ async function main() {
     lines.push('');
     lines.push(`📬 ฟีดแบ็กรอคัดกรอง ${pending} รายการ — เปิด /feedback-admin กด 👍 แล้วยื่นถึงคุณได้`);
   }
+
+  // 5) SEO: sitemap + IndexNow + ผล pre-flight/backup จาก nightly ล่าสุด (soft-fail)
+  const seo = await seoBlock();
+  const seoCheck = lastCheck('seo-preflight.json');
+  const restoreCheck = lastCheck('backup-restore-check.json');
+  const gscCheck = lastCheck('gsc-coverage.json');
+  lines.push('');
+  lines.push(`🔎 <b>SEO</b>: sitemap ${seo.sitemapOk ? `${seo.urls} URL` : '⚠️ ตอบไม่ผ่าน'} · IndexNow ${seo.pingOk ? 'ส่งแล้ว ✓' : '⚠️ ยังไม่ผ่าน'}`);
+  lines.push(
+    `ตรวจหน้าเว็บ: ${seoCheck ? (seoCheck.ok ? `ผ่าน ${seoCheck.checked} URL ✓` : `⚠️ ${seoCheck.problems.length} จุด`) : 'ยังไม่ได้ตรวจ'}` +
+      ` · backup: ${restoreCheck ? (restoreCheck.ok ? `กู้คืนได้จริง ✓ (${restoreCheck.dump ?? '-'})` : '⚠️ กู้คืนไม่ได้') : 'ยังไม่ได้ตรวจ'}`
+  );
+  // GSC coverage: อ่านไฟล์ log ไม่ยิง API ซ้ำ · ยังไม่ได้ตั้ง credential = ขึ้นว่ายังไม่ได้ตั้งค่า (ไม่ใช่เตือน)
+  lines.push(
+    gscCheck
+      ? (gscCheck.skipped
+        ? `Google index: ยังไม่ได้ตั้งค่า GSC API (รอ Verify + credential)`
+        : (gscCheck.ok
+          ? `Google index: ${gscCheck.indexed?.length ?? 0}/${gscCheck.sitemapUrls ?? 0} หน้าติด index ✓ · impressions ${gscCheck.current?.impressions ?? 0}`
+          : `Google index: ⚠️ ${gscCheck.problems?.length ?? 0} จุด`))
+      : 'Google index: ยังไม่ได้ตรวจ'
+  );
 
   const text = lines.join('\n');
 

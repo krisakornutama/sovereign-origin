@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import Head from 'next/head';
+import SeoHead from '../components/public/SeoHead';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
 import { FeedbackButton } from '../components/public/FeedbackButton';
 import { FounderCredit } from '../components/public/FounderCredit';
+import { DemoExplain, DEMO_FAQ_JSONLD } from '../components/public/DemoExplain';
 import { trackPageView, trackDemoTab, trackSurvey, trackQuestion } from '../lib/visitorTrack';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -80,7 +81,12 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <Head><title>สนามทดลอง — Sovereign OS</title></Head>
+      <SeoHead
+        title="สนามทดลอง — ลองใช้ระบบฟาร์ม ปศุสัตว์ การเงิน ตามรอย ร้านค้า — Sovereign Origin"
+        description="สนามทดลองสาธารณะของ Sovereign Origin — ลองใช้โมดูลฟาร์ม ปศุสัตว์ การเงิน โมดูลทั้งหมด ตามรอยล็อต และร้านค้า ไม่ต้องสมัคร ไม่มีล็อกอินขวาง พร้อมคำอธิบายแต่ละโมดูลและคำถามที่ถามบ่อย"
+        path="/demo"
+        jsonLd={DEMO_FAQ_JSONLD}
+      />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
         <header className="space-y-1 pt-2">
           <div className="mono text-[10px] tracking-[0.25em] uppercase text-cyan-400/80">สนามทดลองสาธารณะ</div>
@@ -105,6 +111,10 @@ export default function DemoPage() {
         {tab === 'catalog' && <CatalogTab data={catalog} />}
         {tab === 'trace' && <TraceTab code={lotCode} setCode={setLotCode} lot={lot} loading={lotLoading} err={lotErr} onSearch={loadLot} />}
         {tab === 'shop' && <ShopTab products={products} />}
+
+        {/* เนื้อหาอธิบายแบบ static — render ตอน SSR ให้บอทอ่านได้โดยไม่ต้องรอ JS
+            (วางหลังแท็บ = ข้อมูลอ้างอิง ไม่แย่งความสนใจจากการลองใช้) */}
+        <DemoExplain />
 
         <VisitorSurvey />
 
