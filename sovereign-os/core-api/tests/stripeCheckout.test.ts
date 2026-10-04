@@ -83,6 +83,8 @@ test('แปลงบาทเป็นสตางค์: ปัดครึ่
 const base: CheckoutSessionRequest = {
   amountBaht: 250,
   productName: 'Sovereign Origin — สมาชิกปี',
+  // success_url บังคับ (Stripe ทำเครื่องหมายว่า required conditionally สำหรับ hosted session)
+  successUrl: 'https://sovereign.example.com/checkout/success',
 };
 
 test('payload ต้องส่ง unit_amount เป็นสตางค์ ไม่ใช่บาท', () => {
@@ -119,6 +121,50 @@ test('payload ต้องปฏิเสธสินค้าที่ไม่
   assert.throws(() => buildCheckoutSessionParams({ ...base, productName: '' }), /productName is required/);
   assert.throws(() => buildCheckoutSessionParams({ ...base, quantity: 0 }), /quantity/);
   assert.throws(() => buildCheckoutSessionParams({ ...base, quantity: 1.5 }), /quantity/);
+});
+
+// ── success_url: บังคับ (Stripe: required conditionally สำหรับ hosted session) ──
+
+test('payload ต้องปฏิเสธเมื่อไม่มี success_url — Stripe ทำเครื่องหมายว่า required', () => {
+  assert.throws(
+    () => buildCheckoutSessionParams({ amountBaht: 250, productName: 'สมาชิกปี' }),
+    /successUrl is required/,
+    'ไม่มี success_url = payload ที่ Stripe จะไม่รับ (เคยผ่านเทสต์แต่จริงใช้ไม่ได้)',
+  );
+});
+
+test('payload ต้องปฏิเสธ success_url ที่ว่างหรือมีแต่ช่องว่าง', () => {
+  assert.throws(() => buildCheckoutSessionParams({ ...base, successUrl: '' }), /successUrl is required/);
+  assert.throws(() => buildCheckoutSessionParams({ ...base, successUrl: '   ' }), /successUrl is required/);
+});
+
+test('payload ต้องส่ง success_url ออกไปจริงเมื่อมีค่า', () => {
+  const p = buildCheckoutSessionParams(base);
+  assert.strictEqual(p.success_url, 'https://sovereign.example.com/checkout/success');
+});
+
+// ── client_reference_id: เพดาน 200 ตัวอักษร (กำหนดไว้ในเอกสาร Stripe) ──
+
+test('client_reference_id ยาว 200 ตัวอักษรได้ (ขอบเขตพอดี)', () => {
+  const ref = 'R'.repeat(200);
+  const p = buildCheckoutSessionParams({ ...base, clientReferenceId: ref });
+  assert.strictEqual(p.client_reference_id, ref);
+});
+
+test('client_reference_id ยาว 201 ตัวอักษรต้องโยน error (เกินเพดานของ Stripe)', () => {
+  assert.throws(
+    () => buildCheckoutSessionParams({ ...base, clientReferenceId: 'R'.repeat(201) }),
+    /client_reference_id/,
+  );
+});
+
+// ── นโยบายยอด 0 บาท: ตั้งใจปฏิเสธ แม้ Stripe จะรับ non-negative ────────────
+
+test('นโยบายยอด 0: toThbMinorUnit ปฏิเสธศูนย์ (เป็นนโยบายเรา ไม่ใช่ข้อบังคับของ Stripe)', () => {
+  // Stripe ระบุว่า unit_amount เป็น "non-negative integer" → 0 ผ่านได้
+  // เราเลือกปฏิเสธ เพราะ session ที่ชำระ 0 บาทไม่มีความหมายทางธุรกิจ
+  assert.throws(() => toThbMinorUnit(0), /must be greater than 0/);
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 0 }), /must be greater than 0/);
 });
 
 // ── Transport seam ─────────────────────────────────────────────────────────
