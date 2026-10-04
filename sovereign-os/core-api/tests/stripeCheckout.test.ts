@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import {
   THB_MINOR_UNIT_DIVISOR,
+  THB_MAX_MINOR_UNIT,
   THB_CURRENCY_CODE,
   toThbMinorUnit,
   buildCheckoutSessionParams,
@@ -165,6 +166,30 @@ test('นโยบายยอด 0: toThbMinorUnit ปฏิเสธศูน�
   // เราเลือกปฏิเสธ เพราะ session ที่ชำระ 0 บาทไม่มีความหมายทางธุรกิจ
   assert.throws(() => toThbMinorUnit(0), /must be greater than 0/);
   assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 0 }), /must be greater than 0/);
+});
+
+// ── เพดานบนของ unit_amount: ข้อบังคับจริงจาก Stripe (ไม่ใช่นโยบายของเรา) ─────
+
+test('เพดานบน: ยอดที่ครบเพดานพอดี → ผ่าน', () => {
+  // 99,999,999 สตางค์ = 999,999.99 บาท = ค่าสูงสุดที่ Stripe รับ
+  assert.strictEqual(toThbMinorUnit(THB_MAX_MINOR_UNIT / THB_MINOR_UNIT_DIVISOR), THB_MAX_MINOR_UNIT);
+  const p = buildCheckoutSessionParams({ ...base, amountBaht: 999_999.99 });
+  assert.strictEqual(p.line_items[0].price_data.unit_amount, THB_MAX_MINOR_UNIT);
+});
+
+test('เพดานบน: เกินมาแค่ 1 สตางค์ → ต้องยก error', () => {
+  // ไม่ตรวจตรงนี้ = สร้าง payload ที่ Stripe จะปฏิเสธตอนยิงจริง
+  // ทั้งที่ order ถูกสร้างไว้แล้ว → เงินลูกค้าค้างเงียบ ๆ
+  const oneSatangOver = (THB_MAX_MINOR_UNIT + 1) / THB_MINOR_UNIT_DIVISOR;
+  assert.throws(() => toThbMinorUnit(oneSatangOver), /exceeds Stripe|99999999|must not exceed/i);
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: oneSatangOver }),
+    /exceeds Stripe|99999999|must not exceed/i);
+});
+
+test('เพดานบน: ยอดมหาศาล (1e15) → ต้องถูกจับก่อนถึง Stripe', () => {
+  assert.throws(() => toThbMinorUnit(1e15), /exceeds Stripe|99999999|must not exceed/i);
+  assert.throws(() => buildCheckoutSessionParams({ ...base, amountBaht: 1e15 }),
+    /exceeds Stripe|99999999|must not exceed/i);
 });
 
 // ── Transport seam ─────────────────────────────────────────────────────────

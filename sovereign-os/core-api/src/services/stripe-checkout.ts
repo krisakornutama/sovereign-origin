@@ -23,6 +23,16 @@
 /** Stripe รับยอดเป็นหน่วยเล็กสุดของสกุลเงิน — THB ทศนิยม 2 ตำแหน่ง → บาท × 100 = สตางค์ */
 export const THB_MINOR_UNIT_DIVISOR = 100;
 
+/**
+ * เพดานบนของ unit_amount ตามเอกสาร Stripe:
+ * "unit_amount — A positive integer, in THB (thb), in the smallest currency unit… Maximum: 99999999"
+ * ตัวเลขนี้มาจากเอกสาร ไม่ใช่ค่าที่เราเลือก — ถ้าเปลี่ยนให้เช็คเอกสารใหม่
+ *
+ * ทำไมต้องเช็คตรงนี้: ถ้าไม่เช็ค เราจะสร้าง payload ที่ Stripe ปฏิเสธตอนยิงจริง
+ * ทั้งที่ order ถูกสร้างไว้แล้ว → ลูกค้าจ่ายไม่ได้ และเงินค้างโดยไม่มีใครรู้
+ */
+export const THB_MAX_MINOR_UNIT = 99_999_999;
+
 /** Stripe บังคับให้ส่งรหัสสกุลเงินเป็นตัวพิมพ์เล็ก */
 export const THB_CURRENCY_CODE = 'thb';
 
@@ -122,6 +132,13 @@ export function toThbMinorUnit(amountBaht: number): number {
   const satang = roundBahtToSatang(amountBaht);
   if (satang < 1) {
     throw new RangeError(`amountBaht ${amountBaht} rounds to 0 satang — smaller than 1 satang`);
+  }
+  if (satang > THB_MAX_MINOR_UNIT) {
+    // ข้อบังคับจริงของ Stripe (ไม่ใช่นโยบายของเรา) — จับก่อนสร้าง payload
+    // ไม่งั้น Stripe จะปฏิเสธตอนยิงจริง หลัง order ถูกสร้างไปแล้ว
+    throw new RangeError(
+      `amountBaht ${amountBaht} = ${satang} satang exceeds Stripe's unit_amount maximum of ${THB_MAX_MINOR_UNIT}`,
+    );
   }
   return satang;
 }

@@ -113,7 +113,8 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
     // ไม่งั้น secret ที่เป็นช่องว่างจะกลายเป็น secret ที่ใครก็เดาได้ (copy/paste เหลือช่องว่าง)
     const secret = String(deps.webhookSecret ?? config.stripe.webhookSecret ?? '').trim();
     if (!secret) {
-      return res.status(400).json({ error: 'webhook signing secret is not configured' });
+      console.error('[payments] webhook: ยังไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET — ปฏิเสธทุก delivery (ไม่แตะ order ใด ๆ)');
+      return reject(res, 'webhook signing secret is not configured');
     }
 
     const raw = rawBodyOf(req);
@@ -123,51 +124,82 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       secret,
     });
     if (!verified.ok) {
-      return res.status(400).json({ error: `invalid stripe signature: ${verified.reason}` });
+      // ตั้งใจคง non-2xx: secret อาจเพิ่งหมุน/ยังไม่ได้ตั้ง → การส่งซ้ำอาจผ่าน
+      // ตอบ 2xx ตรงนี้ = บอก Stripe ว่าเลิกส่ง = เงินที่จ่ายจริงหายเงียบ
+      console.warn(`[payments] webhook: ลายเซ็นไม่ผ่าน (${verified.reason}) — ปฏิเสธและรอ Stripe ส่งใหม่`);
+      return reject(res, `invalid stripe signature: ${verified.reason}`);
     }
 
     let event: any;
     try {
       event = JSON.parse(raw);
     } catch {
-      return res.status(400).json({ error: 'webhook body is not valid JSON' });
+      return reject(res, 'webhook body is not valid JSON', 400);
     }
     if (event?.type !== 'checkout.session.completed') {
-      // event อื่นไม่ใช่ธุระของเรา — ตอบ 200 เพื่อไม่ให้ Stripe retry
-      return res.status(200).json({ success: true, ignored: true, type: event?.type ?? null });
+      // event อื่นไม่ใช่ธุระของเรา — ไม่มีทางกลายเป็นจริงในการส่งครั้งหนัง
+      return notApplied(
+        res,
+        'unsupported_event_type',
+        `ไม่ใช่ event ที่เราดูแล: ${event?.type ?? 'ไม่ระบุ'}`,
+        { type: event?.type ?? null },
+      );
     }
 
     const session = event?.data?.object ?? {};
     const refCode = String(session.client_reference_id ?? '').trim();
     if (!refCode) {
-      return res.status(400).json({ error: 'missing client_reference_id — จับคู่ order ไม่ได้' });
+      return notApplied(
+        res,
+        'missing_client_reference_id',
+        'ไม่มี client_reference_id — จับคู่ order ไม่ได้ (ไม่เดา ไม่สร้าง order ใหม่)',
+        { sessionId: String(session.id ?? '') || null },
+      );
     }
 
     const db = deps.prisma ?? prisma;
     const order = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
-    if (!order) return res.status(404).json({ error: `no transfer order for ref_code ${refCode}` });
+    if (!order) {
+      return notApplied(
+        res,
+        'order_not_found',
+        `ไม่พบ order สำหรับ ref_code ${refCode} — ตรวจว่า client_reference_id ถูกต้องไหม`,
+        { refCode },
+      );
+    }
 
     // ── ยอดเงิน: ตัวเลขที่เชื่อคือของ ORDER ไม่ใช่ของ session ─────────────
     // session.amount_total มาจากฝั่ง Stripe (ผู้โจมตีแก้เองได้ถ้าไม่ตรวจลายเซ็น
     // แต่แม้ผ่านลายเซ็นแล้ว เราก็ยังต้องเทียบกับ "ราคาที่ order คาดไว้"
     // คาดหวังมาจาก TransferOrder.amount_thb (เก็บเป็นบาท) → แปลงเป็นสตางค์
     if (String(session.currency) !== THB_CURRENCY_CODE) {
-      return res.status(400).json({
-        error: `currency mismatch: order is ${THB_CURRENCY_CODE}, session charged ${session.currency}`,
-      });
+      return notApplied(
+        res,
+        'currency_mismatch',
+        `สกุลเงินไม่ตรง: order เป็น ${THB_CURRENCY_CODE} แต่ session จ่าย ${session.currency}`,
+        { refCode, expectedCurrency: THB_CURRENCY_CODE, receivedCurrency: session.currency ?? null },
+      );
     }
     const expectedThb = Number(order.amount_thb);
     let expectedMinor: number;
     try {
       expectedMinor = toThbMinorUnit(expectedThb);
     } catch {
-      return res.status(400).json({ error: `order ${refCode} has no usable THB amount` });
+      return notApplied(
+        res,
+        'order_amount_unusable',
+        `order ${refCode} ไม่มียอดบาทที่ใช้ได้ (${order.amount_thb})`,
+        { refCode, amountThb: order.amount_thb ?? null },
+      );
     }
     if (Number(session.amount_total) !== expectedMinor) {
-      // ปฏิเสธอย่างดัง ๆ — ห้ามใช้ยอดใน session มาเป็นความจริงแทน order
-      return res.status(400).json({
-        error: `amount mismatch: order ${refCode} expects ${expectedMinor} satang (THB ${(expectedMinor / 100).toFixed(2)}), session paid ${session.amount_total}`,
-      });
+      // ห้ามใช้ยอดใน session มาเป็นความจริงแทน order
+      return notApplied(
+        res,
+        'amount_mismatch',
+        `ยอดไม่ตรง: order ${refCode} คาด ${expectedMinor} สตางค์ (THB ${(expectedMinor / 100).toFixed(2)}) แต่จ่ายมา ${session.amount_total}`,
+        { refCode, expectedSatang: expectedMinor, receivedSatang: session.amount_total ?? null },
+      );
     }
 
     // ── กันส่งซ้ำ: conditional update แบบ claimPending ของ transfer.service ──
@@ -182,12 +214,18 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
       },
     });
     if (claimed.count !== 1) {
-      // ตอบ 200 เพื่อไม่ให้ Stripe retry ซ้ำ (ตอนนี้ order อยู่ในสถานะที่ยืนยันแล้ว
-      // หรือถูกยกเลิก — ไม่ย้อนสถานะกลับ)
+      // ตอนนี้ order อยู่ในสถานะที่ยืนยันแล้ว หรือถูกยกเลิก — ไม่ย้อนสถานะกลับ
+      // ครั้งนี้ไม่ได้เขียนอะไร แต่ "เงินจ่ายแล้ว" เป็นความจริงอยู่แล้ว
+      // จึงไม่ใช่เคสผิดปกติเท่า mismatch — log ระดับ info พอ
       const fresh = await db.transferOrder.findFirst({ where: { ref_code: refCode } });
+      console.warn(
+        `[payments] webhook: ส่งซ้ำ order ${refCode} (สถานะ ${fresh?.status ?? 'ไม่รู้'}) — ไม่เขียนซ้ำ`,
+      );
       return res.status(200).json({
         success: true,
+        applied: false,
         alreadyApplied: true,
+        reason: 'order_not_pending',
         refCode,
         status: fresh?.status ?? null,
       });
@@ -195,6 +233,7 @@ export function createPaymentsRouter(deps: PaymentsRouterDeps): Router {
 
     return res.status(200).json({
       success: true,
+      applied: true,
       alreadyApplied: false,
       refCode,
       sessionId: String(session.id ?? ''),
@@ -210,6 +249,47 @@ function rawBodyOf(req: any): string {
   if (Buffer.isBuffer(req.body)) return req.body.toString('utf8');
   if (typeof req.body === 'string') return req.body;
   return JSON.stringify(req.body ?? {});
+}
+
+// ── สัญญาการตอบกลับของ webhook ─────────────────────────────────────────────
+// หัวใจคือคำถามข้อเดียว: "ถ้า Stripe ส่งชุดเดิมมาอีก คำตอบจะเปลี่ยนไหม?"
+//
+//   notApplied → เปลี่ยนไม่ได้ (ยอดไม่ตรงจะไม่ตรงในการส่งครั้งหนังด้วย)
+//                 → 2xx เพื่อหยุด retry แต่บอกว่า "ไม่ได้จ่าย" ให้ชัด + log เสียงดัง
+//   reject     → เปลี่ยนได้ (secret หมุน/ยังไม่ได้ตั้ง/เซ็นผิดชั่วคราว)
+//                 → non-2xx ให้ Stripe ส่งต่อจนกว่าจะผ่าน
+//   applied    → เขียน order เป็น VERIFIED แล้ว
+//
+// ทำไม reject ต้องไม่ตอบ 2xx: ถ้าตอบ 2xx เราจะสั่ง Stripe ว่า "ไม่ต้องส่งอีก"
+// แล้วเงินที่ลูกค้าจ่ายจริงจะหายไปเงียบ ๆ — order ไม่มีวันเป็น VERIFIED
+// นี่แย่กว่า retry ดัง ๆ มาก เพราะเงินหายโดยไม่มีใครรู้
+
+/** ตอบ 2xx + บอกตรง ๆ ว่า "ไม่ได้จ่าย" — สำหรับ delivery ที่ไม่มีทางสำเร็จในการส่งครั้งหนัง */
+function notApplied(res: any, reason: string, message: string, extra: Record<string, unknown> = {}) {
+  // log เสียงดัง: การตอบ 2xx ทำให้ event นี้ไม่โผล่ในหน้า Stripe อีก
+  // ถ้าไม่ log เงินค้างจะเงียบไปตลอดจนกว่าจะมีคนไปเจอเอง
+  // ต้อง stringify เอง — ถ้าส่ง object เข้าไป console จะกลายเป็น [object Object]
+  // ทำให้ ref_code กับตัวเลขที่ต้องไปแก้หายไปทั้งหมด
+  const detail = Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : '';
+  console.error(`[payments] webhook ไม่ได้ apply (${reason}) — ${message}${detail}`);
+  return res.status(200).json({
+    success: false,
+    applied: false,
+    ignored: true,
+    reason,
+    error: message,
+    ...extra,
+  });
+}
+
+/** ตอบ non-2xx — สำหรับ delivery ที่ยังมีโอกาสสำเร็จในการส่งครั้งหนัง */
+function reject(res: any, message: string, status = 401) {
+  return res.status(status).json({
+    success: false,
+    applied: false,
+    rejected: true,
+    error: message,
+  });
 }
 
 // ตัวที่ routes.ts เอาไป mount — ใช้ transport ตาม config (ค่า default = ของปลอม)

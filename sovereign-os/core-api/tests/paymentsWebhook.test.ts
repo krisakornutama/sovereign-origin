@@ -103,10 +103,11 @@ test('ลายเซ็นถูกต้อง → ผ่านการตร
   assert.strictEqual(r.body.error, undefined);
 });
 
-test('ไม่มี header stripe-signature → ต้องปฏิเสธ', async () => {
+test('ไม่มี header stripe-signature → ต้องปฏิเสธ (rejected = non-2xx)', async () => {
   const ref = seedOrder('XFR-SIG2', 250);
   const r = await deliver(completion(ref, 'cs_1', 25000));
-  assert.strictEqual(r.status, 400);
+  assert.ok(r.status >= 400, 'ลายเซ็นไม่ผ่าน = ต้อง non-2xx ให้ Stripe ส่งต่อ');
+  assert.strictEqual(r.body.rejected, true);
   assert.match(String(r.body.error), /signature/i);
   assert.strictEqual(orders.get(ref)!.status, 'PENDING', 'order ต้องไม่ถูกแตะ');
 });
@@ -116,7 +117,7 @@ test('ลายเซ็นผิดรูปแบบ → ต้องปฏิ
   const p = completion(ref, 'cs_1', 25000);
   for (const bad of ['garbage', 't=123', 'v1=abc', 't=notanumber,v1=abc']) {
     const r = await deliver(p, bad);
-    assert.strictEqual(r.status, 400, `ควรปฏิเสธ: ${bad}`);
+    assert.ok(r.status >= 400, `ควรปฏิเสธ: ${bad}`);
   }
   assert.strictEqual(orders.get(ref)!.status, 'PENDING');
 });
@@ -125,7 +126,7 @@ test('ลายเซ็นที่เซ็นด้วย secret อื่น
   const ref = seedOrder('XFR-SIG4', 250);
   const p = completion(ref, 'cs_1', 25000);
   const r = await deliver(p, sign(p, 'whsec_someone_elses_secret'));
-  assert.strictEqual(r.status, 400);
+  assert.ok(r.status >= 400);
   assert.strictEqual(orders.get(ref)!.status, 'PENDING');
 });
 
@@ -134,7 +135,7 @@ test('ลายเซ็นเก่าเกิน tolerance → ต้อง�
   const p = completion(ref, 'cs_1', 25000);
   const stale = Math.floor(Date.now() / 1000) - 4000;
   const r = await deliver(p, sign(p, WEBHOOK_SECRET, stale));
-  assert.strictEqual(r.status, 400);
+  assert.ok(r.status >= 400);
   assert.strictEqual(orders.get(ref)!.status, 'PENDING');
 });
 
@@ -144,27 +145,28 @@ test('แก้ body หลังเซ็น → ต้องปฏิเสธ
   const header = sign(p);
   const tampered = p.replace('25000', '100');   // ลดยอดให้ถูกลง แต่ใช้ลายเซ็นเดิม
   const r = await deliver(tampered, header);
-  assert.strictEqual(r.status, 400);
+  assert.ok(r.status >= 400);
   assert.strictEqual(orders.get(ref)!.status, 'PENDING');
 });
 
 // ── 2) ยอดเงินต้องตรงกับ order ───────────────────────────────────────────────
 
-test('ยอดใน session ต่ำกว่าที่ order คาดไว้ → ต้องปฏิเสธ และ order ต้องยัง PENDING', async () => {
+test('ยอดใน session ต่ำกว่าที่ order คาดไว้ → ต้อง "ไม่จ่ายเงิน" แต่ตอบ 2xx (ห้ามให้ Stripe retry)', async () => {
   const ref = seedOrder('XFR-AMT1', 250);        // order คาด 250 บาท = 25000 สตางค์
   const p = completion(ref, 'cs_1', 100);          // แต่ Stripe ส่งมาแค่ 100 สตางค์ = 1 บาท
   const r = await deliver(p, sign(p));
-  assert.strictEqual(r.status, 400);
-  assert.match(String(r.body.error), /amount/i);
+  // 2xx เพราะ "ไม่มีวันกลายเป็นจริง" — ยอดที่ไม่ตรงจะไม่ตรงในการส่งครั้งถัดไปเช่นกัน
+  assert.strictEqual(r.status, 200, '4xx ทำให้ Stripe retry 3 วัน แล้วปิด endpoint ทิ้ง');
+  assertNotApplied(r.body, 'amount_mismatch', 'ยอดไม่ตรง');
   assert.strictEqual(orders.get(ref)!.status, 'PENDING', 'ห้ามจ่ายเงินให้ order ที่ยังไม่ครบ');
 });
 
-test('สกุลเงินไม่ใช่ thb → ต้องปฏิเสธ', async () => {
+test('สกุลเงินไม่ใช่ thb → ต้อง "ไม่จ่ายเงิน" แต่ตอบ 2xx', async () => {
   const ref = seedOrder('XFR-AMT2', 250);
   const p = completion(ref, 'cs_1', 25000, 'usd');
   const r = await deliver(p, sign(p));
-  assert.strictEqual(r.status, 400);
-  assert.match(String(r.body.error), /currency/i);
+  assert.strictEqual(r.status, 200);
+  assertNotApplied(r.body, 'currency_mismatch', 'สกุลเงินผิด');
   assert.strictEqual(orders.get(ref)!.status, 'PENDING');
 });
 
@@ -176,11 +178,12 @@ test('ยอดตรงกัน → order ต้องถูกยืนยั
   assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
 });
 
-test('ไม่พบ order จาก client_reference_id → ต้องปฏิเสธ ไม่ใช่สร้าง order ใหม่', async () => {
+test('ไม่พบ order จาก client_reference_id → 2xx + applied:false ไม่ใช่สร้าง order ใหม่', async () => {
   const p = completion('XFR-NOPE', 'cs_1', 25000);
   const r = await deliver(p, sign(p));
-  assert.strictEqual(r.status, 404);
-  assert.strictEqual(orders.size, 0);
+  assert.strictEqual(r.status, 200, 'order ต้องมีอยู่ก่อนชำระเงินเสมอ → ไม่มีทางสำเร็จในการส่งครั้งหลัง');
+  assertNotApplied(r.body, 'order_not_found', 'ไม่มี order');
+  assert.strictEqual(orders.size, 0, 'ห้ามสร้าง order ใหม่');
 });
 
 // ── 3) กันส่งซ้ำ ─────────────────────────────────────────────────────────────
@@ -241,4 +244,119 @@ test('E2E: สร้าง session ผ่าน endpoint แล้วส่ง c
   assert.strictEqual(r.body.sessionId, session.sessionId);
   assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
   assert.strictEqual(orders.get(ref)!.txid, session.sessionId, 'ต้องเก็บ cs_… ไว้ใน txid');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 5) สัญญาการตอบกลับของ webhook: applied / not-applied / rejected
+//
+// หัวใจอยู่ที่คำถามข้อเดียว: "ถ้าส่งซ้ำอีกครั้ง คำตอบจะเปลี่ยนไหม?"
+//   · เปลี่ยนไม่ได้ (ยอดไม่ตรง/สกุลเงินผิด/ไม่มี order) → ตอบ 2xx เพื่อหยุด retry
+//     แต่ body ต้องบอกว่า "ไม่ได้จ่าย" แบบอ่านไม่ผิด และต้อง log เสียงดัง
+//   · เปลี่ยนได้ (ลายเซ็นผิด/secret ไม่ได้ตั้ง) → ตอบ non-2xx ให้ Stripe ส่งต่อ
+//     เพราะการตอบ 2xx ตอนนี้ = บอก Stripe ว่า "ไม่ต้องส่งอีก" = เงินที่จ่ายจริงหายเงียบ
+// ────────────────────────────────────────────────────────────────────────────
+
+/** ตอบกลับทุกแบบที่ "ไม่ได้จ่าย" ต้องมีรูปร่างนี้เหมือนกันหมด */
+function assertNotApplied(body: any, reason: string, label: string) {
+  assert.strictEqual(body.applied, false, `${label}: ต้องบอกว่าไม่ได้จ่าย`);
+  assert.strictEqual(body.reason, reason, `${label}: ต้องระบุเหตุผลแบบ machine-readable`);
+  assert.strictEqual(body.success, false, `${label}: ห้ามเขียนว่าสำเร็จ`);
+  // กันเผลอให้ค่าที่คนอ่านอาจเข้าใจว่าจ่ายสำเร็จ
+  assert.notStrictEqual(body.status, 'VERIFIED', `${label}: ห้ามตอบว่า VERIFIED`);
+}
+
+test('ไม่มี client_reference_id → 2xx + applied:false (ไม่ใช่ 4xx)', async () => {
+  const p = completion('   ', 'cs_1', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assertNotApplied(r.body, 'missing_client_reference_id', 'ไม่มี client_reference_id');
+});
+
+test('order ถูกยกเลิก → 2xx + applied:false (ห้ามยืนยันย้อนหลัง)', async () => {
+  const ref = seedOrder('XFR-CON1', 250, 'CANCELLED');
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, false, 'รอบนี้ไม่ได้จ่าย');
+  assert.strictEqual(orders.get(ref)!.status, 'CANCELLED');
+});
+
+test('event type ที่ไม่ใช่ของเรา → 2xx + applied:false + ignored (เดิมเป็นแบบนี้แล้ว)', async () => {
+  const p = JSON.stringify({ type: 'payment_intent.succeeded', data: { object: {} } });
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, false);
+  assert.strictEqual(r.body.reason, 'unsupported_event_type');
+});
+
+test('ส่งซ้ำทั้งที่ order VERIFIED แล้ว → ยืนยันว่าจ่ายแล้ว แต่รอบนี้ไม่ได้เขียนซ้ำ', async () => {
+  const ref = seedOrder('XFR-CON2', 250, 'VERIFIED');
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, false, 'รอบนี้ไม่ได้เขียน');
+  assert.strictEqual(r.body.alreadyApplied, true);
+  // กรณีนี้ "จ่ายจริงแล้ว" จึงไม่ใช่เรื่องผิด — ต่างจาก order ที่ไม่มีเลย
+  assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
+});
+
+test('ขอบเขตที่สำคัญที่สุด: ลายเซ็นผิด → ต้อง non-2xx (ห้ามตอบ 2xx)', async () => {
+  // เหตุผลที่ต่างจากข้างบน: ผิด secret อาจเป็นเรื่องชั่วคราว (หมุน secret /
+  // deploy ที่ค่าไม่ครบ) ถ้าตอบ 2xx เราจะสั่ง Stripe ว่าเลิกส่ง แล้วเงินที่จ่ายจริง
+  // จะหายไปเงียบ ๆ โดยไม่มีอะไรมาช่วยกู้ — นี่แย่กว่า retry ดัง ๆ มาก
+  const ref = seedOrder('XFR-SIG2', 250);
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliver(p, sign(p, 'whsec_wrong_secret'));
+  assert.ok(r.status >= 400, `ลายเซ็นผิดต้องไม่ใช่ 2xx (ได้ ${r.status})`);
+  assert.strictEqual(r.body.rejected, true);
+  assert.strictEqual(orders.get(ref)!.status, 'PENDING', 'ห้ามแตะ order');
+});
+
+test('ไม่มี stripe-signature เลย → non-2xx + rejected', async () => {
+  const ref = seedOrder('XFR-SIG3', 250);
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliver(p);
+  assert.ok(r.status >= 400);
+  assert.strictEqual(r.body.rejected, true);
+  assert.strictEqual(orders.get(ref)!.status, 'PENDING');
+});
+
+test('body ไม่ใช่ JSON (แต่ลายเซ็นผ่าน) → non-2xx + rejected', async () => {
+  const r = await deliver('{not json', sign('{not json'));
+  assert.ok(r.status >= 400);
+  assert.strictEqual(r.body.rejected, true);
+});
+
+test('ยอดไม่ตรงต้อง log เสียงดัง ไม่ใช่หายไปเงียบ ๆ ใน 200', async () => {
+  const ref = seedOrder('XFR-LOG1', 250);
+  const p = completion(ref, 'cs_1', 1);
+  const seen: string[] = [];
+  const real = console.error;
+  console.error = (...a: any[]) => { seen.push(a.map(String).join(' ')); };
+  try { await deliver(p, sign(p)); } finally { console.error = real; }
+  assert.ok(seen.length > 0, 'ไม่ match ก็ต้องมีอะไรบางอย่างบอกว่าเกิด mismatch');
+  assert.match(seen.join('\n'), /ref/i, 'log ต้องมี ref_code เพื่อไปหา order มาแก้');
+  assert.match(seen.join('\n'), /25000/, 'log ต้องมีตัวเลขยอดที่คาดไว้กับที่ได้จริง');
+});
+
+test('ไม่มี order → ต้อง log เสียงดังด้วย (ไม่ใช่แค่เงียบตอบ 200)', async () => {
+  const seen: string[] = [];
+  const real = console.error;
+  console.error = (...a: any[]) => { seen.push(a.map(String).join(' ')); };
+  const p = completion('XFR-GHOST', 'cs_1', 25000);
+  try { await deliver(p, sign(p)); } finally { console.error = real; }
+  assert.ok(seen.some((s) => /XFR-GHOST/.test(s)), 'ref ที่ไม่มี order ต้องถูก log');
+});
+
+test('เส้นปกติต้องไม่เปลี่ยน: 200 + applied:true + order VERIFIED', async () => {
+  const ref = seedOrder('XFR-OK1', 250);
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliver(p, sign(p));
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, true);
+  assert.strictEqual(r.body.success, true);
+  assert.strictEqual(r.body.status, 'VERIFIED');
+  assert.strictEqual(r.body.sessionId, 'cs_1');
+  assert.strictEqual(r.body.refCode, ref);
+  assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
 });
