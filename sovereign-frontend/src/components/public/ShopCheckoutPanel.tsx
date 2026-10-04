@@ -154,7 +154,10 @@ export default function ShopCheckoutPanel({ businessId, packages, customerName, 
                     onClick={() => buy(p)}
                     disabled={busy}
                     aria-busy={submitting}
-                    aria-label={`ซื้อแพ็กเกจ ${p.name}`}
+                    // aria-label ทับข้อความบนปุ่มเสมอ → ต้องเปลี่ยนตามสถานะด้วย
+                    // ไม่งั้นคนใช้ screen reader จะได้ยังไงว่า "กำลังเปิดหน้าชำระ"
+                    // ทั้งที่คนที่มองเห็นเห็นข้อความนั้นแล้ว
+                    aria-label={submitting ? `กำลังเปิดหน้าชำระ ${p.name}` : `ซื้อแพ็กเกจ ${p.name}`}
                     className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium shadow shadow-cyan-950/40 disabled:opacity-40"
                   >
                     {submitting ? 'กำลังเปิดหน้าชำระ…' : 'ชำระผ่านบัตร'}
