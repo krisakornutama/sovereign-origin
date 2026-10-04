@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import express, { type Express } from 'express';
 import type { Server } from 'node:http';
 import { createPaymentsRouter } from '../src/modules/payments/payments.routes';
+import { applyStorefrontOrderCompletion } from '../src/services/payment-apply.service';
 import { createFakeStripeTransport } from '../src/services/stripe-checkout';
 import { makeToken } from './helpers';
 
@@ -35,6 +36,8 @@ let storefrontApplied = 0;
 let updateManyCalls = 0;
 // แถวที่ถูกเขียนลง business_payments — ใช้พิสูจน์ว่า "จ่ายครั้งเดียว = แถวเดียว"
 const payments: any[] = [];
+// ให้เทสต์สั่งให้ insert แถวเงินล้มได้ (null = ปกติ) — ใช้พิสูจน์ atomicity
+let paymentInsertError: Error | null = null;
 // นับเฉพาะครั้งที่ "เขียนจริง" (count===1) — ไม่ใช่จำนวนครั้งที่เรียก
 // เพราะการเรียก updateMany ซ้ำเป็นเรื่องปกติของ conditional update (แบบ claimPending)
 // สิ่งที่ต้องพิสูจน์คือ "ใช้ได้ผลจริงครั้งเดียว" ไม่ใช่ "เรียกครั้งเดียว"
@@ -71,12 +74,34 @@ const prisma: any = {
   },
   businessPayment: {
     create: async ({ data }: any) => {
+      if (paymentInsertError) throw paymentInsertError;
       payments.push({ ...data });
       return { id: `pay_${payments.length}`, ...data };
     },
   },
-  // prisma จริงมี $transaction — จำลองเป็นเรียกตรง ๆ (จุดเดียวที่ต้อง atomic คือ CAS + บันทึกเงิน)
-  $transaction: async (fn: any) => fn(prisma),
+  // prisma จริงมี $transaction: ถ้า callback พัง ต้องไม่มีอะไรจากข้างในหลงเหลือ
+  //
+  // เดิมจำลองเป็น `fn(prisma)` ตรง ๆ ซึ่ง "ย้อนกลับไม่ได้" = ทุกอย่างที่เขียนก่อนหน้า
+  // โยกออกไปหมดถึงจะยัง "ผ่าน" ทั้งที่ของจริงมันถูก rollback หาย → เทสต์ที่จับ
+  // atomicity ได้จึงเป็นไปได้แค่ตอนนี้
+  //
+  // ทำเป็นแบบนี้ในไฟล์เดียว ไม่ต้องไปแตะที่อื่น: จุดที่ต้อง atomic คือ CAS หน้าร้าน
+  // บวกแถวเงิน ซึ่งอยู่ในชุดเทสต์นี้แหละ ส่วน orders (TransferOrder) ไม่ได้อยู่ใน
+  // transaction ใด ๆ จึงไม่ต้องกู้
+  $transaction: async (fn: any) => {
+    const snapshot = [...storefront.entries()].map(([k, v]) => [k, { ...v }] as const);
+    const paymentsBefore = payments.length;
+    const appliedBefore = storefrontApplied;
+    try {
+      return await fn(prisma);
+    } catch (err) {
+      storefront.clear();
+      for (const [k, v] of snapshot) storefront.set(k, v);
+      payments.length = paymentsBefore;
+      storefrontApplied = appliedBefore;
+      throw err;
+    }
+  },
 };
 
 let server: Server;
@@ -96,7 +121,7 @@ before(async () => {
 });
 after(async () => { await new Promise<void>((r) => server.close(() => r())); });
 
-beforeEach(() => { orders.clear(); storefront.clear(); payments.length = 0; updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; });
+beforeEach(() => { orders.clear(); storefront.clear(); payments.length = 0; updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; paymentInsertError = null; });
 
 // ── ช่วยสร้างลายเซ็นแบบ Stripe ──────────────────────────────────────────────
 function sign(payload: string, secret = WEBHOOK_SECRET, ts = Math.floor(Date.now() / 1000)): string {
@@ -517,4 +542,40 @@ test('TransferOrder: verified_by ต้องเป็น uuid หรือ null
     v === null || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v)),
     `verified_by ต้องเป็น uuid หรือ null แต่ได้ ${JSON.stringify(v)} — คอลัมน์เป็น @db.Uuid (schema.prisma:375)`,
   );
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 7) atomicity: เขียน order ได้ แต่เขียนแถวเงินไม่ได้ = ต้องไม่มีอะไรเหลือ
+//
+// ทำไมต้องมี: การตี PAID กับการลงแถวเงินเป็นเรื่องเดียวกัน ($transaction)
+// ถ้าวันหนึ่งมีคนย้าย businessPayment.create ออกมานอก transaction แล้ว
+// ออเดอร์จะเป็น PAID ทั้งที่ไม่มีเงินเข้าสมุด — ลูกค้าเห็น "จ่ายแล้ว" ทั้งที่เงินไม่มี
+//
+// ทำไมเรียก service ตรง ๆ ไม่ยิงผ่าน HTTP: express 4 ไม่ส่ง error ออกจาก async
+// handler เมื่อ handler โยน → request ค้างไม่ตอบ (พิสูจน์แล้วกับของจริง) เทสต์จะค้างตาม
+// แต่สิ่งที่ต้องพิสูจน์คือ "สองการเขียนอยู่ใน transaction เดียวกัน" ซึ่งคือตัว service
+// ────────────────────────────────────────────────────────────────────────────
+
+test('หน้าร้าน: เขียนแถวเงินไม่สำเร็จ → order ต้องไม่ค้างเป็น PAID และไม่มีแถวเงินค้าง', async () => {
+  const tok = seedStorefront('tok-atomic', 900, 'ORDERED');
+  const decision = {
+    kind: 'apply' as const,
+    publicToken: tok,
+    orderId: `bo_${tok}`,
+    sessionId: 'cs_atomic',
+    expectedSatang: 90000,
+  };
+
+  paymentInsertError = new Error('businessPayment insert ล้ม (จำลองเหมือนของจริงที่ฐานข้อมูลล่ม)');
+  await assert.rejects(
+    () => applyStorefrontOrderCompletion(prisma, decision),
+    /businessPayment insert/,
+    'ต้องโยน error ออกมา (Stripe จะได้ retry ไม่ใช่เงินหายเงียบ)',
+  );
+  paymentInsertError = null;
+
+  const row = storefront.get(tok)!;
+  assert.strictEqual(row.status, 'ORDERED', 'order ต้องถูกย้อนกลับ ไม่ใช่ค้างเป็น PAID ทั้งที่ไม่มีเงิน');
+  assert.strictEqual(row.paidAmount, 0, 'paidAmount ต้องไม่ถูกเขียนติดไปด้วย');
+  assert.strictEqual(payments.length, 0, 'ไม่มีแถวเงินค้าง');
 });
