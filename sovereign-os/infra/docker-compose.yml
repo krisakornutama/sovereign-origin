@@ -69,6 +69,10 @@ services:
       MQTT_HOST: emqx
       MQTT_PORT: 1883
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
+      # Stripe webhook signing secret (whsec_…) — ค่านี้ทำให้ webhook ตรวจลายเซ็นได้จริง
+      # ว่าง = ปลอดภัยแต่ปฏิเสธทุก delivery (401 "webhook signing secret is not configured")
+      # ค่าอยู่ใน infra/.env (ไม่ track ใน git) — อย่าฝังลงไฟล์นี้
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-2m}
       TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}

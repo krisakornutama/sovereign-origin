@@ -101,6 +101,13 @@ tools/*
 !tools/hidden-tasks/
 !tools/build-desktop.mjs
 !tools/verify.mjs
+# เครื่องมือพิสูจน์ว่า STRIPE_WEBHOOK_SECRET หมุนแล้วมีผลจริง (อ้างถึงใน docs/ops-runbook.md
+# และ package.json scripts.check:stripe-secret — ถ้าไม่ track ไว้ clone ใหม่จะเรียกไม่ได้)
+!tools/check-stripe-secret.mjs
+# ตรวจว่าค่าลับตัวอื่นหลุดแบบเดียวกันไหม + ไลน์ที่ parse โครงสร้างไฟล์ .env/compose
+# (tools/test/env-secret-ownership.test.mjs เรียกไฟล์นี้ — ถ้าไม่ track จะ import ไม่ได้)
+!tools/env-secret-ownership.mjs
+!tools/audit-env-secrets.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
 !tools/indexnow-shop-notify.mjs

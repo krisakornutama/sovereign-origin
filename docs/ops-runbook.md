@@ -341,7 +341,13 @@ npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่�
 
 **ด่าน 2 — API ที่รันอยู่ไม่มีโมดูล payments (แยกจากบั๊กโค้ด):** container `sovereign-core-api` mount `src` จากโฟลเดอร์ MAIN และรัน `npx prisma generate && npm run build && npm start` ทุกครั้งที่บูต ⇒ **`docker restart sovereign-core-api` = deploy จริง ไม่ต้อง rebuild image** · 4/10/69 container ยังเป็น build 1/10 13:31 แต่โมดูล payments เกิด 4/10 11:52 → `/api/payments/*` ตอบ **404** · หลัง restart (healthy ที่ t+40s) ตอบ **401** ⇒ ถ้าเจอ payments 404 อีก **ให้ restart container ก่อนไปสงสัยโค้ด** · ลำดับที่ถูก: `npx prisma generate && npm run build` ใน MAIN ให้ผ่านก่อน แล้วค่อย restart (ถ้า build ล้มในคอนเทนเนอร์ `npm start` ไม่รัน = API ล่มทั้งตัว)
 
-**ด่าน 3 — ไม่มี `STRIPE_WEBHOOK_SECRET`:** ยังไม่ตั้ง ⇒ ทุก delivery ถูกปฏิเสธ (โดยเจตนา) · ต้องสร้าง endpoint ใน **Workbench → Webhooks** และคัด `whsec_…` มาใส่ `.env` (เฉพาะค่านี้ · ห้ามส่ง `sk_`/`rk_`/เลขบัญชีในแชท) · สัญญาที่พิสูจน์แล้ว: secret ไม่ตั้ง/ลายเซ็นไม่ผ่าน → **401** + `rejected:true` (ไม่ใช่ 400) ส่วน **400** ใช้เฉพาะ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่าน — เทสต์ที่คุมสัญญานี้คือ [`tests/paymentsFreshClone.test.ts`](../sovereign-os/core-api/tests/paymentsFreshClone.test.ts) (assert ข้อความ `webhook signing secret is not configured`) · ตอบ non-2xx ไว้ถูกแล้ว ห้ามเปลี่ยนเป็น 2xx: secret อาจเพิ่งหมุน แล้ว Stripe จะส่งซ้ำให้
+**ด่าน 3 — ไม่มี `STRIPE_WEBHOOK_SECRET`:** ยังไม่ตั้ง ⇒ ทุก delivery ถูกปฏิเสธ (โดยเจตนา) · ต้องสร้าง endpoint ใน **Workbench → Webhooks** และคัด `whsec_…` มาใส่ **`sovereign-os/infra/.env`** (เฉพาะค่านี้ · ห้ามส่ง `sk_`/`rk_`/เลขบัญชีในแชท)
+
+> ⚠️ **ห้ามใส่ผิดไฟล์ — ไฟล์นี้คือจุดที่ทำให้เงินหายเงียบในรอบ 4/10/69**
+> ค่านี้มีผลกับ container **เฉพาะเมื่ออยู่ใน `sovereign-os/infra/.env`** เพราะ docker-compose อ่านไฟล์นั้นแล้วส่งเข้า container
+> ส่วน `sovereign-os/core-api/.env` **ไม่มีผลกับ container เลย** (ใช้ได้เฉพาะตอนรันบน host · เพราะ `.dockerignore` ตัด `.env` ออกจาก image และไม่มี mount)
+> ใส่ผิดไฟล์ = หน้าเว็บปกติ แต่ webhook ปฏิเสธทุก delivery (401) แบบไม่มีอะไรเตือน
+> **ตรวจว่ามีผลจริงหรือยัง:** `npm run check:stripe-secret` (ดูหัวข้อ "หมุน secret อย่างไรให้มีผลจริง" ข้างล่าง) · สัญญาที่พิสูจน์แล้ว: secret ไม่ตั้ง/ลายเซ็นไม่ผ่าน → **401** + `rejected:true` (ไม่ใช่ 400) ส่วน **400** ใช้เฉพาะ body ที่ไม่ใช่ JSON หลังลายเซ็นผ่าน — เทสต์ที่คุมสัญญานี้คือ [`tests/paymentsFreshClone.test.ts`](../sovereign-os/core-api/tests/paymentsFreshClone.test.ts) (assert ข้อความ `webhook signing secret is not configured`) · ตอบ non-2xx ไว้ถูกแล้ว ห้ามเปลี่ยนเป็น 2xx: secret อาจเพิ่งหมุน แล้ว Stripe จะส่งซ้ำให้
 
 **ด่าน 4 — WAF default-deny ยังไม่รู้จัก path ของ webhook:** rule "Public-only: block admin/internal paths" (ข้อ 6 ด้านบน) อนุญาตเฉพาะ path ที่อยู่ใน allowlist ซึ่ง **ยังไม่มี `/api/payments/*`** ⇒ เมื่อโดเมนกลับมา Stripe จะได้ **403 ที่ edge** ต้องเติม **บวกอย่างเดียว** ต่อท้ายในวงเล็บ allowlist (ครอบทั้งมี/ไม่มี `/` ปิดท้ายด้วย `starts_with`):
 ```
@@ -350,6 +356,44 @@ or starts_with(http.request.uri.path, "/api/payments/webhook")
 เกณฑ์ตรวจ: `curl -s -o /dev/null -w '%{http_code}' -X POST https://sovereignoriginshop.dpdns.org/api/payments/webhook/` → ต้องได้ **401** (ไม่ใช่ 403) — ถ้าได้ 403 = ยังไม่ขึ้น rule
 
 **⚠️ URL ของ endpoint ต้องมี `/` ปิดท้ายเสมอ:** `next.config.js` ตั้ง `trailingSlash: true` ⇒ `POST /api/payments/webhook` ผ่านประตู `:3000` ตอบ **308** แล้ว redirect ไป `/api/payments/webhook/` · **Stripe ไม่ตาม redirect ของ delivery** (นับเป็น fail) — วัดจริง 4/10/69: `no_slash=308`, `with_slash=401` (ที่ :3001 ตรง ๆ ตอบ 401 ทั้งสองรูปแบบเพราะ Express ไม่ strict routing แต่ Stripe วิ่งผ่าน :3000 เท่านั้น) ⇒ ใช้ `https://sovereignoriginshop.dpdns.org/api/payments/webhook/`
+
+**เงินจ่ายแล้วแต่ระบบไม่บันทึก (เงินหายเงียบ) → ดูที่ไหน:**
+`sovereign-os/core-api/data/payments-rejected-deliveries.jsonl` (ใน container: `/app/data/`) · หนึ่งบรรทัด = ลูกค้าจ่ายจริง 1 รายการที่ระบบปฏิเสธถาวร เพราะ **สกุลเงินไม่ตรง / ยอดไม่ตรง / ยอดของ order ใช้ไม่ได้** — กรณีนี้ webhook ตอบ 200 ตามที่ถูก (retry ซ้ำไม่ช่วย เพราะส่งชุดเดิมก็ยังไม่ตรง) แต่ Stripe จะ**เลิกส่ง event นั้นถาวร** ไฟล์นี้คือร่องรอยเดียวที่เหลือ · อ่านค่าที่ได้: `eventId` (ไปเปิดหน้า Stripe ที่ event นี้) · `refCode` (ไปแก้ order) · `receivedAmountSatang`/`expectedAmountSatang` (ยอดที่ได้จริงเทียบที่คาดไว้) · `orderAmountRaw` (ยอดดิบของ order ที่ใช้ไม่ได้) · แล้วสั่ง Stripe ยิงใหม่หรือจ่าย/คืนด้วยมือ · **ไม่มีอีเมล/ชื่อ/เลขบัตรลูกค้าในไฟล์** (เก็บเท่าที่จำเป็นต่อการตามเงิน) · ทดสอบว่าไฟล์ยังถูกเขียน: `docker exec sovereign-core-api wc -l /app/data/payments-rejected-deliveries.jsonl` · รายละเอียดเชิงเทคนิค: [`docs/modules/payments.md`](modules/payments.md)
+
+**หมุน secret อย่างไรให้มีผลจริง (หมุนบ่อย — ทำตามนี้ทุกครั้ง):**
+
+1. เปิด **Workbench → Webhooks** คัด `whsec_…` ใหม่ (ห้ามส่งค่านี้ในแชท/ส่งอีเมล)
+2. เขียนค่าใหม่ลง **`sovereign-os/infra/.env`** เป็นบรรทัด `STRIPE_WEBHOOK_SECRET=…` (ไฟล์เดียวนี้คือเจ้าของค่า)
+3. **recreate** (ไม่ใช่ restart): `cd sovereign-os/infra && docker compose up -d --no-deps core-api`
+   — ค่าใน `environment:` ถูกอ่านตอน**สร้าง** container ถ้าแค่ `docker restart` ค่าเก่ายังอยู่ (นี่คือเหตุผลว่าการหมุนแล้ว "ดูเหมือนไม่มีผล")
+4. **พิสูจน์** — อย่าเดา ให้รันคำสั่งนี้:
+   ```
+   npm run check:stripe-secret
+   ```
+   ผ่าน = ค่าที่ container ใช้อยู่ **ตรงกับไฟล์เจ้าของจริง** พิมพ์ fingerprint (12 ตัวถัด) ของทั้งสองฝั่งเทียบกัน
+   ไม่ตรง = หมุนแล้วยังไม่มีผล พร้อมบอกคำสั่งแก้ให้ในผลลัพธ์
+
+**หลักฐานว่ามีผลจริงดูจากตรงไหน:** ตอน container บูต จะพิมพ์ใน `docker logs sovereign-core-api` ว่า
+`✅ STRIPE_WEBHOOK_SECRET ตรงกับ sovereign-os/infra/.env (fingerprint xxxxxxxxxxxx)`
+→ **หมุนแล้วต้องเห็น fingerprint เปลี่ยน** ถ้าไม่เปลี่ยน = ยังใช้ค่าเก่า ยังไม่มีผลจริง
+(ถ้าไม่ตรงจะพิมพ์คำเตือนสีแดงพร้อมคำสั่งแก้ทันทีที่บูต ไม่ต้องรอลูกค้าจ่ายเงินจริงถึงจะรู้)
+
+**ทำไมต้องมี fingerprint:** มันพิสูจน์ว่า "หมุนแล้ว" มีผลจริงโดย**ไม่ต้องเปิดเผยค่า** — เป็น hash 12 ตัว ทำให้ได้ตัวเลขที่เทียบกันได้ (เก่า/ใหม่) แต่เอาไปเซ็นอะไรไม่ได้
+
+**ค่าลับตัวอื่นหลุดแบบเดียวกันไหม (ตรวจได้เอง):**
+```
+npm run audit:env-secrets
+```
+พิมพ์รายชื่อคีย์ที่**เขียนไว้แต่ไม่มีผลกับ container** — คำสั่งนี้**รายงานเท่านั้น ไม่ลบ ไม่ย้าย** (ค่าลับต้องให้คนดูแลตัดสินใจเอง)
+
+**ผลที่ตรวจได้ตอนนี้ (5/10/69):** `STRIPE_SECRET_KEY` และ `STRIPE_PUBLISHABLE_KEY` อยู่ใน `core-api/.env` แต่**ไม่ถึง container เลย** ⇒ ถ้าวันหนึ่งตั้ง key จริงใส่ไฟล์นั้น ระบบก็ยังเป็นโหมดปลอมอยู่ (ยิง Stripe จริงไม่ได้) — ต้องย้ายไป `sovereign-os/infra/.env` **และ**เพิ่มบรรทัดส่งค่าใน `docker-compose.yml` ก่อน · นี่คือด่านถัดไปก่อนเปิดขายจริง
+
+**ช่องของค่าในไฟล์ตัวอย่าง (`.env.example`):** ช่องของ `STRIPE_WEBHOOK_SECRET` อยู่ที่**`sovereign-os/infra/.env.example`** (ไฟล์เจ้าของ) เท่านั้น · `sovereign-os/core-api/.env.example` จงใจไม่มีช่องนี้ เพราะไฟล์นั้นไม่มีผลกับ container · มีเทสต์คุมไว้ที่ `tools/test/env-secret-ownership.test.mjs` ⇒ ถ้าวันหนึ่งมีใครย้ายช่องกลับไปผิดไฟล์ รอบ verify จะแดงทันที ไม่ต้องรอลูกค้าจ่ายเงินจริงถึงจะรู้
+
+**ไล่เงินหายอัตโนมัติ (ทุก 30 นาที):** worker `stripe-reconcile` ดึงรายการที่ Stripe บอกว่า "จ่ายแล้ว" มาเทียบกับที่ระบบบันทึก · ดูผลที่ `docker logs sovereign-core-api | grep stripe-reconcile`
+
+- ตอนยังไม่มี `STRIPE_SECRET_KEY` หรือยังไม่เปิด `STRIPE_LIVE_ENABLED` จะพิมพ์ `⚠️ [stripe-reconcile] ข้ามรอบนี้: …` **ทุกรอบ** — นี่คือตั้งใจ ไม่ใช่บั๊ก: งานที่จับเงินหายห้ามเงียบตอนปิด ไม่งั้นกลับไปอยู่ในสถานะเดิมโดยไม่มีใครรู้
+- ถ้าขึ้น `⚠️ พบช่องว่าง N รายการ` = **เงินจริงอยู่คนละฝั่งกับที่ระบบบันทึก** ต้องให้คนตรวจและแก้ด้วยมือ (ระบบไม่แก้ทับให้ เพราะการแก้ทับเงินอัตโนมัติคืออีกช่องที่ทำให้เงินหาย)
 
 **ลำดับที่ถูกก่อนเปิดรับเงิน (ห้ามสลับ):** ตั้ง NS กลับ → เติม WAF allowlist → สร้าง endpoint + เอา `whsec` ใส่ `.env` → ตั้งเบอร์ `shopPromptPay` ของร้านให้ตรงบัญชีรับเงิน → **สุดท้าย**ค่อยเปิด `STRIPE_LIVE_ENABLED=true` แล้วซื้อทดสอบ 1 บาท · **ห้ามเปิด live ก่อนมี `whsec`**: เงินเข้าจริงแต่ออเดอร์ไม่ถูกบันทึก และ Stripe จะ retry ไม่จบ
 

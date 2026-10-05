@@ -14,6 +14,8 @@
     "health": "node tools/system-health.mjs",
     "clean:logs": "node tools/clean-logs.mjs",
     "preview:stack": "node tools/preview-stack.mjs",
-    "preview:check": "node tools/preview-stack.mjs --check"
+    "preview:check": "node tools/preview-stack.mjs --check",
+    "check:stripe-secret": "node tools/check-stripe-secret.mjs",
+    "audit:env-secrets": "node tools/audit-env-secrets.mjs"
   }
 }

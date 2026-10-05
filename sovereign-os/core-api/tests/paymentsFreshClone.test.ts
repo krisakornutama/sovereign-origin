@@ -64,13 +64,15 @@ async function deliver(payload: string, header?: string) {
   return { status: res.status, body: await res.json().catch(() => ({})) as any };
 }
 
-before(async () => { await boot(undefined); });
+before(async () => { await boot(''); });
 after(async () => { if (server) await new Promise<void>((r) => server.close(() => r())); });
 
 // ── fresh clone: ไม่มี secret เลย ────────────────────────────────────────────
 
 test('ไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET เลย → webhook ต้องปฏิเสธ ไม่ใช่รับเงียบ ๆ', async () => {
-  await boot(undefined);
+  // ส่ง '' (ไม่ใช่ undefined) = บังคับสถานะ "ไม่ได้ตั้ง" ให้แน่นอน
+  // undefined จะไหลไปอ่าน .env ของเครื่องผู้รัน → เทสต์นี้ผูกกับเครื่อง
+  await boot('');
   orders.set('XFR-FRESH1', { ref_code: 'XFR-FRESH1', status: 'PENDING', amount_thb: 250 });
   const p = completion('XFR-FRESH1', 25000);
 
@@ -84,7 +86,7 @@ test('ไม่ได้ตั้ง STRIPE_WEBHOOK_SECRET เลย → webhook
 });
 
 test('ข้อความต้องบอกชัดว่าขาดอะไร ไม่ใช่ error กำกวม', async () => {
-  await boot(undefined);
+  await boot('');
   const r = await deliver(completion('XFR-FRESH1', 25000), 't=1,v1=deadbeef');
   assert.ok(r.status >= 400);
   assert.strictEqual(String(r.body.error), 'webhook signing secret is not configured');

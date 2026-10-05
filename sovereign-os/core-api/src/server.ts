@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fs from 'fs';
 import { config } from './config';
+import { reportWebhookSecretProvenance } from './services/webhook-secret-source.runtime';
 import { auditStateChange } from './middleware/auth.middleware';
 import { mountRoutes } from './routes';
 import { createSocketServer } from './realtime/socket';
@@ -83,6 +84,16 @@ function startListener() {
 
 startListener();
 console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
+
+// ── เจ้าของ STRIPE_WEBHOOK_SECRET: ยืนยันตอนบูตว่าค่าที่รันอยู่ตรงกับไฟล์เจ้าของ ──
+//
+// ทำตอนบูต (ไม่ใช่ตอนมี webhook มา) เพราะจุดที่เงินหายคือ "คนหมุน secret แล้ว
+// แต่ค่าไม่ถึง container" ซึ่งไม่มีอะไรเตือนเลยจนกว่าจะมีลูกค้าจ่ายเงินจริง
+//
+// เทียบกับไฟล์เจ้าของที่ mount เข้ามา (/app/host-infra.env = infra/.env) เพราะ
+// นี่คือหลักฐานเดียวที่พิสูจน์ว่า "ค่าที่รันอยู่" ตรงกับ "ค่าที่เจ้าของเพิ่งแก้"
+// ถ้าไม่ตรง = หมุนแล้วไม่มีผลจริง → เตือนทันทีพร้อมบอกคำสั่งแก้
+void reportWebhookSecretProvenance();
 
 // ── Reliability: กัน request เดียวพังทั้งระบบ ──
 // 1) error middleware — 500 ที่อ่านง่ายแทน crash

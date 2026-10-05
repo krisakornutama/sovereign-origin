@@ -38,6 +38,12 @@ let updateManyCalls = 0;
 const payments: any[] = [];
 // ให้เทสต์สั่งให้ insert แถวเงินล้มได้ (null = ปกติ) — ใช้พิสูจน์ atomicity
 let paymentInsertError: Error | null = null;
+// ให้เทสต์สั่งให้ค้นหาออเดอร์หน้าร้านล้ม — จำลอง Prisma P2023 ของจริง
+// (คอลัมน์ publicToken เป็น UUID: ค่าที่ไม่ใช่ UUID ทำให้ query ระเบิดก่อนได้คำตอบ)
+let storefrontLookupError: Error | null = null;
+// นับว่าไป query คอลัมน์ publicToken (UUID) กี่ครั้ง — ใช้พิสูจน์ว่า
+// ค่าผิดรูปแบบต้องถูกกรองทิ้งก่อน ไม่ใช่ยิงให้ DB ระเบิด
+let storefrontLookupCalls = 0;
 // นับเฉพาะครั้งที่ "เขียนจริง" (count===1) — ไม่ใช่จำนวนครั้งที่เรียก
 // เพราะการเรียก updateMany ซ้ำเป็นเรื่องปกติของ conditional update (แบบ claimPending)
 // สิ่งที่ต้องพิสูจน์คือ "ใช้ได้ผลจริงครั้งเดียว" ไม่ใช่ "เรียกครั้งเดียว"
@@ -57,7 +63,11 @@ const prisma: any = {
     },
   },
   businessOrder: {
-    findFirst: async ({ where }: any) => storefront.get(where?.publicToken) ?? null,
+    findFirst: async ({ where }: any) => {
+      storefrontLookupCalls += 1;
+      if (storefrontLookupError) throw storefrontLookupError;
+      return storefront.get(where?.publicToken) ?? null;
+    },
     updateMany: async ({ where, data }: any) => {
       const row = storefront.get(where?.publicToken);
       if (!row) return { count: 0 };
@@ -121,7 +131,7 @@ before(async () => {
 });
 after(async () => { await new Promise<void>((r) => server.close(() => r())); });
 
-beforeEach(() => { orders.clear(); storefront.clear(); payments.length = 0; updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; paymentInsertError = null; });
+beforeEach(() => { orders.clear(); storefront.clear(); payments.length = 0; updateManyCalls = 0; appliedCount = 0; storefrontApplied = 0; paymentInsertError = null; storefrontLookupError = null; storefrontLookupCalls = 0; });
 
 // ── ช่วยสร้างลายเซ็นแบบ Stripe ──────────────────────────────────────────────
 function sign(payload: string, secret = WEBHOOK_SECRET, ts = Math.floor(Date.now() / 1000)): string {
@@ -142,6 +152,23 @@ async function deliver(payload: string, header?: string) {
   if (header !== undefined) headers['stripe-signature'] = header;
   const res = await fetch(`${baseUrl}${API}/webhook`, { method: 'POST', headers, body: payload });
   return { status: res.status, body: await res.json().catch(() => ({})) as any };
+}
+
+/**
+ * ส่งแบบ "มีเวลาจำกัด" — ถ้า handler หลุด unhandled แล้วไม่ตอบ
+ * ของจริงจะค้าง (Express 4 ไม่ส่ง error ออกจาก async handler) ซึ่งทำให้
+ * Stripe retry ไม่จบ ⇒ เทสต์นี้ต้อง fail เร็ว ไม่ใช่แขวน runner
+ */
+async function deliverWithTimeout(payload: string, header: string | undefined, ms = 3000) {
+  let timer: NodeJS.Timeout | undefined;
+  const guard = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`ไม่ได้ response ภายใน ${ms}ms — handler ค้าง`)), ms);
+  });
+  try {
+    return await Promise.race([deliver(payload, header), guard]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function seedOrder(refCode: string, amountThb: number, status = 'PENDING') {
@@ -239,10 +266,13 @@ test('ยอดตรงกัน → order ต้องถูกยืนยั
   assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
 });
 
-test('ไม่พบ order จาก client_reference_id → 2xx + applied:false ไม่ใช่สร้าง order ใหม่', async () => {
-  const p = completion('XFR-NOPE', 'cs_1', 25000);
+test('ไม่พบ order จาก client_reference_id → non-2xx ให้ Stripe ยิงซ้ำ + ไม่ใช่สร้าง order ใหม่', async () => {
+  const p = completion('3f2504e0-4f89-41d3-9a0c-0305e82c3302', 'cs_1', 25000);
   const r = await deliver(p, sign(p));
-  assert.strictEqual(r.status, 200, 'order ต้องมีอยู่ก่อนชำระเงินเสมอ → ไม่มีทางสำเร็จในการส่งครั้งหลัง');
+  // เปลี่ยนจาก 200 เป็น 409 โดยตั้งใจ: 200 ทำให้ Stripe เลิกส่ง ทั้งที่ออเดอร์
+  // อาจยังไม่ทันเขียน (แข่งขันเวลา) = เงินจริงหายเงียบโดยไม่มีใครรู้
+  assert.ok(r.status >= 400, `ต้อง non-2xx ให้ Stripe retry ได้ (ได้ ${r.status})`);
+  assert.strictEqual(r.body.retryable, true);
   assertNotApplied(r.body, 'order_not_found', 'ไม่มี order');
   assert.strictEqual(orders.size, 0, 'ห้ามสร้าง order ใหม่');
 });
@@ -350,6 +380,97 @@ test('event type ที่ไม่ใช่ของเรา → 2xx + applied
   assert.strictEqual(r.body.reason, 'unsupported_event_type');
 });
 
+// ── บั๊กที่ audit จับได้ด้วยการยิงจริง (4/10/69) ───────────────────────────────
+// ของจริง: refCode ที่ไม่ใช่ UUID → Prisma ตอบ P2023 → throw ออกจาก async
+// handler ที่ไม่มี try/catch → Express 4 ไม่ตอบอะไรเลย → Stripe timeout +
+// retry ไม่จบ ทั้งที่เงินเข้าจริงแล้ว (รูปแบบที่แย่ที่สุดของ "จ่ายแล้วระบบไม่รู้")
+test('ค้นหาออเดอร์หน้าร้านพัง (P2023) → ต้องตอบ non-2xx ให้ Stripe retry ได้ ไม่ใช่ค้าง', async () => {
+  const ref = '3f2504e0-4f89-41d3-9a0c-0305e82c3304'; // UUID ถูกรูป แต่ค้นหาแล้ว DB ระเบิด
+  const p = completion(ref, 'cs_1', 25000);
+  storefrontLookupError = Object.assign(
+    new Error('Invalid `db.businessOrder.findFirst()` invocation: Inconsistent column data: Error creating UUID, invalid character: found `N` at 1'),
+    { code: 'P2023' },
+  );
+
+  const r = await deliverWithTimeout(p, sign(p));
+
+  assert.ok(r.status >= 400, `ต้อง non-2xx ให้ Stripe retry ได้ (ได้ ${r.status})`);
+  assert.match(String(r.body.error), /order|lookup|ค้นหา|หาไม่|database|db/i,
+    'ต้องบอกว่าหาออเดอร์ไม่สำเร็จ ไม่ใช่ error กำกวม');
+  assert.strictEqual(payments.length, 0, 'ห้ามเขียนแถวเงินเมื่อหาออเดอร์ไม่ได้');
+  assert.strictEqual(appliedCount, 0, 'ห้ามแตะ order');
+  assert.strictEqual(storefrontApplied, 0, 'ห้ามแตะออเดอร์หน้าร้าน');
+});
+
+// ── ปิดรากเหตุ: กรองรูปแบบ refCode ก่อนไปแตะคอลัมน์ UUID ────────────────────
+// publicToken เป็น @db.Uuid ⇒ ค่าที่ไม่ใช่ UUID ทำให้ Prisma ตอบ P2023
+// ถ้าไม่กรอง เราจะถาม DB ด้วยค่าที่จับคู่ไม่ได้แน่นอน (ถาวร ไม่ใช่แข่งขันเวลา)
+
+test('(ก) refCode ผิดรูปแบบ (ไม่ใช่ UUID และไม่ใช่ ref ของ transfer) → non-2xx แบบจับคู่ไม่ได้ถาวร', async () => {
+  const p = completion('NOPE-999', 'cs_1', 25000);
+  const r = await deliverWithTimeout(p, sign(p));
+
+  assert.ok(r.status >= 400 && r.status < 500,
+    `ต้องเป็น 4xx (Stripe ไม่ควรเข้าใจว่าสำเร็จ) ได้ ${r.status}`);
+  assert.strictEqual(r.body.reason, 'invalid_refcode_format');
+  assert.strictEqual(r.body.retryable, false, 'จับคู่ไม่ได้ถาวร = retry ไม่มีทางสำเร็จ');
+  assert.match(String(r.body.error), /รูปแบบ|UUID|format/i, 'ต้องบอกว่าผิดรูปแบบ อ่านรู้เรื่อง');
+  assert.strictEqual(storefrontLookupCalls, 0, 'ห้ามไป query คอลัมน์ UUID ด้วยค่าที่ผิดรูปแบบ');
+  assert.strictEqual(payments.length, 0, 'ห้ามมีแถวเงิน');
+  assert.strictEqual(appliedCount, 0, 'ห้ามแตะ order');
+  assert.strictEqual(storefrontApplied, 0, 'ห้ามแตะออเดอร์หน้าร้าน');
+});
+
+test('(ข) UUID ถูกรูปต้องไม่ถูก format guard ตัดทิ้ง (ต้องไป query จริง)', async () => {
+  // กันการแก้เกินขอบเขต: ค่าที่ผิดรูปแบบถูกตัด แต่ UUID ที่ถูกรูปต้อง
+  // ไปถึงการ query ตามปกติ ไม่ใช่ถูกตัดตั้งแต่ต้น
+  const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const p = completion(uuid, 'cs_1', 25000);
+  const r = await deliverWithTimeout(p, sign(p));
+
+  assert.ok(r.status >= 400, 'ไม่มีออเดอร์ = non-2xx ให้ Stripe retry');
+  assert.strictEqual(r.body.reason, 'order_not_found');
+  assert.strictEqual(r.body.applied, false);
+  assert.strictEqual(storefrontLookupCalls, 1, 'UUID ถูกรูป = ต้อง query ได้ตามปกติ');
+  assert.strictEqual(payments.length, 0, 'ห้ามมีแถวเงิน');
+  assert.strictEqual(appliedCount, 0, 'ห้ามแตะ order');
+  assert.strictEqual(storefrontApplied, 0, 'ห้ามแตะออเดอร์หน้าร้าน');
+});
+
+test('ref ของ TransferOrder ที่ไม่ใช่ UUID ยังต้องทำงานได้ (ห้ามกรองทิ้งทั้งชนิด)', async () => {
+  const ref = seedOrder('XFR-UUID1', 250);
+  const p = completion(ref, 'cs_1', 25000);
+  const r = await deliverWithTimeout(p, sign(p));
+
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.applied, true, 'ref ของ transfer ไม่ใช่ UUID แต่จับคู่ได้ = ต้องจ่าย');
+  assert.strictEqual(orders.get(ref)!.status, 'VERIFIED');
+  assert.strictEqual(storefrontLookupCalls, 0, 'จับคู่ที่ transfer ได้ = ไม่ต้องไปหาร้าน');
+  assert.strictEqual(payments.length, 0, 'transfer order ไม่เขียนลง business_payments');
+});
+
+// ── ช่องเงินหายเงียบ: order ยังไม่ทันปรากฏตอน webhook มาถึง ────────────────────
+// ของเดิมตอบ 200 + order_not_found ⇒ Stripe ตีความว่าสำเร็จแล้วและไม่ยิงซ้ำ
+// ถ้าเป็นแข่งขันเวลา (webhook มาก่อนแถว order ถูกเขียน) เงินจะเข้าจริงแต่ออเดอร์
+// ไม่เคยเป็น PAID และไม่มีตัวไล่เช็ค Stripe มากู้ ⇒ ต้องตอบ non-2xx ให้ยิงซ้ำ
+test('UUID ถูกรูปแต่ยังไม่มีออเดอร์ → non-2xx ให้ Stripe ยิงซ้ำ (รอออเดอร์ปรากฏ)', async () => {
+  const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3305';
+  const p = completion(uuid, 'cs_1', 25000);
+  const r = await deliverWithTimeout(p, sign(p));
+
+  assert.ok(r.status >= 400, `ต้อง non-2xx ให้ Stripe retry ได้ (ได้ ${r.status})`);
+  assert.strictEqual(r.body.reason, 'order_not_found');
+  assert.strictEqual(r.body.retryable, true, 'อาจเป็นแข่งขันเวลา = retry แล้วอาจสำเร็จ');
+  assert.match(String(r.body.error), /รอ|ยังไม่|อีกครั้ง|retry|ปรากฏ/i,
+    'ต้องบอกว่ากำลังรอออเดอร์ปรากฏ ไม่ใช่ error กำกวม');
+  assert.strictEqual(r.body.applied, false);
+  // ยังไม่มี order = ยังห้ามสร้างอะไรเด็ดขาด
+  assert.strictEqual(orders.size, 0, 'ห้ามสร้าง order ใหม่');
+  assert.strictEqual(payments.length, 0, 'ห้ามมีแถวเงิน');
+  assert.strictEqual(appliedCount, 0, 'ห้ามแตะ order');
+  assert.strictEqual(storefrontApplied, 0, 'ห้ามแตะออเดอร์หน้าร้าน');
+});
+
 test('ส่งซ้ำทั้งที่ order VERIFIED แล้ว → ยืนยันว่าจ่ายแล้ว แต่รอบนี้ไม่ได้เขียนซ้ำ', async () => {
   const ref = seedOrder('XFR-CON2', 250, 'VERIFIED');
   const p = completion(ref, 'cs_1', 25000);
@@ -404,9 +525,9 @@ test('ไม่มี order → ต้อง log เสียงดังด้�
   const seen: string[] = [];
   const real = console.error;
   console.error = (...a: any[]) => { seen.push(a.map(String).join(' ')); };
-  const p = completion('XFR-GHOST', 'cs_1', 25000);
+  const p = completion('3f2504e0-4f89-41d3-9a0c-0305e82c3303', 'cs_1', 25000);
   try { await deliver(p, sign(p)); } finally { console.error = real; }
-  assert.ok(seen.some((s) => /XFR-GHOST/.test(s)), 'ref ที่ไม่มี order ต้องถูก log');
+  assert.ok(seen.some((s) => /3f2504e0-4f89-41d3-9a0c-0305e82c3303/.test(s)), 'ref ที่ไม่มี order ต้องถูก log');
 });
 
 test('เส้นปกติต้องไม่เปลี่ยน: 200 + applied:true + order VERIFIED', async () => {
@@ -430,7 +551,7 @@ test('เส้นปกติต้องไม่เปลี่ยน: 200 + 
 // ────────────────────────────────────────────────────────────────────────────
 
 test('หน้าร้าน: publicToken + ยอดตรง → applied:true และ order เป็น PAID', async () => {
-  const tok = seedStorefront('tok-abc-123', 9900, 'ORDERED');
+  const tok = seedStorefront('11111111-1111-4111-8111-111111111111', 9900, 'ORDERED');
   const p = completion(tok, 'cs_shop_1', 990000);
   const r = await deliver(p, sign(p));
   assert.strictEqual(r.status, 200);
@@ -441,7 +562,7 @@ test('หน้าร้าน: publicToken + ยอดตรง → applied:tru
 });
 
 test('หน้าร้าน: ยอดไม่ตรง → ไม่ apply และ order ยังรอชำระ (เงินหายเงียบ = ห้าม)', async () => {
-  const tok = seedStorefront('tok-mismatch', 9900, 'ORDERED');
+  const tok = seedStorefront('22222222-2222-4222-8222-222222222222', 9900, 'ORDERED');
   const p = completion(tok, 'cs_shop_2', 100); // จ่าย 1 บาท แต่ order 9,900
   const r = await deliver(p, sign(p));
   assert.strictEqual(r.status, 200);
@@ -452,7 +573,7 @@ test('หน้าร้าน: ยอดไม่ตรง → ไม่ apply 
 });
 
 test('หน้าร้าน: ส่งซ้ำหลังจ่ายแล้ว → applied:false alreadyApply ไม่เขียนซ้ำ', async () => {
-  const tok = seedStorefront('tok-dup', 500, 'PAID');
+  const tok = seedStorefront('33333333-3333-4333-8333-333333333333', 500, 'PAID');
   const p = completion(tok, 'cs_shop_3', 50000);
   const r = await deliver(p, sign(p));
   assert.strictEqual(r.status, 200);
@@ -490,7 +611,7 @@ test('หน้าร้าน: checkout-session รับ publicToken เป็
 // ────────────────────────────────────────────────────────────────────────────
 
 test('หน้าร้าน: จ่ายสำเร็จ → ต้องมีแถวเงิน 1 แถว ยอดเท่า order.total', async () => {
-  const tok = seedStorefront('tok-pay-1', 9900, 'ORDERED');
+  const tok = seedStorefront('44444444-4444-4444-8444-444444444441', 9900, 'ORDERED');
   const p = completion(tok, 'cs_pay_1', 990000);
   const r = await deliver(p, sign(p));
   assert.strictEqual(r.status, 200);
@@ -502,7 +623,7 @@ test('หน้าร้าน: จ่ายสำเร็จ → ต้อง�
 });
 
 test('หน้าร้าน: Stripe ส่งซ้ำ → ต้องไม่เพิ่มแถวเงินซ้ำ (เงินเข้าครั้งเดียว)', async () => {
-  const tok = seedStorefront('tok-pay-2', 2500, 'ORDERED');
+  const tok = seedStorefront('44444444-4444-4444-8444-444444444442', 2500, 'ORDERED');
   const p = completion(tok, 'cs_pay_2', 250000);
   await deliver(p, sign(p));
   const again = await deliver(p, sign(p));
@@ -557,7 +678,7 @@ test('TransferOrder: verified_by ต้องเป็น uuid หรือ null
 // ────────────────────────────────────────────────────────────────────────────
 
 test('หน้าร้าน: เขียนแถวเงินไม่สำเร็จ → order ต้องไม่ค้างเป็น PAID และไม่มีแถวเงินค้าง', async () => {
-  const tok = seedStorefront('tok-atomic', 900, 'ORDERED');
+  const tok = seedStorefront('55555555-5555-4555-8555-555555555555', 900, 'ORDERED');
   const decision = {
     kind: 'apply' as const,
     publicToken: tok,

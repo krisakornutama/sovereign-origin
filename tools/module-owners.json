@@ -187,7 +187,9 @@
     "teach-kids-wallet.service": "teach-kids",
     "mqttIngest": "automation",
     "start": "workers",
-    "alert-store.service": "telegram"
+    "alert-store.service": "telegram",
+    "stripe-reconcile.service": "payments",
+    "stripe-reconcile.runtime": "payments"
   },
   "sharedTables": [
     "system_settings",

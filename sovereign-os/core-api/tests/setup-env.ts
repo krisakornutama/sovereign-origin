@@ -14,6 +14,12 @@ process.env.TELEGRAM_BOT_TOKEN = 'test-bot-token';
 process.env.TELEGRAM_CHAT_ID = '12345';
 // โฟลเดอร์ชั่วคราวสำหรับ OTA upload test (ไม่แตะของจริง)
 process.env.OTA_DIR = path.join(os.tmpdir(), 'sovereign-ota-test');
+// โฟลเดอร์หลักฐานการปฏิเสธเงิน — ต้องไม่ใช่ data/ ของของจริง
+//
+// เหตุผลที่บังคับไว้ที่นี่ (ไม่ใช่ต่อไฟล์เทสต์): ไฟล์หลักฐานคือสิ่งที่เจ้าของถูกสั่ง
+// ให้เปิดดูเมื่อเงินหาย ถ้ามี XFR-AMT1/evt_test_1 ของเทสต์ปนอยู่ คนจะไม่มีวัน
+// ไว้ใจไฟล์นี้อีก — และของจริงที่เกิดพร้อมกันจะถูกกลืนหายไปด้วย
+process.env.PAYMENT_EVIDENCE_DIR = path.join(os.tmpdir(), 'sovereign-payment-evidence-test');
 
 // ── กัน flake ที่ราก (2026-09-18) ──────────────────────────────────────────
 // อาการ: ชุด mock ล้มสุ่มทั้งไฟล์ (telegram/firstResponder/ota/mesh-lite/businessPlatform)
