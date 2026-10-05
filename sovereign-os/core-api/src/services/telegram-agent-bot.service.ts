@@ -15,6 +15,7 @@ import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { confirmReportedPaymentByToken, rejectReportedPaymentByToken } from './business-shop.service';
+import { parseJobCallback, approveJob, rejectJob } from './orchestrator-approval.service';
 
 
 export interface ApprovalRequestInfo {
@@ -164,8 +165,29 @@ export class TelegramAgentBot {
       await this.answerCallback(cb?.id, '⛔ ไม่ได้รับอนุญาต');
       return;
     }
-    // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>) — เส้นทางแยกจาก approve/reject
     const raw = String(cb?.data || '');
+    // Agent Orchestration — ปุ่มอนุมัติงานเสี่ยง (jobok:/jobreject:) แยกจาก approve:/reject: ของ agent action
+    const jobCmd = parseJobCallback(raw);
+    if (jobCmd) {
+      const actor = await this.resolveActor();
+      const result = jobCmd.action === 'approve'
+        ? await approveJob(jobCmd.jobId, actor)
+        : await rejectJob(jobCmd.jobId, actor);
+      await this.answerCallback(
+        cb?.id,
+        result.ok ? (jobCmd.action === 'approve' ? '✅ ปล่อยให้รันแล้ว' : '🚫 ยกเลิกงานแล้ว') : '⚠️ งานนี้ตัดสินใจไปแล้ว'
+      );
+      await this.send(
+        result.ok
+          ? [
+              jobCmd.action === 'approve' ? '✅ <b>ปล่อยงานให้เครื่องทำแล้ว</b>' : '🚫 <b>ยกเลิกงานแล้ว</b>',
+              `รหัสงาน: <code>${escapeHtml(jobCmd.jobId)}</code>`,
+            ].join('\n')
+          : `⚠️ <b>ตัดสินใจไม่ได้</b>\n${escapeHtml(result.reason ?? 'ไม่ทราบสาเหตุ')}`
+      );
+      return;
+    }
+    // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>) — เส้นทางแยกจาก approve/reject
     if (raw.startsWith('confirmpay:')) {
       const actor = await this.resolveActor();
       const result = await this.confirmPay(raw.slice('confirmpay:'.length), actor);

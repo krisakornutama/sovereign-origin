@@ -22,6 +22,8 @@ import {
   setMachineStatus,
   type MachineRow,
 } from '../../services/agent-machines.service';
+import { gateJobBeforeDispatch } from '../../services/orchestrator-approval.service';
+import { notifyJobFinished, notifyJobNeedsApproval } from '../../services/orchestrator-notify.service';
 
 const router = Router();
 
@@ -81,10 +83,27 @@ router.post('/:id/status', authenticate, requireRole('SUPERADMIN'), async (req: 
 });
 
 // POST /api/agent-machines/jobs — สั่งงานให้เครื่องที่ระบุ
+// งานเสี่ยงจะถูกพักสถานะ awaiting_approval และส่งปุ่ม ✅/🚫 ไป Telegram
 router.post('/jobs', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   try {
-    const job = await enqueueRemoteJob(req.body || {});
-    res.status(202).json({ job });
+    const body = req.body || {};
+    const job = await enqueueRemoteJob(body);
+    const gate = await gateJobBeforeDispatch({
+      id: job.id,
+      prompt: job.prompt,
+      machine_id: job.machine_id,
+      executor: job.executor,
+      risk: body.risk ?? null,
+    });
+    if (gate.needsApproval) {
+      await notifyJobNeedsApproval({
+        jobId: job.id,
+        machineName: body.machineName ?? null,
+        executor: job.executor,
+        prompt: job.prompt,
+      });
+    }
+    res.status(202).json({ job: { ...job, status: gate.status }, needsApproval: gate.needsApproval, risk: gate.risk });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/required|unsupported executor|not found/i.test(msg)) return res.status(400).json({ error: msg });
@@ -122,12 +141,23 @@ router.post('/jobs/pull', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/agent-machines/jobs/:id/result — ส่งผลกลับ
+// POST /api/agent-machines/jobs/:id/result — ส่งผลกลับ + แจ้งเตือนผู้ใช้
 router.post('/jobs/:id/result', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
     const job = await reportJobResult(req.params.id, req.body || {});
+    // แจ้งเตือนแบบ fire-and-forget: การส่งล้มเหลวห้ามทำให้งานที่เพิ่งเสร็จกลายเป็น error
+    void notifyJobFinished({
+      status: job.status,
+      jobId: job.id,
+      machineName: machine.name,
+      executor: job.executor,
+      model: job.executor_model,
+      result: job.result,
+      error: job.error,
+      exitCode: job.exit_code,
+    }).catch((e) => console.error('[agent-machines] notify failed:', e instanceof Error ? e.message : e));
     res.json({ job });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
