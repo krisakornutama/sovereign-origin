@@ -1,0 +1,90 @@
+// src/main.mjs — จุดเริ่ม runner บนเครื่องคอม
+//
+// วิธีใช้:
+//   1) ผู้ใช้เปิดหน้าเว็บ HUB → ลงทะเบียนเครื่อง → ได้ token
+//   2) copy .env.example เป็น .env แล้วใส่ HUB_URL + MACHINE_TOKEN
+//   3) node src/main.mjs
+//
+// ไม่ต้องแตะ HUB เอง (runner เป็นฝั่ง client เปิดขาออกเท่านั้น)
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRunner } from './runner.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const envPath = join(here, '..', '.env');
+
+// อ่าน .env แบบเอง (ไม่พึ่ง dotenv — runner ต้องเบา)
+function loadEnv(file) {
+  if (!existsSync(file)) return {};
+  const out = {};
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    let val = m[2].trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    out[m[1]] = val;
+  }
+  return out;
+}
+
+const fileEnv = loadEnv(envPath);
+const env = { ...fileEnv, ...process.env };
+
+const config = {
+  hubUrl: (env.HUB_URL || 'http://127.0.0.1:3001').replace(/\/$/, ''),
+  token: env.MACHINE_TOKEN || '',
+  machineName: env.MACHINE_NAME || 'runner',
+  executors: (env.ENABLED_EXECUTORS || 'echo').split(',').map((s) => s.trim()).filter(Boolean),
+  intervalMs: Number(env.POLL_INTERVAL_MS || 15000),
+  opencodeBin: env.OPENCODE_BIN || 'opencode',
+  heartbeatSec: Number(env.HEARTBEAT_SEC || 30),
+};
+
+if (!config.token) {
+  console.error('[runner] ขาด MACHINE_TOKEN — copy .env.example เป็น .env แล้วใส่ token ที่ได้จากหน้าเว็บ HUB');
+  process.exit(1);
+}
+
+console.log(`[runner] เครื่อง=${config.machineName} hub=${config.hubUrl} executor=${config.executors.join(',')}`);
+
+async function api(path, body) {
+  const res = await fetch(`${config.hubUrl}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-machine-token': config.token },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${path} -> HTTP ${res.status} ${text.slice(0, 200)}`);
+  }
+  return await res.json();
+}
+
+const hub = {
+  heartbeat: async () => api('/api/agent-machines/heartbeat', { version: process.version }),
+  pullJobs: async () => {
+    const out = await api('/api/agent-machines/jobs/pull', { limit: 3 });
+    // กรองซ้ำอีกชั้นในเครื่อง — HUB ก็กรอง แต่เครื่องเป็นคนรับผิดชอบสุดท้าย
+    return (out.jobs || []).filter((j) => config.executors.includes(j.executor));
+  },
+  reportResult: async (id, payload) => api(`/api/agent-machines/jobs/${id}/result`, payload),
+};
+
+const runner = createRunner({
+  config,
+  hub,
+  runner: { machineName: config.machineName, opencodeBin: config.opencodeBin },
+});
+
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    console.log(`[runner] ได้รับ ${sig} — หยุดวน loop`);
+    runner.stop();
+    process.exit(0);
+  });
+}
+
+runner.start();
