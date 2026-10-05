@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import {
   parseEnvKeys,
   parseComposeServices,
+  readEnvKeyState,
   isSecretShapedKey,
   findSecretsNotReachingContainer,
   findOwnerKeysReferencedByNothing,
@@ -161,4 +162,47 @@ test('รายงานคีย์ในไฟล์เจ้าของท�
   assert.ok(Array.isArray(dead), 'ต้องคืนรายการ');
   // คีย์ที่มีผลจริงห้ามโผล่
   assert.ok(!dead.includes(WEBHOOK_SECRET), 'คีย์ที่ compose อ้างถึงห้ามถูกรายงานว่าตาย');
+});
+// ── การรายงานต้องแยก "อ่านไม่ได้" กับ "ไม่มีคีย์นี้" ─────────────────────
+// เจอจริงรอบนี้: หลังลบคีย์หลุดออกจากไฟล์หลอก เครื่องมือรายงานว่า "อ่านไม่ได้"
+// ทั้งที่ไฟล์อ่านได้ปกติ — คนละเรื่องกัน และการสับสนแบบนี้ทำให้ไม่เชื่อผลลัพธ์ทั้งหมด
+
+test('readEnvKeyState แยก 3 สถานะ: มีค่า / ไม่มีคีย์ / อ่านไม่ได้', () => {
+  assert.deepEqual(
+    readEnvKeyState('A=1\nSTRIPE_WEBHOOK_SECRET=whsec_abc\n', 'STRIPE_WEBHOOK_SECRET'),
+    { state: 'present', value: 'whsec_abc' },
+  );
+  // อ่านได้ปกติ แต่ไม่มีคีย์นี้ = สถานะที่ถูกต้องหลังลบคีย์หลุด (ไม่ใช่ error)
+  assert.deepEqual(
+    readEnvKeyState('A=1\nPORT=3001\n', 'STRIPE_WEBHOOK_SECRET'),
+    { state: 'absent' },
+  );
+  // ไฟล์อ่านไม่ได้ = ปัญหาอื่น ต้องรายงานต่างจาก "ไม่มีคีย์"
+  assert.deepEqual(readEnvKeyState(null, 'X'), { state: 'unreadable' });
+  assert.deepEqual(readEnvKeyState(undefined, 'X'), { state: 'unreadable' });
+});
+
+test('readEnvKeyState ข้ามคอมเมนต์และตัด comment ท้ายบรรทัด (เหมือน dotenv)', () => {
+  assert.deepEqual(
+    readEnvKeyState('# K=v\nK=real  # trailing\n', 'K'),
+    { state: 'present', value: 'real' },
+  );
+  // คีย์ที่ถูกคอมเมนต์ = ยังไม่ได้ตั้ง ต้องไม่ถูกนับว่ามี
+  assert.deepEqual(readEnvKeyState('# K=v\n', 'K'), { state: 'absent' });
+  // ช่องว่างรอบ ๆ และ quote ต้องถูกตัด
+  assert.deepEqual(readEnvKeyState('  K = "v"  \n', 'K'), { state: 'present', value: 'v' });
+});
+
+test('ไฟล์ตัวอย่างจริง: ช่องต้องอยู่ฝั่งเจ้าของ ไม่ใช่ฝั่งที่ไม่มีผล (กันการย้อยกลับ)', () => {
+  // อ่านแบบ tri-state ตรง ๆ ไม่ผ่าน audit เพราะต้องการพิสูจน์ตัวอ่านเองด้วย
+  assert.deepEqual(
+    readEnvKeyState(read(OWNER_EXAMPLE), WEBHOOK_SECRET),
+    { state: 'present', value: '' },
+    'ไฟล์ตัวอย่างของเจ้าของต้องมีช่อง (ค่าว่าง = ยังไม่ได้ตั้งจริง)',
+  );
+  assert.deepEqual(
+    readEnvKeyState(read(HOST_RUN_EXAMPLE), WEBHOOK_SECRET),
+    { state: 'absent' },
+    'ไฟล์ตัวอย่างที่ไม่มีผลกับ container ต้องไม่มีช่องนี้',
+  );
 });

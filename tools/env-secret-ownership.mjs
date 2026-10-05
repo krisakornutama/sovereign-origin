@@ -88,6 +88,31 @@ export function isSecretShapedKey(key) {
 }
 
 /**
+ * อ่านคีย์เดียวจากเนื้อไฟล์ .env โดย**แยก 3 สถานะ** ไม่ใช่ 2
+ *
+ * ทำไมต้องแยก (เจอจริงรอบนี้): การอ่านแบบคืนค่าเดียวทำให้ "อ่านไฟล์ไม่ได้" กับ
+ * "อ่านได้ แต่ไม่มีคีย์นี้" กลายเป็นข้อความเดียวกัน — พอเราลบคีย์หลุดออกจาก
+ * ไฟล์หลอกตามแผน เครื่องมือก็รายงานว่า "อ่านไม่ได้" ทั้งที่ไฟล์อ่านได้ปกติ
+ * ในเครื่องมือที่หน้าที่คือบอกความจริงเรื่องค่าลับอย่างซื่อสัตย์ ข้อความผิดชนิด
+ * แบบนี้ทำให้คนหยุดเชื่อทั้งตัว — ซึ่งแย่กว่าการไม่มีเครื่องมือเลย
+ *
+ * @returns {{ state: 'present', value: string } | { state: 'absent' } | { state: 'unreadable' }}
+ */
+export function readEnvKeyState(text, key) {
+  if (text === null || text === undefined) return { state: 'unreadable' };
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    if (line.slice(0, eq).trim() !== key) continue;
+    const value = line.slice(eq + 1).trim().replace(/\s+#.*$/, '').trim().replace(/^["']|["']$/g, '');
+    return { state: 'present', value };
+  }
+  return { state: 'absent' };
+}
+
+/**
  * คีย์ลับที่อยู่ในไฟล์ host-run แต่ **ไม่ถึง container เลย**
  *
  * นี่คือรายการที่ต้องรายงานเสียงดัง ไม่ใช่ของที่ "ผิด" เสมอ — เพราะบางคีย์เป็น
