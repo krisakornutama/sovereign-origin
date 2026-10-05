@@ -54,6 +54,21 @@ describe('orchestrator-approval — จัดระดับความเส�
     }
   });
 
+  test('งานทั่วไปที่พูดถึงการลบแต่ไม่ลบทั้งระบบ ต้องไม่ถูกกัก (ไม่ให้ผู้ใช้เบื่อจนกดมั่ว)', () => {
+    for (const p of [
+      'ลบไฟล์ log ที่เก่ากว่า 30 วัน',
+      'ล้าง cache ก่อน build',
+      'ลบไฟล์ build ในโฟลเดอร์ dist',
+    ]) {
+      assert.equal(classifyRisk(p), 'low', `ไม่ควรกัก: ${p}`);
+    }
+  });
+
+  test('ขอบเขตการลบที่กว้างยังถูกจับแม้ไม่ใช้คำว่า "ลบ"', () => {
+    assert.equal(classifyRisk('ลบฐานข้อมูลทั้งหมด'), 'high');
+    assert.equal(classifyRisk('ล้างข้อมูลทั้งหมด'), 'high');
+  });
+
   test('ผู้ใช้บังคับระดับความเสี่ยงเองได้ (ไม่ hardcode)', () => {
     assert.equal(classifyRisk('อ่านไฟล์ธรรมดา', 'high'), 'high');
     assert.equal(classifyRisk('rm -rf /', 'low'), 'low');

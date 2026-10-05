@@ -10,7 +10,13 @@ import { prisma } from '../lib/prisma';
 
 export type RiskLevel = 'low' | 'high';
 
-/** คำที่บ่งบอกว่างานแตะของที่ย้อนกลับไม่ได้ */
+/**
+ * คำที่บ่งบอกว่างานแตะของที่ย้อนกลับไม่ได้
+ *
+ * หลักการ: จับที่ **ขอบเขต** ไม่ใช่แค่คำกริยา
+ * “ลบไฟล์ log เก่า” เป็นงานประจำ ไม่ควรถูกกัก แต่ “ลบฐานข้อมูลทั้งหมด” ต้องกัก
+ * ⇒ ใช้คำว่า “ทั้งหมด/all/the whole” เป็นสัญญาณ ไม่ใช้คำว่า “ลบ” ล้วน ๆ
+ */
 const HIGH_RISK_PATTERNS: RegExp[] = [
   /rm\s+-rf/i,
   /drop\s+table/i,
@@ -22,17 +28,14 @@ const HIGH_RISK_PATTERNS: RegExp[] = [
   /deploy\s+.*prod/i,
   /production/i,
   /\b(?:sudo|shutdown|reboot|rmdir)\b/i,
-  /ลบ[^newline]{0,40}ทั้งหมด/,
-  /ลบไฟล์/,
-  /ล้าง[^newline]{0,20}ข้อมูล/,
+  /(?:ลบ|ล้าง|ทิ้ง|ฟอร์แมต)[^newline]{0,40}(?:ทั้งหมด|ทั้งอัน|the\s+whole)/,
   /ทิ้ง[^newline]{0,20}ฐานข้อมูล/,
-  /ฟอร์แมต/,
   /deploy|ปล่อยขึ้นระบบจริง/i,
   /โอนเงิน/,
   /จ่ายเงิน/,
   /ขายจริง|ตัดเงินจริง/,
   /force[- ]?push|บังคับดัน/i,
-  /wipe|ล้างข้อมูล/i,
+  /wipe\s+(?:the\s+)?(?:database|data|disk|volume)/i,
 ];
 
 export const RISKY_STATUS = 'awaiting_approval';
