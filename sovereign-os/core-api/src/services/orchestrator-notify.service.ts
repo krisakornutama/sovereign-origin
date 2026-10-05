@@ -157,13 +157,14 @@ export async function notifyJobFinished(a: JobAlert, deps: NotifyDeps = {}, opts
   return out;
 }
 
-/** แจ้งว่างานเสี่ยงรอกด — ผูกกับปุ่มที่จะตัดสินใจใน Telegram */
-export async function notifyJobNeedsApproval(
-  a: { jobId: string; machineName?: string | null; executor?: string | null; prompt?: string | null },
-  deps: NotifyDeps = {},
-  opts: NotifyOptions = {}
-): Promise<NotifyResult> {
-  const text = [
+/** ข้อความขออนุมัติงานเสี่ยง (pure — ใช้ร่วมกันได้ทั้งจาก service และจากคำสั่ง Telegram) */
+export function buildApprovalText(a: {
+  jobId: string;
+  machineName?: string | null;
+  executor?: string | null;
+  prompt?: string | null;
+}): string {
+  return [
     '⏸ <b>งานเสี่ยง — รอกดอนุมัติใน Telegram</b>',
     `เครื่อง: ${esc(a.machineName || 'HUB')}`,
     `agent: ${esc(a.executor || '-')}`,
@@ -172,7 +173,19 @@ export async function notifyJobNeedsApproval(
   ]
     .filter(Boolean)
     .join('\n');
+}
 
+/**
+ * แจ้งว่างานเสี่ยงรอกด — ผูกกับปุ่มที่จะตัดสินใจใน Telegram
+ * (ผู้เรียกจากระบบคำสั่งควรใช้ buildApprovalText + buildApprovalButtons ผ่านช่องทางของตัวเอง
+ *  เพื่อให้ chat-id allowlist ของบอทคุมได้จุดเดียว)
+ */
+export async function notifyJobNeedsApproval(
+  a: { jobId: string; machineName?: string | null; executor?: string | null; prompt?: string | null },
+  deps: NotifyDeps = {},
+  opts: NotifyOptions = {}
+): Promise<NotifyResult> {
+  const text = buildApprovalText(a);
   const text2 = deps.sendText ?? ((t: string, b?: any) => sendTelegramMessage(t, b));
   try {
     const ok = await text2(text, buildApprovalButtons(a.jobId));

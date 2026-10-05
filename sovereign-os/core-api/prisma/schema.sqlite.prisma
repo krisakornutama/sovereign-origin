@@ -1146,7 +1146,7 @@ model AgentJob {
   role_id      String   
   role_name    String // snapshot ชื่อบทบาทตอนสร้างงาน
   prompt       String
-  status       String    @default("queued") // queued | running | done | error | cancelled
+  status       String    @default("queued") // queued | running | awaiting_approval | done | error | cancelled
   progress     Int       @default(0) // 0-100
   result       String? // ผลลัพธ์จาก Ollama
   error        String?
@@ -1156,8 +1156,46 @@ model AgentJob {
 
   role AgentRole @relation(fields: [role_id], references: [id], onDelete: Cascade)
 
+  // ── Orchestration: งานนี้จะถูกส่งไปรันบนเครื่องไหน ด้วย executor อะไร ──
+  machine_id     String?
+  executor       String? // opencode | freebuff | echo | ollama-inline
+  executor_model String? // เช่น ollama/gemma3 — ผู้ใช้เลือกเองต่องาน
+  executor_agent String?
+  workspace      String?
+  exit_code      Int?
+  log_tail       String?
+  screenshot_url String? // ภาพหน้าจอตอนจบงาน
+  priority       Int       @default(0)
+  dispatched_at  DateTime?
+  // ── ด่านอนุมัติงานเสี่ยง ──
+  risk           String?
+  approved_by    String?
+  approved_at    DateTime?
+
+  machine AgentMachine? @relation(fields: [machine_id], references: [id], onDelete: SetNull)
+
   @@index([status, created_at])
+  @@index([status, machine_id])
   @@map("agent_jobs")
+}
+
+model AgentMachine {
+  id             String   @id @default(uuid())
+  name           String // "โน้ตบุ๊ค-hub", "คอมห้องทำงาน"
+  os             String   @default("windows")
+  capabilities   Json     @default("[]")
+  executors      Json     @default("[]")
+  token_hash     String   @unique // sha256 ของ machine token (ไม่เก็บ token จริง)
+  status         String   @default("offline")
+  last_heartbeat DateTime?
+  version        String?
+  note           String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  jobs AgentJob[]
+
+  @@map("agent_machines")
 }
 
 // ─────────────────────────────────────────────

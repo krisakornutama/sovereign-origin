@@ -24,6 +24,13 @@ import {
 } from '../../services/agent-machines.service';
 import { gateJobBeforeDispatch } from '../../services/orchestrator-approval.service';
 import { notifyJobFinished, notifyJobNeedsApproval } from '../../services/orchestrator-notify.service';
+import {
+  listQueue,
+  cancelJob,
+  repeatJob,
+  queueStats,
+} from '../../services/orchestrator-queue.service';
+import { callerStatus } from '../../services/caller.service';
 
 const router = Router();
 
@@ -109,6 +116,52 @@ router.post('/jobs', authenticate, requireRole('SUPERADMIN'), async (req: Reques
     if (/required|unsupported executor|not found/i.test(msg)) return res.status(400).json({ error: msg });
     console.error('POST /api/agent-machines/jobs error:', msg);
     res.status(500).json({ error: 'Failed to enqueue job' });
+  }
+});
+
+// GET /api/agent-machines/queue — คิวงานทั้งหมดสำหรับหน้าเว็บ
+router.get('/queue', authenticate, async (req: Request, res: Response) => {
+  try {
+    const limit = Number(req.query.limit ?? 100) || 100;
+    const [jobs, stats] = await Promise.all([listQueue(limit), queueStats()]);
+    res.json({ jobs, stats });
+  } catch (err) {
+    console.error('GET /api/agent-machines/queue error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to load queue' });
+  }
+});
+
+// GET /api/agent-machines/call-status — ระบบโทรเปิดอยู่ไหม (ไม่คืน key)
+router.get('/call-status', authenticate, async (_req: Request, res: Response) => {
+  try {
+    res.json(callerStatus());
+  } catch (err) {
+    console.error('GET /api/agent-machines/call-status error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read caller status' });
+  }
+});
+
+// POST /api/agent-machines/queue/:id/cancel
+router.post('/queue/:id/cancel', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const out = await cancelJob(req.params.id, String(req.body?.actor ?? '') || undefined);
+    if (!out.ok) return res.status(409).json({ error: out.reason || 'cancel failed' });
+    res.json(out);
+  } catch (err) {
+    console.error('POST /api/agent-machines/queue/:id/cancel error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to cancel job' });
+  }
+});
+
+// POST /api/agent-machines/queue/:id/repeat — ทำซ้ำงานเดิมลงคิวใหม่
+router.post('/queue/:id/repeat', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const out = await repeatJob(req.params.id);
+    if (!out.ok) return res.status(404).json({ error: out.reason || 'repeat failed' });
+    res.json(out);
+  } catch (err) {
+    console.error('POST /api/agent-machines/queue/:id/repeat error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to repeat job' });
   }
 });
 
