@@ -1194,7 +1194,7 @@ model AgentJob {
   role_id      String    @db.Uuid
   role_name    String // snapshot ชื่อบทบาทตอนสร้างงาน
   prompt       String
-  status       String    @default("queued") // queued | running | done | error | cancelled
+  status       String    @default("queued") // queued | running | awaiting_approval | done | error | cancelled
   progress     Int       @default(0) // 0-100
   result       String? // ผลลัพธ์จาก Ollama
   error        String?
@@ -1216,6 +1216,10 @@ model AgentJob {
   screenshot_url String?   // ภาพหน้าจอตอนจบงาน (เก็บตอนจบตามที่ผู้ใช้เลือก)
   priority       Int       @default(0)
   dispatched_at  DateTime? @db.Timestamptz
+  // ── ด่านอนุมัติงานเสี่ยง (nullable ทั้งหมด = งานเดิมไม่กระทบ) ──
+  risk           String?   // low | high — ผู้ใช้บังคับได้ ถ้าไม่บังคับระบบเดาจาก prompt
+  approved_by    String?   // ผู้กดปุ่มใน Telegram
+  approved_at    DateTime? @db.Timestamptz
 
   machine AgentMachine? @relation(fields: [machine_id], references: [id], onDelete: SetNull)
 

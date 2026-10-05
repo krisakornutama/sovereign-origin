@@ -11,6 +11,7 @@ import {
   maskBotToken,
 } from '../../services/telegram-credentials.service';
 import { listAlertEvents, alertStats24h } from '../../services/alert-store.service'; // Phase 3: ประวัติ alert ในระบบ
+import { synthesizeWav } from '../../services/tts.service'; // ระดับที่ 2: ส่งเสียงพูดไทย
 
 const router = Router();
 
@@ -103,6 +104,34 @@ async function sendTelegramPhoto(photo: string | Buffer, caption = ''): Promise<
     return true;
   } catch (err) {
     console.error('Telegram sendPhoto failed:', err);
+    return false;
+  }
+}
+
+/**
+ * ส่งเสียงพูดไทย (ระดับที่ 2 ของระบบแจ้งเตือน) — สังเคราะห์ WAV ด้วย engine เดิมของระบบ
+ * (Piper → pyttsx3) แล้วส่งผ่าน Telegram sendVoice
+ * คืน false เมื่อไม่มี credential หรือสังเคราะห์ไม่ได้ (ไม่ throw)
+ */
+async function sendTelegramVoice(text: string): Promise<boolean> {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken || !creds.chatId) {
+    console.warn('Telegram credentials not set');
+    return false;
+  }
+  try {
+    const audio = await synthesizeWav(text);
+    if (!audio) {
+      console.warn('[telegram] สังเคราะห์เสียงไม่ได้ — ข้ามการส่งเสียง');
+      return false;
+    }
+    const form = new FormData();
+    form.append('chat_id', creds.chatId);
+    form.append('voice', new Blob([new Uint8Array(audio)], { type: 'audio/wav' }), 'notify.wav');
+    await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendVoice`, form);
+    return true;
+  } catch (err) {
+    console.error('Telegram sendVoice failed:', err instanceof Error ? err.message : err);
     return false;
   }
 }
@@ -276,5 +305,5 @@ router.post('/photo', authenticate, async (req, res) => {
   }
 });
 
-export { sendTelegram, sendTelegramMessage, sendTelegramPhoto }; // export เพื่อให้บริการอื่นเรียกใช้
+export { sendTelegram, sendTelegramMessage, sendTelegramPhoto, sendTelegramVoice }; // export เพื่อให้บริการอื่นเรียกใช้
 export default router;
