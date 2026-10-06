@@ -8,9 +8,10 @@ import { spawn } from 'child_process';
 import { existsSync, unlinkSync, readFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
-import { resolveTtsConfig } from '../modules/tts/tts.routes';
+import { resolveTtsConfig, resolveTtsScript, spawnPythonWithFallback } from '../modules/tts/tts.routes';
 
-const TTS_SCRIPT = 'E:\\My work\\Project Sovereign Origin\\tools\\tts_speak.py';
+// path ของสคริปต์ pyttsx3 + ลำดับ python ใช้ร่วมกับ /api/tts (resolveTtsScript —
+// env TTS_SCRIPT → สคริปต์ใน image (core-api/tts/tts_speak.py) → legacy E:\ ของ dev host)
 
 export interface SpeakOptions {
   rate?: number;
@@ -92,23 +93,21 @@ export async function synthesizeWav(text: string, opts: SpeakOptions = {}): Prom
       finish(null);
     }, timeoutMs);
 
-    let python: ReturnType<typeof spawn>;
-    try {
-      python = spawn('python', [TTS_SCRIPT, clean, String(opts.rate ?? 180)]);
-    } catch {
-      return finish(null);
-    }
-    python.stdout?.on('data', (d: Buffer) => chunks.push(d));
-    python.stderr?.on('data', (d) => console.error('[tts] stderr:', d.toString().slice(0, 300)));
-    python.on('error', (e: any) => {
-      console.error('[tts] เริ่ม Python ไม่ได้:', e?.message);
-      finish(null);
-    });
-    python.on('close', (code) => {
-      if (settled) return;
-      if (code !== 0) return finish(null);
-      const audio = Buffer.concat(chunks);
-      finish(audio.length > 0 ? audio : null);
+    spawnPythonWithFallback([resolveTtsScript(), clean, String(opts.rate ?? 180)], {
+      onChild: (python) => {
+        python.stdout?.on('data', (d: Buffer) => chunks.push(d));
+        python.stderr?.on('data', (d) => console.error('[tts] stderr:', d.toString().slice(0, 300)));
+        python.on('close', (code) => {
+          if (settled) return;
+          if (code !== 0) return finish(null);
+          const audio = Buffer.concat(chunks);
+          finish(audio.length > 0 ? audio : null);
+        });
+      },
+      onFail: (err) => {
+        console.error('[tts] เริ่ม Python ไม่ได้:', err.message);
+        finish(null);
+      },
     });
   });
 }
