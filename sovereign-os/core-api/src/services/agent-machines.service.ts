@@ -264,3 +264,18 @@ export async function jobMachineId(jobId: string): Promise<string | null> {
 export async function setJobScreenshotUrl(jobId: string, url: string): Promise<void> {
   await prisma.agentJob.update({ where: { id: jobId }, data: { screenshot_url: String(url) } });
 }
+
+/**
+ * ล้าง screenshot_url ของงานที่ไฟล์ภาพถูกไปแล้ว (retention ลบไฟล์เก่า)
+ *
+ * คืนจำนวนแถวที่ถูกแตะ — เรียกจากชั้นเก็บภาพเท่านั้น ไม่ให้โมดูลอื่น
+ * เขียนคอลัมน์ของ agent_jobs เอง (arch-gate จับเส้นข้ามโมดูล)
+ */
+export async function clearScreenshotUrls(urls: string[]): Promise<number> {
+  if (urls.length === 0) return 0;
+  const res = await prisma.agentJob.updateMany({
+    where: { screenshot_url: { in: urls } },
+    data: { screenshot_url: null },
+  });
+  return (res as any)?.count ?? 0;
+}

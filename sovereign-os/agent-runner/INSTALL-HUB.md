@@ -58,6 +58,7 @@ npx prisma db execute --stdin <<< 'DROP SCHEMA agent_orch_test CASCADE;'
 | `BLAND_VOICE_ID` | — | เสียงที่ใช้ (ถ้าไม่ใส่ใช้ค่าเริ่มต้นของ Bland) |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `CALLER_FROM_NUMBER` | — | ต้องมีครบสามตัวถ้าจะโทรผ่าน Twilio |
 | `CALLER_ALERT_PHONE` | — | เบอร์ที่โทร (E.164 เท่านั้น) · ถ้าว่างให้ตั้งในหน้า คิวเอเจนต์ แทน |
+| `ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS` | `14` | เก็บภาพหน้าจอตอนจบงานกี่วันก่อนระบบล้างเอง (ทุก 6 ชม.) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | — | ต้องมีอยู่แล้วของระบบ ไม่งั้นชั้นที่ 1 ไม่ทำงาน |
 
 ตรวจว่า container เห็นจริง (ไม่ใช่แค่ตั้งไว้แต่ไม่มีผล):
