@@ -57,6 +57,7 @@ import { automationEmitter } from '../services/automation.service';
 import { buildSnapshotForAlert } from '../services/chart-snapshot.service';
 import { predictiveWorker } from '../services/predictive.service';
 import { autoInitLocalLlm } from '../services/local-llm.service';
+import { pruneScreenshots } from '../services/orchestrator-screenshot.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // startWorkers — จุดรวมเริ่มงานเบื้องหลังทั้งหมด (ย้ายมาจาก server.ts)
@@ -263,6 +264,21 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runAgentMorningReports();
   setInterval(runAgentMorningReports, 30 * 60 * 1000);
+
+  // ── Agent Orchestration: ลบภาพหน้าจอตอนจบงานที่หมดอายุ (default 14 วัน · ทุก 6 ชม.) ──
+  // ภาพ ~2.8 MB/งาน ถ้าไม่มีคนล้าง disk จะโตไม่รู้จบ — งานล้างเป็นงานเบื้องหลัง
+  // ที่ห้ามทำให้ระบบล้ม จึง catch นิ่ง ๆ เหมือน cron อื่น และ log เมื่อมีอะไรถูกลบ
+  async function runScreenshotPrune() {
+    try {
+      const out = await pruneScreenshots();
+      if (out.deleted.length > 0) {
+        console.log(`🖼️ Orchestrator shots: ลบภาพหมดอายุ ${out.deleted.length} ไฟล์ (เคลียร์ screenshot_url ${out.cleared} แถว)`);
+      }
+    } catch (err) {
+      console.error('Orchestrator screenshot prune error:', err instanceof Error ? err.message : err);
+    }
+  }
+  setInterval(runScreenshotPrune, 6 * 60 * 60 * 1000);
 
   // ── Stripe reconcile: ไล่เงินจริงที่ Stripe บอกว่า "จ่ายแล้ว" กับที่เราบันทึก ──
   // จับช่องว่างที่ทำให้เงินหายโดยไม่มีใครสังเกต (Stripe จ่ายแล้ว · ฝั่งเรายังโชว์

@@ -93,6 +93,8 @@ services:
       CALLER_ALERT_PHONE: ${CALLER_ALERT_PHONE:-}
       # โฟลเดอร์เก็บภาพหน้าจอตอนจบงาน (เว้นว่าง = /app/data/orchestrator-shots ที่ persist อยู่แล้ว)
       ORCHESTRATOR_SCREENSHOT_DIR: ${ORCHESTRATOR_SCREENSHOT_DIR:-}
+      # เก็บภาพกี่วันก่อนลบอัตโนมัติ (worker ล้างทุก 6 ชม.) — ไม่ประกาศตรงนี้ = container ไม่เห็นค่า
+      ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS: ${ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS:-14}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       # ลิงก์สาธารณะสำหรับ QR/ตามรอยล็อต (trace) — ตั้งเป็นโดเมนจริงเมื่อเปิดหน้าร้านสู่อินเทอร์เน็ต
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}

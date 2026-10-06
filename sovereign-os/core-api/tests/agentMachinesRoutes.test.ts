@@ -543,3 +543,104 @@ describe('agent-machines routes — อนุมัติ/ปฏิเสธง�
     }
   });
 });
+
+// red-first (chunk 4): ภาพหน้าจอ ~2.8 MB/งาน สะสมใน data/orchestrator-shots
+// ไม่มี retention ไม่มีใครล้าง ⇒ disk โตไม่รู้จบ
+// กฎ: เกินอายุ (default 14 วัน) = ลบไฟล์ **และ** เคลียร์ screenshot_url บนแถวงาน
+//      (ลบอย่างเดียวไม่พอ — URL ค้างทำให้ผู้ใช้กดดูแล้วเจอ 404 งง ๆ)
+
+describe('agent-machines routes — นโยบายอายุภาพหน้าจอ (retention 14 วัน)', () => {
+  const pruneCalls: any[] = [];
+
+  beforeEach(() => {
+    process.env.ORCHESTRATOR_SCREENSHOT_DIR = shotsDir;
+    delete process.env.ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS; // ใช้ default 14
+    fs.rmSync(shotsDir, { recursive: true, force: true });
+    fs.mkdirSync(shotsDir, { recursive: true });
+    pruneCalls.length = 0;
+    mockModel(prisma as any, 'agentJob', {
+      findUnique: async (args: any) => ({ id: args.where.id, machine_id: 'm-1' }),
+      update: async (args: any) => ({ id: args.where.id, ...args.data }),
+      updateMany: async (args: any) => {
+        pruneCalls.push(args);
+        return { count: args?.where?.screenshot_url?.in?.length ?? 0 };
+      },
+    });
+  });
+
+  /** วางไฟล์ภาพแล้วเลื่อน mtime ย้อนหลังตามจำนวนวัน (ทดสอบบน temp dir ไม่แตะ data จริง) */
+  function putFile(name: string, ageDays: number): string {
+    const full = path.join(shotsDir, name);
+    fs.writeFileSync(full, Buffer.from('png-bytes'));
+    const t = new Date(Date.now() - ageDays * 86_400_000);
+    fs.utimesSync(full, t, t);
+    return full;
+  }
+
+  function loadScreenshotService(): any {
+    return require('../src/services/orchestrator-screenshot.service');
+  }
+
+  test('pruneScreenshots ลบไฟล์เกิน 14 วันและเคลียร์ screenshot_url (ไฟล์ยังไม่หมดอายุต้องอยู่)', async () => {
+    const { pruneScreenshots } = loadScreenshotService();
+    const oldFile = putFile('job-j-old-0001-old.png', 20);
+    const youngFile = putFile('job-j-young-0002-young.png', 13);
+
+    const out = await pruneScreenshots();
+
+    assert.equal(fs.existsSync(oldFile), false, 'ไฟล์อายุ 20 วันต้องถูกลบออกจากดิสก์');
+    assert.equal(fs.existsSync(youngFile), true, 'ไฟล์อายุ 13 วัน (ยังไม่เกิน 14) ห้ามลบ');
+    assert.equal(pruneCalls.length, 1, 'ต้องเคลียร์ screenshot_url บนแถวงานด้วย ไม่ใช่ลบไฟล์อย่างเดียว');
+    assert.deepEqual(pruneCalls[0].data, { screenshot_url: null }, 'ต้องล้างคอลัมน์ screenshot_url');
+    const inList: string[] = pruneCalls[0].where.screenshot_url.in;
+    assert.ok(
+      inList.includes('/api/agent-machines/screenshots/job-j-old-0001-old.png'),
+      'ต้องชี้ URL ของไฟล์ที่ลบไปแล้วเท่านั้น'
+    );
+    assert.ok(!inList.some((u) => u.includes('young')), 'ห้ามแตะแถวของงานที่ภาพยังอยู่');
+    assert.equal(out.deleted.length, 1, 'ต้องรายงานจำนวนไฟล์ที่ลบให้ worker เอาไป log ได้');
+  });
+
+  test('ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS เปลี่ยนอายุที่ใช้ตัดได้', async () => {
+    process.env.ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS = '2';
+    const { pruneScreenshots } = loadScreenshotService();
+    const oldFile = putFile('job-j-3days-old.png', 3);
+    const freshFile = putFile('job-j-1day-new.png', 1);
+
+    await pruneScreenshots();
+
+    assert.equal(fs.existsSync(oldFile), false, 'retention=2 ⇒ ไฟล์ 3 วันต้องหาย');
+    assert.equal(fs.existsSync(freshFile), true, 'retention=2 ⇒ ไฟล์ 1 วันต้องอยู่');
+  });
+
+  test('ค่า retention ที่ผิดรูปแบบต้องตกกลับเป็น 14 วัน ไม่ใช่ลบหมดหรือข้าม', async () => {
+    process.env.ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS = 'not-a-number';
+    const { pruneScreenshots } = loadScreenshotService();
+    const oldFile = putFile('job-j-20days-old.png', 20);
+    const youngFile = putFile('job-j-2days-young.png', 2);
+
+    await pruneScreenshots();
+
+    assert.equal(fs.existsSync(oldFile), false, 'ค่าพังไม่ได้แปลว่าปิด retention');
+    assert.equal(fs.existsSync(youngFile), true, 'ค่าพังต้องไม่ทำให้ลบไฟล์ที่ยังไม่หมดอายุ');
+  });
+
+  test('GET /screenshots/:file ของไฟล์ที่ถูก prune แล้วตอบ 404 ไม่ crash', async () => {
+    const { pruneScreenshots } = loadScreenshotService();
+    putFile('job-j-gone-gone.png', 30);
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const url = `${srv.baseUrl}/api/agent-machines/screenshots/job-j-gone-gone.png`;
+      const before = await fetch(url, { headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` } });
+      assert.equal(before.status, 200, 'ก่อน prune ต้องเปิดดูได้');
+
+      await pruneScreenshots();
+
+      const after = await fetch(url, { headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` } });
+      assert.equal(after.status, 404, 'ไฟล์ถูกลบแล้วต้องตอบ 404 ไม่ใช่ 500/crash');
+    } finally {
+      await srv.close();
+    }
+  });
+});

@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { jobMachineId, setJobScreenshotUrl } from './agent-machines.service';
+import { jobMachineId, setJobScreenshotUrl, clearScreenshotUrls } from './agent-machines.service';
 
 /** โฟลเดอร์เก็บภาพ — override ด้วย env เพื่อให้เทสต์ชี้ไปโฟลเดอร์ชั่วคราวได้ */
 export function screenshotDir(): string {
@@ -67,4 +67,70 @@ export async function saveJobScreenshot(
     throw err;
   }
   return url;
+}
+
+// ── Retention: ภาพ ~2.8 MB/งาน ไม่มีใครล้าง ⇒ disk โตไม่รู้จบ ──
+
+/** อายุเริ่มต้น (วัน) — ถ้าไม่ตั้ง env หรือตั้งผิดรูปแบบจะใช้ค่านี้เสมอ */
+export const DEFAULT_RETENTION_DAYS = 14;
+
+/**
+ * อายุภาพที่จะเก็บ อ่านจาก `ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS`
+ *
+ * ค่าพัง (ไม่ใช่ตัวเลข / น้อยกว่า 1 วัน) ตกกลับเป็น 14 —
+ * ตั้งผิดห้ามแปลเป็น "ลบหมด" หรือ "ข้าม retention" เพราะนั่นคือ two-way fail ที่อันตรายกว่าค่าเริ่มต้น
+ */
+export function screenshotRetentionDays(): number {
+  const raw = Number(process.env.ORCHESTRATOR_SCREENSHOT_RETENTION_DAYS);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_RETENTION_DAYS;
+}
+
+export interface PruneResult {
+  /** จำนวนไฟล์ที่ตรวจดูทั้งหมด */
+  scanned: number;
+  /** ชื่อไฟล์ที่ลบไป (ไม่รวม path) */
+  deleted: string[];
+  /** จำนวนแถวงานที่ถูกเคลียร์ screenshot_url */
+  cleared: number;
+}
+
+/**
+ * ลบภาพหน้าจอที่หมดอายุ + เคลียร์ `screenshot_url` บนแถวงานที่ชี้อยู่
+ *
+ * สำคัญ: ลบไฟล์อย่างเดียวไม่พอ — URL ค้างบนแถวงานทำให้ผู้ใช้กด
+ * "ดูภาพหน้าจอ" แล้วเจอ 404 งง ๆ · สองอย่างนี้จึงต้องเกิดพร้อมกัน
+ * ไม่ throw: worker เรียกทุก 6 ชม. งานล้างไม่มีวันทำให้ระบบล้ม
+ */
+export async function pruneScreenshots(retentionDays?: number): Promise<PruneResult> {
+  const days = retentionDays ?? screenshotRetentionDays();
+  const cutoff = Date.now() - days * 86_400_000;
+  const dir = screenshotDir();
+  const deleted: string[] = [];
+  let scanned = 0;
+
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    try {
+      const st = fs.statSync(full);
+      if (!st.isFile()) continue;
+      scanned += 1;
+      if (st.mtimeMs >= cutoff) continue;
+      fs.unlinkSync(full);
+      deleted.push(name);
+    } catch (err) {
+      // ไฟล์ถูกคนอื่นลบไประหว่างทาง / อ่าน stat ไม่ได้ — ข้าม ไม่ทำให้รอบล้างทั้งหมดล้ม
+      console.error('[orchestrator-screenshot] prune file failed:', name, err instanceof Error ? err.message : err);
+    }
+  }
+
+  let cleared = 0;
+  if (deleted.length > 0) {
+    try {
+      cleared = await clearScreenshotUrls(deleted.map(screenshotUrlFor));
+    } catch (err) {
+      // เคลียร์ URL ไม่ได้ = งานยังชี้ไฟล์ที่หาย — ไม่ crash แต่ต้องเห็นใน log
+      console.error('[orchestrator-screenshot] clear screenshot_url failed:', err instanceof Error ? err.message : err);
+    }
+  }
+  return { scanned, deleted, cleared };
 }
