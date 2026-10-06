@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `tts/tts.routes.ts` (156 บรรทัด)
+- `tts/tts.routes.ts` (233 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -25,20 +25,3 @@ GET /health
 
 <!-- auto:end -->
 
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
-
-### Routes
-- `tts/tts.routes.ts` (156 บรรทัด)
-
-### Endpoints (จาก router)
-```
-POST /speak
-GET /health
-```
-
-<!-- auto:end -->

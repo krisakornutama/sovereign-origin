@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `partners/partners.routes.ts` (185 บรรทัด)
+- `partners/partners.routes.ts` (193 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
