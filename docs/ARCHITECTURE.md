@@ -30,6 +30,21 @@ verify --db   = เพิ่มชุด real-Postgres (test:db) + coverage repo
 verify:full   = เพิ่ม Prod-Truth Gate (fingerprint disk↔runtime) + E2E Playwright
 ```
 
+### Checklist ก่อน commit (รายการเดียว — ทุกบรรทัดมี exit code ที่คาด)
+
+| # | คำสั่ง (รันจาก worktree ของ branch ตัวเอง) | EXIT ที่คาด |
+|---|---|---|
+| 1 | **red-first**: `cd sovereign-os/core-api && npx tsx --test tests/<ไฟล์ใหม่>.test.ts` — เขียนเทสต์ก่อนแก้ ต้องเห็นแดงก่อน | **1** ก่อนแก้ → **0** หลังแก้ |
+| 2 | `cd sovereign-os/core-api && ./node_modules/.bin/tsc --noEmit` (อย่าใช้ `npx tsc` — ค้างบน Windows) | **0** |
+| 3 | `node tools/arch-gate.mjs` (schema-sync · file-budget · env-truth · boundary) | **0** |
+| 4 | `cd sovereign-os/core-api && npm test` — จำนวนเคสต้อง **≥ baseline ของรอบก่อนหน้า** (ห้ามลดลง) | **0** |
+| 5 | `cd sovereign-frontend && npm run typecheck` แล้ว `npm run build` | **0** และ **0** |
+| 6 | `npm run test:tools` (เทสต์ตรรกะเครื่องมือใน tools/ — อยู่ใน verify ด้วย) | **0** |
+| 7 | **`npm run verify` ที่ MAIN (รากโปรเจกต์) เท่านั้น** — worktree ไม่มี node_modules ครบ รันที่ worktree ล้มทันที · ทุกด่านเขียวแล้วค่อย commit · แก้ UI ที่มีผลหน้าเว็บ = `npm run verify:full` (เพิ่ม e2e) | **0** |
+
+> red-first คือกติกา ไม่ใช่คำแนะนำ: งานที่พิสูจน์พฤติกรรมต้องมีเทสต์ใน `tests/` จับไว้
+> และเห็น EXIT=1 จริงก่อนแก้โค้ด — "รันสคริปต์ชั่วคราวผ่าน" ไม่นับเป็นหลักฐาน
+
 - เกตทั้งหมดอยู่ที่ `tools/` (arch-gate.mjs, prod-truth.mjs, fingerprint-lib.mjs, module-owners.json)
 - fingerprint = hash ของ `{relativePath, size, sha256(content)}` เรียงตาม path — คำนวณฝั่ง runtime (`src/lib/runtime-fingerprint.ts`) และฝั่ง tools ให้ผลตรงกันทุกไบต์
 
