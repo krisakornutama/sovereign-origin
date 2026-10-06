@@ -24,7 +24,7 @@ import {
   setMachineStatus,
   type MachineRow,
 } from '../../services/agent-machines.service';
-import { gateJobBeforeDispatch } from '../../services/orchestrator-approval.service';
+import { gateJobBeforeDispatch, approveJob, rejectJob } from '../../services/orchestrator-approval.service';
 import { notifyJobFinished, notifyJobNeedsApproval } from '../../services/orchestrator-notify.service';
 import {
   listQueue,
@@ -258,6 +258,27 @@ router.post('/queue/:id/cancel', authenticate, requireRole('SUPERADMIN'), async 
     res.status(500).json({ error: 'Failed to cancel job' });
   }
 });
+
+// POST /api/agent-machines/queue/:id/approve|reject — ด่านอนุมัติงานเสี่ยงจากหน้าเว็บ
+//
+// เดิมมีแค่ฝั่ง Telegram callback ⇒ ผู้ใช้ที่ไม่ได้เปิด Telegram เปิดงานเสี่ยง
+// ค้างอยู่จนหมดอายุไม่ได้เลย สอง route นี้จึงเป็นเส้นหลักของหน้า /agent-queue
+// approveJob/rejectJob คืน envelope ไม่ throw และ gate ด้วย status=awaiting_approval ในที่เดียว
+// (กันสองคนกดพร้อมกัน) ⇒ สถานะไม่ตรงตอบ 409 ไม่ใช่ 200 ปลอม ๆ
+const decide = (decideFn: (jobId: string, actor?: string) => Promise<{ ok: boolean; status: string; reason?: string }>, label: string) =>
+  async (req: Request, res: Response) => {
+    try {
+      const out = await decideFn(req.params.id, String(req.body?.actor ?? '') || undefined);
+      if (!out.ok) return res.status(409).json({ error: out.reason || `${label} failed`, status: out.status });
+      res.json(out);
+    } catch (err) {
+      console.error(`POST /api/agent-machines/queue/:id/${label} error:`, err instanceof Error ? err.message : err);
+      res.status(500).json({ error: `Failed to ${label} job` });
+    }
+  };
+
+router.post('/queue/:id/approve', authenticate, requireRole('SUPERADMIN'), decide(approveJob, 'approve'));
+router.post('/queue/:id/reject', authenticate, requireRole('SUPERADMIN'), decide(rejectJob, 'reject'));
 
 // POST /api/agent-machines/queue/:id/repeat — ทำซ้ำงานเดิมลงคิวใหม่
 router.post('/queue/:id/repeat', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
