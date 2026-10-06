@@ -326,11 +326,15 @@ async function executeAgentJob(job: any): Promise<string | null> {
   }
 }
 
-/** runner หลัก — ดึงงาน queued มาทำ (จำกัดพร้อมกัน 2 งาน) เรียกซ้ำได้ทุกที่ */
+/** runner หลัก — ดึงงาน queued มาทำ (จำกัดพร้อมกัน 2 งาน) เรียกซ้ำได้ทุกที่
+ *
+ *  ดึงเฉพาะ machine_id = null เท่านั้น: งานที่ผูกกับเครื่องคอมเป็นของ runner บนเครื่องนั้น
+ *  ถ้าไม่กรอง worker ตัวนี้จะไปแย่ง — คนได้ผลลัพธ์จาก Ollama ของ HUB แทนที่จะได้จากเครื่องคอม
+ */
 export async function processAgentQueue(opts?: { limit?: number }): Promise<{ ran: number }> {
   const limit = opts?.limit ?? 2;
   const queued = await prisma.agentJob.findMany({
-    where: { status: 'queued' },
+    where: { status: 'queued', machine_id: null },
     orderBy: { created_at: 'asc' },
     take: limit,
   });

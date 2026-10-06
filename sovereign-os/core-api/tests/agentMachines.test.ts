@@ -171,6 +171,56 @@ describe('agent machines — dispatch', () => {
     assert.equal(created.priority, 0);
   });
 
+  // red-first: หน้าเว็บสั่งงานไม่ส่ง roleId มาเลย (ดู agent-queue.tsx) → role_id ต้องไม่ใช่ ''
+  // PostgreSQL ปฏิเสธค่าว่างในคอลัมน์ UUID ("invalid length: expected length 32, found 0")
+  test('enqueueRemoteJob ที่ไม่มี roleId ต้องผูกบทบาทจริง ไม่ใช่ส่ง role_id ว่าง', async () => {
+    let created: any = null;
+    mockModel(prismaRef() as any, 'agentJob', {
+      create: async (args: any) => { created = args.data; return { id: 'j-1', ...args.data }; },
+      findMany: async () => [],
+      update: async (args: any) => ({ ...args.data, id: args.where.id }),
+    });
+    mockModel(prismaRef() as any, 'agentMachine', {
+      create: async (args: any) => ({ id: 'm-1', ...args.data }),
+      findUnique: async () => ({ id: 'm-1', name: 'runner-a', executors: ['echo'] }),
+      findFirst: async () => null,
+      findMany: async () => [],
+      update: async (args: any) => ({ id: 'm-1', ...args.data }),
+    });
+    let roleLookedUp = 0;
+    mockModel(prismaRef() as any, 'agentRole', {
+      findFirst: async () => { roleLookedUp++; return { id: 'role-real', name: 'ผู้ช่วยรวม' }; },
+      findMany: async () => [],
+      create: async () => { assert.fail('ไม่ควรสร้างบทบาทใหม่'); return {} as any; },
+    });
+    const job = await enqueueRemoteJob({ machineId: 'm-1', executor: 'echo', prompt: 'สั่งจากหน้าเว็บ' });
+    assert.ok(roleLookedUp > 0, 'ต้องหาบทบาทจริงมาใช้');
+    assert.notEqual(created.role_id, '', 'role_id ว่าง = PostgreSQL ตอบ 500 ตอนสั่งงานจากหน้าเว็บ');
+    assert.equal(created.role_id, 'role-real');
+    assert.equal(created.role_name, 'ผู้ช่วยรวม');
+    assert.equal(job.id, 'j-1');
+  });
+
+  test('enqueueRemoteJob ที่ไม่มี roleId ต้องบอกชัดว่าไม่มีบทบาทให้ใช้ ไม่ใช่เขียนค่าว่างลง DB', async () => {
+    mockModel(prismaRef() as any, 'agentJob', {
+      create: async () => { assert.fail('ไม่ควรสร้าง job ที่ role_id ว่าง'); return {} as any; },
+      findMany: async () => [],
+      update: async (args: any) => ({ ...args.data, id: args.where.id }),
+    });
+    mockModel(prismaRef() as any, 'agentMachine', {
+      create: async (args: any) => ({ id: 'm-1', ...args.data }),
+      findUnique: async () => ({ id: 'm-1', name: 'runner-a', executors: ['echo'] }),
+      findFirst: async () => null,
+      findMany: async () => [],
+      update: async (args: any) => ({ id: 'm-1', ...args.data }),
+    });
+    mockModel(prismaRef() as any, 'agentRole', { findFirst: async () => null, findMany: async () => [] });
+    await assert.rejects(
+      () => enqueueRemoteJob({ machineId: 'm-1', executor: 'echo', prompt: 'ไม่มีบทบาท' }),
+      /บทบาท|role/i,
+    );
+  });
+
   test('enqueueRemoteJob rejects when machine unknown', async () => {
     mockModel(prismaRef() as any, 'agentMachine', {
       create: async (args: any) => ({ id: 'm-1', ...args.data }),

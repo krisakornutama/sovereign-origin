@@ -67,6 +67,11 @@ describe('orchestrator-approval — จัดระดับความเส�
   test('ขอบเขตการลบที่กว้างยังถูกจับแม้ไม่ใช้คำว่า "ลบ"', () => {
     assert.equal(classifyRisk('ลบฐานข้อมูลทั้งหมด'), 'high');
     assert.equal(classifyRisk('ล้างข้อมูลทั้งหมด'), 'high');
+    // red-first: `[^newline]` ใน regex ไม่ใช่ "ไม่ใช่ newline" แต่คือ "ไม่ใช่ตัวอักษร n,e,w,l"
+    // ทำให้ข้ามคำกลางที่มีตัวอักษรเหล่านั้นไม่ได้ → งานกักไม่ได้
+    assert.equal(classifyRisk('ล้าง cache ทั้งหมด'), 'high');
+    assert.equal(classifyRisk('ลบโฟลเดอร์ node_modules ทั้งหมด'), 'high');
+    assert.equal(classifyRisk('ทิ้งไฟล์เก่าใน public ทั้งหมด'), 'high');
   });
 
   test('ผู้ใช้บังคับระดับความเสี่ยงเองได้ (ไม่ hardcode)', () => {
