@@ -27,6 +27,8 @@ export interface QueueRow {
   screenshotUrl: string | null;
   createdAt: string | null;
   canCancel: boolean;
+  /** true เฉพาะงานที่รอคนกดอนุมัติ — UI ใช้ขึ้นปุ่ม "อนุมัติให้รัน"/"ปฏิเสธ" */
+  canApprove: boolean;
 }
 
 function str(v: unknown): string {
@@ -36,6 +38,14 @@ function str(v: unknown): string {
 /** ยกเลิกได้เฉพาะงานที่ยังไม่เริ่มรัน — งานกำลังรันอยู่ต้องให้เครื่องรายงานผลเอง */
 export function canCancel(status: string): boolean {
   return status === 'queued' || status === 'awaiting_approval';
+}
+
+/**
+ * อนุมัติได้เฉพาะงานที่สถานะเป็น awaiting_approval เท่านั้น —
+ * งาน queued/done/cancelled ไม่มีปุ่มนี้ให้กด (คู่กับ gate ใน approveJob/rejectJob)
+ */
+export function canApprove(status: string): boolean {
+  return status === 'awaiting_approval';
 }
 
 export async function listQueue(limit = 100): Promise<QueueRow[]> {
@@ -66,6 +76,7 @@ export async function listQueue(limit = 100): Promise<QueueRow[]> {
       screenshotUrl: j.screenshot_url ?? null,
       createdAt: j.created_at ? new Date(j.created_at).toISOString() : null,
       canCancel: canCancel(str(j.status)),
+      canApprove: canApprove(str(j.status)),
     };
   });
 }

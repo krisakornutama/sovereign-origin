@@ -415,10 +415,129 @@ describe('agent-machines routes — ภาพหน้าจอตอนจบ�
         token: 'valid-token',
         jobId: 'j-1',
         buffer: Buffer.from('PNG-BYTES'),
-      });
-      assert.match(out.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
+      });      assert.match(out.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
       const fname = out.screenshotUrl.split('/').pop();
       assert.ok(fs.existsSync(path.join(shotsDir, fname)), 'ไฟล์ที่ runner ส่งต้องถึงดิสก์จริง');
+    } finally {
+      await srv.close();
+    }
+  });
+});
+
+// red-first (chunk 3): ด่านอนุมัติงานเสี่ยงมีแค่ฝั่ง Telegram callback — ไม่มี route/ปุ่มบนเว็บ
+// ⇒ ผู้ใช้ที่ไม่ได้เปิด Telegram เปิดงานเสี่ยงค้างไว้จนหมดอายุไม่ได้เลย
+// กฎสถานะ: 200 เมื่อเปลี่ยนสถานะจริง · 409 เมื่องานไม่ได้อยู่ใน awaiting_approval
+
+describe('agent-machines routes — อนุมัติ/ปฏิเสธงานเสี่ยงจากหน้าเว็บ', () => {
+  let updateManyCalls: any[] = [];
+  let updateCount = 1;
+
+  beforeEach(() => {
+    updateManyCalls = [];
+    updateCount = 1;
+    mockModel(prisma as any, 'agentJob', {
+      findMany: async () => [
+        { id: 'j-risk', status: 'awaiting_approval', prompt: 'ล้างฐานข้อมูลทั้งหมด', priority: 0 },
+        { id: 'j-safe', status: 'queued', prompt: 'สรุปรายงาน', priority: 0 },
+      ],
+      updateMany: async (args: any) => {
+        updateManyCalls.push(args);
+        return { count: updateCount };
+      },
+      groupBy: async () => [], // queueStats ใช้ groupBy — mock ให้ครบจะได้ไม่ log error ท้ายเทสต์
+    });
+  });
+
+  test('POST /queue/:id/approve ปล่อยงานเข้าคิวเมื่อสถานะเป็น awaiting_approval', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/queue/j-risk/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+        body: JSON.stringify({ actor: 'web-admin' }),
+      });
+      assert.equal(res.status, 200, 'อนุมัติได้จากเว็บต้องตอบ 200 (ไม่ใช่ 404 เหมือนตอนนี้)');
+      const body = await res.json() as any;
+      assert.equal(body.ok, true);
+      assert.equal(body.status, 'queued', 'งานต้องถูกปล่อนกลับเข้าคิวให้เครื่องดึง');
+      assert.equal(updateManyCalls.length, 1);
+      assert.equal(updateManyCalls[0].where.status, 'awaiting_approval', 'ต้อง gate ด้วยสถานะกันสองคนกดพร้อมกัน');
+      assert.equal(updateManyCalls[0].data.status, 'queued');
+      assert.equal(updateManyCalls[0].data.approved_by, 'web-admin');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('POST /queue/:id/approve ตอบ 409 เมื่องานไม่ได้รออนุมัติอยู่', async () => {
+    updateCount = 0; // งานถูกตัดสินใจไปแล้ว / ไม่มีจริง
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/queue/j-risk/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+        body: '{}',
+      });
+      assert.equal(res.status, 409, 'สถานะไม่ตรงต้องบอกว่าขัดแย้ง ไม่ใช่แกล้งทำเป็นสำเร็จ');
+      const body = await res.json() as any;
+      assert.ok(body.error, 'ต้องบอกเหตุผลว่าทำไม่ได้');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('POST /queue/:id/reject ปฏิเสธงานเป็น cancelled', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/queue/j-risk/reject`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+        body: JSON.stringify({ actor: 'web-admin' }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json() as any;
+      assert.equal(body.ok, true);
+      assert.equal(body.status, 'cancelled', 'ปฏิเสธแล้วเครื่องห้ามได้งานนี้ไปทำ');
+      assert.equal(updateManyCalls[0].data.status, 'cancelled');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('POST /queue/:id/approve|reject ต้องมีสิทธิ์ SUPERADMIN (401/403)', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const noAuth = await fetch(`${srv.baseUrl}/api/agent-machines/queue/j-risk/approve`, { method: 'POST', body: '{}' });
+      assert.equal(noAuth.status, 401);
+      const wrongRole = await fetch(`${srv.baseUrl}/api/agent-machines/queue/j-risk/reject`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${makeToken('VIEWER')}` },
+        body: '{}',
+      });
+      assert.equal(wrongRole.status, 403, 'คนไม่มีสิทธิ์ห้ามปล่อยงานเสี่ยงเข้าคิว');
+      assert.equal(updateManyCalls.length, 0, 'คนไม่มีสิทธิ์ห้ามแตะฐานข้อมูล');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('GET /queue คืน canApprove=true เฉพาะงานที่รออนุมัติ (ให้ UI ใช้แสดงปุ่ม)', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/queue`, {
+        headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json() as any;
+      const risky = body.jobs.find((j: any) => j.id === 'j-risk');
+      const safe = body.jobs.find((j: any) => j.id === 'j-safe');
+      assert.equal(risky.canApprove, true, 'งานที่รออนุมัติ UI ต้องกดปุ่มได้');
+      assert.equal(safe.canApprove, false, 'งานปกติห้ามขึ้นปุ่มอนุมัติ');
     } finally {
       await srv.close();
     }

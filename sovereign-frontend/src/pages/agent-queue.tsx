@@ -33,6 +33,7 @@ interface QueueRow {
   screenshotUrl: string | null;
   createdAt: string | null;
   canCancel: boolean;
+  canApprove: boolean;
 }
 
 interface MachineRow {
@@ -165,7 +166,7 @@ export default function AgentQueuePage() {
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setMessage(
         body.needsApproval
-          ? "งานนี้ถูกจัดว่าเสี่ยง — รอกดอนุมัติใน Telegram"
+          ? "งานนี้ถูกจัดว่าเสี่ยง — ค้างไว้รอคุณกด ‘อนุมัติให้รัน’ ที่รายการงานด้านล่าง (หรือใน Telegram)"
           : "ส่งเข้าคิวแล้ว เครื่องจะหยิบไปทำ"
       );
       setForm(emptyForm);
@@ -177,7 +178,7 @@ export default function AgentQueuePage() {
     }
   }
 
-  async function act(id: string, action: "cancel" | "repeat") {
+  async function act(id: string, action: "cancel" | "repeat" | "approve" | "reject") {
     setBusy(true);
     setError("");
     setMessage("");
@@ -185,11 +186,19 @@ export default function AgentQueuePage() {
       const res = await authFetch(`${API}/api/agent-machines/queue/${id}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify({ actor: useAuthStore.getState().user?.username || "web" }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setMessage(action === "cancel" ? "ยกเลิกงานแล้ว" : "เพิ่มงานซ้ำลงคิวแล้ว");
+      setMessage(
+        action === "cancel"
+          ? "ยกเลิกงานแล้ว"
+          : action === "repeat"
+            ? "เพิ่มงานซ้ำลงคิวแล้ว"
+            : action === "approve"
+              ? "อนุมัติแล้ว — เครื่องจะหยิบงานนี้ไปทำ"
+              : "ปฏิเสธงานนี้แล้ว เครื่องจะไม่รับงานนี้ไปทำ"
+      );
       await load();
     } catch (e: any) {
       setError(e.message || "ทำรายการไม่สำเร็จ");
@@ -595,6 +604,24 @@ export default function AgentQueuePage() {
                     )}
 
                     <div className="mt-2 flex gap-2">
+                      {j.canApprove && (
+                        <>
+                          <button
+                            onClick={() => void act(j.id, "approve")}
+                            disabled={busy}
+                            className="rounded border border-emerald-700 bg-emerald-950/60 px-2 py-1 text-[11px] text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 disabled:opacity-50"
+                          >
+                            อนุมัติให้รัน
+                          </button>
+                          <button
+                            onClick={() => void act(j.id, "reject")}
+                            disabled={busy}
+                            className="rounded border border-rose-800 px-2 py-1 text-[11px] text-rose-300 hover:border-rose-600 hover:text-rose-200 disabled:opacity-50"
+                          >
+                            ปฏิเสธ
+                          </button>
+                        </>
+                      )}
                       {j.canCancel && (
                         <button
                           onClick={() => void act(j.id, "cancel")}
