@@ -14,6 +14,7 @@ export const common = {
     ota: 'OTA Updates',
     security: 'Cyber Security',
     aiAgent: 'AI Agent',
+    agentQueue: 'Agent Queue',
     ai: 'AI Command Center',
     vision: 'Vision AI',
     property: 'Property Map',
