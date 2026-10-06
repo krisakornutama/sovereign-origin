@@ -144,6 +144,8 @@ tools/*
 !tools/map-owners.mjs
 !tools/gen-module-docs.mjs
 !tools/auto-doc-block.mjs
+# lib ของเทสต์ env-secret-ownership — ไม่มีไฟล์นี้ใน repo = clone สด/CI พังเงียบ (เจอจริงบน MAIN)
+!tools/env-secret-ownership.mjs
 !tools/check-parity.mjs
 !tools/
 !tools/install/
