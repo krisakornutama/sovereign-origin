@@ -1,6 +1,8 @@
 import './setup-env';
 import { describe, test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { mockModel, createTestServer, makeToken } from './helpers';
 import { prisma } from '../src/lib/prisma';
 import { hashToken } from '../src/services/agent-machines.service';
@@ -295,6 +297,128 @@ describe('agent-machines routes — ตั้งเบอร์โทร', () =>
       });
       assert.equal(wrongRole.status, 403);
       assert.equal(Object.keys(phoneStore).length, 0, 'คนไม่มีสิทธิ์ห้ามเขียนเบอร์ลง DB');
+    } finally {
+      await srv.close();
+    }
+  });
+});
+
+// red-first (chunk 2): ก่อนมี route นี้ runner จับภาพหน้าจอได้แต่ไม่มีที่ส่ง
+// => screenshot_url ว่างตลอด ภาพจบงานไม่มีทางไปถึงผู้ใช้
+// ต้องมี x-machine-token เท่านั้น (ไม่ใช่ JWT ของคน) และไฟล์ต้องไม่หลุดออกนอกโฟลเดอร์
+// เก็บเป็น relative path /api/agent-machines/screenshots/<ไฟล์> เพื่อให้ UI เรียกผ่าน authFetch ได้ตรง ๆ
+
+const shotsDir = path.resolve(process.cwd(), '.tmp-orch-shots');
+
+describe('agent-machines routes — ภาพหน้าจอตอนจบงาน', () => {
+  beforeEach(() => {
+    process.env.ORCHESTRATOR_SCREENSHOT_DIR = shotsDir;
+    fs.rmSync(shotsDir, { recursive: true, force: true });
+    mockModel(prisma as any, 'agentJob', {
+      findUnique: async (args: any) => ({ id: args.where.id, machine_id: 'm-1' }),
+      update: async (args: any) => ({ id: args.where.id, ...args.data }),
+    });
+  });
+
+  test('POST /jobs/:id/screenshot ปฏิเสธเมื่อไม่มี machine token (401)', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const fd = new FormData();
+      fd.append('file', new Blob([Buffer.from('x')], { type: 'image/png' }), 'shot.png');
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/jobs/j-1/screenshot`, { method: 'POST', body: fd });
+      assert.equal(res.status, 401, 'ต้องไม่ให้คนไม่มี token อัปโหลด');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('POST /jobs/:id/screenshot เก็บไฟล์จริง + ตั้ง screenshot_url ให้งาน', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const fd = new FormData();
+      fd.append('file', new Blob([Buffer.from('fake-png-bytes')], { type: 'image/png' }), 'shot.png');
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/jobs/j-1/screenshot`, {
+        method: 'POST',
+        headers: { 'x-machine-token': 'valid-token' },
+        body: fd,
+      });
+      assert.equal(res.status, 201);
+      const body = await res.json() as any;
+      assert.match(body.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
+      const fname = body.screenshotUrl.split('/').pop();
+      assert.ok(fs.existsSync(path.join(shotsDir, fname)), 'ไฟล์ต้องอยู่บนดิสก์จริง');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('POST /jobs/:id/screenshot ปฏิเสธไฟล์ที่ไม่ใช่ภาพ และไม่เขียนลงดิสก์เลย', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const fd = new FormData();
+      fd.append('file', new Blob([Buffer.from('MZ')], { type: 'application/octet-stream' }), 'evil.exe');
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/jobs/j-1/screenshot`, {
+        method: 'POST',
+        headers: { 'x-machine-token': 'valid-token' },
+        body: fd,
+      });
+      assert.equal(res.status, 400);
+      const written = fs.existsSync(shotsDir) ? fs.readdirSync(shotsDir).length : 0;
+      assert.equal(written, 0, 'ไฟล์ผิดชนิดต้องไม่ถูกเขียนบนดิสก์');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('GET /screenshots/:file ต้องมี JWT จึงเปิดได้', async () => {
+    fs.mkdirSync(shotsDir, { recursive: true });
+    fs.writeFileSync(path.join(shotsDir, 'job-j-1-x.png'), Buffer.from('png'));
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const noAuth = await fetch(`${srv.baseUrl}/api/agent-machines/screenshots/job-j-1-x.png`);
+      assert.equal(noAuth.status, 401, 'ภาพหน้าจอของเครื่องเป็นของส่วนตัว — ห้ามเปิดสาธารณะ');
+      const ok = await fetch(`${srv.baseUrl}/api/agent-machines/screenshots/job-j-1-x.png`, {
+        headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+      });
+      assert.equal(ok.status, 200);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('GET /screenshots/:file ปฏิเสธ path traversal', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines/screenshots/..%2f..%2fpackage.json`, {
+        headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+      });
+      assert.ok(res.status === 400 || res.status === 404, `ต้องไม่หลุดออกนอกโฟลเดอร์ (ได้ ${res.status})`);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  // เทสต์ข้ามโปรเจ็กต์: ใช้ฟังก์ชัน uploadScreenshot ตัวจริงของ runner ยิงเข้า route จริง
+  // เพื่อกัน field name / filename / header หลุดจากกัน (เทสต์ฝั่งเดียวจับ drift ไม่ได้)
+  test('e2e — uploadScreenshot ของ runner ส่งเข้าถึง route จริงได้', async () => {
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const { uploadScreenshot } = await import('../../agent-runner/src/runner.mjs');
+      const out = await uploadScreenshot({
+        hubUrl: srv.baseUrl,
+        token: 'valid-token',
+        jobId: 'j-1',
+        buffer: Buffer.from('PNG-BYTES'),
+      });
+      assert.match(out.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
+      const fname = out.screenshotUrl.split('/').pop();
+      assert.ok(fs.existsSync(path.join(shotsDir, fname)), 'ไฟล์ที่ runner ส่งต้องถึงดิสก์จริง');
     } finally {
       await srv.close();
     }

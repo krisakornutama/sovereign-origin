@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { pollOnce, runJob } from '../src/runner.mjs';
+import { pollOnce, runJob, uploadScreenshot } from '../src/runner.mjs';
 
 function startFakeHub({ jobs = [], token = 'tok-abc' } = {}) {
   const seen = { paths: [], auth: [], results: [] };
@@ -134,6 +134,64 @@ test('e2e — งานที่ executor ใช้ไม่ได้ ต้อ�
     assert.match(hub.seen.results[0].error, /freebuff|headless/i);
   } finally {
     await hub.close();
+  }
+});
+
+// red-first (chunk 2): ฟอร์แมต multipart ที่ runner ส่ง ต้องตรงกับที่ HUB route รับ
+// (field 'file' · header x-machine-token · path /jobs/:id/screenshot) — ผิดจุดเดียว = ภาพไม่ถึง
+
+test('e2e — อัปโหลดภาพหน้าจอเป็น multipart ฟิลด์ file พร้อม x-machine-token ให้ HUB จริง', async () => {
+  const received = [];
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      received.push({
+        url: req.url,
+        token: req.headers['x-machine-token'],
+        ctype: req.headers['content-type'],
+        body: Buffer.concat(chunks).toString('latin1'),
+      });
+      res.writeHead(201, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, screenshotUrl: '/api/agent-machines/screenshots/x.png' }));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  try {
+    const out = await uploadScreenshot({
+      hubUrl: `http://127.0.0.1:${port}`,
+      token: 'tok-abc',
+      jobId: 'j-1',
+      buffer: Buffer.from('PNGDATA'),
+    });
+    assert.equal(out.screenshotUrl, '/api/agent-machines/screenshots/x.png');
+    assert.equal(received.length, 1);
+    assert.equal(received[0].url, '/api/agent-machines/jobs/j-1/screenshot');
+    assert.equal(received[0].token, 'tok-abc');
+    assert.match(received[0].ctype, /^multipart\/form-data; boundary=/);
+    assert.match(received[0].body, /name="file"/);
+    assert.match(received[0].body, /filename="screenshot\.png"/);
+    assert.match(received[0].body, /PNGDATA/);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('e2e — HUB ตอบปฏิเสธการอัปโหลด ต้อง throw ให้ caller จับได้', async () => {
+  const server = createServer((req, res) => {
+    res.writeHead(401, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: 'invalid machine token' }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  try {
+    await assert.rejects(
+      () => uploadScreenshot({ hubUrl: `http://127.0.0.1:${port}`, token: 'bad', jobId: 'j-1', buffer: Buffer.from('x') }),
+      /401/,
+    );
+  } finally {
+    await new Promise((r) => server.close(r));
   }
 });
 
