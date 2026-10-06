@@ -12,7 +12,9 @@ import {
   runJob,
   pollOnce,
   createRunner,
+  resolveCaptureScreenshot,
 } from '../src/runner.mjs';
+import { captureScreenshot } from '../src/screenshot.mjs';
 
 test('supportsExecutor กรองเฉพาะ executor ที่เครื่องนี้เปิดใช้', () => {
   assert.equal(supportsExecutor(['echo', 'opencode'], 'echo'), true);
@@ -151,4 +153,115 @@ test('createRunner — คืนฟังก์ชัน start/stop ได้ �
   assert.equal(typeof runner.start, 'function');
   assert.equal(typeof runner.stop, 'function');
   assert.equal(runner.isRunning(), false);
+});
+
+// ── ภาพหน้าจอตอนจบงาน (chunk 2) ──
+// red-first: ก่อนหน้านี้ runner ไม่จับภาพเลย ⇒ ภาพจบงานไม่มีทางถึงผู้ใช้
+
+test('resolveCaptureScreenshot — เปิดเป็นค่าเริ่มต้น ปิดได้เมื่อสั่งชัด', () => {
+  assert.equal(resolveCaptureScreenshot(undefined), true, 'ไม่ตั้งค่า = เปิด (ตามแผนงาน)');
+  assert.equal(resolveCaptureScreenshot('true'), true);
+  assert.equal(resolveCaptureScreenshot('1'), true);
+  assert.equal(resolveCaptureScreenshot('false'), false);
+  assert.equal(resolveCaptureScreenshot('0'), false);
+  assert.equal(resolveCaptureScreenshot('no'), false);
+  assert.equal(resolveCaptureScreenshot('off'), false);
+});
+
+test('captureScreenshot — แพลตฟอร์มที่ไม่ใช่ Windows คืน null (ไม่ทำให้ runner ตาย)', async () => {
+  assert.equal(await captureScreenshot({ platform: 'linux' }), null);
+});
+
+test('captureScreenshot — Windows เรียกคำสั่งจับภาพแล้วคืน Buffer', async () => {
+  const b64 = Buffer.from('hello-png').toString('base64');
+  let called = 0;
+  const buf = await captureScreenshot({
+    platform: 'win32',
+    run: async () => {
+      called += 1;
+      return `${b64}\n`;
+    },
+  });
+  assert.equal(called, 1);
+  assert.ok(Buffer.isBuffer(buf));
+  assert.equal(buf.toString(), 'hello-png');
+});
+
+test('captureScreenshot — คำสั่งจับภาพล้มต้องคืน null ไม่โยน error', async () => {
+  const buf = await captureScreenshot({
+    platform: 'win32',
+    run: async () => {
+      throw new Error('powershell not found');
+    },
+  });
+  assert.equal(buf, null);
+});
+
+test('pollOnce — เปิดจับภาพต้องอัปโหลดก่อนรายงานผล และแนบ URL กลับไป', async () => {
+  const order = [];
+  const hub = {
+    heartbeat: async () => ({ status: 'online' }),
+    pullJobs: async () => [{ id: 'j-1', executor: 'echo', prompt: 'x' }],
+    uploadScreenshot: async (id) => {
+      order.push(`upload:${id}`);
+      return { screenshotUrl: '/api/agent-machines/screenshots/x.png' };
+    },
+    reportResult: async (_id, r) => {
+      order.push(`report:${r.screenshotUrl}`);
+    },
+  };
+  const out = await pollOnce({
+    machineName: 'r',
+    hub,
+    runner: { machineName: 'r', captureScreenshot: true, capture: async () => Buffer.from('png') },
+  });
+  assert.deepEqual(order, ['upload:j-1', 'report:/api/agent-machines/screenshots/x.png']);
+  assert.equal(out.dispatched, 1);
+});
+
+test('pollOnce — ปิดจับภาพต้องไม่จับและไม่อัปโหลดเลย', async () => {
+  let uploaded = 0;
+  const hub = {
+    heartbeat: async () => ({ status: 'online' }),
+    pullJobs: async () => [{ id: 'j-1', executor: 'echo', prompt: 'x' }],
+    uploadScreenshot: async () => {
+      uploaded += 1;
+    },
+    reportResult: async () => {},
+  };
+  await pollOnce({
+    machineName: 'r',
+    hub,
+    runner: {
+      machineName: 'r',
+      captureScreenshot: false,
+      capture: async () => {
+        throw new Error('ต้องไม่ถูกเรียกเมื่อปิดจับภาพ');
+      },
+    },
+  });
+  assert.equal(uploaded, 0);
+});
+
+test('pollOnce — อัปโหลดภาพล้มต้องยังรายงานผลงานสำเร็จ (ห้ามกลืนงาน)', async () => {
+  let reported = null;
+  const hub = {
+    heartbeat: async () => ({ status: 'online' }),
+    pullJobs: async () => [{ id: 'j-1', executor: 'echo', prompt: 'x' }],
+    uploadScreenshot: async () => {
+      throw new Error('ECONNRESET');
+    },
+    reportResult: async (_id, r) => {
+      reported = r;
+    },
+  };
+  const out = await pollOnce({
+    machineName: 'r',
+    hub,
+    runner: { machineName: 'r', captureScreenshot: true, capture: async () => Buffer.from('png') },
+  });
+  assert.equal(out.dispatched, 1);
+  assert.equal(out.failed, 0, 'งานทำสำเร็จแล้ว ภาพส่งไม่ได้ต้องไม่ทำให้กลายเป็น error');
+  assert.equal(reported.status, 'done');
+  assert.equal(reported.screenshotUrl, null);
 });

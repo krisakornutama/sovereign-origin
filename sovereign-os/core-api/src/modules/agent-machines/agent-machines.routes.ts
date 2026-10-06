@@ -8,8 +8,10 @@
 //
 // ทั้งสองทางมี try/catch ในตัวเอง เพราะ Express 4 ไม่ส่ง error ออกจาก
 // async handler ที่ throw (คนเรียกจะค้างไม่ตอบ)
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import fs from 'node:fs';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { hardenUpload, handledUpload, resolveInsideRoot, IMAGE_MIME } from '../../lib/harden-upload';
 import {
   prisma,
   authenticateToken,
@@ -37,8 +39,23 @@ import {
   clearAlertPhone,
   maskPhone,
 } from '../../services/orchestrator-alert-phone.service';
+import {
+  saveJobScreenshot,
+  screenshotDir,
+} from '../../services/orchestrator-screenshot.service';
 
 const router = Router();
+
+/** นามสกุลภาพหน้าจอที่ยอมรับ — runner ส่ง PNG เสมอ แต่เปิดรับ jpeg/webp ด้วย */
+const SCREENSHOT_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
+
+// รับภาพเข้าหน่วยความจำก่อน — service เป็นคนเขียนดิสก์ด้วยชื่อไฟล์สุ่มของตัวเอง
+const screenshotUpload = hardenUpload({
+  allowedExtensions: SCREENSHOT_EXTS,
+  maxSizeMB: 10,
+  mode: 'memory',
+  mimeAllow: IMAGE_MIME,
+});
 
 /** ดึง machine จาก x-machine-token หรือ Authorization: Bearer <token> */
 async function authenticateMachineToken(req: Request, res: Response): Promise<MachineRow | null> {
@@ -51,6 +68,20 @@ async function authenticateMachineToken(req: Request, res: Response): Promise<Ma
     return null;
   }
   return machine;
+}
+
+/** middleware: บังคับ machine token แล้วฝาก machine ไว้บน request (handler ใช้ต่อ) */
+function requireMachineToken(req: Request, res: Response, next: NextFunction) {
+  authenticateMachineToken(req, res)
+    .then((machine) => {
+      if (!machine) return; // 401 ถูกส่งไปแล้วใน authenticateMachineToken
+      (req as Request & { machine?: MachineRow }).machine = machine;
+      next();
+    })
+    .catch((err) => {
+      console.error('machine token auth error:', err instanceof Error ? err.message : err);
+      res.status(500).json({ error: 'Machine auth failed' });
+    });
 }
 
 // ── ฝั่งผู้ใช้ (JWT) ──
@@ -197,6 +228,25 @@ router.post('/call-test', authenticate, requireRole('SUPERADMIN'), async (_req: 
   }
 });
 
+// GET /api/agent-machines/screenshots/:file — เปิดภาพหน้าจอตอนจบงาน (ต้องล็อกอิน)
+// ไม่เปิดสาธารณะ: ภาพหน้าจอของเครื่องเป็นข้อมูลส่วนตัวของผู้ใช้
+router.get('/screenshots/:file', authenticate, (req: Request, res: Response) => {
+  let resolved: string;
+  try {
+    // resolveInsideRoot กัน path traversal (..\..\ หรือ absolute) ก่อนแตะดิสก์เสมอ
+    resolved = resolveInsideRoot(screenshotDir(), req.params.file);
+  } catch {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  try {
+    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File not found' });
+    res.sendFile(resolved);
+  } catch (err) {
+    console.error('GET /api/agent-machines/screenshots error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to serve screenshot' });
+  }
+});
+
 // POST /api/agent-machines/queue/:id/cancel
 router.post('/queue/:id/cancel', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   try {
@@ -275,5 +325,28 @@ router.post('/jobs/:id/result', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to record job result' });
   }
 });
+
+// POST /api/agent-machines/jobs/:id/screenshot — runner ส่งภาพหน้าจอตอนจบงาน
+// auth ด้วย x-machine-token เท่านั้น และงานต้องเป็นของเครื่องที่อัปโหลดจริง
+router.post(
+  '/jobs/:id/screenshot',
+  requireMachineToken,
+  handledUpload(screenshotUpload, 'file'),
+  async (req: Request, res: Response) => {
+    try {
+      const machine = (req as Request & { machine?: MachineRow }).machine as MachineRow;
+      const file = (req as Request & { file?: { buffer?: Buffer; originalname?: string } }).file;
+      if (!file?.buffer?.length) {
+        return res.status(400).json({ error: 'ต้องแนบไฟล์ภาพในฟิลด์ file' });
+      }
+      const url = await saveJobScreenshot(req.params.id, machine.id, file.buffer, String(file.originalname || ''));
+      if (!url) return res.status(404).json({ error: 'ไม่พบงานนี้สำหรับเครื่องที่อัปโหลด' });
+      res.status(201).json({ ok: true, screenshotUrl: url });
+    } catch (err) {
+      console.error('POST /api/agent-machines/jobs/:id/screenshot error:', err instanceof Error ? err.message : err);
+      res.status(500).json({ error: 'Failed to store screenshot' });
+    }
+  }
+);
 
 export default router;

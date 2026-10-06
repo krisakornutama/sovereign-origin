@@ -91,6 +91,8 @@ services:
       CALLER_FROM_NUMBER: ${CALLER_FROM_NUMBER:-}
       # fallback ของเบอร์โทรฉุกเฉิน (ถ้ายังไม่ได้ตั้งใน UI) — ต้องเป็น E.164
       CALLER_ALERT_PHONE: ${CALLER_ALERT_PHONE:-}
+      # โฟลเดอร์เก็บภาพหน้าจอตอนจบงาน (เว้นว่าง = /app/data/orchestrator-shots ที่ persist อยู่แล้ว)
+      ORCHESTRATOR_SCREENSHOT_DIR: ${ORCHESTRATOR_SCREENSHOT_DIR:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       # ลิงก์สาธารณะสำหรับ QR/ตามรอยล็อต (trace) — ตั้งเป็นโดเมนจริงเมื่อเปิดหน้าร้านสู่อินเทอร์เน็ต
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}

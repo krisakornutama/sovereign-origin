@@ -287,6 +287,21 @@ export default function AgentQueuePage() {
     }
   }
 
+  async function openScreenshot(url: string) {
+    setError("");
+    try {
+      // endpoint ภาพต้องมี JWT — <a href> แนบ header ไม่ได้ จึงดึงเป็น blob แล้วเปิด
+      const res = await authFetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (e: any) {
+      setError(e.message || "เปิดภาพหน้าจอไม่สำเร็จ");
+    }
+  }
+
   if (!isHydrated) return null;
   if (!isAuthenticated) {
     return (
@@ -564,9 +579,12 @@ export default function AgentQueuePage() {
                     {!j.error && j.result && <p className="mt-1 line-clamp-2 text-[11px] text-emerald-400">{j.result}</p>}
 
                     {j.screenshotUrl && (
-                      <a href={j.screenshotUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline">
+                      <button
+                        onClick={() => void openScreenshot(j.screenshotUrl as string)}
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
+                      >
                         <Icon name="external" size={12} /> ดูภาพหน้าจอตอนจบงาน
-                      </a>
+                      </button>
                     )}
 
                     {j.logTail && (

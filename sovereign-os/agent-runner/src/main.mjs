@@ -9,7 +9,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRunner } from './runner.mjs';
+import { createRunner, uploadScreenshot, resolveCaptureScreenshot } from './runner.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const envPath = join(here, '..', '.env');
@@ -41,6 +41,8 @@ const config = {
   intervalMs: Number(env.POLL_INTERVAL_MS || 15000),
   opencodeBin: env.OPENCODE_BIN || 'opencode',
   heartbeatSec: Number(env.HEARTBEAT_SEC || 30),
+  // จับภาพหน้าจอตอนจบงาน — เปิดเป็นค่าเริ่มต้น (ปิดได้ด้วย CAPTURE_SCREENSHOT=false)
+  captureScreenshot: resolveCaptureScreenshot(env.CAPTURE_SCREENSHOT),
 };
 
 if (!config.token) {
@@ -48,7 +50,10 @@ if (!config.token) {
   process.exit(1);
 }
 
-console.log(`[runner] เครื่อง=${config.machineName} hub=${config.hubUrl} executor=${config.executors.join(',')}`);
+console.log(
+  `[runner] เครื่อง=${config.machineName} hub=${config.hubUrl} executor=${config.executors.join(',')}` +
+    ` captureScreenshot=${config.captureScreenshot}`
+);
 
 async function api(path, body) {
   const res = await fetch(`${config.hubUrl}${path}`, {
@@ -71,12 +76,19 @@ const hub = {
     return (out.jobs || []).filter((j) => config.executors.includes(j.executor));
   },
   reportResult: async (id, payload) => api(`/api/agent-machines/jobs/${id}/result`, payload),
+  // ภาพหน้าจอเป็น multipart ไม่ใช่ JSON — ใช้ uploadScreenshot โดยเฉพาะ
+  uploadScreenshot: (id, buffer) =>
+    uploadScreenshot({ hubUrl: config.hubUrl, token: config.token, jobId: id, buffer }),
 };
 
 const runner = createRunner({
   config,
   hub,
-  runner: { machineName: config.machineName, opencodeBin: config.opencodeBin },
+  runner: {
+    machineName: config.machineName,
+    opencodeBin: config.opencodeBin,
+    captureScreenshot: config.captureScreenshot,
+  },
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

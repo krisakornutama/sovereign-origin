@@ -138,4 +138,8 @@ ipconfig    # บน Windows — ดู IPv4 Address ของการ์ด LA
 - **โมเดลที่ไม่รองรับ tool calling ใช้เป็นตัวแก้โค้ดไม่ได้** (เช่น `gemma3:4b` ของ Ollama
   จะได้ `does not support tools`) — ใช้เป็น "คนตัดสินใจ" ของ HUB ได้ แต่ใช้สั่งงานไม่ได้
 - **OpenCode ต้องมีเครดิตในบัญชี** — ถ้าหมดจะได้ `Insufficient account funds`
-- **ภาพหน้าจอ** เก็บในฟิลด์ `screenshot_url` ตอนจบงาน (runner ยังไม่ได้จับภาพให้)
+- **ภาพหน้าจอ** จับอัตโนมัติตอนจบงาน (ค่าเริ่มต้น) แล้วส่งขึ้น HUB เก็บเป็น `screenshot_url`
+  ดูได้จากปุ่ม "ดูภาพหน้าจอตอนจบงาน" ในหน้า Agent Queue
+  · ปิดได้ด้วย `CAPTURE_SCREENSHOT=false` ในไฟล์ `.env` ของเครื่อง runner
+  · ภาพเก็บฝั่ง HUB ที่ `core-api/data/orchestrator-shots` (persist ผ่าน mount `/app/data`)
+  · ต้องมี PowerShell — แพลตฟอร์มอื่นจะข้ามการจับภาพไปเงียบ ๆ ไม่ทำให้งานพัง

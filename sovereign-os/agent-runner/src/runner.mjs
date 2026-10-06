@@ -9,6 +9,7 @@
 // - งานที่พังต้องรายงานกลับเสมอ ห้ามเงียบ (ผู้ใช้เห็นสถานะตรงไปตรงมา)
 // - ถ้า HUB ล่ม ต้องรอดู ไม่ crash
 import { spawn } from 'node:child_process';
+import { captureScreenshot } from './screenshot.mjs';
 
 const DEFAULT_OPENCODE_BIN = 'opencode';
 const DEFAULT_JOB_TIMEOUT_MS = 30 * 60 * 1000; // งาน agent เขียนโค้ดใช้เวลานาน
@@ -17,6 +18,16 @@ const DEFAULT_JOB_TIMEOUT_MS = 30 * 60 * 1000; // งาน agent เขีย�
 export function supportsExecutor(enabled, executor) {
   if (!Array.isArray(enabled) || enabled.length === 0) return false;
   return enabled.map(String).includes(String(executor));
+}
+
+/**
+ * ตีความ CAPTURE_SCREENSHOT — เปิดเป็นค่าเริ่มต้น ปิดเมื่อสั่งชัดเท่านั้น
+ * รองรับทั้ง 'false', '0', 'no', 'off' (ผู้ใช้อาจเขียนแบบไหนก็ได้)
+ */
+export function resolveCaptureScreenshot(raw) {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
+  return true;
 }
 
 /**
@@ -129,6 +140,31 @@ export async function runJob(job, config = {}) {
 }
 
 /**
+ * อัปโหลดภาพหน้าจอขึ้น HUB (multipart/form-data ฟิลด์ 'file')
+ *
+ * ใช้ FormData/Blob ที่มีใน Node >= 20 — ไม่เพิ่ม dependency
+ * ฟอร์แมตนี้ต้องตรงกับ route POST /api/agent-machines/jobs/:id/screenshot เป๊ะ
+ * (ผิดจุดเดียว = ภาพไม่ถึงผู้ใช้) จึงมี e2e เทสต์กับ HTTP server จริงคุมไว้
+ *
+ * throw เมื่อไม่ ok — ให้ caller (pollOnce) จับแล้วไปต่อ ไม่ลากงานให้พัง
+ */
+export async function uploadScreenshot({ hubUrl, token, jobId, buffer, fetchImpl = fetch }) {
+  const form = new FormData();
+  form.append('file', new Blob([buffer], { type: 'image/png' }), 'screenshot.png');
+  const base = String(hubUrl ?? '').replace(/\/$/, '');
+  const res = await fetchImpl(`${base}/api/agent-machines/jobs/${jobId}/screenshot`, {
+    method: 'POST',
+    headers: { 'x-machine-token': token },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`screenshot -> HTTP ${res.status} ${text.slice(0, 120)}`);
+  }
+  return await res.json();
+}
+
+/**
  * หนึ่งรอบของ loop: heartbeat → pull → รัน → รายงาน
  * HUB ล่ม = คืน error ให้ caller รอบหน้า (ไม่ throw ให้ process ตาย)
  */
@@ -144,12 +180,26 @@ export async function pollOnce({ hub, runner, machineName }) {
       const result = await runJob(job, { ...runner, machineName: machineName ?? runner?.machineName });
       dispatched += 1;
       if (result.status !== 'done') failed += 1;
+      // ภาพหน้าจอตอนจบงาน — จับ/ส่งไม่สำเร็จต้องไม่ทำให้งานที่สำเร็จกลายเป็น error
+      let screenshotUrl = null;
+      if (runner?.captureScreenshot && hub.uploadScreenshot) {
+        try {
+          const shot = await (runner.capture ?? captureScreenshot)();
+          if (shot) {
+            const up = await hub.uploadScreenshot(job.id, shot);
+            screenshotUrl = up?.screenshotUrl ?? null;
+          }
+        } catch (err) {
+          console.error(`[runner] ส่งภาพหน้าจอไม่สำเร็จ: ${err?.message || err}`);
+        }
+      }
       await hub.reportResult(job.id, {
         status: result.status,
         result: result.status === 'done' ? result.summary : null,
         error: result.status === 'done' ? null : result.summary,
         exitCode: result.exitCode,
         logTail: result.logTail ?? null,
+        screenshotUrl,
       });
     }
     return { dispatched, failed };

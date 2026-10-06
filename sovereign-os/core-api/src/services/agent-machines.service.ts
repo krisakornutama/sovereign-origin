@@ -247,3 +247,20 @@ export async function reportJobResult(jobId: string, input: JobResultInput) {
   const updated = await prisma.agentJob.update({ where: { id: jobId }, data: data as any });
   return updated;
 }
+
+/**
+ * machine_id ของงาน หรือ null ถ้าไม่พบ
+ *
+ * service นี้เป็นเจ้าของตาราง agent_jobs ถ้าโมดูลอื่น (เช่น ชั้นเก็บภาพหน้าจอ)
+ * ต้องอ่าน/เขียนคอลัมน์ของ agent_jobs ให้เรียกผ่านฟังก์ชันในไฟล์นี้ ไม่แตะ prisma เอง
+ * (arch-gate บังคับเส้นข้ามโมดูล — ดู tools/boundary-baseline.json)
+ */
+export async function jobMachineId(jobId: string): Promise<string | null> {
+  const job = await prisma.agentJob.findUnique({ where: { id: jobId }, select: { machine_id: true } });
+  return job?.machine_id ?? null;
+}
+
+/** ตั้ง URL ภาพหน้าจอตอนจบงานให้งานหนึ่ง (สำหรับชั้นเก็บภาพที่อัปโหลดจาก runner) */
+export async function setJobScreenshotUrl(jobId: string, url: string): Promise<void> {
+  await prisma.agentJob.update({ where: { id: jobId }, data: { screenshot_url: String(url) } });
+}
