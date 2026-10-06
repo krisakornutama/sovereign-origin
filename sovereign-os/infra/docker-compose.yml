@@ -77,6 +77,20 @@ services:
       OTA_TOKEN: ${OTA_TOKEN:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # ── Agent Orchestration: ระดับการแจ้งเตือนงานที่รันบนเครื่องคอม ──
+      # ก่อนเพิ่มบรรทัดนี้ container ไม่เห็นค่าเหล่านี้เลย ⇒ ผู้ใช้ตั้งในไฟล์นี้แล้ว
+      # ระบบก็ยังไม่เห็น (ชั้น call เปิดสวิตช์ได้แต่โทรไม่ออก) — ตัวแปรที่ไม่ประกาศที่นี่
+      # ไม่เคยเข้า container ไม่ว่าจะตั้งในไฟล์นี้แค่ไหน
+      ORCHESTRATOR_ALERT_TIERS: ${ORCHESTRATOR_ALERT_TIERS:-text}
+      # none = ไม่โทรออก (ค่าเริ่มต้นที่ปลอดภัย) · bland = Bland AI · twilio = Twilio
+      CALL_PROVIDER: ${CALL_PROVIDER:-none}
+      BLAND_API_KEY: ${BLAND_API_KEY:-}
+      BLAND_VOICE_ID: ${BLAND_VOICE_ID:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      CALLER_FROM_NUMBER: ${CALLER_FROM_NUMBER:-}
+      # fallback ของเบอร์โทรฉุกเฉิน (ถ้ายังไม่ได้ตั้งใน UI) — ต้องเป็น E.164
+      CALLER_ALERT_PHONE: ${CALLER_ALERT_PHONE:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       # ลิงก์สาธารณะสำหรับ QR/ตามรอยล็อต (trace) — ตั้งเป็นโดเมนจริงเมื่อเปิดหน้าร้านสู่อินเทอร์เน็ต
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}

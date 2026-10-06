@@ -58,6 +58,9 @@ interface CallStatus {
   enabled: boolean;
   blandReady: boolean;
   twilioReady: boolean;
+  /** มีเบอร์ให้โทรแล้วหรือยัง — ไม่มี = เปิด provider แล้วก็โทรไม่ออก */
+  hasPhone: boolean;
+  phoneMasked: string;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -98,6 +101,7 @@ export default function AgentQueuePage() {
   const [form, setForm] = useState(emptyForm);
   const [registerName, setRegisterName] = useState("");
   const [registerToken, setRegisterToken] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -218,6 +222,71 @@ export default function AgentQueuePage() {
     }
   }
 
+  async function savePhone(e: React.FormEvent) {
+    e.preventDefault();
+    if (!phoneInput.trim()) return setError("กรอกเบอร์โทรก่อนบันทึก");
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await authFetch(`${API}/api/agent-machines/call-phone`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneInput.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setMessage(`บันทึกเบอร์แล้ว (${body.phoneMasked}) — กดทดสอบโทรได้เลย`);
+      setPhoneInput("");
+      await load();
+    } catch (e: any) {
+      setError(e.message || "บันทึกเบอร์ไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearPhone() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await authFetch(`${API}/api/agent-machines/call-phone`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setMessage(body.hasPhone ? "ลบ override แล้ว — ยังใช้เบอร์จาก env อยู่" : "ลบเบอร์แล้ว");
+      await load();
+    } catch (e: any) {
+      setError(e.message || "ลบเบอร์ไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testCall() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await authFetch(`${API}/api/agent-machines/call-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setMessage(
+        body.ok
+          ? `กำลังโทรทดสอบผ่าน ${body.provider} — รอรับสาย`
+          : `ยังโทรไม่ออก: ${body.reason || "ไม่ทราบสาเหตุ"}`
+      );
+    } catch (e: any) {
+      setError(e.message || "ทดสอบโทรไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!isHydrated) return null;
   if (!isAuthenticated) {
     return (
@@ -302,6 +371,69 @@ export default function AgentQueuePage() {
               <code className="mono block break-all rounded bg-black/40 p-2">{registerToken}</code>
             </div>
           )}
+        </section>
+
+        {/* ── ระบบโทร ── */}
+        <section className="card p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-200">ระบบโทรแจ้งเตือน</h2>
+            {callStatus && (
+              <span className="text-[11px] text-gray-500">
+                provider: {callStatus.enabled ? callStatus.provider : "ปิดอยู่"}
+                {callStatus.enabled && !callStatus.blandReady && !callStatus.twilioReady && (
+                  <span className="text-amber-400"> · ยังไม่มีคีย์ของ provider</span>
+                )}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            เบอร์นี้คือปลายทางที่ระบบจะโทรหาตอนงานเสร็จ/รออนุมัติ — ต้องเป็นรูปแบบสากล E.164 (เช่น +66812345678)
+          </p>
+
+          {callStatus?.hasPhone ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/40 px-3 py-2">
+              <span className="text-sm text-gray-300">
+                เบอร์ปัจจุบัน: <code className="mono text-emerald-300">{callStatus.phoneMasked}</code>
+              </span>
+              <button
+                onClick={() => void testCall()}
+                disabled={busy}
+                className="rounded border border-emerald-700/60 px-3 py-1 text-[11px] text-emerald-300 disabled:opacity-50"
+              >
+                ทดสอบโทร
+              </button>
+              <button
+                onClick={() => void clearPhone()}
+                disabled={busy}
+                className="rounded border border-gray-700 px-3 py-1 text-[11px] text-gray-400 hover:border-rose-700 hover:text-rose-300 disabled:opacity-50"
+              >
+                ลบเบอร์
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-400">
+              ยังไม่ได้ตั้งเบอร์โทร — เปิด CALL_PROVIDER ไว้ก็โทรไม่ออกจนกว่าจะกรอกเบอร์ด้านล่าง
+            </p>
+          )}
+
+          <form onSubmit={savePhone} className="flex flex-wrap items-end gap-3 border-t border-gray-800 pt-4">
+            <label className="flex-1 min-w-[220px] text-xs text-gray-400">
+              เบอร์โทรปลายทาง (E.164)
+              <input
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="+66812345678"
+                className={inputCls}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-md border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-300 disabled:opacity-50"
+            >
+              {callStatus?.hasPhone ? "เปลี่ยนเบอร์" : "บันทึกเบอร์"}
+            </button>
+          </form>
         </section>
 
         {/* ── สั่งงาน ── */}

@@ -123,7 +123,7 @@ describe('orchestrator-notify — ส่งจริง', () => {
   });
 
   test('ไม่มีเบอร์โทร → ไม่ยิงโทรออกไปข้างนอก', async () => {
-    const d = deps();
+    const d = deps({ loadCallTo: async () => null } as any);
     const res = await notifyJobFinished(
       { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
       d,
@@ -169,6 +169,84 @@ describe('orchestrator-notify — ส่งจริง', () => {
     );
     assert.equal(d.called[0].to, '+66812345678');
     assert.match(d.called[0].message, /PC-2/);
+  });
+});
+
+// red-first: ก่อนแก้ ไม่มีที่ไหนส่ง callTo เลย ⇒ เปิด CALL_PROVIDER=bland ก็โทรไม่ออก
+// เพราะระบบไม่รู้จะโทรเบอร์ไหน (ผู้ใช้เปิดสวิตช์เห็นว่าพร้อม แต่กดแล้วไม่มีอะไรเกิดขึ้น)
+describe('orchestrator-notify — เบอร์โทรต้องมาจากที่เก็บจริง ไม่ใช่ค่าว่างตลอดไป', () => {
+  test('ไม่ส่ง callTo มา ระบบต้องไปหาเบอร์ที่ตั้งไว้เองแล้วโทร', async () => {
+    const d = deps({ loadCallTo: async () => '+66812345678' } as any);
+    const res = await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['call'] }
+    );
+    assert.equal(d.called.length, 1, 'ต้องโทรจริง ไม่ใช่ตกเพราะไม่มีใครส่ง callTo');
+    assert.equal(d.called[0].to, '+66812345678');
+    assert.equal(res.tiers[0].ok, true);
+  });
+
+  test('หาเบอร์ล้มเหลวต้องไม่ throw — งานที่เพิ่งเสร็จต้องไม่กลายเป็น error', async () => {
+    const d = deps({
+      loadCallTo: async () => {
+        throw new Error('DB down');
+      },
+    } as any);
+    const res = await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['call'] }
+    );
+    assert.equal(d.called.length, 0);
+    assert.equal(res.tiers[0].ok, false);
+  });
+
+  test('callTo ที่ส่งมาเองต้องชนะค่าที่หาจากที่เก็บ (ผู้ใช้บังคับต่องานได้)', async () => {
+    const d = deps({ loadCallTo: async () => '+66900000000' } as any);
+    await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['call'], callTo: '+66812345678' }
+    );
+    assert.equal(d.called[0].to, '+66812345678');
+  });
+
+  test('เบอร์ที่หามาต้องผ่าน E.164 ก่อนโทร — เบอร์ผิดรูปไม่ยิงออกนอกเครื่อง', async () => {
+    const d = deps({ loadCallTo: async () => '0812345678' } as any);
+    const res = await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['call'] }
+    );
+    assert.equal(d.called.length, 0, 'เบอร์ไม่ใช่ E.164 ห้ามยิง');
+    assert.match(String(res.tiers[0].reason), /E\.164/);
+  });
+
+  test('ไม่มี provider แล้วต้องยังทำงานต่อแบบ no-op ไม่ throw', async () => {
+    const d = deps({
+      loadCallTo: async () => '+66812345678',
+      call: async () => ({ ok: false, skipped: true, reason: 'CALL_PROVIDER=none — ไม่โทรออก' }) as any,
+    } as any);
+    const res = await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['text', 'call'] }
+    );
+    assert.equal(res.delivered, true, 'ข้อความสำเร็จก็นับว่าส่งถึงแล้ว');
+    assert.equal(d.sent.length, 1);
+    assert.match(String(res.tiers[1].reason), /provider/i);
+  });
+
+  test('ไม่มีเบอร์ในระบบเลย → ข้ามชั้น call เป็น no-op และบอกว่าไปตั้งที่ไหน', async () => {
+    const d = deps({ loadCallTo: async () => null } as any);
+    const res = await notifyJobFinished(
+      { status: 'done', jobId: 'job-1', machineName: 'PC-2', executor: 'echo', result: 'ok' },
+      d,
+      { tiers: ['text', 'call'] }
+    );
+    assert.equal(d.called.length, 0);
+    assert.match(String(res.tiers[1].reason), /Settings/);
   });
 });
 

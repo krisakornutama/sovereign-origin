@@ -30,7 +30,13 @@ import {
   repeatJob,
   queueStats,
 } from '../../services/orchestrator-queue.service';
-import { callerStatus } from '../../services/caller.service';
+import { callerStatus, placeCall } from '../../services/caller.service';
+import {
+  getAlertPhone,
+  setAlertPhone,
+  clearAlertPhone,
+  maskPhone,
+} from '../../services/orchestrator-alert-phone.service';
 
 const router = Router();
 
@@ -134,10 +140,60 @@ router.get('/queue', authenticate, async (req: Request, res: Response) => {
 // GET /api/agent-machines/call-status — ระบบโทรเปิดอยู่ไหม (ไม่คืน key)
 router.get('/call-status', authenticate, async (_req: Request, res: Response) => {
   try {
-    res.json(callerStatus());
+    // hasPhone สำคัญมาก: เดิมเปิดสวิตช์โทรได้แต่ไม่มีเบอร์ให้โทร ⇒ โทรไม่ออก
+    // UI ต้องเห็นค่านี้เพื่อบอกผู้ใช้ว่าต้องตั้งเบอร์ก่อน ไม่ใช่แค่เปิดสวิตช์
+    const phone = await getAlertPhone();
+    res.json({ ...callerStatus(), hasPhone: Boolean(phone), phoneMasked: maskPhone(phone) });
   } catch (err) {
     console.error('GET /api/agent-machines/call-status error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read caller status' });
+  }
+});
+
+// PUT /api/agent-machines/call-phone { phone } — ตั้งเบอร์ที่ระบบโทรจะใช้ (SUPERADMIN)
+// validate E.164 ตอนบันทึก (service) ไม่ใช่ตอนโทร — ผิดที่ตั้งครั้งเดียว ไม่ต้องรอวันโทรจริง
+router.put('/call-phone', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const phone = await setAlertPhone(req.body?.phone);
+    res.json({ ok: true, hasPhone: true, phoneMasked: maskPhone(phone) });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/E\.164/.test(msg)) return res.status(400).json({ error: msg });
+    console.error('PUT /api/agent-machines/call-phone error:', msg);
+    res.status(500).json({ error: 'Failed to save phone number' });
+  }
+});
+
+// DELETE /api/agent-machines/call-phone — ลบเบอร์ กลับไปใช้ค่าจาก env (SUPERADMIN)
+router.delete('/call-phone', authenticate, requireRole('SUPERADMIN'), async (_req: Request, res: Response) => {
+  try {
+    await clearAlertPhone();
+    const phone = await getAlertPhone();
+    res.json({ ok: true, hasPhone: Boolean(phone), phoneMasked: maskPhone(phone) });
+  } catch (err) {
+    console.error('DELETE /api/agent-machines/call-phone error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to clear phone number' });
+  }
+});
+
+// POST /api/agent-machines/call-test — ยิงสายทดสอบไปเบอร์ที่ตั้งไว้ (SUPERADMIN)
+// ปิดช่องสุดท้ายของ "เปิดสวิตช์โทรแล้วกดทดสอบแต่ไม่มีอะไรเกิดขึ้น":
+// เดิมไม่มีที่กรอกเบอร์ ไม่มี endpoint ทดสอบ ⇒ ผู้ใช้ไม่มีทางรู้ว่าระบบโทรใช้ได้จริงหรือยัง
+// ไม่ throw เด็ดขาด: provider ปิด/ไม่มี key = skipped ตั้งใจ ไม่ใช่ error ให้ UI ตกใจ
+router.post('/call-test', authenticate, requireRole('SUPERADMIN'), async (_req: Request, res: Response) => {
+  try {
+    const phone = await getAlertPhone();
+    if (!phone) {
+      return res.status(400).json({ error: 'ยังไม่ได้ตั้งเบอร์โทร — กรอกเบอร์ก่อนทดสอบ (Settings → ระบบโทร)' });
+    }
+    const result = await placeCall({
+      to: phone,
+      message: 'ทดสอบระบบแจ้งเตือน Sovereign Origin — ได้ยินข้อความนี้แปลว่าระบบโทรใช้งานได้',
+    });
+    res.json({ ...result, phoneMasked: maskPhone(phone) });
+  } catch (err) {
+    console.error('POST /api/agent-machines/call-test error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to place test call' });
   }
 });
 

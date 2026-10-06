@@ -46,7 +46,9 @@ npx prisma db execute --stdin <<< 'DROP SCHEMA agent_orch_test CASCADE;'
 
 ## 2) ฝั่ง HUB — ตั้งค่าระบบแจ้งเตือน (เลือกได้ว่าจะเปิดระดับไหน)
 
-เพิ่มใน `.env` ของ HUB — **ค่าเริ่มต้นคือปลอดภัยที่สุด ไม่ต้องตั้งอะไรก็ใช้ได้**
+เพิ่มใน `sovereign-os/infra/.env` (ไม่ใช่ `core-api/.env` — ไฟล์นั้น container ไม่ได้อ่าน)
+และตัวแปรทุกตัวต้องถูกประกาศไว้ใน `docker-compose.yml` ด้วย ไม่งั้นตั้งค่าแล้วก็ไม่มีผล
+**ค่าเริ่มต้นคือปลอดภัยที่สุด ไม่ต้องตั้งอะไรก็ใช้ได้**
 
 | ตัวแปร | ค่าเริ่มต้น | ความหมาย |
 |---|---|---|
@@ -55,10 +57,19 @@ npx prisma db execute --stdin <<< 'DROP SCHEMA agent_orch_test CASCADE;'
 | `BLAND_API_KEY` | — | key ของ Bland AI (ต้องมีถ้าจะโทรผ่าน Bland) |
 | `BLAND_VOICE_ID` | — | เสียงที่ใช้ (ถ้าไม่ใส่ใช้ค่าเริ่มต้นของ Bland) |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `CALLER_FROM_NUMBER` | — | ต้องมีครบสามตัวถ้าจะโทรผ่าน Twilio |
+| `CALLER_ALERT_PHONE` | — | เบอร์ที่โทร (E.164 เท่านั้น) · ถ้าว่างให้ตั้งในหน้า คิวเอเจนต์ แทน |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | — | ต้องมีอยู่แล้วของระบบ ไม่งั้นชั้นที่ 1 ไม่ทำงาน |
 
+ตรวจว่า container เห็นจริง (ไม่ใช่แค่ตั้งไว้แต่ไม่มีผล):
+
+```bash
+cd sovereign-os/infra && docker compose config | grep -E "CALL_PROVIDER|ORCHESTRATOR_ALERT_TIERS"
+```
+
 **เบอร์ที่ให้โทรต้องเป็น E.164** เท่านั้น (`+66812345678`) — ระบบจะไม่ยิงอะไรออกนอกเครื่อง
-ถ้าเป็นเบอร์ที่ไม่ผ่าน จะข้ามและรายงานเหตุผลกลับ (ไม่ throw)
+เบอร์ที่ไม่ผ่านจะถูกปฏิเสธตอนตั้งค่า (ไม่ใช่ตอนโทร) พร้อมบอกว่าไปตั้งที่ไหน
+ตั้งเบอร์ได้จากหน้า **คิวเอเจนต์ → ระบบโทร** หรือผ่าน `PUT /api/agent-machines/call-phone`
+ค่าที่ตั้งใน UI จะชนะ `CALLER_ALERT_PHONE` ในไฟล์ env
 
 > `CALL_PROVIDER=none` คือ no-op ที่สมบูรณ์ — จะไม่ยิง HTTP ออกไปข้างนอกเลย
 
@@ -84,8 +95,12 @@ npx prisma db execute --stdin <<< 'DROP SCHEMA agent_orch_test CASCADE;'
 HUB_URL=http://<IP-ของ-โน้ตบุ๊ค>:3001
 MACHINE_NAME=คอมเครื่องที่ 2
 MACHINE_TOKEN=<token จากหน้าเว็บ>
-MACHINE_EXECUTORS=opencode
+ENABLED_EXECUTORS=opencode
 ```
+
+> ชื่อตัวแปรคือ `ENABLED_EXECUTORS` (ไม่ใช่ `MACHINE_EXECUTORS`)
+> ถ้าใส่ชื่อผิด runner จะไม่ error — จะรันได้แค่ `echo` เงียบ ๆ
+> ตรวจว่าถูกได้ด้วยบรรทัดแรกตอนรัน: ต้องเห็น `executor=opencode`
 
 4. รัน `install-runner.cmd` (สร้าง Scheduled Task ให้รันอัตโนมัติตอนเปิดเครื่อง)
 5. ตรวจว่าเครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue
