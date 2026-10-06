@@ -17,6 +17,21 @@
 
 ---
 
+## 0) ติดตั้งทั้งระบบในเทิร์นเดียว — ทำตามลำดับนี้จบ
+
+ทั้งหมดอยู่บนไดรฟ์โปรเจกต์ (E:) เท่านั้น — ห้ามคัดลอกโฟลเดอร์โปรเจกต์ไปไดรฟ์ C:
+
+| # | ทำอะไร | ตรวจผล (ต้องเจอ) |
+|---|---|---|
+| 1 | migrate DB: `cd sovereign-os/core-api && npx prisma migrate dev --name agent_orchestration` | ไม่มี error P-problem |
+| 2 | เติม env การแจ้งเตือนใน `sovereign-os/infra/.env` (ตารางข้อ 2) | `docker compose config \| grep CALL_PROVIDER` เห็นค่า |
+| 3 | deploy: `docker compose build core-api && docker compose up -d` (ที่ `sovereign-os/infra`) | `GET :3001/api/tts/health` ตอบ `engine: pyttsx3` · route `/api/agent-machines/*` ไม่ใช่ 404 |
+| 4 | ติดตั้ง runner บนเครื่องที่ 2 (ข้อ 3) | เครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue |
+| 5 | สั่งงาน low-risk งานแรก | งานจบ + มีปุ่ม "ดูภาพหน้าจอตอนจบงาน" |
+| 6 | สั่งงาน high-risk งานแรก | ค้าง `awaiting_approval` → กด "อนุมัติให้รัน" ในหน้า Agent Queue (หรือ ✅ ใน Telegram) แล้วค่อยวิ่ง |
+
+---
+
 ## 1) ฝั่ง HUB — เตรียมฐานข้อมูล (ทำครั้งเดียว)
 
 เพิ่ม `AgentMachine` + ฟิลด์ dispatch ของ `AgentJob` (nullable ทั้งหมด = ของเดิมไม่พัง)
@@ -74,13 +89,26 @@ cd sovereign-os/infra && docker compose config | grep -E "CALL_PROVIDER|ORCHESTR
 
 > `CALL_PROVIDER=none` คือ no-op ที่สมบูรณ์ — จะไม่ยิง HTTP ออกไปข้างนอกเลย
 
-### งานเสี่ยง = รอกดใน Telegram
+### งานเสี่ยง = รอคนกดอนุมัติ (Telegram หรือหน้าเว็บ)
 
 งานที่แตะของที่ย้อนกลับไม่ได้ (`rm -rf`, `DROP TABLE`, force push, deploy production,
 โอนเงิน, "ลบ…ทั้งหมด" ฯลฯ) จะถูกพักเป็นสถานะ `awaiting_approval` — เครื่องจะ**ไม่ดึงไปทำ**
-จนกว่าผู้ใช้กด ✅ ที่ Telegram
+จนกว่าคนจะกดอนุมัติ ที่ไหนก็ได้ 2 ทาง:
+
+- **หน้าเว็บ Agent Queue** — ปุ่ม "อนุมัติให้รัน" / "ปฏิเสธ" ใต้งาน (ต้องล็อกอินด้วย SUPERADMIN)
+- **Telegram** — กด ✅ ที่ข้อความแจ้งงานค้าง
 
 บังคับระดับเองได้ต่องาน: ส่ง `risk: "high" | "low"` หรือพิมพ์ `@risk:high` ใน Telegram
+
+### เสียงแจ้งเตือน (voice) + TTS ใน container
+
+ระดับ `voice` ของ `ORCHESTRATOR_ALERT_TIERS` และการ synthesize ข้อความไทยเป็นไฟล์เสียง
+รัน **ใน container core-api** ด้วย `pyttsx3` + `espeak-ng` (ลงไว้ใน image แล้ว · เสียงไทย `tai/th`)
+ตัวรันสคริปต์เลือก python อัตโนมัติ: `PYTHON_BIN` (ถ้าตั้ง) → `python3` → `python`
+
+- ตรวจว่า image มี TTS: `curl http://localhost:3001/api/tts/health` → `"engine": "pyttsx3"`
+- ถ้า 404 / engine อื่น = ยังรัน image เก่า → build ใหม่ตามข้อ 3 ข้างบน
+- เสียง espeak หยาบกว่า Piper/TTS บนคลาวด์ — ฟังออกชัดแต่ไม่ไพเราะ (ยอมรับแล้ว)
 
 ---
 
