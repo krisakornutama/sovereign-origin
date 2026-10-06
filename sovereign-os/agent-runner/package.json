@@ -1,0 +1,14 @@
+{
+  "name": "sovereign-agent-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent Runner — ตัวรันงานที่ดึงงานจาก SovereignOS HUB ผ่าน LAN แล้วสั่ง agent ทำงานบนเครื่องนี้",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

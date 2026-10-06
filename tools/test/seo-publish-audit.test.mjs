@@ -86,7 +86,8 @@ try {
 // ─────────────────────────────────────────────────────────────
 const { routes, nonPageRoutes } = enumerateRoutes(PAGES);
 const routeNames = routes.map((r) => r.route);
-check('เดิน src/pages เจอทุกไฟล์หน้า', routes.length === 64, `${routes.length} route`);
+// 64 → 65: branch agent-orchestration เพิ่มหน้า agent-queue (7 ต.ค. 69) — ตั้งใจ bump ให้เห็นว่ามีหน้าใหม่เข้ามา
+check('เดิน src/pages เจอทุกไฟล์หน้า', routes.length === 65, `${routes.length} route`);
 check('เจอ /partners/me (หน้าที่เคยหลุด)', routeNames.includes('/partners/me'));
 check('เจอหน้าที่ซ้อน /mbti/compare และ /terrain-demo', routeNames.includes('/mbti/compare') && routeNames.includes('/terrain-demo'));
 check('index.tsx → /', routeNames.includes('/') && !routeNames.includes('/index'));

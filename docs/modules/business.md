@@ -33,72 +33,6 @@
 `business_agents` · `business_customers` · `business_installations` · `business_ledger_entries` · `business_members` · `business_order_lines` · `business_orders` · `business_payments` · `business_products` · `business_purchase_orders` · `business_suppliers` · `businesses`
 
 ### Routes
-- `business/business-shop.routes.ts` (81 บรรทัด)
-- `business/business.routes.ts` (456 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /community
-GET /:businessId
-POST /:businessId/orders
-GET /orders/:token
-POST /orders/:token/pay
-GET /:businessId/promptpay
-GET /
-POST /
-POST /:businessId/agents/seed
-GET /:businessId/members
-POST /:businessId/members
-DELETE /:businessId/members/:memberId
-GET /:businessId/products
-POST /:businessId/products
-PUT /:businessId/products/:id
-GET /:businessId/customers
-POST /:businessId/customers
-GET /:businessId/orders
-GET /:businessId/orders/:id
-GET /:businessId/orders/:id/lots
-POST /:businessId/orders/:id/shipping
-POST /:businessId/orders/:id/transition
-POST /:businessId/orders/:id/payments
-GET /:businessId/installations
-POST /:businessId/installations
-POST /:businessId/installations/:id/transition
-GET /:businessId/ledger
-POST /:businessId/ledger
-PATCH /:businessId/ledger/:id
-DELETE /:businessId/ledger/:id
-GET /:businessId/summary
-GET /:businessId/tax
-GET /:businessId/suppliers
-POST /:businessId/suppliers
-GET /:businessId/purchase-orders
-POST /:businessId/purchase-orders
-POST /:businessId/purchase-orders/:id/receive
-GET /:businessId/agents
-POST /:businessId/agents/:agentId/run
-POST /:businessId/agents/:agentId/enabled
-… อีก 4 เส้น
-```
-
-### Services ที่ทำงานให้โมดูลนี้
-`business-shop.service` · `business.service`
-
-### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
-- business → agent(agent_jobs)
-- business → agent(agent_roles)
-- business → auth(users)
-
-<!-- auto:end -->
-
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-`business_agents` · `business_customers` · `business_installations` · `business_ledger_entries` · `business_members` · `business_order_lines` · `business_orders` · `business_payments` · `business_products` · `business_purchase_orders` · `business_suppliers` · `businesses`
-
-### Routes
 - `business/business-shop.routes.ts` (108 บรรทัด)
 - `business/business.routes.ts` (468 บรรทัด)
 
@@ -156,3 +90,4 @@ POST /:businessId/agents/:agentId/run
 - business → auth(users)
 
 <!-- auto:end -->
+

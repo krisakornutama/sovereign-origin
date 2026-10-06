@@ -15,7 +15,7 @@
 `defcon_events` · `risk_headlines`
 
 ### Routes
-- `risk/risk.routes.ts` (212 บรรทัด)
+- `risk/risk.routes.ts` (217 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -36,31 +36,3 @@ GET /defcon
 
 <!-- auto:end -->
 
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-`defcon_events` · `risk_headlines`
-
-### Routes
-- `risk/risk.routes.ts` (212 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /overview
-GET /headlines
-GET /history
-POST /refresh
-POST /defcon/drill
-POST /stress-test
-POST /scenarios
-GET /scenarios/history
-GET /scenarios/latest
-GET /defcon
-```
-
-### Services ที่ทำงานให้โมดูลนี้
-`aladdin-risk.service` · `defcon-actions.service` · `defcon-engine.service` · `risk-monitor.service`
-
-<!-- auto:end -->

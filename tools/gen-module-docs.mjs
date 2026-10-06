@@ -7,12 +7,14 @@
 //
 // กติกาไม่ทำลาย: ไฟล์ที่มีอยู่แล้ว (8 โมดูลหลักที่เขียนมือ) = ห้ามทับ เว้นแต่ --force
 //                marker <!-- auto:begin --> … <!-- auto:end --> ใช้อัปเดตเฉพาะส่วนอัตโนมัติ
+//                (รองรับทั้งรูปเป๊ะและรูป suffixed ที่ไฟล์จริงใช้ · บล็อกซ้ำถูกลดเหลือ 1 — ดู auto-doc-block.mjs)
 //
 // ใช้: node tools/gen-module-docs.mjs [--force]
 // ────────────────────────────────────────────────────────────────────────────
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyAutoBlock } from './auto-doc-block.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BACKEND = join(ROOT, 'sovereign-os', 'core-api');
@@ -126,9 +128,11 @@ for (const mod of modules) {
 
   if (existsSync(path) && !FORCE) {
     const cur = readFileSync(path, 'utf8');
-    if (cur.includes('<!-- auto:begin -->')) {
-      const next = cur.replace(/<!-- auto:begin -->[\s\S]*?<!-- auto:end -->/, auto.join('\n'));
-      if (next !== cur) { writeFileSync(path, next, 'utf8'); updated++; }
+    // marker จริงในไฟล์เป็นรูป suffixed (มีข้อความหลัง auto:begin) — ห้ามเช็ครูปเป๊ะอย่างเดียว
+    // (บั๊กเดิม: ไม่เคย match → append ทุกรัน → บล็อกซ้ำงอกไม่รู้จบ · applyAutoBlock จัดการแทน)
+    if (cur.includes('<!-- auto:begin')) {
+      const next = applyAutoBlock(cur, auto.join('\n'));
+      if (next !== null && next !== cur) { writeFileSync(path, next, 'utf8'); updated++; }
       else skipped++;
     } else {
       // ไฟล์เก่าไม่มี marker — ต่อท้ายส่วน auto (ไม่แตะเนื้อหาเดิม)

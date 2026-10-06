@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, unlinkSync, readFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -7,8 +7,88 @@ import { authenticate } from '../../middleware/auth.middleware';
 
 const router = Router();
 
-// Python TTS script path (engine: pyttsx3)
-const TTS_SCRIPT = "E:\\My work\\Project Sovereign Origin\\tools\\tts_speak.py";
+// ── path ของสคริปต์ pyttsx3 (engine fallback) ──
+// เดิม hardcode `E:\My work\...\tools\tts_speak.py` — path นี้ไม่มีอยู่ใน image
+// ⇒ container spawn ไม่ได้ → ชั้นเสียงของระบบแจ้งเตือนคืน false เงียบ ๆ ตลอดกาล
+// ตอนนี้สคริปต์อยู่ที่ core-api/tts/tts_speak.py ให้ `COPY . .` เอาเข้า image ด้วย
+
+/** legacy path ของ dev host — ใช้เมื่อไม่มีที่อื่นให้เลือก */
+export const LEGACY_TTS_SCRIPT = 'E:\\My work\\Project Sovereign Origin\\tools\\tts_speak.py';
+
+/** path สัมพัทธ์ใต้ cwd ของโปรเจ็กต์ — ใน container = /app/tts/tts_speak.py */
+export const TTS_SCRIPT_RELPATH = path.join('tts', 'tts_speak.py');
+
+/**
+ * หาสคริปต์ pyttsx3 — ลำดับ: `TTS_SCRIPT` env → สคริปต์ที่อยู่ใน image/project → legacy E:\
+ * ใช้ร่วมกันระหว่าง tts.routes.ts กับ tts.service.ts เพราะสองที่ต้องชี้ที่เดียวกันเสมอ
+ */
+export function resolveTtsScript(
+  env: Record<string, string | undefined> = process.env,
+  cwd: string = process.cwd()
+): string {
+  const fromEnv = env.TTS_SCRIPT && env.TTS_SCRIPT.trim();
+  if (fromEnv) return fromEnv as string;
+  const inProject = path.resolve(cwd, TTS_SCRIPT_RELPATH);
+  if (existsSync(inProject)) return inProject;
+  return LEGACY_TTS_SCRIPT;
+}
+
+/**
+ * ลำดับ binary python ที่จะลอง — container มีแค่ `python3` แต่ dev host Windows มีแค่ `python`
+ * ⇒ ลองทีละตัวจน start ได้ (หรือให้ `PYTHON_BIN` บังคับตัวเดียว)
+ */
+export function pythonBinCandidates(env: Record<string, string | undefined> = process.env): string[] {
+  const override = env.PYTHON_BIN && env.PYTHON_BIN.trim();
+  if (override) return [override as string];
+  return ['python3', 'python'];
+}
+
+export interface PythonSpawnHandlers {
+  /** เรียก 1 ครั้งเมื่อมี binary start ได้จริง — ผู้เรียกค่อยผูก stdout/stderr/close */
+  onChild: (child: ChildProcess) => void;
+  /** เรียก 1 ครั้งเมื่อทุกตัวเลือก start ไม่ได้ — ห้ามหายเงียบ (Express 4 ไม่ส่ง error ออกจาก handler) */
+  onFail: (err: Error) => void;
+}
+
+/**
+ * spawn python โดยลองทีละตัวจาก `pythonBinCandidates`
+ * - ใช้ event `spawn` เป็นสัญญาณว่า start จริง (ENOENT มาทาง `error` ก่อน)
+ * - ถ้า start ไม่ได้สักตัว → `onFail` (ไม่ใช่ปล่อยให้ handler ค้างไม่ตอบ)
+ */
+export function spawnPythonWithFallback(
+  args: string[],
+  handlers: PythonSpawnHandlers,
+  env: Record<string, string | undefined> = process.env
+): void {
+  const candidates = pythonBinCandidates(env);
+  let index = 0;
+
+  const tryNext = () => {
+    if (index >= candidates.length) {
+      handlers.onFail(new Error(`ไม่มี python ที่ start ได้: ${candidates.join(', ')}`));
+      return;
+    }
+    const bin = candidates[index++];
+    let child: ChildProcess;
+    try {
+      child = spawn(bin, args, { windowsHide: true });
+    } catch {
+      tryNext();
+      return;
+    }
+    let started = false;
+    child.once('spawn', () => {
+      started = true;
+      handlers.onChild(child);
+    });
+    child.once('error', (err) => {
+      if (started) return; // start แล้วค่อยพัง = ปล่อยให้ close handler ของผู้เรียกจัดการ
+      console.error(`[tts] เริ่ม ${bin} ไม่ได้: ${err.message} — ลองตัวถัดไป`);
+      tryNext();
+    });
+  };
+  tryNext();
+}
 
 // ── Piper TTS (คุณภาพเสียงสูงกว่า pyttsx3) — กะ config ผ่าน env ──
 // ต้องมี: tools/piper/piper.exe (แตกจาก piper.zip) + ไฟล์เสียงภาษาไทย .onnx
@@ -109,29 +189,26 @@ router.post('/speak', authenticate, (req, res) => {
     console.warn(`[tts] Piper ได้รับเลือกแต่ไม่พร้อม (exe=${cfg.piperExeExists}, voice=${cfg.piperVoiceExists}) — ใช้ pyttsx3 แทน`);
   }
 
-  let python: ReturnType<typeof spawn>;
-  try {
-    python = spawn('python', [TTS_SCRIPT, text, String(rate)]);
-  } catch {
-    return fail(500, 'TTS engine unavailable');
-  }
-
-  const chunks: Buffer[] = [];
-  python.stdout!.on('data', (data: Buffer) => chunks.push(data));
-  python.stderr!.on('data', (data) => console.error('TTS stderr:', data.toString()));
-  python.on('error', (err) => {
-    console.error('Failed to start Python:', err.message);
-    fail(500, 'TTS engine unavailable');
-  });
-  python.on('close', (code) => {
-    if (responded) return;
-    if (code !== 0) return fail(500, 'TTS generation failed');
-    const audio = Buffer.concat(chunks);
-    if (audio.length === 0) return fail(500, 'Empty audio generated');
-    send(() => {
-      res.set({ 'Content-Type': 'audio/wav', 'Content-Length': audio.length, 'Cache-Control': 'no-cache' });
-      res.send(audio);
-    });
+  spawnPythonWithFallback([resolveTtsScript(), String(text), String(rate)], {
+    onChild: (python) => {
+      const chunks: Buffer[] = [];
+      python.stdout!.on('data', (data: Buffer) => chunks.push(data));
+      python.stderr!.on('data', (data) => console.error('TTS stderr:', data.toString()));
+      python.on('close', (code) => {
+        if (responded) return;
+        if (code !== 0) return fail(500, 'TTS generation failed');
+        const audio = Buffer.concat(chunks);
+        if (audio.length === 0) return fail(500, 'Empty audio generated');
+        send(() => {
+          res.set({ 'Content-Type': 'audio/wav', 'Content-Length': audio.length, 'Cache-Control': 'no-cache' });
+          res.send(audio);
+        });
+      });
+    },
+    onFail: (err) => {
+      console.error('Failed to start Python:', err.message);
+      fail(500, 'TTS engine unavailable');
+    },
   });
 });
 

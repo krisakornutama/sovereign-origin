@@ -15,6 +15,17 @@ import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { confirmReportedPaymentByToken, rejectReportedPaymentByToken } from './business-shop.service';
+import { parseJobCallback, approveJob, rejectJob } from './orchestrator-approval.service';
+import {
+  parseQueueCommand,
+  listQueue,
+  cancelJob as cancelQueueJob,
+  repeatJob as repeatQueueJob,
+  summarizeJob,
+} from './orchestrator-queue.service';
+import { enqueueRemoteJob, listMachines } from './agent-machines.service';
+import { gateJobBeforeDispatch } from './orchestrator-approval.service';
+import { buildApprovalText, buildApprovalButtons } from './orchestrator-notify.service';
 
 
 export interface ApprovalRequestInfo {
@@ -146,7 +157,10 @@ export class TelegramAgentBot {
 
   private async handleMessage(msg: any): Promise<void> {
     if (!isAllowedChatId(msg?.from?.id, this.allowedChatId)) return;
-    const cmd = parseCommand(typeof msg.text === 'string' ? msg.text : '');
+    const text = typeof msg.text === 'string' ? msg.text : '';
+    // คิวงาน (/queue /add /cancel /repeat) — ของ Agent Orchestration
+    if (await this.handleQueueCommand(text)) return;
+    const cmd = parseCommand(text);
     if (!cmd) return;
     const actor = await this.resolveActor();
     let result: ActionResultLike | null;
@@ -158,14 +172,115 @@ export class TelegramAgentBot {
     await this.sendDecisionResult(cmd.id, result, cmd.action);
   }
 
+  /** คำสั่งคิวงาน — คืน true ถ้าจัดการแล้ว (เพื่อไม่ให้ตกไปเข้าสาย approve/reject เดิม) */
+  private async handleQueueCommand(text: string): Promise<boolean> {
+    const cmd = parseQueueCommand(text);
+    if (!cmd) return false;
+    try {
+      if (cmd.action === 'list') {
+        const rows = await listQueue(cmd.limit);
+        if (rows.length === 0) {
+          await this.send('📋 <b>คิววานว่าง</b> — สั่ง <code>/add งานที่ต้องการ</code> ได้เลย');
+          return true;
+        }
+        const body = rows
+          .map((r) => summarizeJob({ ...r, executor_model: r.model }, r.machineName))
+          .join('\n\n');
+        await this.send(`📋 <b>คิวงาน (${rows.length})</b>\n\n${body}`.slice(0, 4000));
+        return true;
+      }
+
+      if (cmd.action === 'add') {
+        if (!cmd.executor) {
+          await this.send('ต้องระบุ agent ด้วย เช่น <code>/add งาน @opencode</code>\n(เลือกได้: @opencode @freebuff @echo)');
+          return true;
+        }
+        if (!cmd.machineId) {
+          // ไม่เดาเครื่องให้ — บอกรายการที่มีจริงให้ผู้ใช้เลือกแทน
+          const machines = await listMachines().catch(() => [] as any[]);
+          const list = machines.length
+            ? machines.map((m) => `${escapeHtml(m.name)} → <code>${escapeHtml(m.id)}</code>`).join('\n')
+            : 'ยังไม่มีเครื่องลงทะเบียน — ลงทะเบียนที่หน้า Agent Queue ก่อน';
+          await this.send(`ต้องระบุเครื่องด้วย เช่น <code>@machine:&lt;id&gt;</code>\n\n${list}`);
+          return true;
+        }
+        const job: any = await enqueueRemoteJob({
+          machineId: cmd.machineId,
+          executor: cmd.executor,
+          prompt: cmd.prompt,
+          model: cmd.model,
+          priority: cmd.priority,
+        });
+        const gate = await gateJobBeforeDispatch({
+          id: job.id,
+          prompt: job.prompt,
+          machine_id: job.machine_id,
+          executor: job.executor,
+          risk: cmd.risk,
+        });
+        if (gate.needsApproval) {
+          // ส่งผ่านช่องทางของบอทเอง เพื่อให้ chat-id allowlist คุมได้จุดเดียว
+          await this.send(
+            buildApprovalText({ jobId: job.id, executor: job.executor, prompt: job.prompt }),
+            buildApprovalButtons(job.id)
+          );
+        } else {
+          await this.send(
+            `✅ <b>เข้าคิวแล้ว</b>\nรหัสงาน: <code>${escapeHtml(job.id)}</code>` +
+              (cmd.model ? `\nโมเดล: ${escapeHtml(cmd.model)}` : '')
+          );
+        }
+        return true;
+      }
+
+      const actor = await this.resolveActor();
+      const out = cmd.action === 'cancel'
+        ? await cancelQueueJob(cmd.jobId, actor)
+        : await repeatQueueJob(cmd.jobId);
+      const okText = cmd.action === 'cancel' ? '🚫 <b>ยกเลิกงานแล้ว</b>' : '🔁 <b>เพิ่มงานซ้ำลงคิวแล้ว</b>';
+      const failText = '⚠️ <b>ทำไม่ได้</b>';
+      await this.send(
+        out.ok
+          ? `${okText}\nรหัสงาน: <code>${escapeHtml(cmd.jobId)}</code>`
+          : `${failText}\n${escapeHtml(out.reason || 'ไม่ทราบสาเหตุ')}`
+      );
+      return true;
+    } catch (err) {
+      console.error('[telegram] คำสั่งคิวงานล้ม:', err instanceof Error ? err.message : err);
+      await this.send('⚠️ คำสั่งนี้ทำไม่ได้ — ลองใหม่อีกครั้ง หรือดู log ฝั่งเซิร์ฟเวอร์');
+      return true;
+    }
+  }
+
   private async handleCallback(cb: any): Promise<void> {
     const chatId = cb?.from?.id;
     if (!isAllowedChatId(chatId, this.allowedChatId)) {
       await this.answerCallback(cb?.id, '⛔ ไม่ได้รับอนุญาต');
       return;
     }
-    // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>) — เส้นทางแยกจาก approve/reject
     const raw = String(cb?.data || '');
+    // Agent Orchestration — ปุ่มอนุมัติงานเสี่ยง (jobok:/jobreject:) แยกจาก approve:/reject: ของ agent action
+    const jobCmd = parseJobCallback(raw);
+    if (jobCmd) {
+      const actor = await this.resolveActor();
+      const result = jobCmd.action === 'approve'
+        ? await approveJob(jobCmd.jobId, actor)
+        : await rejectJob(jobCmd.jobId, actor);
+      await this.answerCallback(
+        cb?.id,
+        result.ok ? (jobCmd.action === 'approve' ? '✅ ปล่อยให้รันแล้ว' : '🚫 ยกเลิกงานแล้ว') : '⚠️ งานนี้ตัดสินใจไปแล้ว'
+      );
+      await this.send(
+        result.ok
+          ? [
+              jobCmd.action === 'approve' ? '✅ <b>ปล่อยงานให้เครื่องทำแล้ว</b>' : '🚫 <b>ยกเลิกงานแล้ว</b>',
+              `รหัสงาน: <code>${escapeHtml(jobCmd.jobId)}</code>`,
+            ].join('\n')
+          : `⚠️ <b>ตัดสินใจไม่ได้</b>\n${escapeHtml(result.reason ?? 'ไม่ทราบสาเหตุ')}`
+      );
+      return;
+    }
+    // P19 — ปุ่ม "ยืนยันรับเงิน" ในข้อความแจ้งชำระ (confirmpay:<token ใช้ครั้งเดียว>) — เส้นทางแยกจาก approve/reject
     if (raw.startsWith('confirmpay:')) {
       const actor = await this.resolveActor();
       const result = await this.confirmPay(raw.slice('confirmpay:'.length), actor);

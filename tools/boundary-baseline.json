@@ -1,6 +1,6 @@
 {
   "$comment": "baseline เส้นข้ามโมดูลที่ “ยอมรับแล้ว” — เส้นใหม่นอกไฟล์นี้ = arch-gate fail · เพิ่มเส้นใหม่เมื่อ: โมดูลอื่นจำเป็นจริง (เช่นผ่าน service กลาง) — ระบุเหตุผลไว้ทุกครั้ง · อัปเดตทั้งไฟล์ด้วย: node tools/arch-gate.mjs --update-baseline",
-  "generatedAt": "2026-09-23",
+  "generatedAt": "2026-10-05",
   "violations": {
     "agent → devices(devices)": 1,
     "agent → farm(farm_plots)": 1,
@@ -99,6 +99,12 @@
     "waste → restaurant(restaurant_waste_logs)": 1,
     "workers → automation(automation_alerts)": 4,
     "workers → health(health_flags)": 1,
-    "workers → sensors(sensor_telemetry)": 6
+    "workers → sensors(sensor_telemetry)": 6,
+    "service:agent-machines.service → agent(agent_jobs)": "Agent Orchestration คือ service ตัวกลางของโมดูล agent เอง — ตาราง agent_jobs ถูกย้ายหน้าที่ 'จัดคิว+ส่งไปเครื่องคอม' มาอยู่ที่นี่ การแยกไว้ที่อื่นจะทำให้ enqueue/pull/report ถูกเรียกข้าม service",
+    "service:orchestrator-approval.service → agent(agent_jobs)": "ด่านอนุมัติงานเสี่ยงเขียน/อัปเดตสถานะของ agent_jobs โดยตรง (awaiting_approval/approved_by) — ต้องเขียนแบบมีเงื่อนไขตรงกับ runner ที่ pull อยู่ฝั่ง agent-machines.service จึงแยกชั้นแต่ไม่แยกตาราง",
+    "service:orchestrator-queue.service → agent(agent_jobs)": "คิวงานฝั่งผู้ใช้ (ดู/ยกเลิก/ทำซ้ำ/สรุป) อ่านและเขียน agent_jobs เป็นตารางเดียว เป็น read+write model ของโมดูล agent ไม่มีตารางอื่นปน",
+    "service:agent-machines.service → agent(agent_roles)": "e2e จับบั๊กจริง: หน้าเว็บ/Telegram สั่งงานไม่ได้ส่ง roleId มา แต่ agent_jobs.role_id เป็น UUID NOT NULL + FK ถ้าใส่ค่าว่าง PostgreSQL จะปฏิเสธทั้งประกาศ (invalid length: expected length 32) ⇒ ต้องอ่าน agent_roles หนึ่งแถวเพื่อผูกบทบาทจริง แทนการสร้างบทบาทใหม่หรือปล่อยค่าว่าง",
+    "service:stripe-reconcile.runtime → business(business_payments)": "งานค้างของผู้ใช้ (commit a275ee2) — reconcile ต้องอ่านทั้ง payments และ transfer_orders เพื่อจับคู่ยอดจริง",
+    "service:stripe-reconcile.runtime → treasury(transfer_orders)": "งานค้างของผู้ใช้ (commit a275ee2) — ดูรายการในรอบ reconcile"
   }
 }
