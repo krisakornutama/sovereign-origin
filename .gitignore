@@ -89,6 +89,8 @@ Thumbs.db
 .freebuff/
 .agents/
 .publish-tmp/  # publish โหมด CI: clone mirror ชั่วคราว
+# temp ชั่วคราวของงาน/orchestration (screenshot, tts resolver) — เก็บบน E: เท่านั้น ห้ามย้ายไป C:
+.tmp-*
 
 # ── Docker Desktop runtime state (not project code) ──
 Docker/
@@ -141,6 +143,7 @@ tools/*
 !tools/boundary-baseline.json
 !tools/map-owners.mjs
 !tools/gen-module-docs.mjs
+!tools/auto-doc-block.mjs
 !tools/check-parity.mjs
 !tools/
 !tools/install/

@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `backup/backup.routes.ts` (58 บรรทัด)
+- `backup/backup.routes.ts` (64 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -28,23 +28,3 @@ DELETE /:file
 
 <!-- auto:end -->
 
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
-
-### Routes
-- `backup/backup.routes.ts` (58 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /
-POST /
-POST /restore
-POST /schedule
-DELETE /:file
-```
-
-<!-- auto:end -->
