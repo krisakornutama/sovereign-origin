@@ -4,7 +4,11 @@ COPY package*.json ./
 RUN npm install
 # Survival: pg_dump/psql ใน container — backup DB ผ่าน docker network ได้โดยไม่ต้อง mount docker socket
 # + rsync/openssh-client สำหรับ offsite replication ไป remote server (MESH_RSYNC_TARGET / MESH_SCP_TARGET)
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client rsync openssh-client iproute2 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client rsync openssh-client iproute2 python3 python3-pip espeak-ng && rm -rf /var/lib/apt/lists/*
+# ── TTS: ชั้นเสียงของระบบแจ้งเตือน (pyttsx3 + espeak-ng) ──
+# ขาด 2 บรรทัดนี้ = sendTelegramVoice คืน false เงียบ ๆ ตลอดกาล เพราะ container มีแค่ python3 ไม่มี pyttsx3/espeak
+# (เสียงไทยจาก espeak หยาบกว่า Piper แต่ใช้ได้จริง — Piper เป็นงานติดตั้งแยก)
+RUN pip3 install --no-cache-dir --break-system-packages pyttsx3
 COPY . .
 RUN npx prisma generate
 EXPOSE 3001
