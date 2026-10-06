@@ -1,6 +1,20 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "coder-full",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {
+        "gemma3": {
+          "name": "gemma3:4b"
+        }
+      }
+    }
+  },
   "permission": {
     "read": "allow",
     "edit": {

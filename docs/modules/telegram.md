@@ -12,39 +12,10 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 ## ของจริงในโค้ด (auto-generated)
 
 ### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
-
-### Routes
-- `telegram/telegram.routes.ts` (252 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /config
-PUT /config
-DELETE /config
-GET /updates
-POST /test
-POST /notify
-POST /photo
-```
-
-### Services ที่ทำงานให้โมดูลนี้
-`telegram-agent-bot.service` · `telegram-alert.service` · `telegram-credentials.service`
-
-### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
-- telegram → auth(users)
-
-<!-- auto:end -->
-
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
 `alert_events`
 
 ### Routes
-- `telegram/telegram.routes.ts` (280 บรรทัด)
+- `telegram/telegram.routes.ts` (309 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -65,3 +36,4 @@ POST /photo
 - telegram → auth(users)
 
 <!-- auto:end -->
+

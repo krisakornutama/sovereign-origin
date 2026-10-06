@@ -23,25 +23,8 @@ GET /modules
 GET /dashboard/stats
 ```
 
-<!-- auto:end -->
-
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
-
-### Routes
-- `dashboard/dashboard.routes.ts` (46 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /modules
-GET /dashboard/stats
-```
-
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - dashboard → sensors(sensor_telemetry)
 
 <!-- auto:end -->
+

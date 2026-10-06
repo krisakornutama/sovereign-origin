@@ -41,6 +41,7 @@ import { runBitRotScan } from '../services/data-integrity.service';
 import { systemMonitor } from '../services/system-monitor.service';
 import { createWealthWorker, wealthEmitter } from '../services/wealth.service';
 import { createRiskWorker, riskEmitter } from '../services/risk-monitor.service';
+import { runAndReportStripeReconcile } from '../services/stripe-reconcile.runtime';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from '../services/defcon-engine.service';
 import { runDefconAction } from '../services/defcon-actions.service';
 import { actuationService } from '../services/actuation.service';
@@ -56,6 +57,7 @@ import { automationEmitter } from '../services/automation.service';
 import { buildSnapshotForAlert } from '../services/chart-snapshot.service';
 import { predictiveWorker } from '../services/predictive.service';
 import { autoInitLocalLlm } from '../services/local-llm.service';
+import { pruneScreenshots } from '../services/orchestrator-screenshot.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // startWorkers — จุดรวมเริ่มงานเบื้องหลังทั้งหมด (ย้ายมาจาก server.ts)
@@ -262,6 +264,39 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   runAgentMorningReports();
   setInterval(runAgentMorningReports, 30 * 60 * 1000);
+
+  // ── Agent Orchestration: ลบภาพหน้าจอตอนจบงานที่หมดอายุ (default 14 วัน · ทุก 6 ชม.) ──
+  // ภาพ ~2.8 MB/งาน ถ้าไม่มีคนล้าง disk จะโตไม่รู้จบ — งานล้างเป็นงานเบื้องหลัง
+  // ที่ห้ามทำให้ระบบล้ม จึง catch นิ่ง ๆ เหมือน cron อื่น และ log เมื่อมีอะไรถูกลบ
+  async function runScreenshotPrune() {
+    try {
+      const out = await pruneScreenshots();
+      if (out.deleted.length > 0) {
+        console.log(`🖼️ Orchestrator shots: ลบภาพหมดอายุ ${out.deleted.length} ไฟล์ (เคลียร์ screenshot_url ${out.cleared} แถว)`);
+      }
+    } catch (err) {
+      console.error('Orchestrator screenshot prune error:', err instanceof Error ? err.message : err);
+    }
+  }
+  setInterval(runScreenshotPrune, 6 * 60 * 60 * 1000);
+
+  // ── Stripe reconcile: ไล่เงินจริงที่ Stripe บอกว่า "จ่ายแล้ว" กับที่เราบันทึก ──
+  // จับช่องว่างที่ทำให้เงินหายโดยไม่มีใครสังเกต (Stripe จ่ายแล้ว · ฝั่งเรายังโชว์
+  // "ค้างชำระ") — เคยเกิดจริงตอน webhook secret หลุด โดยหน้าเว็บยังปกติทั้งหมด
+  //
+  // ทุก 30 นาที (ไม่ใช่ทุกวัน) เพราะช่องว่างแบบนี้แก้ได้ตราบที่ยังไม่มีอะไรทับ
+  // และ **ตอนยังไม่มี key/ยังไม่เปิดสวิตช์ จะพิมพ์เหตุผลที่ข้ามเสมอ** เพราะงานที่
+  // จับเงินหายห้ามเงียบตอนปิด (ไม่งั้นกลับไปอยู่ในสถานะเดิมโดยไม่มีใครรู้)
+  async function runStripeReconcileCheck() {
+    try {
+      await runAndReportStripeReconcile();
+    } catch (err) {
+      // runAndReport จัดการ error เองแล้ว — ชั้นนี้กัน worker ล้มดับทั้งระบบ
+      console.error('[stripe-reconcile] worker error:', err instanceof Error ? err.message : err);
+    }
+  }
+  setTimeout(runStripeReconcileCheck, 45_000); // หลังบูต 45 วิ (ให้ DB พร้อมก่อน)
+  setInterval(runStripeReconcileCheck, 30 * 60 * 1000);
 
   // ── BUSINESS PLATFORM: เตือนสต็อกต่ำของทุกธุรกิจผ่าน Telegram (ทุก 6 ชม.) ──
   async function runBusinessLowStockCheck() {

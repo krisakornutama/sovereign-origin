@@ -29,34 +29,6 @@
 `product_lots` · `trace_events`
 
 ### Routes
-- `trace/trace.routes.ts` (93 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /:lotCode/events
-GET /:lotCode/qr
-POST /:lotCode/events
-GET /:lotCode
-GET /
-POST /
-```
-
-### Services ที่ทำงานให้โมดูลนี้
-`trace.service`
-
-### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
-- trace → inventory(inventory_items)
-
-<!-- auto:end -->
-
-<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
-
-## ของจริงในโค้ด (auto-generated)
-
-### ตารางที่เป็นเจ้าของ
-`product_lots` · `trace_events`
-
-### Routes
 - `trace/trace.routes.ts` (118 บรรทัด)
 
 ### Endpoints (จาก router)
@@ -78,3 +50,4 @@ POST /
 - trace → inventory(inventory_items)
 
 <!-- auto:end -->
+

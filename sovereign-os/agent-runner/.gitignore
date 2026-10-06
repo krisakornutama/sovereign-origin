@@ -1,0 +1,5 @@
+# Agent Runner — ไฟล์ที่ห้ามขึ้น git
+.env
+.env.local
+*.log
+node_modules/
