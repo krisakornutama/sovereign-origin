@@ -11,7 +11,8 @@
 // (ถ้าส่งไม่สำเร็จห้ามทำให้ job ที่เพิ่งเสร็จกลายเป็น error)
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { sendTelegramVoice } from '../modules/telegram/telegram.routes';
-import { placeCall, type CallResult } from './caller.service';
+import { placeCall, isDialableNumber, type CallResult } from './caller.service';
+import { getAlertPhone } from './orchestrator-alert-phone.service';
 
 export const ORCHESTRATOR_ALERT_TIERS = ['text', 'voice', 'call'] as const;
 export type AlertTier = (typeof ORCHESTRATOR_ALERT_TIERS)[number];
@@ -23,6 +24,8 @@ export interface NotifyDeps {
   sendText?: (text: string, buttons?: { text: string; data: string }[]) => Promise<boolean>;
   sendVoice?: (text: string) => Promise<boolean>;
   call?: (req: { to: string; message: string }) => Promise<CallResult>;
+  /** หาเบอร์ที่จะโทร (ชั้น call) — DI ไว้ให้เทสต์ ไม่ต้องแตะ DB จริง */
+  loadCallTo?: () => Promise<string | null>;
 }
 
 /** แยกเป็นรายชั้นเพื่อทดสอบ — และเพื่อไม่ต้องส่งจริง */
@@ -97,6 +100,29 @@ export interface NotifyResult {
   error?: string;
 }
 
+/**
+ * เบอร์ที่จะโทร — ลำดับ: ค่าที่ผู้ใช้ส่งมาต่องาน > เบอร์ที่ตั้งไว้ในระบบ > ไม่มี
+ *
+ * ก่อนมี resolver นี้ ไม่มีที่ไหนในระบบส่ง callTo เลย (เปิด CALL_PROVIDER=bland แล้วโทรไม่ออก
+ * เพราะไม่รู้จะโทรเบอร์ไหน) — คืน null ได้เสมอ ชั้น call จะข้ามเป็น no-op ไม่ throw
+ *
+ * คืนค่าที่พบโดยไม่กรองรูปแบบ — ให้ runTier เป็นคนตัดสิน เพื่อบอกเหตุผลได้ตรงว่า
+ * "เบอร์ที่ตั้งไว้ผิดรูป" แทนคำว่า "ไม่ได้ระบุเบอร์" (สองอย่างคนละเรื่อง คนแก้ต่างกัน)
+ */
+async function resolveCallTo(deps: NotifyDeps, explicit?: string | null): Promise<string | null> {
+  const fromCaller = explicit?.trim();
+  if (fromCaller) return fromCaller;
+  const load = deps.loadCallTo ?? (() => getAlertPhone());
+  try {
+    const found = await load();
+    return found ? String(found).trim() : null;
+  } catch (err) {
+    // หาเบอร์ล้ม = ยังโทรไม่ได้ แต่ห้ามทำให้งานที่เพิ่งเสร็จกลายเป็น error
+    console.error('[orchestrator-notify] หาเบอร์โทรไม่สำเร็จ:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function runTier(
   tier: AlertTier,
   text: string,
@@ -114,7 +140,8 @@ async function runTier(
       const ok = await send(text);
       return { ok: !!ok, reason: ok ? undefined : 'ส่งเสียงไม่สำเร็จ' };
     }
-    if (!callTo) return { ok: false, reason: 'ยังไม่ได้ระบุเบอร์โทร' };
+    if (!callTo) return { ok: false, reason: 'ยังไม่ได้ระบุเบอร์โทร (ตั้งใน Settings → ระบบโทร)' };
+    if (!isDialableNumber(callTo)) return { ok: false, reason: 'เบอร์ต้องอยู่ในรูปแบบ E.164 เช่น +66812345678' };
     const call = deps.call ?? ((r: { to: string; message: string }) => placeCall(r));
     const res = await call({ to: String(callTo), message: plainText(text) });
     return { ok: !!res?.ok, reason: res?.ok ? undefined : res?.reason || 'โทรไม่สำเร็จ' };
@@ -147,8 +174,10 @@ export async function notifyJobFinished(a: JobAlert, deps: NotifyDeps = {}, opts
   const text = buildJobAlertText(a);
   const tiers = defaultTiers(opts);
   const results: { tier: AlertTier; ok: boolean; reason?: string }[] = [];
+  // หาเบอร์โทรครั้งเดียวต่อการแจ้งเตือน (ไม่ดึง DB ซ้ำทุกชั้น)
+  const callTo = tiers.includes('call') ? await resolveCallTo(deps, opts.callTo) : null;
   for (const tier of tiers) {
-    const r = await runTier(tier, text, deps, opts.callTo);
+    const r = await runTier(tier, text, deps, callTo);
     results.push({ tier, ok: r.ok, ...(r.reason ? { reason: r.reason } : {}) });
   }
   const delivered = results.some((r) => r.ok);
