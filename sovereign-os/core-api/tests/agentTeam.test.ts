@@ -128,6 +128,27 @@ describe('agent team — background jobs', () => {
     assert.match(String(created[0].error), /ollama down/);
   });
 
+  // red-first: worker ในตัว HUB เคยไปแย่งงานที่สั่งไว้ให้เครื่องคอม (machine_id ไม่ null)
+  // ผลคือ runner ที่เครื่องนั้นไม่มีงานมาทำเลย แต่คนได้ผลลัพธ์จาก Ollama ของ HUB แทน
+  test('processAgentQueue ต้องไม่แตะงานที่ผูกกับเครื่องคอม', async () => {
+    const rows = [
+      { id: 'j-local', status: 'queued', machine_id: null, role_id: 'r-1', prompt: 'งานในเครื่อง', role_name: 'x', progress: 0 },
+      { id: 'j-remote', status: 'queued', machine_id: 'm-1', role_id: 'r-1', prompt: 'งานให้เครื่องคอม', role_name: 'x', progress: 0 },
+    ];
+    let where: any = null;
+    const executed: string[] = [];
+    mockModel(prisma, 'agentRole', {
+      findUnique: async () => ({ id: 'r-1', name: 'x', emoji: '🤖', description: 'x', system_prompt: 'p', capability: 'farm', count: 1, enabled: true }),
+    });
+    mockModel(prisma, 'agentJob', {
+      findMany: async (args: any) => { where = args.where; return rows.filter((j) => (args.where.machine_id === null ? j.machine_id === null : true)); },
+      update: async (args: any) => { const r = rows.find((j) => j.id === args.where.id); if (r) Object.assign(r, args.data); return r; },
+    });
+    setAgentOllama({ post: async () => { executed.push('ran'); return { choices: [{ message: { content: 'ตอบ' } }] }; } });
+    await processAgentQueue();
+    assert.equal(where.machine_id, null, 'ต้องบอกชัดว่าดึงเฉพาะงานที่ไม่ผูกกับเครื่อง (machine_id: null)');
+  });
+
   test('cancelAgentJob cancels a queued job', async () => {
     const created: any[] = [{ id: 'j-3', status: 'queued', progress: 0, result: null, error: null, prompt: 'p', role_name: 'x', role_id: 'r-1', created_at: new Date(), started_at: null, completed_at: null }];
     mockModel(prisma, 'agentJob', {

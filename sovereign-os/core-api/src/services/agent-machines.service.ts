@@ -165,10 +165,26 @@ export async function enqueueRemoteJob(input: EnqueueInput) {
   const machine = await prisma.agentMachine.findUnique({ where: { id: input.machineId } });
   if (!machine) throw new Error(`machine not found: ${input.machineId}`);
 
+  // role_id เป็น UUID NOT NULL + FK — ส่งค่าว่าง PostgreSQL จะปฏิเสธทั้งประกาศ
+  // ("invalid length: expected length 32, found 0") และหน้าเว็บ/Telegram ไม่ได้ส่งมาเลย
+  // ถ้าไม่ระบุ ให้ผูกกับบทบาทจริงที่มีอยู่ และถ้าไม่มีบทบาทเลย = บอกชัด ไม่เขียนงานทิ้งลอย
+  let roleId = input.roleId?.trim() || '';
+  let roleName = input.roleName?.trim() || '';
+  if (!roleId) {
+    const fallback = await prisma.agentRole.findFirst({
+      where: { enabled: true },
+      orderBy: { created_at: 'asc' },
+      select: { id: true, name: true },
+    });
+    if (!fallback) throw new Error('no agent role available — สร้างบทบาท (agent role) อย่างน้อยหนึ่งตัวก่อนสั่งงาน');
+    roleId = fallback.id;
+    if (!roleName) roleName = fallback.name;
+  }
+
   const job = await prisma.agentJob.create({
     data: {
-      role_id: input.roleId ?? '',
-      role_name: input.roleName ?? 'remote',
+      role_id: roleId,
+      role_name: roleName || 'remote',
       prompt,
       status: 'queued',
       machine_id: input.machineId,

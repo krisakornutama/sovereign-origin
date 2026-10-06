@@ -28,8 +28,11 @@ const HIGH_RISK_PATTERNS: RegExp[] = [
   /deploy\s+.*prod/i,
   /production/i,
   /\b(?:sudo|shutdown|reboot|rmdir)\b/i,
-  /(?:ลบ|ล้าง|ทิ้ง|ฟอร์แมต)[^newline]{0,40}(?:ทั้งหมด|ทั้งอัน|the\s+whole)/,
-  /ทิ้ง[^newline]{0,20}ฐานข้อมูล/,
+  // ระวัง: ใน regex เขียน [^\n] ไม่ใช่ [^newline] — ตัวหลังคือ character class
+  // ของตัวอักษร n,e,w,l (ไม่ใช่ newline) ทำให้ข้ามคำกลางไม่ได้
+  // ตัวอย่างที่หลุด: "ล้าง cache ทั้งหมด" มี e ใน "cache" → pattern ไม่ match → งานกักไม่ได้
+  /(?:ลบ|ล้าง|ทิ้ง|ฟอร์แมต)[^\n]{0,40}(?:ทั้งหมด|ทั้งอัน|the\s+whole)/,
+  /ทิ้ง[^\n]{0,20}ฐานข้อมูล/,
   /deploy|ปล่อยขึ้นระบบจริง/i,
   /โอนเงิน/,
   /จ่ายเงิน/,

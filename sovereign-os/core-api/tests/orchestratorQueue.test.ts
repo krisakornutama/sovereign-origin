@@ -260,6 +260,10 @@ describe('orchestrator-queue — คำสั่ง Telegram แบบ end-to-en
       findMany: async () => [MACHINES] as any,
       findUnique: async () => MACHINES as any,
     });
+    // /add ไม่ได้ส่ง roleId มา → enqueueRemoteJob ต้องหาบทบาทจริงมาใช้ (mockModel แทนทั้ง object)
+    mockModel(prisma as any, 'agentRole', {
+      findFirst: async () => ({ id: 'role-1', name: 'นักวิเคราะห์ความเสี่ยง' }) as any,
+    });
     mockModel(prisma as any, 'agentJob', {
       create: async (args: any) => {
         created.push(args.data);
@@ -283,6 +287,9 @@ describe('orchestrator-queue — คำสั่ง Telegram แบบ end-to-en
     mockModel(prisma as any, 'agentMachine', {
       findMany: async () => [MACHINES] as any,
       findUnique: async () => MACHINES as any,
+    });
+    mockModel(prisma as any, 'agentRole', {
+      findFirst: async () => ({ id: 'role-1', name: 'นักวิเคราะห์ความเสี่ยง' }) as any,
     });
     mockModel(prisma as any, 'agentJob', {
       create: async (args: any) => job({ id: 'job-new', ...args.data }),
