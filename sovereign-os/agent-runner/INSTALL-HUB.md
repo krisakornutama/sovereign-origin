@@ -8,7 +8,7 @@
   ผู้ใช้ ──▶ หน้าเว็บ Agent Queue / Telegram
                     │
                     ▼
-        HUB  (:3001 /api/agent-machines)
+        HUB  (:3000 → /api/agent-machines)
                     │
                     │  เครื่องคอมดึงเองผ่าน LAN
                     ▼
@@ -110,15 +110,63 @@ cd sovereign-os/infra && docker compose config | grep -E "CALL_PROVIDER|ORCHESTR
 - ถ้า 404 / engine อื่น = ยังรัน image เก่า → build ใหม่ตามข้อ 3 ข้างบน
 - เสียง espeak หยาบกว่า Piper/TTS บนคลาวด์ — ฟังออกชัดแต่ไม่ไพเราะ (ยอมรับแล้ว)
 
+### เปิดสายโทรจริงทีละขั้น (Bland AI)
+
+ตัวแปรอยู่ในตารางด้านบนแล้ว (เจ้าของจริงคือ `sovereign-os/infra/.env.example`) — นี่คือลําดับที่ทําให้โทรออกได้จริง:
+
+1. **เอา API key** — สมัคร/ล็อกอินที่ <https://bland.ai> → **dashboard → API key** (แผน Start ฟรี ไม่ต้องใช้บัตร · คิดเงินต่อนาทีที่ใช้จริง)
+   โค้ดยิงไป `https://api.bland.ai/v1/calls` ด้วย `Authorization: Bearer <key>` อยู่แล้ว — ไม่ต้องแก้โค้ด
+2. **ใส่ค่าใน `sovereign-os/infra/.env`** — **ไม่ใช่ `core-api/.env`** (container ไม่อ่านไฟล์นั้น):
+   `CALL_PROVIDER=bland` · `BLAND_API_KEY=<key>` · `ORCHESTRATOR_ALERT_TIERS=text,voice,call` · `CALLER_ALERT_PHONE=+66XXXXXXXXX`
+3. **`docker restart` ไม่พอ** — ค่า env ถูกฝังตอนสร้าง container ต้องสร้างใหม่:
+   ```bash
+   cd sovereign-os/infra && docker compose up -d core-api
+   ```
+4. **ตรวจว่าเข้า container จริง** — `docker compose config | grep -c CALL_PROVIDER` (พิมพ์แค่ชื่อตัวแปร — **อย่าพิมพ์ค่าออกมา**)
+5. **ฟังเสียงไทยก่อนจ่ายเงิน** — `GET /api/agent-machines/call-status` ต้องได้ `blandReady: true` → ตั้งเบอร์ให้โทร → ยิง `POST /api/agent-machines/call-test` แล้วรอสายเข้า
+   Bland เป็น English-first (โค้ดส่ง `language: 'th'` ให้ระบบ optimize) — คุณภาพเสียงไทยต้องฟังเองจาก call-test
+   ถ้าไม่พอใจ: Twilio `<Say language="th-TH">` โค้ดรองรับอยู่แล้ว (`TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `CALLER_FROM_NUMBER`)
+6. ต้องมีคําว่า `call` ใน `ORCHESTRATOR_ALERT_TIERS` **และ**มีเบอร์ (E.164) ไม่งั้นชั้นโทรข้ามเงียบ ๆ · ถ้า `TELEGRAM_*` ว่าง ชั้น text/voice จะ no-op เหลือแต่สายโทรที่ทํางาน
+
 ---
 
 ## 3) ฝั่งเครื่องที่ 2 — ติดตั้ง runner
 
 ดูคู่มือเต็มที่ [README.md](README.md) สรุปสั้น ๆ:
 
-1. ติดตั้ง agent CLI บนเครื่องนั้น (เช่น `npm i -g opencode-ai`)
-2. คัดลอกโฟลเดอร์ `sovereign-os/agent-runner` ไปไว้บนเครื่องนั้น
-3. สร้าง `.env` จาก `.env.example` แล้วใส่ค่า (พอร์ตต้องเป็น **3000**):
+### ไฟล์ที่ต้องคัดลอก (ทั้งโฟลเดอร์นี้)
+
+| ไฟล์ | จำเป็น | หมายเหตุ |
+|---|---|---|
+| `src/main.mjs` · `src/runner.mjs` · `src/screenshot.mjs` | ✅ | ตัว runner ทั้งหมด |
+| `package.json` | ✅ | ไม่มี `dependencies` เลย — มีไว้บอกสคริปต์ `npm test` เท่านั้น |
+| `.env.example` | ✅ | ต้นแบบของ `.env` |
+| `install-runner.cmd` | ✅ (Windows) | ตั้ง Scheduled Task |
+| `.gitignore` | แนะนำ | กัน `.env` หลุดเข้า git |
+| `README.md` | แนะนำ | executor · โมเดล · ข้อจำกัด |
+| `test/` | ไม่จำเป็น | ไว้รัน `npm test` บนเครื่องนั้น |
+| `.env` | ❌ **ห้ามคัดลอก** | token ผูกกับเครื่องเดียว (ออกจากหน้าเว็บครั้งเดียว) — เอาไปเครื่องอื่นได้ `401` และเครื่องเดิมพังตาม |
+
+**เครื่องที่ 2 ต้องมี:** Node.js ≥ 20 (`node -v`) · PowerShell (มีใน Windows ทุกตัว ใช้จับภาพหน้าจอ)
+· **ไม่ต้องรัน `npm install`** และไม่ต้องมี git
+
+⚠️ คัดลอกจาก **MAIN working folder** เท่านั้น — `E:\My work\Project Sovereign Origin\sovereign-os\agent-runner` — **ห้าม**คัดลอกจากโฟลเดอร์ `.freebuff/worktrees/...` (ยังเป็นโค้ดก่อนแก้)
+ตัวที่ต้องได้คือ commit `6481d8a` (branch `ai/hub-lan-install`) ตรวจได้ด้วย:
+
+```bash
+grep -n 'jobs/${jobId}/screenshot/' src/runner.mjs   # ต้องพิมพ์บรรทัดออกมา
+```
+
+ไม่มีบรรทัดออกมา = โค้ดก่อนแก้ → งานจะจบ `done` แต่ภาพหน้าจอไม่ขึ้นโดยไม่มี error
+
+### ลำดับติดตั้ง (ทำตามนี้)
+
+1. **เอา token จาก HUB** — หน้าเว็บ HUB → หัวข้อ "เครื่องสั่งงาน" → กด **ลงทะเบียนเครื่องใหม่** (คืน token **ครั้งเดียว** — คัดลอกก่อนปิดหน้าต่าง)
+2. **ตรวจ Node** — `node -v` ต้องได้ v20 ขึ้นไป
+3. (ทางเลือก) ติดตั้ง agent CLI ถ้าจะให้เครื่องนี้รัน `opencode`: `npm i -g opencode-ai` — เริ่มด้วย `echo` พิสูจน์สายก่อนก็ได้
+4. **คัดลอกทั้งโฟลเดอร์นี้** ไปวางบนเครื่องที่ 2 (USB/zip — ใช้ `git pull` ไม่ได้ เพราะโฟลเดอร์นี้ยังไม่ขึ้น remote)
+   · ตรวจก่อนว่าถึง HUB ได้จากเครื่องที่ 2 — ดูหัวข้อ "เปิดพอร์ตให้เครื่องที่ 2 เข้าถึงได้" ท้ายข้อนี้
+5. **สร้าง `.env`** จาก `.env.example` แล้วใส่ค่า (พอร์ตต้องเป็น **3000**):
 
 ```
 HUB_URL=http://<IP-ของ-โน้ตบุ๊ค>:3000
@@ -138,8 +186,11 @@ ENABLED_EXECUTORS=echo
 > ตรวจว่าถูกได้ด้วยบรรทัดแรกตอนรัน: ต้องเห็น `executor=echo`
 > (ถ้าติดตั้ง opencode CLI แล้ว ให้ใส่ `ENABLED_EXECUTORS=echo,opencode`)
 
-4. รัน `install-runner.cmd` (สร้าง Scheduled Task ให้รันอัตโนมัติตอนเปิดเครื่อง)
-5. ตรวจว่าเครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue
+6. **ทดสอบก่อน** (ยังไม่ต้องติดตั้งถาวร) — `node src/main.mjs` ต้องเห็นบรรทัดแรก
+   `[runner] เครื่อง=… hub=http://<IP>:3000 executor=echo captureScreenshot=true` แล้วไม่มี error
+7. **ตรวจว่าเครื่องขึ้น `ออนไลน์`** ในหน้า Agent Queue แล้วกด Ctrl+C ปิด runner ทดสอบ
+8. **ติดตั้งให้รันเอง** — คลิกขวา `install-runner.cmd` → **Run as administrator** (สร้าง Scheduled Task "Sovereign Agent Runner")
+9. **สั่งงานแรกจากหน้าเว็บ** — เลือกเครื่องนี้ · executor `echo` → งานจบ + กด "ดูภาพหน้าจอตอนจบงาน"
 
 ### หา IP ของ HUB
 
