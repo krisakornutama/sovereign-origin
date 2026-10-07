@@ -82,7 +82,7 @@ sovereign-os/core-api/src/
 - Backend: `docker restart sovereign-core-api` → container rebuild `dist` จาก source ที่ mount เอง (generate + tsc) แล้ว start
 - Frontend: `npm run build` ที่ `sovereign-frontend/` แล้ว restart `next start` (:3000)
 - Migration: **ห้าม**รัน raw SQL ข้าม `_prisma_migrations` — ถ้าจำเป็นต้องทำมือ ให้ `prisma migrate resolve` ทันทีเพื่อให้ ledger ตรงความจริง (เคสจริง 23-09: ledger หลุด 3 รายการ + energy ไม่เคยลง prod)
-- พอร์ต: :3000 frontend prod · :3001 backend · 5432 postgres (Docker)
+- พอร์ต: :3000 frontend prod (bind 0.0.0.0 — **เครื่องใน LAN เข้าถึงได้ทางนี้เท่านั้น**) · :3001 backend (ผูก 127.0.0.1:3001 เท่านั้น เครื่องอื่นใน LAN ต่อตรงไม่ได้ ต้องผ่าน rewrite `/api/*` ของ :3000) · 5432 postgres (Docker)
 
 ## ข้อห้ามเดิมจาก AGENTS.md (ยังมีผล)
 
