@@ -118,18 +118,25 @@ cd sovereign-os/infra && docker compose config | grep -E "CALL_PROVIDER|ORCHESTR
 
 1. ติดตั้ง agent CLI บนเครื่องนั้น (เช่น `npm i -g opencode-ai`)
 2. คัดลอกโฟลเดอร์ `sovereign-os/agent-runner` ไปไว้บนเครื่องนั้น
-3. สร้าง `.env` จาก `.env.example` แล้วใส่ค่า:
+3. สร้าง `.env` จาก `.env.example` แล้วใส่ค่า (พอร์ตต้องเป็น **3000**):
 
 ```
-HUB_URL=http://<IP-ของ-โน้ตบุ๊ค>:3001
+HUB_URL=http://<IP-ของ-โน้ตบุ๊ค>:3000
 MACHINE_NAME=คอมเครื่องที่ 2
 MACHINE_TOKEN=<token จากหน้าเว็บ>
-ENABLED_EXECUTORS=opencode
+ENABLED_EXECUTORS=echo
 ```
+
+ตัวอย่างจริง: `HUB_URL=http://192.168.1.102:3000`
+
+> **ห้ามใช้ `:3001`** — API ผูกกับ `127.0.0.1:3001` เท่านั้น (ดู `sovereign-os/infra/docker-compose.yml`)
+> เครื่องอื่นใน LAN ต่อ 3001 ตรง ๆ ไม่ติด · `:3000` คือหน้าเว็บ prod ที่ rewrite `/api/*` ให้เอง
+> ถ้าใส่ผิด runner จะไม่บอกว่า "พอร์ตผิด" — จะรายงาน `ติดต่อ HUB ไม่ได้` ทุก 15 วินาที
 
 > ชื่อตัวแปรคือ `ENABLED_EXECUTORS` (ไม่ใช่ `MACHINE_EXECUTORS`)
 > ถ้าใส่ชื่อผิด runner จะไม่ error — จะรันได้แค่ `echo` เงียบ ๆ
-> ตรวจว่าถูกได้ด้วยบรรทัดแรกตอนรัน: ต้องเห็น `executor=opencode`
+> ตรวจว่าถูกได้ด้วยบรรทัดแรกตอนรัน: ต้องเห็น `executor=echo`
+> (ถ้าติดตั้ง opencode CLI แล้ว ให้ใส่ `ENABLED_EXECUTORS=echo,opencode`)
 
 4. รัน `install-runner.cmd` (สร้าง Scheduled Task ให้รันอัตโนมัติตอนเปิดเครื่อง)
 5. ตรวจว่าเครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue
@@ -139,6 +146,32 @@ ENABLED_EXECUTORS=opencode
 ```bash
 ipconfig    # บน Windows — ดู IPv4 Address ของการ์ด LAN
 ```
+
+### เปิดพอร์ตให้เครื่องที่ 2 เข้าถึงได้ (ทำครั้งเดียวบน HUB)
+
+`next start` (หน้าเว็บ :3000) bind `0.0.0.0` อยู่แล้ว — ที่เหลือคือให้ Windows Firewall
+ยอมรับขาเข้าที่พอร์ต 3000 (ค่าเริ่มต้นของ Windows คือ **ปิด**) เปิดเฉพาะ profile `private`
+เท่านั้น เพื่อไม่ให้เปิดหน้าเว็บออกสู่วง Wi-Fi สาธารณะ:
+
+```powershell
+# PowerShell แบบ Run as administrator (บนโน้ตบุ๊ค HUB)
+netsh advfirewall firewall add rule name="Sovereign HUB LAN (agent runner)" dir=in action=allow protocol=TCP localport=3000 profile=private
+```
+
+ตรวจว่ามีจริง (ไม่ต้อง admin):
+
+```powershell
+netsh advfirewall firewall show rule name="Sovereign HUB LAN (agent runner)"
+```
+
+**ตรวจก่อนติดตั้ง runner** — รันจาก **เครื่องที่ 2** (แทน IP ด้วยของจริง):
+
+```bash
+curl http://192.168.1.102:3000/api/health
+```
+
+ต้องได้ `200` + `"status":"ok"` · ถ้า timeout = ยังไม่ได้เปิด firewall (หรือ IP เปลี่ยน) — อย่าไปต่อ
+(ปิด rule เมื่อเลิกใช้: `netsh advfirewall firewall delete rule name="Sovereign HUB LAN (agent runner)"`)
 
 ---
 
