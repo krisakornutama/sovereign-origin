@@ -114,3 +114,45 @@ test('สอดคล้องกับความจริง: ถ้า API �
     }
   }
 });
+// ── ชุดที่ 2 (audit 7 ต.ค. 69): คู่มือส่งมอบเครื่องที่ 2 ต้องมีของครบ ไม่ใช่แค่ "ก็อปโฟลเดอร์" ──
+//
+// ขอบเขตที่เทสต์ชุดนี้ "ตรวจจริง": ข้อความใน INSTALL-HUB.md มี/ไม่มีคำสำคัญที่ต้องมี
+// ที่เทสต์นี้ทำไม่ได้ (อย่าเข้าใจผิดว่ามันการันตี): ไม่ได้ตรวจว่าคนอ่านทำตามจริง · ว่า IP ในตัวอย่าง
+// ตรงกับเครื่องจริง · ว่า key ของ Bland ใช้ได้ · ว่าคนคัดลอกโฟลเดอร์ตัวเก่าไป · หรือว่าเนื้อหา
+// ถูกต้องทางเทคนิค (ความจริงของพอร์ต/compose ถูกตรวจโดยเทสต์ชุดแรกด้านบน)
+
+const HANDOVER_FILES = ['src/main.mjs', 'src/runner.mjs', 'package.json', '.env.example', 'install-runner.cmd'];
+
+test('INSTALL-HUB.md: inventory ไฟล์ที่ต้องคัดลอก + กฎห้ามคัดลอก .env พร้อมเหตุผล', () => {
+  const text = read(INSTALL_DOC);
+  for (const f of HANDOVER_FILES) {
+    assert.ok(text.includes(f), `inventory ต้องบอกว่า ${f} ต้องคัดลอกไปเครื่องที่ 2`);
+  }
+  assert.match(text, /`\.env`[^\n]*ห้ามคัดลอก/, 'ต้องมีแถวห้ามคัดลอก `.env` (token ผูกกับเครื่องเดียว)');
+  assert.match(text, /token[^\n]{0,40}เครื่องเดียว/, 'ต้องบอกเหตุผลว่าทำไมห้ามคัดลอก .env');
+});
+
+test('INSTALL-HUB.md: Node ≥ 20 · ไม่ต้อง npm install · เตือน worktree + วิธีตรวจว่าได้ตัวที่แก้แล้ว', () => {
+  const text = read(INSTALL_DOC);
+  assert.match(text, /Node(\.js)?[^\n]{0,20}(≥|>=)\s*20/, 'ต้องบอกเพดานขั้นต่ำ Node ≥ 20');
+  assert.match(text, /ไม่ต้อง[^\n]{0,20}npm install/, 'ต้องบอกว่าไม่ต้องรัน npm install');
+  assert.match(text, /worktree/, 'ต้องเตือนว่าห้ามคัดลอกจากโฟลเดอร์ .freebuff/worktrees');
+  assert.match(text, /grep[^\n]*screenshot\/[^\n]*runner\.mjs/, 'ต้องมีคำสั่ง grep ตรวจว่าเป็น runner ตัวที่แก้แล้ว');
+});
+
+test('INSTALL-HUB.md: run-book ครบ (token → node → คัดลอก → .env → ทดสอบ → ออนไลน์ → ติดตั้งถาวร)', () => {
+  const text = read(INSTALL_DOC);
+  for (const re of [/MACHINE_TOKEN/, /node src\/main\.mjs/, /ออนไลน์/, /install-runner\.cmd/, /ENABLED_EXECUTORS/]) {
+    assert.match(text, re, `ขั้นตอนติดตั้งต้องมี ${re}`);
+  }
+  assert.match(text, /curl\s+https?:\/\/\d+\.\d+\.\d+\.\d+:3000\/api\/health/, 'ต้องมีคำสั่งยืนยันว่าถึง HUB ได้จากเครื่องที่ 2');
+});
+
+test('INSTALL-HUB.md: เส้นทาง BLAND_API_KEY ครบ (ที่มา · infra/.env · provider · recreate · call-test)', () => {
+  const text = read(INSTALL_DOC);
+  assert.match(text, /bland\.ai/, 'ต้องบอกว่าขอ key จาก bland.ai (dashboard)');
+  assert.match(text, /CALL_PROVIDER=bland/, 'ต้องบอกค่า CALL_PROVIDER ที่ต้องตั้ง');
+  assert.match(text, /ไม่ใช่\s*`?core-api\/\.env/, 'ต้องบอกว่าไม่ใช่ core-api/.env');
+  assert.match(text, /docker restart[^\n]{0,30}ไม่/, 'ต้องบอกว่า docker restart ไม่พอ');
+  assert.match(text, /call-test/, 'ต้องบอกวิธีฟังเสียงทดสอบจริงก่อนเปิดใช้');
+});
