@@ -124,6 +124,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/ai', label: 'ศูนย์บัญชาการ AI', labelKey: 'common.nav.ai', icon: 'ai', keywords: 'ai ปัญญาประดิษฐ์ คำสั่ง chat' },
       { href: '/ai-agent', label: 'AI Agent', labelKey: 'common.nav.aiAgent', icon: 'ai-agent', keywords: 'เอเจนต์ บทบาท ตัวแทน ai coding' },
       { href: '/agent-queue', label: 'คิวเอเจนต์', labelKey: 'common.nav.agentQueue', icon: 'ai-agent', keywords: 'คิว งาน agent เครื่อง runner dispatch โน้ตบุ๊ค สั่งงาน' },
+      { href: '/machine-console', label: 'คอนโซลเครื่อง', labelKey: 'common.nav.machineConsole', icon: 'terminal', keywords: 'คอนโซล เครื่อง ระยะไกล ดูจอ เมาส์ คีย์บอร์ด ไฟล์ ควบคุม remote screen control file terminal' },
       { href: '/predictive', label: 'พยากรณ์', labelKey: 'common.nav.predictive', icon: 'predictive', keywords: 'พยากรณ์ คาดการณ์ ทำนาย แบตเตอรี่' },
       { href: '/sensors', label: 'อุปกรณ์ & เซ็นเซอร์', labelKey: 'common.nav.sensors', icon: 'sensors', keywords: 'อุปกรณ์ เซ็นเซอร์ sensor device manager ESP32' },
       { href: '/relay', label: 'ควบคุมรีเลย์', labelKey: 'common.nav.relay', icon: 'relay', keywords: 'รีเลย์ ควบคุม สวิตช์ ปั๊มน้ำ ไฟ' },
