@@ -167,9 +167,15 @@ describe('input — แปลงชื่อปุ่มเป็น virtual-key
 });
 
 describe('input — แปลง event จาก HUB เป็นคำสั่งของ host', () => {
-  test('เมาส์ขยับ → move พร้อมพิกัดที่ปัดเป็นจำนวนเต็ม', () => {
-    assert.deepEqual(toHostCommand({ kind: 'mouse', action: 'move', x: 10.6, y: 20.2 }, 1), {
-      command: { id: 1, kind: 'move', x: 11, y: 20 },
+  test('เมาส์ขยับ → สัดส่วน 0..1 (ไม่ใช่พิกเซล) เพื่อให้ทนการย่อภาพ', () => {
+    assert.deepEqual(toHostCommand({ kind: 'mouse', action: 'move', fx: 0.5, fy: 0.25 }, 1), {
+      command: { id: 1, kind: 'moveFrac', fx: 0.5, fy: 0.25 },
+    });
+  });
+
+  test('สัดส่วนที่เกินขอบถูกตัดเข้าขอบ ไม่ปล่อยค่าเพี้ยนไปถึงเครื่อง', () => {
+    assert.deepEqual(toHostCommand({ kind: 'mouse', action: 'move', fx: 1.7, fy: -3 }, 2), {
+      command: { id: 2, kind: 'moveFrac', fx: 1, fy: 0 },
     });
   });
 
@@ -191,9 +197,9 @@ describe('input — แปลง event จาก HUB เป็นคำสั่
     assert.ok(out.error);
   });
 
-  test('พิกัดที่ผิดรูป → ปฏิเสธ (ไม่ขยับเมาส์ไปที่ 0,0 เงียบ ๆ)', () => {
-    assert.ok(toHostCommand({ kind: 'mouse', action: 'move', x: 'zz', y: 1 }, 6).error);
-    assert.ok(toHostCommand({ kind: 'mouse', action: 'move', y: 1 }, 7).error);
+  test('พิกัดที่ผิดรูป → ปฏิเสธ (ไม่ขยับเมาส์ไปที่มุมบนซ้ายเงียบ ๆ)', () => {
+    assert.ok(toHostCommand({ kind: 'mouse', action: 'move', fx: 'zz', fy: 0.5 }, 6).error);
+    assert.ok(toHostCommand({ kind: 'mouse', action: 'move', fy: 0.5 }, 7).error);
   });
 
   test('คีย์บอร์ด → vk + ทิศทางการกด', () => {

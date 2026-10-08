@@ -89,6 +89,16 @@ export function resolveKeyCode(name) {
   return null;
 }
 
+/**
+ * ตรวจพิกัดสัดส่วน (0..1) ที่หน้าเว็บส่งมา
+ * คืน null เมื่อไม่ใช่ตัวเลข — ผู้เรียกต้องปฏิเสธ ไม่เดาว่า 0
+ */
+export function normalizeFraction(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(Math.max(n, 0), 1);
+}
+
 /** ปุ่มเมาส์ที่ยอมรับ → ค่าคงที่ของ Windows */
 export const MOUSE_BUTTONS = {
   left: { down: 0x0002, up: 0x0004 },
@@ -139,6 +149,16 @@ const CS = [
   'if(nx<0)nx=0;if(ny<0)ny=0;if(nx>w)nx=w;if(ny>h)ny=h;',
   'i.U.mi.dx=(int)Math.Round(nx*65535.0/w);i.U.mi.dy=(int)Math.Round(ny*65535.0/h);',
   'i.U.mi.dwFlags=MOVE|ABSOLUTE|VIRTUALDESK;return One(i);}',
+  // ขยับเมาส์ด้วย "สัดส่วน" 0..1 ของ virtual desktop
+  //   ทำไมต้องเป็นสัดส่วน: ภาพที่ส่งขึ้น HUB ถูกย่อ (เช่น 1920 → 1280) ⇒ ถ้าส่ง
+  //   พิกัดพิกเซลตรง ๆ หน้าเว็บต้องรู้ทั้งขนาดจอจริงและจุดเริ่มของ virtual desktop
+  //   แล้วต้องคำนวณย้อนกลับเอง = มี 3 ชั้นที่ต้องตรงกันตลอดเวลา
+  //   ส่งเป็นสัดส่วน ⇒ ฝั่งเครื่องเป็นคนแปลงด้วยค่าที่ตัวเองรู้อยู่แล้วเสมอ
+  'public static long MoveToFrac(double fx,double fy){',
+  'int vx=X0(),vy=Y0(),w=W(),h=H();',
+  'if(fx<0)fx=0;if(fx>1)fx=1;if(fy<0)fy=0;if(fy>1)fy=1;',
+  'int x=vx+(int)Math.Round(fx*(w-1));int y=vy+(int)Math.Round(fy*(h-1));',
+  'return MoveTo(x,y);}',
   'public static long Button(int flag){INPUT i=new INPUT();i.type=0;i.U.mi.dwFlags=(uint)flag;return One(i);}',
   'public static long Wheel(int delta){INPUT i=new INPUT();i.type=0;i.U.mi.mouseData=(uint)delta;i.U.mi.dwFlags=WHEEL;return One(i);}',
   'public static long KeyVk(int vk,bool down){INPUT i=new INPUT();i.type=1;i.U.ki.wVk=(ushort)vk;i.U.ki.dwFlags=down?(uint)0:KEYUP;return One(i);}',
@@ -188,7 +208,7 @@ export function buildInputScript() {
     "$r=@{ok=$false;error='unknown-kind'}",
     "if($c.kind -eq 'ready'){$r=@{ok=$true;note=[Win32In]::Ready()}}",
     "if($c.kind -eq 'noop'){$r=@{ok=$true;note='noop'}}",
-    "if($c.kind -eq 'move'){$r=@{ok=([Win32In]::MoveTo([int]$c.x,[int]$c.y) -gt 0)}}",
+    "if($c.kind -eq 'moveFrac'){$r=@{ok=([Win32In]::MoveToFrac([double]$c.fx,[double]$c.fy) -gt 0)}}",
     "if($c.kind -eq 'button'){$r=@{ok=([Win32In]::Button([int]$c.flag) -gt 0)}}",
     "if($c.kind -eq 'wheel'){$r=@{ok=([Win32In]::Wheel([int]$c.delta) -gt 0)}}",
     "if($c.kind -eq 'key'){$r=@{ok=([Win32In]::KeyVk([int]$c.vk,[bool]$c.down) -gt 0)}}",
@@ -220,10 +240,11 @@ export function toHostCommand(event, id = 1) {
   if (kind === 'mouse') {
     const action = String(event.action ?? 'move');
     if (action === 'move') {
-      const x = normalizeCoord(event.x);
-      const y = normalizeCoord(event.y);
-      if (x === null || y === null) return { error: 'พิกัดเมาส์ไม่ถูกต้อง' };
-      return { command: { id, kind: 'move', x, y } };
+      // สัดส่วน 0..1 ของจอทั้งผืน (ดูเหตุผลใน C# MoveToFrac)
+      const fx = normalizeFraction(event.fx ?? event.x);
+      const fy = normalizeFraction(event.fy ?? event.y);
+      if (fx === null || fy === null) return { error: 'พิกัดเมาส์ไม่ถูกต้อง' };
+      return { command: { id, kind: 'moveFrac', fx, fy } };
     }
     if (action === 'wheel') {
       const delta = normalizeCoord(event.deltaY ?? event.delta);
