@@ -2,6 +2,8 @@ import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { setIo } from './io-registry';
+import { registerMachineControl } from './machine-control.socket';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Socket.IO — realtime push ไปหา frontend
@@ -54,8 +56,16 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
     try {
-      const decoded = jwt.verify(String(token || ''), config.jwtSecret) as { mfa_verified?: boolean };
+      const decoded = jwt.verify(String(token || ''), config.jwtSecret) as {
+        userId?: string;
+        role?: string;
+        mfa_verified?: boolean;
+      };
       if (!decoded.mfa_verified) return next(new Error('MFA verification required'));
+      // เก็บผู้ใช้ไว้บน socket — ช่องควบคุมเครื่องต้องรู้ว่า "ใคร" สั่ง
+      // (ด่านนี้ตรวจแค่ความถูกต้องของ token + MFA · ส่วนสิทธิ์เจาะจง
+      //  เช่น SUPERADMIN ของ machine-control ถูกตรวจที่ handler ของ event นั้น)
+      socket.data.user = { id: String(decoded.userId ?? ''), role: String(decoded.role ?? '') };
       return next();
     } catch {
       return next(new Error('Unauthorized'));
@@ -66,6 +76,12 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   const rawEmit = io.emit.bind(io) as (event: string, ...args: unknown[]) => boolean;
   io.emit = ((event: string, ...args: unknown[]) =>
     rawEmit(event, ...args.map((arg, i) => (i === 0 ? sanitizeSocketEvent(event, arg) : arg)))) as typeof io.emit;
+
+  // ช่องควบคุมเครื่องระยะไกล (browser ↔ runner) — ลงทะเบียน handler ของตัวเอง
+  registerMachineControl(io);
+
+  // route ฝั่ง HTTP ต้อง relay ภาพ/ผลลัพธ์ไปห้องของ socket ⇒ เก็บ io ไว้ที่เดียว
+  setIo(io);
 
   return io;
 }
