@@ -153,6 +153,9 @@ tools/install/*
 !tools/install/install.sh
 !tools/install/install.ps1
 !tools/install/sovereign.env.template
+!tools/install/lib.mjs
+!tools/install/install.mjs
+!tools/install/install.cmd
 !tools/sovereign-launcher/
 tools/sovereign-launcher/*
 !tools/sovereign-launcher/go.mod
