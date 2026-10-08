@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRunner, uploadScreenshot, resolveCaptureScreenshot } from './runner.mjs';
 import { createControlClient } from './control.mjs';
+import { createControlHub } from './hub-control.mjs';
 import { resolveAllowedRoots } from './fsops.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -84,20 +85,6 @@ const hub = {
     return (out.jobs || []).filter((j) => config.executors.includes(j.executor));
   },
   reportResult: async (id, payload) => api(`/api/agent-machines/jobs/${id}/result`, payload),
-  // ── ช่องควบคุมระยะไกล ──
-  // long-poll: HUB หน่วงคำตอบไว้จนกว่าจะมีคำสั่ง (หรือครบเวลา → command: null)
-  nextCommand: async (waitMs) => {
-    const out = await api('/api/machine-control/next', { waitMs });
-    return out?.command ?? null;
-  },
-  // ส่งเฟรมภาพเป็น JSON+base64 (ไม่ใช้ multipart เพราะเฟรมวิ่งถี่ — overhead ต่อเฟรมแพงกว่า)
-  sendFrame: async (frame) =>
-    api('/api/machine-control/frame', {
-      data: frame.buffer.toString('base64'),
-      mime: 'image/jpeg',
-      width: frame.width ?? null,
-      height: frame.height ?? null,
-    }),
   // ภาพหน้าจอเป็น multipart ไม่ใช่ JSON — ใช้ uploadScreenshot โดยเฉพาะ
   uploadScreenshot: (id, buffer) =>
     uploadScreenshot({ hubUrl: config.hubUrl, token: config.token, jobId: id, buffer }),
@@ -117,9 +104,13 @@ const runner = createRunner({
 // วนคู่ขนานกับลูปงาน AI คนละลูป — งาน AI ที่ยาวเป็นชั่วโมงต้องไม่บล็อกการดูจอ
 let control = null;
 if (config.remoteControl) {
+  // ⚠️ ต้องเป็น adapter ของ "ช่องควบคุม" เท่านั้น
+  //    (เคยพลาด: ส่ง `hub` ก้อนเดียวกับงาน AI ⇒ ผลลัพธ์คำสั่งถูกยิงไปที่
+  //     /api/agent-machines/jobs/<commandId>/result แทนที่จะเป็น /api/machine-control/result
+  //     ⇒ ผู้ใช้เห็น "คำสั่งไม่ทำงาน" โดยไม่มี error ให้จับ)
   control = createControlClient({
     config: { intervalMs: 0 },
-    hub,
+    hub: createControlHub({ hubUrl: config.hubUrl, token: config.token }),
     roots: config.remoteFsRoots,
     onError: (msg) => console.error(msg),
   });
