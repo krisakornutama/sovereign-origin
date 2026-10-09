@@ -32,6 +32,7 @@ import aiChatRoutes from './modules/ai/ai-chat.routes';
 import relayRoutes from './modules/relay/relay.routes';
 import telegramRoutes from './modules/telegram/telegram.routes';
 import agentMachinesRoutes from './modules/agent-machines/agent-machines.routes'; // Agent Orchestration Hub — ส่งงานไปเครื่องคอมใน LAN
+import machineControlRoutes from './modules/machine-control/machine-control.routes'; // ช่องควบคุมเครื่องระยะไกล — จอ/เมาส์/คีย์บอร์ด/ไฟล์
 import timescaleRoutes from './modules/timescale/timescale.routes';
 import reportRoutes from './modules/reports/reports.routes';
 import backupRoutes from './modules/backup/backup.routes';
@@ -133,6 +134,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/relay', featureGuard('/relay'), relayRoutes);
   app.use('/api/telegram', telegramRoutes);
   app.use('/api/agent-machines', agentMachinesRoutes); // HUB: ลงทะเบียนเครื่อง + สั่งงานข้ามเครื่อง (ผู้ใช้ JWT / runner machine-token)
+  app.use('/api/machine-control', machineControlRoutes); // ช่องควบคุมเครื่อง: long-poll ของ runner + state/frame/command ของ SUPERADMIN
   app.use('/api/timescale', timescaleRoutes);
   app.use('/api/reports', featureGuard('/reports'), reportRoutes);
   app.use('/api/backup', featureGuard('/backup'), backupRoutes);

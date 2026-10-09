@@ -25,8 +25,8 @@
 |---|---|---|
 | 1 | migrate DB: `cd sovereign-os/core-api && npx prisma migrate dev --name agent_orchestration` | ไม่มี error P-problem |
 | 2 | เติม env การแจ้งเตือนใน `sovereign-os/infra/.env` (ตารางข้อ 2) | `docker compose config \| grep CALL_PROVIDER` เห็นค่า |
-| 3 | deploy: `docker compose build core-api && docker compose up -d` (ที่ `sovereign-os/infra`) | `GET :3001/api/tts/health` ตอบ `engine: pyttsx3` · route `/api/agent-machines/*` ไม่ใช่ 404 |
-| 4 | ติดตั้ง runner บนเครื่องที่ 2 (ข้อ 3) | เครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue |
+| 3 | deploy: `docker compose build core-api && docker compose up -d` (ที่ `sovereign-os/infra`) | `GET :3001/api/tts/health` ตอบ `effective: pyttsx3` · route `/api/agent-machines/*` ไม่ใช่ 404 |
+| 4 | ติดตั้ง runner บนเครื่องที่ 2 (ทำตามข้อ 3 ข้างบน — deploy HUB เสร็จแล้ว) | เครื่องขึ้น `ออนไลน์` ในหน้า Agent Queue |
 | 5 | สั่งงาน low-risk งานแรก | งานจบ + มีปุ่ม "ดูภาพหน้าจอตอนจบงาน" |
 | 6 | สั่งงาน high-risk งานแรก | ค้าง `awaiting_approval` → กด "อนุมัติให้รัน" ในหน้า Agent Queue (หรือ ✅ ใน Telegram) แล้วค่อยวิ่ง |
 
