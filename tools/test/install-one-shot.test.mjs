@@ -50,6 +50,12 @@ function seedSkeleton() {
   fs.writeFileSync(path.join(sandbox, 'sovereign-os', 'agent-runner', 'package.json'), '{"name":"x"}', 'utf8');
 }
 
+/** จำลอง .git ของ checkout ปกติ — พอให้ด่านตรวจสาขาอ่าน HEAD ได้ */
+function writeGitLayout(root, branch) {
+  fs.mkdirSync(path.join(root, '.git'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.git', 'HEAD'), `ref: refs/heads/${branch}\n`, 'utf8');
+}
+
 /** ผู้อ่าน env แบบเดียวกับที่ runner ใช้จริง (main.mjs) — ใช้เทียบว่าเขียนครบ */
 function envKeysReadByRunner() {
   const src = read('sovereign-os/agent-runner/src/main.mjs');
@@ -520,4 +526,74 @@ test('โหมด --no-frontend: ห้ามอ้างว่าหน้า�
   assert.equal(out.exitCode, 0, out.report);
   assert.doesNotMatch(out.report, /เข้าหน้าเว็บที่ http:\/\/127\.0\.0\.1:3000/, 'dashboard ไม่ได้ติดตั้ง — ห้ามอ้างว่าเปิดได้');
   assert.match(out.report, /ไม่ได้ติดตั้งหน้าเว็บ|HUB/, 'ต้องบอกที่มาของหน้าเว็บให้ชัด');
+});
+
+// ── ด่านเตือน "deploy จากสาขาที่ไม่ใช่ main" ─────────────────────────────────────
+// เครื่องจริง 9 ต.ค. 69: worktree หลัก checkout ค้างอยู่บน ai/hub-lan-install ⇒
+// `docker restart core-api` ปล่อยโค้ดจากสาขานั้นขึ้น production โดยไม่มีสัญญาณเตือน
+// (ผลจริง: route machine-control หายทั้งที่มีอยู่ในอีกสาขา)
+describe('lib: ด่านตรวจสาขาที่จะถูก deploy', () => {
+  test('parseGitHead อ่านชื่อสาขา และรู้จัก HEAD แบบ detached', () => {
+    assert.equal(lib.parseGitHead('ref: refs/heads/main\n'), 'main');
+    assert.equal(lib.parseGitHead('ref: refs/heads/ai/hub-lan-install\n'), 'ai/hub-lan-install');
+    assert.equal(lib.parseGitHead('7ca2b1c9d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8\n'), '', 'detached = ไม่มีชื่อสาขา');
+  });
+
+  test('สาขาไม่ใช่ main → มีคำเตือนครบทั้งสาขาตัวเองและสาขา worktree หลัก', () => {
+    assert.deepEqual(lib.deploySourceWarning({ branch: 'main', mainBranch: 'main' }), []);
+    const w = lib.deploySourceWarning({ branch: 'ai/one-shot-install', mainBranch: 'ai/hub-lan-install', mainRepo: 'E:\\x' });
+    assert.equal(w.length, 2);
+    assert.match(w.join(' '), /ai\/one-shot-install/);
+    assert.match(w.join(' '), /ai\/hub-lan-install/);
+  });
+});
+
+test('dry-run: เตือนเมื่อสาขาที่จะ deploy ไม่ใช่ main — และต้องไม่รันคำสั่งเลย', async () => {
+  seedSkeleton();
+  writeGitLayout(sandbox, 'ai/hub-lan-install');
+  const exec = okExec();
+  const out = await install.runInstall({ ...baseFlags({ dryRun: true }), exec: exec.exec, fetchImpl: fakeFetch() });
+  assert.equal(exec.calls.length, 0, 'dry-run ต้องไม่รันคำสั่ง แม้มี .git ให้อ่าน');
+  const step = out.steps.find((s) => s.name === 'source');
+  assert.ok(step, `ต้องมีขั้น source: ${JSON.stringify(out.steps.map((s) => s.name))}`);
+  assert.equal(step.status, 'warn');
+  assert.match(step.detail, /ai\/hub-lan-install/, 'ต้องบอกชื่อสาขาที่จะถูก deploy');
+});
+
+test('verify-only: ก็ต้องเห็นคำเตือนสาขาที่จะ deploy (โหมดที่คนใช้ก่อนปล่อยของจริง)', async () => {
+  writeGitLayout(sandbox, 'ai/hub-lan-install');
+  const out = await install.runInstall({ ...baseFlags({ verifyOnly: true }), exec: okExec().exec, fetchImpl: fakeFetch() });
+  assert.equal(out.exitCode, 0, 'คำเตือนไม่ใช่ความล้มเหลว');
+  const step = out.steps.find((s) => s.name === 'source');
+  assert.ok(step);
+  assert.equal(step.status, 'warn');
+});
+
+test('สาขาเป็น main → ไม่เตือน (กันสัญญาณรบกวน)', async () => {
+  writeGitLayout(sandbox, 'main');
+  const out = await install.runInstall({ ...baseFlags({ verifyOnly: true }), exec: okExec().exec, fetchImpl: fakeFetch() });
+  const step = out.steps.find((s) => s.name === 'source');
+  assert.equal(step.status, 'ok');
+});
+
+test('worktree ที่ถูกดึงออกมา: ต้องเตือนสาขาของ worktree หลักด้วย', async () => {
+  const mainRepo = path.join(sandbox, 'mainrepo');
+  const wtGit = path.join(mainRepo, '.git', 'worktrees', 'w1');
+  fs.mkdirSync(wtGit, { recursive: true });
+  fs.writeFileSync(path.join(mainRepo, '.git', 'HEAD'), 'ref: refs/heads/ai/hub-lan-install\n');
+  fs.writeFileSync(path.join(wtGit, 'HEAD'), 'ref: refs/heads/ai/one-shot-install\n');
+  fs.writeFileSync(path.join(wtGit, 'commondir'), '../..\n');
+  const wt = path.join(sandbox, 'wt');
+  fs.mkdirSync(wt, { recursive: true });
+  fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${wtGit}\n`);
+
+  const out = await install.runInstall({
+    ...baseFlags({ verifyOnly: true, root: wt }),
+    exec: okExec().exec,
+    fetchImpl: fakeFetch(),
+  });
+  const step = out.steps.find((s) => s.name === 'source');
+  assert.equal(step.status, 'warn');
+  assert.match(step.detail, /ai\/one-shot-install/);
+  assert.match(step.detail, /ai\/hub-lan-install/, 'worktree หลักคือที่ที่ container build จาก — ต้องเตือนด้วย');
 });

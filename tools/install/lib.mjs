@@ -363,6 +363,22 @@ export function webUiUrl(hubUrl, apiPort = 3001, webPort = 3000) {
   }
 }
 
+/** อ่านชื่อสาขาจากเนื้อไฟล์ .git/HEAD (บริสุทธิ์ — ไม่แตะดิสก์) */
+export function parseGitHead(text) {
+  const m = /^ref:\s*refs\/heads\/(.+?)\s*$/m.exec(String(text));
+  return m ? m[1] : '';
+}
+
+/** คำเตือนเมื่อสาขาที่จะถูก deploy ไม่ใช่ main (core-api build จาก src ของสาขานั้น) */
+export function deploySourceWarning({ branch = '', mainBranch = '', mainRepo = '' } = {}) {
+  const warns = [];
+  if (branch && branch !== 'main') warns.push(`สาขาที่ checkout อยู่คือ "${branch}"`);
+  if (mainBranch && mainBranch !== 'main') {
+    warns.push(`worktree หลัก${mainRepo ? ` (${mainRepo})` : ''} อยู่บน "${mainBranch}"`);
+  }
+  return warns;
+}
+
 /** สรุปผลรายขั้น → exit code + สิ่งที่ต้องทำต่อ (ห้ามรายงานว่าเสร็จเมื่อมีขั้นล้ม) */
 export function summarizeSteps(steps) {
   const failed = steps.filter((s) => s.status === 'fail');
