@@ -13,6 +13,7 @@ import { createRunner, uploadScreenshot, resolveCaptureScreenshot } from './runn
 import { createControlClient } from './control.mjs';
 import { createControlHub } from './hub-control.mjs';
 import { resolveAllowedRoots } from './fsops.mjs';
+import { selfUpdateOnce, planBoot, markHealthy, HANDOFF_EXIT_CODE } from './selfUpdate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const envPath = join(here, '..', '.env');
@@ -52,7 +53,23 @@ const config = {
   remoteMaxWidth: Number(env.REMOTE_MAX_WIDTH || 1280),
   // เบรกมือฝั่งเครื่อง: ว่าง = ทั้งไดรฟ์ (ตามที่เจ้าของเลือก) · ระบุได้เพื่อรัดให้แคบลง
   remoteFsRoots: resolveAllowedRoots(env),
+  // อัปเดตโค้ดตัวเองจาก HUB (ปิดได้ที่เครื่องนี้ด้วย SELF_UPDATE=false)
+  selfUpdate: resolveCaptureScreenshot(env.SELF_UPDATE),
+  selfUpdateIntervalMs: Number(env.SELF_UPDATE_INTERVAL_SEC || 6 * 60 * 60) * 1000,
+  selfUpdateStartDelayMs: Number(env.SELF_UPDATE_START_DELAY_SEC || 30) * 1000,
 };
+
+// ── เครื่องลูกอัปเดตโค้ดเอง: ธงสั่งงานจากบรรทัดคำสั่ง ──────────────────────────
+//   --self-update   เช็ค+ติดตั้ง+รีสตาร์ท เดี๋ยวนี้แล้วจบ (ใช้ตอน diagnose/สั่งจาก HUB)
+//   --check-update  ดูเวอร์ชันเฉย ๆ ไม่แตะไฟล์ (ใช้ตอนอยากรู้ว่าต่างกันไหม)
+//   --print-version พิมพ์เวอร์ชันโค้ดที่กำลังรัน
+//   --no-self-update ปิดการอัปเดตในรอบนี้ (ใช้เมื่อสงสัยว่าโค้ดใหม่ทำเครื่องพัง)
+const argv = process.argv.slice(2);
+const wantCheck = argv.includes('--check-update');
+const wantSelfUpdate = argv.includes('--self-update');
+const wantVersion = argv.includes('--print-version');
+if (argv.includes('--no-self-update')) config.selfUpdate = false;
+const runnerRoot = join(here, '..');
 
 if (!config.token) {
   console.error('[runner] ขาด MACHINE_TOKEN — copy .env.example เป็น .env แล้วใส่ token ที่ได้จากหน้าเว็บ HUB');
@@ -63,6 +80,72 @@ console.log(
   `[runner] เครื่อง=${config.machineName} hub=${config.hubUrl} executor=${config.executors.join(',')}` +
     ` captureScreenshot=${config.captureScreenshot}`
 );
+
+// ── ช่วงหัวของการบูต: ประกาศตัวว่า "ฉันคือเวอร์ชันที่เพิ่งอัปเดตมา" ──
+// ถ้าอัปเดตแล้วโปรเซสใหม่ "ไม่ประกาศตัว" = ผู้ดูแลย้อนกลับให้เอง (ดู restartSupervised)
+const boot = planBoot(runnerRoot, { log: (m) => console.log(m) });
+if (boot.action === 'starting') setTimeout(() => markHealthy(runnerRoot), 10_000).unref?.();
+
+if (wantVersion || wantCheck || wantSelfUpdate) {
+  try {
+    const out = await selfUpdateOnce({
+      hubUrl: config.hubUrl,
+      token: config.token,
+      dir: runnerRoot,
+      log: (m) => console.log(`[runner] ${m}`),
+      apply: wantSelfUpdate,
+      restart: wantSelfUpdate,
+    });
+    console.log(
+      `[runner] ตรวจเวอร์ชัน: ${out.status}` +
+        ` (เครื่องนี้ ${out.localVersion ?? '-'} · HUB ${out.remoteVersion ?? '-'})${out.reason ? ` — ${out.reason}` : ''}`
+    );
+    if (out.status === 'restarted' && out.handoff?.exitCode === HANDOFF_EXIT_CODE) process.exit(HANDOFF_EXIT_CODE);
+    process.exit(0);
+  } catch (err) {
+    console.error(`[runner] ตรวจ/ติดตั้งอัปเดตไม่สำเร็จ: ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
+}
+
+// รอบอัตโนมัติ: เช็คตอนเริ่ม (หลังปล่อยให้ลูปงานทำงานก่อน) แล้ววนเป็นระยะ
+// ไม่ await — การอัปเดตห้ามถ่วงการรับงาน
+function startSelfUpdateLoop() {
+  if (!config.selfUpdate) {
+    console.log('[runner] อัปเดตโค้ดตัวเอง=ปิด (SELF_UPDATE=false หรือ --no-self-update)');
+    return;
+  }
+  const tick = async () => {
+    try {
+      const out = await selfUpdateOnce({
+        hubUrl: config.hubUrl,
+        token: config.token,
+        dir: runnerRoot,
+        log: (m) => console.log(`[runner] ${m}`),
+      });
+      if (out.status !== 'up-to-date') {
+        console.log(
+          `[runner] อัปเดตโค้ด: ${out.status}` +
+            ` (เครื่องนี้ ${out.localVersion ?? '-'} · HUB ${out.remoteVersion ?? '-'})${out.reason ? ` — ${out.reason}` : ''}`
+        );
+      }
+      if (out.status === 'restarted') {
+        // โปรเซสใหม่ทำงานแล้ว — รอบนี้ยกให้มัน แล้วตัวห่อ (run-runner.cmd) จะไม่เริ่มซ้ำ
+        runner.stop();
+        control?.stop();
+        process.exit(HANDOFF_EXIT_CODE);
+      }
+    } catch (err) {
+      console.error(`[runner] อัปเดตโค้ดเองล้มเหลว (รอบนี้ข้าม): ${err instanceof Error ? err.message : err}`);
+    }
+  };
+  setTimeout(tick, config.selfUpdateStartDelayMs).unref?.();
+  setInterval(tick, config.selfUpdateIntervalMs).unref?.();
+  console.log(
+    `[runner] อัปเดตโค้ดตัวเอง=เปิด (เช็คครั้งแรกใน ${Math.round(config.selfUpdateStartDelayMs / 1000)} วิ · ` +
+      `ทุก ${Math.round(config.selfUpdateIntervalMs / 3600000)} ชม. · รีสตาร์ทตัวเองเมื่อมีเวอร์ชันใหม่)`
+  );
+}
 
 async function api(path, body) {
   const res = await fetch(`${config.hubUrl}${path}`, {
@@ -135,3 +218,4 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 }
 
 runner.start();
+startSelfUpdateLoop();
