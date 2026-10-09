@@ -156,6 +156,11 @@ tools/install/*
 !tools/install/lib.mjs
 !tools/install/install.mjs
 !tools/install/install.cmd
+!tools/agent-pack/
+tools/agent-pack/*
+!tools/agent-pack/pack.mjs
+!tools/agent-pack/setup-machine.mjs
+!tools/agent-pack/SETUP-MACHINE.cmd
 !tools/sovereign-launcher/
 tools/sovereign-launcher/*
 !tools/sovereign-launcher/go.mod
