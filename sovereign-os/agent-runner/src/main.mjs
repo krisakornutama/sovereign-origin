@@ -10,6 +10,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRunner, uploadScreenshot, resolveCaptureScreenshot } from './runner.mjs';
+import { createControlClient } from './control.mjs';
+import { createControlHub } from './hub-control.mjs';
+import { resolveAllowedRoots } from './fsops.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const envPath = join(here, '..', '.env');
@@ -43,6 +46,12 @@ const config = {
   heartbeatSec: Number(env.HEARTBEAT_SEC || 30),
   // จับภาพหน้าจอตอนจบงาน — เปิดเป็นค่าเริ่มต้น (ปิดได้ด้วย CAPTURE_SCREENSHOT=false)
   captureScreenshot: resolveCaptureScreenshot(env.CAPTURE_SCREENSHOT),
+  // ช่องควบคุมระยะไกล (ดูจอ/เมาส์/คีย์บอร์ด/ไฟล์) — เปิดเป็นค่าเริ่มต้น
+  // เพราะเป็นเหตุผลที่เครื่องนี้ลงทะเบียนกับ HUB ตั้งแต่แรก · ปิดได้ที่เครื่องนี้เอง
+  remoteControl: resolveCaptureScreenshot(env.ENABLE_REMOTE_CONTROL),
+  remoteMaxWidth: Number(env.REMOTE_MAX_WIDTH || 1280),
+  // เบรกมือฝั่งเครื่อง: ว่าง = ทั้งไดรฟ์ (ตามที่เจ้าของเลือก) · ระบุได้เพื่อรัดให้แคบลง
+  remoteFsRoots: resolveAllowedRoots(env),
 };
 
 if (!config.token) {
@@ -91,10 +100,36 @@ const runner = createRunner({
   },
 });
 
+// ── ช่องควบคุมระยะไกล (ดูจอ/เมาส์/คีย์บอร์ด/ไฟล์) ──
+// วนคู่ขนานกับลูปงาน AI คนละลูป — งาน AI ที่ยาวเป็นชั่วโมงต้องไม่บล็อกการดูจอ
+let control = null;
+if (config.remoteControl) {
+  // ⚠️ ต้องเป็น adapter ของ "ช่องควบคุม" เท่านั้น
+  //    (เคยพลาด: ส่ง `hub` ก้อนเดียวกับงาน AI ⇒ ผลลัพธ์คำสั่งถูกยิงไปที่
+  //     /api/agent-machines/jobs/<commandId>/result แทนที่จะเป็น /api/machine-control/result
+  //     ⇒ ผู้ใช้เห็น "คำสั่งไม่ทำงาน" โดยไม่มี error ให้จับ)
+  control = createControlClient({
+    config: { intervalMs: 0 },
+    hub: createControlHub({ hubUrl: config.hubUrl, token: config.token }),
+    roots: config.remoteFsRoots,
+    onError: (msg) => console.error(msg),
+  });
+  console.log(
+    `[runner] ช่องควบคุมระยะไกล=เปิด (กว้างสุด ${config.remoteMaxWidth}px · ` +
+      `ขอบเขตไฟล์: ${config.remoteFsRoots.length ? config.remoteFsRoots.join(' | ') : 'ทั้งไดรฟ์'} · ` +
+      `สั่งได้เฉพาะ SUPERADMIN ที่ HUB)`,
+  );
+  // ไม่ await: รอบแรกค้างรอคำสั่งได้นานถึง 25 วิ — ไม่ควรถ่วงการเริ่มทำงานของลูปงาน AI
+  void control.start();
+} else {
+  console.log('[runner] ช่องควบคุมระยะไกล=ปิด (ENABLE_REMOTE_CONTROL=false)');
+}
+
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     console.log(`[runner] ได้รับ ${sig} — หยุดวน loop`);
     runner.stop();
+    control?.stop();
     process.exit(0);
   });
 }
