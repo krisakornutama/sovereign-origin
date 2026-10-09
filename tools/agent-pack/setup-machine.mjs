@@ -191,10 +191,21 @@ export async function runSetup({
   } else if (platform !== 'win32') {
     add('task', 'warn', `ไม่ใช่ Windows — รันเองได้: cd ${dir} && node src/main.mjs`);
   } else {
-    const tr = `cmd /c cd /d "${dir}" && node src\\main.mjs`;
+    // ตัวห่อ run-runner.cmd ทำสองอย่าง: (ก) process ตายแล้วเริ่มใหม่ให้เอง (เครื่องไม่หลุดจาก HUB)
+    // (ข) รับช่วงตอน runner อัปเดตโค้ดตัวเอง (exit 86) โดยไม่สร้างตัวซ้อน
+    const runnerCmd = path.join(dir, 'run-runner.cmd');
+    const hasWrapper = fs.existsSync(runnerCmd);
+    const tr = hasWrapper ? `cmd /c "${runnerCmd}"` : `cmd /c cd /d "${dir}" && node src\\main.mjs`;
     const res = await exec('schtasks', ['/Create', '/TN', TASK_NAME, '/TR', tr, '/SC', 'ONLOGON', '/F']);
     if (res?.code === 0) {
-      add('task', 'ok', `ตั้งให้รันเองตอนล็อกอินแล้ว (${TASK_NAME})`);
+      add(
+        'task',
+        'ok',
+        hasWrapper
+          ? `ตั้งให้รันเองตอนล็อกอินแล้ว (${TASK_NAME}) — ผ่าน run-runner.cmd (ตายแล้วฟื้นเอง)`
+          : `ตั้งให้รันเองตอนล็อกอินแล้ว (${TASK_NAME})`,
+      );
+      if (!hasWrapper) lines.push('  ! ไม่พบ run-runner.cmd ในโฟลเดอร์นี้ — ตัว runner จะยังรีสตาร์ทตัวเองหลังอัปเดตได้ แต่จะไม่ฟื้นเองเมื่อ crash');
     } else {
       add('task', 'warn', 'ตั้ง autostart ไม่สำเร็จ (ต้องสิทธิ์ผู้ดูแลระบบ)');
       lines.push('  วิธีตั้ง autostart: คลิกขวา SETUP-MACHINE.cmd → "Run as administrator" แล้วรันอีกครั้ง');
