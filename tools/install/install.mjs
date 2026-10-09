@@ -104,6 +104,20 @@ export async function runInstall(opts = {}) {
   };
   const skipped = (name, why) => add(name, 'skipped', why);
 
+  /** ด่านเตือน: core-api จะถูก build จาก src ของสาขาที่ checkout อยู่ตรงนี้ (ไม่รันคำสั่ง) */
+  const checkDeploySource = () => {
+    const info = readCheckoutInfo(root);
+    if (!info.branch && !info.mainBranch) return skipped('source', 'ไม่ใช่ git checkout — ไม่มีสาขาให้ตรวจ');
+    const warns = lib.deploySourceWarning(info);
+    if (!warns.length) return add('source', 'ok', 'สาขาที่จะถูก deploy = main');
+    add(
+      'source',
+      'warn',
+      `สาขาที่จะถูก deploy ไม่ใช่ main — ${warns.join(' · ')}`,
+      'ถ้าไม่ตั้งใจปล่อยรุ่นนี้: ย้าย checkout ไป main ก่อน (core-api build จาก src ของสาขาที่นี่)'
+    );
+  };
+
   // ── 0. ค่าเริ่มต้น ───────────────────────────────────────────────────────────
   const hubUrlRaw = opts.hubUrl ?? process.env.SOVEREIGN_HUB_URL ?? `http://127.0.0.1:${API_PORT}`;
   const machineName = opts.machineName ?? opts.machine_name ?? os.hostname();
@@ -114,6 +128,7 @@ export async function runInstall(opts = {}) {
   if (verifyOnly) {
     plan.length = 0;
     plan.push({ name: 'verify' });
+    checkDeploySource();
     const r = await verifyLayer({ add, fetchImpl, hubUrl, withRunner, noFrontend, token: opts.machineToken ?? null });
     return finish({ steps, plan, add, dryRun: false, verifyOnly: true, hubUrl, verified: r });
   }
@@ -128,6 +143,7 @@ export async function runInstall(opts = {}) {
     hubUrl = lib.assertHubUrl(hubUrlRaw);
     if (!templateOk) throw new Error(`ไม่พบเทมเพลต ${path.relative(root, TEMPLATE_PATH)}`);
     add('preflight', 'ok', `รากโปรเจ็ก=${root} · HUB=${hubUrl}`);
+    checkDeploySource();
   } catch (err) {
     add('preflight', 'fail', String(err?.message ?? err), String(err?.message ?? err));
     for (const name of STEP_ORDER.slice(1)) skipped(name, 'preflight ไม่ผ่าน');
@@ -403,6 +419,32 @@ export async function runInstall(opts = {}) {
   await verifyLayer({ add, fetchImpl, hubUrl, withRunner: withRunner && Boolean(runnerToken), noFrontend, token: runnerToken || null });
 
   return finish({ steps, plan, add, dryRun, hubUrl, preview });
+}
+
+/** อ่านสาขาที่ checkout อยู่จาก .git/HEAD — อ่านไฟล์ล้วน (dry-run ห้ามรันคำสั่ง) */
+function readCheckoutInfo(root) {
+  const out = { branch: '', mainRepo: '', mainBranch: '' };
+  try {
+    const dotGit = path.join(root, '.git');
+    if (!fs.existsSync(dotGit)) return out;
+    let gitDir = dotGit;
+    if (fs.statSync(dotGit).isFile()) {
+      const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'));
+      if (!m) return out;
+      gitDir = path.resolve(root, m[1].trim());
+      const commonFile = path.join(gitDir, 'commondir');
+      if (fs.existsSync(commonFile)) {
+        out.mainRepo = path.dirname(path.resolve(gitDir, fs.readFileSync(commonFile, 'utf8').trim()));
+        const mainHead = path.join(out.mainRepo, '.git', 'HEAD');
+        if (fs.existsSync(mainHead)) out.mainBranch = lib.parseGitHead(fs.readFileSync(mainHead, 'utf8'));
+      }
+    }
+    const headFile = path.join(gitDir, 'HEAD');
+    if (fs.existsSync(headFile)) out.branch = lib.parseGitHead(fs.readFileSync(headFile, 'utf8'));
+  } catch {
+    // .git พัง/ถูกย้าย — ห้ามทำให้การติดตั้งล้มเพราะเรื่องนี้
+  }
+  return out;
 }
 
 /** ตรวจสุขภาพ — คืนรายละเอียดไว้ให้ผู้เรียกใช้ต่อได้ */
