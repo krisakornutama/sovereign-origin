@@ -239,6 +239,11 @@ export function buildRunnerEnv({
     REMOTE_MAX_WIDTH: String(maxWidth),
     // ว่าง = ทั้งไดรฟ์ (ผู้ใช้เลือกไว้) · ใส่ path คั่น ; เพื่อรัดขอบเขตให้แคบลง
     REMOTE_FS_ROOTS: '',
+    // อัปเดตโค้ดตัวเองจาก HUB — เปิดตั้งแต่ติดตั้ง ⇒ แก้โค้ดที่ HUB แล้วเครื่องนี้ได้เอง
+    // (ปิดได้ที่เครื่องนี้เองด้วย SELF_UPDATE=false ดู README ของ agent-runner)
+    SELF_UPDATE: 'true',
+    SELF_UPDATE_START_DELAY_SEC: '30',
+    SELF_UPDATE_INTERVAL_SEC: '21600',
   };
   const base = [
     '# Agent Runner env — สร้างโดย tools/install/install.mjs',
