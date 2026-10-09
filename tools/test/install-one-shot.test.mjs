@@ -448,6 +448,37 @@ test('API ตอบไม่ปกติ → ขั้น verify ล้มพร
   assert.match(out.report, /503|api\/health/);
 });
 
+// ── ช่องควบคุมเครื่องเป็น "ฟีเจอร์เสริม" ไม่ใช่ชั้นที่ตัวติดตั้งสร้างเอง ────────────
+// บั๊กจริง 9 ต.ค. 69: /api/machine-control มีเฉพาะสาขา ai/machine-console (ยังไม่เข้า
+// main) แต่ตัวติดตั้งบังคับว่าต้องไม่ 404 ⇒ เครื่องที่รันโค้ดจาก main ติดตั้งจบแล้ว
+// ได้ exit 1 + คำแนะนำ "restart core-api" ที่แก้ไม่ได้ (รีสตาร์ทไม่ทำให้ route เกิด)
+test('ช่องควบคุมไม่มีในสาขาที่รันอยู่ (404) → เตือนเฉย ๆ ไม่ทำให้การติดตั้งล้ม', async () => {
+  const out = await install.runInstall({
+    ...baseFlags({ verifyOnly: true }),
+    exec: okExec().exec,
+    fetchImpl: fakeFetch({ '/api/machine-control': () => ({ ok: false, status: 404, text: async () => 'Not Found' }) }),
+  });
+  assert.equal(out.exitCode, 0, `404 ของฟีเจอร์เสริมต้องไม่ทำให้ติดตั้งล้ม:\n${out.report}`);
+  assert.ok(!out.failed.includes('verify'), 'ห้ามนับเป็นขั้นล้ม');
+  assert.match(out.report, /machine-control/, 'ยังต้องรายงานให้ผู้ใช้เห็น');
+  assert.doesNotMatch(out.report, /restart core-api/, 'รีสตาร์ทไม่ทำให้ route ที่ไม่มีในโค้ดโผล่มา — ห้ามบอกให้ทำ');
+});
+
+test('HUB ปลายทางไม่ตอบ (status 0) → ห้ามรายงานว่าช่องควบคุม "พร้อมใช้งาน"', async () => {
+  const out = await install.runInstall({
+    ...baseFlags({ verifyOnly: true }),
+    exec: okExec().exec,
+    fetchImpl: fakeFetch({
+      '/api/machine-control': () => {
+        throw new Error('ECONNREFUSED');
+      },
+    }),
+  });
+  assert.equal(out.exitCode, 0);
+  assert.doesNotMatch(out.report, /ช่องควบคุมตอบ 0/, 'status 0 = ไม่มีคำตอบ ไม่ใช่ "พร้อมใช้งาน"');
+  assert.match(out.report, /machine-control/, 'ต้องบอกว่าไม่ได้ตรวจ ไม่ใช่เงียบ');
+});
+
 test('env ของ runner ที่มีอยู่แล้วแต่ผู้ใช้ยังไม่ใส่ token → เตือน ไม่รายงานว่าเสร็จ', async () => {
   seedSkeleton();
   const out = await install.runInstall({
@@ -458,4 +489,35 @@ test('env ของ runner ที่มีอยู่แล้วแต่ผ�
   assert.equal(out.exitCode, 1, 'ไม่มี token = runner ต่อ HUB ไม่ได้ ต้องไม่บอกว่าเสร็จ');
   assert.ok(out.failed.includes('runner'));
   assert.match(out.report, /agent-queue|ลงทะเบียน/, 'ต้องบอกว่าขอ token ได้ที่ไหน');
+});
+
+// ── บรรทัดสุดท้าย "พร้อมใช้งาน" ต้องชี้ที่หน้าเว็บจริง ไม่ใช่พอร์ต API ──────────────
+// บั๊กจริง 9 ต.ค. 69: hubUrl ค่าเริ่มต้นคือ :3001 (core-api) แต่หน้าเว็บอยู่ :3000
+// ⇒ ติดตั้งจบแล้วบอกให้ผู้ใช้เปิด :3001 ซึ่งตอบ 404 (ไม่มี UI ให้ล็อกอิน)
+test('lib: webUiUrl แปลงพอร์ต API (:3001) เป็นหน้าเว็บ (:3000) แต่คงที่อยู่ HUB ใน LAN', () => {
+  assert.equal(lib.webUiUrl('http://127.0.0.1:3001'), 'http://127.0.0.1:3000');
+  assert.equal(lib.webUiUrl('http://192.168.1.5:3000'), 'http://192.168.1.5:3000');
+  assert.equal(lib.webUiUrl('http://192.168.1.5:3001'), 'http://192.168.1.5:3000');
+});
+
+test('บรรทัด "พร้อมใช้งาน" ต้องชี้หน้าเว็บ :3000 (ไม่ใช่พอร์ต API ที่ตอบ 404)', async () => {
+  const out = await install.runInstall({
+    ...baseFlags({ verifyOnly: true, noFrontend: false }),
+    exec: okExec().exec,
+    fetchImpl: fakeFetch(),
+  });
+  assert.equal(out.exitCode, 0, out.report);
+  assert.match(out.report, /เข้าหน้าเว็บที่ http:\/\/127\.0\.0\.1:3000/, `ต้องชี้ :3000:\n${out.report}`);
+  assert.doesNotMatch(out.report, /เข้าหน้าเว็บที่ http:\/\/127\.0\.0\.1:3001/, 'ห้ามชี้พอร์ต API');
+});
+
+test('โหมด --no-frontend: ห้ามอ้างว่าหน้าเว็บพร้อมใช้บนเครื่องนี้', async () => {
+  const out = await install.runInstall({
+    ...baseFlags({ verifyOnly: true, noFrontend: true }),
+    exec: okExec().exec,
+    fetchImpl: fakeFetch(),
+  });
+  assert.equal(out.exitCode, 0, out.report);
+  assert.doesNotMatch(out.report, /เข้าหน้าเว็บที่ http:\/\/127\.0\.0\.1:3000/, 'dashboard ไม่ได้ติดตั้ง — ห้ามอ้างว่าเปิดได้');
+  assert.match(out.report, /ไม่ได้ติดตั้งหน้าเว็บ|HUB/, 'ต้องบอกที่มาของหน้าเว็บให้ชัด');
 });

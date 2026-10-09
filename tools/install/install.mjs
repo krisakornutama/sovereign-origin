@@ -422,10 +422,22 @@ async function verifyLayer({ add, fetchImpl, hubUrl, withRunner, noFrontend, tok
     else problems.push(`dashboard ไม่ตอบปกติ (${web.state}) ที่ http://127.0.0.1:${FRONTEND_PORT}/`);
   }
 
-  // ช่องควบคุมเครื่อง: ไม่มี token ต้องได้ 401 (พิสูจน์ว่า route ถูก mount จริง ไม่ใช่ 404)
+  // ช่องควบคุมเครื่อง: ฟีเจอร์เสริมจากสาย ai/machine-console — ตัวติดตั้งไม่ได้สร้าง route นี้เอง
+  // เดิมนับ 404 เป็นขั้นล้ม ⇒ เครื่องที่รันโค้ดจาก main ติดตั้งจบแล้วได้ exit 1 และคำแนะนำ
+  // "restart core-api" ที่แก้ไม่ได้จริง (รีสตาร์ทไม่ทำให้ route ที่ไม่มีในโค้ดโผล่มา)
   const mc = await raw(fetchImpl, `${hubUrl}/api/machine-control/state`);
-  if (mc.status === 404) problems.push(`${hubUrl}/api/machine-control/state = 404 (ยังไม่ mount — restart core-api)`);
-  else add('verify:machine-console', 'ok', `route ช่องควบคุมตอบ ${mc.status} (พร้อมใช้งาน)`);
+  if (mc.status === 0) {
+    add('verify:machine-console', 'warn', `${hubUrl}/api/machine-control/state — ไม่ตอบคำถามจากเครื่องนี้ (ตรวจไม่ได้)`);
+  } else if (mc.status === 404) {
+    add(
+      'verify:machine-console',
+      'warn',
+      `${hubUrl}/api/machine-control/state = 404 — สาขาที่ HUB รันอยู่ยังไม่มีฟีเจอร์นี้ (ไม่นับเป็นความล้มเหลวของการติดตั้ง)`,
+      'ถ้าต้องใช้ช่องควบคุมเครื่อง: เอาโค้ด machine-console (สาย ai/machine-console) เข้าสาขาที่ HUB รันอยู่ แล้ว build/ปล่อย core-api ใหม่'
+    );
+  } else {
+    add('verify:machine-console', 'ok', `route ช่องควบคุมตอบ ${mc.status} (พร้อมใช้งาน)`);
+  }
 
   if (withRunner && token) {
     const hb = await raw(fetchImpl, `${hubUrl}/api/agent-machines/heartbeat`, {
@@ -488,8 +500,14 @@ function finish({ steps, plan, dryRun, hubUrl, preview = null }) {
     lines.push('  ขั้นถัดไป:');
     for (const a of summary.nextActions) lines.push(`    - ${a}`);
   } else if (!dryRun) {
+    const webUrl = lib.webUiUrl(hubUrl);
+    const dashboardReady = steps.some((s) => (s.name === 'frontend' || s.name === 'verify:web') && s.status === 'ok');
     lines.push('');
-    lines.push(`  ✅ พร้อมใช้งาน — เข้าหน้าเว็บที่ ${hubUrl} แล้วล็อกอินด้วยรหัสใน sovereign-os/infra/.credentials`);
+    lines.push(
+      dashboardReady
+        ? `  ✅ พร้อมใช้งาน — เข้าหน้าเว็บที่ ${webUrl} แล้วล็อกอินด้วยรหัสใน sovereign-os/infra/.credentials`
+        : `  ✅ พร้อมใช้งานฝั่ง API — เครื่องนี้ไม่ได้ติดตั้งหน้าเว็บ (หน้าเว็บของ HUB: ${webUrl} · รหัสใน sovereign-os/infra/.credentials)`
+    );
   }
   lines.push('');
   const report = lines.join('\n');
