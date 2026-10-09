@@ -158,6 +158,18 @@ export async function applyUpdate({ dir, version, files, fetchFile, checkFile = 
   }
 }
 
+/**
+ * ล้าง state ที่ค้างอยู่ — ใช้เมื่อ "ไม่มีการส่งงานต่อ"
+ * (state มีไว้บอกผู้ดูแลที่เฝ้าอยู่ว่าโปรเซสใหม่ขึ้นหรือยัง · ไม่มีผู้ดูแล = ไม่ควรเหลือธุรกรรมค้าง)
+ */
+export function clearPending(dir, { fsImpl = fsSync, log = () => {} } = {}) {
+  const state = readState(dir, fsImpl);
+  if (!state) return false;
+  fsImpl.rmSync(path.join(dir, STATE_FILE), { force: true });
+  if (state.toVersion) log(`[update] ติดตั้งเวอร์ชัน ${state.toVersion} แล้วโดยไม่รีสตาร์ท — ล้าง state ค้าง`);
+  return true;
+}
+
 /** เรียกตอนบูต: ประกาศตัว / ล้าง state ที่จบแล้ว — ใช้ตัดสินว่าอัปเดตรอบก่อนสำเร็จจริง */
 export function planBoot(dir, { now = Date.now(), fsImpl = fsSync, log = () => {} } = {}) {
   const state = readState(dir, fsImpl);
@@ -301,7 +313,10 @@ export async function selfUpdateOnce({
     log,
     ...rest,
   });
-  if (!restart) return { status: 'updated', ...out };
+  if (!restart) {
+    clearPending(dir, { fsImpl, log });
+    return { status: 'updated', ...out };
+  }
   const handoff = await restartSupervised({ dir, fsImpl, log, ...rest });
   return { status: handoff.ok ? 'restarted' : 'rolled-back', ...out, handoff };
 }
