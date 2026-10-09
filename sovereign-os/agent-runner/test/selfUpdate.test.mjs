@@ -27,6 +27,7 @@ import {
   SNAPSHOT_DIR,
   HANDOFF_EXIT_CODE,
   REJECT_COOLDOWN_MS,
+  selfUpdateOnce,
 } from '../src/selfUpdate.mjs';
 
 function tmpDir(tag) {
@@ -139,6 +140,22 @@ test('applyUpdate: ชื่อไฟล์จาก HUB ใช้เป็น�
     /ชื่อไฟล์|path/i,
   );
   assert.equal(fs.existsSync(path.join(path.dirname(dir), 'evil.mjs')), false);
+});
+
+test('ติดตั้งโดยไม่รีสตาร์ท = ห้ามทิ้ง state ค้าง (state มีไว้ระหว่าง "ส่งงานต่อ" เท่านั้น)', async () => {
+  const dir = seedRunner(tmpDir('nostate'), FILES);
+  const remote = seedRunner(tmpDir('remote-nostate'), { ...FILES, 'src/main.mjs': 'export const b = 9;\n' });
+  const man = manifestOf(remote);
+  const fetchImpl = async (url) => {
+    if (String(url).includes('update/manifest')) return { ok: true, status: 200, json: async () => man };
+    const rel = decodeURIComponent(String(url).split('path=')[1]);
+    const buf = fs.readFileSync(path.join(remote, rel));
+    return { ok: true, status: 200, arrayBuffer: async () => buf };
+  };
+  const out = await selfUpdateOnce({ hubUrl: 'http://hub', token: 't', dir, fetchImpl, apply: true, restart: false, checkFile: () => {} });
+  assert.equal(out.status, 'updated');
+  assert.equal(fs.existsSync(path.join(dir, STATE_FILE)), false, 'ไม่มีผู้ดูแลเฝ้าอยู่ = ต้องไม่ทิ้ง state ค้าง');
+  assert.equal(localVersion(dir, man.files.map((f) => f.path)), man.version);
 });
 
 test('planBoot: บูตแรกของเวอร์ชันใหม่ประกาศตัว · บูตถัดไปที่ยังไม่สุขภาพดี = ให้ผู้ดูแลตัดสิน · สุขภาพดีแล้ว = ล้าง state', () => {
