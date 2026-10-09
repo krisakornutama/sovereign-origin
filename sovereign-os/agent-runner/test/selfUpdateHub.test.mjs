@@ -24,6 +24,13 @@ import {
 } from '../src/selfUpdate.mjs';
 
 const RUNNER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.resolve(RUNNER_ROOT, '..', '..');
+/** ที่มาของไฟล์ในชุดติดตั้ง — ต้องตรงกับ bundleSource() ของตัวแพ็ก (ไฟล์ติดตั้งอยู่ที่ tools/agent-pack) */
+function sourcePath(rel) {
+  const installer = ['setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd'];
+  return installer.includes(rel) ? path.join(REPO_ROOT, 'tools', 'agent-pack', rel) : path.join(RUNNER_ROOT, rel);
+}
+
 const SANDBOX_ROOT = path.join(RUNNER_ROOT, '.freebuff', 'tmp');
 
 function loadEnv() {
@@ -37,7 +44,8 @@ function loadEnv() {
   return out;
 }
 
-const env = loadEnv();
+// ค่าจาก env ของโปรเซสชนะ .env (เหมือนที่ main.mjs ทำ) — ใช้รันเทสต์กับ token ที่ไม่ต้องเขียนลงไฟล์
+const env = { ...loadEnv(), ...process.env };
 const HUB = (env.HUB_URL || '').replace(/\/$/, '');
 const TOKEN = env.MACHINE_TOKEN || '';
 /** ไม่มี HUB_URL/token ใน .env = เครื่องนี้ไม่ได้ตั้งเป็น runner → ข้าม */
@@ -64,17 +72,18 @@ function stale(dir) {
  * นี่คือโปรแกรมเมอร์จริงที่ main.mjs เขียนในรอบต่อไป — ไม่ใช่โมค
  * ใช้ import() แบบคั่นบรรทัดให้ดูง่าย หนึ่งบรรทัดต่อการอิมปอร์ต
  */
-function healthyLauncherBody(dir) {
-  const root = dirname(dirname(fileURLToPath(import.meta.url)));
-  const lines = [
-    `import { planBoot, markHealthy } from './selfUpdate.mjs';`,
-    `const root = dirname(dirname(fileURLToPath(import.meta.url)));`,
-    `planBoot(root, { log: () => {} });`,
-    `setTimeout(() => process.exit(0), 800);`,
-  ];
-  return lines.join('\n');
+function healthyLauncherBody() {
+  // โปรเซสใหม่ในแซนด์บ็อกซ์ที่ประกาศตัวสำเร็จ (import ให้ครบ — เคยพลาด: ไม่ import dirname ⇒ ตายก่อนประกาศตัว)
+  const src = [
+    "import { planBoot } from './selfUpdate.mjs';",
+    "import { dirname } from 'node:path';",
+    "import { fileURLToPath } from 'node:url';",
+    'const root = dirname(dirname(fileURLToPath(import.meta.url)));',
+    'planBoot(root, { log: () => {} });',
+    'setTimeout(() => process.exit(0), 800);',
+  ].join(String.fromCharCode(10));
+  return src;
 }
-
 test('อัปเดตโค้ดเองจาก HUB จริง: ดาวน์โหลด → ตรวจ hash → สลับไฟล์ → รันซ้ำไม่ทำอะไร', { skip }, async (t) => {
   let manifest = null;
   try {
@@ -100,7 +109,7 @@ test('อัปเดตโค้ดเองจาก HUB จริง: ดา�
   // ไฟล์ที่ได้ต้องเท่ากับต้นฉบับในโปรเจ็กทุกไบต์ (ไม่ได้แค่ "มีไฟล์")
   for (const f of manifest.files) {
     const got = fs.readFileSync(path.join(dir, f.path));
-    const want = fs.readFileSync(path.join(RUNNER_ROOT, f.path));
+    const want = fs.readFileSync(sourcePath(f.path));
     assert.deepEqual(got, want, `ไฟล์ไม่ตรงต้นฉบับ: ${f.path}`);
   }
   assert.equal(localVersion(dir, manifest.files.map((f) => f.path)), manifest.version);
@@ -126,13 +135,9 @@ test('โปรเซสใหม่ไม่ขึ้นจริง (ปล่
 
   const dir = newSandbox('rollback');
   stale(dir);
-  // จำลอง "โค้ดใหม่พังตอน import" ด้วยการเขียนไฟล์ที่ spawn แล้วไม่ออก (ไม่ประกาศตัว)
-  fs.writeFileSync(
-    path.join(dir, 'src', 'broken-launcher.mjs'),
-    `import { planBoot } from './selfUpdate.mjs';\nimport { dirname, join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\n` +
-      `const root = dirname(dirname(fileURLToPath(import.meta.url)));\nplanBoot(root, { log: () => {} });\n` +
-      `setTimeout(() => { throw new Error('โอ้'); }, 200);\n`,
-  );
+  const beforeUpdate = fs.readFileSync(path.join(dir, 'src', 'main.mjs'));
+  // จำลอง "โค้ดใหม่พังตอน import" — โปรเซสตายก่อนมีโอกาสประกาศตัว (จึงไม่เขียน startedAt)
+  fs.writeFileSync(path.join(dir, 'src', 'broken-launcher.mjs'), "throw new Error('จำลองโค้ดใหม่พังตอน import');\n");
 
   const out = await selfUpdateOnce({
     hubUrl: HUB,
@@ -148,7 +153,7 @@ test('โปรเซสใหม่ไม่ขึ้นจริง (ปล่
   assert.equal(out.status, 'rolled-back', JSON.stringify(out));
   assert.equal(out.handoff?.ok, false);
   assert.equal(out.handoff?.rolledBack, true);
-  assert.deepEqual(fs.readFileSync(path.join(dir, 'src', 'main.mjs')), fs.readFileSync(path.join(RUNNER_ROOT, 'src', 'main.mjs')), 'ต้องได้โค้ดเดิมของเครื่องคืนมา');
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'src', 'main.mjs')), beforeUpdate, 'ต้องได้โค้ดเดิมของเครื่องคืนมา (ไม่ใช่ของใหม่)');
   const rejected = JSON.parse(fs.readFileSync(path.join(dir, REJECT_FILE), 'utf8'));
   assert.equal(rejected.version, manifest.version, 'ต้องจำเวอร์ชันที่พังไว้ไม่ให้ลองซ้ำ');
   assert.equal(fs.existsSync(path.join(dir, STATE_FILE)), false);
@@ -173,7 +178,7 @@ test('โปรเซสใหม่ประกาศตัวจริง (ป
   // นี่คือโปรแกรมเมอร์จริงที่ main.mjs เขียนในรอบต่อไป — ไม่ใช่โมค
   fs.writeFileSync(
     path.join(dir, 'src', 'healthy-launcher.mjs'),
-    healthyLauncherBody(dir),
+    healthyLauncherBody(),
     'utf8',
   );
 
