@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -129,6 +130,59 @@ test('pickWritableOutDir ต้องคืนที่ที่ "เขีย�
     assert.match(txt, /SETUP-MACHINE\.cmd/);
     assert.match(txt, /192\.168\.1\.102:3000/);
     assert.doesNotMatch(txt, /tok-|MACHINE_TOKEN=/i, 'ห้ามฝัง token ลงไฟล์ที่คนอ่าน');
+  });
+});
+
+// ── .cmd ต้องไม่ "ปิดหน้าต่างหนี" — ของจริง 9 ต.ค. 69 ผู้ใช้ดับเบิลคลิกแล้วหน้าต่างขึ้นแวบเดียว
+// หายไปโดยไม่มีข้อความอะไร ⇒ ต้องมี pause ทุกเส้นทาง + เขียน log ไว้ให้ย้อนอ่านได้
+// และต้องเป็น CRLF (LF ล้วนเคยถูกใช้แล้วทำให้ cmd.exe อ่านไฟล์เพี้ยน)
+describe('SETUP-MACHINE.cmd: อ่าน error ได้เสมอ', () => {
+  const cmdPath = path.join(ROOT, 'tools', 'agent-pack', 'SETUP-MACHINE.cmd');
+  const raw = fs.readFileSync(cmdPath);
+  const text = raw.toString('utf8');
+
+  test('เป็น CRLF ทั้งไฟล์ (ไม่มี LF เดี่ยว)', () => {
+    const loneLf = text.split('\n').filter((line, i, all) => !(i === all.length - 1) && !line.endsWith('\r'));
+    assert.deepEqual(loneLf, [], 'ทุกบรรทัดต้องจบด้วย CRLF');
+  });
+
+  test('มีทางออกเดียวที่ผ่าน pause — ห้าม exit /b หนีกลางทาง', () => {
+    const exits = text.match(/exit\s+\/b/g) ?? [];
+    assert.equal(exits.length, 1, `ต้องมี exit /b แค่จุดเดียว (เจอ ${exits.length}) — ไม่งั้นหน้าต่างปิดก่อนอ่านได้`);
+    const pauseAt = text.lastIndexOf('pause');
+    const exitAt = text.lastIndexOf('exit /b');
+    assert.ok(pauseAt > 0 && exitAt > pauseAt, 'pause ต้องอยู่ก่อน exit เสมอ');
+    assert.match(text, /:end\b/, 'มี label :end ให้ทุกเส้นทางกระโดดมาเจอ pause');
+    assert.ok([...text.matchAll(/goto\s+:?(end|ok|failed|fail_msg|no_\w+)/g)].length >= 4, 'ทุกกรณีล้มต้อง goto ไปที่ pause');
+  });
+
+  test('เขียน setup-log.txt (ย้อนอ่านได้แม้หน้าต่างปิดไปแล้ว)', () => {
+    assert.match(text, /setup-log\.txt/, 'ต้องบันทึก log ไว้ข้างไฟล์');
+    assert.match(text, /where node/, 'ต้องบันทึกว่าเจอ node ไหม');
+    assert.match(text, /join\.json/, 'ต้องตรวจ join.json ก่อนรัน');
+  });
+
+  // กับดักจริง: endlocal ล้างตัวแปร → exit /b %FINAL% ที่แยกบรรทัดจะได้รหัส 0 เงียบ ๆ
+  // (mini2 = exit 0, mini3/mini4 = exit 1 — พิสูจน์บนเครื่องจริงแล้ว)
+  test('ปิดท้ายด้วย endlocal & exit /b %FINAL% ในบรรทัดเดียว', () => {
+    assert.match(text, /endlocal & exit \/b %FINAL%/, 'ต้องเป็นบรรทัดเดียว ไม่แยกบรรทัด');
+    assert.doesNotMatch(text, /endlocal\r?\n/, 'ห้ามมี endlocal เดี่ยว ๆ');
+  });
+
+  test('รัน .cmd จริงบน Windows: ต้อง pause ได้ ไม่ปิดหน้าต่างหนี และรหัสออกตรงความจริง', { skip: process.platform !== 'win32' }, () => {
+    const dir = fs.mkdtempSync(path.join(TMP_ROOT, 'cmd-run-'));
+    try {
+      fs.copyFileSync(cmdPath, path.join(dir, 'SETUP-MACHINE.cmd'));
+      fs.copyFileSync(path.join(ROOT, 'tools', 'agent-pack', 'setup-machine.mjs'), path.join(dir, 'setup-machine.mjs'));
+      // ไม่มี join.json ⇒ ต้องบอกชัดและจบด้วยรหัส 1 (ไม่ใช่ 0 เงียบ ๆ)
+      const res = spawnSync('cmd', ['/c', path.join(dir, 'SETUP-MACHINE.cmd')], { cwd: dir, input: '', encoding: 'utf8' });
+      assert.equal(res.status, 1, `ต้องออกด้วยรหัส 1 (ได้ ${res.status}) — output: ${res.stdout}`);
+      assert.match(res.stdout, /join\.json/, 'ต้องบอกว่าขาด join.json');
+      assert.ok(fs.existsSync(path.join(dir, 'setup-log.txt')), 'ต้องเขียน log ไว้ให้ย้อนอ่าน');
+      assert.match(fs.readFileSync(path.join(dir, 'setup-log.txt'), 'utf8'), /โฟลเดอร์/, 'log ต้องมีข้อมูลพื้นฐาน');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
