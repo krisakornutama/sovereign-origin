@@ -13,10 +13,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+// สูตรคำนวณเวอร์ชัน/แฮชต้องเป็นตัวเดียวกับฝั่งเครื่องลูก — import โมดูลของ runner ตรง ๆ
+// (ถ้าเขียนสูตรซ้ำสองที่ วันหนึ่งสองฝั่งจะตกลงกันไม่ได้ แล้วเครื่องลูกจะอัปเดตวนไม่จบ)
+import { computeVersionFromEntries, sha256Hex } from '../../sovereign-os/agent-runner/src/selfUpdate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, '..', '..');
 export const RUNNER_DIR = 'sovereign-os/agent-runner';
+/** ที่เก็บชุดอัปเดตฝั่ง HUB — อยู่ใน volume ที่คอนเทนเนอร์ mount ไว้แล้ว (ไม่ต้องแก้ compose/rebuild) */
+export const UPDATE_DATA_DIR = 'sovereign-os/core-api/data/agent-updates';
 /** ที่ที่ลองเขียนตามลำดับ — รากไดรฟ์มักเขียนไม่ได้ (ต้องเป็นผู้ดูแลระบบ) */
 export const OUT_DIR_CANDIDATES = [
   'E:\\SovereignOS-Machine-Setup',
@@ -72,13 +77,43 @@ export function bundleFiles(root = REPO_ROOT) {
     .filter((f) => f.endsWith('.mjs'))
     .sort()
     .map((f) => `src/${f}`);
-  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd'];
+  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd'];
 }
 
 /** ที่มาของไฟล์ในชุดติดตั้ง (ไฟล์ตัวติดตั้งมาจาก tools/agent-pack, ที่เหลือมาจาก agent-runner) */
 export function bundleSource(root, rel) {
-  if (rel === 'setup-machine.mjs' || rel === 'SETUP-MACHINE.cmd') return path.join(root, 'tools', 'agent-pack', rel);
+  if (rel === 'setup-machine.mjs' || rel === 'SETUP-MACHINE.cmd' || rel === 'run-runner.cmd') return path.join(root, 'tools', 'agent-pack', rel);
   return path.join(root, RUNNER_DIR, rel);
+}
+
+/**
+ * เผยแพร่ชุดอัปเดตให้ "เครื่องลูกที่ออนไลน์อยู่" ดึงไปใช้เอง (ไม่ต้องก็อปไฟล์ผ่าน USB อีก)
+ * เขียนลง core-api/data/agent-updates/ = โฟลเดอร์ที่คอนเทนเนอร์ HUB มองเห็นอยู่แล้ว
+ * คืน { version, files } · throw เมื่อไฟล์ต้นทางหาย (จะได้ไม่เผยแพร่ชุดที่ไม่ครบ)
+ */
+export function publishUpdateBundle({ root = REPO_ROOT, dataDir = '', log = () => {} } = {}) {
+  const dir = path.resolve(dataDir || path.join(root, UPDATE_DATA_DIR));
+  const files = bundleFiles(root);
+  const entries = files.map((rel) => {
+    const from = bundleSource(root, rel);
+    if (!fs.existsSync(from)) throw new Error(`เผยแพร่ชุดอัปเดตไม่ได้ — ไม่พบไฟล์ต้นทาง ${from}`);
+    const body = fs.readFileSync(from);
+    return { path: rel, sha256: sha256Hex(body), size: body.length };
+  });
+  const version = computeVersionFromEntries(entries);
+
+  // เขียนทับทั้งชุด: ลบของเก่าก่อน เพื่อไม่ให้ไฟล์ที่ถูกถอดออกจากชุดค้างอยู่ในโฟลเดอร์ files/
+  fs.rmSync(path.join(dir, 'files'), { recursive: true, force: true });
+  for (const rel of files) {
+    const to = path.join(dir, 'files', rel);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(bundleSource(root, rel), to);
+  }
+  const manifest = { version, generatedAt: new Date().toISOString(), files: entries };
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  log(`[agent-pack] เผยแพร่ชุดอัปเดตเวอร์ชัน ${version} (${files.length} ไฟล์) ที่ ${dir}`);
+  return { version, files: entries, dir };
 }
 
 /** ข้อความหน้าแรกที่คนอ่านเจอในโฟลเดอร์ชุดติดตั้ง (ห้ามมี token) */
@@ -170,6 +205,7 @@ export async function runPack({
   issueCommand = null,
   platform = process.platform,
   interfaces = os.networkInterfaces(),
+  updateDataDir = '',
 } = {}) {
   const steps = [];
   const plan = [];
@@ -273,6 +309,17 @@ export async function runPack({
   fs.writeFileSync(path.join(target, 'START-HERE.txt'), renderStartHere({ machineName, hubUrl: hub }), 'utf8');
   add('bundle', 'ok', 'เขียน join.json + START-HERE.txt');
 
+  // 4) เผยแพร่ชุดอัปเดตบน HUB — เครื่องลูกที่ออนไลน์อยู่จะดึงไปใช้เองในรอบถัดไป
+  try {
+    const published = publishUpdateBundle({ root, dataDir: updateDataDir, log: (m) => lines.push(`  ${m}`) });
+    add('update', 'ok', `เผยแพร่ชุดอัปเดตเวอร์ชัน ${published.version} (${published.files.length} ไฟล์) ให้เครื่องลูกดึงเอง`);
+    plan.push(`ชุดอัปเดตเวอร์ชัน: ${published.version} (${published.files.length} ไฟล์) — เครื่องลูกที่อัปเดตโค้ดเองได้อยู่จะได้เวอร์ชันนี้ทันที`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    add('update', 'warn', `เผยแพร่ชุดอัปเดตไม่สำเร็จ: ${msg}`);
+    lines.push('  ! เครื่องลูกจะยังรันโค้ดเดิมและไม่ได้รับเวอร์ชันนี้ — แก้ไฟล์ต้นทางแล้วรันแพ็กใหม่');
+  }
+
   lines.push('══════════════════════════════════════════════════');
   lines.push('  ชุดติดตั้งเครื่องลูก — พร้อมแล้ว');
   lines.push('══════════════════════════════════════════════════');
@@ -282,6 +329,7 @@ export async function runPack({
   lines.push(`    1) ก็อปโฟลเดอร์ ${target} ไปเครื่องปลายทาง (USB/แชร์ LAN)`);
   lines.push('    2) ที่เครื่องนั้น: ดับเบิลคลิก SETUP-MACHINE.cmd');
   lines.push('    3) เปิดหน้าเว็บ HUB → คิวเอเจนต์ → เครื่องนี้จะขึ้นออนไลน์');
+  lines.push('  หลังจากนี้ไม่ต้องก็อปไฟล์อีก: เครื่องลูกเช็คเวอร์ชันกับ HUB เองแล้วอัปเดต+รีสตาร์ทตัวเอง');
   return { exitCode: 0, report: render(), plan, bundleDir: target, steps };
 }
 

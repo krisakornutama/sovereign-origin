@@ -22,6 +22,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const TMP_ROOT = path.join(ROOT, '.freebuff', 'tmp');
 
 const pack = await import('../agent-pack/pack.mjs');
+// สูตรแฮช/เวอร์ชันตัวเดียวกับที่เครื่องลูกใช้ (ตัวแพ็ก import โมดูลนี้จริง)
+const { sha256Hex, computeVersionFromEntries } = await import('../../sovereign-os/agent-runner/src/selfUpdate.mjs');
 const REPO_ROOT_TEST = () => ROOT;
 const setup = await import('../agent-pack/setup-machine.mjs');
 
@@ -346,5 +348,89 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
     }
     assert.equal(fs.existsSync(path.join(bundle, '.env')), false, 'ห้ามก็อป .env ของเครื่องเดิมไป');
     assert.doesNotMatch(out.report, /tok-issued-1/, 'ห้ามพิมพ์ token ออกหน้าจอ');
+  });
+
+  test('แพ็กจริง: เผยแพร่ชุดอัปเดตให้เครื่องลูกดึงเอง (manifest + ไฟล์ตรง hash)', async () => {
+    const fakeIssue = path.join(sandbox, 'issue-fake.mjs');
+    fs.writeFileSync(
+      fakeIssue,
+      "process.stdout.write(JSON.stringify({ id: 'm-2', name: 'ลูก 2', token: 'tok-2' }) + '\\n');\n",
+      'utf8'
+    );
+    const updateDir = path.join(sandbox, 'agent-updates');
+    const out = await pack.runPack({
+      root: ROOT,
+      outDir: path.join(sandbox, 'bundle2'),
+      name: 'ลูก 2',
+      hubUrl: 'http://192.168.1.102:3000',
+      issueCommand: { cmd: process.execPath, args: [fakeIssue] },
+      updateDataDir: updateDir,
+    });
+    assert.equal(out.exitCode, 0, out.report);
+    assert.match(out.report, /เผยแพร่ชุดอัปเดต/, 'ต้องบอกว่าเผยแพร่ชุดอัปเดตแล้ว');
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(updateDir, 'manifest.json'), 'utf8'));
+    assert.match(manifest.version, /^[0-9a-f]{12}$/);
+    const paths = manifest.files.map((f) => f.path);
+    for (const rel of ['src/main.mjs', 'src/selfUpdate.mjs', 'package.json', 'run-runner.cmd']) {
+      assert.ok(paths.includes(rel), `ชุดอัปเดตขาด ${rel}`);
+    }
+    assert.equal(paths.includes('.env'), false, 'ห้ามเผยแพร่ .env');
+    assert.equal(paths.includes('join.json'), false, 'ห้ามเผยแพร่ join.json (มี token ของเครื่อง)');
+
+    // ไฟล์ที่เผยแพร่ต้องตรง hash ที่ประกาศ และเวอร์ชันต้องคำนวณจากไฟล์จริงได้เสมอ
+    for (const f of manifest.files) {
+      const body = fs.readFileSync(path.join(updateDir, 'files', f.path));
+      assert.equal(sha256Hex(body), f.sha256, `hash ไม่ตรง: ${f.path}`);
+      assert.equal(body.length, f.size);
+    }
+    const recomputed = computeVersionFromEntries(manifest.files.map((f) => ({ path: f.path, sha256: f.sha256 })));
+    assert.equal(recomputed, manifest.version, 'เครื่องลูกคำนวณเวอร์ชันจาก manifest แล้วต้องตรงกับที่ HUB ประกาศ');
+  });
+
+  test('เผยแพร่ซ้ำ: ไฟล์ที่ถูกถอดออกจากชุดต้องหายไปจากที่ให้บริการ (ไม่ค้างเก่า)', () => {
+    const updateDir = path.join(sandbox, 'agent-updates-2');
+    const first = pack.publishUpdateBundle({ root: ROOT, dataDir: updateDir });
+    const stale = path.join(updateDir, 'files', 'src', 'ของเก่า.mjs');
+    fs.writeFileSync(stale, 'export const old = 1;\n');
+    const second = pack.publishUpdateBundle({ root: ROOT, dataDir: updateDir });
+    assert.equal(fs.existsSync(stale), false, 'ไฟล์ที่ไม่อยู่ในชุดใหม่ต้องถูกลบ');
+    assert.equal(second.version, first.version, 'เนื้อไฟล์เดิม ⇒ เวอร์ชันเดิม (ไม่สร้างเวอร์ชันใหม่มั่ว)');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(updateDir, 'manifest.json'), 'utf8')).version, first.version);
+  });
+
+  test('ไฟล์ต้นทางหาย = หยุดก่อนเขียน manifest (ไม่เผยแพร่ชุดที่ไม่ครบ)', async () => {
+    const fakeRoot = path.join(sandbox, 'root-broken');
+    fs.mkdirSync(path.join(fakeRoot, 'sovereign-os', 'agent-runner', 'src'), { recursive: true });
+    fs.writeFileSync(path.join(fakeRoot, 'sovereign-os', 'agent-runner', 'src', 'main.mjs'), 'export {};\n');
+    const updateDir = path.join(sandbox, 'agent-updates-broken');
+    assert.throws(() => pack.publishUpdateBundle({ root: fakeRoot, dataDir: updateDir }), /ไม่พบไฟล์ต้นทาง/);
+    assert.equal(fs.existsSync(path.join(updateDir, 'manifest.json')), false);
+  });
+});
+
+describe('run-runner.cmd: ตัวห่อที่ทำให้อัปเดต/ฟื้นตัวได้จริง', () => {
+  const cmdPath = path.join(ROOT, 'tools', 'agent-pack', 'run-runner.cmd');
+  const text = fs.readFileSync(cmdPath).toString('utf8');
+
+  // กับดักจริง: ไฟล์ .cmd ที่เป็น LF ล้วน ทำให้ cmd.exe อ่านเพี้ยนแล้วจบก่อนถึงบรรทัดงาน
+  test('เป็น CRLF ทั้งไฟล์', () => {
+    assert.match(fs.readFileSync(cmdPath).toString('utf8'), /\r\n/);
+    const loneLf = text.split('\n').filter((line, i, all) => !(i === all.length - 1) && !line.endsWith('\r'));
+    assert.deepEqual(loneLf, [], 'ทุกบรรทัดต้องจบด้วย CRLF');
+  });
+
+  test('รู้จักรหัสออก 86 (ส่งงานต่อโปรเซสใหม่) — ห้ามสร้างตัวซ้อน', () => {
+    assert.match(text, /if "%RC%"=="86" goto :done/, 'exit 86 = มีโปรเซสใหม่ทำอยู่แล้ว ต้องไม่เริ่มรอบใหม่');
+    assert.match(text, /if "%RC%"=="0" goto :done/, 'exit 0 = หยุดตามสั่ง ต้องไม่เริ่มใหม่');
+    assert.match(text, /:loop/, 'มีวงรอบสำหรับเริ่มใหม่เมื่อ crash');
+    // ใช้ includes (ไม่ใช่ regex) — แบ็กสแลชในสตริงทดสอบเคยทำให้เขียนไฟล์ผิดเงียบ ๆ มาแล้ว
+    assert.ok(text.includes('node src' + String.fromCharCode(92) + 'main.mjs'), 'คำสั่งรันจริงต้องเป็น node src\\main.mjs');
+  });
+
+  // กับดักเดียวกับ SETUP-MACHINE.cmd: endlocal แยกบรรทัดจะล้างค่า → รหัสออกเป็น 0 เงียบ ๆ
+  test('ปิดท้ายด้วย endlocal & exit /b %RC% ในบรรทัดเดียว', () => {
+    assert.match(text, /endlocal & exit \/b %RC%/, 'ต้องเป็นบรรทัดเดียว ไม่แยกบรรทัด');
+    assert.doesNotMatch(text, /endlocal\r?\n/, 'ห้ามมี endlocal เดี่ยว ๆ');
   });
 });

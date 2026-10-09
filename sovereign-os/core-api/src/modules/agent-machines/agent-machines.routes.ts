@@ -12,6 +12,8 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import fs from 'node:fs';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hardenUpload, handledUpload, resolveInsideRoot, IMAGE_MIME } from '../../lib/harden-upload';
+import { readUpdateManifest, resolveUpdateFile, isSafeRelPath } from '../../services/agent-update.service';
+import { createHash } from 'node:crypto';
 import {
   prisma,
   authenticateToken,
@@ -45,6 +47,11 @@ import {
 } from '../../services/orchestrator-screenshot.service';
 
 const router = Router();
+
+/** hash ของไฟล์ที่ให้บริการ — เทียบกับ manifest ก่อนส่งออกทุกครั้ง (ไฟล์บนดิสก์อาจถูกแก้/หาย) */
+function sha256Hex(buf: Buffer): string {
+  return createHash('sha256').update(buf).digest('hex');
+}
 
 /** นามสกุลภาพหน้าจอที่ยอมรับ — runner ส่ง PNG เสมอ แต่เปิดรับ jpeg/webp ด้วย */
 const SCREENSHOT_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
@@ -293,6 +300,43 @@ router.post('/queue/:id/repeat', authenticate, requireRole('SUPERADMIN'), async 
 });
 
 // ── ฝั่ง runner (machine token) ──
+
+// GET /api/agent-machines/update/manifest — เครื่องลูกถามว่า "มีโค้ดเวอร์ชันใหม่ไหม"
+// ตอบ 404 (ไม่ใช่ error) เมื่อ HUB ยังไม่ได้เผยแพร่ชุดอัปเดต — เครื่องลูกจะได้ไม่ต้องตีความ
+router.get('/update/manifest', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const manifest = readUpdateManifest();
+    if (!manifest) return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
+    res.json(manifest);
+  } catch (err) {
+    console.error('GET /api/agent-machines/update/manifest error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read update manifest' });
+  }
+});
+
+// GET /api/agent-machines/update/file?path=src/main.mjs — ส่งไฟล์ 1 ไฟล์ในชุดอัปเดต
+// เฉพาะชื่อที่อยู่ใน manifest เท่านั้น (กันการอ่านไฟล์อื่นบนเครื่อง HUB) + ตรวจ hash ให้ตรงกับ manifest
+router.get('/update/file', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const rel = String(req.query.path ?? '');
+    if (!isSafeRelPath(rel)) return res.status(400).json({ error: 'invalid file path' });
+    const found = resolveUpdateFile(rel);
+    if (!found) return res.status(404).json({ error: 'not part of the published bundle' });
+    const body = fs.readFileSync(found.abs);
+    if (sha256Hex(body) !== found.entry.sha256) {
+      console.error(`[agent-update] ไฟล์ชุดอัปเดตไม่ตรง manifest: ${rel}`);
+      return res.status(500).json({ error: 'published file does not match manifest — publish again' });
+    }
+    res.type('text/plain; charset=utf-8').send(body);
+  } catch (err) {
+    console.error('GET /api/agent-machines/update/file error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to serve update file' });
+  }
+});
 
 // POST /api/agent-machines/heartbeat — runner ยืนยันว่ายังออนไลน์
 router.post('/heartbeat', async (req: Request, res: Response) => {
