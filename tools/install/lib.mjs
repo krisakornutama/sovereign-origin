@@ -348,6 +348,21 @@ export function redactSecrets(text) {
     .join('\n');
 }
 
+/**
+ * URL ของ "หน้าเว็บ" ที่ผู้ใช้ต้องเปิด
+ * HUB_URL ของ runner ชี้ core-api (:3001) เพราะ runner ต้องผ่าน rewrite /api/* ของหน้าเว็บ
+ * แต่คนต้องเปิด :3000 — ตัวติดตั้งเคยบอกให้เปิด :3001 ซึ่งตอบ 404 (ไม่มี UI)
+ */
+export function webUiUrl(hubUrl, apiPort = 3001, webPort = 3000) {
+  try {
+    const u = new URL(String(hubUrl));
+    if (u.port === String(apiPort) || u.port === '') u.port = String(webPort);
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return String(hubUrl);
+  }
+}
+
 /** สรุปผลรายขั้น → exit code + สิ่งที่ต้องทำต่อ (ห้ามรายงานว่าเสร็จเมื่อมีขั้นล้ม) */
 export function summarizeSteps(steps) {
   const failed = steps.filter((s) => s.status === 'fail');
