@@ -48,7 +48,14 @@ export function buildEnvFile({ hubUrl, token, machineName, executors = 'echo', f
 export function readJoin(dir) {
   const file = path.join(dir, 'join.json');
   if (!fs.existsSync(file)) {
-    return { ok: false, error: `ไม่พบ join.json ใน ${dir} — ชุดติดตั้งไม่ครบ (ควรมี join.json, setup-machine.mjs, src/)` };
+    // ไม่มี join.json = ไม่ใช่ชุดเสีย แต่เป็น "ชุดสากล" ที่ต้องลงทะเบียนเอง
+    // (เจ้าของสั่ง 11/10/69: "ไฟล์เดียวจบ ไม่ต้องทำทีละเครื่อง")
+    //   → ผู้เรียกต้องตัดสินใจต่อ ไม่ใช่ตายที่นี่
+    return {
+      ok: false,
+      code: 'NO_JOIN',
+      error: `ไม่พบ join.json ใน ${dir} — ถ้าเป็นชุดสากล ให้รันด้วย --enroll (ต้องมีรหัสเชิญจากเจ้าของ HUB)`,
+    };
   }
   let parsed;
   try {
@@ -92,6 +99,11 @@ export async function runSetup({
   force = false,
   skipTask = false,
   log = console.log,
+  // ── โหมด "ชุดสากร" (เจ้าของสั่ง 11/10/69: ไฟล์เดียวจบ ไม่ต้องทำทีละเครื่อง) ──
+  // ไม่มี join.json = ขอ token ของตัวเองจาก HUB ด้วยรหัสเชิญ แทนที่จะต้องออกชุดใหม่ทีละเครื่อง
+  enroll = false,
+  hubUrl: hubUrlArg = '',
+  enrollCode = process.env.MACHINE_ENROLL_CODE || '',
 } = {}) {
   const steps = [];
   const lines = [];
@@ -114,28 +126,46 @@ export async function runSetup({
 
   // 1) ชุดติดตั้งครบไหม
   const join = readJoin(dir);
-  if (!join.ok) {
+
+  // โหมดชุดสากร: ไม่มี join.json แต่มี --enroll ⇒ ขอ token เอง
+  let resolved = join.ok ? { hubUrl: join.hubUrl, machineToken: join.machineToken, machineName: join.machineName } : null;
+  if (!resolved && enroll && join.code === 'NO_JOIN') {
+    const { enroll: doEnroll } = await import(path.join(dir, 'src', 'enroll-machine.mjs'));
+    const hub = String(hubUrlArg || process.env.HUB_URL || '').trim();
+    const r = await doEnroll(
+      { hubUrl: hub, code: enrollCode, name: machineName || os.hostname(), os: platform, executors: String(executors).split(',').map((s) => s.trim()).filter(Boolean), version: '' },
+      { fetch: fetchImpl },
+    );
+    if (!r.ok) {
+      add('ลงทะเบียน', 'fail', r.error);
+      return finish(false, 1);
+    }
+    resolved = { hubUrl: hub.replace(/\/+$/, ''), machineToken: r.token, machineName: r.name || machineName || os.hostname() };
+    add('ลงทะเบียน', 'ok', `ขอ token สำเร็จ — เครื่อง "${resolved.machineName}"`);
+  }
+
+  if (!resolved) {
     add('join', 'fail', join.error);
     return finish(false, 1);
   }
-  const name = String(machineName || join.machineName || os.hostname()).trim() || join.machineName;
-  add('join', 'ok', `เครื่อง "${name}" → HUB ${join.hubUrl}`);
+  const name = String(machineName || resolved.machineName || os.hostname()).trim() || resolved.machineName;
+  add('join', 'ok', `เครื่อง "${name}" → HUB ${resolved.hubUrl}`);
 
   // 2) ต่อ HUB ได้ไหม (ก่อนแตะไฟล์)
   let health;
   try {
-    const res = await fetchImpl(`${join.hubUrl}/api/health`, { method: 'GET' });
+    const res = await fetchImpl(`${resolved.hubUrl}/api/health`, { method: 'GET' });
     health = { status: res?.status ?? 0, ok: Boolean(res?.ok || (res?.status ?? 0) < 400) };
   } catch (err) {
     health = { status: 0, ok: false, error: String(err?.message ?? err) };
   }
   if (!health.ok) {
-    add('hub', 'fail', `ต่อ ${join.hubUrl}/api/health ไม่ได้ (${health.error || health.status})`);
+    add('hub', 'fail', `ต่อ ${resolved.hubUrl}/api/health ไม่ได้ (${health.error || health.status})`);
     lines.push('  ตรวจ: HUB เปิดอยู่ไหม · เปิด firewall พอร์ต 3000 (profile private) · Wi-Fi วงเดียวกันไหม');
-    lines.push(`  ทดสอบเองได้: curl -L ${join.hubUrl}/api/health`);
-    return finish(false, 1, join.hubUrl, name);
+    lines.push(`  ทดสอบเองได้: curl -L ${resolved.hubUrl}/api/health`);
+    return finish(false, 1, resolved.hubUrl, name);
   }
-  add('hub', 'ok', `HUB ตอบ ${health.status} ที่ ${join.hubUrl}`);
+  add('hub', 'ok', `HUB ตอบ ${health.status} ที่ ${resolved.hubUrl}`);
 
   // 3) .env (ไม่ทับของเดิมที่ไม่ใช่ token ชุดนี้)
   const envPath = path.join(dir, '.env');
@@ -143,21 +173,21 @@ export async function runSetup({
   let wroteEnv = false;
   if (existing) {
     const existingToken = tokenFromEnvText(existing);
-    if (existingToken === join.machineToken) {
+    if (existingToken === resolved.machineToken) {
       add('env', 'ok', 'มี .env ของเครื่องนี้อยู่แล้ว (ไม่แก้)');
     } else if (!force) {
       add('env', 'fail', 'มี .env อยู่แล้วแต่ token ไม่ตรงกับชุดติดตั้งนี้');
       lines.push('  ถ้าตั้งใจให้เครื่องนี้ใช้ token ใหม่: รันซ้ำด้วย --force (จะสำรอง .env เดิมเป็น .env.bak)');
       lines.push('  ถ้าไม่ตั้งใจ: ตรวจว่าคุณกำลังติดตั้งทับเครื่องที่ใช้งานอยู่หรือไม่');
-      return finish(false, 1, join.hubUrl, name);
+      return finish(false, 1, resolved.hubUrl, name);
     } else {
       fs.writeFileSync(`${envPath}.bak`, existing, 'utf8');
-      fs.writeFileSync(envPath, buildEnvFile({ hubUrl: join.hubUrl, token: join.machineToken, machineName: name, executors, fsRoots: defaultFsRoots(dir, home) }), 'utf8');
+      fs.writeFileSync(envPath, buildEnvFile({ hubUrl: resolved.hubUrl, token: resolved.machineToken, machineName: name, executors, fsRoots: defaultFsRoots(dir, home) }), 'utf8');
       wroteEnv = true;
       add('env', 'warn', 'เขียน .env ใหม่ (สำรองของเดิมเป็น .env.bak)');
     }
   } else {
-    fs.writeFileSync(envPath, buildEnvFile({ hubUrl: join.hubUrl, token: join.machineToken, machineName: name, executors, fsRoots: defaultFsRoots(dir, home) }), 'utf8');
+    fs.writeFileSync(envPath, buildEnvFile({ hubUrl: resolved.hubUrl, token: resolved.machineToken, machineName: name, executors, fsRoots: defaultFsRoots(dir, home) }), 'utf8');
     wroteEnv = true;
     add('env', 'ok', `เขียน .env แล้ว (ขอบเขตไฟล์: ${defaultFsRoots(dir, home).join(' | ')})`);
   }
@@ -165,9 +195,9 @@ export async function runSetup({
   // 4) พิสูจน์ว่า token ใช้ได้จริง = เครื่องออนไลน์
   let hb;
   try {
-    const res = await fetchImpl(`${join.hubUrl}/api/agent-machines/heartbeat`, {
+    const res = await fetchImpl(`${resolved.hubUrl}/api/agent-machines/heartbeat`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-machine-token': join.machineToken },
+      headers: { 'content-type': 'application/json', 'x-machine-token': resolved.machineToken },
       body: JSON.stringify({ version: process.version }),
     });
     hb = { status: res?.status ?? 0 };
@@ -181,7 +211,7 @@ export async function runSetup({
         ? '  token ถูกปฏิเสธ (401): เครื่องนี้อาจถูกลบ/ปิดในหน้า HUB หรือ join.json ถูกแก้ — แพ็กชุดติดตั้งใหม่ที่เครื่อง HUB'
         : '  ตรวจว่า route /api/agent-machines ทำงาน (deploy ล่าสุด) แล้วลองใหม่'
     );
-    return finish(false, 1, join.hubUrl, name);
+    return finish(false, 1, resolved.hubUrl, name);
   }
   add('heartbeat', 'ok', 'HUB ยอมรับ token นี้ — เครื่องขึ้นออนไลน์แล้ว');
 
@@ -214,10 +244,10 @@ export async function runSetup({
   }
 
   if (wroteEnv) lines.push('');
-  lines.push(`  HUB_URL : ${join.hubUrl}`);
+  lines.push(`  HUB_URL : ${resolved.hubUrl}`);
   lines.push(`  ชื่อเครื่อง: ${name}`);
   lines.push(`  โฟลเดอร์ : ${dir}`);
-  return finish(true, 0, join.hubUrl, name);
+  return finish(true, 0, resolved.hubUrl, name);
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
@@ -228,6 +258,13 @@ if (isMain) {
     force: argv.includes('--force'),
     skipTask: argv.includes('--no-task'),
     dir: (argv.find((a) => a.startsWith('--dir=')) ?? '').slice(6) || HERE,
+    // ── โหมดชุดสากร: ไฟล์เดียวใช้ได้ทุกเครื่อง ──────────────────────────
+    // เดิมต้องมี join.json (มี token ฝังมาทีละเครื่อง) → ก๊อปชุดเดียวไปหลายเครื่อง
+    //   HUB จะมองเป็นเครื่องเดียว เพราะระบุตัวจาก token_hash
+    enroll: argv.includes('--enroll'),
+    hubUrl: (argv.find((a) => a.startsWith('--hub-url=')) ?? '').slice(10) || '',
+    enrollCode: (argv.find((a) => a.startsWith('--code=')) ?? '').slice(7) || process.env.MACHINE_ENROLL_CODE || '',
+    machineName: (argv.find((a) => a.startsWith('--name=')) ?? '').slice(7) || '',
   });
   process.exitCode = out.exitCode;
 }

@@ -16,13 +16,27 @@ set "FINAL=1"
 >> "%LOG%" echo.
 
 if not exist "%HERE%setup-machine.mjs" goto no_script
-if not exist "%HERE%join.json" goto no_join
+REM ไม่มี join.json = ไม่ใช่ชุดเสีย — เป็น "ชุดสากล" ที่ต้องลงทะเบียนกับ HUB เอง
+REM   (เจ้าของสั่ง 11/10/69: "ไฟล์เดียวจบ ไม่ต้องทำทีละเครื่อง")
+if exist "%HERE%join.json" goto have_join
+if /i "%~1"=="--enroll" goto enroll_mode
+goto no_join
+
+:enroll_mode
+echo กำลังลงทะเบียนเครื่องนี้กับ HUB (ต้องมีรหัสเชิญ) ...
+echo.
+shift
+node "%HERE%setup-machine.mjs" --enroll %* >> "%LOG%" 2>&1
+goto check_rc
+
+:have_join
 where node >nul 2>&1
 if errorlevel 1 goto no_node
 
 echo กำลังติดตั้งเครื่องนี้เป็นเครื่องลูกของ Sovereign OS ...
 echo.
 node "%HERE%setup-machine.mjs" %* >> "%LOG%" 2>&1
+:check_rc
 set "RC=%errorlevel%"
 >> "%LOG%" echo [จบด้วยรหัส %RC%]
 type "%LOG%"
@@ -38,8 +52,12 @@ echo   = ก็อปไม่ครบทั้งโฟลเดอร์ — 
 goto fail_msg
 
 :no_join
-echo [ผิดพลาด] ไม่พบ join.json (ไฟล์นี้มี token ที่ฝังมาให้ ไม่ต้องพิมพ์เอง)
-echo   = ก็อปใหม่ทั้งโฟลเดอร์จากเครื่อง HUB (ตัวแพ็กสร้างไฟล์นี้ให้)
+echo [ยังทำไม่ได้] ไม่พบ join.json และไม่ได้สั่ง --enroll
+echo.
+echo   ถ้าเป็นชุดสากล (ต้องการติดตั้งไฟล์เดียวใช้ได้ทุกเครื่อง) ให้รัน:
+echo       SETUP-MACHINE.cmd --enroll --hub-url=http://192.168.1.102:3000 --code=รหัสเชิญ
+echo.
+echo   ถ้าคาดว่าจะมี join.json แต่ไม่เจอ = ก๊อปไม่ครบ ให้ก๊อปใหม่ทั้งโฟลเดอร์
 goto fail_msg
 
 :no_node
