@@ -62,6 +62,11 @@ import {
   sanitizeMachineName,
   normalizeExecutors,
 } from '../../services/machine-enroll.service';
+import {
+  readNodeKitManifest,
+  resolveVerifiedNodeKitAsset,
+  nodeKitManifestForClient,
+} from '../../services/node-kit.service';
 
 const router = Router();
 
@@ -430,6 +435,56 @@ router.get('/desktop-update/asset', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('GET /api/agent-machines/desktop-update/asset error:', err instanceof Error ? err.message : err);
     if (!res.headersSent) res.status(500).json({ error: 'Failed to serve desktop update asset' });
+  }
+});
+
+// GET /api/node-kits/manifest — ชุดติดตั้งเครื่องใหม่ (ไฟล์เดียว)
+//
+// เจ้าของสั่ง 12/10/69: ตัวติดตั้งไฟล์เดียวต้องดึงชุดระบบจาก HUB เอง
+//   (เดิมต้องให้เจ้าของก๊อปโฟลเดอร์ ~700 MB ไปเอง = "งงมากเลย ไม่รู้จะกดอันไหน")
+//
+// เปิดให้อ่านได้โดยไม่ต้องมี machine token: เครื่องใหม่ยังไม่มี token มาจะส่ง
+//   แต่ต้องมีรหัสเชิญในการ "ลงทะเบียน" เสมอ (ดู /enroll) — ชุดติดตั้งไม่ใช่คีย์ลับ
+router.get('/node-kits/manifest', async (_req: Request, res: Response) => {
+  try {
+    const manifest = readNodeKitManifest();
+    if (!manifest) {
+      res.status(404).json({
+        error: 'ยังไม่ได้เผยแพร่ชุดติดตั้งเครื่องใหม่',
+        hint: 'รันที่เครื่อง HUB: node tools/build-node-kit.mjs --publish',
+      });
+      return;
+    }
+    // ส่งพาธสัมพัทธ์ ไม่ใช่ URL เต็ม — เครื่องลูกรู้ HUB_URL ของตัวเองอยู่แล้ว
+    //   (HUB อาจอยู่หลัง tunnel/โดเมน ถ้ายัด URL เต็มตอนนี้จะผูกกับทางเดินของ HUB เท่านั้น)
+    res.json(nodeKitManifestForClient(manifest, '/api/agent-machines/node-kits/asset'));
+  } catch (err) {
+    console.error('GET /api/agent-machines/node-kits/manifest error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read node kit manifest' });
+  }
+});
+
+// GET /api/agent-machines/node-kits/asset — ส่ง archive ชุดติดตั้ง (ตรวจแฮชกับ manifest ก่อนทุกครั้ง)
+router.get('/node-kits/asset', async (_req: Request, res: Response) => {
+  try {
+    const found = await resolveVerifiedNodeKitAsset();
+    if (!found) return res.status(404).json({ error: 'node kit missing or does not match manifest' });
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(found.entry.size),
+      'Content-Disposition': `attachment; filename="${found.entry.name}"`,
+      'Cache-Control': 'no-store',
+    });
+    // สตรีมไฟล์ — ระดับร้อย MB ห้ามโหลดทั้งก้อนเข้า memory
+    const stream = fs.createReadStream(found.abs);
+    stream.on('error', (err) => {
+      console.error('GET node-kits/asset stream error:', err.message);
+      res.destroy(err);
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('GET /api/agent-machines/node-kits/asset error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read node kit asset' });
   }
 });
 

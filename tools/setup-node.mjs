@@ -298,7 +298,35 @@ export async function runSetup(opts = {}) {
     step('ตั้งค่าครั้งแรก', 'ok', 'สร้าง .env แล้ว');
   }
 
-  // 6) เริ่มระบบ (ฐานข้อมูล + API + เว็บ)
+  // 6) ติดตั้ง dependency บนเครื่องนี้ — ชุดที่ดาวน์โหลดมาไม่ได้พา node_modules มา
+  //    (483 MB ฝั่ง frontend · ถ้าใส่ในชุดจะใหญ่กว่านี้มาก · และ npm ci บนเครื่องเป้าหมาย
+  //    เร็วกว่าดาวน์โหลด+แตก) — start-sovereign.bat จะเรียก `npm run build` ซึ่งต้องมี node_modules
+  const depsTargets = [
+    path.join(kitDir, 'sovereign-frontend'),
+    path.join(kitDir, 'sovereign-os', 'core-api'),
+  ].filter((d) => fs.existsSync(path.join(d, 'package.json')));
+
+  for (const dir of depsTargets) {
+    const nm = path.join(dir, 'node_modules');
+    if (fs.existsSync(nm)) {
+      step(`dependency ${path.basename(dir)}`, 'ok', 'มี node_modules อยู่แล้ว — ข้าม');
+      continue;
+    }
+    if (wouldDo(`dependency ${path.basename(dir)}`, 'npm ci')) continue;
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    // ไม่มี lockfile = npm ci ใช้ไม่ได้ (ต้องไป install) — บอกชัดแทนที่จะล้มเงียบๆ
+    const lock = fs.existsSync(path.join(dir, 'package-lock.json'));
+    const cmd = lock ? 'ci' : 'install';
+    step(`dependency ${path.basename(dir)}`, 'warn', `กำลัง npm ${cmd} (อาจใช้เวลาหลายนาที) · รุ่น ${pkg.version ?? '?'}`);
+    const r = await exec('npm', [cmd, '--no-audit', '--no-fund'], { cwd: dir, timeout: 20 * 60 * 1000 });
+    if (r.code !== 0 || !fs.existsSync(nm)) {
+      step(`dependency ${path.basename(dir)}`, 'fail', `npm ${cmd} ล้ม (exit ${r.code}) — ต้องมีอินเทอร์เน็ต`);
+      return finish(false, 45);
+    }
+    step(`dependency ${path.basename(dir)}`, 'ok', 'ติดตั้งแล้ว');
+  }
+
+  // 7) เริ่มระบบ (ฐานข้อมูล + API + เว็บ)
   if (wouldDo('เริ่มระบบ', 'รัน start-sovereign.bat (ดึง Docker หลาย GB — ใช้เวลานาน)')) {
     return finish(true, 0); // dry-run จบตรงนี้ ไม่ต้องไปข้างล่าง
   }
