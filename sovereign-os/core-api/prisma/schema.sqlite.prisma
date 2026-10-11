@@ -24,6 +24,10 @@ model User {
   audit_logs    AuditLog[]
   skill_matrix  SkillMatrix[]
 
+  // ── สิทธิ์คุมเครื่อง (เพิ่ม 11/10/69) ──
+  owned_machines AgentMachine[]    @relation("MachineOwner")
+  hub_machines   AgentMachineHub[]
+
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
   asset_positions  AssetPosition[]
   inventory_items  InventoryItem[]
@@ -1190,12 +1194,38 @@ model AgentMachine {
   last_heartbeat DateTime?
   version        String?
   note           String?
+
+  // ── สิทธิ์ควบคุม (เพิ่ม 11/10/69) — ค่าเริ่มต้น USER เสมอ ไม่ใช่ HUB ──
+  role             String    @default("USER")
+  owner_user_id    String?
+  lan_confirmed_at DateTime?
+  pair_code_hash   String?
+  pair_code_at     DateTime?
+
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
   jobs AgentJob[]
+  hub_users AgentMachineHub[]
+  owner    User?        @relation("MachineOwner", fields: [owner_user_id], references: [id], onDelete: SetNull)
 
+  @@index([role])
+  @@index([owner_user_id])
   @@map("agent_machines")
+}
+
+// ผูกเครื่อง ↔ ผู้ใช้ที่คุมได้ (หลายต่อหนึ่ง)
+model AgentMachineHub {
+  machine_id String
+  user_id    String
+  created_at DateTime @default(now())
+
+  machine AgentMachine @relation(fields: [machine_id], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([machine_id, user_id])
+  @@index([user_id])
+  @@map("agent_machine_hubs")
 }
 
 // ─────────────────────────────────────────────

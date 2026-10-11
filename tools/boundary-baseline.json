@@ -105,6 +105,10 @@
     "service:orchestrator-queue.service → agent(agent_jobs)": "คิวงานฝั่งผู้ใช้ (ดู/ยกเลิก/ทำซ้ำ/สรุป) อ่านและเขียน agent_jobs เป็นตารางเดียว เป็น read+write model ของโมดูล agent ไม่มีตารางอื่นปน",
     "service:agent-machines.service → agent(agent_roles)": "e2e จับบั๊กจริง: หน้าเว็บ/Telegram สั่งงานไม่ได้ส่ง roleId มา แต่ agent_jobs.role_id เป็น UUID NOT NULL + FK ถ้าใส่ค่าว่าง PostgreSQL จะปฏิเสธทั้งประกาศ (invalid length: expected length 32) ⇒ ต้องอ่าน agent_roles หนึ่งแถวเพื่อผูกบทบาทจริง แทนการสร้างบทบาทใหม่หรือปล่อยค่าว่าง",
     "service:stripe-reconcile.runtime → business(business_payments)": "งานค้างของผู้ใช้ (commit a275ee2) — reconcile ต้องอ่านทั้ง payments และ transfer_orders เพื่อจับคู่ยอดจริง",
-    "service:stripe-reconcile.runtime → treasury(transfer_orders)": "งานค้างของผู้ใช้ (commit a275ee2) — ดูรายการในรอบ reconcile"
+    "service:stripe-reconcile.runtime → treasury(transfer_orders)": "งานค้างของผู้ใช้ (commit a275ee2) — ดูรายการในรอบ reconcile",
+    "service:agent-machines.service → agent(agent_machines)": "ประกาศเจ้าของ agent_machines = agent (11/10/69 เพิ่มลง owners เพราะตารางนี้เคยไม่มีเจ้าของ) — service นี้เป็นตัวจัดการเครื่องฝั่ง HUB ของโมดูล agent อยู่แล้ว จึงแตะตารางของตัวเอง",
+    "service:orchestrator-queue.service → agent(agent_machines)": "คิวงานข้ามเครื่องต้องอ่านชื่อ/สถานะเครื่องเพื่อแสดงผลและตัดสินว่าจะส่งให้เครื่องไหน (จับคู่งานกับเครื่อง) — อ่านอย่างเดียว",
+    "service:agent-machine-hub.service → agent(agent_machines)": "service สิทธิ์ควบคุมเครื่อง (11/10/69) เป็นตัวจัดการเครื่องฝั่ง HUB ของโมดูล agent เหมือน agent-machines.service — อ่าน role/owner/lan_confirmed_at เพื่อตัดสินว่าใครคุมเครื่องไหน และเขียนเฉพาะคอลัมน์สิทธิ์ที่ตารางนี้เป็นเจ้าของ",
+    "service:agent-machine-hub.service → agent(agent_machine_hubs)": "ตารางเชื่อม many-to-many ที่ประกาศไว้ให้ agent เป็นเจ้าของ (11/10/69) — service นี้สร้าง/ลบผูกของผู้ใช้กับเครื่อง ตามเจ้าของยืนยันว่าเครื่องหนึ่งอยู่ใต้ผู้ใช้ได้หลายคน"
   }
 }

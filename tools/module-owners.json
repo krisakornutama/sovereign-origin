@@ -2,6 +2,8 @@
   "$comment": "Phase 0+1 arch-hardening — แผนที่ความเป็นเจ้าของตาราง (ตาราง → โมดูล) · กติกา: ตารางที่อยู่ใน owners แก้ได้เฉพาะเจ้าของ (arch-gate ตรวจ, ยกเว้น sharedTables ที่ทุกโมดูลแตะได้แบบ cross-cutting) · serviceAliases = ชื่อ service ไฟล์ → โมดูลที่ทำงานให้ (ใช้ทั้ง arch-gate และ map-owners) · เติมรายการใหม่ด้วย: node tools/map-owners.mjs --apply",
   "owners": {
     "agent_jobs": "agent",
+    "agent_machine_hubs": "agent",
+    "agent_machines": "agent",
     "agent_roles": "agent",
     "asset_positions": "treasury",
     "asset_prices": "dime",
