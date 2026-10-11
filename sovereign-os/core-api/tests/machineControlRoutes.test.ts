@@ -33,15 +33,33 @@ let baseUrl = '';
 before(async () => {
   // token ของเครื่อง: authenticateToken หาแถวจาก token_hash — mock ให้เจอเสมอ
   // (ตัว token เองไม่ต้องตรง เพราะ hashToken เทียบเฉพาะค่าที่ mock คืน)
+  //
+  // 11/10/69: เพิ่ม role/owner/lan_confirmed_at + ตารางเชื่อม เพราะช่องควบคุมมีด่านชั้นที่ 2 แล้ว
+  // ⇒ เครื่องที่ทดสอบต้อง "ผูกกับผู้เรียก + ยืนยัน LAN แล้ว" ไม่งั้นทุกเคสจะโดน 403
+  const machineRow = () => ({
+    id: MACHINE_ID,
+    name: 'runner-test',
+    status: 'online',
+    executors: ['opencode'],
+    role: 'USER',
+    owner_user_id: null,
+    lan_confirmed_at: new Date(), // ยืนยัน LAN แล้ว
+    pair_code_hash: null,
+    pair_code_at: null,
+  });
+
   mockModel(prisma as any, 'agentMachine', {
-    findFirst: async () => ({
-      id: MACHINE_ID,
-      name: 'runner-test',
-      status: 'online',
-      executors: ['opencode'],
-    }),
-    findMany: async () => [],
+    findFirst: async () => machineRow(),
+    findMany: async () => [{ ...machineRow(), hub_users: [{ user_id: 'test-user' }] }],
+    findUnique: async () => ({ ...machineRow(), hub_users: [{ user_id: 'test-user' }] }),
     update: async (args: any) => ({ id: MACHINE_ID, ...args.data }),
+  });
+
+  // ผูกเครื่องทดสอบไว้ให้ผู้เรียก (test-user คือ userId ที่ makeToken ใช้)
+  mockModel(prisma as any, 'agentMachineHub', {
+    findMany: async () => [{ machine_id: MACHINE_ID, user_id: 'test-user' }],
+    upsert: async (args: any) => ({ machine_id: MACHINE_ID, user_id: 'test-user', ...(args?.create || {}) }),
+    deleteMany: async () => ({ count: 0 }),
   });
 
   const app = express();

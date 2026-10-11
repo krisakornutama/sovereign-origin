@@ -27,6 +27,17 @@ import {
   setMachineStatus,
   type MachineRow,
 } from '../../services/agent-machines.service';
+import {
+  listMachinesForUser,
+  linkMachineToUser,
+  unlinkMachineFromUser,
+  listUserIdsForMachine,
+  setMachineRole,
+  requestPairing,
+  revokeLanPairing,
+  confirmPairing,
+  userCanControl,
+} from '../../services/agent-machine-hub.service';
 import { gateJobBeforeDispatch, approveJob, rejectJob } from '../../services/orchestrator-approval.service';
 import { notifyJobFinished, notifyJobNeedsApproval } from '../../services/orchestrator-notify.service';
 import {
@@ -488,5 +499,122 @@ router.post(
     }
   }
 );
+
+// ═════════════════════════════════════════════════════════════
+//  สิทธิ์ควบคุมเครื่อง (เจ้าของสั่ง 11/10/69)
+//
+//  กติกา 3 ข้อที่เจ้าของยืนยันด้วยคำพูด:
+//    1) เครื่อง USER สั่งงาน AI ได้ · คุมเครื่องอื่นไม่ได้
+//    2) เครื่องหนึ่งอยู่ใต้ผู้ใช้ได้หลายคน (มีได้ 1–2 คน) ⇒ many-to-many
+//    3) ยืนยัน LAN ต้องกดยืนยันบนเครื่องเป้าหมาย (ดู IP อย่างเดียวไม่พอ)
+//
+//  ทุกเส้นทางในกลุ่มนี้ = SUPERADMIN เท่านั้น และผูกกับผู้เรียกเอง
+//  (ผู้เรียกต้องเป็นคนผูก/ยืนยันเครื่องนั้น — ไม่ใช่แค่เป็น SUPERADMIN คนไหนก็ได้)
+// ═════════════════════════════════════════════════════════════
+
+/** เครื่องที่ผู้เรียก (SUPERADMIN) คุมได้จริง พร้อมฟิลด์สิทธิ์ */
+router.get('/mine', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const machines = await listMachinesForUser(req.user!.id);
+    res.json({
+      machines: machines.map((m) => ({
+        ...m,
+        ip: machineIps.get(m.id)?.ip ?? null,
+        ipSeenAt: machineIps.has(m.id) ? new Date(machineIps.get(m.id)!.at).toISOString() : null,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/agent-machines/mine error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to load machines' });
+  }
+});
+
+/** ผูกเครื่องไว้ใต้ผู้เรียก (ทำซ้ำได้) — ข้อ 2: หลายคนผูกเครื่องเดียวกันได้ */
+router.post('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    await linkMachineToUser(req.params.id, req.user!.id);
+    res.json({ ok: true, linked: req.user!.id });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/link error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to link machine' });
+  }
+});
+
+/** ถอดเครื่องออกจากผู้เรียก (คนอื่นที่ผูกไว้ยังคุมได้อยู่) */
+router.delete('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const removed = await unlinkMachineFromUser(req.params.id, req.user!.id);
+    res.json({ ok: true, removed });
+  } catch (err) {
+    console.error('DELETE /api/agent-machines/:id/link error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to unlink machine' });
+  }
+});
+
+/** ตั้งบทบาทของเครื่อง: HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้ */
+router.put('/:id/role', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const role = String((req.body as { role?: unknown })?.role ?? '');
+    const machine = await setMachineRole(req.params.id, role);
+    res.json({ ok: true, machine });
+  } catch (err) {
+    console.error('PUT /api/agent-machines/:id/role error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to set role' });
+  }
+});
+
+/**
+ * ข้อ 3 รอบที่ 1: เจ้าของเครื่องกด "ขอคู่" → ได้รหัส 6 หลัก
+ * ไปแสดงบนหน้าจอเครื่องนั้น ให้เจ้าของเครื่องพิมพ์กลับมา
+ * ยัง "คุมไม่ได้" จนกว่าจะยืนยันเสร็จ
+ */
+router.post('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { code, machine } = await requestPairing(req.params.id, req.user!.id);
+    res.json({ ok: true, code, machine, lanVerified: machine.lanVerified });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/pair error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to start pairing' });
+  }
+});
+
+/** ถอนการยืนยัน LAN (กดผิดไป) — คุมไม่ได้ทันที */
+router.delete('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    await revokeLanPairing(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/agent-machines/:id/pair error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to revoke pairing' });
+  }
+});
+
+/**
+ * ข้อ 3 รอบที่ 2: เครื่องเป้าหมายยืนยันด้วยรหัส
+ * ยืนยันได้เฉพาะผู้ที่ผูกเครื่องนี้ไว้ (ไม่ใช่ SUPERADMIN คนไหนก็ได้)
+ */
+router.post('/:id/pair/confirm', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const allowed = await userCanControl(req.user!.id, req.params.id);
+    const linked = await listUserIdsForMachine(req.params.id);
+    if (!linked.includes(req.user!.id)) {
+      res.status(403).json({ error: 'คุณไม่ได้ผูกเครื่องนี้ไว้' });
+      return;
+    }
+    const body = (req.body || {}) as { code?: unknown; approve?: unknown };
+    const result = await confirmPairing(req.params.id, {
+      code: typeof body.code === 'string' ? body.code : null,
+      approve: body.approve === false ? false : true,
+    });
+    if (!result.approved) {
+      res.status(400).json({ error: result.reason || 'ยืนยันไม่สำเร็จ', allowed });
+      return;
+    }
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/pair/confirm error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to confirm pairing' });
+  }
+});
 
 export default router;

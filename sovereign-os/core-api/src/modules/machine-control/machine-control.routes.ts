@@ -19,6 +19,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { AuditService } from '../../services/audit.service';
 import { authenticateToken, type MachineRow } from '../../services/agent-machines.service';
+import { userCanControl, controlStateForUser } from '../../services/agent-machine-hub.service';
 import { getIo } from '../../realtime/io-registry';
 import {
   DEFAULT_POLL_WAIT_MS,
@@ -187,9 +188,11 @@ router.post('/result', requireMachineToken, async (req: Request, res: Response) 
 // SUPERADMIN เท่านั้น: ช่องนี้สั่งรันคำสั่งบนเครื่องอื่นได้จริง (เมาส์/คีย์บอร์ด/ไฟล์ทั้งไดรฟ์)
 
 // GET /api/machine-control/state — สถานะช่องของทุกเครื่อง
-router.get('/state', authenticate, requireRole('SUPERADMIN'), async (_req: Request, res: Response) => {
+// เหลือได้เฉพาะช่องของเครื่องที่ "ผู้ใช้คนนี้คุมได้" — SUPERADMIN คนหนึ่งไม่เห็นช่องของคนอื่น
+router.get('/state', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   try {
-    res.json({ channels: controlState() });
+    const channels = await controlStateForUser(req.user!.id, controlState());
+    res.json({ channels });
   } catch (err) {
     console.error('GET /api/machine-control/state error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read control state' });
@@ -198,9 +201,15 @@ router.get('/state', authenticate, requireRole('SUPERADMIN'), async (_req: Reque
 
 // GET /api/machine-control/frame/:machineId — ภาพล่าสุดเป็น binary
 // ใช้ตอนผู้ใช้เพิ่งเปิดหน้า (ยังไม่ได้รับเฟรมจาก socket) — ได้ภาพทันทีไม่ต้องรอรอบถัดไป
-router.get('/frame/:machineId', authenticate, requireRole('SUPERADMIN'), (req: Request, res: Response) => {
+// ด่านชั้นที่ 2: ดูจอเครื่องอื่น = ขั้นสูงสุด ต้องผ่านการยืนยัน LAN เหมือนกัน
+router.get('/frame/:machineId', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   try {
-    const frame = getLatestFrame(String(req.params.machineId));
+    const machineId = String(req.params.machineId);
+    if (!(await userCanControl(req.user!.id, machineId))) {
+      res.status(403).json({ error: 'เครื่องนี้ไม่อยู่ในการควบคุมของคุณ' });
+      return;
+    }
+    const frame = getLatestFrame(machineId);
     if (!frame) {
       res.status(404).json({ error: 'no frame yet' });
       return;
@@ -219,6 +228,10 @@ router.get('/frame/:machineId', authenticate, requireRole('SUPERADMIN'), (req: R
 
 // POST /api/machine-control/command — ยิงคำสั่งไปเครื่องหนึ่ง (สำหรับงานที่ไม่ต้องเปิดดูจอ)
 // ตัวอย่าง: { machineId, type: 'fs.list', payload: { path: 'E:\\' } }
+// ── สิทธิ์ 2 ชั้น (เจ้าของสั่ง 11/10/69) ──
+//   ชั้น 1 (เดิม) = คนที่ล็อกอินต้องเป็น SUPERADMIN
+//   ชั้น 2 (ใหม่) = เครื่องเป้าหมายต้อง "อยู่ใต้ผู้ใช้คนนี้" และ "ยืนยัน LAN แล้ว"
+//   ⇒ SUPERADMIN คนหนึ่งคุมได้เฉพาะเครื่องที่เขาผูกไว้ ไม่ใช่ทุกเครื่องในระบบ
 router.post('/command', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
   try {
     const body = (req.body || {}) as {
@@ -231,6 +244,17 @@ router.post('/command', authenticate, requireRole('SUPERADMIN'), async (req: Req
     const type = typeof body.type === 'string' ? body.type : '';
     if (!machineId || !type) {
       res.status(400).json({ error: 'machineId and type required' });
+      return;
+    }
+
+    // ชั้นที่ 2: เครื่องนี้อยู่ใต้ผู้ใช้คนนี้จริงไหม (และยืนยัน LAN แล้วไหม)
+    // ตรวจก่อน dispatch เสมอ — ไม่งั้นคำสั่งถูกส่งออกไปแล้วค่อยมาปฏิเสธทีหลัง
+    const allowed = await userCanControl(req.user!.id, machineId);
+    if (!allowed) {
+      res.status(403).json({
+        error: 'เครื่องนี้ไม่อยู่ในการควบคุมของคุณ',
+        hint: 'เครื่องต้องผูกกับผู้ใช้นี้ และต้องยืนยัน LAN ด้วยการกดบนเครื่องเป้าหมายก่อน',
+      });
       return;
     }
 

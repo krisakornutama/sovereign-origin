@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "../components/layout/Sidebar";
 import PageHeader from "../components/ui/PageHeader";
@@ -33,6 +33,13 @@ interface MachineRow {
   ipSeenAt?: string | null;
   /** อายุสัญญาณล่าสุดเป็นวินาที — HUB คิดจาก heartbeat จริง (null = ยังไม่เคยส่ง) */
   stale_sec?: number | null;
+  // ── สิทธิ์ควบคุม (เพิ่ม 11/10/69) ──
+  /** HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้ */
+  role?: string;
+  /** ผ่านการกดยืนยันบนเครื่องเป้าหมายแล้วหรือยัง (ไม่ยืนยัน = ยังคุมไม่ได้) */
+  lanVerified?: boolean;
+  /** ผู้ใช้อื่นที่ผูกกับเครื่องนี้ (หลายคนคุมเครื่องเดียวกันได้) */
+  hubUserIds?: string[];
 }
 
 /** แถวผลการสั่งอัปเดตแบบรวม — อยู่ในตารางเดียวกันกับคอนโซล ไม่ต้องเปิดทีละเครื่อง */
@@ -55,7 +62,7 @@ function machineStatusView(m: MachineRow): { label: string; dot: string; tone: s
   return { label: `ออฟไลน์ · เงียบ ${mins} นาที`, dot: "bg-gray-600", tone: "text-gray-500" };
 }
 
-type Tab = "screen" | "files";
+type Tab = "screen" | "files" | "access";
 
 export default function MachineConsolePage() {
   const API = getApiUrl();
@@ -77,9 +84,12 @@ export default function MachineConsolePage() {
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkNote, setBulkNote] = useState("");
 
+
   const load = useCallback(async () => {
     try {
-      const res = await authFetch(`${API}/api/agent-machines`);
+      // /mine = เฉพาะเครื่องที่ "ผู้ใช้คนนี้" ผูกไว้และยืนยัน LAN แล้ว (11/10/69)
+      // เดิมใช้ /api/agent-machines (ทุกเครื่อง) ⇒ SUPERADMIN คนหนึ่งเห็นและกดเครื่องคนอื่นได้
+      const res = await authFetch(`${API}/api/agent-machines/mine`);
       if (!res.ok) {
         setError(`โหลดรายการเครื่องไม่สำเร็จ (HTTP ${res.status})`);
         setLoading(false);
@@ -96,6 +106,103 @@ export default function MachineConsolePage() {
       setLoading(false);
     }
   }, [API]);
+
+  // ── สิทธิ์ควบคุม (เพิ่ม 11/10/69) ────────────────────────────────────────
+  // กติกาที่เจ้าของยืนยัน: เครื่อง USER สั่งงาน AI ได้ แต่คุมเครื่องอื่นไม่ได้
+  // · เครื่องอยู่ใต้ผู้ใช้ได้หลายคน · ยืนยัน LAN ต้องกดบนเครื่องเป้าหมาย
+  const [pairCode, setPairCode] = useState("");
+  const [pairInput, setPairInput] = useState("");
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessNote, setAccessNote] = useState("");
+
+  /** เรียก API สิทธิ์แล้วคืนข้อความพร้อม error ที่อ่านรู้เรื่อง */
+  const callAccess = useCallback(
+    async (path: string, init?: RequestInit): Promise<string> => {
+      const res = await authFetch(`${API}${path}`, {
+        method: init?.method ?? "GET",
+        headers: { "content-type": "application/json", ...(init?.headers || {}) },
+        body: init?.body,
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string; hint?: string };
+      if (!res.ok) return `${data.error || `HTTP ${res.status}`}${data.hint ? ` — ${data.hint}` : ""}`;
+      if (data.code) setPairCode(data.code);
+      return "";
+    },
+    [API],
+  );
+
+  /** ตั้งบทบาทเครื่อง: HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้ */
+  const setRole = useCallback(
+    async (machineId: string, role: string) => {
+      setAccessBusy(true);
+      setAccessNote("");
+      const err = await callAccess(`/api/agent-machines/${machineId}/role`, {
+        method: "PUT",
+        body: JSON.stringify({ role }),
+      });
+      setAccessNote(err || (role === "HUB" ? "ตั้งเป็น HUB แล้ว — คุมเครื่องอื่นได้" : "ตั้งเป็น USER แล้ว"));
+      setAccessBusy(false);
+      await load();
+    },
+    [callAccess, load],
+  );
+
+  /** ขอคู่ → ได้รหัส 6 หลักไปพิมพ์ที่เครื่องเป้าหมาย */
+  const startPairing = useCallback(
+    async (machineId: string) => {
+      setAccessBusy(true);
+      setAccessNote("");
+      setPairCode("");
+      const err = await callAccess(`/api/agent-machines/${machineId}/pair`, { method: "POST" });
+      setAccessNote(err || "ได้รหัสแล้ว — เอาไปพิมพ์ที่เครื่องเป้าหมาย (รหัสใช้ครั้งเดียว)");
+      setAccessBusy(false);
+    },
+    [callAccess],
+  );
+
+  /** ยืนยันด้วยรหัส (ปุ่มบนเครื่องเป้าหมายจะกดตรงนี้) */
+  const confirmPairing = useCallback(
+    async (machineId: string, approve: boolean) => {
+      setAccessBusy(true);
+      setAccessNote("");
+      const err = await callAccess(`/api/agent-machines/${machineId}/pair/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ code: pairInput, approve }),
+      });
+      setAccessNote(err || (approve ? "ยืนยันแล้ว — คุมเครื่องนี้ได้" : "ถอนการยืนยันแล้ว"));
+      setPairInput("");
+      setAccessBusy(false);
+      await load();
+    },
+    [callAccess, load, pairInput],
+  );
+
+  /** ถอดเครื่องออกจากผู้ใช้คนนี้ */
+  const unlink = useCallback(
+    async (machineId: string) => {
+      setAccessBusy(true);
+      setAccessNote("");
+      const err = await callAccess(`/api/agent-machines/${machineId}/link`, { method: "DELETE" });
+      setAccessNote(err || "ถอดเครื่องออกจากคุณแล้ว");
+      setAccessBusy(false);
+      await load();
+    },
+    [callAccess, load],
+  );
+
+  /** ผูกเครื่องนี้ให้อยู่ใต้ผู้ใช้คนนี้ */
+  const link = useCallback(
+    async (machineId: string) => {
+      setAccessBusy(true);
+      setAccessNote("");
+      const err = await callAccess(`/api/agent-machines/${machineId}/link`, { method: "POST" });
+      setAccessNote(err || "ผูกเครื่องนี้กับคุณแล้ว (ยังต้องยืนยัน LAN ก่อนคุมได้)");
+      setAccessBusy(false);
+      await load();
+    },
+    [callAccess, load],
+  );
+
 
   // ── สั่งอัปเดตโค้ดของเครื่องจาก HUB ──────────────────────────────────────
   // เจ้าของสั่ง 11/10/69: hub ต้องเห็นเครื่อง 2 3 4 พร้อมสั่งให้อัปเดตได้
@@ -350,7 +457,7 @@ export default function MachineConsolePage() {
               <>
                 <div className="flex flex-wrap items-center gap-2 border-b border-gray-800 pb-2">
                   <h2 className="mr-2 text-lg text-white">{active.name}</h2>
-                  {(["screen", "files"] as Tab[]).map((t) => (
+                  {(["screen", "files", "access"] as Tab[]).map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -359,7 +466,7 @@ export default function MachineConsolePage() {
                         tab === t ? "bg-emerald-600 text-white" : "border border-gray-700 text-gray-300"
                       }`}
                     >
-                      {t === "screen" ? "จอ" : "ไฟล์"}
+                      {t === "screen" ? "จอ" : t === "files" ? "ไฟล์" : "สิทธิ์ควบคุม"}
                     </button>
                   ))}
                   <span className="ml-auto flex items-center gap-2">
@@ -396,6 +503,118 @@ export default function MachineConsolePage() {
 
                 {tab === "screen" ? (
                   <ScreenPanel machineId={active.id} machineName={active.name} control={control} />
+                ) : tab === "access" ? (
+                  /* ── สิทธิ์ควบคุม (เจ้าของสั่ง 11/10/69) ──
+                     HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้
+                     ยืนยัน LAN ต้องกดยืนยันบนเครื่องเป้าหมาย (ดู IP อย่างเดียวไม่พอ) */
+                  <div className="space-y-3 text-sm text-gray-300">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white">บทบาทเครื่อง:</span>
+                      <button
+                        type="button"
+                        disabled={accessBusy || active.role === "HUB"}
+                        onClick={() => void setRole(active.id, "HUB")}
+                        className="rounded bg-emerald-700 px-3 py-1 text-white disabled:opacity-50"
+                      >
+                        HUB (คุมเครื่องอื่นได้)
+                      </button>
+                      <button
+                        type="button"
+                        disabled={accessBusy || active.role === "USER"}
+                        onClick={() => void setRole(active.id, "USER")}
+                        className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50"
+                      >
+                        USER (สั่งงาน AI ได้)
+                      </button>
+                      <span className="text-xs text-gray-500">
+                        ปัจจุบัน: {active.role === "HUB" ? "HUB" : "USER"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white">สถานะ LAN:</span>
+                      {active.lanVerified ? (
+                        <span className="text-emerald-400">ยืนยันแล้ว — คุมเครื่องนี้ได้</span>
+                      ) : (
+                        <span className="text-amber-400">ยังไม่ยืนยัน — คุมเครื่องนี้ไม่ได้</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={accessBusy}
+                        onClick={() => void startPairing(active.id)}
+                        className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50"
+                      >
+                        ขอรหัสคู่
+                      </button>
+                      <button
+                        type="button"
+                        disabled={accessBusy}
+                        onClick={() => void confirmPairing(active.id, false)}
+                        className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50"
+                      >
+                        ถอนการยืนยัน
+                      </button>
+                    </div>
+
+                    {pairCode && (
+                      <div className="rounded border border-emerald-800 bg-emerald-900/20 px-3 py-2">
+                        <div className="text-white">รหัสคู่ (ใช้ครั้งเดียว):</div>
+                        <div className="font-mono text-2xl tracking-widest text-emerald-300">{pairCode}</div>
+                        <div className="mt-1 text-xs text-gray-400">
+                          เอาไปพิมพ์ที่เครื่องเป้าหมาย (หน้าขอคู่ของแอป) แล้วกดยืนยัน — ดู IP อย่างเดียวไม่พอ
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={pairInput}
+                        onChange={(e) => setPairInput(e.target.value)}
+                        placeholder="พิมพ์รหัส 6 หลัก"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="w-32 rounded border border-gray-700 bg-black px-2 py-1 text-white"
+                      />
+                      <button
+                        type="button"
+                        disabled={accessBusy}
+                        onClick={() => void confirmPairing(active.id, true)}
+                        className="rounded bg-emerald-700 px-3 py-1 text-white disabled:opacity-50"
+                      >
+                        ยืนยันด้วยรหัส
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 border-t border-gray-800 pt-2">
+                      <span className="text-white">การผูก:</span>
+                      {(active.hubUserIds ?? []).length > 0 ? (
+                        <>
+                          <span className="text-gray-400">
+                            ผูกกับผู้ใช้ {active.hubUserIds!.length} คน (หลายคนคุมเครื่องเดียวกันได้)
+                          </span>
+                          <button
+                            type="button"
+                            disabled={accessBusy}
+                            onClick={() => void unlink(active.id)}
+                            className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50"
+                          >
+                            ถอดผูกของฉัน
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={accessBusy}
+                          onClick={() => void link(active.id)}
+                          className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50"
+                        >
+                          ผูกเครื่องนี้กับฉัน
+                        </button>
+                      )}
+                    </div>
+
+                    {accessNote && <div className="text-amber-300">{accessNote}</div>}
+                  </div>
                 ) : (
                   <FilePanel machineId={active.id} control={control} />
                 )}

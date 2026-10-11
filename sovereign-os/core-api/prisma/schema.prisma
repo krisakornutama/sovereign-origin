@@ -37,6 +37,10 @@ model User {
   audit_logs    AuditLog[]
   skill_matrix  SkillMatrix[]
 
+  // ── สิทธิ์คุมเครื่อง (เพิ่ม 11/10/69) ──
+  owned_machines AgentMachine[]     @relation("MachineOwner") // เครื่องที่ตัวเองเป็นเจ้าของ
+  hub_machines   AgentMachineHub[]  // เครื่องที่คุมได้ (ผูกได้หลายเครื่อง, หลายคนก็ผูกเครื่องเดียวกันได้)
+
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
   asset_positions     AssetPosition[]
   inventory_items     InventoryItem[]
@@ -1235,6 +1239,11 @@ model AgentJob {
 // ════════════════════════════════════════════════════════════
 
 // เครื่องคอมที่ลงทะเบียนกับ HUB (runner ตัวละครึง)
+//
+// ── บทบาทของเครื่อง (เจ้าของสั่ง 11/10/69 — ต่างจาก role ของคนที่ล็อกอิน) ──
+//   USER = รับคำสั่งได้ · สั่งงาน AI ได้ · คุมเครื่องอื่นไม่ได้
+//   HUB  = "ทุกเครื่องที่เป็น superadmin เป็น hub ได้" — คุมเครื่องอื่นได้
+//   ค่าเริ่มต้น = USER เสมอ (ไม่ใช่ HUB) เพื่อไม่ให้เครื่องที่เพิ่งลงทะเบียนคุมใครได้เอง
 model AgentMachine {
   id             String    @id @default(uuid()) @db.Uuid
   name           String // "โน้ตบุ๊ค-hub", "คอมห้องทำงาน"
@@ -1247,12 +1256,42 @@ model AgentMachine {
   last_heartbeat DateTime? @db.Timestamptz
   version        String?
   note           String?
+
+  // ── สิทธิ์ควบคุม (เพิ่ม 11/10/69) ──
+  role           String    @default("USER") // HUB | USER — บทบาทของเครื่อง ไม่ใช่ของผู้ใช้
+  owner_user_id  String?   @db.Uuid // ผู้ใช้เจ้าของเครื่องนี้ (ไม่บังคับ: เครื่องเก่าอาจยังไม่ผูก)
+  // ยืนยัน "อยู่ LAN เดียวกัน" = เครื่องต้องกดยืนยันบนตัวเครื่องเอง (เจ้าของสั่ง — ดู IP อย่างเดียวไม่พอ)
+  lan_confirmed_at DateTime? @db.Timestamptz
+  // รหัสคู่ที่รอเครื่องเป้าหมายพิมพ์กลับ (เก็บ hash เหมือน token ไม่เก็บรหัสจริง)
+  pair_code_hash String?
+  pair_code_at   DateTime? @db.Timestamptz
+
   created_at     DateTime  @default(now()) @db.Timestamptz
   updated_at     DateTime  @updatedAt @db.Timestamptz
 
   jobs AgentJob[]
+  // ผู้ใช้ที่คุมเครื่องนี้ได้ — many-to-many (เจ้าของบอกว่า superadmin มีได้ 1–2 คน
+  // ⇒ เครื่องหนึ่งอยู่ใต้ได้หลายคน ไม่ใช่ parent เดียว)
+  hub_users AgentMachineHub[]
+  owner    User?                  @relation("MachineOwner", fields: [owner_user_id], references: [id], onDelete: SetNull)
 
+  @@index([role])
+  @@index([owner_user_id])
   @@map("agent_machines")
+}
+
+// ผูกเครื่อง ↔ ผู้ใช้ที่คุมได้ (หลายต่อหนึ่ง — ข้อ 2 ที่เจ้าของยืนยัน)
+model AgentMachineHub {
+  machine_id String      @db.Uuid
+  user_id    String      @db.Uuid
+  created_at DateTime    @default(now()) @db.Timestamptz
+
+  machine AgentMachine @relation(fields: [machine_id], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([machine_id, user_id])
+  @@index([user_id])
+  @@map("agent_machine_hubs")
 }
 
 // ─────────────────────────────────────────────
