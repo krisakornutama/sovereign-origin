@@ -152,4 +152,236 @@ export function writeDockerDaemonConfig(configPath, existingText, add = DOCKER_D
   return { configPath, config: merged };
 }
 
-export { ROOT };
+// ── จุดเรียกจริง ─────────────────────────────────────────────────────────
+
+const argv = process.argv.slice(2);
+const val = (k, d = '') => (argv.find((a) => a.startsWith(`--${k}=`)) ?? '').slice(k.length + 3) || d;
+const has = (k) => argv.includes(`--${k}`);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const dir = path.join(ROOT, 'logs');
+  fs.mkdirSync(dir, { recursive: true });
+  const logFile = path.join(dir, 'setup-node.log');
+  const lines = [];
+  const log = (m = '') => {
+    lines.push(m);
+    console.log(m);
+    try {
+      fs.appendFileSync(logFile, m + '\n', 'utf8');
+    } catch {
+      /* เขียน log ไม่ได้ = ยังทำงานต่อได้ อย่าทำให้ติดตั้งล้มเพราะ log */
+    }
+  };
+  log(`[${new Date().toISOString()}] เริ่มติดตั้งเครื่องลูกแบบโนดเต็ม`);
+  const out = await runSetup({
+    log,
+    name: val('name'),
+    hubUrl: val('hub-url'),
+    code: val('code'),
+    kitDir: ROOT,
+    dryRun: has('dry-run'),
+  });
+  log(`[${new Date().toISOString()}] จบ (exit ${out.exitCode})`);
+  process.exitCode = out.exitCode;
+}
+
+
+/**
+ * รันทีละขั้น — คืนรายงานที่อ่านรู้เรื่อง
+ * ทุกขั้นบันทึกลง log ของตัวเอง และหยุดทันทีที่ขั้นแรกที่ล้ม
+ * (ขั้นถัดไปขึ้นกับขั้นก่อนหน้าเสมอ เช่นยังไม่มี Docker ก็ยัง start ไม่ได้)
+ */
+export async function runSetup(opts = {}) {
+  const exec = opts.exec ?? defaultExec;
+  const log = opts.log ?? console.log;
+  const home = opts.homedir ?? os.homedir();
+  const kitDir = opts.kitDir ?? ROOT;
+  // dry-run = รายงานว่าจะทำอะไร แต่ไม่แตะอะไรเลย
+  // (เคสจริง 11/10/69: ประกาศไว้แต่ไม่ได้ทำงาน → รันแล้วไปเขียน daemon.json
+  //  ของเครื่องจริง อันตรายกว่าที่คิด)
+  const dryRun = opts.dryRun === true;
+  const steps = [];
+
+  const step = (name, status, detail = '') => {
+    steps.push({ name, status, detail });
+    const mark = status === 'ok' ? '✔' : status === 'fail' ? '✘' : status === 'warn' ? '!' : '·';
+    log(`  ${mark} ${name}${detail ? ` — ${detail}` : ''}`);
+  };
+  /** ถ้าเป็น dry-run = ไม่ทำ แต่รายงานว่าจะทำ */
+  const wouldDo = (name, detail) => {
+    if (!dryRun) return false;
+    step(name, 'warn', `[dry-run] จะ${detail}`);
+    return true;
+  };
+  const finish = (ok, exitCode) => {
+    log('');
+    if (dryRun) {
+      log('  ℹ️  DRY RUN — ไม่ได้แก้อะไรทั้งสิ้น (ลบ --dry-run เพื่อติดตั้งจริง)');
+    } else {
+      log(ok
+        ? '  ✅ ติดตั้งเสร็จ — เครื่องนี้พร้อมรับคำสั่งจาก HUB'
+        : '  ❌ ยังไม่เสร็จ — อ่านข้อความด้านบน (ทุกอย่างอยู่ใน logs/setup-node.log)');
+    }
+    return { ok, exitCode, steps, dryRun };
+  };
+
+  log('══════════════════════════════════════════════════');
+  log('  Sovereign OS — ติดตั้งเครื่องลูกแบบโนดเต็ม');
+  log('══════════════════════════════════════════════════');
+  log(`  ชุดติดตั้ง: ${kitDir}`);
+  log(`  เครื่องนี้: ${opts.name || os.hostname()}`);
+  if (dryRun) log('  ⚠ DRY RUN — จะตรวจอย่างเดียว ไม่แก้อะไร');
+  log('');
+
+  // 1) พื้นที่ — ตรวจก่อนทุกอย่าง เพราะถ้าไม่พอ อย่าเพิ่งไป pull อะไร
+  const freeGb = opts.freeGb ?? freeSpaceGb(kitDir);
+  const space = checkSpace(freeGb);
+  if (!space.ok) {
+    step('พื้นที่ว่าง', 'fail', space.reason);
+    return finish(false, 1);
+  }
+  step('พื้นที่ว่าง', 'ok', space.reason);
+
+  // 2) เครื่องมือ — ตรวจทีละตัว ตัวไหนขาดค่อยติดตั้งเฉพาะตัวนั้น
+  let tools = await checkTools(REQUIRED_TOOLS, exec);
+  const missing = tools.filter((t) => !t.ok);
+  if (missing.length) {
+    step('ตรวจเครื่องมือ', 'warn', `ขาด ${missing.map((t) => t.label).join(', ')}`);
+    if (!wouldDo('ติดตั้งเครื่องมือ', `ติดตั้ง ${missing.map((t) => t.label).join(', ')} ผ่าน winget`)) {
+      for (const t of missing) {
+        const r = await installTool(t, exec);
+        step(`ติดตั้ง ${t.label}`, r.ok ? 'ok' : 'fail', r.reason);
+      }
+      tools = await checkTools(REQUIRED_TOOLS, exec);
+    }
+  }
+  const stillMissing = tools.filter((t) => !t.ok);
+  if (stillMissing.length) {
+    step('เครื่องมือ', 'fail', `ยังขาด ${stillMissing.map((t) => t.label).join(', ')} — ติดตั้งเองแล้วรันซ้ำ`);
+    return finish(false, 2);
+  }
+  step('เครื่องมือ', 'ok', tools.map((t) => `${t.label} ${t.installed || 'พร้อม'}`).join(' · '));
+
+  // 3) จำกัดขนาด log ของ Docker — ต้องทำก่อน compose ไม่งั้นบันทึกเริ่มบวม
+  const daemonPath = path.join(home, '.docker', 'daemon.json');
+  if (wouldDo('จำกัดขนาด log', `เขียน ${daemonPath}`)) {
+    // รายงานเฉพาะข้อมูลเดิม ไม่แก้ไฟล์
+  } else {
+    try {
+      const prev = fs.existsSync(daemonPath) ? fs.readFileSync(daemonPath, 'utf8') : '';
+      const r = writeDockerDaemonConfig(daemonPath, prev);
+      step('จำกัดขนาด log', 'ok', `${r.config['log-opts']['max-size']} × ${r.config['log-opts']['max-file']} (ต้องรีสตาร์ท Docker เพื่อมีผล)`);
+    } catch (err) {
+      step('จำกัดขนาด log', 'warn', String(err?.message ?? err));
+    }
+  }
+
+  // 4) Docker ตอบแล้วจริงไหม (compose จะล้มถ้ายังไม่พร้อม)
+  const docker = await exec('docker', ['info']);
+  if (docker.code !== 0) {
+    step('Docker', 'fail', 'ยังไม่ตอบ — เปิด Docker Desktop แล้วรันซ้ำ');
+    return finish(false, 3);
+  }
+  step('Docker', 'ok', 'ตอบปกติ');
+
+  // 5) ตั้งค่าครั้งแรก (สร้าง infra/.env จากตัวอย่าง) — ข้ามถ้าทำแล้ว
+  const infraEnv = path.join(kitDir, 'sovereign-os', 'infra', '.env');
+  if (fs.existsSync(infraEnv)) {
+    step('ตั้งค่าครั้งแรก', 'ok', 'มี .env อยู่แล้ว — ไม่ทับ');
+  } else if (wouldDo('ตั้งค่าครั้งแรก', 'รัน setup-first-time.bat')) {
+    /* ไม่รันจริงในโหมดตรวจ */
+  } else {
+    const firstTime = await runBatch(path.join(kitDir, 'setup-first-time.bat'), exec);
+    if (!firstTime.ok) {
+      step('ตั้งค่าครั้งแรก', 'fail', firstTime.reason);
+      return finish(false, 4);
+    }
+    step('ตั้งค่าครั้งแรก', 'ok', 'สร้าง .env แล้ว');
+  }
+
+  // 6) เริ่มระบบ (ฐานข้อมูล + API + เว็บ)
+  if (wouldDo('เริ่มระบบ', 'รัน start-sovereign.bat (ดึง Docker หลาย GB — ใช้เวลานาน)')) {
+    return finish(true, 0); // dry-run จบตรงนี้ ไม่ต้องไปข้างล่าง
+  }
+  const started = await runBatch(path.join(kitDir, 'start-sovereign.bat'), exec);
+  if (!started.ok) {
+    step('เริ่มระบบ', 'fail', started.reason);
+    return finish(false, 5);
+  }
+  step('เริ่มระบบ', 'ok', 'ฐานข้อมูล + API + เว็บ ทำงานแล้ว');
+
+  // 7) ลงทะเบียนกับ HUB — หลังระบบขึ้น ไม่งั้นเครื่อง ghost ที่ไม่มีงาน
+  const runnerDir = path.join(kitDir, 'sovereign-os', 'agent-runner');
+  if (!fs.existsSync(path.join(runnerDir, 'setup-machine.mjs'))) {
+    step('ลงทะเบียน HUB', 'fail', 'ไม่พบ setup-machine.mjs — ก๊อปชุดไม่ครบ');
+    return finish(false, 6);
+  }
+  if (wouldDo('ลงทะเบียน HUB', `POST /enroll ที่ ${opts.hubUrl || 'HUB'} ด้วยรหัสเชิญ`)) {
+    return finish(true, 0);
+  }
+  const enrollArgs = [
+    path.join(runnerDir, 'setup-machine.mjs'),
+    '--enroll',
+    ...(opts.hubUrl ? [`--hub-url=${opts.hubUrl}`] : []),
+    ...(opts.code ? [`--code=${opts.code}`] : []),
+    ...(opts.name ? [`--name=${opts.name}`] : []),
+    '--dir=' + runnerDir,
+  ];
+  const enroll = await exec(process.execPath, enrollArgs);
+  if (enroll.code !== 0) {
+    step('ลงทะเบียน HUB', 'fail', (enroll.stdout || enroll.stderr || '').trim().split('\n').slice(-2).join(' '));
+    return finish(false, 7);
+  }
+  step('ลงทะเบียน HUB', 'ok', (enroll.stdout || '').trim().split('\n').filter(Boolean).pop() ?? 'สำเร็จ');
+
+  // 8) กันดิสก์เต็ม — ติดตั้งงานตัด WAL อัตโนมัติ
+  if (!wouldDo('กันดิสก์เต็ม', 'ตั้งงานตัด WAL ทุกคืน 04:30')) {
+    const guard = await installWalGuard({ kitDir, exec });
+    step('กันดิสก์เต็ม', guard.ok ? 'ok' : 'warn', guard.reason);
+  }
+
+  return finish(true, 0);
+}
+
+/** รันไฟล์ .bat (ต้องผ่าน cmd.exe — Windows ไม่รัน .bat โดยตรง) */
+export async function runBatch(batPath, exec = defaultExec) {
+  if (!fs.existsSync(batPath)) return { ok: false, reason: `ไม่พบ ${path.basename(batPath)}` };
+  const r = await exec('cmd.exe', ['/c', batPath], { timeout: 15 * 60 * 1000 });
+  return {
+    ok: r.code === 0,
+    reason: r.code === 0 ? 'สำเร็จ' : `exit ${r.code} — ดู ${path.basename(batPath)} หรือ start-sovereign.log`,
+  };
+}
+
+/** ติดตั้งงานตัด WAL อัตโนมัติ (ตัวเดียวกับที่ทำไว้ที่เครื่อง HUB) */
+export async function installWalGuard({ kitDir, exec = defaultExec }) {
+  const ps1 = path.join(kitDir, 'tools', 'prune-wal.ps1');
+  const cmd = path.join(kitDir, 'tools', 'hidden-tasks', 'sovereign-prune-wal.cmd');
+  if (!fs.existsSync(ps1) || !fs.existsSync(cmd)) {
+    return { ok: false, reason: 'ชุดติดตั้งไม่มีตัวตัด WAL — ติดตั้งเองภายหลังได้' };
+  }
+  const r = await exec('schtasks', [
+    '/Create', '/F',
+    '/TN', 'Sovereign Prune WAL',
+    '/TR', `"${cmd}"`,
+    '/SC', 'DAILY',
+    '/ST', '04:30',
+  ]);
+  if (r.code !== 0) {
+    return { ok: false, reason: `ตั้งงานไม่สำเร็จ (exit ${r.code}) — รันด้วยสิทธิ์ผู้ดูแลระบบ` };
+  }
+  return { ok: true, reason: 'ตัด WAL เก่าทุกคืน 04:30' };
+}
+
+/** พื้นที่ว่างของไดรฟ์ที่เก็บ path (GB) */
+export function freeSpaceGb(target) {
+  try {
+    // เดินขึ้นไปจนเจอรากไดรฟ์
+    let dir = path.resolve(target);
+    while (!fs.existsSync(dir) && path.dirname(dir) !== dir) dir = path.dirname(dir);
+    const stat = fs.statfsSync?.(dir);
+    if (stat) return stat.bavail * stat.bsize / 1024 ** 3;
+  } catch {
+    /* ไม่ได้ = คืน NaN ให้ checkSpace ตัดสินเอง (fail-closed) */
+  }
+  return Number.NaN;
+}
