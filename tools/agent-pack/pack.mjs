@@ -128,14 +128,47 @@ export const FULL_KIT_SKIP_EXT = ['.log', '.tmp', '.pid'];
 export const FULL_KIT_SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 
 /**
+ * ไฟล์ที่ล็อกอยู่ขณะอ่าน — ข้ามเสมอ (ไม่ใช่ของที่ต้องก๊อปไปเครื่องอื่น)
+ *   · *.lock ของ Docker = ไฟล์ชั่วคราวตอน Docker daemon กำลังรัน
+ *     อ่านแล้วได้ EBUSY บน Windows (เคสจริง 11/10/69 — BUILD-KIT ล้มกลางคันทั้งชุด)
+ *   · ไม่มีความหมายกับเครื่องอื่นอยู่แล้ว = ข้ามโดยไม่เสียดี
+ */
+const FULL_KIT_LOCKED_EXT = ['.lock'];
+
+/**
+ * ไฟล์ที่ใหญ่ผิดปกติ = ข้อมูลส่วนตัว/ดิสก์เสมือน ไม่ใช่โค้ดโปรเจกต์
+ *   เคสจริง 11/10/69: Docker/wsl/disk/docker_data.vhdx = 88 GB
+ *   ⇒ node อ่านไฟล์ >2 GB ไม่ได้ (ERR_FS_FILE_TOO_LARGE) → BUILD-KIT ล้มกลางคันทั้งชุด
+ *
+ * เกณฑ์: ข้ามเมื่อใหญ่กว่าเพดานนี้ **และ** ไม่ใช่ไฟล์ที่ระบุว่าอยู่ในชุด
+ * (โมเดลเสียง/ข้อมูลที่ตั้งใจพกไป เช่น whisper ggml ยังผ่านตามปกติ)
+ */
+const KIT_MAX_FILE_BYTES = 1024 * 1024 * 1024; // 1 GB
+const KIT_ALLOWED_BIG = [/\.bin$/i]; // โมเดลที่ตั้งใจพกไป (เช่น whisper)
+
+function isSuspiciouslyLarge(absPath, rel = '') {
+  if (KIT_ALLOWED_BIG.some((re) => re.test(rel))) return false;
+  let size = 0;
+  try {
+    size = fs.statSync(absPath).size;
+  } catch {
+    return true; // อ่านไม่ได้ = ไม่เอาไป (กัน BUILD-KIT ล้มตอนอ่าน)
+  }
+  return size > KIT_MAX_FILE_BYTES;
+}
+
+/**
  * เส้น/โฟลเดอร์ที่ข้าม (เทียบกับ path สัมพัทธ์แบบ /)
  * tools/Git = PortableGit ของเครื่องนี้ · tools/piper = ไบนารีที่แตกจาก piper.zip (ตัว zip ยังไปด้วย)
  * tools/E-Tipitaka = ชุดข้อมูลภายนอก · dist-* = เอาต์พุตของตัวแพ็ก (มี token)
+ * Docker/wsl = ดิสก์ข้อมูล Docker ของเครื่องนี้ (vhdx ~88 GB — เคสจริง 11/10/69
+ *   BUILD-KIT ล้ม ERR_FS_FILE_TOO_LARGE เพราะพยายามอ่านทั้งไฟล์) · เครื่องปลายทาง
+ *   ต้องติดตั้ง Docker เอง ไม่ใช่ก๊อปดิสก์คนละเครื่องไป
  */
-export const FULL_KIT_SKIP_REL = ['tools/Git', 'tools/piper', 'tools/E-Tipitaka'];
+export const FULL_KIT_SKIP_REL = ['tools/Git', 'tools/piper', 'tools/E-Tipitaka', 'Docker/wsl'];
 
 /** โฟลเดอร์ที่ข้ามเพราะเป็นเอาต์พุตของตัวแพ็กเอง (ข้างในมี join.json/token) */
-const FULL_KIT_SKIP_REL_PREFIX = ['dist-'];
+const FULL_KIT_SKIP_REL_PREFIX = ['dist-', 'sovereign-frontend/dist-electron/'];
 
 /**
  * ชื่อไฟล์ที่เป็น "ความลับของเครื่อง" — ห้ามยกไปเครื่องอื่น
@@ -175,7 +208,10 @@ export function fullKitFiles(root = REPO_ROOT, opts = {}) {
         continue;
       }
       if (!entry.isFile()) continue; // symlink/อุปกรณ์ — ไม่ก็อป
-      if (FULL_KIT_SKIP_EXT.includes(path.extname(entry.name).toLowerCase())) continue;
+      const ext = path.extname(entry.name).toLowerCase();
+      if (FULL_KIT_SKIP_EXT.includes(ext)) continue;
+      if (FULL_KIT_LOCKED_EXT.includes(ext)) continue; // *.lock ของ Docker (EBUSY ตอนอ่าน)
+      if (isSuspiciouslyLarge(path.join(dir, entry.name), childRel)) continue;
       out.push(childRel);
     }
   };
