@@ -147,7 +147,8 @@ node tools/agent-pack/pack.mjs --name="คอมเครื่องที่ 2
 
 ตัวแพ็กจะทำให้เองหมด: ออก machine token จาก DB ของ HUB → ก็อปไฟล์ runner ครบ (คำนวณจาก import จริงของ
 `main.mjs` จึงไม่มีทางขาดโมดูล) → ฝัง `HUB_URL` จาก IP ในวง LAN ของเครื่องนี้ → เขียน `join.json`
-(ผลลัพธ์เริ่มต้น: `E:\My work\SovereignOS-Machine-Setup` — รากไดรฟ์ `E:\` เขียนไม่ได้เพราะ ACL ให้แค่ RX)
+(ผลลัพธ์เริ่มต้น: `E:\My work\Project Sovereign Origin\dist-machine-setup` — เก็บในโปรเจ็กและถูก gitignore ผ่าน `dist-*/`
+เพราะ `join.json` มี token ของเครื่องลูก · ที่เก่าที่อยู่นอกโปรเจ็ก (`E:\My work\SovereignOS-Machine-Setup`) เป็นทางถอยเท่านั้น)
 
 ที่ **เครื่องที่ 2**: ก็อปโฟลเดอร์นั้นมาวาง (เช่น `E:\agent-runner`) แล้ว **ดับเบิลคลิก `SETUP-MACHINE.cmd`**
 

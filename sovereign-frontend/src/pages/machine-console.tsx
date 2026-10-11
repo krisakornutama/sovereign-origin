@@ -28,6 +28,31 @@ interface MachineRow {
   os?: string;
   status?: string;
   last_heartbeat?: string | null;
+  /** IP ที่เครื่องติดต่อเข้ามาล่าสุด (จาก heartbeat — HUB เก็บในหน่วยความจำ) */
+  ip?: string | null;
+  ipSeenAt?: string | null;
+  /** อายุสัญญาณล่าสุดเป็นวินาที — HUB คิดจาก heartbeat จริง (null = ยังไม่เคยส่ง) */
+  stale_sec?: number | null;
+}
+
+/** แถวผลการสั่งอัปเดตแบบรวม — อยู่ในตารางเดียวกันกับคอนโซล ไม่ต้องเปิดทีละเครื่อง */
+interface BulkRow {
+  id: string;
+  name: string;
+  state: "pending" | "sent" | "failed";
+  detail: string;
+}
+
+/**
+ * สถานะที่คนอ่านออกทันที — เครื่องที่ปิดอยู่ต้องเห็นคำว่า "ออฟไลน์"
+ * (เดิมมีแค่จุดสีเทา ผู้ใช้ต้องเดาเอาเองว่าหมายถึงอะไร)
+ */
+function machineStatusView(m: MachineRow): { label: string; dot: string; tone: string } {
+  if (m.status === "online") return { label: "ออนไลน์", dot: "bg-emerald-400", tone: "text-emerald-400" };
+  if (m.status === "disabled") return { label: "ปิดใช้งาน", dot: "bg-amber-500", tone: "text-amber-400" };
+  if (m.stale_sec == null) return { label: "ออฟไลน์ · ไม่เคยส่งสัญญาณ", dot: "bg-gray-600", tone: "text-gray-500" };
+  const mins = Math.round(m.stale_sec / 60);
+  return { label: `ออฟไลน์ · เงียบ ${mins} นาที`, dot: "bg-gray-600", tone: "text-gray-500" };
 }
 
 type Tab = "screen" | "files";
@@ -42,6 +67,15 @@ export default function MachineConsolePage() {
   const [tab, setTab] = useState<Tab>("screen");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // สถานะของการ "สั่งอัปเดตจาก HUB" — แยกจาก error ของการโหลดรายการเครื่อง
+  const [busyType, setBusyType] = useState("");
+  const [updateNote, setUpdateNote] = useState("");
+  const [updateError, setUpdateError] = useState("");
+  // ── สั่งอัปเดต "ทุกเครื่องที่ออนไลน์" พร้อมกัน (เจ้าของสั่ง 11/10/69) ──────
+  // ปุ่มเดียวสั่งทั้งวง LAN แล้วเก็บผลของแต่ละเครื่องไว้ในหน้านี้
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkNote, setBulkNote] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +97,101 @@ export default function MachineConsolePage() {
     }
   }, [API]);
 
+  // ── สั่งอัปเดตโค้ดของเครื่องจาก HUB ──────────────────────────────────────
+  // เจ้าของสั่ง 11/10/69: hub ต้องเห็นเครื่อง 2 3 4 พร้อมสั่งให้อัปเดตได้
+  // คำสั่งวิ่งผ่านช่องควบคุม (machine-control) ⇒ audit log บันทึกว่าครั้งใดใครสั่งเครื่องไหน
+  const sendUpdate = useCallback(
+    async (type: "update.check" | "update.apply", machineId: string, machineName: string) => {
+      if (type === "update.apply" && typeof window !== "undefined") {
+        const ok = window.confirm(`สั่งอัปเดตโค้ดของ "${machineName}" จาก HUB?\nเครื่องจะรีสตาร์ทตัวเองหลังอัปเดตเสร็จ`);
+        if (!ok) return;
+      }
+      setBusyType(type);
+      setUpdateNote("");
+      setUpdateError("");
+      try {
+        const res = await authFetch(`${API}/api/machine-control/command`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ machineId, type }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { command?: { id?: string }; error?: string };
+        if (!res.ok) {
+          setUpdateError(data?.error || `สั่งไม่สำเร็จ (HTTP ${res.status})`);
+          return;
+        }
+        setUpdateNote(
+          type === "update.apply"
+            ? `ส่งคำสั่งอัปเดตแล้ว (${data?.command?.id ?? "ไม่ทราบรหัส"}) — เครื่องจะรีสตาร์ทเองเมื่ออัปเดตเสร็จ`
+            : `ส่งคำสั่งตรวจเวอร์ชันแล้ว (${data?.command?.id ?? "ไม่ทราบรหัส"}) — ผลจะกลับมาที่ป้ายสถานะของเครื่อง`,
+        );
+      } catch (err) {
+        setUpdateError(String((err as Error)?.message || err));
+      } finally {
+        setBusyType("");
+      }
+    },
+    [API],
+  );
+
+  // ── สั่งอัปเดตทุกเครื่องที่ออนไลน์พร้อมกัน ───────────────────────────────
+  // ยิงทีละเครื่องผ่านช่องควบคุมเดิม (ไม่ต้องมี endpoint ใหม่ให้ HUB ต้องรีสตาร์ท)
+  // เครื่องที่ปิดอยู่ถูกตัดออกตั้งแต่ต้น — ไม่ส่งคำสั่งไปค้างคิวให้รอเปล่า
+  const sendUpdateAll = useCallback(
+    async (targets: MachineRow[]) => {
+      setUpdateNote("");
+      setUpdateError("");
+      setBulkNote("");
+      if (targets.length === 0) {
+        setBulkRows([]);
+        setUpdateError("ยังไม่มีเครื่องที่ออนไลน์ให้สั่ง — เครื่องที่ปิดอยู่จะถูกข้าม (ไม่ส่งคำสั่งค้างไว้)");
+        return;
+      }
+      if (typeof window !== "undefined") {
+        const list = targets.map((m) => `· ${m.name}`).join("\n");
+        const ok = window.confirm(
+          `สั่งอัปเดตโค้ด ${targets.length} เครื่องที่ออนไลน์?\n${list}\n\nแต่ละเครื่องจะรีสตาร์ทตัวเองเมื่ออัปเดตเสร็จ`,
+        );
+        if (!ok) return;
+      }
+      setBulkBusy(true);
+      setBulkRows(targets.map((m) => ({ id: m.id, name: m.name, state: "pending", detail: "กำลังส่งคำสั่ง…" })));
+      let sent = 0;
+      let failed = 0;
+      for (const m of targets) {
+        try {
+          const res = await authFetch(`${API}/api/machine-control/command`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ machineId: m.id, type: "update.apply" }),
+          });
+          const data = (await res.json().catch(() => ({}))) as { command?: { id?: string }; error?: string };
+          if (res.ok) sent += 1;
+          else failed += 1;
+          setBulkRows((rows) =>
+            rows.map((r): BulkRow =>
+              r.id === m.id
+                ? res.ok
+                  ? { ...r, state: "sent", detail: `ส่งแล้ว · รหัสคำสั่ง ${data?.command?.id ?? "—"}` }
+                  : { ...r, state: "failed", detail: data?.error || `HTTP ${res.status}` }
+                : r,
+            ),
+          );
+        } catch (err) {
+          failed += 1;
+          const msg = String((err as Error)?.message || err);
+          setBulkRows((rows) => rows.map((r): BulkRow => (r.id === m.id ? { ...r, state: "failed", detail: msg } : r)));
+        }
+      }
+      setBulkBusy(false);
+      setBulkNote(
+        `ส่งคำสั่งแล้ว ${sent} เครื่อง${failed ? ` · ไม่สำเร็จ ${failed} เครื่อง` : ""} — เครื่องที่รับคำสั่งจะอัปเดตแล้วรีสตาร์ทเอง`,
+      );
+      void load();
+    },
+    [API, load],
+  );
+
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
@@ -83,6 +212,7 @@ export default function MachineConsolePage() {
   }
 
   const active = machines.find((m) => m.id === activeId) ?? null;
+  const onlineMachines = machines.filter((m) => m.status === "online");
 
   return (
     <div>
@@ -105,6 +235,67 @@ export default function MachineConsolePage() {
           {control.error ? <span className="text-red-300">{control.error}</span> : null}
         </div>
 
+        {/* ปุ่มเดียวสั่งทั้งวง LAN + ผลรายเครื่องอยู่ในที่เดียว (เจ้าของสั่ง 11/10/69) */}
+        <div className="flex flex-wrap items-center gap-3 rounded border border-gray-800 bg-gray-900/30 px-3 py-2">
+          <button
+            type="button"
+            disabled={bulkBusy || onlineMachines.length === 0}
+            onClick={() => void sendUpdateAll(onlineMachines)}
+            className="rounded bg-emerald-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          >
+            {bulkBusy ? "กำลังสั่งทุกเครื่อง…" : `อัปเดตทุกเครื่องที่ออนไลน์ (${onlineMachines.length})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded border border-gray-700 px-3 py-1.5 text-sm text-gray-300"
+          >
+            รีเฟรชรายชื่อ
+          </button>
+          <span className="text-xs text-gray-500">
+            ออนไลน์ {onlineMachines.length}/{machines.length} เครื่อง — เครื่องที่ปิดอยู่จะถูกข้าม
+          </span>
+        </div>
+
+        {bulkNote ? (
+          <p className="rounded bg-emerald-900/20 px-3 py-2 text-xs text-emerald-300">{bulkNote}</p>
+        ) : null}
+
+        {bulkRows.length > 0 ? (
+          <div className="overflow-hidden rounded border border-gray-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-900/60 text-gray-400">
+                <tr>
+                  <th className="px-3 py-2 font-medium">เครื่อง</th>
+                  <th className="px-3 py-2 font-medium">ผลการสั่งอัปเดต</th>
+                  <th className="px-3 py-2 font-medium">รายละเอียด</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bulkRows.map((r) => (
+                  <tr key={r.id} className="border-t border-gray-800/70">
+                    <td className="px-3 py-2 text-gray-200">{r.name}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          r.state === "sent"
+                            ? "text-emerald-400"
+                            : r.state === "failed"
+                              ? "text-red-300"
+                              : "text-gray-400"
+                        }
+                      >
+                        {r.state === "sent" ? "ส่งแล้ว" : r.state === "failed" ? "ไม่สำเร็จ" : "กำลังส่ง…"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-400">{r.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {error ? <p className="rounded bg-red-900/30 px-3 py-2 text-sm text-red-300">{error}</p> : null}
 
         <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
@@ -118,7 +309,9 @@ export default function MachineConsolePage() {
               </p>
             ) : null}
             <ul className="space-y-1">
-              {machines.map((m) => (
+              {machines.map((m) => {
+                const view = machineStatusView(m);
+                return (
                 <li key={m.id}>
                   <button
                     type="button"
@@ -130,11 +323,13 @@ export default function MachineConsolePage() {
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${m.status === "online" ? "bg-emerald-400" : "bg-gray-600"}`}
-                      />
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${view.dot}`} />
                       <span className="truncate">{m.name}</span>
                     </span>
+                    <span className={`mt-0.5 block truncate text-xs ${view.tone}`}>{view.label}</span>
+                    {m.ip ? (
+                      <span className="mt-0.5 block truncate text-xs text-emerald-500/80">IP {m.ip}</span>
+                    ) : null}
                     {m.last_heartbeat ? (
                       <span className="mt-0.5 block truncate text-xs text-gray-500">
                         ครั้งสุดท้าย {new Date(m.last_heartbeat).toLocaleString("th-TH")}
@@ -142,7 +337,8 @@ export default function MachineConsolePage() {
                     ) : null}
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </aside>
 
@@ -166,10 +362,37 @@ export default function MachineConsolePage() {
                       {t === "screen" ? "จอ" : "ไฟล์"}
                     </button>
                   ))}
-                  <span className="ml-auto text-xs text-gray-500">
-                    สั่งงาน AI ให้เครื่องนี้ → หน้า Agent Queue
+                  <span className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busyType !== ""}
+                      onClick={() => void sendUpdate("update.check", active.id, active.name)}
+                      className="rounded border border-gray-700 px-3 py-1 text-sm text-gray-300 disabled:opacity-50"
+                    >
+                      {busyType === "update.check" ? "กำลังตรวจ…" : "ตรวจเวอร์ชัน"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyType !== ""}
+                      onClick={() => void sendUpdate("update.apply", active.id, active.name)}
+                      className="rounded bg-emerald-700 px-3 py-1 text-sm text-white disabled:opacity-50"
+                    >
+                      {busyType === "update.apply" ? "กำลังสั่ง…" : "สั่งอัปเดตจาก HUB"}
+                    </button>
                   </span>
                 </div>
+
+                {updateNote ? (
+                  <p className="rounded bg-emerald-900/20 px-3 py-2 text-xs text-emerald-300">{updateNote}</p>
+                ) : null}
+                {updateError ? (
+                  <p className="rounded bg-red-900/30 px-3 py-2 text-xs text-red-300">{updateError}</p>
+                ) : null}
+
+                <p className="text-xs text-gray-500">
+                  สั่งงาน AI ให้เครื่องนี้ → หน้า Agent Queue · "สั่งอัปเดตจาก HUB" = คำสั่ง update.apply
+                  ผ่านช่องควบคุม (ตรวจก่อนได้ด้วย update.check — ไม่แตะไฟล์)
+                </p>
 
                 {tab === "screen" ? (
                   <ScreenPanel machineId={active.id} machineName={active.name} control={control} />

@@ -644,3 +644,37 @@ describe('agent-machines routes — นโยบายอายุภาพห�
     }
   });
 });
+
+describe('agent-machines routes — เครื่องที่ปิดอยู่ต้องขึ้น offline', () => {
+  test('GET / คิดสถานะจากอายุ heartbeat ไม่ใช่ค่าที่ค้างอยู่ใน DB', async () => {
+    // เจ้าของสั่ง 11/10/69: "ตอนนี้ผมปิดเครื่องอยู่ มันต้องออฟไลน์"
+    // คอลัมน์ status ถูกตั้งเป็น online ตอน heartbeat ครั้งสุดท้ายแล้วค้างอยู่ ⇒ ต้องคำนวณตอนอ่าน
+    const now = Date.now();
+    const rows = [
+      { id: 'm-live', name: 'เครื่องนี้ (HUB)', status: 'online', last_heartbeat: new Date(now - 5_000), executors: ['echo'] },
+      { id: 'm-sleep', name: 'คอมเครื่องที่ 2', status: 'online', last_heartbeat: new Date(now - 3 * 24 * 60 * 60 * 1000), executors: ['echo'] },
+      { id: 'm-new', name: 'คอมเครื่องที่ 3', status: 'online', last_heartbeat: null, executors: ['echo'] },
+      { id: 'm-off', name: 'คอมเครื่องที่ 4', status: 'disabled', last_heartbeat: new Date(now - 3 * 24 * 60 * 60 * 1000), executors: ['echo'] },
+    ];
+    mockModel(prisma as any, 'agentMachine', { findMany: async () => rows });
+
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      const res = await fetch(`${srv.baseUrl}/api/agent-machines`, {
+        headers: { authorization: `Bearer ${makeToken('SUPERADMIN')}` },
+      });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as any;
+      const byId = new Map<string, any>(body.machines.map((m: any) => [m.id, m]));
+
+      assert.equal(byId.get('m-live')?.status, 'online', 'เพิ่ง heartbeat = ออนไลน์');
+      assert.equal(byId.get('m-sleep')?.status, 'offline', 'เครื่องที่ปิดไปแล้วต้องไม่ขึ้นเขียวค้าง');
+      assert.equal(byId.get('m-new')?.status, 'offline', 'ยังไม่เคย heartbeat = ยังไม่ออนไลน์');
+      assert.equal(byId.get('m-off')?.status, 'disabled', 'คนปิดเองต้องคงเป็น disabled');
+      assert.ok((byId.get('m-sleep')?.stale_sec ?? 0) > 60, 'ต้องบอกว่าเงียบมากี่วินาที (หน้าเว็บใช้แสดงผล)');
+    } finally {
+      await srv.close();
+    }
+  });
+});

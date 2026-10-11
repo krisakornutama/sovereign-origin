@@ -167,11 +167,34 @@ function stopAll() {
 const FEATURES = [
   {
     id: 'core',
-    label: '🧱 ระบบหลัก (Frontend + Core API + Docker/DB/EMQX + Launcher)',
+    label: '🧱 ระบบหลัก (Frontend + Core API + Agent Runner + Docker/DB/EMQX + Launcher)',
     required: true,
-    dirs: ['sovereign-frontend', 'sovereign-os/core-api', 'sovereign-os/infra'],
-    files: ['launcher.bat', 'launcher-server.mjs', 'launcher.html', 'start-sovereign.bat', 'setup-first-time.bat'],
+    // agent-runner = ช่องให้ HUB สั่งงาน/อัปเดตเครื่องนั้น (ต้องมีถ้าจะคุมระยะไกล)
+    dirs: ['sovereign-frontend', 'sovereign-os/core-api', 'sovereign-os/infra', 'sovereign-os/agent-runner'],
+    files: [
+      'launcher.bat',
+      'launcher-server.mjs',
+      'launcher.html',
+      'start-sovereign.bat',
+      'setup-first-time.bat',
+      'launcher-watchdog.bat',
+      'autostart.mjs',
+      'package.json',
+      'AGENTS.md',
+      'README.md',
+      'NOTES.md',
+      'QUEUE.md',
+      'STATUS.md',
+    ],
     skip: ['data', 'backups'],
+  },
+  {
+    id: 'tools',
+    label: '🧰 เครื่องมือ/เอกสาร/งานออกแบบทั้งชุด (tools + docs + design + portfolio + dms-firmware)',
+    required: false,
+    // tools/Git = PortableGit ประจำเครื่อง (~500MB) ไม่ใช่โค้ดโปรเจ็ก · piper/E-Tipitaka = ของที่แตกจาก zip/ข้อมูลภายนอก
+    dirs: ['tools', 'docs', 'design', 'portfolio', 'dms-firmware', '.github', '.agents', '.opencode'],
+    skip: ['Git', 'piper', 'E-Tipitaka', 'bin', 'whisper.cpp'],
   },
   { id: 'ollama', label: '🤖 Ollama AI (โมเดล AI ~20GB + ตัวติดตั้ง)', required: false, dirs: ['Ollama'], skip: [] },
   { id: 'edge-ai', label: '🧠 Edge AI (Python RAG + วิเคราะห์)', required: false, dirs: ['sovereign-os/edge-ai'], skip: [] },
@@ -192,7 +215,8 @@ const FEATURES = [
 const SKIP_NAMES = new Set([
   'node_modules', '.next', '.git', 'dist', '.cache', '.turbo', 'build', '__pycache__',
   '.env', '.env.local', '.env.production', '.env.development',
-  'data', 'backups', '.freebuff',
+  'data', 'backups', '.freebuff', 'logs', '.playwright-browsers', 'coverage',
+  '.DS_Store', 'Thumbs.db', 'desktop.ini',
 ]);
 
 function dirStats(dirPath, skip = new Set()) {
@@ -373,21 +397,28 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo == [1/3] ติดตั้ง Frontend dependencies ==
+echo == [1/4] ติดตั้ง Frontend dependencies ==
 if exist "sovereign-frontend\package.json" (
     cd /d "%~dp0sovereign-frontend"
     call npm install
     cd /d "%~dp0"
 )
 
-echo == [2/3] ติดตั้ง Core API dependencies ==
+echo == [2/4] ติดตั้ง Core API dependencies ==
 if exist "sovereign-os\core-api\package.json" (
     cd /d "%~dp0sovereign-os\core-api"
     call npm install
     cd /d "%~dp0"
 )
 
-echo == [3/3] ตรวจ Docker ==
+echo == [3/4] ติดตั้ง Agent Runner (ช่องให้ HUB สั่งงาน/อัปเดตเครื่องนี้) ==
+if exist "sovereign-os\agent-runner\package.json" (
+    cd /d "%~dp0sovereign-os\agent-runner"
+    call npm install
+    cd /d "%~dp0"
+)
+
+echo == [4/4] ตรวจ Docker ==
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
     echo   [WARN] ยังไม่เห็น Docker Desktop - เปิด Docker Desktop แล้วรัน setup-first-time.bat

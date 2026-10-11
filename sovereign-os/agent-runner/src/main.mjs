@@ -192,7 +192,9 @@ if (config.remoteControl) {
   //     /api/agent-machines/jobs/<commandId>/result แทนที่จะเป็น /api/machine-control/result
   //     ⇒ ผู้ใช้เห็น "คำสั่งไม่ทำงาน" โดยไม่มี error ให้จับ)
   control = createControlClient({
-    config: { intervalMs: 0 },
+    // hubUrl/token/runnerRoot ต้องส่งเข้าไปด้วย — คำสั่ง update.check/update.apply
+    // ต้องรู้ว่าจะไปถามเวอร์ชันที่ไหน และอัปเดตโค้ดที่โฟลเดอร์ใด
+    config: { intervalMs: 0, hubUrl: config.hubUrl, token: config.token, runnerDir: runnerRoot },
     hub: createControlHub({ hubUrl: config.hubUrl, token: config.token }),
     roots: config.remoteFsRoots,
     onError: (msg) => console.error(msg),
