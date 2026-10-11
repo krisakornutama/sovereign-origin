@@ -17,8 +17,13 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { fullKitFiles } from '../agent-pack/pack.mjs';
+import { detectAppRunning } from '../desktop-app-running.mjs';
+
+const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -87,6 +92,77 @@ describe('โฟลเดอร์ติดตั้งมีเส้นทา�
     assert.doesNotMatch(inst, /C:\\SovereignOS/, 'ห้ามติดตั้งลงไดรฟ์ C:');
     assert.match(inst, /CreateShortcut/i, 'ต้องทำไอคอนให้เปิดง่ายที่เครื่องปลายทาง');
     assert.match(inst, /robocopy/i, 'ต้องก็อปทั้งชุดแอป (มี runtime + API ในตัว)');
+  });
+});
+
+describe('แพ็กแอปตอนที่แอปเปิดค้างอยู่ (เคสจริง 11/10/69: แพ็กล้ม EPIPE สองรอบ)', () => {
+  // เจ้าของสั่ง: ต้องแพ็กได้โดยไม่ต้องบังคับปิดแอปที่กำลังใช้งาน
+  // → ต้องเขียนลงโฟลเดอร์อื่นได้ ไม่ใช่เขียนทับ dist-portable ที่แอปกำลังรัน
+
+  test('build-desktop.mjs รับ --out= แล้วเขียนลงโฟลเดอร์นั้นจริง', () => {
+    const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'sovereign-out-'));
+    try {
+      const r = spawnSync(process.execPath, [
+        path.join(ROOT, 'tools', 'build-desktop.mjs'),
+        '--skip-runtime',
+        '--skip-sidecar',
+        `--out=${tmp}`,
+      ], { encoding: 'utf8' });
+      assert.equal(r.status, 0, `build-desktop --out ต้องผ่าน แต่ล้ม:\n${r.stderr}`);
+      assert.ok(
+        fs.existsSync(path.join(tmp, 'resources', 'app', 'electron', 'main.js')),
+        'overlay ต้องถูกเขียนลงโฟลเดอร์ที่สั่งด้วย --out',
+      );
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('ไม่ส่ง --out = ยังเขียนลง dist-portable เหมือนเดิม (ไม่เปลี่ยนพฤติกรรมเดิม)', () => {
+    const src = read('tools/build-desktop.mjs');
+    assert.match(
+      src,
+      /outFlag \? path\.resolve\(ROOT, outFlag\) : path\.join\(ROOT, 'dist-portable'\)/,
+      'ค่าเดิมต้องยังเป็น dist-portable — --out เป็นแค่ทางเลือกเพิ่ม',
+    );
+  });
+
+  test('เขียนไม่ได้เพราะแอปค้าง = ต้องบอกวิธีแก้เป็นภาษาไทย ไม่ใช่ dump stack', () => {
+    const src = read('tools/build-desktop.mjs');
+    assert.match(src, /EPIPE|EBUSY|EPERM/, 'ต้องจับกรณีไฟล์ถูกล็อก (Windows ใช้รหัสพวกนี้)');
+    assert.match(src, /Sovereign OS/, 'ข้อความ error ต้องบอกว่าปิดแอปตัวไหน');
+  });
+
+  test('PACK-DESKTOP ต้องเช็กว่าแอปรันอยู่ไหม แล้วเปลี่ยนไปเขียน staging', { skip: !haveInstall }, () => {
+    const pack = fs.readFileSync(path.join(INSTALL_DIR, 'PACK-DESKTOP.mjs'), 'utf8');
+    // เคสจริง 11/10/69: เทสต์แบบ "grep ว่ามีคำว่า appIsRunning" ผ่านทั้งที่โค้ดถูกถอด
+    //   (mutation: `const busy = false` ยังผ่าน) → ต้องผูกกับค่าที่เรียกจริง
+    assert.match(
+      pack,
+      /const busy = await appIsRunning\(\)/,
+      'busy ต้องมาจากการตรวจจริง — ถ้า hardcode false เทสต์นี้ต้องแดง',
+    );
+    assert.match(pack, /desktop-app-running/, 'ต้องเรียกตัวตรวจจากโปรเจกต์ (เทสต์ได้) ไม่ใช่เขียนเอง');
+    assert.match(pack, /dist-portable-staging/, 'ต้องมีโฟลเดอร์ staging สำหรับเขียนแทน dist-portable');
+    assert.match(pack, /--out=/, 'ต้องส่ง --out ให้ build-desktop.mjs เพื่อเปลี่ยนปลายทาง');
+  });
+
+  test('ตัวตรวจแอปค้างตัดสินจาก tasklist ได้ถูกต้อง (เทสต์กับผลจริง ไม่ใช่ grep)', () => {
+    // เคสจริง: ถ้าตัดสินผิด = แพ็กชนแอป (EPIPE) หรือเขียนทับตอนแอปกำลังรัน
+    assert.equal(detectAppRunning('"Sovereign OS.exe"   1234 Console  1  200,000 K'), true, 'ต้องจับได้เมื่อแอปรันอยู่');
+    assert.equal(detectAppRunning('"sovereign os.exe"   1234 Console  1  200,000 K'), true, 'ชื่อ process Windows ไม่ตรงตัวพิมพ์');
+    assert.equal(detectAppRunning('INFO: No tasks are running which match the specified criteria.'), false, 'tasklist ตอบว่าไม่มี = ไม่ค้าง');
+    assert.equal(detectAppRunning(''), false, 'ผลลัพธ์ว่าง = ไม่ค้าง');
+    assert.equal(detectAppRunning(undefined), false, 'ไม่มีผลลัพธ์ = ไม่ค้าง (ห้าม throw)');
+    assert.equal(detectAppRunning('"Sovereign Updater.exe"  99 Console  1  10,000 K'), false, 'ชื่อคล้ายกันแต่ไม่ใช่แอป ห้ามจับผิด');
+  });
+
+  test('ตัวตรวจแอปค้างอยู่ในชุดติดตั้ง (เครื่องปลายทางต้องแพ็กต่อได้)', () => {
+    const kit = new Set(fullKitFiles(ROOT));
+    assert.ok(
+      kit.has('tools/desktop-app-running.mjs'),
+      'ชุดติดตั้งขาด tools/desktop-app-running.mjs — เครื่องใหม่จะแพ็กแอปไม่ได้',
+    );
   });
 });
 
