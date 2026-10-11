@@ -284,7 +284,9 @@ function showMainWindow() {
   try {
     if (!win || win.isDestroyed()) { createWindow(); boot(); return; }
     if (win.isMinimized()) win.restore();
-    win.show(); win.focus();
+    win.show();
+    win.focus();
+    dlog('showMainWindow: หน้าต่างถูกเรียกกลับมา');
   } catch (e) { dlog('showMainWindow error:', e.message); }
 }
 
@@ -424,9 +426,15 @@ function startBackend() {
   } catch (e) { console.error('startBackend failed', e.message); }
 }
 
-// ── single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง ──
+// single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง
 const hasSingleLock = app.requestSingleInstanceLock();
-if (hasSingleLock) app.on('second-instance', () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); } });
+if (hasSingleLock) app.on('second-instance', () => {
+  // ดับเบิลคลิกซ้ำต้อง "เห็นหน้าต่าง" เสมอ ไม่ใช่แค่โชว์แล้วหายไป
+  // (เคสจริง 11/10/69: ปิดหน้าต่าง = ย่อลง tray แล้วเปิดใหม่ไม่ขึ้นเลย
+  //  เพราะ show() ไม่ได้เรียก — ผู้ใช้คิดว่าแอปพัง ทั้งที่มันรันอยู่)
+  dlog('second-instance: เรียกหน้าต่างกลับมา');
+  showMainWindow();
+});
 else { dlog('single-instance: Sovereign OS รันอยู่แล้ว — ปิดตัวซ้ำ'); app.quit(); }
 
 app.whenReady().then(() => {
