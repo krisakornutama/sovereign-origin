@@ -14,7 +14,8 @@
 //      (ถ้าไม่มี core-api/dist ให้ build ก่อน — sidecar ไม่มี dist = จอดำแบบเดิม)
 //   4) ตรวจ sync ซอร์ส ↔ overlay ทุกไฟล์ ไม่ตรง = exit 1
 //
-// ใช้: node tools/build-desktop.mjs [--skip-runtime] [--skip-sidecar]
+// ใช้: node tools/build-desktop.mjs [--skip-runtime] [--skip-sidecar] [--out=<พาธ>]
+//   --out=<พาธ> = เขียนผลลัพธ์ลงโฟลเดอร์นั้นแทน dist-portable (กันชนกับแอปที่กำลังรัน)
 // ─────────────────────────────────────────────────────────────
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -25,7 +26,20 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FE = path.join(ROOT, 'sovereign-frontend');
 const CORE_API = path.join(ROOT, 'sovereign-os', 'core-api');
 const DIST = path.join(FE, 'dist-electron', 'win-unpacked');
-const PORTABLE = path.join(ROOT, 'dist-portable');
+
+// ── เขียนลงที่ไหน ──────────────────────────────────────────────────────────
+// ค่าเดิม = dist-portable (ไม่เปลี่ยนพฤติกรรมเดิมเลย)
+//
+// --out=<พาธ> (หรือ SOVEREIGN_DESKTOP_OUT) = เขียนลงโฟลเดอร์อื่น
+//   เหตุผลที่ต้องมี (เคสจริง 11/10/69): ถ้าแอปกำลังรันอยู่ใน dist-portable/
+//   cpSync เขียนทับจะได้ EPIPE บน Windows แล้วแพ็กล้มทั้งชุด
+//   (ล้มซ้ำ 2 รอบเพราะเจ้าของเปิดแอปค้างไว้) — ให้ตัวแพ็กส่งปลายทางมาเป็น
+//   staging dir แทน แอปที่เปิดอยู่ก็ไม่ถูกแตะ
+const outFlag = (() => {
+  const hit = process.argv.find((a) => a.startsWith('--out='));
+  return hit ? hit.slice('--out='.length) : (process.env.SOVEREIGN_DESKTOP_OUT || '');
+})();
+const PORTABLE = outFlag ? path.resolve(ROOT, outFlag) : path.join(ROOT, 'dist-portable');
 const APP = path.join(PORTABLE, 'resources', 'app');
 
 const skipRuntime = process.argv.includes('--skip-runtime');
@@ -40,7 +54,20 @@ if (!skipRuntime) {
   }
   log('copy electron runtime →', path.relative(ROOT, PORTABLE));
   mkdirSync(PORTABLE, { recursive: true });
-  cpSync(DIST, PORTABLE, { recursive: true, force: true });
+  try {
+    cpSync(DIST, PORTABLE, { recursive: true, force: true });
+  } catch (e) {
+    // EPIPE/EBUSY บน Windows = มีโปรเซสอื่นเปิดไฟล์ในโฟลเดอร์ปลายทางค้างอยู่
+    // (เคสจริง 11/10/69: แอป Sovereign OS ยังรันอยู่ใน dist-portable ตอนแพ็ก)
+    if (e && (e.code === 'EPIPE' || e.code === 'EBUSY' || e.code === 'EPERM')) {
+      die(
+        `เขียนลง ${path.relative(ROOT, PORTABLE)} ไม่ได้ — มีโปรเซสอื่นเปิดไฟล์ในนั้นค้างอยู่\n` +
+          `   วิธีแก้: ปิดแอปที่รันจากโฟลเดอร์นั้นก่อน (Task Manager → Sovereign OS)\n` +
+          `   หรือสั่งเขียนลงที่อื่นแทน:  node tools/build-desktop.mjs --out=dist-portable-staging`,
+      );
+    }
+    throw e;
+  }
 }
 
 // ── 2) overlay จากซอร์ส → resources/app ──

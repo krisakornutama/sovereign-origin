@@ -245,11 +245,26 @@ function checkToolFilesTracked() {
   const TOOLS = join(ROOT, 'tools');
   // เก็บชื่อไฟล์ที่ถูกอ้างอิงจากจุดเรียกหลัก (verify.mjs และเกต 2 ตัว + runner/report)
   const referenced = new Set(['arch-gate.mjs', 'frontend-gate.mjs', 'prod-truth.mjs', 'verify.mjs']);
-  for (const f of ['verify.mjs', 'arch-gate.mjs', 'frontend-gate.mjs']) {
+  // เกตที่ต้องไล่ด้วย: จุดเรียกหลัก + เทสต์ใน tools/test/
+  //   เคสจริง 11/10/69: tools/desktop-app-running.mjs ถูกอ้างจากเทสต์ + จาก
+  //   PACK-DESKTOP.mjs (นอก repo) → ไม่มีในรายการข้างบน → gate ผ่านทั้งที่ไฟล์
+  //   ไม่ถูก git track (ติด tools/* ใน .gitignore) = clone ใหม่จะไม่มีไฟล์นี้
+  //   แล้วแพ็กแอปที่เครื่องอื่นพังเงียบ ๆ
+  const scanTargets = ['verify.mjs', 'arch-gate.mjs', 'frontend-gate.mjs'];
+  const testDir = join(TOOLS, 'test');
+  if (existsSync(testDir)) {
+    for (const e of readdirSync(testDir)) {
+      if (/\.test\.mjs$/.test(e)) scanTargets.push(join('test', e));
+    }
+  }
+  for (const f of scanTargets) {
     const p = join(TOOLS, f);
     if (!existsSync(p)) continue;
     const text = readFileSync(p, 'utf8');
-    for (const m of text.matchAll(/['"\(]([A-Za-z0-9._-]+\.(?:mjs|json|ps1))['"\)]/g)) {
+    // รองรับทั้ง 'foo.mjs' และ '../foo.mjs' — เคสจริง 11/10/69: เทสต์ import เป็น
+    //   `from '../desktop-app-running.mjs'` (มี ../ นำหน้า) regex เดิมจับไม่ได้
+    //   → ไฟล์หลุดจากรายการที่ต้อง track แล้ว gate ผ่านทั้งที่ไม่ได้ตรวจ
+    for (const m of text.matchAll(/['"(](?:\.{1,2}\/)?([A-Za-z0-9._-]+\.(?:mjs|json|ps1))['")]/g)) {
       if (existsSync(join(TOOLS, m[1]))) referenced.add(m[1]); // อ้างถึงของจริงใน tools/ เท่านั้น
     }
   }
