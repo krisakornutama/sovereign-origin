@@ -45,6 +45,29 @@ export function buildEnvFile({ hubUrl, token, machineName, executors = 'echo', f
   ].join('\r\n');
 }
 
+/**
+ * อ่านค่าที่แถมมากับชุดสากร (ไฟล์ enroll-code.txt รูปแบบ KEY=VALUE)
+ *   ทำให้ผู้ใช้แค่ดับเบิลคลิก SETUP-MACHINE.cmd ไม่ต้องพิมพ์อะไรเลย
+ *   ไฟล์นี้ไม่มี = ต้องพิมพ์ --hub-url/--code เอง (ยังทำได้)
+ * @returns {{hubUrl: string, code: string}}
+ */
+export function readEnrollmentFile(dir) {
+  const file = path.join(dir, 'enroll-code.txt');
+  const empty = { hubUrl: '', code: '' };
+  if (!fs.existsSync(file)) return empty;
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return empty;
+  }
+  const pick = (key) => {
+    const m = new RegExp(`^\\s*${key}\\s*=\\s*(.+)$`, 'm').exec(text);
+    return m ? m[1].trim() : '';
+  };
+  return { hubUrl: pick('HUB_URL'), code: pick('MACHINE_ENROLL_CODE') };
+}
+
 export function readJoin(dir) {
   const file = path.join(dir, 'join.json');
   if (!fs.existsSync(file)) {
@@ -130,10 +153,15 @@ export async function runSetup({
   // โหมดชุดสากร: ไม่มี join.json แต่มี --enroll ⇒ ขอ token เอง
   let resolved = join.ok ? { hubUrl: join.hubUrl, machineToken: join.machineToken, machineName: join.machineName } : null;
   if (!resolved && enroll && join.code === 'NO_JOIN') {
-    const { enroll: doEnroll } = await import(path.join(dir, 'src', 'enroll-machine.mjs'));
-    const hub = String(hubUrlArg || process.env.HUB_URL || '').trim();
+    // pathToFileURL จำเป็น: บน Windows `await import('E:\\...')` โยน ERR_UNSUPPORTED_ESM_URL_SCHEME
+//   (เคสจริง 11/10/69 — ทดสอบชุดสากรจริงแล้วพังตรงนี้ ยังไม่ได้ไปถึงเครื่องปลายทาง)
+const { enroll: doEnroll } = await import(pathToFileURL(path.join(dir, 'src', 'enroll-machine.mjs')).href);
+    // ลำดับค่ามา: สิ่งที่สั่งเอง > ตัวแปรแวดล้อม > ไฟล์ที่แถมมากับชุดสากร
+    const preset = readEnrollmentFile(dir);
+    const hub = String(hubUrlArg || process.env.HUB_URL || preset.hubUrl || '').trim();
+    const code = String(enrollCode || process.env.MACHINE_ENROLL_CODE || preset.code || '').trim();
     const r = await doEnroll(
-      { hubUrl: hub, code: enrollCode, name: machineName || os.hostname(), os: platform, executors: String(executors).split(',').map((s) => s.trim()).filter(Boolean), version: '' },
+      { hubUrl: hub, code, name: machineName || os.hostname(), os: platform, executors: String(executors).split(',').map((s) => s.trim()).filter(Boolean), version: '' },
       { fetch: fetchImpl },
     );
     if (!r.ok) {

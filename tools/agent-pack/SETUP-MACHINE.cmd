@@ -16,17 +16,27 @@ set "FINAL=1"
 >> "%LOG%" echo.
 
 if not exist "%HERE%setup-machine.mjs" goto no_script
-REM ไม่มี join.json = ไม่ใช่ชุดเสีย — เป็น "ชุดสากล" ที่ต้องลงทะเบียนกับ HUB เอง
+REM ไม่มี join.json = "ชุดสากร" ที่ต้องลงทะเบียนกับ HUB เอง
 REM   (เจ้าของสั่ง 11/10/69: "ไฟล์เดียวจบ ไม่ต้องทำทีละเครื่อง")
+REM   ถ้าเป็นชุดที่คัดลอกไม่ครบจริงๆ การลงทะเบียนใหม่จะได้เครื่องซ้ำ
+REM   → เตือนให้เห็นก่อน แต่ไม่บล็อก (กด Ctrl+C ได้ถ้าไม่ต้องการ)
 if exist "%HERE%join.json" goto have_join
-if /i "%~1"=="--enroll" goto enroll_mode
-goto no_join
+where node >nul 2>&1
+if errorlevel 1 goto no_node
+echo [หมายเหตุ] ไม่พบ join.json ในโฟลเดอร์นี้
+echo            ระบบจะลงทะเบียนเครื่องนี้กับ HUB ด้วย "รหัสเชิญ" แทน
+echo            (ถ้าคาดว่าจะมี join.json แปลว่าก๊อปไม่ครบ — กด Ctrl+C เพื่อหยุด)
+echo.
+goto enroll_mode
 
 :enroll_mode
-echo กำลังลงทะเบียนเครื่องนี้กับ HUB (ต้องมีรหัสเชิญ) ...
+echo กำลังติดตั้งเครื่องนี้เป็นเครื่องลูกของ Sovereign OS ...
 echo.
-shift
-node "%HERE%setup-machine.mjs" --enroll %* >> "%LOG%" 2>&1
+if "%~1"=="" (
+  node "%HERE%setup-machine.mjs" --enroll %* >> "%LOG%" 2>&1
+) else (
+  node "%HERE%setup-machine.mjs" --enroll %* >> "%LOG%" 2>&1
+)
 goto check_rc
 
 :have_join
