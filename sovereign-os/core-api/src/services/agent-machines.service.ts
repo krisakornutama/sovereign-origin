@@ -32,6 +32,8 @@ export interface MachineRow {
   last_heartbeat?: Date | null;
   version?: string | null;
   note?: string | null;
+  /** อายุสัญญาณล่าสุดเป็นวินาที (คำนวณตอนอ่าน — null เมื่อเครื่องยังไม่เคย heartbeat) */
+  stale_sec?: number | null;
 }
 
 export interface EnqueueInput {
@@ -108,9 +110,60 @@ export async function authenticateToken(token: string): Promise<MachineRow | nul
   return found as unknown as MachineRow;
 }
 
+/**
+ * อายุ heartbeat ที่ยังนับว่า "ออนไลน์"
+ *
+ * เครื่องลูก heartbeat ทุก ~30 วิ (runner) ⇒ 90 วิ = พลาด 3 รอบติดกัน
+ * (เครื่องถูกปิด · เน็ตหลุด · โปรเซสดับ) ตรงนี้คือเหตุที่ "เครื่องปิดอยู่ต้องขึ้นออฟไลน์":
+ * คอลัมน์ status ใน DB ถูกตั้งเป็น online ตอน heartbeat ครั้งสุดท้ายแล้วค้างอยู่
+ * ถ้าเอาไปแสดงตรง ๆ เครื่องที่ปิดไปแล้วจะขึ้นเขียวตลอดกาล — เจ้าของสั่ง 11/10/69 ให้แก้
+ * ปรับได้ผ่าน env เพื่อเครื่องที่ heartbeat ห่างกว่านี้
+ */
+export const MACHINE_STALE_MS = (() => {
+  const raw = Number(process.env.MACHINE_STALE_MS ?? '');
+  return Number.isFinite(raw) && raw > 0 ? raw : 90_000;
+})();
+
+/**
+ * สถานะที่ "ใช้จริง" ของเครื่องหนึ่ง ณ เวลาหนึ่ง (ฟังก์ชันบริสุทธิ์ — เทสต์ได้ไม่ต้องมี DB)
+ *   disabled        = คนปิดเอง → คงไว้ (ไม่กลายเป็น offline)
+ *   อายุ ≤ staleMs   = online
+ *   อายุเกิน        = offline (เครื่องไม่ส่งสัญญาณแล้ว)
+ *   ไม่มี heartbeat = offline
+ */
+export function effectiveMachineStatus(
+  row: Pick<MachineRow, 'status' | 'last_heartbeat'>,
+  now: number = Date.now(),
+  staleMs: number = MACHINE_STALE_MS,
+): string {
+  if (row.status === 'disabled') return 'disabled';
+  const at = row.last_heartbeat ? new Date(row.last_heartbeat).getTime() : NaN;
+  if (!Number.isFinite(at)) return 'offline';
+  return now - at <= staleMs ? 'online' : 'offline';
+}
+
+/** อายุสัญญาณล่าสุดเป็นวินาที (null = ยังไม่เคยส่ง) — หน้าเว็บใช้บอกว่าเงียบมากี่นาที */
+export function machineStaleSec(
+  row: Pick<MachineRow, 'last_heartbeat'>,
+  now: number = Date.now(),
+): number | null {
+  const at = row.last_heartbeat ? new Date(row.last_heartbeat).getTime() : NaN;
+  if (!Number.isFinite(at)) return null;
+  return Math.max(0, Math.round((now - at) / 1000));
+}
+
+/**
+ * รายการเครื่อง — คืน status ที่แท้จริง (คำนวณจากอายุ heartbeat) ไม่ใช่ค่าที่ค้างใน DB
+ * เครื่องที่ปิดอยู่จึงขึ้น offline ทันทีที่เกินเกณฑ์ โดยไม่ต้องมีใครไปแก้ DB
+ */
 export async function listMachines(): Promise<MachineRow[]> {
-  const rows = await prisma.agentMachine.findMany({ orderBy: { created_at: 'asc' } });
-  return rows as unknown as MachineRow[];
+  const rows = (await prisma.agentMachine.findMany({ orderBy: { created_at: 'asc' } })) as unknown as MachineRow[];
+  const now = Date.now();
+  return rows.map((row) => ({
+    ...row,
+    status: effectiveMachineStatus(row, now),
+    stale_sec: machineStaleSec(row, now),
+  }));
 }
 
 export async function heartbeat(machineId: string, version?: string): Promise<MachineRow> {

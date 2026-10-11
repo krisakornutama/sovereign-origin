@@ -87,7 +87,9 @@ try {
 const { routes, nonPageRoutes } = enumerateRoutes(PAGES);
 const routeNames = routes.map((r) => r.route);
 // 64 → 65: branch agent-orchestration เพิ่มหน้า agent-queue (7 ต.ค. 69) — ตั้งใจ bump ให้เห็นว่ามีหน้าใหม่เข้ามา
-check('เดิน src/pages เจอทุกไฟล์หน้า', routes.length === 65, `${routes.length} route`);
+// 65 → 66: branch machine-console เพิ่มหน้า machine-console (8 ต.ค. 69) — หน้าภายใน (ต้องล็อกอิน SUPERADMIN)
+//           ไม่มี SeoHead/robots ของตัวเอง ⇒ audit จัดเข้ากอง "หน้าในระบบ" ถูกต้องแล้ว (findings ยัง 0)
+check('เดิน src/pages เจอทุกไฟล์หน้า', routes.length === 66, `${routes.length} route`);
 check('เจอ /partners/me (หน้าที่เคยหลุด)', routeNames.includes('/partners/me'));
 check('เจอหน้าที่ซ้อน /mbti/compare และ /terrain-demo', routeNames.includes('/mbti/compare') && routeNames.includes('/terrain-demo'));
 check('index.tsx → /', routeNames.includes('/') && !routeNames.includes('/index'));

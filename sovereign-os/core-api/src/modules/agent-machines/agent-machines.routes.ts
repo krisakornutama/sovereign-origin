@@ -12,6 +12,9 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import fs from 'node:fs';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hardenUpload, handledUpload, resolveInsideRoot, IMAGE_MIME } from '../../lib/harden-upload';
+import { readUpdateManifest, resolveUpdateFile, isSafeRelPath } from '../../services/agent-update.service';
+import { readDesktopManifest, resolveVerifiedDesktopAsset } from '../../services/desktop-update.service';
+import { createHash } from 'node:crypto';
 import {
   prisma,
   authenticateToken,
@@ -24,6 +27,17 @@ import {
   setMachineStatus,
   type MachineRow,
 } from '../../services/agent-machines.service';
+import {
+  listMachinesForUser,
+  linkMachineToUser,
+  unlinkMachineFromUser,
+  listUserIdsForMachine,
+  setMachineRole,
+  requestPairing,
+  revokeLanPairing,
+  confirmPairing,
+  userCanControl,
+} from '../../services/agent-machine-hub.service';
 import { gateJobBeforeDispatch, approveJob, rejectJob } from '../../services/orchestrator-approval.service';
 import { notifyJobFinished, notifyJobNeedsApproval } from '../../services/orchestrator-notify.service';
 import {
@@ -46,6 +60,11 @@ import {
 
 const router = Router();
 
+/** hash ของไฟล์ที่ให้บริการ — เทียบกับ manifest ก่อนส่งออกทุกครั้ง (ไฟล์บนดิสก์อาจถูกแก้/หาย) */
+function sha256Hex(buf: Buffer): string {
+  return createHash('sha256').update(buf).digest('hex');
+}
+
 /** นามสกุลภาพหน้าจอที่ยอมรับ — runner ส่ง PNG เสมอ แต่เปิดรับ jpeg/webp ด้วย */
 const SCREENSHOT_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
 
@@ -56,6 +75,22 @@ const screenshotUpload = hardenUpload({
   mode: 'memory',
   mimeAllow: IMAGE_MIME,
 });
+
+/**
+ * IP ล่าสุดที่เครื่องแต่ละตัวติดต่อเข้ามา — เก็บในหน่วยความจำ ไม่แตะ DB
+ *
+ * ทำไมไม่เพิ่มคอลัมน์ในตาราง: การเพิ่มคอลัมน์ต้อง migrate และเครื่องลูกที่อัปเดตโค้ดตัวเองได้
+ * ต้องไม่ค้างรอ migration ของ HUB · เจตนาคือ "เห็นเครื่อง 2 3 4 พร้อม IP เดี๋ยวนี้"
+ * ⇒ ค่าว่างหลังรีสตาร์ท API จนกว่าเครื่องนั้นจะ heartbeat รอบถัดไป (ทุก ~30 วิ)
+ */
+const machineIps = new Map<string, { ip: string; at: number }>();
+
+/** IP ของผู้เรียก — รองรับกรณีผ่าน tunnel/reverse proxy (x-forwarded-for ตัวแรก) */
+function callerIp(req: Request): string {
+  const fwd = String(req.header('x-forwarded-for') || '').split(',')[0].trim();
+  const raw = fwd || req.ip || req.socket?.remoteAddress || '';
+  return raw.replace(/^::ffff:/, '');
+}
 
 /** ดึง machine จาก x-machine-token หรือ Authorization: Bearer <token> */
 async function authenticateMachineToken(req: Request, res: Response): Promise<MachineRow | null> {
@@ -90,7 +125,13 @@ function requireMachineToken(req: Request, res: Response, next: NextFunction) {
 router.get('/', authenticate, async (_req: Request, res: Response) => {
   try {
     const machines = await listMachines();
-    res.json({ machines });
+    // แนบ IP ที่เห็นล่าสุดจาก heartbeat — หน้า /machine-console ใช้บอกว่าเครื่องอยู่ที่ไหนในวง
+    res.json({
+      machines: machines.map((m) => {
+        const hit = machineIps.get(m.id);
+        return { ...m, ip: hit?.ip ?? null, ipSeenAt: hit ? new Date(hit.at).toISOString() : null };
+      }),
+    });
   } catch (err) {
     console.error('GET /api/agent-machines error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to load machines' });
@@ -294,11 +335,100 @@ router.post('/queue/:id/repeat', authenticate, requireRole('SUPERADMIN'), async 
 
 // ── ฝั่ง runner (machine token) ──
 
+// GET /api/agent-machines/update/manifest — เครื่องลูกถามว่า "มีโค้ดเวอร์ชันใหม่ไหม"
+// ตอบ 404 (ไม่ใช่ error) เมื่อ HUB ยังไม่ได้เผยแพร่ชุดอัปเดต — เครื่องลูกจะได้ไม่ต้องตีความ
+router.get('/update/manifest', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const manifest = readUpdateManifest();
+    if (!manifest) return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
+    res.json(manifest);
+  } catch (err) {
+    console.error('GET /api/agent-machines/update/manifest error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read update manifest' });
+  }
+});
+
+// GET /api/agent-machines/update/file?path=src/main.mjs — ส่งไฟล์ 1 ไฟล์ในชุดอัปเดต
+// เฉพาะชื่อที่อยู่ใน manifest เท่านั้น (กันการอ่านไฟล์อื่นบนเครื่อง HUB) + ตรวจ hash ให้ตรงกับ manifest
+router.get('/update/file', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const rel = String(req.query.path ?? '');
+    if (!isSafeRelPath(rel)) return res.status(400).json({ error: 'invalid file path' });
+    const found = resolveUpdateFile(rel);
+    if (!found) return res.status(404).json({ error: 'not part of the published bundle' });
+    const body = fs.readFileSync(found.abs);
+    if (sha256Hex(body) !== found.entry.sha256) {
+      console.error(`[agent-update] ไฟล์ชุดอัปเดตไม่ตรง manifest: ${rel}`);
+      return res.status(500).json({ error: 'published file does not match manifest — publish again' });
+    }
+    res.type('text/plain; charset=utf-8').send(body);
+  } catch (err) {
+    console.error('GET /api/agent-machines/update/file error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to serve update file' });
+  }
+});
+
+// ── ชุดอัปเดต "แอปเดสก์ท็อป" (Electron) — เครื่องปลายทางดึงจาก HUB ──
+// เจ้าของสั่ง 11/10/69: ให้ HUB เป็นแหล่งอัปเดตของแอป (ไม่ต้องรอ GitHub release)
+// เครื่องปลายทางถาม manifest → เห็นว่าใหม่กว่า → ดาวน์โหลดไฟล์เดียว → ตรวจ SHA-256 ก่อนติดตั้ง
+// ตอบ 404 (ไม่ใช่ error) เมื่อ HUB ยังไม่เผยแพร่ — แอปจะตกไปเช็ค GitHub แทนได้
+
+// GET /api/agent-machines/desktop-update/manifest
+router.get('/desktop-update/manifest', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const manifest = readDesktopManifest();
+    if (!manifest) {
+      return res.status(404).json({
+        error: 'no desktop update published',
+        hint: 'ประกอบแอปที่ HUB (BUILD-DESKTOP.cmd) แล้วเผยแพร่ด้วย node PACK-DESKTOP.mjs --publish',
+      });
+    }
+    res.json(manifest);
+  } catch (err) {
+    console.error('GET /api/agent-machines/desktop-update/manifest error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read desktop update manifest' });
+  }
+});
+
+// GET /api/agent-machines/desktop-update/asset — ส่งตัวติดตั้ง (ตรวจแฮชกับ manifest ก่อนส่งทุกครั้ง)
+router.get('/desktop-update/asset', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const found = await resolveVerifiedDesktopAsset();
+    if (!found) return res.status(404).json({ error: 'desktop asset missing or does not match manifest' });
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(found.entry.size),
+      'Content-Disposition': `attachment; filename="${found.entry.name}"`,
+      'Cache-Control': 'no-store',
+    });
+    // สตรีมไฟล์ — ไฟล์ระดับร้อย MB ห้ามโหลดทั้งก้อนเข้า memory
+    const stream = fs.createReadStream(found.abs);
+    stream.on('error', (err) => {
+      console.error('GET /api/agent-machines/desktop-update/asset stream error:', err.message);
+      res.destroy(err);
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('GET /api/agent-machines/desktop-update/asset error:', err instanceof Error ? err.message : err);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to serve desktop update asset' });
+  }
+});
+
 // POST /api/agent-machines/heartbeat — runner ยืนยันว่ายังออนไลน์
 router.post('/heartbeat', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    // บันทึก IP ทุกครั้งที่เครื่องรายงานตัว — เป็นแหล่งเดียวที่รู้ที่อยู่จริงของเครื่องลูก
+    machineIps.set(machine.id, { ip: callerIp(req), at: Date.now() });
     const updated = await heartbeat(machine.id, String(req.body?.version ?? '') || undefined);
     res.json({ machine: updated });
   } catch (err) {
@@ -369,5 +499,122 @@ router.post(
     }
   }
 );
+
+// ═════════════════════════════════════════════════════════════
+//  สิทธิ์ควบคุมเครื่อง (เจ้าของสั่ง 11/10/69)
+//
+//  กติกา 3 ข้อที่เจ้าของยืนยันด้วยคำพูด:
+//    1) เครื่อง USER สั่งงาน AI ได้ · คุมเครื่องอื่นไม่ได้
+//    2) เครื่องหนึ่งอยู่ใต้ผู้ใช้ได้หลายคน (มีได้ 1–2 คน) ⇒ many-to-many
+//    3) ยืนยัน LAN ต้องกดยืนยันบนเครื่องเป้าหมาย (ดู IP อย่างเดียวไม่พอ)
+//
+//  ทุกเส้นทางในกลุ่มนี้ = SUPERADMIN เท่านั้น และผูกกับผู้เรียกเอง
+//  (ผู้เรียกต้องเป็นคนผูก/ยืนยันเครื่องนั้น — ไม่ใช่แค่เป็น SUPERADMIN คนไหนก็ได้)
+// ═════════════════════════════════════════════════════════════
+
+/** เครื่องที่ผู้เรียก (SUPERADMIN) คุมได้จริง พร้อมฟิลด์สิทธิ์ */
+router.get('/mine', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const machines = await listMachinesForUser(req.user!.id);
+    res.json({
+      machines: machines.map((m) => ({
+        ...m,
+        ip: machineIps.get(m.id)?.ip ?? null,
+        ipSeenAt: machineIps.has(m.id) ? new Date(machineIps.get(m.id)!.at).toISOString() : null,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/agent-machines/mine error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to load machines' });
+  }
+});
+
+/** ผูกเครื่องไว้ใต้ผู้เรียก (ทำซ้ำได้) — ข้อ 2: หลายคนผูกเครื่องเดียวกันได้ */
+router.post('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    await linkMachineToUser(req.params.id, req.user!.id);
+    res.json({ ok: true, linked: req.user!.id });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/link error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to link machine' });
+  }
+});
+
+/** ถอดเครื่องออกจากผู้เรียก (คนอื่นที่ผูกไว้ยังคุมได้อยู่) */
+router.delete('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const removed = await unlinkMachineFromUser(req.params.id, req.user!.id);
+    res.json({ ok: true, removed });
+  } catch (err) {
+    console.error('DELETE /api/agent-machines/:id/link error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to unlink machine' });
+  }
+});
+
+/** ตั้งบทบาทของเครื่อง: HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้ */
+router.put('/:id/role', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const role = String((req.body as { role?: unknown })?.role ?? '');
+    const machine = await setMachineRole(req.params.id, role);
+    res.json({ ok: true, machine });
+  } catch (err) {
+    console.error('PUT /api/agent-machines/:id/role error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to set role' });
+  }
+});
+
+/**
+ * ข้อ 3 รอบที่ 1: เจ้าของเครื่องกด "ขอคู่" → ได้รหัส 6 หลัก
+ * ไปแสดงบนหน้าจอเครื่องนั้น ให้เจ้าของเครื่องพิมพ์กลับมา
+ * ยัง "คุมไม่ได้" จนกว่าจะยืนยันเสร็จ
+ */
+router.post('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { code, machine } = await requestPairing(req.params.id, req.user!.id);
+    res.json({ ok: true, code, machine, lanVerified: machine.lanVerified });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/pair error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to start pairing' });
+  }
+});
+
+/** ถอนการยืนยัน LAN (กดผิดไป) — คุมไม่ได้ทันที */
+router.delete('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    await revokeLanPairing(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/agent-machines/:id/pair error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to revoke pairing' });
+  }
+});
+
+/**
+ * ข้อ 3 รอบที่ 2: เครื่องเป้าหมายยืนยันด้วยรหัส
+ * ยืนยันได้เฉพาะผู้ที่ผูกเครื่องนี้ไว้ (ไม่ใช่ SUPERADMIN คนไหนก็ได้)
+ */
+router.post('/:id/pair/confirm', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+  try {
+    const allowed = await userCanControl(req.user!.id, req.params.id);
+    const linked = await listUserIdsForMachine(req.params.id);
+    if (!linked.includes(req.user!.id)) {
+      res.status(403).json({ error: 'คุณไม่ได้ผูกเครื่องนี้ไว้' });
+      return;
+    }
+    const body = (req.body || {}) as { code?: unknown; approve?: unknown };
+    const result = await confirmPairing(req.params.id, {
+      code: typeof body.code === 'string' ? body.code : null,
+      approve: body.approve === false ? false : true,
+    });
+    if (!result.approved) {
+      res.status(400).json({ error: result.reason || 'ยืนยันไม่สำเร็จ', allowed });
+      return;
+    }
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('POST /api/agent-machines/:id/pair/confirm error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to confirm pairing' });
+  }
+});
 
 export default router;

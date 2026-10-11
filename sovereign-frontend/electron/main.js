@@ -2,13 +2,14 @@
 //  Sovereign OS — Desktop Shell
 //  โหลดแบบมีลำดับสำรอง: Dashboard :3000 → Launcher :4100 → หน้า Offline ในตัว
 //  ตรวจสถานะทุก 3 วิ แล้วเด้งไป Dashboard อัตโนมัติเมื่อระบบขึ้น
+//  อัปเดต: ถาม HUB ของเจ้าของก่อน (sovereign-hub.json ข้าง exe) → ไม่ได้ค่อยไป GitHub release
 // ─────────────────────────────────────────────────────────────
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
-const { verifyAsset } = require('./verify-asset');
+const { verifyAsset, sha256File } = require('./verify-asset');
 const { downloadFile } = require('./download');
 
 const DASHBOARD_URL = 'http://localhost:3000';
@@ -250,7 +251,7 @@ function updateTrayMenu() {
     const st = lastStatus;
     const upd = updateInfo;
     const updLabel = (upd && upd.ok && upd.hasUpdate)
-      ? `⬆️ มีเวอร์ชันใหม่ ${upd.latest} (ตอนนี้ v${upd.current}) — เปิดตั้งค่า`
+      ? `⬆️ มีเวอร์ชันใหม่ ${upd.latest} (ตอนนี้ v${upd.current})${upd.source === 'hub' ? ' · จาก HUB' : ''} — เปิดตั้งค่า`
       : 'ตรวจอัปเดต…';
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '🏰 Sovereign OS v' + app.getVersion(), enabled: false },
@@ -320,15 +321,41 @@ function runCmd(cmd, args, timeout = 8000) {
   });
 }
 
-// ── Auto-Update: ตรวจ release จาก GitHub (ไม่พึ่ง dependency ภายนอก) ──
+// ── HUB ของเจ้าของ: เครื่องปลายทางถาม HUB ก่อน แล้วค่อยตกไป GitHub ──
+// ไฟล์ sovereign-hub.json วางไว้ข้าง exe (INSTALL-DESKTOP.cmd เขียนให้จาก join.json ของเครื่องนั้น)
+//   { hubUrl: "http://192.168.1.102:3000", machineToken: "...", machineName: "คอมเครื่องที่ 2" }
+// ไม่มีไฟล์นี้ = พฤติกรรมเดิม (เช็ค GitHub เท่านั้น) — เครื่องที่ไม่ได้อยู่ในวงของเจ้าของไม่พัง
+function readHubConfig() {
+  try {
+    const p = path.join(path.dirname(app.getPath('exe')), 'sovereign-hub.json');
+    if (!fs.existsSync(p)) return null;
+    // เผื่อไฟล์ถูกเขียนโดย PowerShell/โปรแกรมที่ใส่ BOM — JSON.parse กับ BOM จะโยน error
+    const j = JSON.parse(String(fs.readFileSync(p, 'utf8')).replace(/^\uFEFF/, ''));
+    const hubUrl = String(j.hubUrl || '').replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(hubUrl)) return null;
+    return { hubUrl, machineToken: String(j.machineToken || ''), machineName: String(j.machineName || '') };
+  } catch { return null; }
+}
+
+// ── Auto-Update: ตรวจเวอร์ชันจาก HUB ก่อน แล้วจึง GitHub (ไม่พึ่ง dependency ภายนอก) ──
 const https = require('https');
-function fetchJson(url) {
+const httpTransport = require('http');
+
+/** GET JSON ได้ทั้ง http (ในวง LAN) และ https + แนบ header ได้ */
+function fetchJsonAny(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop', Accept: 'application/vnd.github+json' } }, (res) => {
+    const transport = String(url).startsWith('http:') ? httpTransport : https;
+    const req = transport.get(url, { headers: { 'User-Agent': 'SovereignOS-Desktop', ...headers } }, (res) => {
       if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
-      let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
-    }).on('error', reject);
+      let d = ''; res.setEncoding('utf8'); res.on('data', (c) => { d += c; });
+      res.on('error', reject);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject);
   });
+}
+function fetchJson(url) {
+  return fetchJsonAny(url, { Accept: 'application/vnd.github+json' });
 }
 function cmpVer(a, b) {
   const p = (s) => String(s).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
@@ -337,19 +364,39 @@ function cmpVer(a, b) {
   return 0;
 }
 async function checkForUpdates(interactive) {
-  const res = { ok: false, latest: null, current: app.getVersion(), assetUrl: null, hasUpdate: false, error: null, at: Date.now() };
-  try {
-    const rel = await fetchJson('https://api.github.com/repos/' + UPSTREAM_REPO + '/releases/latest');
-    const asset = (rel.assets || []).find((a) => /portable\.exe$/i.test(a.name)) || null;
-    res.ok = true; res.latest = rel.tag_name; res.assetUrl = asset ? asset.browser_download_url : null;
-  } catch (e) { res.error = e.message; }
+  const res = { ok: false, latest: null, current: app.getVersion(), assetUrl: null, hasUpdate: false, error: null, at: Date.now(), source: null, expectedSha: null, assetName: null };
+  // 1) HUB ของเจ้าของก่อน — เครื่องในวง LAN ไม่ต้องรอ release บน GitHub
+  const hub = readHubConfig();
+  if (hub) {
+    try {
+      const m = await fetchJsonAny(
+        hub.hubUrl + '/api/agent-machines/desktop-update/manifest',
+        hub.machineToken ? { 'x-machine-token': hub.machineToken } : {}
+      );
+      if (m && m.version && m.asset && m.asset.name) {
+        res.ok = true; res.source = 'hub'; res.latest = String(m.version);
+        res.assetUrl = hub.hubUrl + '/api/agent-machines/desktop-update/asset';
+        res.assetName = String(m.asset.name);
+        res.expectedSha = String(m.asset.sha256 || '').toLowerCase();
+        dlog('update check: HUB มีเวอร์ชัน', res.latest);
+      }
+    } catch (e) { dlog('hub update check failed (จะลอง GitHub แทน):', e.message); }
+  }
+  // 2) ไม่ได้จาก HUB (ยังไม่เผยแพร่/ติดต่อไม่ได้) → ตกไป GitHub เหมือนเดิม
+  if (!res.ok) {
+    try {
+      const rel = await fetchJson('https://api.github.com/repos/' + UPSTREAM_REPO + '/releases/latest');
+      const asset = (rel.assets || []).find((a) => /portable\.exe$/i.test(a.name)) || null;
+      res.ok = true; res.source = 'github'; res.latest = rel.tag_name; res.assetUrl = asset ? asset.browser_download_url : null;
+    } catch (e) { res.error = e.message; }
+  }
   res.hasUpdate = !!(res.ok && res.latest && cmpVer(res.latest, res.current) > 0);
   updateInfo = res;
   updateTrayMenu();
   for (const w of [win, setupWin]) { try { w && !w.isDestroyed() && w.webContents.send('sovereign:update', res); } catch { /* ignore */ } }
   if (interactive) {
     const msg = !res.ok ? ('ตรวจอัปเดตไม่สำเร็จ: ' + res.error)
-      : res.hasUpdate ? ('มีเวอร์ชันใหม่ ' + res.latest + ' (ตอนนี้ v' + res.current + ')' + (res.assetUrl ? ' — ดาวน์โหลดได้จากหน้าตั้งค่า' : ' — ยังไม่มีไฟล์ติดตั้งใน release'))
+      : res.hasUpdate ? ('มีเวอร์ชันใหม่ ' + res.latest + ' (ตอนนี้ v' + res.current + ')' + (res.source === 'hub' ? ' · จาก HUB' : '') + (res.assetUrl ? ' — ดาวน์โหลดได้จากหน้าตั้งค่า' : ' — ยังไม่มีไฟล์ติดตั้งใน release'))
       : ('ใช้เวอร์ชันล่าสุดแล้ว (v' + res.current + ')');
     try { dialog.showMessageBox(win || undefined, { type: 'info', title: 'Sovereign OS — อัปเดต', message: msg }); } catch { /* ignore */ }
   }
@@ -459,6 +506,24 @@ ipcMain.handle('sovereign:downloadUpdate', async () => {
   const dest = path.join(app.getPath('downloads'), 'Sovereign-OS-' + String(u.latest).replace(/^v/, '') + '-portable.exe');
   try {
     await downloadFile(u.assetUrl, dest);
+    // ── มาจาก HUB: ลายเซ็นอ้างอิงคือ sha256 ใน manifest ของ HUB (fail-closed เหมือนกัน) ──
+    // เหตุผลที่ตรวจได้โดยไม่ต้องมี registry: manifest เดินทางมาก่อนหน้าแล้ว และไฟล์ต้องตรงแฮชที่ประกาศไว้
+    if (u.source === 'hub') {
+      let actual = '';
+      try { actual = (await sha256File(dest)).toLowerCase(); }
+      catch (he) {
+        try { fs.unlinkSync(dest); } catch { /* ignore */ }
+        return { ok: false, message: 'ยกเลิกการติดตั้ง — อ่านไฟล์ที่ดาวน์โหลดไม่ได้ (' + he.message + ')' };
+      }
+      if (!u.expectedSha || actual !== u.expectedSha) {
+        try { fs.unlinkSync(dest); } catch { /* ignore */ }
+        dlog('hub update rejected: hash mismatch');
+        return { ok: false, message: 'ยกเลิกการติดตั้ง — แฮชไม่ตรงกับที่ HUB ประกาศ ลบไฟล์ทิ้งแล้ว' };
+      }
+      shell.openPath(dest);
+      dlog('hub update downloaded + hash verified:', dest);
+      return { ok: true, message: 'ดาวน์โหลดจาก HUB แล้ว และตรวจ SHA-256 ผ่าน — เปิดตัวติดตั้งให้แล้ว (แนะนำปิดโปรแกรมเดิมก่อนติดตั้ง)' };
+    }
     // ด่านความปลอดภัย: ตรวจ SHA-256 ก่อนเปิดรัน — ไม่ผ่าน/ไม่มีลายเซ็นอ้างอิง/ตรวจไม่ได้ = ลบไฟล์ทิ้ง ห้ามเปิด (fail-closed)
     let v;
     try { v = await verifyAsset({ assetUrl: u.assetUrl, dest }); }

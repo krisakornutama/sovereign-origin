@@ -146,16 +146,24 @@ export async function runJob(job, config = {}) {
  * ฟอร์แมตนี้ต้องตรงกับ route POST /api/agent-machines/jobs/:id/screenshot เป๊ะ
  * (ผิดจุดเดียว = ภาพไม่ถึงผู้ใช้) จึงมี e2e เทสต์กับ HTTP server จริงคุมไว้
  *
+ * ⚠️ URL ต้องมี `/` ปิดท้ายเสมอ (7 ต.ค. 69 — วัดผ่าน HUB จริง):
+ *   เครื่องที่ 2 ต่อ HUB ทางหน้าเว็บ :3000 (API :3001 ผูก loopback) ซึ่งเป็น Next ที่ตั้ง
+ *   `trailingSlash: true` ⇒ POST ที่ไม่มี `/` ปิดท้ายโดน **308** แล้ว multipart body มาถึง
+ *   ปลายทางไม่ครบ → `400 {"error":"Unexpected end of form"}` (งานจบ done แต่ภาพหายเงียบ ๆ)
+ *   ยิง path ที่มี `/` ปิดท้ายตรง ๆ = 201 + ภาพขึ้นจริง ⇒ ห้ามพึ่ง redirect เด็ดขาด
+ *
  * throw เมื่อไม่ ok — ให้ caller (pollOnce) จับแล้วไปต่อ ไม่ลากงานให้พัง
  */
 export async function uploadScreenshot({ hubUrl, token, jobId, buffer, fetchImpl = fetch }) {
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: 'image/png' }), 'screenshot.png');
   const base = String(hubUrl ?? '').replace(/\/$/, '');
-  const res = await fetchImpl(`${base}/api/agent-machines/jobs/${jobId}/screenshot`, {
+  const res = await fetchImpl(`${base}/api/agent-machines/jobs/${jobId}/screenshot/`, {
     method: 'POST',
     headers: { 'x-machine-token': token },
     body: form,
+    // ถ้ามี hop ไหนพาไป 308 ให้ล้มทันที (เห็น error ชัด) ดีกว่าส่ง body ไม่ครบแล้วได้ 400 ที่ปลายทาง
+    redirect: 'error',
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

@@ -20,6 +20,38 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 
+  // ── 1b. ควบคุมระยะไกล (เครื่องในเครือข่าย) ──
+  //  เจ้าของสั่ง 11/10/69: ต้องมีเมนู "ควบคุมระยะไกล" ให้เห็นชัด
+  //  รวมของที่เกี่ยวกับการสั่งเครื่องอื่นไว้ที่เดียว: ดูจอ/คุมเครื่อง · สั่งงาน AI · สั่งอัปเดตโค้ด (OTA)
+  {
+    title: '🖥️ ควบคุมระยะไกล',
+    titleKey: 'common.nav.group.remote',
+    items: [
+      {
+        href: '/machine-console',
+        label: 'คอนโซลเครื่อง',
+        labelKey: 'common.nav.machineConsole',
+        icon: 'terminal',
+        keywords:
+          'คอนโทรล ควบคุมระยะไกล คอนโซล เครื่อง เครื่องที่ 2 3 4 ระยะไกล ดูจอ เมาส์ คีย์บอร์ด ไฟล์ ควบคุม remote screen control file terminal ip',
+      },
+      {
+        href: '/agent-queue',
+        label: 'คิวเอเจนต์',
+        labelKey: 'common.nav.agentQueue',
+        icon: 'ai-agent',
+        keywords: 'คิว งาน agent เครื่อง runner dispatch โน้ตบุ๊ค สั่งงาน',
+      },
+      {
+        href: '/ota',
+        label: 'อัปเดตเครื่อง (OTA)',
+        labelKey: 'common.nav.ota',
+        icon: 'ota',
+        keywords: 'อัปเดต เฟิร์มแวร์ ota เครื่องลูก hub สั่งอัปเดต ชุดติดตั้ง',
+      },
+    ],
+  },
+
   // ── 2. ร้านอาหาร (ธุรกิจ) ──
   {
     title: '🏪 ร้านอาหาร',
@@ -123,13 +155,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/learning', label: 'เรียนรู้เอง (Self-Learning)', labelKey: 'common.nav.learning', icon: 'ai', keywords: 'เรียนรู้เอง self-learning data lake พยากรณ์ ทำนาย ai เรียนรู้ต่อ' },
       { href: '/ai', label: 'ศูนย์บัญชาการ AI', labelKey: 'common.nav.ai', icon: 'ai', keywords: 'ai ปัญญาประดิษฐ์ คำสั่ง chat' },
       { href: '/ai-agent', label: 'AI Agent', labelKey: 'common.nav.aiAgent', icon: 'ai-agent', keywords: 'เอเจนต์ บทบาท ตัวแทน ai coding' },
-      { href: '/agent-queue', label: 'คิวเอเจนต์', labelKey: 'common.nav.agentQueue', icon: 'ai-agent', keywords: 'คิว งาน agent เครื่อง runner dispatch โน้ตบุ๊ค สั่งงาน' },
       { href: '/predictive', label: 'พยากรณ์', labelKey: 'common.nav.predictive', icon: 'predictive', keywords: 'พยากรณ์ คาดการณ์ ทำนาย แบตเตอรี่' },
       { href: '/sensors', label: 'อุปกรณ์ & เซ็นเซอร์', labelKey: 'common.nav.sensors', icon: 'sensors', keywords: 'อุปกรณ์ เซ็นเซอร์ sensor device manager ESP32' },
       { href: '/relay', label: 'ควบคุมรีเลย์', labelKey: 'common.nav.relay', icon: 'relay', keywords: 'รีเลย์ ควบคุม สวิตช์ ปั๊มน้ำ ไฟ' },
       { href: '/automation', label: 'ระบบอัตโนมัติ', labelKey: 'common.nav.automation', icon: 'automation', keywords: 'อัตโนมัติ ระบบอัตโนมัติ กฎ' },
       { href: '/energy', label: 'พลังงาน', labelKey: 'common.nav.energy', icon: 'energy', keywords: 'พลังงาน ไฟฟ้า แบตเตอรี่ โซลาร์' },
-      { href: '/ota', label: 'อัปเดต OTA', labelKey: 'common.nav.ota', icon: 'ota', keywords: 'อัปเดต เฟิร์มแวร์ ota' },
       { href: '/infrastructure', label: 'โครงสร้างพื้นฐาน', labelKey: 'common.nav.infrastructure', icon: 'infrastructure', keywords: 'โครงสร้างพื้นฐาน เน็ตเวิร์ก กล้อง น้ำ' },
       { href: '/governance-sim', label: 'จำลองการปกครอง', labelKey: 'common.nav.governanceSim', icon: 'governance', keywords: 'จำลอง การปกครอง สังคม war room' },
     ],

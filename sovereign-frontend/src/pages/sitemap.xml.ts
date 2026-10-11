@@ -34,14 +34,21 @@ function buildXml(host: string): string {
   );
 }
 
-export async function getServerSideProps({ req, res }: GetServerSidePropsContext): Promise<{ props: Record<string, never> }> {
-  const host = String(req.headers.host || '').toLowerCase().split(':')[0];
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=600');
-  res.end(buildXml(host));
-  return { props: {} };
-}
+// หมายเหตุ 11/10/69 (ชุดติดตั้งแอปเดสก์ท็อป): `output: 'export'` ห้ามมี GSSP — หน้าเดียวที่ยังใช้ GSSP
+// เคยทำให้ `npm run electron:build` ตายทั้งชุด (Export encountered an error on /sitemap.xml)
+// แอปเดสก์ท็อปไม่มี request/host ให้ตอบตาม ⇒ ปิด GSSP เฉพาะโหมด static export;
+// เว็บที่ `next start` ยังได้พฤติกรรมตอบตาม host เดิมทุกอย่าง (SOVEREIGN_STATIC_EXPORT ไม่ถูกตั้ง)
+export const getServerSideProps =
+  process.env.SOVEREIGN_STATIC_EXPORT === '1'
+    ? undefined
+    : async function getServerSideProps({ req, res }: GetServerSidePropsContext): Promise<{ props: Record<string, never> }> {
+        const host = String(req.headers.host || '').toLowerCase().split(':')[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=600');
+        res.end(buildXml(host));
+        return { props: {} };
+      };
 
 const SitemapPage: NextPage = () => null;
 

@@ -3,21 +3,35 @@
 ระบบบ้านอัจฉริยะ Sovereign ที่ดูแลตัวเองได้ (Self-Sovereign Home OS) — Security, Resilience, AI และ Telemetry ในชุดเดียว
 ทดสอบ 994/994 tests ผ่าน 100% · core-api รันบน RAM ~220MiB, CPU <0.5%
 
-## 🚀 ติดตั้งภายในคลิกเดียว (One-Click Install)
+## 🚀 ติดตั้งครั้งเดียวใช้งานได้เลย (One-Shot Install)
 
-**ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2)
+**ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2) **+ Node.js 20+**
 
-**Windows (PowerShell):**
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\install\install.ps1
+**Windows — ดับเบิลคลิก:**
+```bat
+tools\install\install.cmd
 ```
 
 **Linux / macOS:**
 ```bash
-bash tools/install/install.sh
+node tools/install/install.mjs
 ```
 
-ตัวติดตั้งจะ: ตรวจ Docker → สร้าง `infra/.env` (สุ่ม secret + admin password ให้อัตโนมัติ) → `docker compose up -d` → รอระบบพร้อม → พิมพ์ URL + รหัสล็อกอิน (บันทึกที่ `infra/.credentials`)
+ตัวติดตั้งครั้งเดียวทำ **ทั้งโปรเจ็ก** ในเทิร์นเดียว: ตรวจ prerequisite → สร้าง env ทุกชั้น (`infra/.env`, `core-api/.env`, `frontend/.env`, `agent-runner/.env` — สุ่ม secret ให้ รันซ้ำไม่ทับค่าเดิม) → `docker compose up -d` → รอ healthy → ตรวจสุขภาพ API จริง → (ถ้า `--with-runner`) ลงทะเบียน scheduled task ของ agent runner แล้วตรวจสอบย้อนหลับด้วย `schtasks /Query` → พิมพ์ URL + รหัสล็อกอิน
+
+### Flags
+
+| Flag | ความหมาย |
+|---|---|
+| `--dry-run` | ดูแผน + .env ที่จะสร้าง (ทุกความลับถูกปิด) โดยไม่ลงมือใด ๆ |
+| `--verify-only` | ตรวจระบบอย่างเดียว ไม่แตะไฟล์/ไม่สั่ง compose |
+| `--with-runner` | ติดตั้ง agent runner + ลงทะเบียน scheduled task บนเครื่องนี้ด้วย |
+| `--with-runner --machine-token=…` | ใส่ token จากหน้า Agent Queue ล่วงหน้า |
+| `--no-frontend` | ข้าม Dashboard (กันชน port 3000) |
+| `--prod` | ใช้ docker-compose.prod.yml (build production images) |
+| `--force` | สร้าง `infra/.env` ใหม่จากเทมเพลต (สำรองไฟล์เก่า .bak) — **รหัส DB เดิมจะเปลี่ยน** |
+
+ตัวติดตั้งเก่า (`install.ps1` / `install.sh`) ยังใช้ได้เหมือนเดิม — ทำเฉพาะส่วน Docker stack
 
 ### Flags
 

@@ -153,13 +153,14 @@ tools/install/*
 !tools/install/install.sh
 !tools/install/install.ps1
 !tools/install/sovereign.env.template
-!tools/sovereign-launcher/
-tools/sovereign-launcher/*
-!tools/sovereign-launcher/go.mod
-!tools/sovereign-launcher/main.go
-!tools/sovereign-launcher/build.ps1
-!tools/sovereign-launcher/web/
-tools/sovereign-launcher/SovereignOS-Setup.exe
+!tools/install/lib.mjs
+!tools/install/install.mjs
+!tools/install/install.cmd
+!tools/agent-pack/
+tools/agent-pack/*
+!tools/agent-pack/pack.mjs
+!tools/agent-pack/setup-machine.mjs
+!tools/agent-pack/SETUP-MACHINE.cmd
 Ollama/
 
 # ── Keys & certificates (เพิ่มเติม) ─────────────
@@ -179,6 +180,11 @@ coverage/
 
 # Next-Gen Security runtime state (app-control blocklist, ids offset, ai analyst report)
 **/core-api/data/
+
+# OTA firmware + cold-storage audit logs (โฟลเดอร์เกิดตอนรัน — โค้ดใช้จริง ห้าม git clean ลบ)
+sovereign-os/core-api/ota_firmwares/
+sovereign-os/infra/ota_firmwares/
+sovereign-os/infra/cold-storage/
 
 # Runtime data (offsite encrypted backups, knowledge uploads) — ไม่ควรเข้าสู่ git
 **/infra/offsite/
@@ -231,6 +237,9 @@ dist-portable/Docker
 
 # ── Desktop overlay experiment copies (ไม่ใช่ของจริง) ──
 dist-portable-copy/
+
+# ── DMS product repo (ย้ายเข้าโปรเจ็ก 10/10/69 — คง .git ของตัวเองไว้ ห้าม git กลืน) ──
+/sovereign-dms/
 
 # ── Secrets / credentials (ห้ามเข้า git เด็ดขาด) ──
 admin-mfa-qr.png

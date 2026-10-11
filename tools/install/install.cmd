@@ -1,0 +1,1 @@
+@echo off & chcp 65001 >nul & where node >nul 2>&1 || (echo [ERROR] Node.js 20+ not found - install it first: https://nodejs.org & pause & exit /b 1) & node "%~dp0install.mjs" %* & if not errorlevel 1 exit /b 0 & echo. & echo [INCOMPLETE] read the "next steps" above - this window stays open & pause & exit /b 1
