@@ -4,6 +4,10 @@
 //   screen.start/fps/stop/snapshot → เปิด/ปรับ/ปิดสตรีมภาพหน้าจอ
 //   input.mouse/key/text           → ฉีดเมาส์/คีย์บอร์ด
 //   fs.*                           → อ่าน/เขียน/ลบไฟล์
+//   update.check                   → บอกว่าเครื่องนี้กับ HUB ต่างเวอร์ชันกันไหม (ไม่แตะไฟล์)
+//   update.apply                   → อัปเดตโค้ดตัวเองจาก HUB แล้วส่งไม้ต่อให้โปรเซสใหม่
+//     (เจ้าของสั่ง 11/10/69: "hub เห็นเครื่อง 2 3 4 แล้วสั่งการให้อัปเดตได้" ⇒ ต้องมีคำสั่งนี้
+//      ไม่ใช่รอให้เครื่องลูกตั้งเวลาอัปเดตเองอย่างเดียว)
 //
 // ทำไม long-poll ไม่ใช่ websocket:
 //   agent-runner ต้อง "ไม่มี dependency ภายนอก" และออกขาออกเท่านั้น ⇒ ใช้ fetch
@@ -14,9 +18,14 @@
 // - หนึ่งรอบ = หนึ่งคำสั่ง แล้วรายงานผลกลับเสมอ (สำเร็จหรือล้ม) — ห้ามเงียบ
 // - HUB ล่ม/เน็ตขาด ต้องวนลองใหม่ ไม่ crash และไม่ทำให้ช่อง AI job ที่มีอยู่พัง
 // - สตรีมภาพต้องหยุดทันทีที่ไม่มีใครดู (ไม่กิน CPU/แบนด์วิดท์ค้าง)
+import { fileURLToPath } from 'node:url';
 import { startScreenStream } from './screen.mjs';
 import { createInputHost } from './input.mjs';
 import { resolveAllowedRoots, runFsCommand, writeFile, readFile } from './fsops.mjs';
+import { selfUpdateOnce } from './selfUpdate.mjs';
+
+/** รากของ runner (โฟลเดอร์ที่มี package.json + src) — ค่าเริ่มต้นของงานอัปเดตโค้ดตัวเอง */
+const DEFAULT_RUNNER_DIR = fileURLToPath(new URL('..', import.meta.url));
 
 /** HUB หน่วงคำตอบได้นานสุดเท่านี้ (ต้อง ≤ เพดานของ HUB) */
 export const POLL_WAIT_MS = 25_000;
@@ -58,6 +67,10 @@ export function createControlClient({
   fsRunner = runFsCommand,
   // ฉีดเข้ามาได้เพื่อให้เทสต์คุมเส้นทาง snapshot ได้โดยไม่ต้องจับจอจริง
   capture = captureOnce,
+  // ตัวอัปเดตโค้ดตัวเอง — ต้องฉีดได้ เพื่อให้เทสต์พิสูจน์เส้นทาง "สั่งอัปเดตจาก HUB" จริง
+  selfUpdate = selfUpdateOnce,
+  // ออกจากโปรเซสหลังรายงานผลแล้ว (ตอนอัปเดตสำเร็จ = ส่งไม้ต่อให้โปรเซสใหม่)
+  exitProcess = (code) => process.exit(code),
   roots,
   onLog = console.log,
   onError = console.error,
@@ -117,6 +130,39 @@ export function createControlClient({
         return { ok: true };
       }
 
+      // ── สั่งอัปเดตโค้ดตัวเองจาก HUB ──
+      // ต้องมี hubUrl/token ของเครื่องนี้ (main.mjs ส่งมาใน config) ไม่งั้นอัปเดตไม่ได้ — บอกตรง ๆ
+      // ไม่เงียบ: คำสั่งที่ทำไม่ได้ต้องรายงานผลกลับเสมอ (HUB รอจน timeout = ผู้ใช้เห็น "คำสั่งไม่ทำงาน")
+      case 'update.check':
+      case 'update.apply': {
+        const hubUrl = String(config.hubUrl ?? '');
+        const token = String(config.token ?? '');
+        if (!hubUrl || !token) {
+          return { ok: false, error: 'ไม่มี hubUrl/token ของเครื่องนี้ — สั่งอัปเดตจาก HUB ไม่ได้' };
+        }
+        const applyNow = command.type === 'update.apply';
+        const out = await selfUpdate({
+          hubUrl,
+          token,
+          dir: config.runnerDir ?? DEFAULT_RUNNER_DIR,
+          apply: applyNow,
+          restart: applyNow,
+          log: (m) => onLog(`[control] ${m}`),
+        });
+        const result = {
+          status: out?.status ?? 'unknown',
+          localVersion: out?.localVersion ?? null,
+          remoteVersion: out?.remoteVersion ?? null,
+          reason: out?.reason ?? null,
+        };
+        return {
+          ok: true,
+          result,
+          // อัปเดตเสร็จและมีโปรเซสใหม่ทำงานแล้ว: รายงานผลก่อน แล้วค่อยออกจากโปรเซสเก่า
+          ...(out?.status === 'restarted' && out?.handoff?.exitCode ? { exitAfterReport: out.handoff.exitCode } : {}),
+        };
+      }
+
       default: {
         if (String(command?.type ?? '').startsWith('fs.')) {
           return await fsRunner(command, { roots: allowedRoots });
@@ -153,6 +199,13 @@ export function createControlClient({
       await hub.reportResult(command.id, outcome);
     } catch (err) {
       onError(`[control] รายงานผลไม่สำเร็จ: ${err?.message || err}`);
+    }
+
+    // อัปเดตตัวเองสำเร็จ = โปรเซสใหม่ทำงานแล้ว · ตัวห่อ (run-runner.cmd) ไม่ต้องเริ่มซ้ำ
+    // ⇒ รายงานผลเสร็จแล้วออกด้วยรหัส handoff (ตัวห่อรู้จักรหัสนี้ = หยุด ไม่วน)
+    if (typeof outcome?.exitAfterReport === 'number') {
+      onLog(`[control] ส่งไม้ต่อให้โปรเซสที่อัปเดตแล้ว — ออกด้วยรหัส ${outcome.exitAfterReport}`);
+      exitProcess(outcome.exitAfterReport);
     }
   };
 

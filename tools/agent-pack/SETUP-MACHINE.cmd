@@ -1,8 +1,7 @@
-@echo off
+@echo off & chcp 65001 >nul
 REM ── ติดตั้งเครื่องนี้เป็น "เครื่องลูก" ของ Sovereign OS — ดับเบิลคลิกไฟล์นี้ ──
 REM ทุกอย่างถูกบันทึกไว้ที่ setup-log.txt ข้างไฟล์นี้ (หน้าต่างปิดไปแล้วก็ย้อนอ่านได้)
 REM ทางออกของสคริปต์มีทางเดียว: :end → pause → exit (ไม่มีทางปิดหน้าต่างหนี)
-chcp 65001 >nul
 setlocal EnableExtensions
 set "HERE=%~dp0"
 cd /d "%HERE%" 2>nul

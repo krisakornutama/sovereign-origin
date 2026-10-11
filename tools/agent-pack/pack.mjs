@@ -22,9 +22,12 @@ export const REPO_ROOT = path.resolve(HERE, '..', '..');
 export const RUNNER_DIR = 'sovereign-os/agent-runner';
 /** ที่เก็บชุดอัปเดตฝั่ง HUB — อยู่ใน volume ที่คอนเทนเนอร์ mount ไว้แล้ว (ไม่ต้องแก้ compose/rebuild) */
 export const UPDATE_DATA_DIR = 'sovereign-os/core-api/data/agent-updates';
-/** ที่ที่ลองเขียนตามลำดับ — รากไดรฟ์มักเขียนไม่ได้ (ต้องเป็นผู้ดูแลระบบ) */
+/** ที่ที่ลองเขียนตามลำดับ — เรียงจาก "ในโปรเจ็ก" ออกไปข้างนอก
+ *  คำสั่งเจ้าของ 10/10/69: ของที่เกี่ยวข้องต้องอยู่กับโปรเจ็ก ไม่กระจายไปรากไดรฟ์/โฟลเดอร์ข้างนอก
+ *  โฟลเดอร์นี้ถูก gitignore ผ่าน pattern "dist-*" แล้ว และ join.json ข้างในมี machine token — ห้าม commit
+ *  สองตัวท้ายคงไว้เป็นทางถอย เผื่อเครื่องที่เขียนในโปรเจ็กไม่ได้ */
 export const OUT_DIR_CANDIDATES = [
-  'E:\\SovereignOS-Machine-Setup',
+  path.join(REPO_ROOT, 'dist-machine-setup'),
   'E:\\My work\\SovereignOS-Machine-Setup',
   path.join(REPO_ROOT, '.freebuff', 'agent-pack-out'),
 ];
@@ -84,6 +87,120 @@ export function bundleFiles(root = REPO_ROOT) {
 export function bundleSource(root, rel) {
   if (rel === 'setup-machine.mjs' || rel === 'SETUP-MACHINE.cmd' || rel === 'run-runner.cmd') return path.join(root, 'tools', 'agent-pack', rel);
   return path.join(root, RUNNER_DIR, rel);
+}
+
+// ── ชุด "ติดตั้งทุกฟังก์ชั่น" (ทั้งโปรเจ็ก) ─────────────────────────────────────
+//
+// เจ้าของสั่ง 11/10/69: "ผมต้องการติดตั้งทุกฟังก์ชั่น" ⇒ ชุดที่ยกไปเครื่องอื่น
+// ต้องมี **ทุกส่วน** ของโปรเจ็ก (เว็บ · API · ฐานข้อมูล · docker · runner · เครื่องมือ · เอกสาร · เฟิร์มแวร์)
+// ไม่ใช่แค่ agent-runner อย่างชุด OTA
+//
+// แต่ยังคัดของที่ "ไม่ควรไปเด็ดขาด" ออกเสมอ:
+//   · ความลับ (.env* ทุกไฟล์) — เครื่องปลายทางสร้างของตัวเองจาก setup-first-time
+//   · ของที่สร้างใหม่ได้ (node_modules · .next · dist · build · __pycache__)
+//   · ข้อมูลรันจริง/สำรอง (backups · logs · data) และไฟล์ชั่วคราว (*.log/*.tmp/*.pid)
+//   · โฟลเดอร์เอาต์พุตของตัวแพ็กเอง (dist-*) — ข้างในมี machine token
+//   · .freebuff (worktree/สถานะของแอป) และ tools/Git (toolchain ประจำเครื่อง ~500MB ไม่ใช่โค้ดโปรเจ็ก)
+//   · โมเดล Ollama (~20GB) — เปิดมาด้วย withOllama เมื่อต้องการจริง ๆ
+
+/** ชื่อโฟลเดอร์/ไฟล์ที่ข้ามเสมอ (ตรงกับ SKIP_NAMES ฝั่ง launcher เพื่อให้สองระบบคัดเหมือนกัน) */
+export const FULL_KIT_SKIP_DIRS = new Set([
+  '.git',
+  '.freebuff',
+  '.next',
+  '.turbo',
+  '.cache',
+  '.playwright-browsers',
+  'node_modules',
+  'backups',
+  'logs',
+  'data',
+  '__pycache__',
+  'build',
+  'dist',
+  'coverage',
+]);
+
+/** ไฟล์นามสกุลที่ไม่ยกไป (บันทึก/ไฟล์ชั่วคราว) */
+export const FULL_KIT_SKIP_EXT = ['.log', '.tmp', '.pid'];
+
+/** ไฟล์ระบบปฏิบัติการที่ไม่มีความหมายบนเครื่องอื่น */
+export const FULL_KIT_SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
+
+/**
+ * เส้น/โฟลเดอร์ที่ข้าม (เทียบกับ path สัมพัทธ์แบบ /)
+ * tools/Git = PortableGit ของเครื่องนี้ · tools/piper = ไบนารีที่แตกจาก piper.zip (ตัว zip ยังไปด้วย)
+ * tools/E-Tipitaka = ชุดข้อมูลภายนอก · dist-* = เอาต์พุตของตัวแพ็ก (มี token)
+ */
+export const FULL_KIT_SKIP_REL = ['tools/Git', 'tools/piper', 'tools/E-Tipitaka'];
+
+/** โฟลเดอร์ที่ข้ามเพราะเป็นเอาต์พุตของตัวแพ็กเอง (ข้างในมี join.json/token) */
+const FULL_KIT_SKIP_REL_PREFIX = ['dist-'];
+
+/**
+ * ชื่อไฟล์ที่เป็น "ความลับของเครื่อง" — ห้ามยกไปเครื่องอื่น
+ * `.env.example` / `.env.sample` / `.env.template` ไม่นับ: เป็นตัวอย่างให้เครื่องใหม่คัดลอกใช้
+ */
+export function isSecretEnvName(name) {
+  if (!name.startsWith('.env')) return false;
+  return !/^\.env\.(example|sample|template)$/i.test(name);
+}
+
+/**
+ * ไฟล์ทั้งโปรเจ็กที่ยกไปกับชุดติดตั้ง (คำนวณจากการเดินบนดิสก์จริง — ไม่ใช่รายการที่จำมา)
+ * @param {string} root repo ของ HUB
+ * @param {{ withOllama?: boolean }} [opts] withOllama = ยกโมเดล Ollama (~20GB) ไปด้วย
+ * @returns {string[]} path สัมพัทธ์แบบ / เรียงตามชื่อ (ใช้เทียบแฮช/ตรวจความครบได้)
+ */
+export function fullKitFiles(root = REPO_ROOT, opts = {}) {
+  const withOllama = opts.withOllama === true;
+  const out = [];
+  const walk = (dir, rel) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // อ่านไม่ได้ (สิทธิ์/ถูกล็อก) = ข้าม ไม่ทำให้ทั้งชุดล้ม
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (FULL_KIT_SKIP_DIRS.has(entry.name)) continue;
+      if (FULL_KIT_SKIP_FILES.has(entry.name)) continue;
+      if (isSecretEnvName(entry.name)) continue; // ความลับห้ามหลุดออกจากเครื่องนี้ (.env.example ผ่านได้)
+      if (!withOllama && childRel === 'Ollama') continue;
+      if (FULL_KIT_SKIP_REL.includes(childRel)) continue;
+      if (FULL_KIT_SKIP_REL_PREFIX.some((p) => childRel.startsWith(p))) continue;
+      if (entry.isDirectory()) {
+        walk(path.join(dir, entry.name), childRel);
+        continue;
+      }
+      if (!entry.isFile()) continue; // symlink/อุปกรณ์ — ไม่ก็อป
+      if (FULL_KIT_SKIP_EXT.includes(path.extname(entry.name).toLowerCase())) continue;
+      out.push(childRel);
+    }
+  };
+  walk(root, '');
+  return out;
+}
+
+/** ที่มาของไฟล์ในชุดทั้งโปรเจ็ก = ตัวไฟล์ใน repo ตรง ๆ (path สัมพัทธ์เท่านั้น) */
+export function fullKitSource(root, rel) {
+  return path.join(root, ...String(rel).split('/'));
+}
+
+/**
+ * สรุปเป็นรายส่วน (โฟลเดอร์บนสุด) — ใช้รายงานว่า "ชุดนี้ครอบคลุมอะไรบ้าง" ให้เจ้าของอ่าน
+ * @returns {Array<{ part: string, files: number }>} เรียงมาก→น้อย
+ */
+export function kitPartSummary(files) {
+  const byPart = new Map();
+  for (const rel of files) {
+    const part = rel.includes('/') ? rel.slice(0, rel.indexOf('/')) : '(ไฟล์ที่รากโปรเจ็ก)';
+    byPart.set(part, (byPart.get(part) ?? 0) + 1);
+  }
+  return [...byPart.entries()]
+    .map(([part, count]) => ({ part, files: count }))
+    .sort((a, b) => b.files - a.files || a.part.localeCompare(b.part));
 }
 
 /**
@@ -201,6 +318,10 @@ export async function runPack({
   token = '',
   force = false,
   dryRun = false,
+  /** fullKit = ยก "ทั้งโปรเจ็ก" ไปเครื่องนั้น (ติดตั้งทุกฟังก์ชั่น) · false = เฉพาะ runner (ชุดเล็กสำหรับ OTA) */
+  fullKit = false,
+  /** withOllama = ยกโมเดล Ollama (~20GB) ไปด้วย (มีผลเมื่อ fullKit) */
+  withOllama = false,
   exec = defaultExec,
   issueCommand = null,
   platform = process.platform,
@@ -229,7 +350,14 @@ export async function runPack({
   plan.push(`HUB_URL ที่จะฝังในชุดติดตั้ง: ${hub}`);
   plan.push(`โฟลเดอร์ปลายทาง (บนเครื่อง HUB): ${target || '(ไม่พบที่ที่เขียนได้ — ใช้ --out=<พาธของคุณ> )'}`);
   if (!outDir) plan.push(`เลือกอัตโนมัติจาก: ${OUT_DIR_CANDIDATES.join(' → ')}`);
-  plan.push(`ไฟล์ที่จะก็อป: ${bundleFiles(root).length} ไฟล์ (จาก ${RUNNER_DIR} — ไม่รวม .env/test)`);
+  // ชุดเต็ม = ทั้งโปรเจ็ก (ทุกฟังก์ชั่น) · ชุดเล็ก = เฉพาะ runner ตามเดิม
+  const fileList = fullKit ? fullKitFiles(root, { withOllama }) : bundleFiles(root);
+  const sourceOf = (rel) => (fullKit ? fullKitSource(root, rel) : bundleSource(root, rel));
+  plan.push(
+    fullKit
+      ? `ไฟล์ที่จะก็อป: ${fileList.length} ไฟล์ — ทั้งโปรเจ็ก (ทุกฟังก์ชั่น)${withOllama ? ' + โมเดล Ollama' : ''} · ไม่รวม .env/ของที่สร้างใหม่ได้`
+      : `ไฟล์ที่จะก็อป: ${fileList.length} ไฟล์ (จาก ${RUNNER_DIR} — ไม่รวม .env/test)`
+  );
   plan.push('ออก token: node scripts/issue-machine-token.ts ผ่าน tsx ของ core-api (ต่อ DB ของ HUB)');
 
   if (dryRun) {
@@ -245,7 +373,7 @@ export async function runPack({
 
   if (!target) {
     add('output', 'fail', 'ไม่พบโฟลเดอร์ปลายทางที่เขียนได้');
-    lines.push('  ✘ เขียนที่รากไดรฟ์ E: ไม่ได้ (ต้องเป็นผู้ดูแลระบบ) — ระบุเองด้วย --out="E:\\ที่ของคุณ" ');
+    lines.push('  ✘ เขียนโฟลเดอร์ปลายทางในโปรเจ็กและที่สำรองไม่ได้ — ระบุเองด้วย --out="E:\\ที่ของคุณ" ');
     return { exitCode: 1, report: render(), plan, bundleDir: "", steps };
   }
   const joinPath = path.join(target, 'join.json');
@@ -282,10 +410,10 @@ export async function runPack({
     add('token', 'warn', 'ใช้ token ที่ผู้ใช้ส่งมา (ไม่เรียก DB)');
   }
 
-  // 2) ก็อปไฟล์
-  const files = bundleFiles(root);
+  // 2) ก็อปไฟล์ (fileList/sourceOf ถูกเลือกตามโหมดตั้งแต่ต้นฟังก์ชัน)
+  const files = fileList;
   for (const rel of files) {
-    const from = bundleSource(root, rel);
+    const from = sourceOf(rel);
     const to = path.join(target, rel);
     if (!fs.existsSync(from)) {
       add('copy', 'fail', `ไม่พบไฟล์ต้นทาง ${from}`);
@@ -295,7 +423,7 @@ export async function runPack({
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
   }
-  add('copy', 'ok', `ก็อป ${files.length} ไฟล์ไป ${target}`);
+  add('copy', 'ok', `ก็อป ${files.length} ไฟล์ไป ${target}${fullKit ? ' (ทั้งโปรเจ็ก)' : ''}`);
 
   // 3) join.json + หน้าคู่มือ
   const join = {
@@ -354,9 +482,12 @@ if (isMain) {
   node tools/agent-pack/pack.mjs --name="ชื่อเครื่องลูก" [options]
 
   --name=..        ชื่อเครื่องที่จะโชว์บนหน้าเว็บ (ค่าเริ่มต้น = ชื่อเครื่องนี้)
-  --out=..         โฟลเดอร์ปลายทางบนเครื่อง HUB (ค่าเริ่มต้น ${DEFAULT_OUT_DIR})
+  --out=..         โฟลเดอร์ปลายทางบนเครื่อง HUB (ค่าเริ่มต้น ${OUT_DIR_CANDIDATES[0]})
   --hub-url=..     ที่อยู่ HUB ที่จะฝังให้เครื่องลูก (ค่าเริ่มต้น = IP ในวง LAN ของเครื่องนี้ :3000)
   --executors=..   executor ของเครื่องลูก เช่น echo หรือ echo,opencode (ค่าเริ่มต้น echo)
+  --full           ยก "ทั้งโปรเจ็ก" ไปด้วย (ติดตั้งทุกฟังก์ชั่น — ไฟล์เยอะกว่า แต่ครบ)
+  --minimal        เฉพาะ agent-runner (ชุดเล็ก — ใช้เมื่อเครื่องนั้นต้องเป็นแค่โหนดรับคำสั่ง)
+  --with-ollama    รวมโมเดล Ollama (~20GB) — ใช้กับ --full
   --token=..       ใช้ token ที่มีอยู่แล้ว (ข้ามการออก token ใหม่)
   --force          แพ็กทับได้ (ออก token ใหม่)
   --dry-run        ดูแผนก่อน ไม่เขียน/ไม่รันอะไร
@@ -371,6 +502,9 @@ if (isMain) {
     token: values.token ?? '',
     force: flags.has('force'),
     dryRun: flags.has('dry-run'),
+    // ดีฟอลต์ของ CLI = ชุดเต็ม (ติดตั้งทุกฟังก์ชั่น) — --minimal ค่อยกลับไปชุดเล็ก
+    fullKit: !flags.has('minimal'),
+    withOllama: flags.has('with-ollama'),
   });
   console.log(out.report);
   process.exitCode = out.exitCode;

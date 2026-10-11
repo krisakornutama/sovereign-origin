@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hardenUpload, handledUpload, resolveInsideRoot, IMAGE_MIME } from '../../lib/harden-upload';
 import { readUpdateManifest, resolveUpdateFile, isSafeRelPath } from '../../services/agent-update.service';
+import { readDesktopManifest, resolveVerifiedDesktopAsset } from '../../services/desktop-update.service';
 import { createHash } from 'node:crypto';
 import {
   prisma,
@@ -64,6 +65,22 @@ const screenshotUpload = hardenUpload({
   mimeAllow: IMAGE_MIME,
 });
 
+/**
+ * IP ล่าสุดที่เครื่องแต่ละตัวติดต่อเข้ามา — เก็บในหน่วยความจำ ไม่แตะ DB
+ *
+ * ทำไมไม่เพิ่มคอลัมน์ในตาราง: การเพิ่มคอลัมน์ต้อง migrate และเครื่องลูกที่อัปเดตโค้ดตัวเองได้
+ * ต้องไม่ค้างรอ migration ของ HUB · เจตนาคือ "เห็นเครื่อง 2 3 4 พร้อม IP เดี๋ยวนี้"
+ * ⇒ ค่าว่างหลังรีสตาร์ท API จนกว่าเครื่องนั้นจะ heartbeat รอบถัดไป (ทุก ~30 วิ)
+ */
+const machineIps = new Map<string, { ip: string; at: number }>();
+
+/** IP ของผู้เรียก — รองรับกรณีผ่าน tunnel/reverse proxy (x-forwarded-for ตัวแรก) */
+function callerIp(req: Request): string {
+  const fwd = String(req.header('x-forwarded-for') || '').split(',')[0].trim();
+  const raw = fwd || req.ip || req.socket?.remoteAddress || '';
+  return raw.replace(/^::ffff:/, '');
+}
+
 /** ดึง machine จาก x-machine-token หรือ Authorization: Bearer <token> */
 async function authenticateMachineToken(req: Request, res: Response): Promise<MachineRow | null> {
   const header = req.header('x-machine-token') || '';
@@ -97,7 +114,13 @@ function requireMachineToken(req: Request, res: Response, next: NextFunction) {
 router.get('/', authenticate, async (_req: Request, res: Response) => {
   try {
     const machines = await listMachines();
-    res.json({ machines });
+    // แนบ IP ที่เห็นล่าสุดจาก heartbeat — หน้า /machine-console ใช้บอกว่าเครื่องอยู่ที่ไหนในวง
+    res.json({
+      machines: machines.map((m) => {
+        const hit = machineIps.get(m.id);
+        return { ...m, ip: hit?.ip ?? null, ipSeenAt: hit ? new Date(hit.at).toISOString() : null };
+      }),
+    });
   } catch (err) {
     console.error('GET /api/agent-machines error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to load machines' });
@@ -338,11 +361,63 @@ router.get('/update/file', async (req: Request, res: Response) => {
   }
 });
 
+// ── ชุดอัปเดต "แอปเดสก์ท็อป" (Electron) — เครื่องปลายทางดึงจาก HUB ──
+// เจ้าของสั่ง 11/10/69: ให้ HUB เป็นแหล่งอัปเดตของแอป (ไม่ต้องรอ GitHub release)
+// เครื่องปลายทางถาม manifest → เห็นว่าใหม่กว่า → ดาวน์โหลดไฟล์เดียว → ตรวจ SHA-256 ก่อนติดตั้ง
+// ตอบ 404 (ไม่ใช่ error) เมื่อ HUB ยังไม่เผยแพร่ — แอปจะตกไปเช็ค GitHub แทนได้
+
+// GET /api/agent-machines/desktop-update/manifest
+router.get('/desktop-update/manifest', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const manifest = readDesktopManifest();
+    if (!manifest) {
+      return res.status(404).json({
+        error: 'no desktop update published',
+        hint: 'ประกอบแอปที่ HUB (BUILD-DESKTOP.cmd) แล้วเผยแพร่ด้วย node PACK-DESKTOP.mjs --publish',
+      });
+    }
+    res.json(manifest);
+  } catch (err) {
+    console.error('GET /api/agent-machines/desktop-update/manifest error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read desktop update manifest' });
+  }
+});
+
+// GET /api/agent-machines/desktop-update/asset — ส่งตัวติดตั้ง (ตรวจแฮชกับ manifest ก่อนส่งทุกครั้ง)
+router.get('/desktop-update/asset', async (req: Request, res: Response) => {
+  try {
+    const machine = await authenticateMachineToken(req, res);
+    if (!machine) return;
+    const found = await resolveVerifiedDesktopAsset();
+    if (!found) return res.status(404).json({ error: 'desktop asset missing or does not match manifest' });
+    res.set({
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(found.entry.size),
+      'Content-Disposition': `attachment; filename="${found.entry.name}"`,
+      'Cache-Control': 'no-store',
+    });
+    // สตรีมไฟล์ — ไฟล์ระดับร้อย MB ห้ามโหลดทั้งก้อนเข้า memory
+    const stream = fs.createReadStream(found.abs);
+    stream.on('error', (err) => {
+      console.error('GET /api/agent-machines/desktop-update/asset stream error:', err.message);
+      res.destroy(err);
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('GET /api/agent-machines/desktop-update/asset error:', err instanceof Error ? err.message : err);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to serve desktop update asset' });
+  }
+});
+
 // POST /api/agent-machines/heartbeat — runner ยืนยันว่ายังออนไลน์
 router.post('/heartbeat', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    // บันทึก IP ทุกครั้งที่เครื่องรายงานตัว — เป็นแหล่งเดียวที่รู้ที่อยู่จริงของเครื่องลูก
+    machineIps.set(machine.id, { ip: callerIp(req), at: Date.now() });
     const updated = await heartbeat(machine.id, String(req.body?.version ?? '') || undefined);
     res.json({ machine: updated });
   } catch (err) {

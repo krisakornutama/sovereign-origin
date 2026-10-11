@@ -1,4 +1,4 @@
-@echo off
+@echo off & chcp 65001 >nul
 REM ── ติดตั้ง Agent Runner ให้รันอัตโนมัติบน Windows ──────────────────
 REM ใช้: คลิกขวา install-runner.cmd → Run as administrator
 REM ต้องมี .env พร้อมแล้ว (copy จาก .env.example แล้วใส่ MACHINE_TOKEN)
