@@ -167,12 +167,61 @@ test('e2e — อัปโหลดภาพหน้าจอเป็น multi
     });
     assert.equal(out.screenshotUrl, '/api/agent-machines/screenshots/x.png');
     assert.equal(received.length, 1);
-    assert.equal(received[0].url, '/api/agent-machines/jobs/j-1/screenshot');
+    assert.equal(received[0].url, '/api/agent-machines/jobs/j-1/screenshot/');
     assert.equal(received[0].token, 'tok-abc');
     assert.match(received[0].ctype, /^multipart\/form-data; boundary=/);
     assert.match(received[0].body, /name="file"/);
     assert.match(received[0].body, /filename="screenshot\.png"/);
     assert.match(received[0].body, /PNGDATA/);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+// red-first (7 ต.ค. 69): วัดจริงผ่าน HUB (:3000 → rewrite → :3001) แล้วพบว่า
+// POST multipart ที่ไม่มี `/` ปิดท้าย → Next (trailingSlash: true) ตอบ 308 → body มาถึงปลายทางไม่ครบ
+// → 400 {"error":"Unexpected end of form"} · งานจบ done แต่ภาพไม่ถึงผู้ใช้ (เงียบด้วย — runner แค่ log)
+// ⇒ อัปโหลดภาพต้องยิง URL สุดท้ายตรง ๆ ไม่พึ่ง redirect
+
+test('e2e — อัปโหลดภาพต้องไม่พึ่ง redirect (เลียนแบบ HUB ที่ 308 POST ไม่มี / ปิดท้าย)', async () => {
+  const hit = [];
+  const server = createServer((req, res) => {
+    hit.push(req.url);
+    if (!req.url.endsWith('/')) {
+      // เลียนแบบ Next ของ HUB: 308 ไป path ที่มี / ปิดท้าย
+      res.writeHead(308, { location: `${req.url}/` });
+      res.end();
+      return;
+    }
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      res.writeHead(201, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, screenshotUrl: '/api/agent-machines/screenshots/x.png' }));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  let init = null;
+  const fetchImpl = (url, opts) => {
+    init = opts;
+    return fetch(url, opts);
+  };
+  try {
+    const out = await uploadScreenshot({
+      hubUrl: `http://127.0.0.1:${port}`,
+      token: 'tok-abc',
+      jobId: 'j-1',
+      buffer: Buffer.from('PNGDATA'),
+      fetchImpl,
+    });
+    assert.equal(out.screenshotUrl, '/api/agent-machines/screenshots/x.png');
+    assert.deepEqual(
+      hit,
+      ['/api/agent-machines/jobs/j-1/screenshot/'],
+      'ต้องยิง URL สุดท้ายตรง ๆ — ของจริง 308 hop ทำให้ multipart มาถึงไม่ครบ (400 Unexpected end of form)',
+    );
+    assert.equal(init?.redirect, 'error', 'ต้องตั้ง redirect:error ให้ล้มทันทีถ้ามี hop พาไป 308 แทนที่จะส่ง body ไม่ครบ');
   } finally {
     await new Promise((r) => server.close(r));
   }
