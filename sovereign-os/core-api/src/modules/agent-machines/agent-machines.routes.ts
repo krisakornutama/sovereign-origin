@@ -57,8 +57,19 @@ import {
   saveJobScreenshot,
   screenshotDir,
 } from '../../services/orchestrator-screenshot.service';
+import {
+  decideEnroll,
+  sanitizeMachineName,
+  normalizeExecutors,
+} from '../../services/machine-enroll.service';
 
 const router = Router();
+
+/**
+ * จำนวนครั้งที่ลงทะเบียนแล้วล้มเหลว ต่อ IP — กันเดารหัสเชิญทีละตัว
+ * เก็บในหน่วยความจำเท่านั้น (พอกันการเดา) ไม่ต้องเขียนลง DB
+ */
+const enrollFailures = new Map<string, number>();
 
 /** hash ของไฟล์ที่ให้บริการ — เทียบกับ manifest ก่อนส่งออกทุกครั้ง (ไฟล์บนดิสก์อาจถูกแก้/หาย) */
 function sha256Hex(buf: Buffer): string {
@@ -419,6 +430,56 @@ router.get('/desktop-update/asset', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('GET /api/agent-machines/desktop-update/asset error:', err instanceof Error ? err.message : err);
     if (!res.headersSent) res.status(500).json({ error: 'Failed to serve desktop update asset' });
+  }
+});
+
+// POST /api/agent-machines/enroll — เครื่องใหม่ขอ token ของตัวเอง
+//
+// เจ้าของสั่ง 11/10/69: "ไฟล์เดียวจบ ไม่ต้องทำทีละเครื่อง"
+//   เดิมต้องออกชุดทีละเครื่องเพื่อฝัง token — ก๊อปชุดเดียวไปหลายเครื่องแล้ว
+//   HUB มองเป็นเครื่องเดียว (ระบุตัวจาก token_hash) ⇒ ทำแบบนี้ใช้ไม่ได้จริง
+//
+// การรักษาความปลอดภัย:
+//   • ไม่ต้องล็อกอิน แต่ต้องมี "รหัสเชิญ" (MACHINE_ENROLL_CODE) — ไม่ตั้ง = ปิดช่องนี้
+//   • เครื่องใหม่ได้ role = USER เสมอ (machine-access.service ข้อ 1) = คุมเครื่องอื่นไม่ได้
+//     ต้องไปผูกเจ้าของ + กดยืนยันในหน้า /machine-console อีกที
+//   • จำกัดครั้งล้มเหลวต่อผู้เรียก และไม่คืนรหัสเชิญกลับในข้อความ error
+router.post('/enroll', async (req: Request, res: Response) => {
+  try {
+    const ip = callerIp(req);
+    const verdict = decideEnroll({
+      expectedCode: process.env.MACHINE_ENROLL_CODE,
+      code: req.body?.code,
+      name: req.body?.name,
+      os: req.body?.os,
+      executors: normalizeExecutors(req.body?.executors),
+      version: req.body?.version,
+      priorFailures: enrollFailures.get(ip) ?? 0,
+    });
+    enrollFailures.set(ip, verdict.failures);
+
+    if (verdict.decision !== 'accepted') {
+      // บันทึกไว้ล้วนๆ (ไม่มีรหัส) เผื่อเจ้าของจะเห็นว่ามีใครแอบลอง
+      console.warn(`POST /api/agent-machines/enroll ปฏิเสธ (${verdict.decision}) จาก ${ip}: ${verdict.reason}`);
+      // ตอบ 404 เมื่อปิดช่องทาง = ไม่บอกว่ามีช่องนี้อยู่จริง
+      const status = verdict.decision === 'disabled' ? 404 : verdict.decision === 'rate_limited' ? 429 : 400;
+      res.status(status).json({ error: verdict.reason, decision: verdict.decision });
+      return;
+    }
+
+    const name = sanitizeMachineName(String(req.body?.name ?? ''));
+    const created = await registerMachine({
+      name,
+      os: String(req.body?.os ?? 'windows'),
+      executors: normalizeExecutors(req.body?.executors),
+      version: String(req.body?.version ?? '') || undefined,
+      note: 'ลงทะเบียนเองผ่านรหัสเชิญ (POST /enroll)',
+    });
+    console.log(`ลงทะเบียนเครื่องใหม่ "${name}" (${created.machine.id}) จาก ${ip} — role เริ่มต้น USER`);
+    res.status(201).json({ id: created.machine.id, name: created.machine.name, token: created.token });
+  } catch (err) {
+    console.error('POST /api/agent-machines/enroll error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to enroll machine' });
   }
 });
 
