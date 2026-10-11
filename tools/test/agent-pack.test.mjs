@@ -133,6 +133,17 @@ test('pickWritableOutDir ต้องคืนที่ที่ "เขีย�
     assert.match(txt, /192\.168\.1\.102:3000/);
     assert.doesNotMatch(txt, /tok-|MACHINE_TOKEN=/i, 'ห้ามฝัง token ลงไฟล์ที่คนอ่าน');
   });
+
+  // เคสจริง 11/10/69: เดิมบอกแค่ "ดับเบิลคลิก SETUP-MACHINE.cmd" แต่ไฟล์อยู่ที่
+  //   tools\agent-pack\SETUP-MACHINE.cmd (ลึก 2 ชั้น) → ผู้ใช้ไล่หาไม่เจอ คิดว่าชุดเสีย
+  test('START-HERE ต้องบอกพาธจริงของ SETUP-MACHINE.cmd (ไม่ใช่แค่ชื่อไฟล์)', () => {
+    const txt = pack.renderStartHere({ machineName: 'เครื่องที่-3', hubUrl: 'http://192.168.1.102:3000' });
+    assert.match(
+      txt,
+      /tools\\agent-pack\\SETUP-MACHINE\.cmd/,
+      'ต้องเขียนพาธเต็มที่ถูกต้อง — ไฟล์ไม่ได้อยู่ระดับบนสุด ถ้าบอกแค่ชื่อไฟล์ผู้ใช้จะหาไม่เจอ',
+    );
+  });
 });
 
 // ── .cmd ต้องไม่ "ปิดหน้าต่างหนี" — ของจริง 9 ต.ค. 69 ผู้ใช้ดับเบิลคลิกแล้วหน้าต่างขึ้นแวบเดียว
