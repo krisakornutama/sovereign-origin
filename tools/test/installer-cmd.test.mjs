@@ -95,7 +95,9 @@ describe('payload ที่รันผ่าน iex (บั๊กข้อ 2, 5
       !/\$Dest\s*=\s*Join-Path\s+\$PSScriptRoot/.test(script),
       'ห้ามใช้ $PSScriptRoot เป็นปลายทางแตกชุด',
     );
-    assert.ok(script.includes("Join-Path $env:SOV_DIR 'SovereignOS'"), 'ต้องแตกข้างไฟล์ .cmd');
+    // ต้องอิง $env:SOV_DIR (โฟลเดอร์ของไฟล์ .cmd) — $PSScriptRoot คือ %TEMP%
+    assert.match(script, /\$installerDir\s*=\s*if \(\$env:SOV_DIR\)/);
+    assert.ok(script.includes("Join-Path $installerDir 'SovereignOS'"), 'ต้องแตกข้างไฟล์ .cmd');
     assert.ok(script.includes('StartsWith($tempFull'), 'ต้องปฏิเสธปลายทางที่อยู่ใน %TEMP%');
   });
 
