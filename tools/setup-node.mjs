@@ -290,7 +290,8 @@ export async function startDockerDesktop({
       'Docker', 'Docker', 'Docker Desktop.exe',
     );
     if (fs.existsSync(exe)) {
-      try { spawn(exe, [], { windowsHide: true, detached: true, stdio: 'ignore' }).unref(); } catch { /* เปิดไม่ได้ = รอต่อแล้วบอก */ }
+      // ห้าม detached: true — ขัดกับ windowsHide แล้ว Docker Desktop เด้งหน้าต่าง (12/10/69)
+    try { spawn(exe, [], { windowsHide: true, stdio: 'ignore' }).unref(); } catch { /* เปิดไม่ได้ = รอต่อแล้วบอก */ }
     }
   }
 

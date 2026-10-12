@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
@@ -99,6 +99,71 @@ describe('machine-health ต้องเฝ้าที่ที่ของจ�
     const m = /MH_OFFSITE_LOG \|\| join\((\w+), 'offsite-log\.jsonl'\)/.exec(src());
     assert.ok(m, 'ต้องมี OFFSITE_LOG');
     assert.equal(m[1], 'LEGACY_BACKUP_DIR', `offsite log ต้องอ่านจาก ${m[1]} — ย้ายตาม DB_BACKUP_DIR ไม่ได้`);
+  });
+});
+
+describe('เครื่องมือที่ระบบพึ่ง ต้องอยู่ใน git (ไม่ใช่ถูก ignore)', () => {
+  // เคสจริง 12/10/69: .gitignore มีบรรทัด "frontend-watchdog.mjs" ทับ whitelist
+  //   ⇒ ไฟล์หายจาก git แต่ Architecture Gate จับได้ตอน verify (ช้าเกินไป)
+  //   และถ้าไม่มี gate: watchdog หาย = เว็บไม่ฟื้นเองหลังเครื่องตาย โดยไม่มีใครรู้
+  const essential = [
+    'tools/frontend-watchdog.mjs',
+    'tools/docker-watchdog.mjs',
+    'tools/machine-health.mjs',
+    'tools/machine-alert.mjs',
+    'tools/verify.mjs',
+    'tools/system-health.mjs',
+  ];
+  for (const f of essential) {
+    test(`${f} ต้องไม่ถูก .gitignore บล็อก`, () => {
+      // check-ignore: exit 0 = ถูก ignore (แย่) · exit 1 = ไม่ถูก ignore (ถูกต้อง)
+      const r = spawnSync('git', ['check-ignore', '-q', f], { cwd: REPO, windowsHide: true });
+      assert.notEqual(r.status, 0, `${f} ถูก .gitignore ตัดทิ้ง — ระบบจะขาดไฟล์นี้เงียบๆ`);
+    });
+  }
+
+  test('.gitignore ต้องไม่มีบรรทัดที่ตัดชื่อไฟล์นี้ทิ้งแบบเปล่าๆ', () => {
+    const text = fs.readFileSync(path.join(REPO, '.gitignore'), 'utf8');
+    const bare = text.split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#') && !l.startsWith('!') && /[\w.-]+\.(mjs|js|ps1)$/.test(l));
+    assert.deepEqual(bare, [], `บรรทัดเหล่านี้ตัดไฟล์เครื่องมือทิ้ง: ${bare.join(', ')}`);
+  });
+
+  test('watchdog ทุกตัวต้องถูก track จริง', () => {
+    const tracked = execFileSync('git', ['ls-files', 'tools/'], { cwd: REPO, encoding: 'utf8' });
+    for (const f of ['tools/frontend-watchdog.mjs', 'tools/docker-watchdog.mjs']) {
+      assert.ok(tracked.includes(f), `${f} ไม่อยู่ใน git — watchdog จะหายเวลาเครื่องรีสตาร์ท`);
+    }
+  });
+});
+
+describe('watchdog ห้ามใช้ detached:true คู่กับ windowsHide (เคสจริง 12/10/69)', () => {
+  // detached บน Windows แปลว่า "สร้าง console ใหม่ให้ลูก" ซึ่งขัดกับ windowsHide
+  //   (ที่แปลว่า "อย่าสร้างหน้าต่าง") ⇒ ได้ console ที่ซ่อนไม่ได้ = หน้าต่างเด้ง
+  //   พิสูจน์แล้วด้วยการฆ่าเซิร์ฟเวอร์แล้วรอ watchdog เปิดใหม่ — ยังเหลือหน้าต่าง
+  //   แก้โดยตัด detached ออก ใช้ stdio:'ignore' + unref() แทน (ยังเบื้องหลังได้)
+  for (const f of ['frontend-watchdog.mjs', 'docker-watchdog.mjs', 'verify.mjs', 'setup-node.mjs']) {
+    test(`${f}: spawn ที่เปิด process ยาวต้องไม่มี detached:true`, () => {
+      const lines = fs.readFileSync(path.join(TOOLS, f), 'utf8').split('\n');
+      lines.forEach((l, i) => {
+        if (l.trim().startsWith('//') || l.trim().startsWith('*') || l.trim().startsWith('//  ')) return;
+        // มองเฉพาะบรรทัดที่มี windowsHide และ spawn/spawnSync จริง
+        if (!/windowsHide/.test(l)) return;
+        assert.ok(
+          !/detached:\s*true/.test(l),
+          `${f}:${i + 1}: detached:true คู่กับ windowsHide → หน้าต่างยังเด้ง\n  ${l.trim().slice(0, 100)}`,
+        );
+      });
+    });
+  }
+
+  test('frontend-watchdog ต้องซ่อนหน้าต่างจริง (windowsHide + stdio ignore)', () => {
+    const text = fs.readFileSync(path.join(TOOLS, 'frontend-watchdog.mjs'), 'utf8');
+    const m = /spawn\('cmd'[\s\S]{0,220}?\}\)\.unref\(\)/.exec(text);
+    assert.ok(m, 'ต้องมีการ spawn เซิร์ฟเวอร์');
+    assert.match(m[0], /windowsHide:\s*true/, 'ต้องมี windowsHide');
+    assert.match(m[0], /stdio:\s*'ignore'/, 'ต้องตัด stdio ไม่ให้ผูกกับ console');
   });
 });
 
