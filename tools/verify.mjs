@@ -173,7 +173,8 @@ function bootProdFrontend(frontendDir) {
   } catch { /* logs เขียนไม่ได้ = บูตต่อ */ }
   const fd = openSync(RESTART_LOG, 'a');
   const child = spawn('cmd', ['/c', 'npm', 'run', 'start', '--', '-p', String(DEV_PORT)], {
-    cwd: frontendDir, detached: true, windowsHide: true, stdio: ['ignore', fd, fd],
+    // ห้าม detached: true — ขัดกับ windowsHide แล้วหน้าต่างยังเด้ง (ดูหมายเหตุข้างบน)
+    cwd: frontendDir, windowsHide: true, stdio: ['ignore', fd, fd],
   });
   child.unref();
   child.on('error', (e) => { try { appendFileSync(RESTART_LOG, `[spawn error] ${e.message}\n`); } catch { /* ignore */ } });
@@ -446,8 +447,11 @@ if (devPidBefore && devIsProd !== false) {
       'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0hide-next-server-window.ps1" -Seconds 5',
     ].join('\r\n');
     writeFileSync(helperPath, helper, 'utf8');
-    // windowsHide: true — ไม่งั้น detached cmd บน Windows เด้งหน้าต่าง console ขึ้นมาทุกรอบ verify (เคสจริง 25/9)
-    const child = spawn('cmd', ['/c', helperPath], { cwd: ROOT, shell: false, detached: true, windowsHide: true, stdio: 'ignore' });
+    // windowsHide: true — ไม่งั้นเด้งหน้าต่าง console ขึ้นมาทุกรอบ verify (เคสจริง 25/9)
+    // ⚠ ห้ามใส่ detached: true — บน Windows detached แปลว่า "สร้าง console ใหม่ให้ลูก"
+    //   ซึ่งขัดกับ windowsHide ⇒ ได้ console ที่ซ่อนไม่ได้ = หน้าต่างยังเด้งอยู่
+    //   (เคสจริง 12/10/69: หน้าต่าง node เด้งทั้งที่ตั้ง windowsHide ไว้แล้ว)
+    const child = spawn('cmd', ['/c', helperPath], { cwd: ROOT, shell: false, windowsHide: true, stdio: 'ignore' });
     child.unref();
     console.log(`\n🔄 ตั้งเวลากู้ dev server หลัง verify จบ 3 วิ (kill PID ${devPidBefore} + เคลียร์ .next + เปิดใหม่ + รอฟังพอร์ตจริง)`);
     console.log('   ถ้ากู้ไม่ขึ้นจะมีข้อความ "[verify-restore] ... ไม่ยอมฟัง :3000" ค้างในหน้าต่าง sovereign-dev');

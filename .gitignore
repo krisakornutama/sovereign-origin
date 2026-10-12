@@ -223,7 +223,10 @@ sovereign-frontend/test-results/
 sovereign-os/core-api/models/*.gguf
 sovereign-os/core-api/models/*.bin
 
-frontend-watchdog.mjs
+# ⚠ เคยตัดไว้ที่นี่ (12/10/69) — ทำให้ tools/frontend-watchdog.mjs หายจาก git
+#   แต่มันคือ watchdog ที่เปิดเว็บหลังเครื่องตาย ซึ่งขาดแล้วระบบจะไม่ฟื้นเอง
+#   และ Architecture Gate จับได้ (tool-files-tracked) — ไม่งั้นจะพังแบบเงียบๆ
+#   whitelist ที่บรรทัด ~124 มีอยู่แล้ว จึงตัดบรรทัดนี้ทิ้ง
 
 # ── Desktop dist (rebuildable — ไม่ commit binaries ใหญ่) ──
 sovereign-frontend/dist-electron/

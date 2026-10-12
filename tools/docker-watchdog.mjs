@@ -93,7 +93,10 @@ if (dockerAlive()) {
     ok = false; detail = `ไม่พบ Docker Desktop exe (${DOCKER_EXE}) — ตรวจตำแหน่งติดตั้ง`;
   } else {
     try {
-      const child = spawn(DOCKER_EXE, [], { detached: true, stdio: 'ignore', windowsHide: true });
+      // ⚠ ห้ามใส่ detached: true — บน Windows detached แปลว่า "สร้าง console ใหม่ให้ลูก"
+      //   ซึ่งขัดกับ windowsHide ⇒ ได้ console ที่ซ่อนไม่ได้ = หน้าต่าง Docker เด้ง
+      //   (เคสจริง 12/10/69 — ยืนยันด้วยการฆ่าแล้วรอ watchdog เปิดใหม่)
+      const child = spawn(DOCKER_EXE, [], { stdio: 'ignore', windowsHide: true });
       child.unref();
     } catch (e) { /* spawn fail = ตัดสินที่ daemon อย่างเดียว */ }
     let up = false; // ประสบการณ์จริง 27/9: daemon กลับมาใน 10–50 วิ — รอได้ถึง 7 นาที
