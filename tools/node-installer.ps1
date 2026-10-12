@@ -66,21 +66,50 @@ Say '==========================================================='
 Say "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] เริ่ม"
 if ($DryRun) { Say '  DRY RUN - จะตรวจอย่างเดียว ไม่แก้อะไร' }
 
-# ── 1) พื้นที่ว่าง ────────────────────────────────────────────────────────
-$root = [System.IO.Path]::GetPathRoot($PSScriptRoot)
+# ── 0) จะติดตั้งไว้ที่ไหน ───────────────────────────────────────────────────
+# ⚠ ต้องหาปลายทาง "ก่อน" ตรวจพื้นที่เสมอ
+#   เคสจริง 12/10/69: เจ้าของวางไฟล์ไว้บน E: แต่โค้ดวัดพื้นที่ที่ $PSScriptRoot
+#   ซึ่งคือ %TEMP% (C:) ⇒ รายงานว่า C: ว่าง 3.5 GB แล้วหยุด ทั้งที่ E: ว่างเพียงพอ
+#   ⇒ เครื่องที่วางไว้ดิสก์ไหน ต้องไปติดตั้งและวัดพื้นที่บนดิสก์นั้นเสมอ
+$installerDir = if ($env:SOV_DIR) { $env:SOV_DIR } else { $PSScriptRoot }
+if (-not $Dest) { $Dest = Join-Path $installerDir 'SovereignOS' }
+$Dest = [System.IO.Path]::GetFullPath($Dest)
+
+# ปฏิเสธปลายทางที่อยู่ใน %TEMP% — Windows ล้างทิ้งเป็นระยะ ข้อมูลจะหายเงียบๆ
+$tempFull = [System.IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+if ($Dest.StartsWith($tempFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+  Die ("ปลายทางอยู่ในโฟลเดอร์ชั่วคราวของ Windows ซึ่งจะถูกล้างทิ้ง:`n    $Dest`n  ย้ายไฟล์ INSTALL-SOVEREIGN-NODE.cmd ไปวางในโฟลเดอร์ที่ถาวรแล้วรันใหม่")
+}
+
+# ── 1) พื้นที่ว่าง — วัดดิสก์ที่ $Dest อยู่จริง ─────────────────────────────────
+$root = [System.IO.Path]::GetPathRoot($Dest)
 $need = 12.0
-try {
-  $drive = Get-PSDrive -Name $root.TrimEnd(':\') -ErrorAction Stop
-  $freeGb = [math]::Round($drive.Free / 1GB, 1)
-} catch { $freeGb = $null }
+function Get-FreeGb([string] $driveName) {
+  try {
+    $d = Get-PSDrive -Name $driveName -ErrorAction Stop
+    return [math]::Round($d.Free / 1GB, 1)
+  } catch { return $null }
+}
+$freeGb = Get-FreeGb ($root.TrimEnd(':\'))
 
 if ($null -eq $freeGb) {
-  Say "  ! อ่านพื้นที่ว่างไม่ได้ - ข้ามการตรวจ (ต้องมีอย่างน้อย $need GB)"
+  Say "  ! อ่านพื้นที่ว่างของ $root ไม่ได้ - ข้ามการตรวจ (ต้องมีอย่างน้อย $need GB)"
 } elseif ($freeGb -lt $need) {
-  Say "  X พื้นที่ว่าง $freeGb GB - ต้องมีอย่างน้อย $need GB"
-  Die "เครื่องนี้พื้นที่ไม่พอสำหรับระบบ (ต้อง $need GB เหลือให้ของเดิมด้วย)"
+  Say "  X พื้นที่ว่างบน ${root} เหลือ $freeGb GB - ต้องมีอย่างน้อย $need GB"
+  # บอกให้เลือกดิสก์ได้ทันที แทนที่จะปล่อยให้เดา
+  $others = Get-PSDrive -PSProvider FileSystem |
+    Where-Object { $_.Free -gt 0 -and $_.Root.TrimEnd(':') -ne $root.TrimEnd(':') } |
+    ForEach-Object { "     $($_.Root) ว่าง $([math]::Round($_.Free/1GB,1)) GB" }
+  if ($others) {
+    Say '  ดิสก์อื่นบนเครื่องนี้:'
+    $others | ForEach-Object { Say $_ }
+    Say '  วิธีแก้: ย้ายไฟล์ INSTALL-SOVEREIGN-NODE.cmd ไปวางบนดิสก์ที่ว่างพอ แล้วดับเบิลคลิกใหม่'
+  } else {
+    Say '  วิธีแก้: ลบของเก่าออกจนได้อย่างน้อย ' + $need + ' GB แล้วรันใหม่'
+  }
+  Die "พื้นที่บน $root ไม่พอสำหรับระบบ (ต้อง $need GB เหลือให้ของเดิมด้วย)"
 } else {
-  Say "  OK พื้นที่ว่าง $freeGb GB (ต้อง $need GB)"
+  Say "  OK พื้นที่ว่างบน ${root} $freeGb GB (ต้อง $need GB)"
 }
 
 # ── 2) ติดตั้ง Node.js ถ้ายังไม่มี ────────────────────────────────────────
@@ -109,7 +138,7 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
 
 # ── 3) ถาม HUB + ดาวน์โหลด ────────────────────────────────────────────────
 if (-not $HubUrl) {
-  $preset = Join-Path $PSScriptRoot 'install-node.txt'
+  $preset = Join-Path $installerDir 'install-node.txt'
   if (Test-Path $preset) {
     $txt = Get-Content $preset -Raw -Encoding utf8
     if ($txt -match '(?m)^\s*HUB_URL\s*=\s*(.+)$') { $HubUrl = $Matches[1].Trim() }
@@ -121,20 +150,6 @@ if (-not $HubUrl) {
 }
 $HubUrl = $HubUrl.TrimEnd('/')
 if ($HubUrl -notmatch '^https?://') { Die "ที่อยู่ HUB ไม่ถูกต้อง: $HubUrl" }
-
-# ── จะแตกชุดไว้ที่ไหน ────────────────────────────────────────────────────
-# ⚠ เคสจริง 12/10/69: ค่าเริ่มต้นเดิมใช้ $PSScriptRoot ซึ่งคือ %TEMP% (ที่ดาวน์โหลดสคริปต์)
-#   ⇒ ชุดทั้งหมด ~11 GB (รวม Docker) ไปอยู่ใน C:\...\Temp ซึ่ง Windows ล้างทิ้งเป็นระยะ
-#   และดิสก์ C: ที่เจ้าของมีพื้นที่น้อยที่สุด — ผิดกฎของโครงการด้วย
-#   ⇒ ต้องอยู่ข้างไฟล์ .cmd ที่คนก๊อปมา (รู้ตำแหน่งแน่นอน เห็นง่าย ลบง่าย)
-if (-not $Dest) { $Dest = Join-Path $env:SOV_DIR 'SovereignOS' }
-$Dest = [System.IO.Path]::GetFullPath($Dest)
-
-# ปฏิเสธปลายทางที่อยู่ใน %TEMP% — ข้อมูลจะหายเมื่อ Windows ล้างไฟล์ชั่วคราว
-$tempFull = [System.IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
-if ($Dest.StartsWith($tempFull, [System.StringComparison]::OrdinalIgnoreCase)) {
-  Die ("ปลายทางอยู่ในโฟลเดอร์ชั่วคราวของ Windows ซึ่งจะถูกล้างทิ้ง:`n    $Dest`n  ย้ายไฟล์ INSTALL-SOVEREIGN-NODE.cmd ไปวางในโฟลเดอร์ที่ถาวรแล้วรันใหม่ (เช่น D:\Sovereign)")
-}
 
 Say "  HUB : $HubUrl"
 Say "  จะติดตั้งไว้ที่: $Dest"

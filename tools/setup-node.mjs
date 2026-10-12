@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -109,15 +109,61 @@ export const REQUIRED_TOOLS = [
 
 // ── ตัวรันคำสั่ง (ฉีดได้ในเทสต์) ────────────────────────────────────────
 
+/**
+ * ตัวรันคำสั่ง — ส่งผลลัพธ์ออกทาง onOutput ขณะทำงาน
+ *
+ * ⚠ เคสจริง 12/10/69: เดิมใช้ execFile ซึ่งผูก stdout/stderr เป็น pipe
+ *   คนใช้จะเห็นแค่บรรทัดเดียว แล้วหน้าต่างเงียบไป 40 นาที
+ *   (npm ci 5 นาที · next build 3 นาที · docker pull ~5.2 GB 30-40 นาที)
+ *   คนคิดว่าค้าง แล้วกดปิด — งานทั้งหมดเสียเปล่า
+ *   ⇒ ต้องสตรีมขึ้นจอทีละบรรทัดตอนรันจริง
+ *
+ * คง return shape เดิม {code, stdout, stderr} ไว้ เทสต์เดิมจึงไม่พัง
+ * จำกัดบัฟเฟอร์ที่เก็บไว้ที่ท้ายสุด 64 KB — docker pull ผลิต log หลักพันบรรทัด
+ * ถ้าเก็บทั้งหมดจะกินหน่วยความจำเครื่องเป้าหมายจนพัง
+ */
+const CAPTURE_TAIL_BYTES = 64 * 1024;
+
+/** เก็บท้ายสุดไว้ N ไบต์ (ตัดจากหน้า) — ใช้กันบัฟเฟอร์บวม */
+function appendCapped(buf, text) {
+  buf.chunks.push(text);
+  let len = buf.bytes + Buffer.byteLength(text);
+  while (buf.chunks.length > 1 && len > CAPTURE_TAIL_BYTES) {
+    const dropped = buf.chunks.shift();
+    len -= Buffer.byteLength(dropped);
+  }
+  buf.bytes = len;
+  return buf.chunks.join('');
+}
+
 export function defaultExec(cmd, args, opts = {}) {
+  const { onOutput, ...rest } = opts;
   return new Promise((resolve) => {
-    execFile(cmd, args, { windowsHide: true, maxBuffer: 4 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-      resolve({
-        code: err ? (typeof err.code === 'number' ? err.code : 1) : 0,
-        stdout: String(stdout ?? ''),
-        stderr: String(stderr ?? ''),
-      });
+    const child = spawn(cmd, args, { windowsHide: true, ...rest });
+    const outBuf = { chunks: [], bytes: 0 };
+    const errBuf = { chunks: [], bytes: 0 };
+    let settled = false;
+    const done = (code) => {
+      if (settled) return;
+      settled = true;
+      resolve({ code, stdout: outBuf.chunks.join(''), stderr: errBuf.chunks.join('') });
+    };
+    child.stdout?.on('data', (d) => {
+      const s = String(d);
+      appendCapped(outBuf, s);
+      if (onOutput) onOutput(s);
     });
+    child.stderr?.on('data', (d) => {
+      const s = String(d);
+      appendCapped(errBuf, s);
+      if (onOutput) onOutput(s);
+    });
+    // ไฟล์ไม่มี / สั่งไม่ได้ → ห้ามค้าง ให้คืนค่าเหมือนคำสั่งล้ม
+    child.on('error', (err) => {
+      appendCapped(errBuf, String(err?.message ?? err));
+      done(1);
+    });
+    child.on('close', (code) => done(typeof code === 'number' ? code : 1));
   });
 }
 
@@ -131,7 +177,8 @@ export async function checkTools(tools = REQUIRED_TOOLS, exec = defaultExec) {
   const out = [];
   for (const t of tools) {
     const [bin, ...rest] = String(t.probe).split(' ');
-    const r = await exec(bin, rest);
+    // เครื่องมือที่ต้องการแค่ "มี/ไม่มี" = ไม่ต้องโชว์ผลลัพธ์ (docker info ยาวเป็นสิบบรรทัด)
+    const r = await exec(bin, rest, { onOutput: null });
     out.push({ ...t, ok: r.code === 0, installed: r.code === 0 ? (r.stdout || '').trim().split('\n')[0] : '' });
   }
   return out;
@@ -207,8 +254,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
  * (ขั้นถัดไปขึ้นกับขั้นก่อนหน้าเสมอ เช่นยังไม่มี Docker ก็ยัง start ไม่ได้)
  */
 export async function runSetup(opts = {}) {
-  const exec = opts.exec ?? defaultExec;
+  const baseExec = opts.exec ?? defaultExec;
   const log = opts.log ?? console.log;
+  // ทุกคำสั่งที่ยาวต้อง "หายใจ" ออกทางจอขณะรัน มิฉะนั้นคนเห็นหน้าค้าง
+  //   แล้วกดปิด = เสียเวลาทั้งวัน (เคสจริง 12/10/69)
+  const sink = opts.onOutput ?? ((text) => log(String(text).replace(/\s+$/, '')));
+  const exec = (cmd, args, o = {}) =>
+    baseExec(cmd, args, { ...o, onOutput: 'onOutput' in o ? o.onOutput : sink });
   const home = opts.homedir ?? os.homedir();
   const kitDir = opts.kitDir ?? ROOT;
   // dry-run = รายงานว่าจะทำอะไร แต่ไม่แตะอะไรเลย
@@ -333,25 +385,28 @@ export async function runSetup(opts = {}) {
     // ไม่มี lockfile = npm ci ใช้ไม่ได้ (ต้องไป install) — บอกชัดแทนที่จะล้มเงียบๆ
     const lock = fs.existsSync(path.join(dir, 'package-lock.json'));
     const cmd = lock ? 'ci' : 'install';
-    step(`dependency ${path.basename(dir)}`, 'warn', `กำลัง npm ${cmd} (อาจใช้เวลาหลายนาที) · รุ่น ${pkg.version ?? '?'}`);
+    step(`dependency ${path.basename(dir)}`, 'warn', `กำลัง npm ${cmd} (3-6 นาที · ยังไม่ค้าง) · รุ่น ${pkg.version ?? '?'}`);
+    const t0 = Date.now();
     const r = await exec('npm', [cmd, '--no-audit', '--no-fund'], { cwd: dir, timeout: 20 * 60 * 1000 });
+    const secs = Math.round((Date.now() - t0) / 1000);
     if (r.code !== 0 || !fs.existsSync(nm)) {
-      step(`dependency ${path.basename(dir)}`, 'fail', `npm ${cmd} ล้ม (exit ${r.code}) — ต้องมีอินเทอร์เน็ต`);
+      step(`dependency ${path.basename(dir)}`, 'fail', `npm ${cmd} ล้ม (exit ${r.code}) — ต้องมีอินเทอเน็ต`);
       return finish(false, 45);
     }
-    step(`dependency ${path.basename(dir)}`, 'ok', 'ติดตั้งแล้ว');
+    step(`dependency ${path.basename(dir)}`, 'ok', `ติดตั้งแล้ว (${secs} วิ)`);
   }
 
   // 7) เริ่มระบบ (ฐานข้อมูล + API + เว็บ)
-  if (wouldDo('เริ่มระบบ', 'รัน start-sovereign.bat (ดึง Docker หลาย GB — ใช้เวลานาน)')) {
+  if (wouldDo('เริ่มระบบ', 'รัน start-sovereign.bat (ดึง Docker ~5 GB — 30-45 นาที ไม่ต้องกลัวค้าง)')) {
     return finish(true, 0); // dry-run จบตรงนี้ ไม่ต้องไปข้างล่าง
   }
+  const tStart = Date.now();
   const started = await runBatch(path.join(kitDir, RUNTIME_FILES.startSystem), exec);
   if (!started.ok) {
     step('เริ่มระบบ', 'fail', started.reason);
     return finish(false, 5);
   }
-  step('เริ่มระบบ', 'ok', 'ฐานข้อมูล + API + เว็บ ทำงานแล้ว');
+  step('เริ่มระบบ', 'ok', `ฐานข้อมูล + API + เว็บ ทำงานแล้ว (${Math.round((Date.now() - tStart) / 60000)} นาที)`);
 
   // 8) ลงทะเบียนกับ HUB — หลังระบบขึ้น ไม่งั้นเครื่อง ghost ที่ไม่มีงาน
   // ⚠ setup-machine.mjs อยู่ใน tools/agent-pack ไม่ใช่ agent-runner
