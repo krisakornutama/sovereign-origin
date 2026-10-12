@@ -176,6 +176,36 @@ export function missingRequired(files, required = REQUIRED_IN_KIT) {
   return required.filter((r) => !set.has(r));
 }
 
+/** BOM = 3 ไบต์ EF BB BF */
+const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
+
+/**
+ * วางสคริปต์ตัวติดตั้งไฟล์เดียวลงในโฟลเดอร์ที่ HUB เสิร์ฟ
+ *
+ * ต้องเติม UTF-8 BOM เสมอ: PowerShell 5.1 (ของที่มากับ Windows) อ่านไฟล์ .ps1
+ *   ที่ไม่มี BOM เป็น ANSI ตาม codepage ของเครื่อง → ข้อความไทยกลายเป็นตัวยึกยือ
+ *   (เจอจริงในโปรเจกต์นี้ — ทางแก้คือ BOM + [Console]::OutputEncoding)
+ *
+ * @returns {{name: string, sha256: string, size: number} | null}
+ */
+export function stageBootstrap(filesDir, srcRel = 'tools/node-installer.ps1') {
+  const src = path.join(ROOT, srcRel);
+  if (!fs.existsSync(src)) {
+    console.error(`[build-node-kit] ไม่พบ ${srcRel} — ตัวติดตั้งไฟล์เดียวจะใช้ไม่ได้`);
+    return null;
+  }
+  const body = fs.readFileSync(src);
+  const out = Buffer.concat([UTF8_BOM, body]);
+  const name = 'install-node.ps1';
+  const abs = path.join(filesDir, name);
+  fs.writeFileSync(abs, out);
+  return {
+    name,
+    sha256: crypto.createHash('sha256').update(out).digest('hex'),
+    size: out.length,
+  };
+}
+
 function sha256File(abs) {
   const h = crypto.createHash('sha256');
   const s = fs.readFileSync(abs); // ตอนแตกจะเป็นก้อนเดียว — ขนาดระดับสิบ MB
@@ -247,12 +277,17 @@ async function main() {
   const assetAbs = path.join(filesDir, assetName);
 
   say('');
-  say('[1/3] คัดลอกไฟล์ + บีบอัด (อาจใช้เวลาหลายนาที) ...');
+  say('[1/4] คัดลอกไฟล์ + บีบอัด (อาจใช้เวลาหลายนาที) ...');
   makeZip(files, assetAbs);
 
   const stat = fs.statSync(assetAbs);
   say(`      ได้ ${assetName} · ${mb(stat.size)}`);
-  say('[2/3] คำนวณ sha256 ...');
+
+  // สคริปต์ตัวติดตั้งไฟล์เดียว — ไฟล์ .cmd ที่คนก๊อปไปจะโหลดชิ้นนี้มาก่อน
+  say('[2/4] วางสคริปต์ตัวติดตั้งไฟล์เดียว (bootstrap) ...');
+  const bootstrap = stageBootstrap(filesDir);
+
+  say('[3/4] คำนวณ sha256 ...');
   const sha256 = sha256File(assetAbs);
 
   // enrollmentOpen = HUB ตั้ง MACHINE_ENROLL_CODE ไว้แล้วหรือยัง
@@ -270,12 +305,13 @@ async function main() {
     version,
     generatedAt: new Date().toISOString(),
     asset: { name: assetName, sha256, size: stat.size },
+    bootstrap,
     entrypoint: 'SETUP-NODE.cmd',
     enrollmentOpen,
     notes: `ไฟล์ ${files.length.toLocaleString('en-US')} · Ollama: ${WITH_OLLAMA ? 'รวม' : 'ไม่รวม'}`,
   };
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
-  say('[3/3] เขียน manifest.json แล้ว');
+  say('[4/4] เขียน manifest.json แล้ว');
 
   say('');
   say(PUBLISH
@@ -283,6 +319,8 @@ async function main() {
     : '  ✅ ประกอบแล้ว (ยังไม่เผยแพร่) — เพิ่ม --publish เพื่อให้เครื่องใหม่ดึงได้');
   say(`     enrollmentOpen = ${enrollmentOpen}${enrollmentOpen ? '' : '  (ยังไม่ได้ตั้ง MACHINE_ENROLL_CODE ที่ HUB)'}`);
   say(`     sha256 = ${sha256.slice(0, 16)}…`);
+  if (bootstrap) say(`     bootstrap = ${bootstrap.name} · ${bootstrap.size} bytes · ${bootstrap.sha256.slice(0, 16)}…`);
+  else say('     bootstrap = ไม่มี (ตัวติดตั้งจะใช้ได้แค่ .cmd รุ่นเก่า)');
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

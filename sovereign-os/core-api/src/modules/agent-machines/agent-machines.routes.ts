@@ -65,6 +65,7 @@ import {
 import {
   readNodeKitManifest,
   resolveVerifiedNodeKitAsset,
+  resolveVerifiedBootstrap,
   nodeKitManifestForClient,
 } from '../../services/node-kit.service';
 
@@ -461,6 +462,38 @@ router.get('/node-kits/manifest', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('GET /api/agent-machines/node-kits/manifest error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read node kit manifest' });
+  }
+});
+
+// GET /api/agent-machines/node-kits/bootstrap — สคริปต์ตัวติดตั้งไฟล์เดียว (~10 KB)
+//
+// ไฟล์ .cmd ที่คนก๊อปไปเครื่องใหม่ต้องเป็น ASCII ล้วน (ข้อความไทวงใน .cmd ทำให้
+//   cmd.exe พัง — เจอจริง 10/10/69 ทั้งโปรเจกต์) แต่ข้อความที่คนอ่านต้องเป็นไทย
+//   ⇒ ตัว .cmd จึงโหลดสคริปต์ชิ้นนี้มารันแทน (UTF-8) แล้วค่อยดึงชุดติดตั้งตาม
+router.get('/node-kits/bootstrap', async (_req: Request, res: Response) => {
+  try {
+    const found = await resolveVerifiedBootstrap();
+    if (!found) {
+      res.status(404).json({ error: 'installer script missing or does not match manifest' });
+      return;
+    }
+    res.set({
+      // UTF-8 เท่านั้น — สคริปต์นี้มีข้อความไทย (ต่างจาก .cmd ที่ต้อง ASCII)
+      'Content-Type': 'application/octet-stream; charset=utf-8',
+      'Content-Length': String(found.entry.size),
+      'Cache-Control': 'no-store',
+      // ถ้าไฟล์ .cmd ถูกแก้ ให้ที่อยู่คำโทษไม่ข้ามผ่าน proxy ขององค์กร
+      'X-Content-Type-Options': 'nosniff',
+    });
+    const stream = fs.createReadStream(found.abs);
+    stream.on('error', (err) => {
+      console.error('GET node-kits/bootstrap stream error:', err.message);
+      res.destroy(err);
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error('GET /api/agent-machines/node-kits/bootstrap error:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'Failed to read node kit bootstrap' });
   }
 });
 
