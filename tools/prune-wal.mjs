@@ -141,7 +141,7 @@ const q = spawnSync(
   'docker',
   ['exec', 'sovereign-db', 'psql', '-U', 'sovereign', '-d', 'sovereign', '-t', '-A', '-F', '|',
     '-c', 'SELECT failed_count, last_archived_wal FROM pg_stat_archiver'],
-  { encoding: 'utf8' },
+  { windowsHide: true, encoding: 'utf8' },
 );
 const line = (q.stdout || '').split('\n').find((l) => /\|/.test(l));
 if (line) {

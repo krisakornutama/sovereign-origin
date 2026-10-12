@@ -53,7 +53,7 @@ const runStartedAt = new Date().toISOString(); // ใช้ตรวจว่า
 // (แรมต่ำ → OOM exit 134 · ดิสก์เต็ม → build พัง · docker ล่ม → เทส/e2e ล้มหรือถูกข้าม)
 let machine = { ok: true, problems: [], info: {} };
 try {
-  const mh = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], {
+  const mh = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 90_000,
     // ห้าม shell:true กับ path absolute ที่มีเว้นวรรค — shell ตัดที่ช่องว่าง → "Cannot find module 'E:\\My'"
     // (บั๊กแฝงจาก phase4a-c: ยังไม่เคยรันจริงเพราะ commit หลังตี 2 — machine-alert มาพิสูจน์ให้เห็นก่อน)
@@ -86,7 +86,7 @@ if (!backend.up) {
   console.log('⚠️  backend :3001 ไม่ตอบ — บูต docker stack ก่อน (ไม่งั้น e2e จะถูกข้ามเงียบ)');
   const infra = join(REPO, 'sovereign-os', 'infra');
   const up = spawnSync('docker', ['compose', '-f', join(infra, 'docker-compose.yml'), 'up', '-d'],
-    { cwd: infra, encoding: 'utf8', timeout: 300_000 });
+    { windowsHide: true, cwd: infra, encoding: 'utf8', timeout: 300_000 });
   backend.startedByUs = true;
   backend.up = await backendAlive(180_000);
   if (!backend.up) {
@@ -100,7 +100,7 @@ try {
   // E2E_REQUIRE_BACKEND=1 = e2e ห้ามถูกข้ามเงียบ (ถ้า backend ตายกลางทาง = ต้อง fail ให้เห็น ไม่ใช่รายงานผ่าน)
   const script = backend.up ? 'verify:full' : 'verify';
   console.log(`▶ gate: npm run ${script}${backend.up ? ' (e2e บังคับรัน)' : ' (e2e ไม่รวม — backend ไม่ขึ้น)'}`);
-  const r = spawnSync('npm', ['run', script], {
+  const r = spawnSync('npm', ['run', script], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 30 * 60_000, shell: true,
     env: backend.up ? { ...process.env, E2E_REQUIRE_BACKEND: '1' } : process.env,
   });
@@ -116,7 +116,7 @@ try {
 //  รัน --strict เพื่อให้ exit code สะท้อนผลจริง แต่ไม่มีวันทำ nightly พัง: ผลแค่ไปโชว์ในรายงาน
 let indexnow = null;
 {
-  const r = spawnSync('node', [join(REPO, 'tools', 'indexnow-shop-notify.mjs'), '--strict'], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'indexnow-shop-notify.mjs'), '--strict'], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 120_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -128,7 +128,7 @@ let indexnow = null;
 // ── SEO pre-flight: ทุก URL ใน sitemap ยัง 200 + title/description/canonical ครบไหม (2/10/69) ──
 let seo = null;
 {
-  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'seo-preflight.mjs'), '--strict'], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'seo-preflight.mjs'), '--strict'], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 180_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -142,7 +142,7 @@ let seo = null;
 //  ซึ่ง seo-preflight มองไม่เห็นเพราะมันไม่รู้ว่า Google เข้ามาแล้วหรือยัง
 let gsc = null;
 {
-  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'gsc-coverage.mjs'), '--strict'], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'gsc-coverage.mjs'), '--strict'], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 120_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -162,7 +162,7 @@ if (process.env.NIGHTLY_SKIP_RESTORE === '1') {
   console.log('⏭ ข้ามการพิสูจน์ backup (NIGHTLY_SKIP_RESTORE=1)');
   restore = { ok: null, skipped: true, last: 'ข้าม (NIGHTLY_SKIP_RESTORE=1)' };
 } else {
-  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'backup-restore-check.mjs'), '--strict'], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'backup-restore-check.mjs'), '--strict'], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 900_000,
   });
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -253,7 +253,7 @@ try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 // ── สรุป Telegram (สคริปต์แยก — soft-fail) — เก็บ output ไว้พิสูจน์เสมอ (ส่ง/skip/พลาด) ──
 // NIGHTLY_REPORT_DRY=1 = พิมพ์ข้อความลง report.log แต่ไม่ส่งจริง (ใช้ตอนทดสอบระบบ = ไม่ต้องกวนเจ้าของตอนตี 2)
 const rep = spawnSync('node', [join(REPO, 'tools', 'nightly-report.mjs'), STATUS,
-  ...(process.env.NIGHTLY_REPORT_DRY === '1' ? ['--dry'] : [])], { cwd: REPO, encoding: 'utf8' });
+  ...(process.env.NIGHTLY_REPORT_DRY === '1' ? ['--dry'] : [])], { windowsHide: true, cwd: REPO, encoding: 'utf8' });
 writeFileSync(join(LOGDIR, 'report.log'), `${rep.stdout ?? ''}\n${rep.stderr ?? ''}`);
 // process.exitCode ไม่ใช่ process.exit: บน Node 24/Windows การ exit ทันทีหลัง fetch
 // (health check ข้างบน) ทำให้ libuv assert → Task Scheduler ได้ 127 แม้งานผ่านจริง

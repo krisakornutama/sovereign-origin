@@ -32,7 +32,7 @@ const children = [];
 const procs = [];
 
 function start(name, cmd, args, cwd, env, waitForPort) {
-  const child = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { windowsHide: true, cwd, env: { ...process.env, ...env }, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
   const tag = `[${name}]`;
   child.stdout.on('data', (d) => process.stdout.write(String(d).split('\n').filter(Boolean).map((l) => `${tag} ${l}`).join('\n') + '\n'));

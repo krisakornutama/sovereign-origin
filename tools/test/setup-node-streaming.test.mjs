@@ -50,8 +50,14 @@ describe('defaultExec — สตรีมผลลัพธ์ขณะรัน
 
   test('คืนค่า shape เดิม {code, stdout, stderr} — เทสต์เดิมต้องไม่พัง', async () => {
     const r = await defaultExec('cmd.exe', ['/c', 'echo hello'], { onOutput: null });
-    assert.deepEqual(Object.keys(r).sort(), ['code', 'stderr', 'stdout']);
+    // เพิ่ม timedOut ตั้งแต่แก้เรื่อง timeout — ของเดิมต้องยังอยู่ครบ
+    //   (โค้ดเดิมไม่บอกว่าหมดเวลาหรือล้ม ผู้เรียกตัดสินใจผิด)
+    assert.deepEqual(Object.keys(r).sort(), ['code', 'stderr', 'stdout', 'timedOut']);
+    for (const k of ['code', 'stdout', 'stderr']) {
+      assert.ok(k in r, `ของเดิม ${k} ต้องยังอยู่`);
+    }
     assert.equal(r.code, 0);
+    assert.equal(r.timedOut, false);
     assert.match(r.stdout, /hello/);
   });
 

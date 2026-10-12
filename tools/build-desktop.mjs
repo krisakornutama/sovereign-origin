@@ -105,7 +105,7 @@ for (const name of ['app.asar', 'app.asar.unpacked']) {
 if (!skipSidecar) {
   if (!existsSync(path.join(CORE_API, 'dist', 'server.js'))) {
     log('ไม่มี core-api/dist — build ก่อน (npm run build ใน sovereign-os/core-api)');
-    const r = spawnSync('npm', ['run', 'build'], { cwd: CORE_API, stdio: 'inherit', shell: true });
+    const r = spawnSync('npm', ['run', 'build'], { windowsHide: true, cwd: CORE_API, stdio: 'inherit', shell: true });
     if (r.status !== 0) die('core-api build ล้มเหลว');
   }
   const sidecar = [

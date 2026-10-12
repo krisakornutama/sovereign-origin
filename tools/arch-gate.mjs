@@ -33,7 +33,7 @@ const problems = [];
 const reports = [];
 
 function sh(cmd, opts = {}) {
-  return execSync(cmd, { encoding: 'utf8', cwd: ROOT, ...opts }).trim();
+  return execSync(cmd, { windowsHide: true, encoding: 'utf8', cwd: ROOT, ...opts }).trim();
 }
 
 // ── 1) schema-sync: model ทั้งสอง schema ต้องตรงกัน ──
@@ -270,7 +270,7 @@ function checkToolFilesTracked() {
   }
   let tracked;
   try {
-    tracked = new Set(execSync('git ls-files tools/', { cwd: ROOT, encoding: 'utf8', timeout: 15_000 })
+    tracked = new Set(execSync('git ls-files tools/', { windowsHide: true, cwd: ROOT, encoding: 'utf8', timeout: 15_000 })
       .split('\n').map((l) => l.trim()).filter(Boolean).map((p) => p.replace(/^tools\//, '')));
   } catch {
     reports.push('tool-files-tracked: ข้าม (git ไม่ตอบ)');
