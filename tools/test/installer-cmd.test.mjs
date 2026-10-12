@@ -137,6 +137,34 @@ describe('ลูปแยกอาร์กิวเมนต์ (บั๊ก�
   });
 });
 
+describe('สิทธิ์ผู้ดูแลระบบ (บั๊กข้อ 8 — winget ติดตั้ง Docker ไม่ได้)', () => {
+  test('ต้องขอสิทธิ์ผู้ดูแลก่อนทำอะไรทั้งหมด', () => {
+    const netAt = lines.findIndex((l) => l.trim() === 'net session >nul 2>&1');
+    const pwAt = lines.findIndex((l) => l.includes('ReadAllText($f)'));
+    assert.ok(netAt > 0, 'ต้องตรวจสิทธิ์ด้วย net session');
+    assert.ok(pwAt > 0, 'ต้องมีบรรทัด payload');
+    assert.ok(netAt < pwAt, 'ต้องขอสิทธิ์ก่อนเข้า payload');
+    assert.ok(lines[netAt + 1].includes('goto :isadmin'), 'ต้องข้ามถ้าเป็นผู้ดูแลอยู่แล้ว');
+  });
+
+  test('ต้องยกระดับสิทธิ์ด้วย RunAs และส่งอาร์กิวเมนต์ต่อไปด้วย', () => {
+    assert.ok(body.includes('-Verb RunAs'), 'ต้องยกระดับด้วย RunAs');
+    // อาร์กิวเมนต์ถูกส่งผ่าน process ยกระดับใหม่ — environment ของเดิมไม่ตามไป
+    assert.ok(body.includes("-ArgumentList '%*'"), 'ต้องส่ง %* ไปกับ process ที่ยกระดับ');
+  });
+
+  test('ต้องมีทางเลือกไม่มีอาร์กิวเมนต์ด้วย (ไม่งั้น -ArgumentList ว่างพัง)', () => {
+    assert.ok(body.includes('if "%*"=="" goto :elevate_noargs'), 'ต้องแยกกรณีไม่มีอาร์กิวเมนต์');
+    assert.ok(lines.includes(':elevate_noargs'));
+  });
+
+  test('สคริปต์ .ps1 ต้องบอกชัดว่าต้อง Run as administrator', () => {
+    const script = fs.readFileSync(path.join(REPO, 'tools', 'node-installer.ps1'), 'utf8');
+    assert.match(script, /IsInRole/, 'ต้องตรวจสิทธิ์ใน .ps1 ด้วย (เข้าทางอื่นก็ต้องรู้)');
+    assert.match(script, /Run as administrator/, 'ต้องบอกวิธีแก้เป็นภาษาคน');
+  });
+});
+
 describe('บล็อก if / echo (บั๊กข้อ 4 — cmd นับ ) เป็นตัวปิดบล็อก)', () => {
   test('ห้ามมีวงเล็บในบรรทัด echo ใดๆ', () => {
     const bad = lines.filter((l) => /^\s*echo\b/i.test(l) && /[()]/.test(l));
@@ -161,7 +189,10 @@ describe('เทสต์รวม — รันไฟล์จริงแบ�
       t.skip('ยังไม่ได้สร้างไฟล์ตัวติดตั้ง');
       return;
     }
+    // ถ้า process นี้ไม่มีสิทธิ์ผู้ดูแล = ทดสอบ "การขอสิทธิ์" แทน (UAC ตอบไม่ได้ในเทสต์)
+    //   ข้ามการยกระดับด้วย SOV_NO_ELEVATE เพื่อให้ .ps1 ตรวจสิทธิ์และบอกผลตามจริง
     let out = '';
+    let code = 0;
     try {
       out = execFileSync('cmd.exe', ['/c', f, '-DryRun'], {
         cwd: REPO,
@@ -169,12 +200,19 @@ describe('เทสต์รวม — รันไฟล์จริงแบ�
         input: '',
         timeout: 5 * 60 * 1000,
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, SOV_NO_ELEVATE: '1' },
       });
     } catch (err) {
+      code = err.status ?? 1;
       // pause ไม่มีคนกด → cmd คืนค่า 0 แต่ stdout ต้องบอกว่า DRY RUN จบ
       out = String(err.stdout ?? '') + String(err.stderr ?? '');
     }
-    assert.match(out, /DRY RUN จบ|ไม่ได้แก้อะไร/, `ผลลัพธ์ไม่คาดหวัง:\n${out.slice(0, 900)}`);
+    assert.match(
+      out,
+      /DRY RUN จบ|ไม่ได้แก้อะไร|Run as administrator/,
+      `ผลลัพธ์ไม่คาดหวัง:\n${out.slice(0, 900)}`,
+    );
     assert.ok(!/รันซ้ำหนึ่งครั้งหลังติดตั้ง Node\.js/.test(out), 'ไม่ควรไปติดตั้ง Node ซ้ำ');
+    void code;
   });
 });

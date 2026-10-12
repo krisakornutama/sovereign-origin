@@ -144,6 +144,27 @@ export function buildCmdHead() {
     'chcp 65001 >nul 2>&1',
     'setlocal EnableExtensions DisableDelayedExpansion',
     '',
+    // ── ขอสิทธิ์ผู้ดูแลระบบก่อนทุกอย่าง ──────────────────────────────────
+    // เคสจริง 12/10/69: winget ติดตั้ง Docker Desktop ไม่ได้
+    //   "The installer will request to run as administrator" → ตัวติดตั้งรันไม่มีสิทธิ์
+    //   winget ล้ม exit 1 แล้วตัวติดตั้งบอก "ติดตั้งเองแล้วรันซ้ำ" ทั้งที่คนไม่รู้ว่าต้องกดอะไร
+    //   ⇒ ขอสิทธิ์เองตั้งแต่ต้น คนกดดับเบิลคลิกครั้งเดียวเหมือนเดิม
+    //   (ยังจำเป็นอีกจุด: ตั้งงานตัด WAL ด้วย schtasks ก็ต้องใช้สิทธิ์)
+    'net session >nul 2>&1',
+    'if not errorlevel 1 goto :isadmin',
+    // ข้ามการยกระดับได้เฉพาะตอนทดสอบเท่านั้น
+    //   ปลอดภัยเพราะ .ps1 ยังตรวจสิทธิ์อยู่เสมอ — ข้ามแค่ "การขอ" ไม่ได้ข้าม "การบังคับ"
+    'if defined SOV_NO_ELEVATE goto :isadmin',
+    'echo.',
+    'echo   Opening with administrator permission ...',
+    'if "%*"=="" goto :elevate_noargs',
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath \'%~f0\' -ArgumentList \'%*\' -Verb RunAs"',
+    'exit /b 0',
+    ':elevate_noargs',
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath \'%~f0\' -Verb RunAs"',
+    'exit /b 0',
+    ':isadmin',
+    '',
     // ส่งโฟลเดอร์ของตัวเองไปให้ payload ใช้
     //   $PSScriptRoot ใช้ไม่ได้ เพราะ payload รันผ่าน iex ซึ่งไม่มี script file
     //   (เจอตอนรันครั้งแรก — "Cannot bind argument to parameter 'Path'")
