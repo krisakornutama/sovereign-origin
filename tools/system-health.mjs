@@ -11,7 +11,7 @@ const REPO = process.env.HEALTH_REPO || 'krisakornutama/sovereign-origin';
 const PROD_SITEMAP = 'https://krisakornutama.github.io/project-sovereign/sitemap.xml';
 const gh = (args) =>
   new Promise((resolve) => {
-    execFile('gh', ['api', ...args], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
+    execFile('gh', ['api', ...args], { windowsHide: true, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
       resolve(err ? null : stdout),
     );
   });

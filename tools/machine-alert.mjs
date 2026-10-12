@@ -17,6 +17,8 @@ import { spawnSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// สวิตช์เปิด/ปิดของเจ้าของ — ปิดไว้เป็นค่าเริ่มต้น (12/10/69)
+import { readConfig as readAlertConfig } from './machine-alert.config.mjs';
 
 // REPO จากไฟล์ (ไฟล์อยู่ tools/ → ขึ้น 2 ชั้น) — แบบเดียวกับ nightly-verify (บั๊ก path เคยเกิดแล้ว)
 function dirname1(p) {
@@ -27,12 +29,21 @@ const REPO = dirname1(dirname1(fileURLToPath(import.meta.url)));
 const STATEDIR = join(REPO, 'logs', 'machine-alert');
 const STATE = join(STATEDIR, 'state.json');
 const DRY = process.argv.includes('--dry');
-const COOLDOWN_MS = Number(process.env.MA_COOLDOWN_MIN ?? 60) * 60_000;
+// ⚠ ต้องสั่ง "ส่ง" ถึงจะส่ง — เจ้าของสั่ง 12/10/69:
+//   "ถ้ามันต้องรันจริง ๆ ให้รันจากการที่ผมสั่งการ ไม่ใช่รันเองอัตโนมัติ"
+//   ⇒ งานตั้งเวลา (ทุก 10 นาที) ยังตรวจสุขภาพได้ แต่ไม่ส่งออกจนกว่าจะสั่ง
+//   คำสั่งส่งเอง:  node tools/alerts.mjs now     (หรือ tools/machine-alert.mjs --send)
+const SEND = process.argv.includes('--send');
+// cooldown มาจากไฟล์ตั้งค่า (ปรับได้โดยไม่ต้องแก้โค้ด) — ตัวแปรแวดล้อยัง override ได้
+const alertCfgGlobal = readAlertConfig();
+const COOLDOWN_MS = Number(
+  process.env.MA_COOLDOWN_MIN ?? (alertCfgGlobal.enabled ? alertCfgGlobal.cooldownMin : 0),
+) * 60_000;
 
 // ── 1) ตรวจสุขภาพเครื่อง (สคริปต์เดียวกับ nightly ใช้ — ความจริงชุดเดียว) ──
 let health = null;
 try {
-  const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs'), ...process.argv.slice(1)], {
+  const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs'), ...process.argv.slice(1)], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 90_000,
     // ห้าม shell:true — path repo มีเว้นวรรค ("E:/My work/...") shell ตัดที่ช่องว่าง → "Cannot find module 'E:\\My'"
     // (บั๊กจริงตอนทดสอบรอบแรก — args array ไม่มี shell เข้า CreateProcess ตรง ปลอดภัยกับเว้นวรรค)
@@ -49,7 +60,7 @@ const criticals = health.problems.filter((p) => p.level === 'critical');
 // ops-status เขียน data/ops-status.json (ผล task scheduler + nightly ที่ container/เว็บมองไม่เห็นเอง)
 if (process.argv.includes('--snapshot')) {
   try {
-    spawnSync('node', [join(REPO, 'tools', 'ops-status.mjs'), '--snapshot'], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
+    spawnSync('node', [join(REPO, 'tools', 'ops-status.mjs'), '--snapshot'], { windowsHide: true, cwd: REPO, encoding: 'utf8', timeout: 120_000 });
   } catch { /* snapshot พัง = หน้าเว็บข้อมูลเก่ากว่านิดเดียว ไม่กระทบการแจ้งเตือน */ }
 }
 // I0a (28/9/69): frontend-watchdog — :3000 ล่ม/แขวน = ชุบกลับเองทุกรอบ Machine Watch
@@ -77,7 +88,7 @@ function dbCreds() {
   try {
     const out = execSync(
       `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
-      { encoding: 'utf8', timeout: 20_000 }
+      { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
     ).split('\n').map((l) => l.trim()).filter(Boolean);
     const creds = { token: out[0] ?? '', chatId: out[1] ?? '' };
     if (creds.token && creds.chatId) {
@@ -117,7 +128,7 @@ function flushPending() {
   try {
     const lines = readFileSync(PENDING, 'utf8').split('\n').filter(Boolean);
     for (const line of lines) {
-      try { execSync(insertEventSql(JSON.parse(line)), { encoding: 'utf8', timeout: 20_000, stdio: 'pipe' }); }
+      try { execSync(insertEventSql(JSON.parse(line)), { windowsHide: true, encoding: 'utf8', timeout: 20_000, stdio: 'pipe' }); }
       catch { left.push(line); }
     }
   } catch { return; }
@@ -126,7 +137,7 @@ function flushPending() {
 function recordEvent(rec) {
   if (DRY) return;
   try {
-    execSync(insertEventSql(rec), { encoding: 'utf8', timeout: 20_000, stdio: 'pipe' });
+    execSync(insertEventSql(rec), { windowsHide: true, encoding: 'utf8', timeout: 20_000, stdio: 'pipe' });
   } catch (err) {
     queuePending(rec);
     console.log('จด alert_events ไม่สำเร็จ — เข้าคิวรอ flush (soft-fail):', err instanceof Error ? err.message.split('\n')[0] : err);
@@ -176,7 +187,20 @@ const ctx = `แรมว่าง ${health.info?.ramFreeGB ?? '?'}GB · ดิ�
 const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── 6) ส่ง + จด ──
-const canSend = Boolean(token && chatId) && !DRY;
+// ⚠ สวิตช์เปิด/ปิดของเจ้าของ (12/10/69): ปิดไว้เป็นค่าเริ่มต้น
+//   เพราะ "ส่งข้อมูลหลาย ๆ อย่างโดยที่ยังไม่ได้จริง บางทีมันก็รก"
+//   ปิดแล้วยังตรวจสุขภาพอยู่เหมือนเดิม และยังจด alert_events ไว้ครบ
+//   เปิดกลับ: node tools/alerts.mjs on
+const alertCfg = readAlertConfig();
+// ต้องเป็นจริงทั้ง 3 ข้อ: เจ้าของสั่งส่ง + สวิตช์เปิด + มี creds
+const canSend = Boolean(token && chatId) && !DRY && alertCfg.enabled && SEND;
+const suppressedReason = !SEND ? 'not-requested' : !alertCfg.enabled ? 'alerts-off' : null;
+if (!canSend && (toSend.length || toRecover.length) && !DRY) {
+  const why = !SEND
+    ? 'ยังไม่มีคำสั่งส่ง (งานอัตโนมัติไม่ส่งโดยตั้งใจ)'
+    : 'สวิตช์ปิดอยู่';
+  console.log(`ไม่ส่ง Telegram (${toSend.length} เรื่องรอ) — ${why} · สั่งเอง: node tools/alerts.mjs now`);
+}
 
 for (const { problem, repeat } of toSend) {
   const key = `machine:${problem.area}`;
@@ -195,14 +219,21 @@ for (const { problem, repeat } of toSend) {
     }
     console.log(sent ? `ส่ง Telegram แล้ว: ${title}` : `Telegram ส่งไม่สำเร็จ 3 ครั้ง — จะลองใหม่รอบถัดไป (ไม่มาร์ค state)`);
   } else {
-    console.log(`${DRY ? '[dry] ' : 'ไม่มี Telegram creds — '}จะส่ง: ${title}\n${text}`);
+    // บอกเหตุผลจริง — เดิมพิมพ์ "ไม่มี creds" ทั้งที่อาจเป็นเพราะสวิตช์ปิด
+    //   (ทำให้ตอนแก้ปัญหาไปคนละทาง เคสจริง 12/10/69)
+    const why = suppressedReason === 'alerts-off'
+      ? 'สวิตช์ปิดอยู่'
+      : DRY ? '[dry]' : 'ไม่มี Telegram creds';
+    console.log(`${why} — จะส่ง: ${title}\n${text}`);
   }
   recordEvent({
     severity: 'critical', eventKey: key, title, detail: `${problem.message} (${ctx})`,
-    sent, suppressed: sent ? null : (DRY ? 'dry' : (canSend ? 'send-failed' : 'no-creds')),
+    sent, suppressed: sent ? null : (suppressedReason ?? (DRY ? 'dry' : (canSend ? 'send-failed' : 'no-creds'))),
   });
   // มาร์คเฉพาะเมื่อส่งถึงจริง — ส่งไม่ออก = รอบถัดไป (10 นาที) ลองใหม่ทันที ไม่ติด cooldown
   // (บั๊กจริง 25 ก.ย.: เคยมาร์คทั้งที่ส่งไม่ออก → alert หายเงียบเป็นชั่วโมง)
+  // ⚠ ปิดสวิตช์อยู่ = ห้ามมาร์คเด็ดขาด มิฉะนั้นเปิดกลับมาแล้วจะไม่ส่งซ้ำเลย
+  //   เพราะ "ส่งแล้ว" ทั้งที่ยังไม่เคยส่ง (เคสจริง 12/10/69 ที่เจ้าของเปิด-ปิดเอง)
   if (!DRY && sent) state.alerts[key] = new Date().toISOString();
 }
 
@@ -215,9 +246,10 @@ for (const { area, lastSent } of toRecover) {
   if (canSend) {
     try { sent = await sendTelegram(token, chatId, text); } catch { /* soft-fail */ }
   }
-  console.log(`${sent ? 'ส่ง' : DRY ? '[dry] จะส่ง' : 'จะส่ง'} recovery: ${title}`);
-  recordEvent({ severity: 'info', eventKey: key, title, detail: `หายจากวิกฤต (${mins} นาที) (${ctx})`, sent, suppressed: sent ? null : (DRY ? 'dry' : 'no-creds') });
-  if (!DRY) delete state.alerts[key];
+  console.log(`${sent ? 'ส่ง' : suppressedReason === 'alerts-off' ? 'สวิตช์ปิดอยู่ — จะส่ง' : DRY ? '[dry] จะส่ง' : 'จะส่ง'} recovery: ${title}`);
+  recordEvent({ severity: 'info', eventKey: key, title, detail: `หายจากวิกฤต (${mins} นาที) (${ctx})`, sent, suppressed: sent ? null : (suppressedReason ?? (DRY ? 'dry' : 'no-creds')) });
+  // ปิดสวิตช์อยู่ = อย่าลบ state ไม่งั้นเปิดกลับมาจะไม่รู้ว่าเคยวิกฤตอะไร
+  if (!DRY && alertCfg.enabled) delete state.alerts[key];
 }
 
 if (!DRY) writeFileSync(STATE, JSON.stringify(state, null, 2) + '\n');

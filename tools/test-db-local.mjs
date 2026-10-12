@@ -39,7 +39,7 @@ const log = (msg) => console.log(`[test-db] ${msg}`);
 const fail = (msg) => { console.error(`[test-db] ✗ ${msg}`); process.exit(1); };
 
 function sh(cmd, opts = {}) {
-  return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', cwd: ROOT, ...opts }).trim();
+  return execSync(cmd, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', cwd: ROOT, ...opts }).trim();
 }
 function shOk(cmd) {
   try { sh(cmd); return true; } catch { return false; }
@@ -123,7 +123,7 @@ if (await fwdHealthy()) {
 log(`push schema → ${TEST_DB} (สร้างอัตโนมัติถ้ายังไม่มี)`);
 const pushUrl = fwdUrl;
 {
-  const push = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], {
+  const push = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], { windowsHide: true,
     cwd: API, stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32',
     env: { ...process.env, DATABASE_URL: pushUrl },
   });
@@ -146,7 +146,7 @@ const TEST_TMPDIR = path.join(API, '.dbtest-tmp');
 fs.mkdirSync(TEST_TMPDIR, { recursive: true });
 
 log(`รัน ${TESTS.length} ไฟล์เทส (RUN_DB_TESTS=1, --test-concurrency=1)`);
-const test = spawnSync('npx', ['tsx', '--test', '--test-concurrency=1', ...TESTS], {
+const test = spawnSync('npx', ['tsx', '--test', '--test-concurrency=1', ...TESTS], { windowsHide: true,
   cwd: API,
   stdio: 'inherit',
   shell: process.platform === 'win32',

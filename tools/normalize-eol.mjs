@@ -22,7 +22,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHECK_ONLY = process.argv.includes('--check');
 const SKIP_BIG = 8 * 1024 * 1024; // asset ใหญ่ผิดปกติ = ไม่ต้องอ่านทั้งก้อน
 
-const files = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
+const files = execFileSync('git', ['ls-files', '-z'], { windowsHide: true, cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
   .toString('utf8').split('\0').filter(Boolean);
 
 // git เป็นเจ้าของการตัดสินว่าไฟล์ไหน "เป็นข้อความ" — อ่านครั้งเดียวทั้งชุด (check-attr รับ --stdin)
@@ -31,7 +31,7 @@ const files = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64
 const attrInfo = new Map();
 {
   const raw = execFileSync('git', ['check-attr', '-z', 'text', 'eol', '--stdin'],
-    { cwd: ROOT, input: files.join('\0') + '\0', maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+    { windowsHide: true, cwd: ROOT, input: files.join('\0') + '\0', maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
   const parts = raw.split('\0').filter((s) => s !== '');
   let i = 0;
   while (i < parts.length) {
@@ -70,7 +70,7 @@ if (CHECK_ONLY && changed.length) {
   process.exitCode = 1;
 } else if (changed.length) {
   // stat cache ของ git ยังจำไฟล์เก่าอยู่ → add+reset เพื่อล้าง (เนื้อหาใน index ไม่เปลี่ยน)
-  execFileSync('git', ['add', '-A'], { cwd: ROOT, stdio: 'ignore' });
-  execFileSync('git', ['reset', '-q'], { cwd: ROOT, stdio: 'ignore' });
+  execFileSync('git', ['add', '-A'], { windowsHide: true, cwd: ROOT, stdio: 'ignore' });
+  execFileSync('git', ['reset', '-q'], { windowsHide: true, cwd: ROOT, stdio: 'ignore' });
   console.log('✅ โฟลเดอร์ทำงานเป็น LF ทั้งหมดแล้ว (ตรวจซ้ำด้วย: node tools/normalize-eol.mjs --check)');
 }

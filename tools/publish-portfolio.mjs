@@ -33,7 +33,7 @@ const sanitizeErr = (e) => String((e && e.message) || e)
   .replace(/Authorization: Basic [A-Za-z0-9+/=]+/g, 'Authorization: Basic ***')
   .replace(/\/\/[^/@\s]*@/g, '//***@/');
 const authed = (dir, ...a) => {
-  try { return execFileSync('git', ['-C', dir, ...ghAuthArgs, ...a], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim(); }
+  try { return execFileSync('git', ['-C', dir, ...ghAuthArgs, ...a], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim(); }
   catch (e) { throw new Error(sanitizeErr(e)); }
 };
 

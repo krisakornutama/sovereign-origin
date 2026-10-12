@@ -226,7 +226,7 @@ function makeZip(files, outAbs) {
       fs.copyFileSync(f.abs, dest);
     }
     const ps = `Compress-Archive -Path '${tmp}\\*' -DestinationPath '${outAbs}' -Force`;
-    const r = spawnSync('powershell.exe', ['-NoProfile', '-Command', ps], { encoding: 'utf8' });
+    const r = spawnSync('powershell.exe', ['-NoProfile', '-Command', ps], { windowsHide: true, encoding: 'utf8' });
     if (r.status !== 0) die(`บีบอัดไม่สำเร็จ (exit ${r.status}): ${r.stderr || r.stdout}`);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

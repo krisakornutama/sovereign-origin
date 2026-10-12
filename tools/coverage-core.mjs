@@ -87,7 +87,7 @@ console.log('\n✅ วัดเสร็จ — รายงานเต็ม: 
 if (args.includes('--no-floor')) {
   console.log('ℹ️  ข้าม coverage floor (--no-floor)');
 } else {
-  const floor = spawnSync('node', [join(ROOT, 'coverage-floor.mjs')], { stdio: 'inherit', shell: process.platform === 'win32' });
+  const floor = spawnSync('node', [join(ROOT, 'coverage-floor.mjs')], { windowsHide: true, stdio: 'inherit', shell: process.platform === 'win32' });
   if (floor.status !== 0) {
     console.error('\n❌ coverage floor ไม่ผ่าน — gate แดง (ยก baseline ด้วย node tools/coverage-floor.mjs --update เมื่อถอยเพราะตั้งใจ)');
     process.exit(1);

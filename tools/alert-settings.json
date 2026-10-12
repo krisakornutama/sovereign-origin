@@ -1,0 +1,5 @@
+{
+  "enabled": false,
+  "minLevel": "critical",
+  "cooldownMin": 120
+}

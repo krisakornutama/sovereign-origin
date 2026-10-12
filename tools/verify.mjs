@@ -69,7 +69,7 @@ console.log('═══ Sovereign Quality Gate ═══');
 // ตรวจ: schema-sync (postgres↔sqlite) · file-budget (เพดาน 800 บรรทัด/ไฟล์ที่เปลี่ยน)
 //       env-truth (DATABASE_URL ชี้ DB ที่ connect ได้จริง) · module-boundary (report-only)
 {
-  const gate = spawnSync('node', [join(ROOT, 'arch-gate.mjs')], { cwd: ROOT, shell: false, stdio: 'inherit' });
+  const gate = spawnSync('node', [join(ROOT, 'arch-gate.mjs')], { windowsHide: true, cwd: ROOT, shell: false, stdio: 'inherit' });
   if (gate.status !== 0) {
     console.error('\n❌ Architecture Gate ล้ม — verify ไม่ดำเนินการต่อ (แก้ตามรายงานด้านบนก่อน)');
     process.exit(1);
@@ -80,7 +80,7 @@ console.log('═══ Sovereign Quality Gate ═══');
 // ตรวจ: import-layers (pages→lib/stores/components; ui/layout ใช้ร่วมได้) · line-budget
 //       (pages ≤800 / components ≤400) · sidebar-rule (ทุกหน้ามี Sidebar) — ของเดิมผ่านผ่าน baseline
 {
-  const fg = spawnSync('node', [join(ROOT, 'frontend-gate.mjs')], { cwd: ROOT, shell: false, stdio: 'inherit' });
+  const fg = spawnSync('node', [join(ROOT, 'frontend-gate.mjs')], { windowsHide: true, cwd: ROOT, shell: false, stdio: 'inherit' });
   if (fg.status !== 0) {
     console.error('\n❌ Frontend Gate ล้ม — verify ไม่ดำเนินการต่อ (แก้ตามรายงานด้านบนก่อน)');
     process.exit(1);
@@ -93,7 +93,7 @@ console.log('═══ Sovereign Quality Gate ═══');
 // ทั้งที่ build ไม่ได้ทำอันตรายอะไร = เว็บลงฟรี ต้องแยก prod ออกจาก dev ก่อนเสมอ
 function findListenerPid(port) {
   try {
-    const out = spawnSync('netstat', ['-ano'], { shell: true, encoding: 'utf8' });
+    const out = spawnSync('netstat', ['-ano'], { windowsHide: true, shell: true, encoding: 'utf8' });
     for (const line of (out.stdout || '').split('\n')) {
       if (line.includes(`:${port}`) && line.includes('LISTENING')) {
         const pid = parseInt(line.trim().split(/\s+/).pop(), 10);
@@ -223,7 +223,7 @@ function waitHttpAlive(url, timeoutMs) {
 async function runStep(step) {
   process.stdout.write(`▶ ${step.name} ...\n`);
   // shell ต่อสเต็ป: shell:false เมื่อ arg มีช่องว่าง (path มี "My work") — Windows shell จะตัดคำผิด
-  const run = () => spawnSync(step.cmd, step.args, { cwd: step.cwd, shell: step.shell !== false, stdio: 'pipe', encoding: 'utf8' });
+  const run = () => spawnSync(step.cmd, step.args, { windowsHide: true, cwd: step.cwd, shell: step.shell !== false, stdio: 'pipe', encoding: 'utf8' });
   let r = run();
   // exit 134 = build worker ตายแบบ native OOM (Zone Allocation) — พบจริงเมื่อแรม/commit charge ของเครื่อง
   // ต่ำ (prod server + docker รันคู่กัน) · ไม่ใช่บั๊กโค้ด (CI บน GitHub แรมโล่งผ่านเสมอ) → พักแล้วลองใหม่ 2 ครั้ง
@@ -311,7 +311,7 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
       // ต้อง /T = kill ทั้งต้นไม้ — `npm run start` spawn ลูก `next start` ที่เป็นตัวถือพอร์ตจริง
       // (เจอจริง 2/10: kill แค่พ่อ → ลูกยังถือ :3000 → server ใหม่ bind ไม่ได้ → prod ล่ม 502
       //  และ verify:full หยุดก่อน e2e ทั้งที่ไม่ได้มีอะไรผิดกับโค้ด)
-      spawnSync('taskkill', ['/PID', String(pidNow), '/F', '/T'], { shell: true, stdio: 'ignore' });
+      spawnSync('taskkill', ['/PID', String(pidNow), '/F', '/T'], { windowsHide: true, shell: true, stdio: 'ignore' });
       const home = `http://localhost:${DEV_PORT}/`;
       // watchdog ของเครื่องมีตารางเวลาเอง — รอได้ไม่นาน ไม่งั้นเสียเวลา e2e ไปกับการรอ
       let up = await waitHttpAlive(home, 20_000);
@@ -364,7 +364,7 @@ if (process.env.VERIFY_SEQUENTIAL === '1') {
     } else if (!existsSync(join(mainFe, '.next', 'BUILD_ID'))) {
       console.warn(`⚠️  prod :${DEV_PORT} ยัง serve จาก worktree — MAIN ยังไม่มี build (${mainFe}/.next) · watchdog จะกู้เองเมื่อ worktree หาย`);
     } else {
-      spawnSync('taskkill', ['/PID', String(pid), '/F', '/T'], { shell: true, stdio: 'ignore' });
+      spawnSync('taskkill', ['/PID', String(pid), '/F', '/T'], { windowsHide: true, shell: true, stdio: 'ignore' });
       await waitPortFree(DEV_PORT, 30_000);
       bootProdFrontend(mainFe);
       const back = await waitHttpAlive(`http://localhost:${DEV_PORT}/`, 90_000);

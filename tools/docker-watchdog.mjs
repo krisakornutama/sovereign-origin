@@ -29,7 +29,7 @@ const HEALTH_URL = 'http://localhost:3001/healthz';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function sh(cmd, args, timeout = 20_000) {
-  try { return { ok: true, out: execFileSync(cmd, args, { encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'] }) }; }
+  try { return { ok: true, out: execFileSync(cmd, args, { windowsHide: true, encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'] }) }; }
   catch (e) { return { ok: false, err: String(e?.status ?? e?.message ?? e) }; }
 }
 function dockerAlive() { return sh('docker', ['info', '--format', '{{.ServerVersion}}'], 15_000).ok; }

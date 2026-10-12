@@ -124,48 +124,112 @@ export const REQUIRED_TOOLS = [
  */
 const CAPTURE_TAIL_BYTES = 64 * 1024;
 
-/** เก็บท้ายสุดไว้ N ไบต์ (ตัดจากหน้า) — ใช้กันบัฟเฟอร์บวม */
-function appendCapped(buf, text) {
-  buf.chunks.push(text);
-  let len = buf.bytes + Buffer.byteLength(text);
-  while (buf.chunks.length > 1 && len > CAPTURE_TAIL_BYTES) {
-    const dropped = buf.chunks.shift();
-    len -= Buffer.byteLength(dropped);
-  }
-  buf.bytes = len;
-  return buf.chunks.join('');
+/** หลังฆ่า process ให้เวลาอีกนิดก่อนฝืนจบ (กันกรณี kill ไม่ตก) */
+const KILL_GRACE_MS = 5000;
+
+/**
+ * ถอด byte เป็นข้อความให้ถูก encoding
+ *
+ * ⚠ เคสจริง 12/10/69: `wsl --status` ตอบเป็น **UTF-16LE** (มี null byte คั่นทุกตัวอักษร)
+ *   ถ้าอ่านเป็น UTF-8 จะได้ "D e f a u l t ..." และเทียบคำไม่มีวันตรง
+ *   ทำให้วินิจฉัย virtualization ผิดเงียบๆ
+ *
+ * เคสจริงอีกอัน: PowerShell ที่ถูก spawn โดยไม่มี console จะเขียนอักษรไทยออกมาเป็น "?"
+ *   แก้ที่ต้นทาง (บังคับ UTF-8) ไม่ได้ทุกโปรแกรม ⇒ ฝั่งเราต้องรับมือให้ได้
+ */
+export function decodeOutput(buf) {
+  if (!buf || buf.length === 0) return '';
+  // BOM
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return buf.slice(2).toString('utf16le');
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) return buf.swap16().slice(2).toString('utf16le');
+  // ไม่มี BOM แต่มี null byte เป็นช่วง ๆ = UTF-16LE (wsl, หลายตัวบน Windows)
+  if (buf.length >= 4 && buf[1] === 0x00 && buf[3] === 0x00) return buf.toString('utf16le');
+  return buf.toString('utf8');
 }
 
+/** เก็บ byte ท้ายสุดไว้ N ไบต์ (ตัดจากหน้า) — ใช้กันบัฟเฟอร์บวม */
+function appendCapped(buf, chunk) {
+  buf.parts.push(chunk);
+  buf.bytes += chunk.length;
+  while (buf.parts.length > 1 && buf.bytes > CAPTURE_TAIL_BYTES) {
+    buf.bytes -= buf.parts.shift().length;
+  }
+}
+
+/**
+ * ตัวรันคำสั่ง
+ *
+ * ปัญหาที่แก้ (เจอจากการรันจริง ไม่ใช่จากการอ่านโค้ด):
+ *  1. เดิมใช้ execFile ผูก stdout/stderr เป็น pipe แล้วทิ้ง
+ *     ⇒ npm ci 5 นาที · next build 3 นาที · docker pull 5.2 GB 30-40 นาที
+ *       หน้าต่างเงียบสนิท คนคิดว่าค้างแล้วกดปิด = เสียเวลาทั้งวัน
+ *  2. รอเฉพาะ 'close' = ต้องรอ stdio ปิดด้วย
+ *     ⇒ ถ้าลูกหลาน (docker compose) ถือ stdio ไว้ 'close' จะไม่มีวันมา = ค้างตลอดการติดตั้ง
+ *     ต้องรอ 'exit' เป็นหลัก แล้วค่อยเก็บ stdout ที่เหลือ
+ *  3. timeout ของ spawn ฆ่าแต่ไม่รับประกันว่า process ตาย
+ *     ⇒ ต้องมีนาฬิกาของตัวเอง + ตัดสินว่าหมดเวลา แล้วรายงานว่าหมดเวลา (ไม่ใช่ล้มเงียบๆ)
+ */
 export function defaultExec(cmd, args, opts = {}) {
-  const { onOutput, ...rest } = opts;
+  const { onOutput, timeout, ...rest } = opts;
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { windowsHide: true, ...rest });
-    const outBuf = { chunks: [], bytes: 0 };
-    const errBuf = { chunks: [], bytes: 0 };
+    let child;
+    try {
+      child = spawn(cmd, args, { windowsHide: true, ...rest });
+    } catch (err) {
+      resolve({ code: 1, stdout: '', stderr: String(err?.message ?? err) });
+      return;
+    }
+    const outBuf = { parts: [], bytes: 0 };
+    const errBuf = { parts: [], bytes: 0 };
     let settled = false;
+    let timedOut = false;
+    let killTimer = null;
+
     const done = (code) => {
       if (settled) return;
       settled = true;
-      resolve({ code, stdout: outBuf.chunks.join(''), stderr: errBuf.chunks.join('') });
+      if (killTimer) clearTimeout(killTimer);
+      let exitCode = code;
+      const stdout = decodeOutput(Buffer.concat(outBuf.parts));
+      let stderr = decodeOutput(Buffer.concat(errBuf.parts));
+      if (timedOut) {
+        // บอกตรงๆ ว่าหมดเวลา ไม่ใช่ให้ไปเดาเองว่าทำไมช้า
+        stderr += `\n[หมดเวลา ${Math.round(timeout / 1000)} วิ — ถูกหยุดแล้ว]`;
+        // ใช้รหัสมาตรฐานของ timeout เสมอ ไม่ใช่รหัสจริงของ process ที่ถูกฆ่า
+        //   (บน Windows การ kill ให้รหัสมั่ว เช่น 1 หรือ null → ผู้เรียกตัดสินใจผิด)
+        exitCode = 124;
+      }
+      resolve({ code: exitCode, stdout, stderr, timedOut });
     };
-    child.stdout?.on('data', (d) => {
-      const s = String(d);
-      appendCapped(outBuf, s);
-      if (onOutput) onOutput(s);
-    });
-    child.stderr?.on('data', (d) => {
-      const s = String(d);
-      appendCapped(errBuf, s);
-      if (onOutput) onOutput(s);
-    });
-    // ไฟล์ไม่มี / สั่งไม่ได้ → ห้ามค้าง ให้คืนค่าเหมือนคำสั่งล้ม
+
+    const pump = (buf, d) => {
+      appendCapped(buf, d);
+      if (onOutput) onOutput(decodeOutput(d).replace(/\u0000/g, ''));
+    };
+    child.stdout?.on('data', (d) => pump(outBuf, d));
+    child.stderr?.on('data', (d) => pump(errBuf, d));
+
+    if (timeout && timeout > 0) {
+      killTimer = setTimeout(() => {
+        timedOut = true;
+        try { child.kill('SIGKILL'); } catch { /* ตายไปแล้ว */ }
+        // ฆ่าแล้วยังไม่ exit = อย่ารอต่อ ไม่งั้นค้าง (ปัญหาข้อ 3)
+        killTimer = setTimeout(() => done(124), KILL_GRACE_MS);
+      }, timeout);
+    }
+
     child.on('error', (err) => {
-      appendCapped(errBuf, String(err?.message ?? err));
+      appendCapped(errBuf, Buffer.from(String(err?.message ?? err)));
       done(1);
     });
-    child.on('close', (code) => done(typeof code === 'number' ? code : 1));
+    // 'exit' มาก่อน 'close' เสมอ และมาทันทีเมื่อ process ตาย
+    //   การรอ 'close' อย่างเดียวคือทางที่ทำให้ทั้งตัวติดตั้งค้าง
+    child.on('exit', (code) => done(typeof code === 'number' ? code : 1));
   });
 }
+
+/** โค้ดที่ให้ PowerShell เขียนผลลัพธ์เป็น UTF-8 เสมอ */
+export const PS_UTF8_PREFIX = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; ';
 
 // ── ขั้นตอน ─────────────────────────────────────────────────────────────
 
@@ -178,7 +242,7 @@ export async function checkTools(tools = REQUIRED_TOOLS, exec = defaultExec) {
   for (const t of tools) {
     const [bin, ...rest] = String(t.probe).split(' ');
     // เครื่องมือที่ต้องการแค่ "มี/ไม่มี" = ไม่ต้องโชว์ผลลัพธ์ (docker info ยาวเป็นสิบบรรทัด)
-    const r = await exec(bin, rest, { onOutput: null });
+    const r = await exec(bin, rest, { windowsHide: true, onOutput: null });
     out.push({ ...t, ok: r.code === 0, installed: r.code === 0 ? (r.stdout || '').trim().split('\n')[0] : '' });
   }
   return out;
@@ -214,11 +278,11 @@ export async function startDockerDesktop({
   pollMs = 5 * 1000,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 } = {}) {
-  const probe = async () => (await exec('docker', ['info'], { onOutput: null })).code === 0;
+  const probe = async () => (await exec('docker', ['info'], { windowsHide: true, onOutput: null })).code === 0;
 
   if (await probe()) return { ok: true, reason: 'ทำงานอยู่แล้ว' };
 
-  const viaCli = await exec('docker', ['desktop', 'start'], { timeout: 120 * 1000 });
+  const viaCli = await exec('docker', ['desktop', 'start'], { windowsHide: true, timeout: 120 * 1000 });
   if (viaCli.code !== 0) {
     // รุ่นเก่าไม่มีคำสั่งนี้ = เปิดตัวโปรแกรมตรง ๆ
     const exe = path.join(
@@ -226,7 +290,7 @@ export async function startDockerDesktop({
       'Docker', 'Docker', 'Docker Desktop.exe',
     );
     if (fs.existsSync(exe)) {
-      try { spawn(exe, [], { detached: true, stdio: 'ignore' }).unref(); } catch { /* เปิดไม่ได้ = รอต่อแล้วบอก */ }
+      try { spawn(exe, [], { windowsHide: true, detached: true, stdio: 'ignore' }).unref(); } catch { /* เปิดไม่ได้ = รอต่อแล้วบอก */ }
     }
   }
 
@@ -240,6 +304,80 @@ export async function startDockerDesktop({
     ok: false,
     reason: 'รอ 10 นาทีแล้ว Docker ยังไม่ตอบ — เปิด Docker Desktop ด้วยมือแล้วรอให้ไอคอนเป็นเขียว แล้วรันซ้ำ',
   };
+}
+
+/**
+ * หาสาเหตุจริงที่ Docker Desktop ติดตั้งไม่ได้
+ *
+ * ⚠ เคสจริง 12/10/69: winget ล้ม exit 1 บอกแค่ "Installer failed"
+ *   คนไม่มีทางรู้ว่าเพราะอะไร ต้องเดา → ต้องมีคนไปหาต่อให้
+ *   สาเหตุที่เจอบ่อยที่สุด: WSL2 ไม่ได้เปิด (Docker Desktop บังคับใช้)
+ *
+ * @returns {Promise<string[]>} บรรทัดที่อ่านเป็นภาษาคน
+ */
+export async function diagnoseDockerInstall({ exec = defaultExec, home = os.homedir() } = {}) {
+  const lines = [];
+
+  // WSL2 — Docker Desktop บังคับใช้ (ถ้าไม่มี = ติดตั้งไม่ได้แน่นอน)
+  //   ครอบด้วย PowerShell เพื่อบังคับ UTF-8 ไม่งั้น wsl ตอบเป็น UTF-16LE
+  //   (เคสจริง 12/10/69: อ่านเป็น UTF-8 ได้ "D e f a u l t" เทียบคำไม่มีวันตรง)
+  const wsl = await exec('powershell.exe', [
+    '-NoProfile', '-Command', `${PS_UTF8_PREFIX}wsl --status`,
+  ], { onOutput: null, timeout: 60 * 1000 });
+  if (wsl.code !== 0) {
+    lines.push('WSL2 ไม่ได้เปิดใช้งาน — Docker Desktop ต้องใช้ตัวนี้');
+    lines.push('  แก้:  wsl --install --no-distribution   แล้วรีสตาร์ทเครื่อง');
+  } else {
+    lines.push('WSL2: พร้อม');
+  }
+
+  // เปิด virtualization ไว้ไหม (VirtualMachinePlatform ต้องได้ด้วย)
+  const virt = await exec('powershell.exe', [
+    '-NoProfile', '-Command',
+    `${PS_UTF8_PREFIX}(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty VirtualizationFirmwareEnabled)`,
+  ], { onOutput: null, timeout: 60 * 1000 });
+  const virtOn = String(virt.stdout ?? '').toLowerCase().includes('true');
+  if (!virtOn) {
+    lines.push('Virtualization ปิดอยู่ใน BIOS/UEFI — เปิด Intel VT-x หรือ AMD-V แล้วรีสตาร์ท');
+  } else {
+    lines.push('Virtualization: เปิดแล้ว');
+  }
+
+  // ที่ที่มีคำตอบจริง: Docker เขียน installer.error.json ไว้ตอนติดตั้งล้ม
+  //   (เคสจริง 12/10/69: ไม่มีไฟล์นี้เมื่อรันครั้งแรก ต้องรอให้ตัวติดตั้งล้มก่อน
+  //    รอบถัดไปจึงจะมีไฟล์นี้ให้อ่าน — เลยต้องดู install-log.txt ด้วย)
+  const localAppData = process.env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local');
+  const dockerDir = path.join(localAppData, 'Docker');
+
+  const errJson = path.join(dockerDir, 'installer.error.json');
+  try {
+    if (fs.existsSync(errJson)) {
+      const txt = fs.readFileSync(errJson, 'utf8').replace(/\0/g, '').trim();
+      // ไฟล์นี้จะมีอยู่เสมอแม้ติดตั้งสำเร็จ แต่จะว่างเปล่า
+      //   (เคสจริง 12/10/69: รายงาน "Docker installer error:" ว่างเปล่า = งงกว่าไม่บอก)
+      if (txt && txt !== '{}') {
+        lines.push(`Docker installer error: ${txt.replace(/\s+/g, ' ').slice(0, 300)}`);
+      }
+    }
+  } catch { /* ไม่มี/อ่านไม่ได้ = ไปดู log ต่อ */ }
+
+  const logPath = path.join(dockerDir, 'install-log.txt');
+  try {
+    if (fs.existsSync(logPath)) {
+      const raw = fs.readFileSync(logPath, 'latin1');
+      const bad = raw.split(/\r?\n/)
+        .map((s) => s.replace(/\0/g, '').trim())
+        .filter((s) => s && !/^CommandLine:/i.test(s) && !/\.exe"/i.test(s))
+        .filter((s) => /(^|[\s:=])(error|failed|failure|exception|denied)\b/i.test(s)
+          || /\b0x[0-9a-f]{6,}\b/i.test(s))
+        .slice(-4);
+      if (bad.length) lines.push(`Docker install log: ${bad.join(' | ').slice(0, 400)}`);
+    }
+  } catch {
+    /* อ่าน log ไม่ได้ = ไม่ใช่เรื่องคอขาดบาดตาย แค่ไม่มีข้อมูลเพิ่ม */
+  }
+
+  return lines;
 }
 
 /** เขียน daemon.json ของ Docker Desktop (จำกัดขนาด log) */
@@ -369,6 +507,11 @@ export async function runSetup(opts = {}) {
           const boot = await startDockerDesktop({ exec, log });
           step('เปิด Docker', boot.ok ? 'ok' : 'fail', boot.reason);
         }
+        // ติดตั้งไม่สำเร็จ = หาสาเหตุจริงให้ ไม่ใช่ปล่อยให้คนเดา
+        //   "Installer failed with exit code: 1" บอกอะไรไม่ได้เลย (เคสจริง 12/10/69)
+        if (!r.ok && t.id === 'docker') {
+          for (const d of await diagnoseDockerInstall({ exec })) step('  ·', 'warn', d);
+        }
       }
       tools = await checkTools(REQUIRED_TOOLS, exec);
     }
@@ -440,7 +583,7 @@ export async function runSetup(opts = {}) {
     const cmd = lock ? 'ci' : 'install';
     step(`dependency ${path.basename(dir)}`, 'warn', `กำลัง npm ${cmd} (3-6 นาที · ยังไม่ค้าง) · รุ่น ${pkg.version ?? '?'}`);
     const t0 = Date.now();
-    const r = await exec('npm', [cmd, '--no-audit', '--no-fund'], { cwd: dir, timeout: 20 * 60 * 1000 });
+    const r = await exec('npm', [cmd, '--no-audit', '--no-fund'], { windowsHide: true, cwd: dir, timeout: 20 * 60 * 1000 });
     const secs = Math.round((Date.now() - t0) / 1000);
     if (r.code !== 0 || !fs.existsSync(nm)) {
       step(`dependency ${path.basename(dir)}`, 'fail', `npm ${cmd} ล้ม (exit ${r.code}) — ต้องมีอินเทอเน็ต`);
@@ -499,12 +642,17 @@ export async function runSetup(opts = {}) {
 }
 
 /** รันไฟล์ .bat (ต้องผ่าน cmd.exe — Windows ไม่รัน .bat โดยตรง) */
-export async function runBatch(batPath, exec = defaultExec) {
+export async function runBatch(batPath, exec = defaultExec, timeoutMs = 60 * 60 * 1000) {
   if (!fs.existsSync(batPath)) return { ok: false, reason: `ไม่พบ ${path.basename(batPath)}` };
-  const r = await exec('cmd.exe', ['/c', batPath], { timeout: 15 * 60 * 1000 });
+  // ครั้งแรกดึง Docker หลาย GB = นาทีจนถึงชั่วโมง ตั้งเวลาให้พอสมเหตุสมผล
+  const r = await exec('cmd.exe', ['/c', batPath], { windowsHide: true, timeout: timeoutMs });
   return {
     ok: r.code === 0,
-    reason: r.code === 0 ? 'สำเร็จ' : `exit ${r.code} — ดู ${path.basename(batPath)} หรือ start-sovereign.log`,
+    reason: r.code === 0
+      ? 'สำเร็จ'
+      : r.timedOut
+        ? `หมดเวลา ${Math.round(timeoutMs / 60000)} นาที — ดู ${path.basename(batPath)}`
+        : `exit ${r.code} — ดู ${path.basename(batPath)} หรือ start-sovereign.log`,
   };
 }
 

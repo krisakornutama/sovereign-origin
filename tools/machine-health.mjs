@@ -28,11 +28,22 @@ const RAM_CRIT_GB = Number(process.env.MH_RAM_CRIT_GB ?? 0.8);
 const DISK_WARN_GB = Number(process.env.MH_DISK_WARN_GB ?? 20);
 const DISK_CRIT_GB = Number(process.env.MH_DISK_CRIT_GB ?? 8);
 const BACKUP_MAX_AGE_H = Number(process.env.MH_BACKUP_MAX_AGE_H ?? 26); // รอบคืน 03:00 + 2 ชม. กันหลับ/ชดเชย
-const DB_BACKUP_DIR = process.env.MH_DB_BACKUP_DIR || join(MAIN_ROOT, 'sovereign-os/core-api/backups');
+// ⚠ โฟลเดอร์ที่ "งาน backup เขียนจริง" = backups/postgres (tools/backup-db.ps1 เขียนตรงนี้)
+//   เคสจริง 12/10/69: เดิมเฝ้า core-api/backups/*.sql.gz ซึ่งไม่มีใครเขียนอีกแล้ว
+//   (29 ไฟล์ค้างจากเดิม · ไฟล์ล่าสุด 37.7 ชม. ทั้งที่ backup รอบ 03:00 สำเร็จทุกคืน)
+//   ⇒ แจ้งวิกฤต "backup เก่า" ทุกรอบ ไม่ว่าระบบจะปกติแค่ไหน = สัญญาณรบกวนที่แย่ที่สุด
+//     เจ้าของบอน 12/10/69: "การส่งข้อมูลหลาย ๆ อย่างโดยที่ยังไม่ได้จริง บางทีมันก็รก"
+//   ⇒ ต้องเฝ้าที่ที่ของจริงถูกเขียน และคงโฟลเดอร์เก่าไว้เป็นทางสำรอง (ยังมีไฟล์เก่า 29 ไฟล์)
+const LIVE_BACKUP_DIR = process.env.MH_LIVE_BACKUP_DIR || join(MAIN_ROOT, 'backups/postgres');
+const LEGACY_BACKUP_DIR = process.env.MH_DB_BACKUP_DIR || join(MAIN_ROOT, 'sovereign-os/core-api/backups');
+const DB_BACKUP_DIR = LIVE_BACKUP_DIR;
 const OFFSITE_DIR = process.env.MH_OFFSITE_DIR || join(MAIN_ROOT, 'sovereign-os/infra/offsite');
-const OFFSITE_LOG = process.env.MH_OFFSITE_LOG || join(DB_BACKUP_DIR, 'offsite-log.jsonl');
+// ⚠ log ของ offsite/mirror เขียนไว้ในโฟลเดอร์เก่าตลอด — ย้ายตาม DB_BACKUP_DIR ไม่ได้
+//   เคสจริง 12/10/69: เปลี่ยน DB_BACKUP_DIR ไปหา backup ที่ถูกที่ แล้วลืมย้าย log ตาม
+//   ⇒ ขึ้น "ไม่เคยสำรองนอกเครื่องเลย" ทั้งที่มี log อยู่จริง (false alarm รอบสองในวันเดียว)
+const OFFSITE_LOG = process.env.MH_OFFSITE_LOG || join(LEGACY_BACKUP_DIR, 'offsite-log.jsonl');
 // E3: log ของช่องทางที่สอง (mirror — คนละดิสก์) ใช้ตัดสินว่า Telegram ล้มแล้วมีตัวชดเชยหรือไม่
-const MIRROR_LOG = process.env.MH_MIRROR_LOG || join(DB_BACKUP_DIR, 'offsite-mirror-log.jsonl');
+const MIRROR_LOG = process.env.MH_MIRROR_LOG || join(LEGACY_BACKUP_DIR, 'offsite-mirror-log.jsonl');
 
 const problems = []; // { level, area, message }
 const info = {};
@@ -41,7 +52,7 @@ const info = {};
 try {
   const out = execSync(
     'powershell -NoProfile -Command "[math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1KB)"',
-    { encoding: 'utf8', timeout: 20_000 }
+    { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
   ).trim();
   const freeBytes = Number(out);
   if (Number.isFinite(freeBytes) && freeBytes > 0) {
@@ -64,6 +75,10 @@ try {
 const CONTAINERS = ['sovereign-db', 'sovereign-core-api'];
 info.containers = {};
 try {
+  // ⚠ ห้ามแตะคำสั่งนี้ด้วยเครื่องมือแก้แบบค้นหา+แทนที่อัตโนมัติ
+  //   เคสจริง 12/10/69: เครื่องมือใส่ windowsHide เข้าไปใน --format ทำให้ docker คืนค่าผิดรูป
+  //   ⇒ โค้ดคิดว่า container ทั้งหมดล่ม แล้วแจ้งวิกฤตรอบเย็นทั้งที่ระบบปกติ
+  //   {{.Names}} คือรูปแบบของ Docker — ต้องมีวงปีกกาศสองชั้นพอดี
   const out = execSync('docker ps --format "{{.Names}}\\t{{.Status}}"', { encoding: 'utf8', timeout: 20_000 });
   for (const name of CONTAINERS) {
     const line = out.split('\n').find((l) => l.startsWith(name));
@@ -77,16 +92,34 @@ try {
 // (รากเคสจริง 24–26/9: offsite-push ตายเมื่อ DNS ล่ม + ไม่มีใครดูว่าไฟล์ล่าสุดแก่แค่ไหน)
 const ageHours = (ms) => Math.round(((Date.now() - ms) / 3_600_000) * 10) / 10;
 
-// 4a) DB backup (เป้า 03:00 ทุกคืน — sovereign_backup_YYYYMMDD_*.sql.gz)
+// 4a) DB backup (เป้า 03:00 ทุกคืน — เขียนที่ backups/postgres/*.dump โดย tools/backup-db.ps1)
+//     เดิมอ่านแค่โฟลเดอร์เก่า = แจ้งวิกฤตปลอมทุกรอบ (ดูรายละเอียดที่ DB_BACKUP_DIR ข้างบน)
 try {
-  const files = readdirSync(DB_BACKUP_DIR).filter((f) => f.startsWith('sovereign_backup_') && f.endsWith('.sql.gz')).sort();
+  // ที่ถูก: *.dump (backup-db.ps1) · ที่เก่า: sovereign_backup_*.sql.gz — รับทั้งคู่กันเครื่องเก่าไม่เผลอ
+  const isBackup = (f) =>
+    f.endsWith('.dump') || (f.startsWith('sovereign_backup_') && f.endsWith('.sql.gz'));
+  let files = [];
+  let where = DB_BACKUP_DIR;
+  try {
+    files = readdirSync(DB_BACKUP_DIR).filter(isBackup);
+  } catch { files = []; }
   if (!files.length) {
-    problems.push({ level: 'critical', area: 'backup', message: `ไม่มีไฟล์ DB backup เลยใน ${DB_BACKUP_DIR} — สาย backup 03:00 ไม่เคยสำเร็จ` });
+    // โฟลเดอร์ที่ถูกไม่มีไฟล์ → ลองโฟลเดอร์เก่าก่อนบอกวิกฤต (กันเตือนปลอมตอนย้ายโฟลเดอร์)
+    try {
+      files = readdirSync(LEGACY_BACKUP_DIR).filter(isBackup);
+      where = LEGACY_BACKUP_DIR;
+    } catch { files = []; }
+  }
+  if (!files.length) {
+    problems.push({ level: 'critical', area: 'backup', message: `ไม่มีไฟล์ DB backup เลย (${DB_BACKUP_DIR} และ ${LEGACY_BACKUP_DIR}) — สาย backup 03:00 ไม่เคยสำเร็จ` });
     info.dbBackupAgeH = null;
   } else {
-    const age = ageHours(statSync(join(DB_BACKUP_DIR, files.at(-1))).mtimeMs);
+    files.sort();
+    const newest = files.at(-1);
+    const age = ageHours(statSync(join(where, newest)).mtimeMs);
     info.dbBackupAgeH = age;
-    if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'backup', message: `DB backup เก่า ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ไฟล์ล่าสุด ${files.at(-1)} — สาย 03:00 พัง/ถูกข้ามหลายคืน` });
+    info.dbBackupFile = newest;
+    if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'backup', message: `DB backup เก่า ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ไฟล์ล่าสุด ${newest} — สาย 03:00 พัง/ถูกข้ามหลายคืน` });
   }
 } catch (e) {
   info.dbBackupAgeH = null;
@@ -138,14 +171,14 @@ try {
 
 // 4b+) I3 — audit_logs partitioning สุขภาพ: INSERT ตก default = partition ขาด (ห้ามเงียบ)
 try {
-  const defCount = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT count(*) FROM audit_logs_default"', { encoding: 'utf8', timeout: 20_000 }).trim();
+  const defCount = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT count(*) FROM audit_logs_default"', { windowsHide: true, encoding: 'utf8', timeout: 20_000 }).trim();
   info.auditDefaultRows = Number(defCount);
   if (info.auditDefaultRows > 0) problems.push({ level: 'warn', area: 'audit', message: `audit_logs มี ${info.auditDefaultRows} แถวตกใน default partition — partition เดือนนั้นหาย (รัน tools/verify/audit-retention.mjs เพื่อสร้างใหม่)` });
 } catch { /* Docker/DB ดับ = จับโดยด่านอื่นอยู่แล้ว */ }
 
 // 4c) I1c — WAL archive ติดขัด: failed>0 = warn ทันที · ไม่มีไฟล์ใหม่ >30 นาที = warn (archive_timeout 300s ต้องไหลสม่ำเสมอ)
 try {
-  const s = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT failed_count, COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time))::int, -1) FROM pg_stat_archiver"', { encoding: 'utf8', timeout: 20_000 });
+  const s = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT failed_count, COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time))::int, -1) FROM pg_stat_archiver"', { windowsHide: true, encoding: 'utf8', timeout: 20_000 });
   const [failed, sinceLast] = s.trim().split('|').map(Number);
   info.walArchiveFailed = failed;
   info.walArchiveSecsSinceLast = sinceLast;
@@ -155,7 +188,7 @@ try {
 
 // ── 5) สุขภาพดิสก์กายภาพ — เครื่องนี้มีดิสก์เดียว (C+E = Disk 0) SSD เสื่อม = ตายทั้งระบบ ──
 try {
-  const out = execSync('powershell -NoProfile -Command "Get-PhysicalDisk | Select-Object -ExpandProperty HealthStatus"', { encoding: 'utf8', timeout: 20_000 });
+  const out = execSync('powershell -NoProfile -Command "Get-PhysicalDisk | Select-Object -ExpandProperty HealthStatus"', { windowsHide: true, encoding: 'utf8', timeout: 20_000 });
   const statuses = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   info.physicalDiskHealth = statuses;
   const bad = statuses.filter((s) => !/healthy/i.test(s));

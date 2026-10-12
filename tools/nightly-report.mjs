@@ -61,7 +61,7 @@ function dbCreds() {
   try {
     const out = execSync(
       `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
-      { encoding: 'utf8', timeout: 20_000 }
+      { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
     ).split('\n').map((l) => l.trim()).filter(Boolean);
     return { token: out[0] ?? '', chatId: out[1] ?? '' };
   } catch {

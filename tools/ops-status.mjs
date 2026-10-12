@@ -75,7 +75,7 @@ function taskLines() {
 // ── สายเครื่อง + backup (จาก machine-health — ตัวเดียวกับ watchdog ไม่คำนวณซ้ำ) ──
 function machineLines() {
   try {
-    const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], { encoding: 'utf8', timeout: 60_000 });
+    const r = spawnSync('node', [join(REPO, 'tools', 'machine-health.mjs')], { windowsHide: true, encoding: 'utf8', timeout: 60_000 });
     if (!r.stdout) throw new Error('ไม่ตอบ');
     return JSON.parse(r.stdout);
   } catch {
