@@ -198,6 +198,50 @@ export async function installTool(tool, exec = defaultExec) {
   return { ok: r.code === 0, reason: r.code === 0 ? 'ติดตั้งแล้ว' : `winget ล้ม (exit ${r.code}) — ${r.stdout.trim().slice(-200)}` };
 }
 
+/**
+ * เปิด Docker Desktop แล้วรอจน engine ตอบ
+ *
+ * ⚠ เคสจริง 12/10/69: winget ติดตั้ง Docker Desktop เสร็จก็จบ แต่โปรแกรมยังไม่ถูกเปิด
+ *   ⇒ `docker info` ล้มทันที ⇒ ตัวติดตั้งบอก "ยังขาด Docker Desktop" ทั้งที่เพิ่งติดตั้งเสร็จ
+ *   คนต้องเดาว่าไปเปิดเองแล้วรันซ้ำ = เสียเวลาไม่รู้เรื่อง
+ *
+ * Docker Desktop รุ่นใหม่ (4.3x+) มี `docker desktop start` · รุ่นเก่าไม่มี → เปิด exe ตรง
+ */
+export async function startDockerDesktop({
+  exec = defaultExec,
+  log = console.log,
+  waitMs = 10 * 60 * 1000,
+  pollMs = 5 * 1000,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+} = {}) {
+  const probe = async () => (await exec('docker', ['info'], { onOutput: null })).code === 0;
+
+  if (await probe()) return { ok: true, reason: 'ทำงานอยู่แล้ว' };
+
+  const viaCli = await exec('docker', ['desktop', 'start'], { timeout: 120 * 1000 });
+  if (viaCli.code !== 0) {
+    // รุ่นเก่าไม่มีคำสั่งนี้ = เปิดตัวโปรแกรมตรง ๆ
+    const exe = path.join(
+      process.env.ProgramFiles ?? 'C:\\Program Files',
+      'Docker', 'Docker', 'Docker Desktop.exe',
+    );
+    if (fs.existsSync(exe)) {
+      try { spawn(exe, [], { detached: true, stdio: 'ignore' }).unref(); } catch { /* เปิดไม่ได้ = รอต่อแล้วบอก */ }
+    }
+  }
+
+  log('        (รอ Docker Desktop ตอบ — ครั้งแรกเปิดช้า 1-3 นาที)');
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    if (await probe()) return { ok: true, reason: 'Docker Desktop ตอบแล้ว' };
+    await sleep(pollMs);
+  }
+  return {
+    ok: false,
+    reason: 'รอ 10 นาทีแล้ว Docker ยังไม่ตอบ — เปิด Docker Desktop ด้วยมือแล้วรอให้ไอคอนเป็นเขียว แล้วรันซ้ำ',
+  };
+}
+
 /** เขียน daemon.json ของ Docker Desktop (จำกัดขนาด log) */
 export function writeDockerDaemonConfig(configPath, existingText, add = DOCKER_DAEMON_CONFIG) {
   let existing = {};
@@ -318,13 +362,22 @@ export async function runSetup(opts = {}) {
       for (const t of missing) {
         const r = await installTool(t, exec);
         step(`ติดตั้ง ${t.label}`, r.ok ? 'ok' : 'fail', r.reason);
+        // winget ติดตั้ง Docker Desktop เสร็จ = ยังไม่ได้ "เปิด" เครื่อง
+        //   docker info จะล้มทันทีที่ยังไม่ได้ start ⇒ ต้องเปิดและรอให้เสร็จเอง
+        //   ไม่งั้นคนต้องเดาว่าไปกดเปิด Docker เอง (เคสจริง 12/10/69)
+        if (r.ok && t.id === 'docker') {
+          const boot = await startDockerDesktop({ exec, log });
+          step('เปิด Docker', boot.ok ? 'ok' : 'fail', boot.reason);
+        }
       }
       tools = await checkTools(REQUIRED_TOOLS, exec);
     }
   }
   const stillMissing = tools.filter((t) => !t.ok);
   if (stillMissing.length) {
-    step('เครื่องมือ', 'fail', `ยังขาด ${stillMissing.map((t) => t.label).join(', ')} — ติดตั้งเองแล้วรันซ้ำ`);
+    step('เครื่องมือ', 'fail', stillMissing.some((t) => t.id === 'docker')
+      ? 'Docker Desktop ยังไม่ตอบ — เปิด Docker Desktop ด้วยมือ แล้วรอจนไอคอนเป็นเขียว แล้วรันซ้ำ'
+      : `ยังขาด ${stillMissing.map((t) => t.label).join(', ')} — ติดตั้งเองแล้วรันซ้ำ`);
     return finish(false, 2);
   }
   step('เครื่องมือ', 'ok', tools.map((t) => `${t.label} ${t.installed || 'พร้อม'}`).join(' · '));
