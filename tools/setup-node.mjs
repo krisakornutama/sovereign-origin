@@ -26,6 +26,22 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * ไฟล์ที่ตัวติดตั้งเรียกใช้ "ตอนรันจริง" — ต้องมีในชุดที่แตกทุกครั้ง
+ *
+ * ประกาศไว้ที่เดียวให้เทสต์ตรวจกับของจริงได้ ไม่งั้นโค้ดกับชุดจะหลุดจากกันเงียบๆ
+ *   เคสจริง 12/10/69: โค้ดเช็ค `sovereign-os/agent-runner/setup-machine.mjs`
+ *     ซึ่งไม่เคยมีอยู่จริง (อยู่ที่ tools/agent-pack) → เครื่องจริงดึง Docker
+ *     หลาย GB มาเสร็จ แล้วล้มทีหลัง = เสียเวลาคนทั้งวัน
+ */
+export const RUNTIME_FILES = {
+  setupFirstTime: 'setup-first-time.bat',
+  startSystem: 'start-sovereign.bat',
+  enrollScript: 'tools/agent-pack/setup-machine.mjs',
+  pruneWalPs1: 'tools/prune-wal.ps1',
+  pruneWalCmd: 'tools/hidden-tasks/sovereign-prune-wal.cmd',
+};
+
 // ── งบพื้นที่ (วัดจากเครื่องจริง 11/10/69 ไม่ใช่เดา) ──────────────────────
 //   docker images ที่ระบบใช้  ~5.2 GB (timescaledb 2.4 · core-api 2.3 · emqx 0.46)
 //   ฐานข้อมูลเริ่มต้น      ~0.1 GB (จริงตอนนี้ 60 MB)
@@ -290,7 +306,7 @@ export async function runSetup(opts = {}) {
   } else if (wouldDo('ตั้งค่าครั้งแรก', 'รัน setup-first-time.bat')) {
     /* ไม่รันจริงในโหมดตรวจ */
   } else {
-    const firstTime = await runBatch(path.join(kitDir, 'setup-first-time.bat'), exec);
+    const firstTime = await runBatch(path.join(kitDir, RUNTIME_FILES.setupFirstTime), exec);
     if (!firstTime.ok) {
       step('ตั้งค่าครั้งแรก', 'fail', firstTime.reason);
       return finish(false, 4);
@@ -330,24 +346,28 @@ export async function runSetup(opts = {}) {
   if (wouldDo('เริ่มระบบ', 'รัน start-sovereign.bat (ดึง Docker หลาย GB — ใช้เวลานาน)')) {
     return finish(true, 0); // dry-run จบตรงนี้ ไม่ต้องไปข้างล่าง
   }
-  const started = await runBatch(path.join(kitDir, 'start-sovereign.bat'), exec);
+  const started = await runBatch(path.join(kitDir, RUNTIME_FILES.startSystem), exec);
   if (!started.ok) {
     step('เริ่มระบบ', 'fail', started.reason);
     return finish(false, 5);
   }
   step('เริ่มระบบ', 'ok', 'ฐานข้อมูล + API + เว็บ ทำงานแล้ว');
 
-  // 7) ลงทะเบียนกับ HUB — หลังระบบขึ้น ไม่งั้นเครื่อง ghost ที่ไม่มีงาน
+  // 8) ลงทะเบียนกับ HUB — หลังระบบขึ้น ไม่งั้นเครื่อง ghost ที่ไม่มีงาน
+  // ⚠ setup-machine.mjs อยู่ใน tools/agent-pack ไม่ใช่ agent-runner
+  //   (เคสจริง 12/10/69: ตรวจพาธเดิมตอนรันครั้งแรก → ไม่พบไฟล์ = เครื่องจริงติดตั้งไม่เสร็จ
+  //    หลังดึง Docker หลาย GB มาแล้ว = เสียเวลาคนทั้งวัน) เทสต์ kit-files จับกรณีนี้
   const runnerDir = path.join(kitDir, 'sovereign-os', 'agent-runner');
-  if (!fs.existsSync(path.join(runnerDir, 'setup-machine.mjs'))) {
-    step('ลงทะเบียน HUB', 'fail', 'ไม่พบ setup-machine.mjs — ก๊อปชุดไม่ครบ');
+  const setupMachine = path.join(kitDir, RUNTIME_FILES.enrollScript);
+  if (!fs.existsSync(setupMachine)) {
+    step('ลงทะเบียน HUB', 'fail', 'ไม่พบ tools/agent-pack/setup-machine.mjs — ชุดติดตั้งไม่ครบ');
     return finish(false, 6);
   }
   if (wouldDo('ลงทะเบียน HUB', `POST /enroll ที่ ${opts.hubUrl || 'HUB'} ด้วยรหัสเชิญ`)) {
     return finish(true, 0);
   }
   const enrollArgs = [
-    path.join(runnerDir, 'setup-machine.mjs'),
+    setupMachine,
     '--enroll',
     ...(opts.hubUrl ? [`--hub-url=${opts.hubUrl}`] : []),
     ...(opts.code ? [`--code=${opts.code}`] : []),
@@ -361,7 +381,7 @@ export async function runSetup(opts = {}) {
   }
   step('ลงทะเบียน HUB', 'ok', (enroll.stdout || '').trim().split('\n').filter(Boolean).pop() ?? 'สำเร็จ');
 
-  // 8) กันดิสก์เต็ม — ติดตั้งงานตัด WAL อัตโนมัติ
+  // 9) กันดิสก์เต็ม — ติดตั้งงานตัด WAL อัตโนมัติ
   if (!wouldDo('กันดิสก์เต็ม', 'ตั้งงานตัด WAL ทุกคืน 04:30')) {
     const guard = await installWalGuard({ kitDir, exec });
     step('กันดิสก์เต็ม', guard.ok ? 'ok' : 'warn', guard.reason);
@@ -382,8 +402,8 @@ export async function runBatch(batPath, exec = defaultExec) {
 
 /** ติดตั้งงานตัด WAL อัตโนมัติ (ตัวเดียวกับที่ทำไว้ที่เครื่อง HUB) */
 export async function installWalGuard({ kitDir, exec = defaultExec }) {
-  const ps1 = path.join(kitDir, 'tools', 'prune-wal.ps1');
-  const cmd = path.join(kitDir, 'tools', 'hidden-tasks', 'sovereign-prune-wal.cmd');
+  const ps1 = path.join(kitDir, RUNTIME_FILES.pruneWalPs1);
+  const cmd = path.join(kitDir, RUNTIME_FILES.pruneWalCmd);
   if (!fs.existsSync(ps1) || !fs.existsSync(cmd)) {
     return { ok: false, reason: 'ชุดติดตั้งไม่มีตัวตัด WAL — ติดตั้งเองภายหลังได้' };
   }

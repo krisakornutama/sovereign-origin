@@ -15,19 +15,32 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runSetup } from '../setup-node.mjs';
+import { runSetup, RUNTIME_FILES } from '../setup-node.mjs';
 
-/** สร้างชุดติดตั้งปลอมครบโครง (bat, infra/.env, runner) */
+/**
+ * สร้างชุดติดตั้งปลอมครบโครง (bat, infra/.env, runner)
+ *
+ * ⚠ สร้างไฟล์จาก RUNTIME_FILES เสมอ ห้ามพิมพ์พาธเอง
+ *   เคสจริง 12/10/69: fixture เดิมเขียนพาธ 'sovereign-os/agent-runner/setup-machine.mjs'
+ *   ซึ่งตรงกับโค้ดที่ผิดพาธพอดี → เทสต์ผ่านทั้งที่ของจริงจะพังตอนรันบนเครื่องใหม่
+ *   (setup-machine.mjs อยู่ที่ tools/agent-pack ตลอดมา)
+ */
 function fakeKit({ withInfraEnv = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-kit-'));
-  fs.writeFileSync(path.join(dir, 'setup-first-time.bat'), '@echo off\r\n');
-  fs.writeFileSync(path.join(dir, 'start-sovereign.bat'), '@echo off\r\n');
+  const stub = {
+    [RUNTIME_FILES.setupFirstTime]: '@echo off\r\n',
+    [RUNTIME_FILES.startSystem]: '@echo off\r\n',
+    [RUNTIME_FILES.enrollScript]: '// mock\n',
+    [RUNTIME_FILES.pruneWalPs1]: '# mock\n',
+    [RUNTIME_FILES.pruneWalCmd]: 'echo x\r\n',
+  };
+  for (const [rel, body] of Object.entries(stub)) {
+    const abs = path.join(dir, ...rel.split('/'));
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, body);
+  }
   fs.mkdirSync(path.join(dir, 'sovereign-os', 'infra'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'sovereign-os', 'agent-runner'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'sovereign-os', 'agent-runner', 'setup-machine.mjs'), '// mock\n');
-  fs.mkdirSync(path.join(dir, 'tools', 'hidden-tasks'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'tools', 'prune-wal.ps1'), '# mock\n');
-  fs.writeFileSync(path.join(dir, 'tools', 'hidden-tasks', 'sovereign-prune-wal.cmd'), 'echo x\r\n');
   if (withInfraEnv) fs.writeFileSync(path.join(dir, 'sovereign-os', 'infra', '.env'), 'X=1\n');
   return { dir, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
