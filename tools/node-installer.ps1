@@ -121,9 +121,23 @@ if (-not $HubUrl) {
 }
 $HubUrl = $HubUrl.TrimEnd('/')
 if ($HubUrl -notmatch '^https?://') { Die "ที่อยู่ HUB ไม่ถูกต้อง: $HubUrl" }
-if (-not $Dest) { $Dest = Join-Path $PSScriptRoot 'node-kit' }
+
+# ── จะแตกชุดไว้ที่ไหน ────────────────────────────────────────────────────
+# ⚠ เคสจริง 12/10/69: ค่าเริ่มต้นเดิมใช้ $PSScriptRoot ซึ่งคือ %TEMP% (ที่ดาวน์โหลดสคริปต์)
+#   ⇒ ชุดทั้งหมด ~11 GB (รวม Docker) ไปอยู่ใน C:\...\Temp ซึ่ง Windows ล้างทิ้งเป็นระยะ
+#   และดิสก์ C: ที่เจ้าของมีพื้นที่น้อยที่สุด — ผิดกฎของโครงการด้วย
+#   ⇒ ต้องอยู่ข้างไฟล์ .cmd ที่คนก๊อปมา (รู้ตำแหน่งแน่นอน เห็นง่าย ลบง่าย)
+if (-not $Dest) { $Dest = Join-Path $env:SOV_DIR 'SovereignOS' }
+$Dest = [System.IO.Path]::GetFullPath($Dest)
+
+# ปฏิเสธปลายทางที่อยู่ใน %TEMP% — ข้อมูลจะหายเมื่อ Windows ล้างไฟล์ชั่วคราว
+$tempFull = [System.IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+if ($Dest.StartsWith($tempFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+  Die ("ปลายทางอยู่ในโฟลเดอร์ชั่วคราวของ Windows ซึ่งจะถูกล้างทิ้ง:`n    $Dest`n  ย้ายไฟล์ INSTALL-SOVEREIGN-NODE.cmd ไปวางในโฟลเดอร์ที่ถาวรแล้วรันใหม่ (เช่น D:\Sovereign)")
+}
 
 Say "  HUB : $HubUrl"
+Say "  จะติดตั้งไว้ที่: $Dest"
 $api = "$HubUrl/api/agent-machines/node-kits"
 
 try {

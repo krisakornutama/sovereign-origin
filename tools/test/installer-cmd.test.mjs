@@ -87,6 +87,18 @@ describe('payload ที่รันผ่าน iex (บั๊กข้อ 2, 5
     assert.ok(!payload.includes('$PSScriptRoot'), 'ใช้ $env:SOV_DIR แทน');
   });
 
+  test('ชุดติดตั้งต้องไม่ถูกแตกลง %TEMP% (Windows ล้างทิ้ง + ดิสก์ C: เล็ก)', () => {
+    // เคสจริง 12/10/69: ค่าเริ่มต้นเดิมคือ $PSScriptRoot\node-kit แต่ $PSScriptRoot
+    //   ของสคริปต์ที่ดาวน์โหลดคือ %TEMP% ⇒ ~11 GB ไปตกบน C:
+    const script = fs.readFileSync(path.join(REPO, 'tools', 'node-installer.ps1'), 'utf8');
+    assert.ok(
+      !/\$Dest\s*=\s*Join-Path\s+\$PSScriptRoot/.test(script),
+      'ห้ามใช้ $PSScriptRoot เป็นปลายทางแตกชุด',
+    );
+    assert.ok(script.includes("Join-Path $env:SOV_DIR 'SovereignOS'"), 'ต้องแตกข้างไฟล์ .cmd');
+    assert.ok(script.includes('StartsWith($tempFull'), 'ต้องปฏิเสธปลายทางที่อยู่ใน %TEMP%');
+  });
+
   test('ไม่ส่ง -DryRun เป็น switch parameter ผ่าน powershell -File', () => {
     // powershell.exe -File แปลงทุกค่าเป็น string → SwitchParameter แปลงไม่ได้
     assert.ok(!/DryRun'\]\s*=\s*\$true/.test(payload), 'ให้ส่งผ่าน environment แทน');
