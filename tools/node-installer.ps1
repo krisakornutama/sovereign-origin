@@ -64,6 +64,22 @@ Say '==========================================================='
 Say '  Sovereign OS - ติดตั้งเครื่องนี้เป็นเครื่องลูก'
 Say '==========================================================='
 Say "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] เริ่ม"
+
+# ── สิทธิ์ผู้ดูแลระบบ ──────────────────────────────────────────────────────
+# winget ติดตั้ง Docker Desktop ไม่ได้ถ้าไม่มีสิทธิ์
+#   (เคสจริง 12/10/69: "The installer will request to run as administrator"
+#    → winget ล้ม exit 1 แล้วตัวติดตั้งบอก "ติดตั้งเองแล้วรันซ้ำ" ทั้งที่คนไม่รู้ว่าต้องทำอะไร)
+#   ไฟล์ .cmd จะขอสิทธิ์ให้ก่อนอยู่แล้ว แต่ถ้าเข้ามาทางอื่น = บอกตรงๆ ไม่ใช่ล้มกลางคัน
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$isAdmin = (New-Object Security.Principal.WindowsPrincipal($identity)).IsInRole(
+  [Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+  Say '  X ตัวติดตั้งนี้ต้องใช้สิทธิ์ผู้ดูแลระบบ (Docker Desktop + งานตั้งเวลา)'
+  Say '    วิธีแก้: คลิกขวาที่ไฟล์ INSTALL-SOVEREIGN-NODE.cmd แล้วเลือก'
+  Say '    "Run as administrator" (ทำงานเป็นผู้ดูแลระบบ)'
+  Die 'ไม่มีสิทธิ์ผู้ดูแลระบบ — ติดตั้งต่อไม่ได้' 3
+}
+Say '  OK สิทธิ์ผู้ดูแลระบบ'
 if ($DryRun) { Say '  DRY RUN - จะตรวจอย่างเดียว ไม่แก้อะไร' }
 
 # ── 0) จะติดตั้งไว้ที่ไหน ───────────────────────────────────────────────────

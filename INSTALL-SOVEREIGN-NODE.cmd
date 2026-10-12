@@ -15,6 +15,19 @@ REM ============================================================================
 chcp 65001 >nul 2>&1
 setlocal EnableExtensions DisableDelayedExpansion
 
+net session >nul 2>&1
+if not errorlevel 1 goto :isadmin
+if defined SOV_NO_ELEVATE goto :isadmin
+echo.
+echo   Opening with administrator permission ...
+if "%*"=="" goto :elevate_noargs
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs"
+exit /b 0
+:elevate_noargs
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+exit /b 0
+:isadmin
+
 set "SOV_DIR=%~dp0"
 
 set "SOV_SELF=%~f0"
