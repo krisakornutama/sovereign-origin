@@ -57,6 +57,11 @@ services:
       MQTT_PORT: 1883
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>= 16 random chars)}
       OLLAMA_URL: ${OLLAMA_URL:-http://sovereign-ollama:11434}
+      # ── ชี้ให้ตัวแอปอ่านของที่เผยแพร่จาก host (default ในโค้ดชี้ไป /app/data ซึ่งคือ PGDATA) ──
+      # agent-updates / desktop-updates / node-kits ถูก mount แยกตาม volumes ข้างล่าง
+      AGENT_UPDATE_DIR: /app/agent-updates
+      DESKTOP_UPDATE_DIR: /app/desktop-updates
+      NODE_KIT_DIR: /app/node-kits
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-2m}
       TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -116,6 +121,14 @@ services:
       #   ตัวแปรที่ compose ประกาศไว้แล้ว (DATABASE_URL/JWT_SECRET/…) ยังชนะเหมือนเดิม
       #   เพราะ dotenv ไม่เขียนทับค่าที่ process.env มีอยู่แล้ว
       - ../core-api/.env:/app/.env:ro
+      # ── ข้อมูลที่ "ตัวแอปเป็นเจ้าของ" แยกจากข้อมูลฐานข้อมูล ──────────────
+      # เคสจริง 12/10/69: /app/data ชี้ไปที่ infra/data (เก็บ PGDATA + wal-archive)
+      #   แต่ตัวแอปอ่านที่ core-api/data → ของที่เผยแพร่จากฝั่ง host
+      #   (agent-updates / desktop-updates / node-kits) มองไม่เห็นจากใน container เลย
+      #   ต้อง mount เฉพาะทาง ไม่ไปแตะทางของฐานข้อมูล (incident 2026-09-09 เคยพังมาแล้ว)
+      - ../core-api/data/node-kits:/app/node-kits
+      - ../core-api/data/desktop-updates:/app/desktop-updates
+      - ../core-api/data/agent-updates:/app/agent-updates
       - ../infra/offsite:/app/offsite
       # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â mount certs ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â²ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â° HTTPS:
       # - ./certs:/app/certs:ro
