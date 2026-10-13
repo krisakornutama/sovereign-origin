@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* backup-restore-check — พิสูจน์ว่า backup ล่าสุด "กู้คืนได้จริง" ไม่ใช่แค่มีไฟล์ (คำสั่งเจ้าของ 2/10/69)
    ใช้: node tools/verify/backup-restore-check.mjs [--strict] [--test] [--keep]
-   เรียกอัตโนมัติ: tools/nightly-verify.mjs (ทุกคืน) + tools/verify/visitor-digest.mjs (รายสัปดาห์)
+   เรียกอัตโนมัติ: tools/nightly-verify.mjs (ทุกคืน) + tools/nightly-verify.mjs
 
    ทำอะไร: กู้ dump ล่าสุดเข้า "ฐานข้อมูลชั่วคราว" แล้วเทียบกับฐานข้อมูลจริงทีละตาราง
      · ตารางครบไหม (restore ต้องได้ทุกตาราง)

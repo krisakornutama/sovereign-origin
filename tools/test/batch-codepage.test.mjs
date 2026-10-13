@@ -119,7 +119,6 @@ describe('launcher .cmd ที่แปลงแล้ว: บรรทัดเ
     'nightly-gate-task.cmd',
     'security-digest-task.cmd',
     'sovereign-offsite-task.cmd',
-    'visitor-digest-task.cmd',
     'tools/install/install.cmd',
     'tools/cleanup-finish.cmd',
     'tools/repair-shell.cmd',

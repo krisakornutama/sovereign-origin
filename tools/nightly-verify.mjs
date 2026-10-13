@@ -112,47 +112,9 @@ try {
   writeFileSync(join(LOGDIR, 'last-run.log'), `runner error: ${err instanceof Error ? err.stack : String(err)}`);
 }
 
-// ── SEO: IndexNow (บอท Bing/Yandex/Seznam/Naver) — ให้รู้ทันทีที่ URL เปลี่ยน (คำสั่งเจ้าของ 2/10/69)
-//  รัน --strict เพื่อให้ exit code สะท้อนผลจริง แต่ไม่มีวันทำ nightly พัง: ผลแค่ไปโชว์ในรายงาน
-let indexnow = null;
-{
-  const r = spawnSync('node', [join(REPO, 'tools', 'indexnow-shop-notify.mjs'), '--strict'], { windowsHide: true,
-    cwd: REPO, encoding: 'utf8', timeout: 120_000,
-  });
-  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-  indexnow = { ok: r.status === 0, last: out.find((l) => l.startsWith('indexnow-shop:')) ?? out[out.length - 1] ?? '' };
-  writeFileSync(join(LOGDIR, 'indexnow.log'), out.join('\n') + '\n');
-  console.log(`🔎 IndexNow: ${indexnow.last || '(ไม่มีผลลัพธ์)'}`);
-}
-
-// ── SEO pre-flight: ทุก URL ใน sitemap ยัง 200 + title/description/canonical ครบไหม (2/10/69) ──
-let seo = null;
-{
-  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'seo-preflight.mjs'), '--strict'], { windowsHide: true,
-    cwd: REPO, encoding: 'utf8', timeout: 180_000,
-  });
-  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-  seo = { ok: r.status === 0, last: out.find((l) => l.startsWith('seo-preflight:')) ?? out[out.length - 1] ?? '' };
-  writeFileSync(join(LOGDIR, 'seo-preflight.log'), out.join('\n') + '\n');
-  console.log(`🔎 SEO pre-flight: ${seo.last}`);
-}
-
-// ── SEO: GSC coverage — หน้าที่ Google เห็นจริง ตรงกับ sitemap ไหม (2/10/69) ──
-//  ต้องมี credential (ยังไม่ได้ตั้ง = ข้ามเงียบ ไม่ทำให้ nightly แดง) · จับ "หน้าเคยติด index แล้วหายไป"
-//  ซึ่ง seo-preflight มองไม่เห็นเพราะมันไม่รู้ว่า Google เข้ามาแล้วหรือยัง
-let gsc = null;
-{
-  const r = spawnSync('node', [join(REPO, 'tools', 'verify', 'gsc-coverage.mjs'), '--strict'], { windowsHide: true,
-    cwd: REPO, encoding: 'utf8', timeout: 120_000,
-  });
-  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((s) => s.trim()).filter(Boolean);
-  // เครื่องมือเขียนสถานะตัวเองไว้ใน logs/gsc-coverage.json — อ่านสถานะ "ข้าม" มาให้รายงานโชว์ ⏭ (ไม่ใช่ ✓)
-  let gscSkipped = false;
-  try { gscSkipped = JSON.parse(readFileSync(join(REPO, 'logs', 'gsc-coverage.json'), 'utf8')).skipped === true; } catch { /* ไม่มีไฟล์ = ถือว่าไม่ได้ข้าม */ }
-  gsc = { ok: r.status === 0, skipped: gscSkipped, last: out.find((l) => l.startsWith('gsc-coverage:')) ?? out[out.length - 1] ?? '' };
-  writeFileSync(join(LOGDIR, 'gsc-coverage.log'), out.join('\n') + '\n');
-  console.log(`🔎 GSC coverage: ${gsc.last}`);
-}
+// 13/10/69: ถอดขั้นตอน SEO ออก (IndexNow · seo-preflight · GSC coverage) เพราะเป็นของเว็บสาธารณะ
+//   คำสั่งเจ้าของ: "เว็บไซต์คุณไม่ต้องยุ่ง · พัฒนาแค่ app desktop" → ย้ายไป E:\My work\Sovereign-Web-Standalone
+const indexnow = null; const seo = null; const gsc = null;
 
 // ── Backup: พิสูจน์ว่า dump ล่าสุดกู้คืนได้จริง (กู้เข้า DB ชั่วคราวแล้วลบทิ้ง ไม่แตะ DB จริง) ──
 // ปิดได้ด้วย NIGHTLY_SKIP_RESTORE=1 (ถ้าเครื่องหนัก) · ค่าดีฟอลต์ = รันทุกคืน เพราะไฟล์ backup ที่กู้ไม่ได้
