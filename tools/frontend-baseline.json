@@ -5,8 +5,7 @@
     "     line-budget (pages≤800, components≤400)",
     "     sidebar-rule (ทุกหน้า import Sidebar; exception = public/login/redirect/ไฟล์พิเศษ)",
     "รายการในนี้ = หนี้ที่รับไว้ชั่วคราว — ของใหม่ที่ละเมิด = verify FAIL",
-    "demo.tsx (sidebar-rule) ตั้งใจรับ: public demo page เหมือน /shop /community — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)",
-    "about.tsx + partners.tsx (sidebar-rule) ตั้งใจรับ: หน้าสาธารณะ P16 เหมือน /shop /demo — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)"
+    "about.tsx + partners.tsx (sidebar-rule) ตั้งใจรับ: หน้าสาธารณะ P16 เหมือน /shop — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)"
   ],
   "violations": [
     "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",

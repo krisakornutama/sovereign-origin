@@ -137,13 +137,10 @@ export default function SensorsPublic() {
         <section className="card p-5 space-y-2">
           <h2 className="font-ledger text-base text-gray-200">อยากดูข้อมูลจริงในระบบทำงาน?</h2>
           <p className="text-sm text-gray-400 leading-relaxed">
-            เข้าสนามทดลองได้ทันทีโดยไม่ต้องสมัคร — ข้อมูลชุดตัวอย่างของทั้งระบบ (ฟาร์ม ปศุสัตว์ การเงิน ตามรอยสินค้า)
+            เข้าดูข้อมูลจริงของระบบได้ทันทีโดยไม่ต้องสมัคร (เซนเซอร์จริง ฝูงจริง พอร์ตจริง)
             เปิดให้ลองกดดูได้ทุกเมนู หรือดูรายละเอียดที่มาและทีมงานได้ที่หน้าเกี่ยวกับเรา
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <a href="/demo" className="px-4 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white text-sm font-medium">
-              🧪 เข้าสนามทดลอง
-            </a>
             <a href="/about" className="px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 text-sm">
               เกี่ยวกับเรา
             </a>

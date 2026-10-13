@@ -1,13 +1,13 @@
 "use client";
 // src/components/public/FeedbackButton.tsx
 // ปุ่มฟีดแบ็กลอยสำหรับหน้าสาธารณะ (P: Publishing → ย้ายจาก pages/demo.tsx ตามกฎ import-layers)
-//  หน้าที่ใช้: /demo · /shop · /community · /trace — ส่งเข้า POST /api/feedback (honeypot กันสแปม)
+//  หน้าที่ใช้: /shop · /community · /trace — ส่งเข้า POST /api/feedback (honeypot กันสแปม)
 //  P10: กดเปิด = ยิง beacon feedback_open เข้า /api/track (พฤติกรรมผู้เยี่ยมชม)
 import { useState, useCallback } from 'react';
 import { getApiUrl } from '../../lib/config';
 import { trackFeedbackOpen } from '../../lib/visitorTrack';
 
-export function FeedbackButton({ page = '/demo' }: { page?: string }) {
+export function FeedbackButton({ page = '/' }: { page?: string }) {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('general');
   const [message, setMessage] = useState('');

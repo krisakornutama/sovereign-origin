@@ -71,7 +71,7 @@ export const PUBLIC_PATHS: PublicPath[] = [
   { path: '/partners', changefreq: 'weekly', priority: '0.8' },
   { path: '/partners/guide', changefreq: 'monthly', priority: '0.6' },
   { path: '/community', changefreq: 'weekly', priority: '0.7' },
-  { path: '/demo', changefreq: 'monthly', priority: '0.7' },
+  // 13/10/69: '/demo' ถูกถอดออกจากโปรเจกต์นี้ (ย้ายไป E:\My work\Sovereign-Demo-Standalone)
   { path: '/mbti', changefreq: 'monthly', priority: '0.5' },
   { path: '/sensors', changefreq: 'daily', priority: '0.5' },
   // P24 ต่อ 4 (3/10/69): เพิ่ม /trace เพราะแก้หน้าให้เรนเดอร์เนื้อหาจริงตอน SSR + ใส่ SeoHead แล้ว

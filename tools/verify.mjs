@@ -425,6 +425,11 @@ if (devPidBefore && devIsProd !== false) {
     const helperPath = join(ROOT, 'restart-dev-helper.cmd');
     const helper = [
       '@echo off',
+      // chcp 65001 ต้องมาก่อนข้อความไทยทุกครั้ง (กฎ AGENTS.md) — ไฟล์นี้มี echo ภาษาไทย
+      // ถ้าไม่มีบรรทัดนี้ cmd.exe อ่านด้วย codepage ของ console (ไม่ใช่ UTF-8)
+      // → เศษไบต์ไทยกลายเป็นคำสั่ง ยิ่งกว่านั้น tools/test/batch-codepage.test.mjs
+      // จะแดงทุกครั้งที่รัน verify (13/10/69: verify สร้างไฟล์ที่ตัวเองสั่งห้าม)
+      'chcp 65001 >nul',
       'timeout /t 3 /nobreak >nul',
       `taskkill /PID ${devPidBefore} /F >nul 2>&1`,
       // กัน port-drift (เคสจริง 25/9): next dev เจอพอร์ตไม่ว่างจะเด้งไปฟัง 3001+ เอง
