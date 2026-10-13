@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import SeoHead from '../components/public/SeoHead';
 import { fetchJsonObject } from '../lib/fetchJson';
 import { getApiUrl } from '../lib/config';
@@ -7,6 +8,7 @@ import { FeedbackButton } from '../components/public/FeedbackButton';
 import { FounderCredit } from '../components/public/FounderCredit';
 import { DemoExplain, DEMO_FAQ_JSONLD } from '../components/public/DemoExplain';
 import { trackPageView, trackDemoTab, trackSurvey, trackQuestion } from '../lib/visitorTrack';
+import { isDesktopShell } from '../lib/publicAccess';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /demo — สนามทดลองสาธารณะ (ไม่ต้อง login) — P: Publishing
@@ -44,6 +46,7 @@ const STATUS_TH: Record<string, { label: string; cls: string }> = {
 const CLASS_TH: Record<string, string> = { CASH: 'เงินสด', STOCK: 'หุ้น', GOLD: 'ทองคำ', CRYPTO: 'คริปโต' };
 
 export default function DemoPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<'farm' | 'livestock' | 'finance' | 'catalog' | 'trace' | 'shop'>('farm');
   const [farm, setFarm] = useState<FarmData | null>(null);
   const [stock, setStock] = useState<LivestockData | null>(null);
@@ -54,8 +57,22 @@ export default function DemoPage() {
   const [lotLoading, setLotLoading] = useState(false);
   const [lotErr, setLotErr] = useState('');
   const [products, setProducts] = useState<DemoProduct[] | null>(null);
+  // 13/10/69 (คำสั่งเจ้าของ: "สนามทดลองเอาออกจากตัว desktop — ให้อยู่เฉพาะบนเว็บ"):
+  // แอป desktop (Electron) ไม่มีสนามทดลอง — พาไปหน้าหลักแทน
+  // `mounted` กันไม่ให้ SSR ของเว็บโดนบัง (SEO ต้องได้เนื้อหาจริงจาก server)
+  const [mounted, setMounted] = useState(false);
+  const [desktopBlocked, setDesktopBlocked] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    if (isDesktopShell()) {
+      setDesktopBlocked(true);
+      router.replace('/dashboard');
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (isDesktopShell()) return; // ไม่ดึงข้อมูล sandbox ทิ้งในแอป desktop
     trackPageView('/demo'); // P10: เก็บสถิติการเยือน (cookieless · ไม่มี PII)
     fetchJsonObject<FarmData>(`${API}/farm`).then((d) => d && setFarm(d));
     fetchJsonObject<LivestockData>(`${API}/livestock`).then((d) => d && setStock(d));
@@ -78,6 +95,15 @@ export default function DemoPage() {
       setLotLoading(false);
     }
   }, []);
+
+  // แอป desktop: ไม่มีสนามทดลอง — อย่าเรนเดอร์เนื้อหาแม้แต่ชั่วขณะ (กันแฟลชก่อน redirect)
+  if (mounted && desktopBlocked) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+        <p className="text-sm text-gray-400">สนามทดลองเปิดให้ใช้บนเว็บเท่านั้น — กำลังพาไปหน้าหลัก…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
