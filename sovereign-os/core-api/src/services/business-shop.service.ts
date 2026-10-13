@@ -477,8 +477,9 @@ export async function createPartnerBill(businessId: string, input: PartnerBillIn
       data: { businessId, orderId: order.id, title: String(input.installTitle).slice(0, 160), status: 'TODO' },
     });
   }
-  // P18: ลิงก์ลับของบิล (publicToken) ติดใน Telegram ด้วย — เจ้าของกดเปิดดูบิล/ชำระจากมือถือได้ทันที
-  await notifyPartnerBill(partner, title, `${process.env.PUBLIC_APP_URL || 'https://sovereignoriginshop.dpdns.org'}/shop/?order=${order.publicToken}`);
+  // 13/10/69: ถอดการแจ้งคู่ค้าทาง Telegram ออก (เครือข่ายคู่ค้าเป็นของเว็บสาธารณะ
+  //   ถูกย้ายไป E:\My work\Sovereign-Web-Standalone แล้ว) — บิลยังถูกบันทึกไว้ครบ
+  //   เจ้าของยังดู/ชำระผ่าน Telegram ของตัวเองได้ตามปกติ
   return { orderId: order.id, orderNo: order.orderNo, publicToken: (order as any).publicToken, total };
 }
 
@@ -513,13 +514,7 @@ export async function partnerBills(partnerId: string, take = 50): Promise<Array<
 }
 
 
-/** แจ้งคู่ค้าว่ามีบิลใหม่ (ผ่าน service ของ partner — กัน boundary) */
-async function notifyPartnerBill(partner: { id: string; name: string; category: string; contactName: string; contactPhone: string }, title: string, payUrl?: string): Promise<void> {
-  try {
-    const { notifyPartnerNewBill } = await import('./partner.service');
-    await notifyPartnerNewBill(partner, title, payUrl);
-  } catch { /* เงียบ — ไม่กระทบบิล */ }
-}
+/** 13/10/69: notifyPartnerBill() ถูกถอดไปพร้อมเครือข่ายคู่ค้าสาธารณะ (ของเว็บ) */
 
 /** P17 — ภาพรวมลิงก์ส่วนตัวของคู่ค้า: บิลทั้งหมด + สถานะชำระ + งานติดตั้ง/ซ่อม — ยืนยันด้วย token ลิงก์ลับ */
 export async function partnerPortal(partnerId: string, token: string): Promise<any | null> {

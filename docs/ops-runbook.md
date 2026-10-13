@@ -369,8 +369,16 @@ or starts_with(http.request.uri.path, "/api/payments/webhook")
 3. กด **"📮 ยื่นถึงผม"** → ของที่ 👍 ที่ยังไม่ sent ถูกย่อส่ง Telegram เจ้าของ (ส่งซ้ำไม่ได้ — mark sent_at)
 - อีเมล digest (แทน Telegram): เติม SMTP_* ใน infra/.env แล้วขยาย `feedback.service.ts` — การ์ดอนาคต
 
-### สรุปสิ่งที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
-`/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/track` · `/api/health` · `/partners` · `/about` · `/api/partners*` (เพิ่ม 30/9) · `/robots.txt` · `/sitemap.xml` (เพิ่ม 1/10 — เดิม 403 ต้องแก้ใน dashboard ทั้งสองโซน) — ที่เหลือ block ทั้งหมด (403 ที่ edge)
+### สรุปส่วนที่เปิดสู่โลกภายนอก (WAF allowlist 30/9/69)
+> **⚠ ข้ามหัวข้อนี้ไปได้ — 13/10/69: โปรเจกต์นี้เป็นแอป desktop เท่านั้น**
+> คำสั่งเจ้าของ: *"เว็บไซต์คุณไม่ต้องยุ่ง · คุณพัฒนาแค่ app desktop ตรงนี้เท่านั้น"*
+> หน้าเว็บสาธารณะ **ทั้งหมด** ถูกถอดออกจากโปรเจกต์นี้แล้ว ย้ายไป
+> `E:\My work\Sovereign-Web-Standalone` (เว็บ) และ `E:\My work\Sovereign-Demo-Standalone` (สนามทดลอง)
+> → **ไม่ต้องใช้ tunnel / โดเมน / WAF allowlist ของเว็บกับโปรเจกต์นี้อีก**
+> แอป desktop คุยกับ backend ผ่าน `http://127.0.0.1:3001` โดยตรง (ไม่มีชั้น edge)
+>
+> ประวัติของ allowlist เดิม (ยังเก็บไว้ให้อ้างอิง แต่ path ทุกตัวถูกถอดแล้ว นอกจาก `/api/health`):
+> `/shop*` · `/trace*` · `/demo*` · `/api/shop*` · `/api/trace*` · `/api/demo*` · `/api/feedback` · `/api/track` · `/api/health` · `/partners` · `/about` · `/api/partners*` (เพิ่ม 30/9) · `/robots.txt` · `/sitemap.xml` (เพิ่ม 1/10 — เดิม 403 ต้องแก้ใน dashboard ทั้งสองโซน) — ที่เหลือ block ทั้งหมด (403 ที่ edge)
 
 ### เก็บพฤติกรรม/ความต้องการผู้ใช้ (P10 — 30/9/69) + หน้าแรกโหมดทดลอง (P11)
 - **ตาราง `visitor_events`** (migration 20260930150000) — **cookieless ไม่มี PII**: ไม่เก็บชื่อ/อีเมล/IP เปล่า (ip→sha256+salt 8 ตัว ใช้นับผู้มาเยือนประมาณ) · kind ต้องอยู่ allowlist: `page_view · demo_tab · time_on_page · survey · question · feedback_open · outbound`
