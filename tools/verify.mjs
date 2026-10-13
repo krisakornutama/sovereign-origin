@@ -44,7 +44,7 @@ const steps = [
   // เทสต์ตรรกะของเครื่องมือใน tools/ (coverage floor · seo h1 · gsc coverage · verify-asset)
   // — ต้องอยู่ใน gate ไม่ใช่รันเองตอนจำเป็น ไม่งั้นกติกาที่ปกป้องระบบ (เช่น "หน้าต้องมี h1")
   //   จะกลับไปพังเงียบได้โดยไม่มีใครรู้ (เคสจริง: /sensors/ + /shop/ ค้างที่ h1=0 นานเพราะ
-  //   ไม่มีเทสต์คุมกติกานี้ — ตอนนี้มี tools/test/seo-h1.test.mjs เป็นกันหมด)
+  //   ไม่มีเทสต์คุมกติกานี้ · 13/10/69: seo-h1.test.mjs ถูกถอดไปพร้อมส่วนเว็บ)
   { name: 'tools: unit tests (node --test)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'test:tools'] },
 ];
 if (RUN_DB) {
@@ -425,6 +425,11 @@ if (devPidBefore && devIsProd !== false) {
     const helperPath = join(ROOT, 'restart-dev-helper.cmd');
     const helper = [
       '@echo off',
+      // chcp 65001 ต้องมาก่อนข้อความไทยทุกครั้ง (กฎ AGENTS.md) — ไฟล์นี้มี echo ภาษาไทย
+      // ถ้าไม่มีบรรทัดนี้ cmd.exe อ่านด้วย codepage ของ console (ไม่ใช่ UTF-8)
+      // → เศษไบต์ไทยกลายเป็นคำสั่ง ยิ่งกว่านั้น tools/test/batch-codepage.test.mjs
+      // จะแดงทุกครั้งที่รัน verify (13/10/69: verify สร้างไฟล์ที่ตัวเองสั่งห้าม)
+      'chcp 65001 >nul',
       'timeout /t 3 /nobreak >nul',
       `taskkill /PID ${devPidBefore} /F >nul 2>&1`,
       // กัน port-drift (เคสจริง 25/9): next dev เจอพอร์ตไม่ว่างจะเด้งไปฟัง 3001+ เอง
