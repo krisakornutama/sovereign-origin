@@ -7,6 +7,13 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import crypto from 'node:crypto';
+
+const REPO = join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PREFIX = 'enc:v1:';
 
 const statusPath = process.argv[2];
 if (!statusPath || !existsSync(statusPath)) {
@@ -56,14 +63,14 @@ const text =
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')
     : '');
 
-// ── ส่ง Telegram (credentials จาก DB — soft-fail) ──
+// ── 3) Telegram creds — อ่านจาก DB + ถอดรหัส ──
 function dbCreds() {
   try {
     const out = execSync(
       `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
       { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
     ).split('\n').map((l) => l.trim()).filter(Boolean);
-    return { token: out[0] ?? '', chatId: out[1] ?? '' };
+    return { token: decryptField(out[0] ?? ''), chatId: decryptField(out[1] ?? '') };
   } catch {
     return { token: '', chatId: '' };
   }
