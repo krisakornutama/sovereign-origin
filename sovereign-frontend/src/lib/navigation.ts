@@ -83,6 +83,23 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 
+  // ── 2c. ธุรกิจ IoT (Soverien) ──
+  {
+    title: '📦 ธุรกิจ IoT (Soverien)',
+    titleKey: 'common.nav.group.soverien',
+    items: [
+      { href: '/soverien-dashboard', label: 'แดชบอร์ด Soverien', labelKey: 'soverien.nav.dashboard', icon: 'dashboard', keywords: 'soverien iot สติกเกอร์ serial รับประกัน ออเดอร์' },
+      { href: '/soverien-serial', label: 'ออก Serial', labelKey: 'soverien.nav.serial', icon: 'hash', keywords: 'serial number รุ่นอุปกรณ์ รหัส' },
+      { href: '/soverien-sticker', label: 'สติกเกอร์', labelKey: 'soverien.nav.sticker', icon: 'tag', keywords: 'สติกเกอร์ sticker qr code แพะอุปกรณ์' },
+      { href: '/soverien-order', label: 'ออกออเดอร์', labelKey: 'soverien.nav.order', icon: 'clipboard', keywords: 'ออเดอร์ order ลูกค้า ขาย ติดตั้ง' },
+      { href: '/soverien-warehouse', label: 'คลังออเดอร์', labelKey: 'soverien.nav.warehouse', icon: 'archive', keywords: 'คลัง warehouse ค้นหา กรอง สถานะ' },
+      { href: '/soverien-warranty', label: 'รับประกัน', labelKey: 'soverien.nav.warranty', icon: 'shield', keywords: 'รับประกัน warranty วันที่สิ้นสุด serial' },
+      { href: '/soverien-customers', label: 'ลูกค้า', labelKey: 'soverien.nav.customers', icon: 'users', keywords: 'ลูกค้า customer crm ประวัติ' },
+      { href: '/soverien-guide', label: 'คู่มือขาย', labelKey: 'soverien.nav.guide', icon: 'book', keywords: 'คู่มือ manual ขาย roi demo' },
+      { href: '/soverien-settings', label: 'ตั้งค่า Soverien', labelKey: 'soverien.nav.settings', icon: 'settings', keywords: 'ตั้งค่า pin backup export' },
+    ],
+  },
+
   // ── 3. ฟาร์ม & ทรัพยากร ──
   {
     title: '🌾 ฟาร์ม & ทรัพยากร',

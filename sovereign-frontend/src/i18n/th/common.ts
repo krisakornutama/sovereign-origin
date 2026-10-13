@@ -57,6 +57,16 @@ export const common = {
     users: 'ผู้ใช้',
     audit: 'บันทึกตรวจสอบ',
     settings: 'ตั้งค่า',
+    // Soverien
+    soverienDashboard: 'แดชบอร์ด Soverien',
+    soverienSerial: 'ออก Serial',
+    soverienSticker: 'สติกเกอร์',
+    soverienOrder: 'ออกออเดอร์',
+    soverienWarehouse: 'คลังออเดอร์',
+    soverienWarranty: 'รับประกัน',
+    soverienCustomers: 'ลูกค้า',
+    soverienGuide: 'คู่มือขาย',
+    soverienSettings: 'ตั้งค่า Soverien',
     group: {
       overview: 'ภาพรวม',
       restaurant: '🏪 ร้านอาหาร',
@@ -68,6 +78,7 @@ export const common = {
       dataReports: '📊 ข้อมูล',
       myAccount: 'บัญชีของฉัน',
       system: '⚙️ ระบบ',
+      soverien: '📦 ธุรกิจ IoT (Soverien)',
     },
   },
 

@@ -55,6 +55,16 @@ export const common = {
     users: 'Users',
     audit: 'Audit Log',
     settings: 'Settings',
+    // Soverien
+    soverienDashboard: 'Soverien Dashboard',
+    soverienSerial: 'Generate Serial',
+    soverienSticker: 'Stickers',
+    soverienOrder: 'Create Order',
+    soverienWarehouse: 'Order Warehouse',
+    soverienWarranty: 'Warranty',
+    soverienCustomers: 'Customers',
+    soverienGuide: 'Sales Guide',
+    soverienSettings: 'Soverien Settings',
     group: {
       overview: 'Overview',
       restaurant: '🏪 Restaurant',
@@ -66,6 +76,7 @@ export const common = {
       dataReports: '📊 Data',
       myAccount: 'My Account',
       system: '⚙️ System',
+      soverien: '📦 IoT Business (Soverien)',
     },
   },
 
