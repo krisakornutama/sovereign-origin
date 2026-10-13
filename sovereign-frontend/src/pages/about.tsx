@@ -159,14 +159,13 @@ export default function AboutPage() {
           <div className="flex flex-wrap justify-center gap-3 pt-1">
             <a href="/shop" className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-semibold px-5 py-2.5 text-sm transition">🤝 เข้าหน้าสนับสนุน</a>
             <a href="/partners" className="rounded-xl border border-white/15 hover:border-emerald-500/50 px-5 py-2.5 text-sm transition">🗺️ ดู/สมัครแผนที่คู่ค้า</a>
-            <a href="/demo" className="rounded-xl border border-white/15 hover:border-emerald-500/50 px-5 py-2.5 text-sm transition">🧪 ลองเล่นระบบ</a>
           </div>
         </section>
 
         <footer className="text-center text-[10px] text-gray-600 pt-4 space-y-1">
           <div>Sovereign Origin · ดูแลโดย <b className="text-gray-500">กฤษกรณ์ อุตมะ</b></div>
           <div>
-            <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/partners" className="hover:text-gray-400 underline underline-offset-2">แผนที่คู่ค้า</a> · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">เดโม่</a> · <a href="/trace" className="hover:text-gray-400 underline underline-offset-2">ตามรอย</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
+            <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/partners" className="hover:text-gray-400 underline underline-offset-2">แผนที่คู่ค้า</a> · <a href="/trace" className="hover:text-gray-400 underline underline-offset-2">ตามรอย</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
           </div>
         </footer>
       </main>

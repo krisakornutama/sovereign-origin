@@ -5,7 +5,7 @@
 //  - เงียบทุกกรณี — tracking ล้มต้องไม่กระทบการใช้งาน
 import { getApiUrl } from './config';
 
-type Kind = 'page_view' | 'demo_tab' | 'time_on_page' | 'survey' | 'question' | 'feedback_open' | 'outbound' | 'cta_click';
+type Kind = 'page_view' | 'time_on_page' | 'survey' | 'question' | 'feedback_open' | 'outbound' | 'cta_click';
 
 function send(kind: Kind, page: string, detail?: string, value?: string, useBeacon = false): void {
   if (typeof window === 'undefined') return;
@@ -35,9 +35,8 @@ export function trackPageView(page: string): void {
   window.addEventListener('pagehide', onLeave, { once: true });
 }
 
-export function trackDemoTab(page: string, detail: string): void {
-  send('demo_tab', page, detail);
-}
+// 13/10/69: trackDemoTab() ถูกถอดไปพร้อมหน้าสนามทดลอง (ย้ายไป E:\My work\Sovereign-Demo-Standalone)
+//   ฝั่ง server ยังรับ kind 'demo_tab' อยู่ใน allowlist เพื่อให้ข้อมูลเก่าในตาราง visitor_events ยังอ่านได้
 
 export function trackSurvey(page: string, value: string): void {
   send('survey', page, undefined, value);

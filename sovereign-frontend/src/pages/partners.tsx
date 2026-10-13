@@ -404,7 +404,7 @@ export default function PartnersPage() {
         </section>
 
         <footer className="text-center text-[10px] text-gray-600 pt-8">
-          เครือข่ายคู่ค้า Sovereign Origin · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a> · <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
+          เครือข่ายคู่ค้า Sovereign Origin · <a href="/shop" className="hover:text-gray-400 underline underline-offset-2">สนับสนุนโครงการ</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
           <FounderCredit className="pt-1" />
         </footer>
       </main>

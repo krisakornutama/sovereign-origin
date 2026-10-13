@@ -104,10 +104,33 @@ test('SSR (ไม่มี window) = ไม่ใช่สาธารณะ', a
   assert.equal(m.isPublicHostname(), false);
 });
 
-// ── 5) หน้า /demo ต้องถูกบล็อกบน desktop (ไม่ใช่แค่แก้ที่หน้าแรก) ──
-test('หน้า /demo มีด่านบล็อกสำหรับ desktop', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'sovereign-frontend', 'src', 'pages', 'demo.tsx'), 'utf8');
-  assert.match(src, /isDesktopShell|desktopOnlyBlocked/, 'demo.tsx ต้องมีการตัดสนามทดลองออกจาก desktop');
+// ── 5) ระบบสนามทดลองถูกถอดออกจากโปรเจกต์นี้แล้ว (13/10/69) ──
+test('หน้าสนามทดลอง /demo ไม่อยู่ในโปรเจกต์อีกแล้ว', () => {
+  const demoPage = path.join(ROOT, 'sovereign-frontend', 'src', 'pages', 'demo.tsx');
+  assert.equal(fs.existsSync(demoPage), false, 'pages/demo.tsx ต้องถูกลบออก (ย้ายไป E:\\My work\\Sovereign-Demo-Standalone)');
+  const svc = path.join(ROOT, 'sovereign-os', 'core-api', 'src', 'services', 'demo-sandbox.service.ts');
+  assert.equal(fs.existsSync(svc), false, 'demo-sandbox.service.ts ต้องถูกลบออก');
+});
+
+test('ไม่มีลิงก์หรือ import ที่ชี้ไป /demo เหลือในโค้ดฝั่งหน้าเว็บ', () => {
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const src = path.join(ROOT, 'sovereign-frontend', 'src');
+  const bad = walk(src)
+    .filter((f) => /\.tsx?$/.test(f))
+    .filter((f) => {
+      const code = fs.readFileSync(f, 'utf8').split(/\r?\n/).filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+      return /href=["']\/demo|["']\/demo["']|DemoExplain|trackDemoTab/.test(code);
+    })
+    .map((f) => path.relative(ROOT, f));
+  assert.deepEqual(bad, [], `ยังมีโค้ดอ้าง /demo:\n  ${bad.join('\n  ')}`);
+});
+
+test('backend ไม่ mount /api/demo แล้ว', () => {
+  const raw = fs.readFileSync(path.join(ROOT, 'sovereign-os', 'core-api', 'src', 'routes.ts'), 'utf8');
+  // ข้ามบรรทัดคอมเมนต์ (คอมเมนต์ที่อธิบายว่า "ถอด /api/demo ออกแล้ว" ไม่ใช่คำสั่ง)
+  const code = raw.split(/\r?\n/).filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+  assert.doesNotMatch(code, /demoRoutes|\/api\/demo/, 'routes.ts ต้องไม่ mount /api/demo');
 });
 
 // ── 6) next.config.js ต้องไม่เปิด public mode ตอน static export (กันซ้ำ) ──

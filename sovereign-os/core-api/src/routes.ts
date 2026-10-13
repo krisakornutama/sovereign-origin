@@ -90,7 +90,6 @@ import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
 import businessShopRoutes from './modules/business/business-shop.routes';
 import traceRoutes from './modules/trace/trace.routes';
-import demoRoutes from './modules/demo/demo.routes';
 import feedbackRoutes from './modules/feedback/feedback.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import partnersRoutes from './modules/partners/partners.routes';
@@ -110,7 +109,8 @@ export function mountRoutes(app: Express): void {
   app.use('/api/auth', authRoutes);
   app.use('/api/shop', businessShopRoutes); // PUBLIC SHOP — หน้าร้านสาธารณะ (rate limit ใน router — ต้องมาก่อน /api/business)
   app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (public ตามรหัส + login จัดการล็อต)
-  app.use('/api/demo', demoRoutes); // PUBLIC DEMO SANDBOX — สนามทดลองสาธารณะ (ข้อมูลเดโม่คงตัว — ไม่แตะ DB จริง)
+  // 13/10/69: ถอด /api/demo ออกจากโปรเจกต์นี้แล้ว — ย้ายไป E:\My work\Sovereign-Demo-Standalone
+  //   (เหตุผล: เจ้าของต้องการไม่ให้ทับซ้อนกับโปรเจกต์หลัก · มี README วิธีนำกลับ)
   app.use('/api/feedback', feedbackRoutes); // PUBLIC FEEDBACK — ปุ่มฟีดแบ็ก (POST สาธารณะ · admin จัดการ)
   app.use('/api', analyticsRoutes); // VISITOR TRACKING (P10) — POST /api/track สาธารณะ · GET /api/analytics/summary admin
   app.use('/api/partners', partnersRoutes); // PARTNER NETWORK (P16) — POST สมัครสาธารณะ · GET แผนที่ ACTIVE · admin อนุมัติ

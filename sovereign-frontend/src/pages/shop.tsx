@@ -367,7 +367,7 @@ function Storefront({ businessId }: { businessId: string }) {
         <ShopFaq />
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a>
+          ดำเนินการผ่านระบบ Sovereign OS
           <FounderCredit className="pt-1" />
         </footer>
         <FeedbackButton page="/shop" />
@@ -521,7 +521,7 @@ function OrderView({ token }: { token: string }) {
         {fullyPaid && <ThankYouCard orderNo={order.orderNo} />}
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          ดำเนินการผ่านระบบ Sovereign OS · <a href="/demo" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นเดโม่</a> · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
+          ดำเนินการผ่านระบบ Sovereign OS · <a href="/about" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a>
           <FounderCredit className="pt-1" />
         </footer>
         <FeedbackButton page="/shop" />

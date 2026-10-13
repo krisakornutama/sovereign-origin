@@ -103,7 +103,7 @@ export default function PartnerGuidePage() {
         </section>
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          เครือข่ายคู่ค้า Sovereign Origin · <a href="/about/" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a> · <a href="/demo/" className="hover:text-gray-400 underline underline-offset-2">ลองเล่นระบบ</a>
+          เครือข่ายคู่ค้า Sovereign Origin · <a href="/about/" className="hover:text-gray-400 underline underline-offset-2">เกี่ยวกับเรา</a> · 
         </footer>
       </main>
       <FeedbackButton page="/partners/guide" />

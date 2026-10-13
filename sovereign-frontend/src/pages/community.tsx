@@ -126,7 +126,7 @@ export default function CommunityPage() {
 
         <footer className="text-[11px] text-slate-600 pt-4 border-t border-slate-900 space-y-1">
           <div>{t('community.footer', 'ร้านเข้าร่วม/ถอนตัวเองได้จากหน้าตั้งค่าร้าน — ระบบโชว์เฉพาะข้อมูลที่ร้านเปิดเผยเท่านั้น')}</div>
-          <div>Powered by Sovereign OS · <a href="/demo" className="hover:text-slate-400 underline underline-offset-2">ลองเล่นเดโม่</a></div>
+          <div>Powered by Sovereign OS</div>
           <FounderCredit />
         </footer>
       </main>

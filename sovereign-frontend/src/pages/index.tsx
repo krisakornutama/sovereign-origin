@@ -82,14 +82,14 @@ export default function Home() {
           </header>
 
           <div className="grid gap-3">
+            {/* 13/10/69: ถอดการ์ด "เข้าสนามทดลอง" ออก (ย้ายไป E:\My work\Sovereign-Demo-Standalone)
+                A/B เดิมวัดว่า "เดโม่ก่อน vs ร้านก่อน" — ตัดเดโม่แล้วสองสาขาเหมือนกันจึงเหลือรายการเดียว
+                ค่า variant ยังถูกส่งไปกับ cta_click เพื่อให้ข้อมูลเดิมในตาราง visitor_events อ่านได้ต่อ */}
             {(
-              variant === 'B'
-                ? [['shop', '🛒', 'ร้านอุปกรณ์ & ซอฟต์แวร์', 'ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต', 'hover:border-emerald-500/60', 'text-emerald-300'],
-                   ['demo', '🧪', 'เข้าสนามทดลอง', 'ฟาร์ม · ปศุสัตว์ · การเงิน · ตามรอย · ร้าน — ข้อมูลตัวอย่างล้วน', 'hover:border-cyan-500/60', 'text-cyan-300'],
-                   ['trace', '🔎', 'ตามรอยผลผลิต', 'ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ', 'hover:border-amber-500/60', 'text-amber-300']]
-                : [['demo', '🧪', 'เข้าสนามทดลอง', 'ฟาร์ม · ปศุสัตว์ · การเงิน · ตามรอย · ร้าน — ข้อมูลตัวอย่างล้วน', 'hover:border-cyan-500/60', 'text-cyan-300'],
-                   ['shop', '🛒', 'ร้านอุปกรณ์ & ซอฟต์แวร์', 'ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต', 'hover:border-emerald-500/60', 'text-emerald-300'],
-                   ['trace', '🔎', 'ตามรอยผลผลิต', 'ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ', 'hover:border-amber-500/60', 'text-amber-300']]
+              [
+                ['shop', '🛒', 'ร้านอุปกรณ์ & ซอฟต์แวร์', 'ชุดอุปกรณ์ DMS · ซอฟต์แวร์แยกโมดูล — พร้อมบัตรตามรอยการผลิต', 'hover:border-emerald-500/60', 'text-emerald-300'],
+                ['trace', '🔎', 'ตามรอยผลผลิต', 'ใส่รหัสล็อตดูที่มาทั้งสาย — ต้นทางถึงมือคุณ', 'hover:border-amber-500/60', 'text-amber-300'],
+              ] as const
             ).map(([href, icon, title, desc, borderCls, titleCls]) => (
               <a key={href} href={`/${href}`} onClick={cta(href)} className={`block card p-5 transition group ${borderCls}`}>
                 <div className="flex items-baseline gap-3">
@@ -104,7 +104,7 @@ export default function Home() {
           </div>
 
           <p className="text-center text-[11px] text-gray-600">
-            เจอปัญหาหรืออยากเสนอฟีเจอร์ → ปุ่ม 💬 มุมขวาล่างของทุกหน้าทดลอง
+            เจอปัญหาหรืออยากเสนอฟีเจอร์ → ปุ่ม 💬 มุมขวาล่างของหน้าสาธารณะ
           </p>
 
           {/* เนื้อหาอธิบายแบบ static (เกณฑ์ thin content: หน้านี้ต้องมีข้อความให้บอทอ่าน) */}
