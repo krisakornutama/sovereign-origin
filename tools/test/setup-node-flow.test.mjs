@@ -56,6 +56,14 @@ function mockExec(overrides = {}) {
         return typeof result === 'function' ? result(args) : result;
       }
     }
+    // ⚠ wsl --status ถูกเรียกโดย diagnoseDockerInstall ก่อนตรวจ Docker
+    if (bin === 'powershell.exe' && args.some((a) => a.includes('wsl --status'))) {
+      return { code: 0, stdout: 'WSL2: พร้อม', stderr: '' };
+    }
+    // Virtualization check
+    if (bin === 'powershell.exe' && args.some((a) => a.includes('VirtualizationFirmwareEnabled'))) {
+      return { code: 0, stdout: 'True\r\n', stderr: '' };
+    }
     if (bin === 'docker' && args[0] === 'info') return { code: 0, stdout: 'Server Version: 27', stderr: '' };
     if (bin === 'node' || bin.endsWith('node.exe')) return { code: 0, stdout: 'ok', stderr: '' };
     return { code: 0, stdout: '', stderr: '' };
