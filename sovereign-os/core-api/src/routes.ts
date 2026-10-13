@@ -88,12 +88,7 @@ import systemRoutes, { livenessRouter } from './modules/system/system.routes';
 import clientMonitorRoutes from './modules/system/client-monitor.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
-import businessShopRoutes from './modules/business/business-shop.routes';
 import traceRoutes from './modules/trace/trace.routes';
-import feedbackRoutes from './modules/feedback/feedback.routes';
-import analyticsRoutes from './modules/analytics/analytics.routes';
-import partnersRoutes from './modules/partners/partners.routes';
-import softwareRoutes from './modules/software/software.routes';
 import { featureGuard } from './services/feature-grant.service';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -107,14 +102,16 @@ export function mountRoutes(app: Express): void {
   // SUPERADMIN ผ่านเสมอ, สมาชิกต้องได้รับ grant ในตาราง user_feature_grants
   // (หน้า auth/devices/telemetry/sensors เป็นโครงสร้างพื้นฐาน — ใคร login แล้วใช้ได้)
   app.use('/api/auth', authRoutes);
-  app.use('/api/shop', businessShopRoutes); // PUBLIC SHOP — หน้าร้านสาธารณะ (rate limit ใน router — ต้องมาก่อน /api/business)
-  app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (public ตามรหัส + login จัดการล็อต)
-  // 13/10/69: ถอด /api/demo ออกจากโปรเจกต์นี้แล้ว — ย้ายไป E:\My work\Sovereign-Demo-Standalone
-  //   (เหตุผล: เจ้าของต้องการไม่ให้ทับซ้อนกับโปรเจกต์หลัก · มี README วิธีนำกลับ)
-  app.use('/api/feedback', feedbackRoutes); // PUBLIC FEEDBACK — ปุ่มฟีดแบ็ก (POST สาธารณะ · admin จัดการ)
-  app.use('/api', analyticsRoutes); // VISITOR TRACKING (P10) — POST /api/track สาธารณะ · GET /api/analytics/summary admin
-  app.use('/api/partners', partnersRoutes); // PARTNER NETWORK (P16) — POST สมัครสาธารณะ · GET แผนที่ ACTIVE · admin อนุมัติ
-  app.use('/api/software', softwareRoutes); // SOFTWARE CATALOG — ขายซอฟต์แวร์แยกชิ้น (admin: scan/publish/unpublish)
+  app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (หน้าใน sidebar ของแอป)
+  // 13/10/69: ถอดเส้นทางของเว็บสาธารณะออกจากโปรเจกต์นี้ทั้งหมด (คำสั่งเจ้าของ:
+  //   "เว็บไซต์คุณไม่ต้องยุ่ง · คุณพัฒนาแค่ app desktop ตรงนี้เท่านั้น")
+  //   - /api/shop      หน้าร้านสาธารณะ        (ย้ายไป Sovereign-Web-Standalone)
+  //   - /api/demo      สนามทดลอง               (ย้ายไป Sovereign-Demo-Standalone)
+  //   - /api/feedback  ปุ่มฟีดแบ็กบนเว็บ
+  //   - /api           POST /api/track (สถิติผู้เยี่ยมชม) + GET /api/analytics/summary
+  //   - /api/partners  เครือข่ายคู่ค้าสาธารณะ
+  //   - /api/software  แคตตาล็อกซอฟต์แวร์สาธารณะ
+  //   โค้ดทั้งหมดถูกย้ายออกไปครบ พร้อม README วิธีนำกลับเข้า
   app.use('/api/business', businessRoutes); // BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (สิทธิ์ต่อธุรกิจใน router)
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);

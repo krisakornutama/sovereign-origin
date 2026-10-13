@@ -44,7 +44,7 @@ const steps = [
   // เทสต์ตรรกะของเครื่องมือใน tools/ (coverage floor · seo h1 · gsc coverage · verify-asset)
   // — ต้องอยู่ใน gate ไม่ใช่รันเองตอนจำเป็น ไม่งั้นกติกาที่ปกป้องระบบ (เช่น "หน้าต้องมี h1")
   //   จะกลับไปพังเงียบได้โดยไม่มีใครรู้ (เคสจริง: /sensors/ + /shop/ ค้างที่ h1=0 นานเพราะ
-  //   ไม่มีเทสต์คุมกติกานี้ — ตอนนี้มี tools/test/seo-h1.test.mjs เป็นกันหมด)
+  //   ไม่มีเทสต์คุมกติกานี้ · 13/10/69: seo-h1.test.mjs ถูกถอดไปพร้อมส่วนเว็บ)
   { name: 'tools: unit tests (node --test)', cwd: join(ROOT, '..'), cmd: 'npm', args: ['run', 'test:tools'] },
 ];
 if (RUN_DB) {
