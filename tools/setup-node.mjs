@@ -249,17 +249,25 @@ export async function checkTools(tools = REQUIRED_TOOLS, exec = defaultExec) {
 }
 
 /** ติดตั้งผ่าน winget ถ้ามี (ไม่มี winget = บอกให้ติดตั้งเอง ไม่เดา) */
-export async function installTool(tool, exec = defaultExec) {
+export async function installTool(tool, exec = defaultExec, log = (m) => {}) {
   if (!tool.winget) return { ok: false, reason: `ไม่รู้วิธีติดตั้ง ${tool.label} — ให้ติดตั้งเองแล้วรันซ้ำ` };
   const hasWinget = await exec('where', ['winget']);
   if (hasWinget.code !== 0) {
     return { ok: false, reason: `ไม่พบ winget — ติดตั้ง ${tool.label} เองแล้วรันซ้ำ` };
   }
+  // ⚠ Docker Desktop ต้องใช้สิทธิ์ admin (winget จะเรียก UAC)
+  //   ถ้าไม่มีสิทธิ์ = winget ล้ม exit 1 บอก "The installer will request to run as administrator"
+  //   (เคสจริง 12/10/69: คนต้องกด Yes ใน UAC ถึงจะติดตั้งได้)
+  if (tool.id === 'docker') {
+    log('  · ตรวจสอบสิทธิ์ admin: Docker Desktop ต้องใช้สิทธิ์ผู้ดูแล — UAC จะขึ้นให้กด Yes');
+  }
   const r = await exec('winget', [
     'install', '--id', tool.winget, '-e',
     '--accept-source-agreements', '--accept-package-agreements',
   ]);
-  return { ok: r.code === 0, reason: r.code === 0 ? 'ติดตั้งแล้ว' : `winget ล้ม (exit ${r.code}) — ${r.stdout.trim().slice(-200)}` };
+  // แสดง stderr ด้วย เพราะ winget บางครั้ง error อยู่ใน stderr
+  const errMsg = r.code === 0 ? 'ติดตั้งแล้ว' : `winget ล้ม (exit ${r.code}) — ${(r.stderr || r.stdout || '').trim().slice(-300)}`;
+  return { ok: r.code === 0, reason: errMsg };
 }
 
 /**
@@ -499,7 +507,12 @@ export async function runSetup(opts = {}) {
     step('ตรวจเครื่องมือ', 'warn', `ขาด ${missing.map((t) => t.label).join(', ')}`);
     if (!wouldDo('ติดตั้งเครื่องมือ', `ติดตั้ง ${missing.map((t) => t.label).join(', ')} ผ่าน winget`)) {
       for (const t of missing) {
-        const r = await installTool(t, exec);
+        // ⚠ ตรวจสอบ Docker prerequisites ก่อนลง winget (กัน winget ล้มเงียบๆ)
+        if (t.id === 'docker') {
+          step('ตรวจสอบ Docker prerequisites', 'warn', 'กำลังตรวจสอบ WSL2 / Virtualization...');
+          for (const d of await diagnoseDockerInstall({ exec })) step('  ·', 'warn', d);
+        }
+        const r = await installTool(t, exec, step);
         step(`ติดตั้ง ${t.label}`, r.ok ? 'ok' : 'fail', r.reason);
         // winget ติดตั้ง Docker Desktop เสร็จ = ยังไม่ได้ "เปิด" เครื่อง
         //   docker info จะล้มทันทีที่ยังไม่ได้ start ⇒ ต้องเปิดและรอให้เสร็จเอง

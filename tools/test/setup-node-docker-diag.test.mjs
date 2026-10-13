@@ -148,7 +148,8 @@ test('ดึงบรรทัด error จาก install-log.txt (รอบท�
 
   test('runSetup ต้องเรียกวินิจฉัยตอนติดตั้ง docker ไม่สำเร็จ', () => {
     const src = fs.readFileSync(path.join(REPO, 'tools', 'setup-node.mjs'), 'utf8');
-    const at = src.indexOf('await installTool(t, exec)');
+    // ตอนนี้มีพารามิเตอร์ step เพิ่ม: installTool(t, exec, step)
+    const at = src.indexOf('await installTool(t, exec');
     assert.ok(at > 0);
     const after = src.slice(at, at + 900);
     assert.match(after, /!r\.ok && t\.id === 'docker'/, 'ต้องวินิจฉัยเฉพาะตอนล้ม');

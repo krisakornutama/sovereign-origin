@@ -91,7 +91,8 @@ describe('startDockerDesktop', () => {
 describe('runSetup ต้องเปิด Docker ให้หลังติดตั้ง', () => {
   test('โค้ดต้องเรียก startDockerDesktop หลังติดตั้ง docker', () => {
     const src = fs.readFileSync(path.join(REPO, 'tools', 'setup-node.mjs'), 'utf8');
-    const at = src.indexOf('await installTool(t, exec)');
+    // ตอนนี้มีพารามิเตอร์ step เพิ่ม: installTool(t, exec, step)
+    const at = src.indexOf('await installTool(t, exec');
     assert.ok(at > 0, 'ต้องมีการติดตั้งเครื่องมือ');
     const after = src.slice(at, at + 700);
     assert.match(after, /startDockerDesktop/, 'ต้องเปิด Docker ต่อทันทีหลังติดตั้ง');
