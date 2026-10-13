@@ -18,7 +18,7 @@ echo.
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
     call :note "[ERROR] Docker Desktop ยังไม่เปิด — ให้เปิด Docker Desktop ก่อน แล้วรันใหม่"
-    pause
+    call :settle
     exit /b 1
 )
 
@@ -32,7 +32,7 @@ call :note "  - ROOT = %ROOT%"
 :: ============ ตรวจสอบว่า setup ครั้งแรกแล้วหรือยัง ============
 if not exist "%ROOT%\sovereign-os\infra\.env" (
     call :note "[ERROR] ยังไม่พบ infra\.env — ให้รัน setup-first-time.bat ก่อนครั้งแรก"
-    pause
+    call :settle
     exit /b 1
 )
 
@@ -55,7 +55,7 @@ if %errorlevel% neq 0 (
         goto :compose_retry
     )
     call :note "[ERROR] เริ่ม container ไม่สำเร็จหลัง 3 ครั้ง — ดู: docker compose logs"
-    echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
+    call :settle
     exit /b 1
 )
 call :note "  - containers พร้อมแล้ว"
@@ -109,7 +109,7 @@ set /a count+=3
 title Sovereign OS - กำลังเริ่ม... ผ่านไป !count! วินาที
 if %count% geq 240 (
     call :note "[ERROR] Backend ไม่พร้อมใน 240 วินาที — ดู: docker logs sovereign-core-api"
-    echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
+    call :settle
     exit /b 1
 )
 echo   ยังรออยู่... ผ่านไป !count! วินาที
@@ -148,12 +148,21 @@ echo.
 echo ปิดหน้าต่างนี้ได้เลย - Hot Reload ทำงานทั้ง frontend และ backend
 echo.
 >> "%LOG%" echo ==== Sovereign OS ready %date% %time% ====
-:: ถ้ารันแบบมีคนดู (double-click / interactive) ให้ค้างรอกดคีย์ — แต่ถ้ารันจาก agent/CI
-:: (ไม่มี stdin) ห้ามรอ: pause จะบล็อกตลอดไป = "hang" ที่เคยเจอซ้ำ ๆ
-echo | pause >nul 2>&1 || timeout /t 5 >nul 2>&1
+:: 13/10/69: ห้าม "echo | pause" อีก — pipe บังคับให้ cmd fork ลูกเป็น process ใหม่
+:: (จับได้: cmd.exe /S /D /c " pause 1>nul 2>&1" → ได้ console ใหม่ = หน้าต่างเด้งทุกครั้งที่รัน)
+:: แก้เป็น :settle ซึ่งใช้ timeout ตรง ๆ (ไม่ fork) — คนดูได้อ่าน · headless จบทันที ไม่ค้าง
+call :settle
 exit /b 0
 
 :: ============ subroutine ============
+:: รอให้เจ้าของอ่านผล โดยไม่เด้งหน้าต่างและไม่ค้างตอนรันแบบไม่มีคนดู
+:: · timeout ไม่ fork (ไม่มี pipe) → ไม่มี console ใหม่ = ไม่มีหน้าต่างเด้ง
+:: · stdin เป็น console (double-click) → รอให้อ่าน / กดคีย์ข้ามได้
+:: · stdin ถูก redirect (electron / scheduled task) → timeout จบทันที ไม่ค้าง
+:settle
+timeout /t 8 /nobreak >nul 2>&1
+goto :eof
+
 :note
 echo %~1
 echo %~1>>"%LOG%"
