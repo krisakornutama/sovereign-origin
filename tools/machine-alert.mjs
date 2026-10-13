@@ -17,6 +17,7 @@ import { spawnSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 // สวิตช์เปิด/ปิดของเจ้าของ — ปิดไว้เป็นค่าเริ่มต้น (12/10/69)
 import { readConfig as readAlertConfig } from './machine-alert.config.mjs';
 
@@ -79,18 +80,54 @@ let state = { alerts: {} };
 try { state = JSON.parse(readFileSync(STATE, 'utf8')); } catch { /* ยังไม่มี */ }
 if (!state.alerts) state.alerts = {};
 
-// ── 3) Telegram creds — อ่านจาก DB (แบบเดียวกับ nightly-report) + **cache ลงไฟล์** ──
+// ── 3) Telegram creds — อ่านจาก DB + **ถอดรหัส + cache ลงไฟล์** ──
 // บทเรียนจริง 25 ก.ย. 2026: docker daemon ล่ม = DB ตาย = อ่าน creds ไม่ได้ = แจ้งไม่ออกพอดีตอนที่ต้องแจ้งที่สุด
 // วิธี: อ่าน DB สำเร็จเมื่อไรเขียน cache ทับเสมอ (logs/ เป็น gitignored — ไม่มี token ลง git)
 //       อ่าน DB ไม่ได้ → ใช้ cache ล่าสุดแทน (Telegram API เป็น external — ไม่ต้องพึ่ง docker)
+// ⚠ Creds ใน DB เก็บเป็น AES-256-GCM (enc:v1:...) — ต้องถอดรหัสก่อนใช้
+//   key อยู่ data/field-crypto.key (mount จาก core-api data volume)
 const CREDS_CACHE = join(STATEDIR, 'telegram-creds.json');
+const CRYPTO_KEY_FILE = join(REPO, 'sovereign-os', 'core-api', 'data', 'field-crypto.key');
+const PREFIX = 'enc:v1:';
+
+let cachedCryptoKey = null;
+function loadCryptoKey() {
+  if (cachedCryptoKey) return cachedCryptoKey;
+  try {
+    const k = fs.readFileSync(CRYPTO_KEY_FILE);
+    if (k.length === 32) {
+      cachedCryptoKey = k;
+      return cachedCryptoKey;
+    }
+  } catch { /* ไม่มี key = สร้างใหม่ไม่ได้ */ }
+  return null;
+}
+
+function decryptField(value) {
+  if (!value) return '';
+  if (!value.startsWith(PREFIX)) return value; // plaintext เก่า
+  const key = loadCryptoKey();
+  if (!key) return '';
+  try {
+    const [ivB64, dataB64] = value.slice(PREFIX.length).split(':');
+    const raw = Buffer.from(dataB64, 'base64');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
+    decipher.setAuthTag(raw.subarray(raw.length - 16));
+    return Buffer.concat([decipher.update(raw.subarray(0, raw.length - 16)), decipher.final()]).toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
 function dbCreds() {
   try {
     const out = execSync(
       `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
       { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
     ).split('\n').map((l) => l.trim()).filter(Boolean);
-    const creds = { token: out[0] ?? '', chatId: out[1] ?? '' };
+    const rawToken = out[0] ?? '';
+    const rawChatId = out[1] ?? '';
+    const creds = { token: decryptField(rawToken), chatId: decryptField(rawChatId) };
     if (creds.token && creds.chatId) {
       try { writeFileSync(CREDS_CACHE, JSON.stringify(creds) + '\n'); } catch { /* soft-fail */ }
     }
