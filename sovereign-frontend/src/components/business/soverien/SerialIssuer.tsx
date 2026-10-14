@@ -29,28 +29,25 @@ export default function SerialIssuer({ db, setDb }: { db: Db; setDb: (d: Db) => 
 
   function generate() {
     if (!model) return;
-    const next = db;
-    const made = issueSerials(next, model.id, count);
-    next.serials = [...next.serials, ...made];
-    setDb(next);
+    const made = issueSerials(db, model.id, count);
+    // ⚠ ต้องสร้าง object ใหม่เสมอ 14/10/69
+    //   เดิม `const next = db; next.serials = [...]` คือ object เดิมเป๊ะ
+    //   → React เทียบด้วย Object.is เห็นว่าเหมือนเดิม จึง "ไม่วาดใหม่"
+    //   → ผู้ใช้ต้องกดอะไรสักอย่างเพื่อให้หน้าจอรีเฟรช (อาการที่เจ้าของเจอ)
+    setDb({ ...db, serials: [...db.serials, ...made] });
     setIssued(made);
     setMsg({ ok: true, text: `ออก serial แล้ว ${made.length} ชิ้น (${made[0].sn} → ${made[made.length - 1].sn})` });
   }
 
   function voidSerial(sn: string) {
-    const next = db;
-    const s = next.serials.find((x) => x.sn === sn);
+    const s = db.serials.find((x) => x.sn === sn);
     if (!s || s.status === 'SOLD') return;
-    s.status = 'VOID';
-    setDb(next);
+    setDb({ ...db, serials: db.serials.map((x) => (x.sn === sn ? { ...x, status: 'VOID' } : x)) });
     setMsg({ ok: true, text: `ยกเลิก ${sn} แล้ว (ตัวนับไม่ถอย — serial จะไม่ถูกใช้ซ้ำ)` });
   }
 
   function updateModel(id: string, patch: Partial<{ name: string; price: number; active: boolean }>) {
-    const next = db;
-    const m = next.models.find((x) => x.id === id);
-    if (m) Object.assign(m, patch);
-    setDb(next);
+    setDb({ ...db, models: db.models.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
   }
 
   const listed = showAll ? db.serials : db.serials.slice(-50).reverse();
@@ -124,9 +121,8 @@ export default function SerialIssuer({ db, setDb }: { db: Db; setDb: (d: Db) => 
         <button type="button" className={btnGhost} onClick={() => {
           const id = `model-${Date.now().toString(36)}`;
           const n = db.models.length + 1;
-          const next = db;
-          next.models.push({ id, name: `รุ่นใหม่ ${n}`, prefix: `Soverign-Unit${n}`, price: 990, active: true, lastNo: -1 });
-          setDb(next);
+          const nextModels = [...db.models, { id, name: `รุ่นใหม่ ${n}`, prefix: `Soverign-Unit${n}`, price: 990, active: true, lastNo: -1 }];
+          setDb({ ...db, models: nextModels });
           setModelId(id);
         }}>+ เพิ่มรุ่น</button>
         <p className="text-[11px] text-gray-500">prefix เป็นตัวกำหนดรูปแบบ S/N · เปลี่ยนแล้ว serial ที่ออกไปแล้วจะไม่ตรงกับที่พิมพ์บนป้าย</p>

@@ -46,6 +46,9 @@ export type Order = {
   createdAt: string;
 };
 
+export type StickerFit = 'cover' | 'contain' | 'stretch';
+export type StickerAlign = 'left' | 'center' | 'right';
+
 export type StickerConfig = {
   widthMm: number;
   heightMm: number;
@@ -58,7 +61,25 @@ export type StickerConfig = {
   qrX: number;
   qrY: number;
   qrSize: number;
+  /**
+   * ที่อยู่ปลายทางของ QR (เช่น https://โดเมนของคุณ)
+   * เว้นว่าง = ใช้ origin ของเครื่องที่เปิดแอปอยู่ (localhost ตอนรันบนเครื่องตัวเอง)
+   * ต้องตั้งเป็นโดเมนจริง ถ้าจะให้ลูกค้าสแกนด้วยมือถือ (14/10/69)
+   */
+  qrBaseUrl?: string;
   templateDataUrl?: string;   // ภาพต้นแบบจากผู้ใช้ (base64)
+
+  // ── เพิ่ม 14/10/69 จากอาการที่เจ้าของบอก: ──
+  //   "ย่อภาพให้เล็กไม่ได้ / ปรับตัวอักษรไม่คล่อง / ตัวหนังสือไม่ชัด"
+  tplFit: StickerFit;      // ย่อภาพต้นแบบลงสติกเกอร์: เต็มจอ(ตัดขอบ) / พอดีทั้งหมด / ยืดเต็ม
+  tplScale: number;        // 0.2–3  ย่อ/ขยายเพิ่มจากโหมดข้างบน
+  tplX: number;            // -1..1  เลื่อนภาพต้นแบบแนวนอน
+  tplY: number;            // -1..1  เลื่อนภาพต้นแบบแนวตั้ง
+  serialAlign: StickerAlign;
+  serialPlate: boolean;    // วางพื้นหลังหลัง S/N ให้อ่านออกแม้ทับภาพ
+  serialPlateColor: string;
+  showWarranty: boolean;   // แสดง/ซ่อนบรรทัดวันสิ้นประกัน
+  warrantyColor: string;
 };
 
 export type Settings = {
@@ -71,6 +92,14 @@ export type Settings = {
   sticker: StickerConfig;
 };
 
+/**
+ * แม่แบบป้ายที่ตั้งค่าไว้แล้ว (14/10/69)
+ *   เจ้าของบอกว่าต้องจัดวางทุกครั้ง = ยากเกินไป
+ *   → ตั้งค่าครั้งเดียว ตั้งชื่อไว้ แล้วกดชื่อเดียวจบ
+ *   มีหลายแบบป้ายได้ (หลัก / กล่องเล็ก / ตัวอย่าง) แต่ละแบบจำค่าของตัวเอง
+ */
+export type StickerPreset = { id: string; name: string; cfg: StickerConfig };
+
 export type Db = {
   version: 1;
   models: Model[];
@@ -78,4 +107,5 @@ export type Db = {
   orders: Order[];
   settings: Settings;
   orderSeq: number;
+  stickerPresets: StickerPreset[];
 };

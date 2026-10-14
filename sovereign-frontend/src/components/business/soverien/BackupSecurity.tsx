@@ -25,9 +25,8 @@ export default function BackupSecurity({ db, setDb }: { db: Db; setDb: (d: Db) =
   }, [s.lastBackupAt]);
 
   function patch(p: Partial<typeof s>) {
-    const next = db;
-    next.settings = { ...next.settings, ...p };
-    setDb(next);
+    // ⚠ 14/10/69: ต้องสร้าง object ใหม่ ไม่ใช่แก้ db เดิม (React เทียบ Object.is)
+    setDb({ ...db, settings: { ...db.settings, ...p } });
   }
 
   function exportJson() {
@@ -80,6 +79,7 @@ export default function BackupSecurity({ db, setDb }: { db: Db; setDb: (d: Db) =
       orders: [],
       settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
       orderSeq: 0,
+      stickerPresets: [],
     };
     setDb(reset);
     void fresh;

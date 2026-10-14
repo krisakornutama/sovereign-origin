@@ -314,7 +314,7 @@ export default function AgentQueuePage() {
   if (!isHydrated) return null;
   if (!isAuthenticated) {
     return (
-      <div>
+      <div className="flex">
         <Sidebar />
         <main className="p-6 text-gray-400">กรุณาเข้าสู่ระบบก่อน</main>
       </div>
@@ -324,7 +324,7 @@ export default function AgentQueuePage() {
   const onlineCount = machines.filter((m) => m.status === "online").length;
 
   return (
-    <div>
+    <div className="flex">
       <Sidebar />
       <main className="p-6 space-y-6">
         <PageHeader
