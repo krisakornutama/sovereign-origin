@@ -18,6 +18,8 @@ import { PendingPaymentsCard, computePendingReports, useConfirmReportedPayment }
 import { BusinessShopTab } from './BusinessShopTab';
 import { AgentsTab } from './BusinessAgentsTab';
 import { LedgerRow, ProductsTab, CustomersTab, InstallationsTab, LedgerForm, AddMemberCard } from './BusinessTabs';
+import SoverienHub from './soverien/SoverienHub';
+import { useCreateOrderFromCart } from './useOrderActions';
 
 export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Business; onExit: () => void; refreshBiz?: () => void }) {
   const user = useAuthStore((s) => s.user);
@@ -97,16 +99,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
   // หัก ณ ที่จ่ายต่อออเดอร์ (ท.ป.4 ที่ลูกค้า B2B หัก) — ค่าว่าง = ไม่มี WHT
   const [whtInput, setWhtInput] = useState<Record<string, string>>({});
   const { confirmingId, confirm: confirmReportedPayment } = useConfirmReportedPayment(base, load, setNotice);
-  async function createOrder(customerId?: string) {
-    const items = Object.entries(cart).filter(([, q]) => q > 0).map(([productId, qty]) => ({ productId, qty }));
-    if (items.length === 0) { setNotice({ ok: false, text: 'เลือกสินค้าก่อนเปิดออเดอร์' }); return; }
-    try {
-      const o = await post(`${base}/orders`, { items, customerId: customerId || undefined });
-      setNotice({ ok: true, text: `เปิดออเดอร์ ${o.orderNo} แล้ว (${baht(o.total)}) — ยืนยันที่แท็บออเดอร์` });
-      setCart({});
-      await load();
-    } catch (e: any) { setNotice({ ok: false, text: e.message }); }
-  }
+  const { createOrder } = useCreateOrderFromCart({ base, cart, setCart, post, reload: load, setNotice });
   async function transition(order: Order, action: string, label: string) {
     try {
       await post(`${base}/orders/${order.id}/transition`, { action });
@@ -176,6 +169,9 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
           </button>
         ))}
       </div>
+
+      {/* ── เครื่องมือร้าน Soverien (14/10/69) — ย่อยไว้โมดูลแยก ไม่ให้ไฟล์นี้พังเพดานบรรทัด ── */}
+      {tab === 'soverien' && <SoverienHub />}
 
       {/* ── ภาพรวม ── */}
       {tab === 'overview' && (
