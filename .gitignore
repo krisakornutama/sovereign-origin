@@ -103,6 +103,7 @@ tools/*
 !tools/hidden-tasks/
 !tools/build-desktop.mjs
 !tools/desktop-app-running.mjs
+!tools/find-shadow-installs.mjs
 # เจอตอนเพิ่มกฎให้ gate ไล่เทสต์ด้วย (11/10/69): สองไฟล์นี้ถูกอ้างจากเทสต์
 #   แต่ไม่เคยถูก track → clone ใหม่จะไม่มี แล้วเทสต์/เครื่องมือที่แก้ .cmd จะรันไม่ได้
 !tools/batch-codepage.mjs

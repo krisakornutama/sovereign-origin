@@ -1,23 +1,13 @@
 ﻿// components/business/soverien/backup.ts
-// ค่าคงที่เริ่มต้นของเครื่องมือ + ฟังก์ชันสำรอง/ล้างข้อมูล + วัดโควตา localStorage
-// แยกจาก store เพื่อไม่ให้ไฟล์ UI ต้องดึง store ทั้งก้อนมาแค่เรียก wipeAll
-import type { Settings } from './types';
+// ฟังก์ชันสำรอง/ล้างข้อมูล + วัดโควตา localStorage
+//
+// ⚠ ค่าเริ่มต้นต้องอยู่ที่ store.ts ที่เดียว (14/10/69)
+//   เคสจริง: เคยมี DEFAULT_SETTINGS ซ้ำทั้งใน backup.ts และ store.ts
+//   พอเพิ่มฟิลด์ใหม่ใน store.ts ไฟล์นี้ไม่ได้อัปเดต → `next build` พัง
+//   ทั้งที่ store.ts ผ่านสบายๆ  → ย้ายมา import จากที่เดียวกันจะไม่ drift อีก
+import { KEY, DEFAULT_SETTINGS } from './store';
 
-export const KEY = 'soverien.tools.v1';
-
-export const DEFAULT_SETTINGS: Settings = {
-  models: [
-    { id: 'temp-01', name: 'Soverien Temp v1 (ESP8266 + DS18B20)', prefix: 'Soverign-Temp', price: 990, active: true, lastNo: -1 },
-  ],
-  nearExpiryDays: 30,
-  shippingDays: 14,
-  warrantyDays: 365,
-  sticker: {
-    widthMm: 40, heightMm: 20, dpi: 300,
-    serialX: 0.06, serialY: 0.38, serialSize: 26, serialColor: '#111827',
-    showQr: true, qrX: 0.76, qrY: 0.18, qrSize: 64,
-  },
-};
+export { KEY, DEFAULT_SETTINGS };
 
 export function wipeAll(): void {
   if (typeof window === 'undefined') return;

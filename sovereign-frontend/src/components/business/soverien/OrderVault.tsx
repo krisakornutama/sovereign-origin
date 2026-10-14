@@ -65,15 +65,15 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
 
   function voidOrder(o: Order) {
     if (!window.confirm(`ยกเลิกออเดอร์ ${o.no} ของ ${o.customerName}?\nS/N ที่ผูกไว้จะกลับเป็น "ในคลัง"`)) return;
-    const next = db;
-    const target = next.orders.find((x) => x.id === o.id);
+    const target = db.orders.find((x) => x.id === o.id);
     if (!target) return;
-    target.status = 'VOID';
-    for (const sn of target.serials) {
-      const s = next.serials.find((x) => x.sn === sn);
-      if (s) { s.status = 'STOCK'; s.orderId = undefined; }
-    }
-    setDb(next);
+    // ⚠ 14/10/69: ต้องสร้าง object ใหม่ (ดู OrderCreate.tsx) ไม่ใช่แก้ในตัว
+    const freeSet = new Set(target.serials);
+    setDb({
+      ...db,
+      orders: db.orders.map((x) => (x.id === o.id ? { ...x, status: 'VOID' } : x)),
+      serials: db.serials.map((s) => (freeSet.has(s.sn) ? { ...s, status: 'STOCK', orderId: undefined } : s)),
+    });
     setOpen(null);
     setMsg(`ยกเลิกออเดอร์ ${o.no} แล้ว · S/N กลับเข้าคลัง`);
   }

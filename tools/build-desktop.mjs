@@ -21,6 +21,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findShadowInstalls, EXE_NAME } from './find-shadow-installs.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FE = path.join(ROOT, 'sovereign-frontend');
@@ -45,6 +46,7 @@ const APP = path.join(PORTABLE, 'resources', 'app');
 const skipRuntime = process.argv.includes('--skip-runtime');
 const skipSidecar = process.argv.includes('--skip-sidecar');
 const log = (...a) => console.log('[build-desktop]', ...a);
+const warn = (...a) => console.warn('[build-desktop] !!!', ...a);
 const die = (m) => { console.error('[build-desktop] ERROR:', m); process.exit(1); };
 
 // ── 1) electron runtime → dist-portable ──
@@ -68,6 +70,21 @@ if (!skipRuntime) {
     }
     throw e;
   }
+}
+
+// ── 1b) เตือน "สำเนาเงา" ที่ทำให้แพ็กแล้วไม่มีผล (14/10/69) ──
+//   เคสจริง: มีโฟลเดอร์ E:\My work\SovereignOS เป็นสำเนาเก่าที่ถูกก๊อปออกไปเอง
+//   ไอคอนเดสก์ท็อปยังชี้ไปที่นั่น → แพ็กใหม่เสร็จแต่เปิดแอปแล้วยังเป็นของเก่า
+//   อาการ: "แก้แล้วไม่มีผล" และไม่รู้จะเชื่อ build ไหน
+const shadows = findShadowInstalls(ROOT, PORTABLE);
+
+if (shadows.length) {
+  warn('');
+  warn('⚠ พบสำเนาแอปเก่านอกโปรเจกต์ — ถ้าไอคอนเดสก์ท็อปชี้ไปที่นั่น แพ็กใหม่นี้จะไม่มีผล:');
+  for (const d of shadows) warn(`   · ${d}`);
+  warn('   วิธีแก้: ลบสำเนาเก่า (หรือย้ายไปเก็บ) แล้วชี้ shortcut ไปที่:');
+  warn(`     ${path.join(PORTABLE, EXE_NAME)}`);
+  warn('');
 }
 
 // ── 2) overlay จากซอร์ส → resources/app ──

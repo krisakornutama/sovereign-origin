@@ -33,13 +33,12 @@ export default function OrderCreate({ db, setDb, onDone }: {
 
   function submit() {
     if (!canSubmit || !model) return;
-    const next = db;
-    const made = issueSerials(next, model.id, count);
-    next.serials = [...next.serials, ...made];
+    const made = issueSerials(db, model.id, count);
+    const serials = [...db.serials, ...made];
 
     const o: Order = {
       id: `ord-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      no: nextOrderNo(next),
+      no: nextOrderNo(db),
       issueDate,
       customerName: form.customerName.trim(),
       phone: form.phone.trim(),
@@ -55,12 +54,12 @@ export default function OrderCreate({ db, setDb, onDone }: {
       createdAt: new Date().toISOString(),
     };
     // ผูก serial → ออเดอร์ (เปลี่ยนสถานะเป็นขายแล้ว)
-    for (const sn of o.serials) {
-      const target = next.serials.find((x) => x.sn === sn);
-      if (target) { target.status = 'SOLD'; target.orderId = o.id; }
-    }
-    next.orders = [o, ...next.orders];
-    setDb(next);
+    // ⚠ 14/10/69: ต้องสร้าง serial object ใหม่ทุกตัวที่แตะ
+    //   ถ้าแก้ในตัว (mutate) แล้วส่ง array เดิม → React เทียบ Object.is เห็นเหมือนกัน
+    //   → หน้าจอไม่รีเฟรช ต้องไปกดอะไรสักอย่างก่อนถึงจะเห็นผล
+    const soldSet = new Set(o.serials);
+    const linked = serials.map((x) => (soldSet.has(x.sn) ? { ...x, status: 'SOLD' as const, orderId: o.id } : x));
+    setDb({ ...db, serials: linked, orders: [o, ...db.orders], orderSeq: db.orderSeq + 1 });
 
     setMsg({ ok: true, text: `ออกออเดอร์ ${o.no} แล้ว · ${o.serials.length} ชิ้น · ประกันถึง ${thaiDate(w.end)}` });
     setForm({ customerName: '', phone: '', address: '', line: '', note: '' });

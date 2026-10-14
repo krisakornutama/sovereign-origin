@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -76,10 +76,10 @@ export default function BusinessPage() {
   const current = businesses.find((b) => b.id === selected) ?? null;
 
   return (
-    <div className="atmo-system min-h-screen bg-gray-950 text-gray-100">
+    <div className="atmo-system min-h-screen bg-gray-950 text-gray-100 flex">
       <Sidebar />
       <div className="lg:pl-64">
-        <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
+        <div className="max-w-6xl p-4 md:p-6 space-y-4">
           <PageHeader title="ธุรกิจของฉัน" subtitle="จักรวรรดิธุรกิจ — สินค้า ลูกค้า ออเดอร์ ติดตั้ง การเงิน และผู้ช่วย AI ในที่เดียว" theme="system" icon={<Icon name="package" size={26} />} />
 
           {notice && (

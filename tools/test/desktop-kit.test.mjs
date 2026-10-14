@@ -13,7 +13,7 @@
    3) โฟลเดอร์ติดตั้งต้องมีเส้นทางแอปเดสก์ท็อปจริง: PACK-DESKTOP.mjs (เรียกตัวประกอบ
       ของโปรเจ็ก ไม่มีสูตรซ้ำ) · BUILD-DESKTOP.cmd · INSTALL-DESKTOP.cmd (ทำงานบน E:)
 */
-import { test, describe } from 'node:test';
+import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +21,8 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { fullKitFiles } from '../agent-pack/pack.mjs';
+import { findShadowInstalls, SHADOW_DIRS } from '../find-shadow-installs.mjs';
+import os from 'node:os';
 import { detectAppRunning } from '../desktop-app-running.mjs';
 
 const require = createRequire(import.meta.url);
@@ -95,7 +97,7 @@ describe('โฟลเดอร์ติดตั้งมีเส้นทา�
   });
 });
 
-describe('แพ็กแอปตอนที่แอปเปิดค้างอยู่ (เคสจริง 11/10/69: แพ็กล้ม EPIPE สองรอบ)', () => {
+describe('แพ็กแอปตอนที่แอปเปิดค้างอยู่ (เคสจริง 11/10/69: แพ็กล้ม EPIPE สองรอบ)', (ctx) => {
   // เจ้าของสั่ง: ต้องแพ็กได้โดยไม่ต้องบังคับปิดแอปที่กำลังใช้งาน
   // → ต้องเขียนลงโฟลเดอร์อื่นได้ ไม่ใช่เขียนทับ dist-portable ที่แอปกำลังรัน
 
@@ -145,6 +147,73 @@ describe('แพ็กแอปตอนที่แอปเปิดค้า�
     assert.match(pack, /desktop-app-running/, 'ต้องเรียกตัวตรวจจากโปรเจกต์ (เทสต์ได้) ไม่ใช่เขียนเอง');
     assert.match(pack, /dist-portable-staging/, 'ต้องมีโฟลเดอร์ staging สำหรับเขียนแทน dist-portable');
     assert.match(pack, /--out=/, 'ต้องส่ง --out ให้ build-desktop.mjs เพื่อเปลี่ยนปลายทาง');
+  });
+
+  // ── สำเนาเงานอกโปรเจกต์ (14/10/69) ──
+  // เคสจริง: E:\My work\SovereignOS เป็นสำเนาเก่าที่ก๊อปออกมาเอง ไอคอนเดสก์ท็อปชี้ไปที่นั่น
+  //   → แพ็กใหม่เสร็จ แต่เปิดแอปแล้วยังเป็นของเก่า ("แก้แล้วไม่มีผล")
+  //   ตอนนั้น build รันผ่านหมด ไม่มีอะไรฟ้อง เพราะไม่มีใครเช็คเรื่องนี้
+  // ⚠ ทดสอบด้วยการรันโค้ดจริงบนต้นไม้ชั่วคราว ไม่ใช่ grep —
+  //   grep ผ่านได้ทั้งที่ฟังก์ชันคืนค่าผิดหรือไม่มีอะไรเทียบเลย
+  const tmpRoots = [];
+
+  // แยก tmp ต่อเทสต์ — ถ้าใช้โฟลเดอร์เดียวกัน exe ที่เคสก่อนหน้าสร้างไว้จะค้าง
+  // แล้วทำให้เคส "โฟลเดอร์เปล่า" ผ่านมือ (เจอจริงตอนเขียนรอบแรก 14/10/69)
+  const freshRoot = () => {
+    const r = fs.mkdtempSync(path.join(os.tmpdir(), 'sovereign-shadow-'));
+    tmpRoots.push(r);
+    return r;
+  };
+
+  const makeSibling = (root, name, withExe = true) => {
+    const dir = path.join(root, name);
+    fs.mkdirSync(dir, { recursive: true });
+    if (withExe) fs.writeFileSync(path.join(dir, 'Sovereign OS.exe'), 'x');
+    return dir;
+  };
+
+  after(() => {
+    for (const r of tmpRoots) {
+      try { fs.rmSync(r, { recursive: true, force: true }); } catch { /* windows อาจล็อกไฟล์ชั่วคราว */ }
+    }
+  });
+
+  test('จับสำเนาเงาที่มี exe อยู่จริง (เคสจริงของเจ้าของ)', () => {
+    const root = freshRoot();
+    const shadow = makeSibling(root, SHADOW_DIRS[0]);
+    const project = path.join(root, 'MyProject');
+    fs.mkdirSync(project, { recursive: true });
+    const found = findShadowInstalls(project, path.join(project, 'dist-portable'));
+    assert.deepEqual(found, [shadow], 'ต้องเจอโฟลเดอร์ที่มี Sovereign OS.exe');
+  });
+
+  test('โฟลเดอร์เปล่าไม่นับ — ไม่มี exe = ไม่ใช่สำเนาแอป', () => {
+    const root = freshRoot();
+    makeSibling(root, SHADOW_DIRS[0], false);
+    const project = path.join(root, 'MyProject');
+    fs.mkdirSync(project, { recursive: true });
+    assert.deepEqual(findShadowInstalls(project, path.join(project, 'dist-portable')), []);
+  });
+
+  test('ไม่เตือนผิดตัวตอนตัวที่แพ็กอยู่คือสำเนาเงาตัวนั้นพอดี', () => {
+    const root = freshRoot();
+    const shadow = makeSibling(root, SHADOW_DIRS[0]);
+    const project = path.join(root, 'MyProject');
+    fs.mkdirSync(project, { recursive: true });
+    assert.deepEqual(
+      findShadowInstalls(project, shadow),
+      [],
+      'ถ้า PORTABLE คือโฟลเดอร์นั้นพอดี ต้องไม่เตือนให้ลบตัวเอง',
+    );
+  });
+
+  test('ไม่ต้องเตือนซ้ำทุกครั้งที่แพ็ก — staging เป็นของตัวแพ็ก ไม่ใช่สำเนาเงา', () => {
+    const root = freshRoot();
+    const project = path.join(root, 'MyProject');
+    fs.mkdirSync(project, { recursive: true });
+    makeSibling(root, SHADOW_DIRS[0]);
+    const found = findShadowInstalls(project, path.join(project, 'dist-portable-staging'));
+    assert.equal(found.length, 1, 'staging ต้องไม่กลายเป็นเป้าหมายของการเตือน');
   });
 
   test('ตัวตรวจแอปค้างตัดสินจาก tasklist ได้ถูกต้อง (เทสต์กับผลจริง ไม่ใช่ grep)', () => {

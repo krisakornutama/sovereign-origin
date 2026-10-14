@@ -311,7 +311,7 @@ export default function MachineConsolePage() {
 
   if (!isAuthenticated) {
     return (
-      <div>
+      <div className="flex">
         <Sidebar />
         <main className="p-6 text-gray-400">กรุณาเข้าสู่ระบบก่อน</main>
       </div>
@@ -322,7 +322,7 @@ export default function MachineConsolePage() {
   const onlineMachines = machines.filter((m) => m.status === "online");
 
   return (
-    <div>
+    <div className="flex">
       <Sidebar />
       <main className="p-6 space-y-6">
         <PageHeader

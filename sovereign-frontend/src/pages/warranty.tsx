@@ -19,7 +19,7 @@ export default function WarrantyPage() {
   useEffect(() => { setDb(load()); }, []);
 
   return (
-    <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100">
+    <div className="atmo-nature min-h-screen bg-gray-950 text-gray-100 flex">
       {/* มี Sidebar ตามกฎ sidebar-rule ของโปรเจกต์ — คนที่สแกน QR
           ต้องยังเดินไปหน้าอื่นต่อได้ ไม่ใช่ติดอยู่ที่หน้าจอเดียว */}
       <Sidebar />

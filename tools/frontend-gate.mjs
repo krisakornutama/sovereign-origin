@@ -167,8 +167,40 @@ function checkSidebar() {
     if (name === 'sitemap.xml.ts') continue;
     if (!hasSidebarImport(file)) {
       add('sidebar-rule', file, 'หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)');
+      continue;
+    }
+    // ── กฎแถม: ตัวห่อต้องเป็น flex ──
+    //   เคสจริง 14/10/69: business.tsx ครอบด้วย <div class="...text-gray-100"> โดยไม่มี flex
+    //   Sidebar เป็น position:sticky (ไม่ใช่ fixed) → ถ้า parent เป็น block มันจะกินบรรทัดเต็มจอ
+    //   เนื้อหาที่อยู่ถัดมาจถูกดันลงไปข้างล่างจอ (หน้าว่าง 800px ด้านบน เห็นแค่หัวเรื่องที่หายไป)
+    //   → ต้องเป็น flex เสมอ ตรวจจาก element ที่ครอบ <Sidebar /> โดยตรง
+    if (!wrapsSidebarInFlex(readFileSync(file, 'utf8'))) {
+      add('sidebar-rule', file, 'ตัวห่อ <Sidebar /> ไม่ได้ใส่ class flex — Sidebar จะดันเนื้อหาลงด้านล่างจอ');
     }
   }
+}
+
+/**
+ * ดูว่า element ที่ครอบ <Sidebar /> มีคำว่า flex ใน class หรือไม่
+ * คืน true ถ้าไม่พบ Sidebar เลย (ไม่ต้องตรวจ) หรือครอบด้วย flex แล้ว
+ */
+function wrapsSidebarInFlex(src) {
+  const lines = src.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!/<Sidebar\s*\/>/.test(lines[i])) continue;
+    // ไล่ขึ้นไปหาแท็กเปิดของ element ที่ครอบอยู่
+    for (let j = i - 1; j >= 0 && j >= i - 4; j--) {
+      const m = lines[j].match(/<([A-Za-z][\w.]*)\b([^>]*)>\s*$/);
+      if (!m) continue;
+      const attrs = m[2] || '';
+      // เจอ className ที่มี flex → ผ่าน
+      if (/\bflex\b/.test(attrs)) return true;
+      // เจอ <div> เปล่า ๆ ที่ครอบ → ไม่มี flex → fail
+      if (/<div\b/.test(m[0])) return false;
+      return true;
+    }
+  }
+  return true;
 }
 
 // ── Baseline ────────────────────────────────────────────────────────────────
