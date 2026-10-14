@@ -17,7 +17,33 @@ import { useLanguageStore } from '../../stores/useLanguageStore';
 // → scrollTop หายเป็น 0 ทุกครั้ง จำไว้ระดับ module (module อยู่ข้ามการสลับหน้า) แล้วคืนให้ตอน mount
 let savedSidebarScrollTop: number | null = null;
 
+/**
+ * 14/10/69 — กู้ "เปลี่ยนหน้าแล้วต้องขึ้นบนสุด"
+ *
+ * ทั้งแอปตั้ง `scroll={false}` ไว้ทุกลิงก์ (Sidebar/MobileNav/CommandPalette
+ * และลิงก์ในหน้า) = ตั้งใจไม่ให้ Next เลื่อนหน้าเอง
+ * ผลคือ: อยู่หน้าที่ยาว เลื่อนลงมาแล้วกดเมนู → เปลี่ยนหน้าแล้วยังค้างที่ตำแหน่งเดิม
+ * ต้องเลื่อนขึ้นมาเองทีละหน้า (เจอบ่อยที่สุดที่ /restaurant และ /business)
+ *
+ * ทำที่ Sidebar เพราะ mount อยู่ทุกหน้าในระบบ (53/56 — ที่เหลือคือหน้า login,
+ * redirect และหน้าที่ไม่ต้องเลื่อน) และไม่ต้องไปแตะ `_app.tsx` (อยู่ในรายการห้ามแตะ)
+ *
+ * ข้อยกเว้น: ถ้ามี hash (เช่น /treasury#runway) ให้ Next จัดการ scroll ไปที่ anchor
+ * ถ้าไม่มี hash ค่อยพากลับไปบนสุด
+ */
+function useScrollToTopOnRouteChange() {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hash) return;
+    // รอ 1 เฟรม ให้หน้าใหม่ layout เสร็จก่อน กันเลื่อนแล้วหน้ายังไม่สูงพอ
+    const id = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(id);
+  }, [pathname]);
+}
+
 export default function Sidebar() {
+  useScrollToTopOnRouteChange();
   const pathname = usePathname();
   const router = useRouter();
   const asideRef = useRef<HTMLElement>(null);
