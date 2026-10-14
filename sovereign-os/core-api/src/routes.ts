@@ -86,6 +86,7 @@ import usersRoutes from './modules/users/users.routes';
 import auditRoutes from './modules/audit/audit.routes';
 import systemRoutes, { livenessRouter } from './modules/system/system.routes';
 import clientMonitorRoutes from './modules/system/client-monitor.routes';
+import qrRoutes from './modules/system/qr.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import businessRoutes from './modules/business/business.routes';
 import traceRoutes from './modules/trace/trace.routes';
@@ -281,6 +282,9 @@ export function mountRoutes(app: Express): void {
   // Client Error Monitoring — รับ error จาก browser ผู้ใช้ (สาธารณะ+rate limit — error ก่อน login ก็ต้องเห็น)
   if (process.env.CLIENT_ERROR_ENABLED !== 'false') {
     app.use('/api/client-monitor', clientMonitorRoutes);
+  // 14/10/69: QR generator สำหรับป้ายสติกเกอร์ Soverien — ไม่แตะ DB · ไม่ต้อง auth
+  //   (ไม่มีข้อมูลลูกค้าใน QR — เก็บแค่รหัสอุปกรณ์ + ลิงก์หน้าตรวจประกัน)
+  app.use('/api/util', qrRoutes);
   }
   app.use('/api/automation', automationAlertsRoutes); // GET /alerts — หลัง automation.routes เสมอ
 }
