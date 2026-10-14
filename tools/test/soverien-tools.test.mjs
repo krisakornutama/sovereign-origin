@@ -193,3 +193,53 @@ test('ZIP ที่สร้างมี signature ถูกต้องคร�
   assert.ok(blob instanceof Blob);
   assert.equal(blob.type, 'application/zip');
 });
+
+// ── 8) ค้นประกันด้วย S/N — ต้องแยก "ไม่มี serial" ออกจาก "ยังไม่ผูกออเดอร์" (14/10/69) ──
+const { lookupWarranty } = store;
+
+test('กรอกว่าง = ยังไม่ได้ค้น (EMPTY)', () => {
+  assert.equal(lookupWarranty(emptyDb(), '   ').kind, 'EMPTY');
+});
+
+test('S/N ที่ไม่มีในระบบ = UNKNOWN (ต่างจาก serial ที่ออกแล้วแต่ยังไม่ขาย)', () => {
+  assert.equal(lookupWarranty(emptyDb(), 'Soverign-Temp-999').kind, 'UNKNOWN');
+});
+
+test('serial ที่ออกแล้วแต่ยังไม่ผูกออเดอร์ = UNSOLD ไม่ใช่ UNKNOWN', () => {
+  const db = emptyDb();
+  const made = store.issueSerials(db, db.models[0].id, 1);
+  db.serials.push(...made);
+  const hit = lookupWarranty(db, made[0].sn);
+  assert.equal(hit.kind, 'UNSOLD', 'serial มีจริงแต่ยังไม่ขาย → ต้องไม่ขึ้นว่า "ไม่พบ Serial"');
+  assert.equal(hit.order, undefined);
+});
+
+test('serial ที่ผูกกับออเดอร์แล้ว = สถานะประกันจริง', () => {
+  const db = emptyDb();
+  const made = store.issueSerials(db, db.models[0].id, 1);
+  const s = made[0];
+  db.serials.push(s);
+  db.orders.push({
+    id: 'o1', no: 'SO-0001', customerName: 'ทดสอบ', phone: '0800000000', line: '', address: '', note: '',
+    modelIds: [db.models[0].id], serials: [s.sn], issueDate: '2026-10-01',
+    warrantyStart: '2026-10-15', warrantyEnd: '2027-10-15', status: 'ACTIVE', total: 0, createdAt: '2026-10-01',
+  });
+  s.orderId = 'o1';
+  const hit = lookupWarranty(db, `  ${s.sn.toLowerCase()}  `);
+  assert.equal(hit.kind, 'IN', 'ต้อง normalize เป็นตัวพิมพ์ใหญ่และตัดช่องว่าง');
+  assert.equal(hit.order?.no, 'SO-0001');
+});
+
+test('ออเดอร์ที่ยกเลิก = VOID ไม่ใช่หมดประกัน', () => {
+  const db = emptyDb();
+  const made = store.issueSerials(db, db.models[0].id, 1);
+  const s = made[0];
+  db.serials.push(s);
+  const o = {
+    id: 'o1', no: 'SO-0001', customerName: 'ทดสอบ', phone: '0800000000', line: '', address: '', note: '',
+    modelIds: [db.models[0].id], serials: [s.sn], issueDate: '2026-10-01',
+    warrantyStart: '2026-10-15', warrantyEnd: '2027-10-15', status: 'VOID', total: 0, createdAt: '2026-10-01',
+  };
+  db.orders.push(o); s.orderId = 'o1';
+  assert.equal(lookupWarranty(db, s.sn).kind, 'VOID');
+});
