@@ -1,4 +1,4 @@
-// components/business/soverien/store.ts
+﻿// components/business/soverien/store.ts
 // คลังข้อมูลใน localStorage + การคำนวณประกัน + เครื่องมือเสริม
 // ทุกอย่าง synchronous ตั้งใจ เพราะแอป desktop ทำงานคนเดียว และตามสเปกผู้ใช้สั่ง
 // "เก็บ lastSerialNumber ใน localStorage" — ห้ามซ้ำเด็ดขาด (counter ไม่เคยถอยหลัง แม้ void)
@@ -124,6 +124,32 @@ export function warrantyState(o: Order, s: Settings, today = todayIso()): { stat
   if (left < 0) return { state: 'OUT', daysLeft: left };
   if (left <= s.nearExpiryDays) return { state: 'NEAR', daysLeft: left };
   return { state: 'IN', daysLeft: left };
+}
+
+export type Lookup = { kind: WState | 'UNSOLD' | 'EMPTY'; sn: string; order?: Order };
+
+/**
+ * ค้น S/N เพื่อตรวจประกัน — แยก 3 เคสที่ "คนละความหมายกัน" (14/10/69)
+ *   EMPTY   = ยังไม่ได้กรอกอะไร
+ *   UNKNOWN = ไม่มี serial นี้ในระบบเลย (พิมพ์ผิด / เป็นของเครื่องอื่น)
+ *   UNSOLD  = มี serial จริง แต่ยังไม่ได้ผูกกับออเดอร์ → ยังไม่เริ่มประกัน
+ *
+ * ก่อนแก้: UNKNOWN ครอบทั้ง UNKNOWN กับ UNSOLD → หัวข้อบนหน้าขึ้นว่า
+ * "ไม่พบ Serial นี้" แต่ข้างล่างบอก "serial นี้ยังไม่ได้ผูกกับออเดอร์" ขัดกันเอง
+ */
+export function lookupWarranty(db: Db, raw: string): Lookup {
+  const typed = raw.trim();
+  if (!typed) return { kind: 'EMPTY', sn: '' };
+  // ⚠ เทียบแบบไม่สนตัวพิมพ์ใหญ่/เล็ก แล้วคืนค่า "ตามที่เก็บในระบบ"
+  //   เพราะ serial เก็บเป็น "Soverign-Temp-000" (ตัวพิมพ์ผสม)
+  //   ถ้าเอา .toUpperCase() ไปเทียบตรงๆ → "SOVERIGN-TEMP-000" !== "Soverign-Temp-000"
+  //   → ค้นประกันไม่มีวันเจอ แม้พิมพ์ถูก (จริงแล้วเทสต์นี้จับได้ 14/10/69)
+  const key = typed.toUpperCase();
+  const serial = db.serials.find((s) => s.sn.toUpperCase() === key);
+  if (!serial) return { kind: 'UNKNOWN', sn: typed };
+  const order = serial.orderId ? db.orders.find((o) => o.id === serial.orderId) : undefined;
+  if (!order) return { kind: 'UNSOLD', sn: serial.sn };
+  return { kind: warrantyState(order, db.settings).state, sn: serial.sn, order };
 }
 
 // ── Serial ─────────────────────────────────────────────────────────────────

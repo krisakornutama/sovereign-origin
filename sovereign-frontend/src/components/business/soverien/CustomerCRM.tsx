@@ -75,9 +75,15 @@ export default function CustomerCRM({ db }: { db: Db }) {
                     <td className="py-2 pr-2 mono text-emerald-300">{c.value.toLocaleString('th-TH')} ฿</td>
                     <td className="py-2 pr-2 text-gray-400">{thaiDate(c.lastOrderDate)}</td>
                     <td className="py-2">
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
                         {c.phone && <a className="text-[11px] text-cyan-400 hover:underline" href={`tel:${c.phone}`}>โทร</a>}
-                        {c.line && <span className="text-[11px] text-slate-500">@{c.line}</span>}
+                        {c.line && (
+                          // เปิดแชท LINE ของลูกค้าโดยตรง — สเปก: "ปุ่ม 'ติดต่อกลับ' (เปิด LINE / โทร)"
+                          // ti/p/~<id> ใช้ได้กับ LINE ID รูปแบบ @xxx หรือ xxx
+                          <a className="text-[11px] text-emerald-400 hover:underline"
+                            href={`https://line.me/ti/p/~${encodeURIComponent(c.line.replace(/^@/, ''))}`}
+                            target="_blank" rel="noopener noreferrer">LINE</a>
+                        )}
                       </div>
                     </td>
                   </tr>

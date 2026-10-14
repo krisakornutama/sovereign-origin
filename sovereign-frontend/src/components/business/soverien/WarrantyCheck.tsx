@@ -4,10 +4,10 @@
 // รองรับ ?sn=... ใน URL เพื่อให้ QR บนสติกเกอร์สแกนแล้วเปิดหน้านี้พร้อมกรอกให้
 import { useEffect, useMemo, useState } from 'react';
 import { Db } from './types';
-import { warrantyState, thaiDate, thaiShort, daysBetween } from './store';
+import { thaiDate, thaiShort, daysBetween, lookupWarranty } from './store';
 import { Card, inputCls, btnPrimary, Stat, Empty } from './ui';
 
-type Result = { kind: 'IN' | 'NEAR' | 'OUT' | 'VOID' | 'UNKNOWN'; sn: string; orderId?: string };
+type Result = { kind: 'IN' | 'NEAR' | 'OUT' | 'VOID' | 'UNKNOWN' | 'UNSOLD'; sn: string; orderId?: string };
 
 export default function WarrantyCheck({ db }: { db: Db }) {
   const [q, setQ] = useState('');
@@ -20,14 +20,11 @@ export default function WarrantyCheck({ db }: { db: Db }) {
     } catch { /* ไม่มี window/URLSearchParams */ }
   }, []);
 
+  // ตรรกะการค้นอยู่ใน store.lookupWarranty (มีเทสต์คุม) ไม่ฝังใน JSX
+  // EMPTY แปลงเป็น UNKNOWN + sn ว่าง เพราะ UI ตัดสินด้วย res.sn === '' อยู่แล้ว
   const res: Result = useMemo(() => {
-    const sn = q.trim().toUpperCase();
-    if (!sn) return { kind: 'UNKNOWN', sn: '' };
-    const found = db.serials.find((s) => s.sn === sn);
-    if (!found) return { kind: 'UNKNOWN', sn };
-    const order = found.orderId ? db.orders.find((o) => o.id === found.orderId) : undefined;
-    if (!order) return { kind: 'UNKNOWN', sn, orderId: undefined };  // ยังไม่ได้ขาย = ยังไม่มีประกัน
-    return { kind: warrantyState(order, db.settings).state, sn, orderId: order.id };
+    const hit = lookupWarranty(db, q);
+    return { kind: hit.kind === 'EMPTY' ? 'UNKNOWN' : hit.kind, sn: hit.sn, orderId: hit.order?.id };
   }, [q, db]);
 
   const order = res.orderId ? db.orders.find((o) => o.id === res.orderId) : undefined;
@@ -38,6 +35,8 @@ export default function WarrantyCheck({ db }: { db: Db }) {
     NEAR: { box: 'border-amber-500/40 bg-amber-500/10', text: 'text-amber-300', icon: '⚠️', label: 'ใกล้หมดประกัน' },
     OUT: { box: 'border-rose-500/40 bg-rose-500/10', text: 'text-rose-300', icon: '❌', label: 'หมดประกันแล้ว' },
     VOID: { box: 'border-slate-600 bg-slate-800/60', text: 'text-gray-400', icon: '⚫', label: 'ออเดอร์ถูกยกเลิก' },
+    // ต่างจาก UNKNOWN: serial มีจริง เพียงยังไม่ได้ผูกกับออเดอร์ (14/10/69)
+    UNSOLD: { box: 'border-sky-500/40 bg-sky-500/10', text: 'text-sky-300', icon: '🕓', label: 'ออก serial แล้ว แต่ยังไม่ผูกกับออเดอร์' },
     UNKNOWN: { box: 'border-slate-700 bg-slate-900/50', text: 'text-gray-300', icon: '🔍', label: 'ไม่พบ Serial นี้' },
   }[res.kind];
 
@@ -94,9 +93,10 @@ export default function WarrantyCheck({ db }: { db: Db }) {
                 <div className="text-xs text-gray-400">LINE: {order.line}</div>
               )}
             </>
-          ) : res.kind === 'UNKNOWN' && model ? (
-            <p className="text-sm text-gray-300">
-              Serial นี้ยังไม่ได้ผูกกับออเดอร์ — ยังไม่เริ่มประกัน (ประกันเริ่มนับจากวันออกใบออเดอร์)
+          ) : res.kind === 'UNSOLD' ? (
+            <p className="text-sm text-sky-200">
+              Serial นี้ถูกออกจากคลังแล้ว แต่ยังไม่ได้ผูกกับออเดอร์ — ประกันจะเริ่มนับเมื่อมีการออกออเดอร์
+              (คลิกที่ 🏷️ Soverien → 📝 ออกออเดอร์ แล้วเลือก serial ใบนี้)
             </p>
           ) : null}
         </div>
