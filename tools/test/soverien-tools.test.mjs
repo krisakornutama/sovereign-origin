@@ -699,12 +699,20 @@ test('ต้องมีการ์ดแจ้งเตือนอยู่�
 });
 
 test('หน้าเว็บห้ามฝัง bot token ของเจ้าของไว้ในซอร์สโค้ด (16/10/69)', () => {
-  // ⚠ เจ้าของวาง token จริงในแชทวันที่ 16/10/69 — ต้องไม่ให้หลุดเข้า git ตอนนี้
+  // ⚠ เจ้าของวาง token จริงในแชท (รอบแรก) แล้วออกใหม่รอบที่สอง — ทั้งสองตัวต้องไม่หลุดเข้า git
+  //   ถ้าวันหนึ่งมีคนอยู่ดี ๆ ก็ควรเพิ่มรายการนี้ทันที (ข้อนี้คือกันไว้เผื่อเกิดซ้ำ)
+  const banned = [
+    ['8807673052', 'บอทรุ่นแรก'],
+    ['AAG93mLtKvYyNyLQLzGhnbqHCw6RbqIYcZI', 'token รุ่นแรก'],
+    ['8671099037', 'บอทรุ่นสอง'],
+    ['AAEmDQ7P9DTu2kUBJRbL926Kw_N1hi8ylHU', 'token รุ่นสอง'],
+  ];
   const files = ['telegram-notify.ts', 'TelegramNotifyCard.tsx', 'SoverienHub.tsx', 'store.ts', 'StickerStudio.tsx'];
   for (const f of files) {
     const src = code(f);
-    assert.doesNotMatch(src, /8807673052/, `${f}: ห้ามมีตัวเลขบอท token ของเจ้าของ`);
-    assert.doesNotMatch(src, /AAG93mLt/, `${f}: ห้ามมีส่วนของ token ของเจ้าของ`);
+    for (const [secret, label] of banned) {
+      assert.ok(!src.includes(secret), `${f}: ห้ามมี${label}ของเจ้าของ (${secret.slice(0, 6)}…)`);
+    }
   }
 });
 

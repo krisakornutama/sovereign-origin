@@ -3,6 +3,7 @@
 // เจ้าของ: "ตัวเดียวกับส่งข้อมูลเรื่องบ้าง แต่อันนี้แยกเฉพาะห้อง เพราะเกี่ยวกับธุรกิจโดยตรง"
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { formatBusinessAlert, type BusinessEventKind } from '../src/services/telegram-alert.service';
 import { validateTelegramChatId, maskChatId } from '../src/services/telegram-credentials.service';
 
@@ -30,6 +31,35 @@ describe('maskChatId', () => {
     assert.equal(maskChatId('-1001234567890'), '••••890', 'เหลือ 3 ตัวท้าย');
     assert.ok(!maskChatId('-1001234567890').includes('1001'), 'ต้องไม่เหลือหัวห้องให้เดาต่อ');
     assert.equal(maskChatId('12345'), '••••', 'สั้นมาก = mask ทั้งหมด');
+  });
+});
+
+/** ตัดคอมเมนต์ออกก่อนตรวจ ไม่งั้นคำอธิบายที่เขียนไว้จะถูกจับผิด */
+const credSrc = () => readFileSync(new URL('../src/services/telegram-credentials.service.ts', import.meta.url), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+
+describe('cache ของ credentials (บั๊กจริงที่เจอตอนรัน 17/10/69)', () => {
+  it('อัปเดตห้องธุรกิจต้องไม่ทำให้ token ที่อยู่ใน cache หายไป', () => {
+    // ⚠ เคยเขียน cache = { ...(cache ?? {}), bizChatId: id }
+    //   ตอน cache ยังเป็น null (ยังไม่เคยอ่าน) → ได้ object ที่มีแค่ bizChatId
+    //   → การอ่านครั้งถัดไปได้ token = ว่าง → ส่งไม่ออก ทั้งที่ token อยู่ในฐานข้อมูลถูกต้อง
+    const src = credSrc();
+    assert.doesNotMatch(src, /cache\s*=\s*\{\s*\.\.\.\(cache/,
+      'ห้ามอัปเดต cache บางฟิลด์ — ต้องทิ้งทั้งก้อนให้โหลดใหม่ (ดู invalidateCache)');
+    assert.match(src, /function invalidateCache\(\)[\s\S]*?cache\s*=\s*null/, 'ต้องมี invalidateCache ที่ล้าง cache ทั้งหมด');
+  });
+
+  it('ทุกจุดที่แก้ credential ต้องล้าง cache แบบเดียวกัน', () => {
+    const src = credSrc();
+    for (const fn of ['setTelegramCredentials', 'clearTelegramCredentials', 'setBusinessChatId', 'clearBusinessChatId']) {
+      const body = new RegExp(`export async function ${fn}\\([^)]*\\)[\\s\\S]*?\\n}`).exec(src)?.[0] ?? '';
+      assert.ok(body, `ต้องหา function ${fn} เจอ`);
+      assert.doesNotMatch(body, /cache\s*=\s*\{\s*\.\.\./,
+        `${fn} ห้ามอัปเดต cache บางฟิลด์`);
+      assert.match(body, /invalidateCache\(\)/,
+        `${fn} ต้องเรียก invalidateCache() (ล้างทั้งก้อน) มิฉะนั้นค่าฟิลด์อื่นจะค้างผิด`);
+    }
   });
 });
 
