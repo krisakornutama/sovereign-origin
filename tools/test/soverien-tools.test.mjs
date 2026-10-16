@@ -28,6 +28,10 @@ const store = await import(`${dir}/store.ts`);
 const types = await import(`${dir}/types.ts`);
 const zip = await import(`${dir}/zip.ts`);
 const layout = await import(`${dir}/sticker-layout.ts`);
+const presets = await import(`${dir}/sticker-presets.ts`);
+const sizes = await import(`${dir}/sticker-sizes.ts`);
+const fonts = await import(`${dir}/sticker-fonts.ts`);
+const tpl = await import(`${dir}/sticker-template.ts`);
 
 const { load, save, issueSerials, formatSn, warrantyDates, warrantyState, addDays, daysBetween, buildCustomers, buildSummary, emptyDb, KEY } = store;
 
@@ -217,6 +221,7 @@ const components = ['StickerQuickPanel.tsx', 'StickerPresets.tsx','StickerStudio
 const code = (rel) => fsReadFile(`${SOV_DIR}/${rel}`)
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '');
+const storesrc = code('store.ts');
 
 test('ห้ามแก้ object เดิมแล้วส่งกลับเข้า setDb — React เทียบ Object.is แล้วไม่วาดใหม่', () => {
   for (const f of components) {
@@ -278,8 +283,18 @@ test('แม่แบบป้าย: บันทึก/เรียก/ลบ 
   assert.match(src, /onSave/, 'ต้องบันทึกได้');
   assert.match(src, /onApply/, 'ต้องเรียกกลับมาได้');
   assert.match(src, /onDelete/, 'ต้องลบได้');
-  const studio = code('StickerStudio.tsx');
-  assert.match(studio, /`p-\$\{Date\.now\(\)\.toString\(36\)\}`/, 'id ต้องไม่ซ้ำ (ใช้เวลาปัจจุบัน)');
+  // ⚠ 16/10/69 — เดิมยืนยันด้วยการ grep หา `Date.now()` ใน StickerStudio.tsx ซึ่งพิสูจน์อะไรไม่ได้จริง
+  //   (grep ผ่าน ≠ id ไม่ซ้ำ) → ทดสอบพฤติกรรมจริงแทน: สร้าง 500 ชุดในลมติดกัน ต้องได้ id ไม่ซ้ำเลย
+  const ids = new Set();
+  for (let i = 0; i < 500; i++) ids.add(presets.newPresetId());
+  assert.equal(ids.size, 500, `สร้าง 500 แม่แบบแล้ว id ต้องไม่ซ้ำ (ได้ ${ids.size} ค่า)`);
+
+  const cfg = store.DEFAULT_STICKER;
+  const one = presets.makePreset('ป้ายหลัก', cfg);
+  assert.notEqual(one.cfg, cfg, 'ต้องคัดลอก cfg ไม่ใช่อ้างอิงของเดิม (ไม่งั้นแก้ที่ที่หนึ่งโดยไปแก้ทั้งชุด)');
+  one.cfg.serialX = 0.9;
+  assert.equal(cfg.serialX, store.DEFAULT_STICKER.serialX, 'แก้แม่แบบที่บันทึกแล้ว ต้องไม่กระทบค่าเดิม');
+  assert.ok(!ids.has(one.id), 'id ของ makePreset ต้องไม่ชนกับที่สร้างไว้ก่อน');
 });
 
 test('db ต้องเก็บ stickerPresets และข้อมูลเก่าที่ไม่มีต้องไม่พัง', () => {
@@ -291,6 +306,406 @@ test('db ต้องเก็บ stickerPresets และข้อมูลเ�
   mem.set(KEY, JSON.stringify(old));
   const db = load();
   assert.deepEqual(db.stickerPresets, [], 'ข้อมูลเก่าต้องได้ [] ไม่ใช่ undefined');
+});
+
+// ── 16) พิมพ์หลายใบบนกระดาษ 1 แผ่น (14/10/69 จาก "พิมพ์ได้ 8-16 ภาพ หรือมากกว่า") ──
+const A4 = { paperWMm: 210, paperHMm: 297, dpi: 300, marginMm: 10, gapMm: 2, stickerWMm: 30, stickerHMm: 22.5 };
+const gapPxOf = (gapMm, dpi) => Math.round((gapMm / 25.4) * dpi);
+
+test('A4 จัดป้าย 30×22.5 มม. ได้มากกว่า 16 ใบตามที่เจ้าของต้องการ', () => {
+  const p = layout.planSheet(A4);
+  assert.ok(p.capacity >= 16, `ได้ ${p.cols}×${p.rows} = ${p.capacity} ใบ (ต้องการ ≥16)`);
+});
+
+test('ชิ้นสุดท้ายต้องไม่ล้นขอบกระดาษ', () => {
+  const p = layout.planSheet(A4);
+  const g = gapPxOf(A4.gapMm, A4.dpi);
+  for (const i of [0, p.capacity - 1]) {
+    const c = layout.sheetCellXY(p, i, g);
+    assert.ok(c.x + p.cellWpx <= p.pageWpx, `ชิ้นที่ ${i} ล้นขอบขวา: ${c.x}+${p.cellWpx} > ${p.pageWpx}`);
+    assert.ok(c.y + p.cellHpx <= p.pageHpx, `ชิ้นที่ ${i} ล้นขอบล่าง: ${c.y}+${p.cellHpx} > ${p.pageHpx}`);
+  }
+});
+
+test('หน้ากระดาษต้องได้ 2480×3508 px ที่ 300 dpi (มาตรฐาน A4 สำหรับพิมพ์)', () => {
+  const p = layout.planSheet(A4);
+  assert.equal(p.pageWpx, 2480);
+  assert.equal(p.pageHpx, 3508);
+});
+
+test('ขอบกระดาษน้อยลง = ได้ป้ายมากขึ้น', () => {
+  const wide = layout.planSheet({ ...A4, marginMm: 5 });
+  const narrow = layout.planSheet({ ...A4, marginMm: 20 });
+  assert.ok(wide.capacity > narrow.capacity, `ขอบ 5 มม. ได้ ${wide.capacity} > ขอบ 20 มม. ได้ ${narrow.capacity}`);
+});
+
+test('ระยะห่างเพิ่ม = ลดจำนวนป้าย (ต้องพอให้ตัดได้)', () => {
+  const tight = layout.planSheet({ ...A4, gapMm: 1 });
+  const loose = layout.planSheet({ ...A4, gapMm: 6 });
+  assert.ok(tight.capacity > loose.capacity, `ห่าง 1 มม. ได้ ${tight.capacity} > ห่าง 6 มม. ได้ ${loose.capacity}`);
+});
+
+test('ค่าผิดปกติต้องไม่ทำให้ระบบพัง (0 หรือ ติดลบ)', () => {
+  assert.ok(layout.planSheet({ ...A4, dpi: 0 }).pageWpx > 0, 'dpi = 0 ต้องกลับไปใช้ 300');
+  const z = layout.planSheet({ ...A4, stickerWMm: 0, stickerHMm: 0 });
+  assert.ok(Number.isFinite(z.cols) && Number.isFinite(z.rows), 'ป้าย 0 มม. ต้องไม่ให้ Infinity/NaN');
+  assert.ok(z.capacity >= 1 && z.cellWpx > 0, `ป้าย 0 มม. ต้องยังจัดได้ (ได้ ${z.capacity} ช่อง)`);
+  const neg = layout.planSheet({ ...A4, gapMm: -5, marginMm: -20 });
+  assert.ok(Number.isFinite(neg.capacity) && neg.capacity >= 1, 'ค่าติดลบต้องไม่ทำให้พัง');
+});
+
+test('ช่องถัดไปต้องขยับตามระยะห่างพอดี ไม่ทับกัน', () => {
+  const p = layout.planSheet(A4);
+  const g = gapPxOf(A4.gapMm, A4.dpi);
+  const a = layout.sheetCellXY(p, 0, g);
+  const b = layout.sheetCellXY(p, 1, g);
+  assert.equal(b.x - (a.x + p.cellWpx), g, 'ระยะแนวนอนต้องเท่ากับ gap พอดี');
+});
+
+// ── 17) ขนาดป้าย + ฟอนต์ + ขนาดจริงจากไฟล์ (16/10/69 จากเจ้าของ) ────────────
+test('ค่าเริ่มต้นต้องเป็นกรอบอุปกรณ์ 81×55 มม. ที่เจ้าของวัดมา', () => {
+  assert.equal(store.DEFAULT_STICKER.widthMm, 81, '8.1 ซม. = 81 มม.');
+  assert.equal(store.DEFAULT_STICKER.heightMm, 55, '5.5 ซม. = 55 มม.');
+});
+
+test('ค่าเริ่มต้นต้องใช้ฟอนต์ Garuda (ของเจ้าของ) ไม่ใช่ฟอนต์โค้ด', () => {
+  assert.equal(store.DEFAULT_STICKER.serialFont, 'Garuda');
+  assert.doesNotMatch(storesrc, /JetBrains Mono/, 'อย่าฝังฟอนต์เว็บไว้ใน store — ถ้าเครื่องอื่นไม่มีจะกลายเป็นฟอนต์สำรองเงียบ ๆ');
+});
+
+test('ฟอนต์ที่มีช่องว่างต้องถูกห่อด้วยอัญประกาศ (ไม่งั้น canvas ตัดที่ช่องว่างแล้วหาไม่เจอ)', () => {
+  assert.equal(fonts.fontCss('Leelawadee UI', 40, false), '400 40px "Leelawadee UI"');
+  assert.equal(fonts.fontCss('Garuda', 48, true), '700 48px "Garuda"');
+  assert.match(fonts.fontCss('Tahoma', 30, true), /^700 /, 'ตัวหนาได้ weight 700');
+});
+
+test('ค่าฟอนต์ผิดปกติต้องกลายเป็นค่าใช้ได้ ไม่ใช่ ctx.font ที่พัง', () => {
+  assert.equal(fonts.fontCss('', 0, false), '400 16px "Garuda"', 'ค่าว่าง/ขนาดศูนย์ = ใช้ค่าเริ่มต้น');
+  assert.equal(fonts.fontCss('  ', -5, false), '400 16px "Garuda"', 'ค่าติดลบ = ใช้ค่าเริ่มต้น');
+  assert.equal(fonts.safeFontName('a"b;c'), 'abc', 'ตัดอัญประกาศ/เซมิโคลอนที่จะทำให้ CSS เพี้ยน');
+  assert.equal(fonts.safeFontName(''), 'Garuda', 'ว่าง = Garuda');
+});
+
+test('เปลี่ยนขนาดป้ายแล้วขนาดตัวอักษรต้องขยับตาม (ไม่งั้นป้ายใหญ่ขึ้นแต่อักษรเล็กเท่าเดิม = อ่านไม่ออก)', () => {
+  const big = sizes.serialSizeFor(81, 300);
+  const small = sizes.serialSizeFor(40, 300);
+  assert.ok(big > small, `81 มม. (${big} px) ต้องใหญ่กว่า 40 มม. (${small} px)`);
+  const patch = sizes.sizePatch({ key: 'k', label: 'l', widthMm: 81, heightMm: 55 }, 300);
+  assert.equal(patch.serialSize, big, 'sizePatch ต้องใช้ขนาดตัวอักษรที่คำนวณมา');
+  assert.equal(patch.widthMm, 81);
+  assert.equal(patch.heightMm, 55);
+});
+
+test('รายการขนาดต้องมีกรอบอุปกรณ์ 81×55 เป็นค่าแรก และไฮไลต์ได้ตรงตัว', () => {
+  assert.equal(sizes.STICKER_SIZES[0].key, 'device-81x55');
+  assert.equal(sizes.matchSize(81, 55), 'device-81x55');
+  assert.equal(sizes.matchSize(77, 55), null, 'ขนาดที่ไม่มีในรายการต้องไม่ไฮไลต์ปุ่มไหนเลย');
+});
+
+/** สร้าง PNG header ปลอม ๆ ที่มี chunk pHYs ตามหน่วยพิกเซลต่อเมตร */
+function pngWithPhys(pxW, pxH, ppu) {
+  const b = new Uint8Array(64);
+  b.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  const be = (o, v) => { b[o] = (v >>> 24) & 255; b[o + 1] = (v >>> 16) & 255; b[o + 2] = (v >>> 8) & 255; b[o + 3] = v & 255; };
+  be(33, 9);                                        // ความยาว chunk
+  b.set([0x70, 0x48, 0x59, 0x73], 37);              // 'p' 'H' 'Y' 's'
+  be(41, ppu); be(45, ppu); b[49] = 1;              // ppuX, ppuY, หน่วย = เมตร
+  return tpl.pngPhysicalMm(b, pxW, pxH);
+}
+
+test('อ่านขนาดจริงจากไฟล์ PNG ได้ (เจ้าของไม่ต้องพิมพ์ตัวเลขเอง)', () => {
+  // 81×55 มม. @300 dpi = 957×650 px และ 11811 พิกเซล/เมตร (300/0.0254)
+  const r = pngWithPhys(957, 650, 11811);
+  assert.ok(r, 'ต้องอ่านได้');
+  assert.ok(Math.abs(r.widthMm - 81) < 0.5, `ได้ ${r.widthMm?.toFixed(1)} มม. (คาด ~81)`);
+  assert.ok(Math.abs(r.heightMm - 55) < 0.5, `ได้ ${r.heightMm?.toFixed(1)} มม. (คาด ~55)`);
+  assert.ok(Math.abs(r.dpi - 300) < 2, `ได้ ${r.dpi} dpi (คาด ~300)`);
+});
+
+test('ไฟล์ที่ไม่มีขนาดจริงต้องคืน null ไม่ใช่ตัวเลขมั่ว', () => {
+  assert.equal(tpl.pngPhysicalMm(new Uint8Array(0), 100, 100), null, 'ไฟล์ว่าง');
+  const short = new Uint8Array(10);
+  short.set([137, 80, 78, 71, 13, 10, 26, 10], 0);   // signature มี แต่ข้อมูลไม่ครบ
+  assert.equal(tpl.pngPhysicalMm(short, 100, 100), null, 'ไฟล์สั้นกว่า header');
+  const jpeg = new Uint8Array(64); jpeg.set([0xff, 0xd8, 0xff, 0xe0], 0);
+  assert.equal(tpl.pngPhysicalMm(jpeg, 100, 100), null, 'ไม่ใช่ PNG (JPEG)');
+  // ชิ้น chunk ชื่ออื่น (เช่น sRGB) ต้องไม่ถูกอ่านเป็น pHYs
+  const other = new Uint8Array(64);
+  other.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  other.set([0x73, 0x52, 0x47, 0x42], 37);            // "sRGB"
+  assert.equal(tpl.pngPhysicalMm(other, 100, 100), null, 'chunk ชื่ออื่น = ใช้ไม่ได้');
+  // หน่วยไม่ใช่เมตร = ไม่รู้ขนาดจริง
+  const noUnit = new Uint8Array(64);
+  noUnit.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  const be = (o, v) => { noUnit[o] = (v >>> 24) & 255; noUnit[o + 1] = (v >>> 16) & 255; noUnit[o + 2] = (v >>> 8) & 255; noUnit[o + 3] = v & 255; };
+  be(33, 9); noUnit.set([0x70, 0x48, 0x59, 0x73], 37); be(41, 11811); be(45, 11811); noUnit[49] = 0;
+  assert.equal(tpl.pngPhysicalMm(noUnit, 957, 650), null, 'หน่วยไม่ใช่เมตร = ใช้ไม่ได้');
+});
+
+test('ป้าย Sovereign OS ต้องตั้งค่าให้เห็นบนแถบสีเข้ม (16/10/69 จากภาพต้นแบบจริง)', () => {
+  const p = presets.labelProfile('sovereign-os');
+  assert.ok(p, 'ต้องมีโปรไฟล์ป้าย Sovereign OS');
+  assert.equal(p.patch.serialColor, '#ffffff', 'ช่อง Serial No. อยู่บนแถบน้ำเงินเข้ม → ตัวเลขต้องเป็นสีขาว (สีดำมองไม่เห็น)');
+  assert.equal(p.patch.showQr, false, 'มี QR พิมพ์ไว้แล้วมุมขวาล่าง ห้ามวางทับ');
+  assert.equal(p.patch.showWarranty, false, 'บรรทัดวันสิ้นประกันจะไปชนกับ QR ที่พิมพ์ไว้');
+  assert.equal(p.patch.serialPlate, false, 'พื้นหลังสีขาวบนแถบเข้มจะเห็นเป็นก้อนสีขาว');
+  assert.ok(p.patch.serialY > 0.7 && p.patch.serialY < 0.95, `ตำแหน่งต้องอยู่แถบล่าง (ได้ ${p.patch.serialY})`);
+  assert.ok(p.patch.serialX > 0.15 && p.patch.serialX < 0.5, `ต้องอยู่ถัดจากคำว่า "Serial No." (ได้ ${p.patch.serialX})`);
+});
+
+test('โปรไฟล์ป้ายเปล่าต้องตั้งค่าตรงข้ามกับป้าย Sovereign OS', () => {
+  const a = presets.profilePatch('sovereign-os', store.DEFAULT_STICKER);
+  const b = presets.profilePatch('blank-light', store.DEFAULT_STICKER);
+  assert.equal(b.serialColor, '#111827', 'พื้นสว่างใช้ตัวเลขสีเข้ม');
+  assert.equal(b.showQr, true, 'ป้ายเปล่าให้ระบบวาง QR เอง');
+  assert.notEqual(a.serialColor, b.serialColor, 'สองแบบต้องต่างกันจริง');
+  assert.equal(presets.profilePatch('ไม่มีแบบนี้', store.DEFAULT_STICKER), null, 'ชื่อไม่รู้จัก = ไม่แก้อะไร');
+});
+
+test('หน้าจอต้องมีตัวเลือกขนาดและฟอนต์ และต้องเช็คว่าฟอนต์มีในเครื่องจริง', () => {
+  const quick = code('StickerQuickPanel.tsx');
+  assert.match(quick, /STICKER_SIZES/, 'ต้องมีปุ่มเลือกขนาดป้าย');
+  assert.match(quick, /serialFont/, 'ต้องมีตัวเลือกฟอนต์');
+  assert.match(quick, /isFontAvailable/, 'ต้องเช็คว่าฟอนต์มีในเครื่อง (canvas เงียบ ๆ เมื่อฟอนต์หาย)');
+  assert.match(code('sticker-draw.ts'), /fontCss\(cfg\.serialFont/, 'ตัววาดต้องใช้ฟอนต์ที่เลือก ไม่ hardcode');
+});
+
+// ── 18) เส้นประกอบห้ามหลุดไปกับไฟล์ที่ดาวน์โหลด (16/10/69) ────────────────
+// ⚠ ตอนนี้ผมนับ "พิกเซลสีเขียว" ในไฟล์ที่ดาวน์โหลด แล้วสรุปว่ามีเส้นประกอบติดไป
+//   ผิด — ป้ายจริงของเจ้าของมีสีเขียวอยู่ในภาพอยู่แล้ว (เกล็ดหิมะ/วงจรไฟฟ้า) นับได้ 20 พิกเซล
+//   ทั้งที่ไฟล์สะอาด → การวัดด้วยสีพิสูจน์อะไรไม่ได้ ต้องดูว่า "สั่งวาดกรอบ" หรือไม่ตรง ๆ
+const frame = await import(`${dir}/sticker-frame.ts`);
+
+function spyCtx() {
+  const calls = { strokeRect: [], setLineDash: [], fillText: [], save: 0, restore: 0 };
+  const ctx = new Proxy({}, {
+    get(_t, p) {
+      if (p === 'measureText') return () => ({ width: 120 });
+      if (p in calls) return (...a) => { calls[p] = Array.isArray(calls[p]) ? [...calls[p], ...a] : calls[p] + 1; };
+      return () => {};
+    },
+    set() { return true; },
+  });
+  return { ctx, calls };
+}
+
+test('กรอบประกอบวาดเป็นเส้นประกอบจริง (ขีดกลับมา 1 กรอบ + ล้างสถานะ)', () => {
+  const a = spyCtx();
+  frame.drawGuideFrame(a.ctx, 100, 200, 250, 40);
+  assert.equal(a.calls.strokeRect.length, 4, `ต้องวาดกรอบ 1 ครั้ง (ได้ ${a.calls.strokeRect.length / 4} ครั้ง)`);
+  assert.deepEqual(a.calls.strokeRect, [96, 176, 258, 48], 'กรอบต้องอยู่รอบกล่องข้อความจริง');
+  // ⚠ spy เก็บ "รายการของ argument แต่ละครั้ง" → setLineDash([4,3]) เก็บเป็น [[4,3]]
+  assert.deepEqual(a.calls.setLineDash, [[4, 3]], 'ต้องเป็นเส้นประกอบ ไม่ใช่เส้นทึบ');
+  assert.equal(a.calls.save, 1, 'ต้อง save ก่อนเปลี่ยนสถานะ');
+  assert.equal(a.calls.restore, 1, 'ต้อง restore หลังเสร็จ (ไม่งั้นสีของข้อความจะถูกกรอบทิ้ง)');
+});
+
+test('สีกรอบต้องอ่านได้แต่บางพอ — ไม่งั้นบังตัวเลขหรือเห็นเป็นกรอบในไฟล์จริง', () => {
+  assert.match(frame.GUIDE_COLOR, /^rgba\(/, 'ต้องเป็น rgba (มี alpha)');
+  const alpha = parseFloat(frame.GUIDE_COLOR.split(',')[3]);
+  assert.ok(alpha > 0 && alpha < 1, `alpha ต้องอยู่ระหว่าง 0-1 (ได้ ${alpha})`);
+});
+
+test('ตัววาดต้องเรียกกรอบเฉพาะตอน showGuide เป็นจริง (ไม่งั้นกรอบหลุดลงไฟล์)', () => {
+  const src = code('sticker-draw.ts');
+  assert.match(src, /if \(showGuide\) drawGuideFrame\(/, 'ต้องมีเงื่อนไข if (showGuide) ครอบการวาดกรอบ');
+  assert.doesNotMatch(src, /ctx\.strokeRect\(/, 'ห้ามเรียก strokeRect ตรง ๆ ใน sticker-draw (ให้ผ่าน sticker-frame เท่านั้น)');
+  assert.match(src, /showGuide\s*=\s*false/, 'ค่าเริ่มต้นต้องเป็น false — เรียกแบบลืมใส่พารามิเตอร์ก็ปลอดภัย');
+});
+
+test('จุดที่ดาวน์โหลดต้องไม่มีทางขอกรอบประกอบได้เลย', () => {
+  // 16/10/69 — ย้ายการดาวน์โหลดไป sticker-download.ts แล้ว
+  // ตอนนี้พิสูจน์ได้แรงกว่าเดิม: ชนิด PaintFn ไม่มีพารามิเตอร์ showGuide ให้ส่งตั้งแต่แรก
+  const dl = code('sticker-download.ts');
+  assert.match(dl, /type PaintFn = \(canvas: HTMLCanvasElement, sn: string, scale: number\)/,
+    'PaintFn ต้องรับแค่ (canvas, sn, scale) — ไม่มีช่องให้ส่ง showGuide');
+  assert.doesNotMatch(dl, /paint\([^)]*,\s*true\s*\)/, 'sticker-download ห้ามส่ง showGuide=true ไปกับ paint');
+  assert.match(dl, /paint\(c, sn, dlScale\)/, 'ต้องวาดด้วย paint(c, sn, dlScale)');
+  assert.doesNotMatch(dl, /showGuide/, 'ไม่ควรมีคำว่า showGuide ในไฟล์ดาวน์โหลดเลย');
+
+  const studio = code('StickerStudio.tsx');
+  assert.match(studio, /\(canvas, sn, scale\) => paint\(canvas, sn, scale\)/,
+    'ตัวห่อ paintForFile ต้องไม่เติม showGuide (ส่งต่อ 3 พารามิเตอร์เท่านั้น)');
+  assert.match(studio, /paint\(canvasRef\.current, active, PREVIEW_SCALE, true\)/, 'หน้าจอต้องขอกรอบประกอบ');
+});
+
+test('ตัดขอบขาวต้องหากรอบเนื้อหาจริงได้ และไม่ตัดภาพที่ไม่มีขอบขาว', () => {
+  const W = 100, H = 80;
+  const px = new Uint8ClampedArray(W * H * 4);
+  const fill = (x0, y0, x1, y1, v) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = (y * W + x) * 4;
+      px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = 255;
+    }
+  };
+  fill(0, 0, W, H, 255);        // พื้นขาวทั้งภาพ
+  fill(10, 20, 90, 60, 0);       // เนื้อหาสีดำ
+  const box = tpl.findContentBox(px, W, H);
+  assert.deepEqual(box, { x: 10, y: 20, w: 80, h: 40 }, 'ต้องหากรอบเนื้อหาตรงเป๊ะ');
+
+  const allWhite = new Uint8ClampedArray(W * H * 4).fill(255);
+  assert.equal(tpl.findContentBox(allWhite, W, H), null, 'ภาพขาวล้วน = ไม่มีอะไรให้ตัด');
+
+  // ขอบขาวเกือบขาวเป๊ะ (สแกน/บีบอัด) ต้องถือว่าขาว ไม่งั้น noise 1 จุดจะกันภาพทั้งใบ
+  const noise = new Uint8ClampedArray(px); noise[0] = noise[1] = noise[2] = 250;
+  assert.deepEqual(tpl.findContentBox(noise, W, H), box, 'พิกเซลเกือบขาวต้องไม่ถือเป็นเนื้อหา');
+});
+
+// ── 19) กำหนดขนาดภาพเป็นมิลลิเมตรเอง (16/10/69 จาก "ภาพมันเล็กกว่าที่ควรจะเป็น") ──
+const rectOf = (o) => layout.exactRect(100, 50, 800, 600, ...o);
+
+test('กำหนดกว้าง-สูงได้ตรง ๆ ตามที่ใส่ (มิลลิเมตร → พิกเซลตามสัดส่วนที่ผ่านเข้ามา)', () => {
+  const r = rectOf([800, 600, 0, 0]);
+  assert.equal(r.w, 800, 'กว้างต้องเท่าที่สั่ง');
+  assert.equal(r.h, 600, 'สูงต้องเท่าที่สั่ง');
+  assert.equal(r.x, 0, 'กว้างเต็มป้าย = ต้องชิดซ้าย ไม่เหลือขอบ');
+  assert.equal(r.y, 0, 'สูงเต็มป้าย = ต้องชิดบน ไม่เหลือขอบ');
+});
+
+test('ใส่ข้างเดียว อีกข้างต้องคงสัดส่วนภาพ (ภาพ 2:1)', () => {
+  const onlyW = rectOf([400, 0, 0, 0]);
+  assert.equal(onlyW.w, 400);
+  assert.equal(onlyW.h, 200, 'สูงต้อง = กว้าง/2 ตามสัดส่วนภาพ ไม่ใช่ยืดจนเต็มป้าย');
+  const onlyH = rectOf([0, 300, 0, 0]);
+  assert.equal(onlyH.h, 300);
+  assert.equal(onlyH.w, 600, 'กว้างต้อง = สูง×2');
+});
+
+test('ภาพเล็กกว่าป้ายต้องอยู่กลางป้าย ไม่ลอยมุม (กันภาพหายไปมุม)', () => {
+  const r = rectOf([200, 100, 0, 0]);
+  assert.equal(r.x, 300, 'ต้องเหลือขอบซ้าย 300 (= (800-200)/2)');
+  assert.equal(r.y, 250, 'ต้องเหลือขอบบน 250 (= (600-100)/2)');
+});
+
+test('เลื่อนภาพด้ยังทำงานตอนกำหนดขนาดเอง', () => {
+  const r = rectOf([200, 100, 0.5, -0.5]);
+  assert.equal(r.x, 300 + 400, 'เลื่อนขวา 50% = ขยับเท่าครึ่งความกว้างป้าย');
+  assert.equal(r.y, 250 - 300, 'เลื่อนขึ้น 50%');
+});
+
+test('ค่า 0 ทั้งคู่ต้องไม่ทำให้ภาพหาย (กันเรียกผิดแล้วป้ายว่าง)', () => {
+  // ไม่ได้กำหนดขนาดเลย = เต็มความกว้างป้าย แล้วคงสัดส่วนภาพ (พฤติกรรมเดียวกับ contain)
+  // ตัววาดจริงจะไม่เรียก exactRect เมื่อเป็น 0 ทั้งคู่ แต่ถ้าเรียกผิดก็ต้องไม่ทำให้ป้ายว่าง
+  const r = rectOf([0, 0, 0, 0]);
+  assert.equal(r.w, 800, 'กว้างเต็มป้าย');
+  assert.equal(r.h, 400, 'สูง = กว้าง/2 ตามสัดส่วนภาพ (ไม่ยืดจนเต็ม = ไม่บิดภาพ)');
+  assert.equal(r.y, 100, 'ต้องอยู่กลางแนวตั้ง ไม่ชิดบน');
+});
+
+test('ภาพที่ไม่มีขนาด (0×0) ต้องไม่ทำให้หารด้วยศูนย์', () => {
+  const r = layout.exactRect(0, 0, 800, 600, 400, 0, 0, 0);
+  assert.ok(Number.isFinite(r.w) && Number.isFinite(r.h) && r.w > 0, 'ต้องได้ขนาดใช้งาน ไม่ใช่ NaN/Infinity');
+});
+
+test('ค่าเริ่มต้นต้องไม่กำหนดขนาดภาพเอง (0 = ให้ระบบคำนวณ)', () => {
+  assert.equal(store.DEFAULT_STICKER.tplWMm, 0, '0 = ใช้โหมด fit ตามปกติ');
+  assert.equal(store.DEFAULT_STICKER.tplHMm, 0);
+});
+
+test('ตัววาดต้องเลือกใช้ exactRect เมื่อกำหนดขนาดเอง และ fitImageRect เมื่อไม่กำหนด', () => {
+  const src = code('sticker-draw.ts');
+  assert.match(src, /cfg\.tplWMm > 0 \|\| cfg\.tplHMm > 0/,
+    'ต้องมีเงื่อนไขแยกสองทาง: กำหนดเอง → exactRect · ไม่กำหนด → fitImageRect');
+  assert.match(src, /exactRect\(img\.width[\s\S]{0,120}fitImageRect\(/,
+    'ต้องเรียก exactRect ก่อน แล้วค่อย fall back เป็น fitImageRect');
+  assert.match(src, /cfg\.tplWMm \* perMm/, 'ต้องแปลงมิลลิเมตรเป็นพิกเซลด้วย perMm = W / widthMm');
+});
+
+// ── 20) แจ้งเตือน Telegram เข้าห้องธุรกิจ (16/10/69) ────────────────────────
+const tg = await import(`${dir}/telegram-notify.ts`);
+/** สูตรของจริงจาก store — ส่งเข้า buildTrackingDigest ตามที่ component ทำ (ดูคอมเมนต์ใน telegram-notify.ts) */
+const DEPSX = { warrantyState: store.warrantyState, thaiDate: store.thaiDate };
+
+test('ตรวจหมายเลขห้องต้องเหมือนกฎของ backend เป๊ะ (สองฝั่งตรวจ กันกรณีเขียนทับข้าม)', () => {
+  for (const ok of ['123456789', '-123456789', '-1001234567890', '  -1009876543210  ']) {
+    assert.equal(tg.validateChatId(ok), '', `"${ok}" ต้องผ่าน`);
+  }
+  for (const bad of ['', 'abc', '@mygroup', '12.5', '12 345']) {
+    assert.notEqual(tg.validateChatId(bad), '', `"${bad}" ต้องถูกปฏิเสธ`);
+  }
+});
+
+test('ไฟล์ logic ต้องไม่ import อะไรที่ต้องใช้เบราว์เซอร์ (Node เรียกไฟล์นี้เพื่อทดสอบ)', () => {
+  // ⚠ เคยพลาดตรงนี้: import getApiUrl แบบ static → Node โหลดไฟล์ไม่ขึ้นเลยตั้งแต่ต้น (16/10/69)
+  //   เจอเพราะ ERR_MODULE_NOT_FOUND ตอนรันเทสต์ ไม่ใช่เพราะ logic ผิด
+  const src = code('telegram-notify.ts');
+  assert.doesNotMatch(src, /<[A-Za-z][\s\S]*>\s*$/m, 'ต้องไม่มี JSX ในไฟล์ logic');
+  const imports = [...src.matchAll(/^\s*import[^;]*from\s+'([^']+)'/gm)].map((m) => m[1]);
+  const browserOnly = imports.filter((p) => !p.startsWith('./types'));
+  assert.deepEqual(browserOnly, [], `ต้อง import แค่ type เท่านั้น แต่เจอ: ${browserOnly.join(', ')}`);
+  assert.match(src, /api\/telegram\/biz/, 'ต้องชี้ไปที่ route ฝั่ง backend');
+  assert.doesNotMatch(src, /botToken\s*[:=]/, 'ห้ามฝัง bot token ในฝั่งหน้าเว็บ');
+});
+
+test('สรุปงานที่ต้องติดตาม: ไม่มีอะไรค้าง = บอกว่าสบายใจ ไม่ใช่ส่งข้อความเปล่า', () => {
+  const empty = tg.buildTrackingDigest(store.emptyDb(), DEPSX, '2026-10-17');
+  assert.equal(empty.isEmpty, true);
+  assert.match(empty.detail, /ทุกออเดอร์/, 'ต้องบอกว่าสถานะปกติ');
+  assert.ok(empty.detail.length > 0, 'ห้ามส่งรายละเอียดว่าง');
+});
+
+test('สรุปงานที่ต้องติดตาม: แยกหมดแล้ว / ใกล้หมด / S/N ไม่ผูกออเดอร์ ให้เห็นชัด', () => {
+  const db = store.emptyDb();
+  const base = { id: 'o1', customerName: 'สมชาย', serials: ['Soverign-Temp-000'], createdAt: '2026-01-01', status: 'ACTIVE', shippingDays: 0 };
+  db.orders = [
+    { ...base, id: 'out', warrantyStart: '2025-01-01', warrantyEnd: '2025-06-01', serials: ['A'] },
+    { ...base, id: 'near', warrantyStart: '2026-10-01', warrantyEnd: '2026-10-20', serials: ['B'] },
+    { ...base, id: 'ok', warrantyStart: '2026-10-01', warrantyEnd: '2027-10-01', serials: ['C'] },
+  ];
+  db.serials = [
+    { sn: 'A', modelId: 'temp-01', status: 'SOLD', orderId: 'out' },
+    { sn: 'B', modelId: 'temp-01', status: 'SOLD', orderId: 'near' },
+    { sn: 'C', modelId: 'temp-01', status: 'SOLD', orderId: 'ok' },
+    { sn: 'D', modelId: 'temp-01', status: 'SOLD' },      // ออกแล้วไม่ผูกออเดอร์
+    { sn: 'E', modelId: 'temp-01', status: 'STOCK' },     // ยังไม่ออก ไม่นับ
+  ];
+  const d = tg.buildTrackingDigest(db, DEPSX, '2026-10-17');
+  assert.equal(d.isEmpty, false);
+  assert.match(d.detail, /หมดประกันแล้ว 1 รายการ/, 'ต้องนับหมดแล้ว 1 (ไม่รวมใกล้หมด/ปกติ)');
+  assert.match(d.detail, /ใกล้หมดประกัน 1 รายการ/, 'ต้องนับใกล้หมด 1');
+  assert.match(d.detail, /ยังไม่ผูกออเดอร์ 1 ใบ/, 'S/N ที่ออกแล้วไม่ผูก = 1 (E ยังไม่ออก ไม่นับ)');
+  assert.match(d.detail, /สมชาย/, 'ต้องบอกว่าใคร');
+});
+
+test('ออเดอร์ที่ยกเลิก (VOID) ต้องไม่ถูกนับว่าประกันหมด (ไม่งั้นเจ้าของโดนแจ้งเตือนมั่ว)', () => {
+  const db = store.emptyDb();
+  db.orders = [{
+    id: 'v', customerName: 'เก่า', serials: ['X'], status: 'VOID', createdAt: '2020-01-01',
+    warrantyStart: '2020-01-01', warrantyEnd: '2020-02-01',
+  }];
+  db.serials = [{ sn: 'X', modelId: 'temp-01', status: 'VOID' }];
+  assert.equal(tg.buildTrackingDigest(db, DEPSX, '2026-10-17').isEmpty, true, 'VOID ต้องไม่ทำให้มีรายการค้าง');
+});
+
+test('รายการค้างเยอะต้องถูกตัด ไม่ยัดข้อความยาวจน Telegram ปฏิเสธ (ข้อจำกัด 4096 ตัว)', () => {
+  const db = store.emptyDb();
+  db.orders = Array.from({ length: 60 }, (_, i) => ({
+    id: `o${i}`, customerName: `ลูกค้าหมายเลข${i}`, serials: [`SN${i}`], status: 'ACTIVE',
+    createdAt: '2025-01-01', warrantyStart: '2025-01-01', warrantyEnd: '2025-02-01',
+  }));
+  db.serials = db.orders.map((o, i) => ({ sn: `SN${i}`, modelId: 'temp-01', status: 'SOLD', orderId: o.id }));
+  const d = tg.buildTrackingDigest(db, DEPSX, '2026-10-17');
+  assert.ok(d.detail.length < 3500, `ข้อความยาว ${d.detail.length} ตัว ต้องไม่เกินที่ Telegram รับได้`);
+  assert.match(d.detail, /60 รายการ/, 'ต้องบอกจำนวนรวมจริง ไม่ใช่จำนวนที่ตัด');
+});
+
+test('ต้องมีการ์ดแจ้งเตือนอยู่ในแท็บ "ติดตาม" ไม่ใช่ที่อื่น (ตามที่เจ้าของขอ)', () => {
+  const hub = code('SoverienHub.tsx');
+  assert.match(hub, /section === 'notify' && <TelegramNotifyCard/, 'ต้องผูกการ์ดเข้ากับหัวข้อย่อย notify');
+  const trackBlock = /track: \[([\s\S]*?)\]/.exec(hub);
+  assert.ok(trackBlock && trackBlock[1].includes("key: 'notify'"), 'หัวข้อย่อยต้องอยู่ใน track');
+  const sellBlock = /sell: \[([\s\S]*?)\]/.exec(hub);
+  assert.ok(!sellBlock[1].includes("key: 'notify'"), 'ห้ามไปอยู่ผิดแท็บ');
+});
+
+test('หน้าเว็บห้ามฝัง bot token ของเจ้าของไว้ในซอร์สโค้ด (16/10/69)', () => {
+  // ⚠ เจ้าของวาง token จริงในแชทวันที่ 16/10/69 — ต้องไม่ให้หลุดเข้า git ตอนนี้
+  const files = ['telegram-notify.ts', 'TelegramNotifyCard.tsx', 'SoverienHub.tsx', 'store.ts', 'StickerStudio.tsx'];
+  for (const f of files) {
+    const src = code(f);
+    assert.doesNotMatch(src, /8807673052/, `${f}: ห้ามมีตัวเลขบอท token ของเจ้าของ`);
+    assert.doesNotMatch(src, /AAG93mLt/, `${f}: ห้ามมีส่วนของ token ของเจ้าของ`);
+  }
 });
 
 // ── 12) โครงสร้างแท็บเครื่องมือ ต้องไม่รกกลับมา (14/10/69) ────────────────
@@ -320,7 +735,8 @@ test('ทุกหัวข้อย่อยต้องมีเนื้อ�
   // ต้องดูเฉพาะบล็อก SECTIONS — TABS ก็ใช้รูปแบบ { key:..., label:... } เหมือนกัน
   const block = hubSrc.slice(hubSrc.indexOf('const SECTIONS'), hubSrc.indexOf('const DEFAULT_SECTION'));
   const keys = [...block.matchAll(/\{ key: '(\w+)', label:/g)].map((m) => m[1]);
-  assert.equal(keys.length, 7, `ต้องมีหัวข้อย่อย 7 อัน (2+2+3) · เจอ ${keys.length}`);
+  // 2 (sell) + 2 (sticker) + 4 (track: คลัง/ตรวจประกัน/ลูกค้า/แจ้งเตือน) = 8
+  assert.equal(keys.length, 8, `ต้องมีหัวข้อย่อย 8 อัน · เจอ ${keys.length}`);
   for (const k of keys) {
     assert.ok(hubSrc.includes(`section === '${k}'`), `หัวข้อย่อย "${k}" ต้องมีเงื่อนไข render ด้วย`);
   }

@@ -1,41 +1,28 @@
 "use client";
 // components/business/soverien/StickerStudio.tsx
 // ส่วนที่ 3 — สร้างภาพสติกเกอร์ประจำเครื่อง (14/10/69)
-// ผู้ใช้อัปโหลดภาพต้นแบบที่พิมพ์เอง → ระบบ overlay S/N + วันสิ้นสุดประกัน + QR ทับ
-// ดาวน์โหลดทีละภาพ (PNG) หรือทั้งหมด (.zip — เขียน ZIP เอง ไม่ต้องเพิ่ม dependency)
+// อัปโหลดภาพต้นแบบ → overlay S/N + วันสิ้นประกัน · ดาวน์โหลด PNG ทีละใบ, ZIP รวม, หรือเรียงลงแผ่น A4
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Db, StickerPreset } from './types';
 import { modelById, thaiDate } from './store';
 import { round3, clamp, stickerHeightFor } from './sticker-layout';
-import { paintSticker, loadImage } from './sticker-draw';
+import { paintSticker } from './sticker-draw';
+import { loadTemplate, loadImage, trimTemplateMargins } from './sticker-template';
 import StickerControls from './StickerControls';
 import StickerQuickPanel from './StickerQuickPanel';
 import StickerSerialPicker from './StickerSerialPicker';
-import { buildZip, downloadBlob, canvasToPngBytes } from './zip';
+import StickerSheetPrint from './StickerSheetPrint';
+import { useStickerPresets } from './StickerPresets';
+import { downloadOne as downloadStickerOne, downloadZip, type PaintFn } from './sticker-download';
 import { getApiUrl } from '../../../lib/config';
 import { Card, inputCls, btnPrimary, btnGhost, Notice, Empty } from './ui';
 
-const MAX_TEMPLATE_PX = 1200;   // ภาพต้นแบบเกินนี้ localStorage ไม่รับ (โควตา ~5 MB)
-const MAX_TEMPLATE_BYTES = 900_000;
-/** คุณภาพ JPEG ของภาพต้นแบบ — 85% ทำให้เส้นตาละเอียดเป็นหย่อม (14/10/69) */
-const TEMPLATE_QUALITY = 0.92;
 /** วาดภาพตัวอย่างที่ความละเอียดจอจริง ไม่ใช่ขนาดพิมพ์ (กันภาพเละตอนดู) */
 const PREVIEW_SCALE = 2;
 
 /** ขนาดสติกเกอร์เป็น px จากมิลลิเมตร @ dpi (40×20 มม. @300 = 472×236) */
 export function mmToPx(mm: number, dpi: number): number {
   return Math.round((mm / 25.4) * dpi);
-}
-
-/** ย่อภาพต้นแบบให้เล็กลงก่อนเก็บลง localStorage */
-async function normalizeTemplate(file: File): Promise<string> {
-  const img = await loadImage(URL.createObjectURL(file));
-  const scale = Math.min(1, MAX_TEMPLATE_PX / Math.max(img.width, img.height));
-  const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(img.width * scale));
-  c.height = Math.max(1, Math.round(img.height * scale));
-  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', TEMPLATE_QUALITY);
 }
 
 /** ดึงภาพ QR จาก backend (frontend ไม่มี dependency สร้าง QR) พร้อม cache */
@@ -80,12 +67,16 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   // โหมดง่ายเป็นค่าเริ่มต้น (14/10/69) — ซ่อนตัวเลื่อน ~20 ตัวไว้ข้างใต้
   const [advanced, setAdvanced] = useState(false);
+  // ความละเอียดไฟล์ดาวน์โหลด: 1x = ขนาดพิมพ์จริง · 2x = คมเท่า 600 dpi (ขนาดกระดาษเท่าเดิม)
+  const [dlScale, setDlScale] = useState(2);
+  // ขนาดจริงที่อ่านได้จากไฟล์ต้นแบบ (16/10/69) — null = ไฟล์ไม่ได้บันทึกขนาดไว้
+  const [sizeHint, setSizeHint] = useState<{ widthMm: number; heightMm: number } | null>(null);
+
 
   // มาจากแท็บ "ออกออเดอร์" → เลือกให้อัตโนมัติ
   useEffect(() => {
     if (presetSerials?.length) { setPicked(new Set(presetSerials)); setCurrent(presetSerials[0]); onClearPreset?.(); }
   }, [presetSerials, onClearPreset]);
-
   const pool = useMemo(() => db.serials.filter((s) => s.status !== 'VOID'), [db.serials]);
   const active = current && pool.some((s) => s.sn === current) ? current : (picked.values().next().value ?? pool[0]?.sn ?? '');
   const activeSerial = pool.find((s) => s.sn === active);
@@ -95,22 +86,24 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
   // ข้อความวันสิ้นประกันของใบที่กำลังดู (คำนวณครั้งเดียว แล้วส่งเข้าไปวาด)
   const warrantyText = activeOrder ? `ประกันถึง ${thaiDate(activeOrder.warrantyEnd)}` : 'ยังไม่ออกใบ';
 
+  // ข้อความวันสิ้นประกันของ serial ใดก็ได้ — ใช้ตอนเรียงหลายใบลงแผ่นเดียว (14/10/69)
+  //   ต้องเป็นฟังก์ชันแยก เพราะแผ่นหนึ่งมีหลายใบ แต่ warrantyText ข้างบนเป็นของใบเดียว
+  const warrantyTextFor = useCallback((sn: string) => {
+    const s = db.serials.find((x) => x.sn === sn);
+    const o = s?.orderId ? db.orders.find((x) => x.id === s.orderId) : undefined;
+    return o ? `ประกันถึง ${thaiDate(o.warrantyEnd)}` : 'ยังไม่ออกใบ';
+  }, [db.serials, db.orders]);
+
   /** ปล่อยเมาส — ถ้าไม่ได้ลากเลย แปลว่าผู้ใช้คลิก ให้ยึดตำแหน่งที่คลิกทันที */
   function onRelease() {
     const d = downAt.current;
-    if (d && !d.moved) {
-      patch({ serialX: round3(clamp(d.x, 0, 1)), serialY: round3(clamp(d.y, 0, 1)) });
-    }
+    if (d && !d.moved) patch({ serialX: round3(clamp(d.x, 0, 1)), serialY: round3(clamp(d.y, 0, 1)) });
     downAt.current = null;
     setDrag(null);
   }
 
-  // ── วาดสติกเกอร์ (โค้ดวาดย้ายไป sticker-draw.ts) ──
-// ⚠ 14/10/69 — ภาพเล่นไม่ใช่ภาพคุณ
-//   ขนาดพิมพ์ที่ 30 มม. @300dpi = 354 px แต่จอแสดงประมาณ 760 px
-//   ถ้าวาดที่ 354 แล้วปล่อยให้เบราว์เซอร์ขยาย → เบลอทั้งภาพ
-//   → ภาพตัวอย่างวาดที่ PREVIEW_SCALE เท่า (ไฟล์ที่ดาวน์โหลดยังเป็นขนาดพิมพ์จริงเสมอ)
-  const paint = useCallback(async (canvas: HTMLCanvasElement | null, sn: string, scale = 1) => {
+  // ── วาดสติกเกอร์ (โค้ดวาดอยู่ใน sticker-draw.ts) ──
+  const paint = useCallback(async (canvas: HTMLCanvasElement | null, sn: string, scale = 1, showGuide = false) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -119,43 +112,42 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     canvas.height = Math.round(H * k);
     // ขยายขนาดที่เป็น "พิกเซลตายตัว" (ฟอนต์/QR) ตามสัดส่วน ไม่ให้หน้าจอกับไฟล์ที่พิมพ์ไม่ตรงกัน
     const drawCfg = k === 1 ? cfg : { ...cfg, serialSize: Math.round(cfg.serialSize * k), qrSize: Math.round(cfg.qrSize * k) };
-    await paintSticker(ctx, canvas.width, canvas.height, drawCfg, sn, warrantyText, location.origin);
+    await paintSticker(ctx, canvas.width, canvas.height, drawCfg, sn, warrantyText, location.origin, showGuide);
   }, [cfg, W, H, warrantyText]);
 
-  useEffect(() => { void paint(canvasRef.current, active, PREVIEW_SCALE); }, [paint, active]);
+  // เส้นประกอบตำแหน่งขึ้นเฉพาะหน้าจอ — ตอนดาวน์โหลดส่ง showGuide = false
+  useEffect(() => { void paint(canvasRef.current, active, PREVIEW_SCALE, true); }, [paint, active]);
 
   function patch(p: Partial<typeof cfg>) {
     // ⚠ ต้องสร้าง object ใหม่ทุกชั้น 14/10/69
     //   เดิม `const next = db; next.settings.sticker = {...}` ได้ object เดิมเป๊ะ
     //   → React เทียบ Object.is เห็นเหมือนกัน → ไม่วาด canvas ใหม่
-    //   → เลื่อนสไลเดอร์แล้วไม่มีอะไรเกิดขึ้น ต้องไปคลิกที่ canvas ก่อน (อาการที่เจ้าของเจอ 14/10/69)
+    //   → เลื่อนสไลเดอร์แล้วไม่มีอะไรเกิดขึ้น (ต้องไปคลิก canvas ก่อน)
     setDb({ ...db, settings: { ...db.settings, sticker: { ...db.settings.sticker, ...p } } });
+  }
+
+  /** รันงานกับภาพต้นแบบแล้วรายงานผลให้เจ้าของเสมอ (2 ปุ่มใช้ร่วมกัน จัดการ error เหมือนกัน) */
+  async function withTemplate(fn: (tpl: string) => Promise<string>, failMsg: string) {
+    const tpl = cfg.templateDataUrl;
+    if (!tpl) { setMsg({ ok: false, text: 'ยังไม่มีภาพต้นแบบ — อัปโหลดก่อน' }); return; }
+    try { setMsg({ ok: true, text: await fn(tpl) }); }
+    catch (e: any) { setMsg({ ok: false, text: e?.message ?? failMsg }); }
   }
 
   /**
    * จับขนาดป้ายให้ตรงกับภาพต้นแบบ (14/10/69)
-   *
-   * ปัญหาที่เจ้าของเจอ: "ผมไม่สามารถปรับภาพให้ตรงได้เลย"
-   *   เพราะภาพต้นแบบมีสัดส่วนของมันเอง แต่ป้ายต้องตั้ง กว.x × ส.xxx มม. แยกกัน
-   *   ต่างกันนิดเดียวภาพก็บิดหรือมีขอบขาว → ต้องเดาสุ่มจนตรง
-   *   วิธีนี้: คงความกว้างที่ตั้งไว้ แล้วคำนวณส่วนสูงจากสัดส่วนภาพ → ตรงเป๊ะทันที
+   * ปัญหาที่เจ้าของเจอ: "ผมไม่สามารถปรับภาพให้ตรงได้เลย" — เพราะสัดส่วนภาพกับขนาดป้าย
+   *   ต่างกันนิดเดียวภาพก็บิดหรือมีขอบขาว → คงความกว้างเดิม คำนวณส่วนสูงจากภาพ → ตรงเป๊ะ
    */
   async function autoFitToTemplate() {
-    const tpl = cfg.templateDataUrl;
-    if (!tpl) { setMsg({ ok: false, text: 'ยังไม่มีภาพต้นแบบ — อัปโหลดก่อน' }); return; }
-    try {
+    await withTemplate(async (tpl) => {
       const img = await loadImage(tpl);
       if (!img.width || !img.height) throw new Error('อ่านขนาดภาพไม่ได้');
       const wMm = cfg.widthMm;
       const hMm = stickerHeightFor(img.width, img.height, wMm);
       patch({ heightMm: hMm, tplFit: 'contain', tplScale: 1, tplX: 0, tplY: 0 });
-      setMsg({
-        ok: true,
-        text: `จับขนาดเป็น ${wMm} × ${hMm} มม. ให้เท่าภาพแล้ว — ภาพเต็มพอดี ไม่ตัด ไม่มีขอบขาว`,
-      });
-    } catch (e: any) {
-      setMsg({ ok: false, text: e?.message ?? 'จับขนาดไม่สำเร็จ' });
-    }
+      return `จับขนาดเป็น ${wMm} × ${hMm} มม. ให้เท่าภาพแล้ว — ภาพเต็มพอดี ไม่ตัด ไม่มีขอบขาว`;
+    }, 'จับขนาดไม่สำเร็จ');
   }
 
   /** ขยับตำแหน่ง S/N ทีละไม่กี่มิลลิเมตร (ใช้จับช่องที่พิมพ์ไว้บนป้าย) */
@@ -166,31 +158,41 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     });
   }
 
-  // ── แม่แบบป้าย 14/10/69 ──
-  //   ตั้งค่าครั้งเดียว ตั้งชื่อไว้ แล้วกดชื่อเดียวจบ
-  //   (ตอนก่อนต้องจัดวางใหม่ทุกครั้ง — ซึ่งเจ้าของบอกว่า "ยากเกินไป")
-  function savePreset(name: string) {
-    const id = `p-${Date.now().toString(36)}`;
-    setDb({ ...db, stickerPresets: [...db.stickerPresets, { id, name, cfg: { ...cfg } }] });
+  /** ตัดพื้นขาวรอบภาพป้าย — ภาพจริงมีขอบขาว ถ้าไม่ตัด ขนาดที่ตั้งไว้จะไม่ตรงกับกรอบจริง (16/10/69) */
+  async function trimTemplate() {
+    await withTemplate(async (tpl) => {
+      const r = await trimTemplateMargins(tpl);
+      if (!r.trimmed) return 'ไม่พบขอบขาวให้ตัด — ภาพนี้เต็มขอบอยู่แล้ว';
+      patch({ templateDataUrl: r.dataUrl });
+      return `ตัดขอบขาวแล้ว (เหลือ ${r.ratio.toFixed(2)}:1) — กด ⚡ จับขนาดให้ตรงอีกครั้งเพื่อให้ขนาดป้ายตรงกรอบ`;
+    }, 'ตัดขอบขาวไม่สำเร็จ');
+  }
+
+  // ── แม่แบบป้าย 14/10/69 ── ตั้งค่าครั้งเดียว ตั้งชื่อไว้ แล้วกดชื่อเดียวจบ
+  //   logic อยู่ใน useStickerPresets เพราะไฟล์นี้ชิดเพดาน 400 บรรทัด
+  const presetOps = useStickerPresets(db, cfg, setDb);
+  const savePreset = (name: string) => {
+    presetOps.savePreset(name);
     setMsg({ ok: true, text: `บันทึกแม่แบบ "${name}" แล้ว · ครั้งหน้ากดชื่อนี้ได้เลย` });
-  }
-  function applyPreset(p: StickerPreset) {
-    setDb({ ...db, settings: { ...db.settings, sticker: { ...p.cfg } } });
+  };
+  const applyPreset = (p: StickerPreset) => {
+    presetOps.applyPreset(p);
     setMsg({ ok: true, text: `ใช้แม่แบบ "${p.name}" แล้ว` });
-  }
-  function deletePreset(id: string) {
-    setDb({ ...db, stickerPresets: db.stickerPresets.filter((p) => p.id !== id) });
-  }
+  };
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 12_000_000) { setMsg({ ok: false, text: 'ไฟล์ใหญ่เกิน 12 MB' }); return; }
     try {
-      const dataUrl = await normalizeTemplate(file);
-      if (dataUrl.length > MAX_TEMPLATE_BYTES) { setMsg({ ok: false, text: 'ย่อภาพแล้วยังใหญ่เกินไป — ลองภาพที่เล็กกว่า' }); return; }
+      // 16/10/69 — ได้ทั้งภาพและขนาดจริงจากไฟล์ (ถ้า PNG บันทึกขนาดไว้)
+      //   ไม่ใช้ขนาดนั้นทันที เพราะเจ้าของอาจตั้งใจพิมพ์ที่ขนาดอื่น
+      const { dataUrl, sizeMm } = await loadTemplate(file);
+      setSizeHint(sizeMm);
       patch({ templateDataUrl: dataUrl });
-      setMsg({ ok: true, text: 'อัปโหลดภาพต้นแบบแล้ว (เก็บในเครื่อง ไม่ออกไปไหน)' });
+      setMsg({ ok: true, text: sizeMm
+        ? `อัปโหลดแล้ว — ตรวจพบขนาดจริง ${Math.round(sizeMm.widthMm)}×${Math.round(sizeMm.heightMm)} มม. (กดปุ่มสีเหลืองเพื่อใช้)`
+        : 'อัปโหลดภาพต้นแบบแล้ว (เก็บในเครื่อง ไม่ออกไปไหน)' });
     } catch (err: any) {
       setMsg({ ok: false, text: err?.message ?? 'อัปโหลดไม่สำเร็จ' });
     }
@@ -204,28 +206,20 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     });
   }
 
+  const paintForFile: PaintFn = useCallback(
+    (canvas, sn, scale) => paint(canvas, sn, scale),   // ไม่ส่ง showGuide = ไฟล์สะอาด ไม่มีกรอบ
+    [paint],
+  );
+
   async function downloadOne(sn: string) {
-    const c = document.createElement('canvas');
-    await paint(c, sn);
-    const bytes = await canvasToPngBytes(c);
-    downloadBlob(new Blob([bytes as BlobPart], { type: 'image/png' }), `${sn}.png`);
+    await downloadStickerOne(paintForFile, sn, dlScale);
   }
 
   async function downloadAll() {
-    const list = [...picked];
-    if (!list.length) { setMsg({ ok: false, text: 'ยังไม่ได้เลือก serial' }); return; }
     setBusy(true);
     try {
-      const files: Array<{ name: string; data: Uint8Array }> = [];
-      for (const sn of list) {
-        const c = document.createElement('canvas');
-        await paint(c, sn);
-        files.push({ name: `${sn}.png`, data: await canvasToPngBytes(c) });
-      }
-      const d = new Date();
-      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-      downloadBlob(buildZip(files), `soverien-stickers-${stamp}.zip`);
-      setMsg({ ok: true, text: `ดาวน์โหลด ${files.length} ไฟล์เป็น ZIP แล้ว` });
+      const n = await downloadZip(paintForFile, [...picked], dlScale);
+      setMsg({ ok: true, text: `ดาวน์โหลด ${n} ไฟล์เป็น ZIP แล้ว` });
     } catch (err: any) {
       setMsg({ ok: false, text: err?.message ?? 'สร้าง ZIP ไม่สำเร็จ' });
     } finally {
@@ -233,12 +227,8 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     }
   }
 
-  // ── คลิก/ลากวางตำแหน่ง S/N บนภาพ ──
-  //
-  // 14/10/69 — เจ้าของบอกว่างานจริงคือ "เปลี่ยน 000 เป็น 001" ไม่ใช่มานั่งจัดวางใหม่ทุกครั้ง
-  //   เดิม: ต้องลากจับหัวข้อความไปวาง + ไล่ปรับสไลเดอร์ → ยากเกินไป
-  //   ใหม่: **คลิกที่ไหน ข้อความยึดตรงนั้นทันที** ไม่ต้องลาก ไม่ต้องแม่นยำ
-  //        (ลากยังได้เหมือนเดิมสำหรับคนที่อยากจัดละเอียด)
+  // ── คลิก/ลากวางตำแหน่ง S/N ──
+  // 14/10/69: คลิกที่ไหนข้อความยึดตรงนั้นทันที (เดิมต้องลากจับหัวข้อความ → ยากเกินไป)
   const downAt = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   function onPointer(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -247,9 +237,8 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     const py = (e.clientY - rect.top) / rect.height;
 
     // ⚠ 14/10/69 — จับตำแหน่งไว้ "ทุกครั้งที่กดลง" ไม่ใช่หลังผ่านเงื่อนไขอื่น
-    //   เคยตั้งไว้ใน else-if ที่ต้องมี activeSerial → ถ้าไม่มี serial ที่เลือก
-    //   บรรทัดนั้นไม่ทำงาน → onRelease ไม่รู้ว่าผู้ใช้คลิกไว้ตรงไหน
-    //   อาการที่เจอตอนทดสอบ: กดตรงไหนก็ไม่ขยับ เหมือนปุ่มไม่มีผล
+    //   เคยอยู่ใน else-if ที่ต้องมี activeSerial → ไม่มี serial ที่เลือกก็ไม่ทำงาน
+    //   → onRelease ไม่รู้ว่าผู้ใช้คลิกไว้ตรงไหน (อาการ: กดตรงไหนก็ไม่ขยับ)
     if (e.type === 'pointerdown' && e.button === 0) {
       downAt.current = { x: px, y: py, moved: false };
     } else if (downAt.current) {
@@ -374,10 +363,14 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
                 presets={db.stickerPresets}
                 onPatch={patch}
                 onAutoFit={autoFitToTemplate}
+                onTrim={trimTemplate}
                 onSavePreset={savePreset}
                 onApplyPreset={applyPreset}
-                onDeletePreset={deletePreset}
+                onDeletePreset={presetOps.deletePreset}
                 onGoAdvanced={() => setAdvanced(true)}
+                pxW={W} pxH={H}
+                dlScale={dlScale} onDlScale={setDlScale}
+                sizeHint={sizeHint}
               />
             )}
           </Card>
@@ -393,6 +386,13 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
         onPreview={setCurrent}
         onPickAll={() => setPicked(new Set(pool.map((s) => s.sn)))}
         onClearAll={() => setPicked(new Set())}
+      />
+
+      {/* ── พิมพ์หลายใบลงแผ่นเดียว 14/10/69 ── วางใต้ตัวเลือก serial เพราะต้องเลือกก่อนว่าจะพิมพ์ใบไหน */}
+      <StickerSheetPrint
+        cfg={cfg}
+        serials={useMemo(() => [...picked], [picked])}
+        warrantyOf={warrantyTextFor}
       />
     </div>
   );

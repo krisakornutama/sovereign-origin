@@ -9,13 +9,20 @@ import type { Db, Model, Order, Serial, Settings, StickerConfig, StickerFit, Sti
 export const KEY = 'soverien.tools.v1';
 
 export const DEFAULT_STICKER: StickerConfig = {
-  widthMm: 40,
-  heightMm: 20,
+  // ⚠ 16/10/69 — เจ้าของวัดกรอบอุปกรณ์เองได้ 8.1 × 5.5 ซม.
+  //   "ขนาดความกว้างคือ 8.1 สูง 5.5 ต่อภาพ ผมลองแล้ว ตรงกับกรอบอุปกรณ์พอดี"
+  //   = 81 × 55 มม. เดิมค่าเริ่มต้น 40×20 มม. คือขนาดที่ผมเดาขึ้นเอง ไม่ใช่ของจริง
+  widthMm: 81,
+  heightMm: 55,
   dpi: 300,
   serialX: 0.06,
   serialY: 0.38,
   serialSize: 26,
   serialColor: '#111827',
+  // ⚠ 16/10/69 — ฟอนต์ Garuda ของเจ้าของ (C:\Windows\Fonts\GARA.TTF)
+  //   เดิม hardcode JetBrains Mono ซึ่งเป็นฟอนต์เว็บ/โค้ด ไม่ใช่ฟอนต์ที่เขาพิมพ์ป้ายด้วย
+  serialFont: 'Garuda',
+  serialBold: true,
   // ⚠ QR ปิดไว้เป็นค่าเริ่มต้น 14/10/69
   //   เพราะเทมเพลตป้ายจริงของเจ้าของ "พิมพ์ QR มาให้แล้วในภาพอยู่แล้ว"
   //   ถ้าเปิดทับจะได้ QR ซ้ำสองอันบนป้ายเดียวกัน
@@ -31,6 +38,9 @@ export const DEFAULT_STICKER: StickerConfig = {
   tplScale: 1,
   tplX: 0,
   tplY: 0,
+  // 16/10/69 — 0 = ให้ระบบคำนวณจาก tplFit · เจ้าของกำหนดเองได้จากช่อง "ขนาดภาพ"
+  tplWMm: 0,
+  tplHMm: 0,
   serialAlign: 'left',
   serialPlate: true,
   serialPlateColor: '#ffffff',

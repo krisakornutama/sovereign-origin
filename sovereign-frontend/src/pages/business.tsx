@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -129,7 +130,18 @@ export default function BusinessPage() {
 
               {/* รายการธุรกิจ */}
               {businesses.length === 0 ? (
-                <EmptyState icon={<Icon name="package" size={26} />} title="ยังไม่มีธุรกิจ" description="กดปุ่ม “สร้างธุรกิจ” เพื่อเริ่มธุรกิจแรกของคุณ — ระบบเตรียมทีม สินค้า ออเดอร์ การเงิน และผู้ช่วย AI ให้ครบ" />
+                <>
+                  <EmptyState icon={<Icon name="package" size={26} />} title="ยังไม่มีธุรกิจ" description="กดปุ่ม “สร้างธุรกิจ” เพื่อเริ่มธุรกิจแรกของคุณ — ระบบเตรียมทีม สินค้า ออเดอร์ การเงิน และผู้ช่วย AI ให้ครบ" />
+                  {/* 16/10/69 — เครื่องมือ Soverien เก็บข้อมูลในเครื่องเอง ไม่ต้องมีธุรกิจ
+                      เดิมมันซ่อนอยู่ใต้ธุรกิจ → พอ token หมดอายุก็เข้าไม่ถึงเครื่องมือของตัวเอง
+                      จึงให้ทางเข้าตรง ไม่ต้องล็อกอิน */}
+                  <div className="mt-2">
+                    <Link href="/soverien"
+                      className="inline-block rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20">
+                      🛠 เปิดเครื่องมือ Soverien (ไม่ต้องมีธุรกิจ)
+                    </Link>
+                  </div>
+                </>
               ) : (
                 <div className="grid md:grid-cols-2 gap-3">
                   {businesses.map((b) => {

@@ -3,17 +3,11 @@
 // ใช้ร่วมกันทั้งหน้าตัวอย่างและไฟล์ที่ดาวน์โหลด (ต้องเป็นฟังก์ชันเดียวกันเสมอ
 // ไม่งั้นสิ่งที่เห็นหน้าจอกับไฟล์ที่ได้จริงจะไม่ตรงกัน)
 import type { StickerConfig } from './types';
-import { fitImageRect, alignOffsetX, fitFontSize } from './sticker-layout';
+import { fitImageRect, exactRect, alignOffsetX, fitFontSize } from './sticker-layout';
+import { loadImage } from './sticker-template';
+import { fontCss } from './sticker-fonts';
+import { drawGuideFrame } from './sticker-frame';
 import { getApiUrl } from '../../../lib/config';
-
-export function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = () => rej(new Error('โหลดภาพไม่สำเร็จ'));
-    img.src = src;
-  });
-}
 
 /** ดึงภาพ QR จาก backend (frontend ไม่มี dependency สร้าง QR) พร้อม cache */
 const qrCache = new Map<string, HTMLImageElement | null>();
@@ -48,10 +42,15 @@ export function plate(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
  * วาดสติกเกอร์ 1 ใบลง canvas
  * @param warrantyText ข้อความวันสิ้นประกัน (ค่าว่าง = ยังไม่ออกใบ)
  * @param origin ที่อยู่เครื่อง ใช้ต่อท้าย URL ของ QR
+ * @param showGuide วาดเส้นประกอบตำแหน่งไหม — **ต้องเป็น false ตอนดาวน์โหลด**
+ *   (เจ้าของเจอ 14/10/69: "มีกรอบด้วย...ไม่ให้ผลลัพธ์มีกรอบด้วยดีกว่า"
+ *    เส้นประกอบมีไว้ช่วยลากวางเฉพาะตอนดูหน้าจอ ห้ามติดไปกับไฟล์จริง)
  */
+export { loadImage } from './sticker-template';
+
 export async function paintSticker(
   ctx: CanvasRenderingContext2D, W: number, H: number,
-  cfg: StickerConfig, sn: string, warrantyText: string, origin: string,
+  cfg: StickerConfig, sn: string, warrantyText: string, origin: string, showGuide = false,
 ) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
@@ -61,7 +60,12 @@ export async function paintSticker(
   if (tpl) {
     try {
       const img = await loadImage(tpl);
-      const r = fitImageRect(img.width, img.height, W, H, cfg.tplFit, cfg.tplScale, cfg.tplX, cfg.tplY);
+      // 16/10/69 — เจ้าของกำหนดขนาดภาพเป็นมิลลิเมตรเอง ("ภาพมันเล็กกว่าที่ควรจะเป็น")
+      //   tplWMm/tplHMm > 0 = ใช้ขนาดนั้นตรง ๆ แทนการคำนวณจากโหมด fit
+      const perMm = cfg.widthMm > 0 ? W / cfg.widthMm : 1;
+      const r = (cfg.tplWMm > 0 || cfg.tplHMm > 0)
+        ? exactRect(img.width, img.height, W, H, cfg.tplWMm * perMm, cfg.tplHMm * perMm, cfg.tplX, cfg.tplY)
+        : fitImageRect(img.width, img.height, W, H, cfg.tplFit, cfg.tplScale, cfg.tplX, cfg.tplY);
       ctx.drawImage(img, r.x, r.y, r.w, r.h);
     } catch { /* ไม่มีภาพต้นแบบ = ใช้พื้นขาวล้วน */ }
   }
@@ -71,8 +75,10 @@ export async function paintSticker(
   ctx.textAlign = 'left';
 
   // ── S/N ──
+  // 16/10/69 — เดิม hardcode JetBrains Mono ทั้งที่เจ้าของใช้ Garuda
+  //   ตอนนี้ใช้ฟอนต์ที่เจ้าของเลือกไว้ และใช้กับทั้ง S/N และบรรทัดรับประกัน
   const fontPx = fitFontSize(text, W - 10, cfg.serialSize);
-  ctx.font = `600 ${fontPx}px "JetBrains Mono", Consolas, monospace`;
+  ctx.font = fontCss(cfg.serialFont, fontPx, cfg.serialBold !== false);
   const tw = ctx.measureText(text).width;
   const bx = alignOffsetX(cfg.serialAlign, tw, W, cfg.serialX * W);
   const by = cfg.serialY * H;
@@ -80,12 +86,8 @@ export async function paintSticker(
   if (cfg.serialPlate) plate(ctx, bx, by, tw, fontPx, cfg.serialPlateColor);
 
   // เส้นคั่นช่วยจัดตำแหน่ง — วัดจากความกว้างจริงของข้อความ ไม่เดาเอง
-  ctx.save();
-  ctx.strokeStyle = 'rgba(16,185,129,.55)';
-  ctx.setLineDash([4, 3]);
-  ctx.lineWidth = 1;
-  ctx.strokeRect(bx - 4, by - fontPx / 2 - 4, tw + 8, fontPx + 8);
-  ctx.restore();
+  // ⚠ วาดเฉพาะตอนดูหน้าจอ ไฟล์ที่ดาวน์โหลดต้องสะอาด (14/10/69)
+  if (showGuide) drawGuideFrame(ctx, bx, by, tw, fontPx);
 
   ctx.fillStyle = cfg.serialColor;
   ctx.fillText(text, bx, by);
@@ -93,7 +95,7 @@ export async function paintSticker(
   // ── วันสิ้นสุดประกัน (มุมขวาล่าง) ──
   if (cfg.showWarranty && warrantyText) {
     const wf = Math.max(9, Math.round(H * 0.062));
-    ctx.font = `${wf}px "Sarabun", sans-serif`;
+    ctx.font = fontCss(cfg.serialFont, wf, false);
     const ww = ctx.measureText(warrantyText).width;
     const wy = H - Math.round(H * 0.075);
     if (cfg.serialPlate) plate(ctx, W - 6 - ww, wy, ww, wf, cfg.serialPlateColor);

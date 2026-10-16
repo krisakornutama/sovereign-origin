@@ -75,11 +75,27 @@ export type StickerConfig = {
   tplScale: number;        // 0.2–3  ย่อ/ขยายเพิ่มจากโหมดข้างบน
   tplX: number;            // -1..1  เลื่อนภาพต้นแบบแนวนอน
   tplY: number;            // -1..1  เลื่อนภาพต้นแบบแนวตั้ง
+  /**
+   * ขนาดภาพต้นแบบบนป้ายเป็นมิลลิเมตร — 0 = ให้ระบบคำนวณจาก tplFit เอง (16/10/69)
+   * เจ้าของถาม: "ผมสามารถกำหนดความกว้างและสูงของภาพได้มั้ย เพราะภาพมันเล็กกว่าที่ควรจะเป็น"
+   *   → ใส่ค่าแค่ข้างเดียวได้ อีกข้างจะคำนวณตามสัดส่วนภาพให้เอง (ภาพจะไม่บิด)
+   */
+  tplWMm: number;
+  tplHMm: number;
   serialAlign: StickerAlign;
   serialPlate: boolean;    // วางพื้นหลังหลัง S/N ให้อ่านออกแม้ทับภาพ
   serialPlateColor: string;
   showWarranty: boolean;   // แสดง/ซ่อนบรรทัดวันสิ้นประกัน
   warrantyColor: string;
+  /**
+   * ฟอนต์ของข้อความบนป้าย — เจ้าของใช้ Garuda (16/10/69)
+   * เก็บเป็นชื่อ CSS font-family เต็ม แล้วปล่อยให้ผู้ใช้เลือกเองได้
+   * ⚠ ถ้าเครื่องไม่มีฟอนต์นี้ canvas จะเงียบ ๆ ไปใช้ฟอนต์สำรอง
+   *   → ต้องเช็คด้วย sticker-fonts.ts ว่ามีจริง ไม่ใช่แค่เขียนชื่อลงไป
+   */
+  serialFont: string;
+  /** ทำตัวหนา — Garuda มี GARA.TTF/GARABD.TTF สองไฟล์แยกกัน */
+  serialBold: boolean;
 };
 
 export type Settings = {
