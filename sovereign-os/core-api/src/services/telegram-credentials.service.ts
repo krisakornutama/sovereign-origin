@@ -102,8 +102,8 @@ export async function setTelegramCredentials(
       update: { value: chatId },
     }),
   ]);
-  cache = { token: botToken, chatId };
-  cacheTime = Date.now();
+  // ⚠ ห้ามเขียน cache แบบบางฟิลด์ — ดู invalidateCache (เคยพังตอนรันจริง 17/10/69)
+  invalidateCache();
 }
 
 /** ลบ override คืนกลับไปใช้ value จาก .env */
@@ -111,14 +111,12 @@ export async function clearTelegramCredentials(): Promise<void> {
   await prisma.systemSetting.deleteMany({
     where: { key: { in: [TELEGRAM_TOKEN_KEY, TELEGRAM_CHAT_ID_KEY] } },
   });
-  cache = {};
-  cacheTime = Date.now();
+  invalidateCache();
 }
 
 /** ล้าง cache — เทสต์ใช้กันค่าค้างจากเคสก่อนหน้า */
 export function __resetTelegramCredentialCache(): void {
-  cache = {};
-  cacheTime = 0;
+  invalidateCache();
 }
 
 /** แสดง token แบบ mask เฉพาะ 4 ตัวท้าย (ไม่คืน token เต็มกลับไป UI) */
@@ -156,15 +154,26 @@ export async function setBusinessChatId(chatId: string): Promise<void> {
     create: { key: TELEGRAM_BIZ_CHAT_ID_KEY, value: id },
     update: { value: id },
   });
-  cache = { ...(cache ?? {}), bizChatId: id };
-  cacheTime = Date.now();
+  invalidateCache();
 }
 
 /** ล้างเฉพาะห้องธุรกิจ — ห้องของระบบยังใช้ได้ตามเดิม */
 export async function clearBusinessChatId(): Promise<void> {
   await prisma.systemSetting.deleteMany({ where: { key: TELEGRAM_BIZ_CHAT_ID_KEY } });
-  cache = { ...(cache ?? {}), bizChatId: '' };
-  cacheTime = Date.now();
+  invalidateCache();
+}
+
+/**
+ * ทิ้ง cache ทั้งก้อนให้โหลดใหม่ทั้งหมด — **ห้ามอัปเดตบางฟิลด์**
+ *
+ * ⚠ เจอตอนรันจริง 17/10/69: เขียน `cache = { ...(cache ?? {}), bizChatId: id }`
+ *   ตอนที่ cache ยังเป็น null (ยังไม่เคยอ่าน) จะได้ object ที่มีแค่ bizChatId
+ *   → การอ่านครั้งถัดไปได้ token = ว่าง → ส่งไม่ออก ("no_bot_token")
+ *   ทั้งที่ token อยู่ในฐานข้อมูลถูกต้อง เพราะตอนนั้นยังไม่ได้อ่านเข้า cache
+ */
+function invalidateCache(): void {
+  cache = null;
+  cacheTime = 0;
 }
 
 /** mask หมายเลขห้องตอนส่งกลับ UI — เหลือ 3 ตัวท้ายพอให้เจ้าของรู้ว่าตั้งถูกห้อง */
