@@ -5,9 +5,31 @@
 // ที่มาของของนี้: เจ้าของบอกว่า "ต้องปรับตัวหนังสือในแอปรวมถึงรวมเข้ากับภาพ ซึ่งมันยากมาก
 // ทั้งๆ ที่ควรจะง่าย" — เพราะระบบไม่มีที่จำ ทุกครั้งต้องทำใหม่ตั้งแต่ต้น
 //   → ตั้งค่าครั้งเดียว ตั้งชื่อ (เช่น "ป้ายหลัก") แล้วกดชื่อเพื่อเรียกค่าทั้งชุดกลับมา
-import { useState } from 'react';
-import type { StickerConfig, StickerPreset } from './types';
+import { useCallback, useState } from 'react';
+import type { Db, StickerConfig, StickerPreset } from './types';
+import { makePreset } from './sticker-presets';
 import { btnGhost } from './ui';
+
+/**
+ * สร้าง/ใช้/ลบแม่แบบป้าย (16/10/69)
+ * ย้ายมาจาก StickerStudio เพราะไฟล์นั้นชิดเพดาน 400 บรรทัดทุกรอบที่เพิ่มฟีเจอร์
+ *   → logic ควรอยู่ติดกับ UI ที่ใช้มัน ไม่ใช่ในไฟล์ที่ยัดทุกอย่างเข้าไป
+ */
+export function useStickerPresets(db: Db, cfg: StickerConfig, setDb: (d: Db) => void) {
+  const savePreset = useCallback((name: string) => {
+    setDb({ ...db, stickerPresets: [...db.stickerPresets, makePreset(name, cfg)] });
+  }, [db, cfg, setDb]);
+
+  const applyPreset = useCallback((p: StickerPreset) => {
+    setDb({ ...db, settings: { ...db.settings, sticker: { ...p.cfg } } });
+  }, [db, setDb]);
+
+  const deletePreset = useCallback((id: string) => {
+    setDb({ ...db, stickerPresets: db.stickerPresets.filter((p) => p.id !== id) });
+  }, [db, setDb]);
+
+  return { savePreset, applyPreset, deletePreset };
+}
 
 export default function StickerPresets({ presets, cfg, onSave, onApply, onDelete }: {
   presets: StickerPreset[];

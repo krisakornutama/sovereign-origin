@@ -5,7 +5,7 @@
 // - soft-fail: ไม่มี token / เน็ตตัด = log เงียบ ไม่ทำให้ request หลักชะงัก
 import axios from 'axios';
 import { config } from '../config';
-import { getTelegramCredentials } from './telegram-credentials.service';
+import { getTelegramCredentials, getBusinessChatId } from './telegram-credentials.service';
 import { recordAlertEvent } from './alert-store.service'; // Phase 3: ทุก alert ถูกจดลง alert_events (soft-fail)
 
 export type AlertSeverity = 'critical' | 'warn' | 'info';
@@ -223,4 +223,83 @@ export function sendTelegramAlert(
     return createTelegramAlertDispatcher(config.telegramAlert, { send: diSenderNow }).send(payload);
   }
   return getTelegramAlertDispatcher().send(payload);
+}
+
+// ── แจ้งเตือนธุรกิจ (16/10/69) ─────────────────────────────────────────────
+// เจ้าของ: "ตัวเดียวกับส่งข้อมูลเรื่องบ้าง แต่อันนี้แยกเฉพาะห้อง เพราะเกี่ยวกับธุรกิจโดยตรง"
+//   → ใช้บอทเดียวกัน แต่ส่งไปห้องของธุรกิจ (chat id คนละห้อง) · ไม่กระทบการแจ้งเตือนระบบ
+//   soft-fail เหมือนของเดิม: ไม่มีบอท/ห้อง/เน็ตตัด = log เงียบ ไม่ทำให้งานหลักพัง
+
+export type BusinessEventKind =
+  | 'order'      // ออเดอร์ใหม่
+  | 'shipping'   // ส่งของแล้ว
+  | 'warranty'   // ประกันใกล้หมด / หมดแล้ว
+  | 'stock'      // สินค้าใกล้หมด
+  | 'info';
+
+const BIZ_EVENT_ICON: Record<BusinessEventKind, string> = {
+  order: '🧾', shipping: '🚚', warranty: '🛡', stock: '📦', info: 'ℹ️',
+};
+
+const BIZ_EVENT_TH: Record<BusinessEventKind, string> = {
+  order: 'ออเดอร์ใหม่', shipping: 'ส่งของแล้ว', warranty: 'ประกัน',
+  stock: 'สินค้าใกล้หมด', info: 'แจ้งเตือน',
+};
+
+/** จัดข้อความแจ้งเตือนธุรกิจให้อ่านง่ายบนโทรศัพท์ */
+export function formatBusinessAlert(kind: BusinessEventKind, title: string, detail = ''): string {
+  const head = `<b>${BIZ_EVENT_ICON[kind]} ${BIZ_EVENT_TH[kind]}</b>\n${title}`;
+  return detail ? `${head}\n\n${detail}` : head;
+}
+
+/** ส่งข้อความเข้าห้องธุรกิจโดยเฉพาะ (soft-fail) — คืนเหตุผลถ้าส่งไม่ได้ */
+export async function sendBusinessAlert(
+  kind: BusinessEventKind, title: string, detail = '', eventKey?: string
+): Promise<{ sent: boolean; reason: string }> {
+  const creds = await getTelegramCredentials();
+  const bizChatId = await getBusinessChatId();
+  if (!creds.botToken) return { sent: false, reason: 'no_bot_token' };
+  if (!bizChatId) return { sent: false, reason: 'no_business_chat' };
+
+  const html = formatBusinessAlert(kind, title, detail);
+  try {
+    await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
+      chat_id: bizChatId,
+      text: html,
+      parse_mode: 'HTML',
+    });
+    await recordAlertEvent({
+      severity: kind === 'warranty' ? 'warn' : 'info',
+      eventKey: eventKey || `biz:${kind}:${html}`,
+      title: title.replace(/<[^>]*>/g, '').slice(0, 120),
+      detail: html,
+      sent: true,
+      suppressed: null,
+      source: 'soverien-business',
+    });
+    return { sent: true, reason: 'sent' };
+  } catch (err) {
+    console.error('Business alert send failed:', err instanceof Error ? err.message : err);
+    return { sent: false, reason: 'send_failed' };
+  }
+}
+
+/** ส่งข้อความธุรกิจตาม chat id ที่ระบุ (ใช้ตอนทดสอบ — ยังไม่ต้องบันทึกถาวร) */
+export async function sendBusinessAlertTo(
+  chatId: string, kind: BusinessEventKind, title: string, detail = ''
+): Promise<{ sent: boolean; reason: string; error?: string }> {
+  const creds = await getTelegramCredentials();
+  if (!creds.botToken) return { sent: false, reason: 'no_bot_token' };
+  try {
+    const res = await axios.post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
+      chat_id: chatId,
+      text: formatBusinessAlert(kind, title, detail),
+      parse_mode: 'HTML',
+    });
+    return { sent: true, reason: 'sent', error: res?.data?.description };
+  } catch (err: any) {
+    // Telegram ตอบ 400 พร้อมคำอธิบายที่อ่านเป็นภาษาอังกฤษ — ส่งกลับไปให้เจ้าของเห็น
+    // เช่น "chat not found" = ยังไม่ได้เพิ่มบอทเข้าห้อง, หรือหมายเลขห้องผิด
+    return { sent: false, reason: 'send_failed', error: err?.response?.data?.description || err?.message };
+  }
 }

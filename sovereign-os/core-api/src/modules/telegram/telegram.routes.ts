@@ -9,7 +9,13 @@ import {
   setTelegramCredentials,
   clearTelegramCredentials,
   maskBotToken,
+  getBusinessChatId,
+  setBusinessChatId,
+  clearBusinessChatId,
+  validateTelegramChatId,
+  maskChatId,
 } from '../../services/telegram-credentials.service';
+import { sendBusinessAlert, sendBusinessAlertTo } from '../../services/telegram-alert.service';
 import { listAlertEvents, alertStats24h } from '../../services/alert-store.service'; // Phase 3: ประวัติ alert ในระบบ
 import { synthesizeWav } from '../../services/tts.service'; // ระดับที่ 2: ส่งเสียงพูดไทย
 
@@ -259,6 +265,88 @@ router.post('/notify', authenticate, async (req, res) => {
   const { message } = req.body;
   const ok = await sendTelegram(message);
   res.json({ success: ok });
+});
+
+// ── แจ้งเตือนธุรกิจ → ห้องเฉพาะธุรกิจ (16/10/69) ────────────────────────────
+// เจ้าของใช้บอทตัวเดียวกับระบบ แต่ส่งไปห้องคนละห้อง (ข้อมูลธุรกิจ ไม่ปนกับเรื่องเทคนิค)
+// ⚠ /biz ทั้งหมดต้อง authenticate — ไม่งั้นใครก็ยิงข้อความออกทางบอทของเจ้าของได้
+
+// GET /api/telegram/biz — สถานะการตั้งค่า (ห้องถูก mask ก่อนส่งกลับ)
+router.get('/biz', authenticate, async (_req, res) => {
+  try {
+    const creds = await getTelegramCredentials();
+    const bizChatId = await getBusinessChatId();
+    res.json({
+      success: true,
+      hasBotToken: Boolean(creds.botToken),
+      tokenMask: maskBotToken(creds.botToken),
+      bizChatIdMasked: maskChatId(bizChatId),
+      bizChatIdSet: Boolean(bizChatId),
+      ready: Boolean(creds.botToken && bizChatId),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'อ่านค่าตั้งค่าไม่สำเร็จ' });
+  }
+});
+
+// PUT /api/telegram/biz — ตั้ง/เปลี่ยนห้องธุรกิจ (เขียนทับห้องเดิม)
+router.put('/biz', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const { chatId } = req.body || {};
+  const bad = validateTelegramChatId(String(chatId ?? ''));
+  if (bad) return res.status(400).json({ success: false, error: bad });
+  try {
+    await setBusinessChatId(String(chatId));
+    res.json({ success: true, bizChatIdMasked: maskChatId(String(chatId).trim()) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'บันทึกห้องไม่สำเร็จ' });
+  }
+});
+
+// DELETE /api/telegram/biz — ล้างห้องธุรกิจ (ห้องของระบบไม่กระทบ)
+router.delete('/biz', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  try {
+    await clearBusinessChatId();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'ล้างห้องไม่สำเร็จ' });
+  }
+});
+
+// POST /api/telegram/biz/test — ส่งข้อความทดสอบ (ยังไม่บันทึกถาวร)
+router.post('/biz/test', authenticate, async (req, res) => {
+  const { chatId } = req.body || {};
+  try {
+    const target = (chatId && String(chatId).trim()) ? String(chatId).trim() : await getBusinessChatId();
+    const bad = validateTelegramChatId(target);
+    if (bad) return res.status(400).json({ success: false, error: bad });
+    const r = await sendBusinessAlertTo(
+      target, 'info',
+      'ทดสอบระบบแจ้งเตือนจาก Sovereign OS',
+      `ส่งเมื่อ ${new Date().toLocaleString('th-TH')} · ถ้าเห็นข้อความนี้ แปลว่าตั้งค่าถูกต้องแล้ว`
+    );
+    if (!r.sent) return res.status(400).json({ success: false, error: r.error || 'ส่งไม่สำเร็จ', reason: r.reason });
+    res.json({ success: true, bizChatIdMasked: maskChatId(target) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'ทดสอบไม่สำเร็จ' });
+  }
+});
+
+// POST /api/telegram/biz/notify — ส่งเหตุการณ์ธุรกิจจริง (เรียกจากเครื่องมือ Soverien)
+// body: { kind: 'order'|'shipping'|'warranty'|'stock'|'info', title, detail?, eventKey? }
+router.post('/biz/notify', authenticate, async (req, res) => {
+  const { kind, title, detail, eventKey } = req.body || {};
+  const allowed = ['order', 'shipping', 'warranty', 'stock', 'info'];
+  if (!allowed.includes(kind)) return res.status(400).json({ success: false, error: 'ชนิดเหตุการณ์ไม่ถูกต้อง' });
+  const text = String(title ?? '').trim();
+  if (!text) return res.status(400).json({ success: false, error: 'ไม่มีข้อความให้แจ้ง' });
+  if (text.length > 900) return res.status(400).json({ success: false, error: 'ข้อความยาวเกิน 900 ตัวอักษร' });
+  try {
+    const r = await sendBusinessAlert(kind, text, String(detail ?? '').slice(0, 900), eventKey);
+    // soft-fail: ยังไม่ได้ตั้งห้อง = ตอบ 200 พร้อมเหตุผล ไม่ใช่ error
+    res.json({ success: r.sent, reason: r.reason });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'ส่งแจ้งเตือนไม่สำเร็จ' });
+  }
 });
 
 // POST /api/telegram/photo – ส่งรูปภาพ

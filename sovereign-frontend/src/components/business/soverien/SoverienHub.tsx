@@ -23,10 +23,11 @@ import WarrantyCheck from './WarrantyCheck';
 import SummaryCards from './SummaryCards';
 import CustomerCRM from './CustomerCRM';
 import BackupSecurity from './BackupSecurity';
+import TelegramNotifyCard from './TelegramNotifyCard';
 import { PinGate } from './ui';
 
 type TabKey = 'summary' | 'sell' | 'sticker' | 'track' | 'settings';
-type SectionKey = 'order' | 'guide' | 'serial' | 'design' | 'vault' | 'warranty' | 'crm';
+type SectionKey = 'order' | 'guide' | 'serial' | 'design' | 'vault' | 'warranty' | 'crm' | 'notify';
 
 const TABS: Array<{ key: TabKey; label: string; icon: string; needPin?: boolean }> = [
   { key: 'summary', label: 'สรุป', icon: '📊' },
@@ -44,6 +45,7 @@ const SECTIONS: Record<TabKey, Array<{ key: SectionKey; label: string }>> = {
     { key: 'vault', label: 'คลังออเดอร์' },
     { key: 'warranty', label: 'ตรวจประกัน' },
     { key: 'crm', label: 'ลูกค้า' },
+    { key: 'notify', label: '🔔 แจ้งเตือน' },
   ],
   settings: [],
 };
@@ -143,6 +145,8 @@ export default function SoverienHub() {
           )}
           {tab === 'track' && section === 'warranty' && <WarrantyCheck db={db} />}
           {tab === 'track' && section === 'crm' && <CustomerCRM db={db} />}
+          {/* แจ้งเตือน Telegram เข้าห้องธุรกิจ (16/10/69) — เพิ่มในแท็บ "ติดตาม" ตามที่เจ้าของขอ */}
+          {tab === 'track' && section === 'notify' && <TelegramNotifyCard db={db} />}
 
           {tab === 'settings' && <BackupSecurity db={db} setDb={setDb} />}
         </>
