@@ -93,34 +93,47 @@ function bailWithBackup(raw: string): Db {
   return emptyDb();
 }
 
+/**
+ * ทำให้ข้อมูลที่อ่านจากภายนอก (localStorage · ไฟล์สำรอง) ผ่านมาตรฐานชุดเดียวกัน (17/10/69)
+ *
+ * เดิมตรรกะนี้ฝังอยู่ใน load() อย่างเดียว → ตอนกู้คืนไฟล์ JSON ไม่ได้ผ่านจุดนี้
+ *   ไฟล์เก่าที่ไม่มี settings.sticker จะเข้าหน้าสติกเกอร์แล้ว crash ทันที (เจ้าของเจอจริง)
+ * คืน null เมื่อ "ไม่ใช่ข้อมูลของเครื่องมือนี้" — ผู้เรียกต้องเป็นคนตัดสินใจว่าจะทำอย่างไรต่อ
+ */
+export function normalizeDb(parsed: Db | null | undefined): Db | null {
+  if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.serials) || !Array.isArray(parsed.orders)) return null;
+  parsed.settings = { ...emptyDb().settings, ...parsed.settings, sticker: { ...DEFAULT_STICKER, ...(parsed.settings?.sticker ?? {}) } };
+  parsed.models = Array.isArray(parsed.models) && parsed.models.length ? parsed.models : emptyDb().models;
+  parsed.orderSeq = Number(parsed.orderSeq) || 0;
+  // แม่แบบป้ายที่บันทึกไว้ (ข้อมูลเก่ายังไม่มีฟิลด์นี้)
+  parsed.stickerPresets = Array.isArray(parsed.stickerPresets)
+    ? parsed.stickerPresets.filter((p) => p && typeof p.name === 'string' && p.cfg)
+    : [];
+  return parsed;
+}
+
 export function load(): Db {
   if (!canUse()) return emptyDb();
   let raw = '';
   try {
     raw = window.localStorage.getItem(KEY) || '';
     if (!raw) return emptyDb();
-    const db = JSON.parse(raw) as Db;
-    // กันข้อมูลเก่า/เสีย = คืนค่าเริ่มต้นใหม่ (ปลอดภัยกว่า crash ตอนใช้งาน)
-    if (!db || db.version !== 1 || !Array.isArray(db.serials) || !Array.isArray(db.orders)) {
-      // ⚠ เส้นทางนี้เดิม "ทิ้งของจริงทิ้ง" โดยไม่เก็บสำเนาไว้เลย (14/10/69)
-      return bailWithBackup(raw);
-    }
-    db.settings = { ...emptyDb().settings, ...db.settings, sticker: { ...DEFAULT_STICKER, ...(db.settings?.sticker ?? {}) } };
-    db.models = Array.isArray(db.models) && db.models.length ? db.models : emptyDb().models;
-    db.orderSeq = Number(db.orderSeq) || 0;
-    // แม่แบบป้ายที่บันทึกไว้ (ข้อมูลเก่ายังไม่มีฟิลด์นี้)
-    db.stickerPresets = Array.isArray(db.stickerPresets)
-      ? db.stickerPresets.filter((p) => p && typeof p.name === 'string' && p.cfg)
-      : [];
-    return db;
+    // ⚠ เส้นทางนี้เดิม "ทิ้งของจริงทิ้ง" โดยไม่เก็บสำเนาไว้เลย (14/10/69)
+    return normalizeDb(JSON.parse(raw) as Db) ?? bailWithBackup(raw);
   } catch {
     return bailWithBackup(raw);
   }
 }
 
-export function save(db: Db): void {
-  if (!canUse()) return;
-  try { window.localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* เต็ม/quota — ข้าม ไม่ทำให้แอปพัง */ }
+/**
+ * คืน false เมื่อบันทึกไม่สำเร็จ (โควตาเต็ม / เบราว์เซอร์ปิดการเขียน) (17/10/69)
+ *
+ * เดิม catch ทิ้งเงียบ ๆ → เจ้าของพิมพ์ออเดอร์เสร็จ หน้าจอขึ้น "ออกออเดอร์แล้ว"
+ *   แต่ข้อมูลไม่เคยถูกเก็บ และไม่มีใครรู้จนกว่าจะเปิดแอปใหม่แล้วทุกอย่างหาย
+ */
+export function save(db: Db): boolean {
+  if (!canUse()) return false;
+  try { window.localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch { return false; }
 }
 
 export function wipeAll(): void {
@@ -179,6 +192,19 @@ export function warrantyState(o: Order, s: Settings, today = todayIso()): { stat
   if (left < 0) return { state: 'OUT', daysLeft: left };
   if (left <= s.nearExpiryDays) return { state: 'NEAR', daysLeft: left };
   return { state: 'IN', daysLeft: left };
+}
+
+/**
+ * ข้อความวันสิ้นประกันของ "serial ตัวเดียว" — ใช้ตอนวาดป้ายทุกใบ (17/10/69)
+ *
+ * ⚠ ต้องเป็นฟังก์ชันที่รับ sn เสมอ ห้ามคำนวณจาก "ใบที่กำลังดู" แล้วปิดผนึกเข้าตัววาด
+ *   เพราะตอนดาวน์โหลด ZIP หลายใบ ตัววาดถูกเรียกด้วย sn ใหม่ทุกไฟล์
+ *   → ถ้า capture ค่าไว้จากใบเดิม ป้ายที่เหลือทุกใบจะได้วันสิ้นประกันผิด
+ */
+export function warrantyTextFor(db: Db, sn: string): string {
+  const s = db.serials.find((x) => x.sn === sn);
+  const o = s?.orderId ? db.orders.find((x) => x.id === s.orderId) : undefined;
+  return o ? `ประกันถึง ${thaiDate(o.warrantyEnd)}` : 'ยังไม่ออกใบ';
 }
 
 export type Lookup = { kind: WState | 'UNSOLD' | 'EMPTY'; sn: string; order?: Order };
@@ -320,6 +346,25 @@ export type Summary = {
   byMonth: Array<{ month: string; count: number; value: number }>;
 };
 
+/**
+ * คีย์ "ปี-เดือน" ของ 12 เดือนย้อนหลัง (รวมเดือนนี้) — ใช้ทำกราฟรายเดือน (17/10/69)
+ *
+ * ⚠ ห้ามใช้ `d.setMonth(d.getMonth() - i)` กับวันที่ 29/30/31 เด็ดขาด
+ *   เพราะเดือนถัดไปอาจไม่มีวันนั้น (31 ก.ย. ไม่มี) → JavaScript โดดไปวันที่ 1 ของเดือนถัดไป
+ *   ผลคือคีย์ซ้ำ/เพี้ยน ได้เดือนน้อยกว่า 12 ช่อง และแถวแรกของกราฟกลายเป็นเดือนผิด
+ */
+export function lastTwelveMonthKeys(today: string): string[] {
+  const [y, m] = today.split('-').map(Number);
+  const now = new Date();
+  const base = (Number.isFinite(y) ? y : now.getFullYear()) * 12 + ((Number.isFinite(m) ? m : now.getMonth() + 1) - 1);
+  const out: string[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const t = base - i;
+    out.push(`${Math.floor(t / 12)}-${String(((t % 12) + 12) % 12 + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+
 export function buildSummary(db: Db, today = todayIso()): Summary {
   const active = db.orders.filter((o) => o.status === 'ACTIVE');
   let inW = 0, near = 0, out = 0, revenue = 0;
@@ -332,12 +377,7 @@ export function buildSummary(db: Db, today = todayIso()): Summary {
   }
   // กราฟรายเดือน (12 เดือนล่าสุด)
   const buckets = new Map<string, { month: string; count: number; value: number }>();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    buckets.set(key, { month: key, count: 0, value: 0 });
-  }
+  for (const key of lastTwelveMonthKeys(today)) buckets.set(key, { month: key, count: 0, value: 0 });
   for (const o of active) {
     const key = o.issueDate.slice(0, 7);
     const b = buckets.get(key);

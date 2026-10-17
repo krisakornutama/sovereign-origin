@@ -54,19 +54,26 @@ const DEFAULT_SECTION: Record<TabKey, SectionKey | null> = {
   summary: null, sell: 'order', sticker: 'design', track: 'vault', settings: null,
 };
 
+const SAVE_FAILED_MSG = '⚠ บันทึกลงเครื่องไม่สำเร็จ (พื้นที่เก็บเต็ม) — สิ่งที่เพิ่งทำไป "ยังไม่ถูกเก็บ" ถ้าปิดแอปจะหาย · กด “ส่งออกไฟล์สำรอง (JSON)” ที่แท็บตั้งค่าเพื่อล้างพื้นที่';
+
 export default function SoverienHub() {
   const [db, setDbState] = useState<Db | null>(null);
   const [tab, setTab] = useState<TabKey>('summary');
   const [section, setSection] = useState<SectionKey>('order');
   const [unlocked, setUnlocked] = useState(false);
   const [stickerPreset, setStickerPreset] = useState<string[] | undefined>();
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   // โหลดจาก localStorage หลัง mount (SSR ไม่มี window)
   useEffect(() => { setDbState(load()); }, []);
 
   const setDb = useCallback((d: Db) => {
-    save(d);
+    // ⚠ ต้องรายงานทันทีเมื่อบันทึกไม่สำเร็จ (17/10/69)
+    //   เดิม save() เงียบ ๆ เมื่อโควตาเต็ม → หน้าขึ้น "ออกออเดอร์แล้ว" แต่ข้อมูลไม่เคยถูกเก็บ
+    //   และไม่มีใครรู้จนกว่าจะเปิดแอปใหม่ แล้วทุกอย่างหายไป
+    const saved = save(d);
     setDbState(d);
+    setSaveErr(saved ? null : SAVE_FAILED_MSG);
   }, []);
 
   const go = useCallback((t: TabKey) => {
@@ -96,6 +103,13 @@ export default function SoverienHub() {
           ข้อมูลเก็บในเครื่องนี้ (localStorage) · ควรสำรองเป็น JSON เป็นประจำ
         </span>
       </header>
+
+      {/* ขึ้นคงที่ทุกแท็บเมื่อบันทึกไม่สำเร็จ — ห้ามปล่อยให้เจ้าของคิดว่าข้อมูลถูกเก็บแล้ว (17/10/69) */}
+      {saveErr && (
+        <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+          {saveErr}
+        </div>
+      )}
 
       {/* แท็บหลัก 5 อัน — เหลือเท่าที่จำได้ ไม่ต้องเลื่อนหา */}
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="เครื่องมือ Soverien">

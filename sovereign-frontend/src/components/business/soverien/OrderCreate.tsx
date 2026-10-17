@@ -27,14 +27,22 @@ export default function OrderCreate({ db, setDb, onDone }: {
 
   const phoneOk = PHONE_RE.test(form.phone.replace(/[^0-9]/g, ''));
   const stockLeft = db.serials.filter((x) => x.modelId === modelId && x.status === 'STOCK').length;
-  const canSubmit = !!model && form.customerName.trim().length > 0 && phoneOk && stockLeft >= count;
+  // ⚠ 17/10/69 คลังไม่พอ = ระบบออกใหม่ให้เอง ไม่บล็อก
+  //   เดิมบังคับให้ "ต้องมีคลังก่อน" แต่โค้ดกลับสร้าง serial ใหม่ทุกครั้งอยู่ดี → เงื่อนไขนั้นไม่ได้ป้องกันอะไร
+  const short = Math.max(0, count - stockLeft);
+  const canSubmit = !!model && form.customerName.trim().length > 0 && phoneOk;
 
   function set<K extends keyof typeof form>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
   function submit() {
     if (!canSubmit || !model) return;
-    const made = issueSerials(db, model.id, count);
+    // ⚠ ต้องผูก serial ที่ "อยู่ในคลัง" ก่อน (ตัวที่พิมพ์ป้ายไว้แล้ว) แล้วค่อยออกใหม่ให้ครบ
+    //   เดิมสร้าง serial ใหม่ทุกครั้ง → ป้ายที่พิมพ์ไปไม่เคยถูกขาย
+    //   ระบบบอกเลขอื่นกับที่ติดอยู่บนเครื่องของลูกค้าจริง → สแกน QR ป้ายแล้วเจอประกันคนละใบ
+    const taken = db.serials.filter((x) => x.modelId === model.id && x.status === 'STOCK').slice(0, count);
+    const made = taken.length < count ? issueSerials(db, model.id, count - taken.length) : [];
     const serials = [...db.serials, ...made];
+    const used = [...taken, ...made];
 
     const o: Order = {
       id: `ord-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
@@ -45,9 +53,9 @@ export default function OrderCreate({ db, setDb, onDone }: {
       address: form.address.trim() || undefined,
       line: form.line.trim() || undefined,
       note: form.note.trim() || undefined,
-      serials: made.map((x) => x.sn),
+      serials: used.map((x) => x.sn),
       unitPrice: price,
-      total: price * made.length,
+      total: price * used.length,
       warrantyStart: w.start,
       warrantyEnd: w.end,
       status: 'ACTIVE',
@@ -61,7 +69,10 @@ export default function OrderCreate({ db, setDb, onDone }: {
     const linked = serials.map((x) => (soldSet.has(x.sn) ? { ...x, status: 'SOLD' as const, orderId: o.id } : x));
     setDb({ ...db, serials: linked, orders: [o, ...db.orders], orderSeq: db.orderSeq + 1 });
 
-    setMsg({ ok: true, text: `ออกออเดอร์ ${o.no} แล้ว · ${o.serials.length} ชิ้น · ประกันถึง ${thaiDate(w.end)}` });
+    setMsg({
+      ok: true,
+      text: `ออกออเดอร์ ${o.no} แล้ว · ${o.serials.length} ชิ้น${made.length ? ` (ใช้ของในคลัง ${taken.length} + ออกใหม่ ${made.length})` : ''} · ประกันถึง ${thaiDate(w.end)}`,
+    });
     setForm({ customerName: '', phone: '', address: '', line: '', note: '' });
     setQty('1');
     onDone(o.serials);
@@ -72,7 +83,8 @@ export default function OrderCreate({ db, setDb, onDone }: {
       {msg && <Notice kind={msg.ok ? 'ok' : 'err'}>{msg.text}</Notice>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="S/N ในคลังของรุ่นนี้" value={stockLeft} tone={stockLeft > 0 ? 'good' : 'bad'} />
+        <Stat label="S/N ในคลังของรุ่นนี้" value={stockLeft} tone={short > 0 ? 'warn' : 'good'}
+          hint={short > 0 ? `จะออกใหม่ให้ ${short} ตัว` : undefined} />
         <Stat label="วันที่ออกใบ" value={thaiDate(issueDate)} />
         <Stat label="เริ่มประกัน" value={thaiDate(w.start)} hint={`+ ขนส่ง ${s.shippingDays} วัน`} />
         <Stat label="สิ้นสุดประกัน" value={thaiDate(w.end)} tone="good" hint={`+ ประกัน ${s.warrantyDays} วัน`} />
@@ -91,7 +103,7 @@ export default function OrderCreate({ db, setDb, onDone }: {
               ))}
             </select>
           </Field>
-          <Field label="จำนวน" hint={`เหลือในคลัง ${stockLeft}`}>
+          <Field label="จำนวน" hint={short > 0 ? `คลังเหลือ ${stockLeft} · ระบบจะออกใหม่ให้ ${short}` : `เหลือในคลัง ${stockLeft}`}>
             <input type="number" min={1} max={99} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="ราคาต่อหน่วย (บาท)">
@@ -134,7 +146,7 @@ export default function OrderCreate({ db, setDb, onDone }: {
           </button>
           {!canSubmit && (
             <span className="text-xs text-amber-300/80">
-              {!model ? 'เลือกรุ่น' : !form.customerName.trim() ? 'ใส่ชื่อลูกค้า' : !phoneOk ? 'เบอร์โทรยังไม่ครบ' : `S/N ในคลังไม่พอ (เหลือ ${stockLeft})`}
+              {!model ? 'เลือกรุ่น' : !form.customerName.trim() ? 'ใส่ชื่อลูกค้า' : 'เบอร์โทรยังไม่ครบ'}
             </span>
           )}
         </div>

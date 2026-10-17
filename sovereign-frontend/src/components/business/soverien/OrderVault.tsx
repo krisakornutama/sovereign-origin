@@ -4,10 +4,10 @@
 // ค้นหา · กรองสถานะ · ไฮไลต์สีประกัน · Export CSV · พิมพ์ · Void · สร้างสติกเกอร์ใหม่
 import { useMemo, useState } from 'react';
 import { Db, Order } from './types';
-import { orderTotal, todayIso, thaiDate, warrantyState, WState } from './store';
+import { orderTotal, todayIso, thaiDate, warrantyDates, warrantyState, WState } from './store';
 import { ordersToCsv, printHtml, ordersPrintTable } from './csv';
 import { downloadText } from './zip';
-import { Card, inputCls, btnGhost, btnDanger, Empty, Notice } from './ui';
+import { Card, inputCls, btnPrimary, btnGhost, btnDanger, Empty, Notice } from './ui';
 
 type Filter = 'ALL' | 'IN' | 'NEAR' | 'OUT' | 'VOID';
 
@@ -42,6 +42,8 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [open, setOpen] = useState<Order | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // โหมดแก้ไขออเดอร์ (17/10/69) — เดิมหน้าตั้งค่าบอกว่า "ให้แก้ที่รายรายการในคลังออเดอร์" แต่ไม่มี UI นั้นอยู่จริง
+  const [edit, setEdit] = useState<Partial<Order> | null>(null);
   const today = todayIso();
 
   const rows = useMemo(() => {
@@ -76,6 +78,36 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
     });
     setOpen(null);
     setMsg(`ยกเลิกออเดอร์ ${o.no} แล้ว · S/N กลับเข้าคลัง`);
+  }
+
+  /**
+   * บันทึกการแก้ไขออเดอร์ (17/10/69)
+   * แก้วันที่ออกใบ = ประกันถูกคำนวณใหม่ทั้งคู่ · แก้ราคาต่อหน่วย = ยอดรวม = ราคา × จำนวน S/N
+   */
+  function close() { setOpen(null); setEdit(null); }
+
+  function saveEdit() {
+    if (!edit || !open) return;
+    const issueDate = edit.issueDate || open.issueDate;
+    const unitPrice = Math.max(0, Number(edit.unitPrice) || 0);
+    const w = warrantyDates(issueDate, db.settings);
+    const next: Order = {
+      ...open,
+      customerName: (edit.customerName ?? '').trim() || open.customerName,
+      phone: (edit.phone ?? '').trim() || open.phone,
+      line: (edit.line ?? '').trim() || undefined,
+      address: (edit.address ?? '').trim() || undefined,
+      note: (edit.note ?? '').trim() || undefined,
+      issueDate,
+      unitPrice,
+      total: unitPrice * open.serials.length,
+      warrantyStart: w.start,
+      warrantyEnd: w.end,
+    };
+    setDb({ ...db, orders: db.orders.map((x) => (x.id === next.id ? next : x)) });
+    setOpen(next);
+    setEdit(null);
+    setMsg(`บันทึกการแก้ไข ${next.no} แล้ว · ประกันถึง ${thaiDate(w.end)}`);
   }
 
   function exportCsv() {
@@ -131,7 +163,7 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
               </thead>
               <tbody>
                 {rows.map(({ o, w }) => (
-                  <tr key={o.id} onClick={() => setOpen(o)}
+                  <tr key={o.id} onClick={() => { setEdit(null); setOpen(o); }}
                     className={`cursor-pointer hover:bg-slate-800/40 border-b border-slate-800/60 ${ROW_CLS[w.state]}`}>
                     <td className="py-2 pr-2 mono text-gray-100">{o.serials.join(', ')}</td>
                     <td className="py-2 pr-2 text-gray-400">{db.models.find((m) => o.serials[0]?.startsWith(m.prefix + '-'))?.name ?? '—'}</td>
@@ -152,16 +184,50 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
       </Card>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setOpen(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={close}>
           <div className="w-full max-w-lg card p-5 space-y-3 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="flex items-start gap-3">
               <div>
                 <h3 className="font-semibold text-gray-100">ออเดอร์ {open.no}</h3>
                 <p className="text-xs text-gray-500">{thaiDate(open.createdAt.slice(0, 10))}</p>
               </div>
-              <button type="button" className="ml-auto text-gray-500 hover:text-gray-200" onClick={() => setOpen(null)} aria-label="ปิด">✕</button>
+              <button type="button" className="ml-auto text-gray-500 hover:text-gray-200" onClick={close} aria-label="ปิด">✕</button>
             </div>
 
+            {/* โหมดแก้ไข (17/10/69) — เปลี่ยนเป็นฟอร์มเมื่อกด "แก้ไข" แล้ว */}
+            {edit ? (
+              <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 space-y-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {([
+                    ['ชื่อลูกค้า', 'customerName', 'text'],
+                    ['เบอร์โทร', 'phone', 'text'],
+                    ['LINE ID', 'line', 'text'],
+                    ['ราคาต่อหน่วย (บาท)', 'unitPrice', 'number'],
+                    ['วันที่ออกใบ', 'issueDate', 'date'],
+                  ] as Array<[string, keyof Order, string]>).map(([label, key, type]) => (
+                    <label key={key} className="text-xs text-gray-400">
+                      {label}
+                      <input type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined}
+                        className={inputCls} value={String(edit[key] ?? '')}
+                        onChange={(e) => setEdit({ ...edit, [key]: type === 'number' ? Math.max(0, Number(e.target.value) || 0) : e.target.value })} />
+                    </label>
+                  ))}
+                  <label className="text-xs text-gray-400 sm:col-span-2">
+                    ที่อยู่
+                    <textarea className={`${inputCls} min-h-16`} value={edit.address ?? ''}
+                      onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
+                  </label>
+                  <label className="text-xs text-gray-400 sm:col-span-2">
+                    หมายเหตุ
+                    <textarea className={`${inputCls} min-h-16`} value={edit.note ?? ''}
+                      onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
+                  </label>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  เปลี่ยนวันที่ออกใบ = ประกันถึงวันใหม่ · เปลี่ยนราคาต่อหน่วย = ยอดรวม = ราคา × {open.serials.length} ชิ้น
+                </p>
+              </div>
+            ) : (
             <dl className="grid grid-cols-2 gap-2 text-xs">
               {[
                 ['ลูกค้า', open.customerName],
@@ -179,15 +245,24 @@ export default function OrderVault({ db, setDb, onGenSticker }: {
                 </div>
               ))}
             </dl>
+            )}
 
-            {open.address && <p className="text-xs text-gray-400">ที่อยู่: {open.address}</p>}
-            {open.note && <p className="text-xs text-gray-400">หมายเหตุ: {open.note}</p>}
+            {open.address && !edit && <p className="text-xs text-gray-400">ที่อยู่: {open.address}</p>}
+            {open.note && !edit && <p className="text-xs text-gray-400">หมายเหตุ: {open.note}</p>}
             <div className="text-xs">
               <div className="text-gray-500 mb-1">S/N ({open.serials.length})</div>
               <div className="flex flex-wrap gap-1">{open.serials.map((sn) => <span key={sn} className="mono text-[11px] px-1.5 py-0.5 rounded bg-slate-800">{sn}</span>)}</div>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
+              {open.status === 'ACTIVE' && (edit
+                ? (
+                  <>
+                    <button type="button" className={btnPrimary} onClick={saveEdit}>บันทึกการแก้ไข</button>
+                    <button type="button" className={btnGhost} onClick={() => setEdit(null)}>ยกเลิกการแก้ไข</button>
+                  </>
+                )
+                : <button type="button" className={btnGhost} onClick={() => setEdit({ ...open })}>แก้ไข</button>)}
               <button type="button" className={btnGhost} onClick={() => { onGenSticker(open.serials); setOpen(null); }}>สร้างสติกเกอร์ใหม่</button>
               {open.phone && <a className={btnGhost} href={`tel:${open.phone}`}>โทร</a>}
               {open.status === 'ACTIVE'

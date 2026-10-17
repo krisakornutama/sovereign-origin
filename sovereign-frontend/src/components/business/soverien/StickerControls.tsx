@@ -228,14 +228,18 @@ export default function StickerControls({ cfg, patch, hasTemplate, pxW, pxH, onA
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-[11px] text-gray-500">ขนาดจริง {pxW}×{pxH} px</span>
+        {/* ⚠ 17/10/69 ปุ่มนี้ห้ามแตะ showQr/showWarranty เด็ดขาด
+            ป้ายจริงของเจ้าของ "พิมพ์ QR มาให้แล้วในภาพต้นแบบ" และเดิมมี `showQr: true` อยู่ตรงนี้
+            → ทุกครั้งที่กดคืนค่าตำแหน่ง ป้ายก็เลยมี QR ซ้ำสองอันบนป้ายเดียวกัน
+            ปุ่มชื่อ "คืนค่าตำแหน่ง" จึงคืนแค่ตำแหน่ง/สี ไม่ใช่เปิดเนื้อหาขึ้นมาใหม่ */}
         <button type="button" className={btnGhost} onClick={() => patch({
           serialX: 0.06, serialY: 0.38, serialSize: 26, serialColor: '#111827',
           serialAlign: 'left', serialPlate: true, serialPlateColor: '#ffffff',
-          qrX: 0.76, qrY: 0.18, qrSize: 64, showQr: true, showWarranty: true,
+          qrX: 0.76, qrY: 0.18, qrSize: 64,
           warrantyColor: '#111827',
           tplFit: 'contain', tplScale: 1, tplX: 0, tplY: 0,
         })}>
-          คืนค่าตำแหน่งเริ่มต้น
+          คืนค่าตำแหน่งเริ่มต้น (ไม่แตะ QR / วันประกัน)
         </button>
       </div>
     </Card>

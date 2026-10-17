@@ -4,7 +4,7 @@
 // รองรับ ?sn=... ใน URL เพื่อให้ QR บนสติกเกอร์สแกนแล้วเปิดหน้านี้พร้อมกรอกให้
 import { useEffect, useMemo, useState } from 'react';
 import { Db } from './types';
-import { thaiDate, thaiShort, daysBetween, lookupWarranty } from './store';
+import { thaiDate, thaiShort, daysBetween, lookupWarranty, todayIso } from './store';
 import { Card, inputCls, btnPrimary, Stat, Empty } from './ui';
 
 type Result = { kind: 'IN' | 'NEAR' | 'OUT' | 'VOID' | 'UNKNOWN' | 'UNSOLD'; sn: string; orderId?: string };
@@ -40,22 +40,26 @@ export default function WarrantyCheck({ db }: { db: Db }) {
     UNKNOWN: { box: 'border-slate-700 bg-slate-900/50', text: 'text-gray-300', icon: '🔍', label: 'ไม่พบ Serial นี้' },
   }[res.kind];
 
-  const daysLeft = order && order.status === 'ACTIVE' ? daysBetween(new Date().toISOString().slice(0, 10), order.warrantyEnd) : 0;
+  // ⚠ ต้องนับวัน "ตามเวลาเครื่อง" ไม่ใช่ UTC (17/10/69)
+  //   เดิมใช้ toISOString().slice(0,10) → ระหว่าง 00:00–07:00 ของไทย (UTC+7)
+  //   วันที่ที่ได้ยังเป็นของเมื่อวาน → ลูกค้าเห็น "เหลืออีก 1 วัน" เกินจริง
+  const daysLeft = order && order.status === 'ACTIVE' ? daysBetween(todayIso(), order.warrantyEnd) : 0;
 
   return (
     <div className="space-y-4">
       <Card title="ตรวจประกัน" sub="พิมพ์รหัสที่ติดบนป้าย — เช่น Soverign-Temp-001">
-        <div className="flex flex-wrap gap-2">
+        <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); setQ(q.trim().toUpperCase()); }}>
           <input
             className={`${inputCls} flex-1 min-w-[16rem] mono uppercase`}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
             placeholder="Soverign-Temp-000"
             aria-label="กรอกหมายเลขประจำเครื่อง"
           />
-          <button type="button" className={btnPrimary} onClick={() => { /* คำนวณสดอยู่แล้ว — ปุ่มนี้มีไว้ให้กดยืนยัน */ }}>ตรวจสอบ</button>
-        </div>
+          {/* เดิมปุ่มนี้เป็น onClick ว่าง ๆ และมี onKeyDown ดัก Enter ทิ้ง → กดปุ่มกับ Enter ไม่ได้อะไรเลย
+              ตอนนี้รวมเป็น <form> เดียวกัน Enter จึงทำงานเท่ากับกดปุ่ม (ลูกค้าที่สแกนแล้วพิมพ์ต่อมักกด Enter) */}
+          <button type="submit" className={btnPrimary}>ตรวจสอบ</button>
+        </form>
       </Card>
 
       {res.sn === '' ? (
@@ -79,11 +83,16 @@ export default function WarrantyCheck({ db }: { db: Db }) {
                   tone={daysLeft > db.settings.nearExpiryDays ? 'good' : daysLeft >= 0 ? 'warn' : 'bad'}
                 />
               </div>
-              <div className={`text-sm ${style.text}`}>
-                {daysLeft > 0
-                  ? `เหลืออีก ${daysLeft} วัน`
-                  : `หมดประกันเมื่อ ${thaiDate(order.warrantyEnd)} (${Math.abs(daysLeft)} วันที่แล้ว)`}
-              </div>
+              {order.status === 'ACTIVE' ? (
+                <div className={`text-sm ${style.text}`}>
+                  {daysLeft > 0
+                    ? `เหลืออีก ${daysLeft} วัน`
+                    : `หมดประกันเมื่อ ${thaiDate(order.warrantyEnd)} (${Math.abs(daysLeft)} วันที่แล้ว)`}
+                </div>
+              ) : (
+                /* ออเดอร์ยกเลิกแล้วห้ามขึ้น "หมดประกันเมื่อ … วันที่แล้ว" เพราะขัดกับป้าย⚫ ด้านบน (17/10/69) */
+                <div className="text-sm text-gray-400">ออเดอร์นี้ถูกยกเลิกแล้ว — ประกันหยุดนับ</div>
+              )}
               {order.phone && (
                 <div className="text-xs text-gray-400">
                   โทรติดตาม: <a className="text-cyan-400 hover:underline" href={`tel:${order.phone}`}>{order.phone}</a>
@@ -95,8 +104,8 @@ export default function WarrantyCheck({ db }: { db: Db }) {
             </>
           ) : res.kind === 'UNSOLD' ? (
             <p className="text-sm text-sky-200">
-              Serial นี้ถูกออกจากคลังแล้ว แต่ยังไม่ได้ผูกกับออเดอร์ — ประกันจะเริ่มนับเมื่อมีการออกออเดอร์
-              (คลิกที่ 🏷️ Soverien → 📝 ออกออเดอร์ แล้วเลือก serial ใบนี้)
+              Serial นี้อยู่ในคลังแล้ว แต่ยังไม่ได้ผูกกับออเดอร์ — ประกันจะเริ่มนับเมื่อมีการออกออเดอร์
+              (ไปที่ 🧾 ออกออเดอร์ แล้วใส่ชื่อลูกค้า — ระบบจะผูก serial ในคลังให้เอง)
             </p>
           ) : null}
         </div>

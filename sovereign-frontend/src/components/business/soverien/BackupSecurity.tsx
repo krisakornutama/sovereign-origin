@@ -5,6 +5,8 @@
 import { useEffect, useState } from 'react';
 import type { Db } from './types';
 import { DEFAULT_SETTINGS, KEY, wipeAll } from './backup';
+import { normalizeDb } from './store';
+import { guardSerialCounter } from './serial-guard';
 import { ordersToCsv, serialsToCsv } from './csv';
 import { downloadText, downloadBlob } from './zip';
 import { Card, Field, inputCls, btnPrimary, btnGhost, btnDanger, Notice } from './ui';
@@ -50,13 +52,18 @@ export default function BackupSecurity({ db, setDb }: { db: Db; setDb: (d: Db) =
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const parsed = JSON.parse(await file.text()) as Db;
-      if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.serials) || !Array.isArray(parsed.orders)) {
-        throw new Error('ไฟล์นี้ไม่ใช่ข้อมูลของเครื่องมือ Soverien');
-      }
-      if (!window.confirm(`กู้คืน ${parsed.orders.length} ออเดอร์ · ${parsed.serials.length} serial ?\nข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด`)) return;
+      // ⚠ 17/10/69 ต้องผ่าน normalizeDb ให้เหมือน load() — เดิมใช้ object ดิบจากไฟล์
+      //   ไฟล์เก่าที่ไม่มี settings.sticker → เปิดหน้าสติกเกอร์แล้ว crash ทันที
+      const parsed = normalizeDb(JSON.parse(await file.text()) as Db);
+      if (!parsed) throw new Error('ไฟล์นี้ไม่ใช่ข้อมูลของเครื่องมือ Soverien');
+      // ⚠ กู้ข้อมูลห้ามทำให้ตัวนับ serial ถอยหลัง (กฎเหล็ก: ห้ามออกเลขซ้ำ แม้กู้/ล้าง)
+      const raised = guardSerialCounter(parsed, db);
+      const raiseNote = raised.length
+        ? `\nปรับตัวนับขึ้นเพื่อไม่ให้เลขซ้ำกับที่เคยพิมพ์ไปแล้ว: ${raised.map((m) => `${m.prefix} → ${m.lastNo}`).join(' · ')}`
+        : '';
+      if (!window.confirm(`กู้คืน ${parsed.orders.length} ออเดอร์ · ${parsed.serials.length} serial ?\nข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด${raiseNote}`)) return;
       setDb(parsed);
-      setMsg({ ok: true, text: 'กู้คืนข้อมูลเรียบร้อย' });
+      setMsg({ ok: true, text: raised.length ? 'กู้คืนข้อมูลเรียบร้อย · ตัวนับ serial ถูกยกขึ้นเพื่อกันเลขซ้ำ' : 'กู้คืนข้อมูลเรียบร้อย' });
     } catch (err: any) {
       setMsg({ ok: false, text: err?.message ?? 'อ่านไฟล์ไม่สำเร็จ' });
     } finally {
@@ -65,14 +72,13 @@ export default function BackupSecurity({ db, setDb }: { db: Db; setDb: (d: Db) =
   }
 
   function wipe() {
-    if (!window.confirm('ล้างข้อมูลทั้งหมดของเครื่องมือ Soverien ใช่หรือไม่?')) return;
+    if (!window.confirm('ล้างข้อมูลทั้งหมดของเครื่องมือ Soverien ใช่หรือไม่?\n\nป้ายที่พิมพ์ออกไปแล้วจะตามหาประกันไม่ได้อีก และตัวนับ serial จะเริ่มใหม่ที่ 000')) return;
     if (window.prompt('พิมพ์คำว่า DELETE ALL เพื่อยืนยัน') !== 'DELETE ALL') {
       setMsg({ ok: false, text: 'ยกเลิก — ไม่ได้ลบข้อมูล' });
       return;
     }
-    const fresh = { ...db };
     wipeAll();
-    const reset: Db = {
+    setDb({
       version: 1,
       models: JSON.parse(JSON.stringify(DEFAULT_SETTINGS.models)),
       serials: [],
@@ -80,9 +86,7 @@ export default function BackupSecurity({ db, setDb }: { db: Db; setDb: (d: Db) =
       settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
       orderSeq: 0,
       stickerPresets: [],
-    };
-    setDb(reset);
-    void fresh;
+    });
     setMsg({ ok: true, text: 'ล้างข้อมูลทั้งหมดแล้ว' });
   }
 
