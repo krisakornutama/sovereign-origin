@@ -95,7 +95,7 @@ export default function OrderCreate({ db, setDb, onDone }: {
             <input type="number" min={1} max={99} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="ราคาต่อหน่วย (บาท)">
-            <input type="number" min={0} max={1000000} step={1} className={inputCls} value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+            <input type="number" min={0} step={1} className={inputCls} value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
           </Field>
         </div>
         <div className="text-right text-sm text-gray-300">
