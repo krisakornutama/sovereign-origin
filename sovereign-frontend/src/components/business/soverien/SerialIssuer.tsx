@@ -42,6 +42,9 @@ export default function SerialIssuer({ db, setDb }: { db: Db; setDb: (d: Db) => 
   function voidSerial(sn: string) {
     const s = db.serials.find((x) => x.sn === sn);
     if (!s || s.status === 'SOLD') return;
+    // ⚠ ปุ่มนี้อยู่ชิดกับทุกแถวในตาราง แค่คลิกผิดก็ทำให้ serial ถูกทำลายถาวร (ไม่มีปุ่มยกเลิกย้อนกลับ)
+    //   และถ้าป้ายใบนี้ถูกพิมพ์ออกไปแล้ว เจ้าของจะตามหาเครื่องของลูกค้าไม่ได้
+    if (!window.confirm(`ยกเลิก serial ${sn}?\n\nใช้ซ้ำไม่ได้อีก (ตัวนับไม่ถอยหลัง) และถ้าพิมพ์ป้ายไปแล้วจะตามประกันไม่ได้`)) return;
     setDb({ ...db, serials: db.serials.map((x) => (x.sn === sn ? { ...x, status: 'VOID' } : x)) });
     setMsg({ ok: true, text: `ยกเลิก ${sn} แล้ว (ตัวนับไม่ถอย — serial จะไม่ถูกใช้ซ้ำ)` });
   }

@@ -1,7 +1,10 @@
 // components/business/soverien/csv.ts
 // สร้าง/อ่าน CSV — ป้องกัน Excel ตีความผิดด้วย BOM + escape เครื่องหมายพิเศษ
-import { Order, Db } from './types';
-import { orderTotal, thaiDate } from './store';
+// ⚠ `import type` เท่านั้น — เทสต์ Node เรียกไฟล์นี้ตรง ๆ (tools/test/soverien-tools.test.mjs)
+//   ถ้าเขียนเป็น value import ธรรมดา Node จะพยายาม resolve './types' แล้วล้มทันที
+import type { Order, Db } from './types';
+import { thaiDate } from './store';
+import { orderRowTotals } from './csv-row-total';
 
 function cell(v: unknown): string {
   const s = v === undefined || v === null ? '' : String(v);
@@ -16,15 +19,19 @@ export function ordersToCsv(db: Db): string {
       'เริ่มประกัน', 'สิ้นสุดประกัน', 'จำนวน', 'ราคาต่อหน่วย', 'ยอดรวม', 'สถานะ', 'หมายเหตุ'],
   ];
   for (const o of [...db.orders].sort((a, b) => a.issueDate.localeCompare(b.issueDate))) {
-    for (const sn of o.serials) {
+    // ⚠ "ยอดรวม" ต้องรวมคอลัมน์แล้วได้ยอดออเดอร์จริง (17/10/69)
+    //   เดิมใส่ orderTotal(o) ทุกแถว → ออเดอร์ 3 ชิ้น ถูก Excel บวกรวมเป็น 3 เท่า
+    //   ตรรกะนี้อยู่ที่ csv-row-total.ts (มีเทสต์คุม · แยกเพราะ csv.ts import store ซึ่ง Node เรียกตรง ๆ ไม่ได้)
+    const totals = orderRowTotals(o);
+    o.serials.forEach((sn, i) => {
       const model = db.models.find((m) => sn.startsWith(m.prefix + '-'));
       rows.push([
         o.no, sn, model?.name ?? '', o.customerName, o.phone, o.line ?? '', o.address ?? '',
         thaiDate(o.issueDate), thaiDate(o.warrantyStart), thaiDate(o.warrantyEnd),
-        '1', String(o.unitPrice), String(orderTotal(o)),
+        '1', String(o.unitPrice), String(totals[i]),
         o.status === 'VOID' ? 'ยกเลิก' : 'ใช้งาน', o.note ?? '',
       ]);
-    }
+    });
   }
   return rows.map((r) => r.map(cell).join(',')).join('\r\n');
 }

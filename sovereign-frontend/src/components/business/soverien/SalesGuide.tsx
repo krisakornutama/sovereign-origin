@@ -4,6 +4,7 @@
 // เนื้อหานำไปใช้จริงได้ทันที + เครื่องคำนวณ ROI ให้ลูกค้าคำนวณเอง
 import { useState } from 'react';
 import { Card, Field, inputCls, btnGhost } from './ui';
+import { breakEvenDays } from './roi';
 
 const PRINCIPLES = [
   {
@@ -58,8 +59,8 @@ export default function SalesGuide() {
   const n = Math.max(1, Math.min(50, Number(qty) || 1));
   const pkg = PACKAGES[Math.min(n, 3) - 1];
   const price = pkg.price;
-  const months = price > 0 && loss > 0 ? Math.max(0, price / (loss / 12)) : null;
-  const perYear = Math.ceil(months ?? 0);
+  // หน่วย = "วัน" มาตลอด (roi.breakEvenDays) — เดิมคำนวณออกมาเป็นเดือนแล้วไปแสดงในช่องที่เขียนว่า "วัน"
+  const days = breakEvenDays(price, loss);
 
   return (
     <div className="space-y-4">
@@ -106,11 +107,13 @@ export default function SalesGuide() {
         </div>
 
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-1">
-          {loss > 0 && months !== null ? (
+          {loss > 0 && days !== null ? (
             <>
               <div className="text-lg">
-                คุ้มทุนภายใน <span className="mono text-emerald-300">{perYear >= 365 ? 'มากกว่า 1 ปี' : `ประมาณ ${perYear} วัน`}</span>
-                {perYear > 365 && <> (≈ {Math.ceil(perYear / 30)} เดือน)</>}
+                คุ้มทุนภายใน <span className="mono text-emerald-300">
+                  {days > 365 ? 'มากกว่า 1 ปี' : `ประมาณ ${days.toLocaleString('th-TH')} วัน`}
+                </span>
+                {days >= 60 && <> (≈ {Math.max(1, Math.round(days / 30.44)).toLocaleString('th-TH')} เดือน)</>}
               </div>
               <div className="text-xs text-gray-400">
                 แพ็กเกจ {pkg.name} · ราคา {price.toLocaleString('th-TH')} บาท · ของเสียต่อปี {loss.toLocaleString('th-TH')} บาท

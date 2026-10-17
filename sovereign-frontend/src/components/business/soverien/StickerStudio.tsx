@@ -4,7 +4,7 @@
 // อัปโหลดภาพต้นแบบ → overlay S/N + วันสิ้นประกัน · ดาวน์โหลด PNG ทีละใบ, ZIP รวม, หรือเรียงลงแผ่น A4
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Db, StickerPreset } from './types';
-import { modelById, thaiDate } from './store';
+import { warrantyTextFor } from './store';
 import { round3, clamp, stickerHeightFor } from './sticker-layout';
 import { paintSticker } from './sticker-draw';
 import { loadTemplate, loadImage, trimTemplateMargins } from './sticker-template';
@@ -80,19 +80,11 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
   const pool = useMemo(() => db.serials.filter((s) => s.status !== 'VOID'), [db.serials]);
   const active = current && pool.some((s) => s.sn === current) ? current : (picked.values().next().value ?? pool[0]?.sn ?? '');
   const activeSerial = pool.find((s) => s.sn === active);
-  const activeOrder = activeSerial?.orderId ? db.orders.find((o) => o.id === activeSerial.orderId) : undefined;
   const W = mmToPx(cfg.widthMm, cfg.dpi);
   const H = mmToPx(cfg.heightMm, cfg.dpi);
-  // ข้อความวันสิ้นประกันของใบที่กำลังดู (คำนวณครั้งเดียว แล้วส่งเข้าไปวาด)
-  const warrantyText = activeOrder ? `ประกันถึง ${thaiDate(activeOrder.warrantyEnd)}` : 'ยังไม่ออกใบ';
-
-  // ข้อความวันสิ้นประกันของ serial ใดก็ได้ — ใช้ตอนเรียงหลายใบลงแผ่นเดียว (14/10/69)
-  //   ต้องเป็นฟังก์ชันแยก เพราะแผ่นหนึ่งมีหลายใบ แต่ warrantyText ข้างบนเป็นของใบเดียว
-  const warrantyTextFor = useCallback((sn: string) => {
-    const s = db.serials.find((x) => x.sn === sn);
-    const o = s?.orderId ? db.orders.find((x) => x.id === s.orderId) : undefined;
-    return o ? `ประกันถึง ${thaiDate(o.warrantyEnd)}` : 'ยังไม่ออกใบ';
-  }, [db.serials, db.orders]);
+  // ข้อความวันสิ้นประกันของ "serial นั้น ๆ" — ใช้ทุกทาง: preview · PNG ใบเดียว · ZIP ทั้งชุด · แผ่นพิมพ์
+  //   ตรรกะอยู่ที่ store.warrantyTextFor (มีเทสต์คุม) เพราะดาวน์โหลด ZIP เรียก paint ด้วย sn ใหม่ทุกไฟล์
+  const warrantyTextOf = useCallback((sn: string) => warrantyTextFor(db, sn), [db]);
 
   /** ปล่อยเมาส — ถ้าไม่ได้ลากเลย แปลว่าผู้ใช้คลิก ให้ยึดตำแหน่งที่คลิกทันที */
   function onRelease() {
@@ -112,8 +104,9 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
     canvas.height = Math.round(H * k);
     // ขยายขนาดที่เป็น "พิกเซลตายตัว" (ฟอนต์/QR) ตามสัดส่วน ไม่ให้หน้าจอกับไฟล์ที่พิมพ์ไม่ตรงกัน
     const drawCfg = k === 1 ? cfg : { ...cfg, serialSize: Math.round(cfg.serialSize * k), qrSize: Math.round(cfg.qrSize * k) };
-    await paintSticker(ctx, canvas.width, canvas.height, drawCfg, sn, warrantyText, location.origin, showGuide);
-  }, [cfg, W, H, warrantyText]);
+    // ⚠ วันประกันต้องคำนวณจาก sn "ที่กำลังวาด" เท่านั้น — ห้ามใช้ค่าที่คำนวณจากใบที่เปิดดูอยู่
+    await paintSticker(ctx, canvas.width, canvas.height, drawCfg, sn, warrantyTextOf(sn), location.origin, showGuide);
+  }, [cfg, W, H, warrantyTextOf]);
 
   // เส้นประกอบตำแหน่งขึ้นเฉพาะหน้าจอ — ตอนดาวน์โหลดส่ง showGuide = false
   useEffect(() => { void paint(canvasRef.current, active, PREVIEW_SCALE, true); }, [paint, active]);
@@ -392,7 +385,7 @@ export default function StickerStudio({ db, setDb, presetSerials, onClearPreset 
       <StickerSheetPrint
         cfg={cfg}
         serials={useMemo(() => [...picked], [picked])}
-        warrantyOf={warrantyTextFor}
+        warrantyOf={warrantyTextOf}
       />
     </div>
   );
