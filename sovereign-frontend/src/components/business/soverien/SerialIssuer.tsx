@@ -109,7 +109,7 @@ export default function SerialIssuer({ db, setDb }: { db: Db; setDb: (d: Db) => 
             <div key={m.id} className="grid gap-2 sm:grid-cols-[1fr_7rem_6rem_auto] items-center border border-slate-700 rounded-lg p-2">
               <input className={inputCls} value={m.name} onChange={(e) => updateModel(m.id, { name: e.target.value })} aria-label="ชื่อรุ่น" />
               <input className={inputCls} value={m.prefix} readOnly aria-label="prefix" title="prefix เปลี่ยนไม่ได้หลังออก serial แล้ว เพราะจะทำให้ S/N เดิมไม่ตรง" />
-              <input type="number" min={0} className={inputCls} value={m.price}
+              <input type="number" min={0} max={1000000} step={1} className={inputCls} value={m.price}
                 onChange={(e) => updateModel(m.id, { price: Number(e.target.value) || 0 })} aria-label="ราคาต่อหน่วย" />
               <label className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
                 <input type="checkbox" checked={m.active} onChange={(e) => updateModel(m.id, { active: e.target.checked })} />
