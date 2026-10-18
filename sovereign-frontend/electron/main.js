@@ -4,13 +4,15 @@
 //  ตรวจสถานะทุก 3 วิ แล้วเด้งไป Dashboard อัตโนมัติเมื่อระบบขึ้น
 //  อัปเดต: ถาม HUB ของเจ้าของก่อน (sovereign-hub.json ข้าง exe) → ไม่ได้ค่อยไป GitHub release
 // ─────────────────────────────────────────────────────────────
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 const { verifyAsset, sha256File } = require('./verify-asset');
 const { downloadFile } = require('./download');
+const yt = require('./youtube');
+const { registerYouTubeIpc } = require('./youtube-ipc');
 
 const DASHBOARD_URL = 'http://localhost:3000';
 const LAUNCHER_URL = 'http://localhost:4100';
@@ -530,6 +532,14 @@ ipcMain.handle('sovereign:retryDashboard', async () => {
   if (st.frontend) { showingOffline = false; stopProbe(); win.loadURL(DASHBOARD_URL).catch(() => showOffline()); return { ok: true }; }
   return { ok: false, message: 'Dashboard ยังไม่พร้อม' };
 });
+
+// ── IPC: YouTube — อัปโหลดอัตโนมัติ (OAuth 2.0 loopback + resumable upload) ──
+// ตัว logic อยู่ใน ./youtube-ipc.js (รับ electron API เข้ามาทางพารามิเตอร์ → เทสต์ด้วยของปลอมได้)
+// ทำไมไม่ทำใน backend: ไฟล์วิดีโออยู่บนเครื่องนี้ อ่านตรงแล้วส่งขึ้น YouTube = ข้อมูลวิ่งรอบเดียว
+// และไม่ต้อง restart backend เลย (โปรเจ็กอยู่ระหว่าง Cold Soak)
+// ⚠ credential เก็บด้วย safeStorage (Windows DPAPI) ที่ userData\youtube-oauth.bin
+//   ห้ามลง localStorage และห้ามลง repo เด็ดขาด — repo นี้เป็น public
+registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin: () => win, log: dlog });
 
 // ── IPC: wizard + อัปเดต ──
 ipcMain.handle('sovereign:openWizard', (_e, focus) => { openWizard(focus); return { ok: true }; });
