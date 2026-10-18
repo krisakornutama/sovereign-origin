@@ -29,11 +29,19 @@ const yt = require('./youtube');
  * @param {object} deps.safeStorage - electron.safeStorage
  * @param {() => object|null} deps.getWin - คืน BrowserWindow ปัจจุบัน (อาจถูกปิดไปแล้ว)
  * @param {(...a:any[])=>void} [deps.log] - ตัวเขียน log ของ shell
+ * @param {(url: string) => Promise<{close: () => void}>} [deps.openConsent]
+ *        เปิดหน้าอนุญาตของ Google "ในหน้าต่างของแอปเอง" แล้วคืนตัวปิด
+ *        ⚠ เจ้าของสั่งชัดเจน: การเชื่อมต่อบัญชีต้องเกิดขึ้นใน Sovereign OS ทั้งหมด
+ *          ห้ามเด้งออกไปเบราว์เซอร์ภายนอก (shell.openExternal) อีก
+ * @param {string} [deps.embeddedDir] - โฟลเดอร์ที่มี youtube-client.json (ดีฟอลต์ = ข้างไฟล์นี้)
+ *        เทสต์ส่งโฟลเดอร์เปล่าเข้ามา เพื่อไม่ให้ผลลัพธ์ขึ้นกับไฟล์จริงบนเครื่อง
  */
-function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, log }) {
+function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, log, openConsent, embeddedDir }) {
   const dlog = typeof log === 'function' ? log : () => {};
+  const openConsentFn = typeof openConsent === 'function' ? openConsent : null;
 
   let cache = null;      // credential ที่โหลดแล้ว (null = ยังไม่โหลด)
+  let embeddedCache;     // undefined = ยังไม่ตรวจ, null = ไม่มีไฟล์ที่ฝังมา
   let connecting = false; // กันกดเชื่อมต่อซ้อนกันสองรอบ (loopback จะชนกัน)
   let abort = false;      // ธงยกเลิกการอัปโหลด
 
@@ -49,8 +57,29 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
     });
   }
 
+  /**
+   * credential ที่ "ฝังมากับแอป" — มีไว้ให้เจ้าของไม่ต้อง import ไฟล์ JSON เอง
+   * หา 2 ที่: ข้างไฟล์ electron (ติดไปกับตัวแอป) และใน userData (เผื่อแพ็กใหม่แล้วไฟล์หาย)
+   */
+  function embedded() {
+    if (embeddedCache === undefined) {
+      try {
+        embeddedCache = yt.loadEmbeddedClient({
+          dir: embeddedDir || __dirname,
+          extra: [path.join(app.getPath('userData'), 'youtube-client.json')],
+        });
+      } catch { embeddedCache = null; }
+    }
+    return embeddedCache;
+  }
+
   function creds() {
     if (cache === null) cache = secure() ? (store().load() || {}) : {};
+    // ⭐ ยังไม่มี client ที่เคยนำเข้า = ใช้ตัวที่ฝังมากับแอปเลย (เจ้าของไม่ต้องทำอะไร)
+    if (!cache.clientId || !cache.clientSecret) {
+      const e = embedded();
+      if (e) cache = { ...cache, clientId: e.clientId, clientSecret: e.clientSecret, clientSource: 'embedded' };
+    }
     return cache;
   }
 
@@ -71,7 +100,7 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
     const p = yt.parseClientSecretFile(String(text || ''));
     if (!p.ok) return p;
     if (!secure()) return { ok: false, message: 'Windows ยังไม่พร้อมใช้การเข้ารหัส — จึงยังไม่เก็บความลับให้' };
-    persist({ ...creds(), clientId: p.clientId, clientSecret: p.clientSecret });
+    persist({ ...creds(), clientId: p.clientId, clientSecret: p.clientSecret, clientSource: 'imported' });
     return { ok: true, clientHint: p.clientId.slice(0, 24) + '...' };
   }
 
@@ -85,6 +114,7 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
       connected: Boolean(c.refreshToken),
       channelTitle: c.channelTitle || '',
       clientHint: c.clientId ? c.clientId.slice(0, 24) + '...' : '',
+      clientSource: c.clientId && c.clientSecret ? (c.clientSource || 'imported') : '',
       freePerDay: yt.FREE_UPLOADS_PER_DAY,
     };
   });
@@ -101,13 +131,20 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
 
   ipcMain.handle('sovereign:youtubeImportText', (_e, text) => applyClient(text));
 
-  ipcMain.handle('sovereign:youtubeConnect', async () => {
+  ipcMain.handle('sovereign:youtubeConnect', async (_e, opts) => {
     if (connecting) return { ok: false, message: 'กำลังเชื่อมต่ออยู่แล้ว — รอให้เสร็จก่อน' };
     const c = creds();
     if (!c.clientId || !c.clientSecret) return { ok: false, message: yt.MSG.noClient };
     if (!secure()) return { ok: false, message: 'Windows ยังไม่พร้อมใช้การเข้ารหัส — จึงไม่เก็บความลับให้' };
+    // ทางเลือกสุดท้าย: ผู้ใช้กดเองเท่านั้น (เกิดเมื่อ Google ปฏิเสธหน้าต่างในแอป)
+    // ไม่ใช่พฤติกรรมปกติ — ดีฟอลต์ต้องเป็นหน้าต่างในแอปเสมอ
+    const useExternal = Boolean(opts && opts.external === true);
+    if (!useExternal && !openConsentFn) return { ok: false, message: 'แอปเวอร์ชันนี้ยังเปิดหน้าอนุญาตในแอปไม่ได้ — กรุณาอัปเดตแอป' };
     connecting = true;
     let srv = null;
+    let consent = null;
+    let closedEarly = false;
+    let closedInfo = null;
     try {
       const pkce = yt.makePkce();
       const state = yt.makeState();
@@ -115,12 +152,43 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
       const got = new Promise((resolve) => { settle = resolve; });
 
       srv = await yt.startLoopback({ onResult: (u) => settle(u), timeoutMs: 300000 });
-      await shell.openExternal(yt.buildAuthUrl({
-        clientId: c.clientId, redirectUri: srv.redirectUri, state, codeChallenge: pkce.challenge,
-      }));
 
-      const url = await got;
-      if (!url) return { ok: false, message: 'รอ 5 นาทีแล้วยังไม่ได้รับการอนุญาต — กดเชื่อมต่อใหม่ได้เลย' };
+      const authUrl = yt.buildAuthUrl({
+        clientId: c.clientId, redirectUri: srv.redirectUri, state, codeChallenge: pkce.challenge,
+      });
+
+      if (useExternal) {
+        dlog('youtube: เปิดเบราว์เซอร์ภายนอกตามคำสั่งผู้ใช้ (ทางเลือกสุดท้าย)');
+        await shell.openExternal(authUrl);
+      } else {
+        // ⭐ เปิดหน้าอนุญาตของ Google "ในหน้าต่างของแอปเอง"
+        //   เดิมใช้ shell.openExternal (เด้งออกไปเบราว์เซอร์นอก) — เจ้าของสั่งให้ยกเลิกวิธีนั้น
+        consent = await openConsentFn(authUrl);
+      }
+
+      // ถ้าผู้ใช้ปิดหน้าต่างเองก่อนอนุญาต ไม่ต้องรอครบ 5 นาที
+      // (หน้าต่างที่ถูก Google บล็อกจะรายงาน { blocked: true } กลับมาด้วย)
+      const closed = consent && consent.done && typeof consent.done.then === 'function'
+        ? consent.done.then((v) => { closedEarly = true; closedInfo = v || {}; return null; })
+        : new Promise(() => {});
+
+      const url = await Promise.race([got, closed]);
+      if (!url) {
+        if (closedInfo && closedInfo.blocked === true) {
+          return {
+            ok: false,
+            blocked: true,
+            message: 'Google ไม่ยอมเปิดหน้าอนุญาตในหน้าต่างของแอป (ขึ้นว่า "browser or app may not be secure") — '
+              + 'ถ้าจำเป็นต้องเชื่อมต่อตอนนี้ ใช้ปุ่ม "เปิดในเบราว์เซอร์ (ทางเลือกสุดท้าย)" ด้านล่างได้',
+          };
+        }
+        return {
+          ok: false,
+          message: closedEarly
+            ? 'ยังไม่ได้รับการอนุญาต (ปิดหน้าต่างไปก่อน) — กดเชื่อมต่อใหม่ได้เลย'
+            : 'รอ 5 นาทีแล้วยังไม่ได้รับการอนุญาต — กดเชื่อมต่อใหม่ได้เลย',
+        };
+      }
       const parsed = yt.parseRedirect(url, state);
       if (!parsed.ok) return parsed;
 
@@ -143,6 +211,8 @@ function registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin, 
     } catch (e) {
       return { ok: false, message: 'เชื่อมต่อไม่สำเร็จ: ' + (e && e.message) };
     } finally {
+      // ปิดหน้าต่างอนุญาตเสมอ (สำเร็จ/ล้ม/หมดเวลา) — ห้ามให้มีหน้าต่างค้างบนจอ
+      if (consent && typeof consent.close === 'function') { try { consent.close(); } catch { /* ปิดไม่ได้ก็ช่างมัน */ } }
       if (srv) { try { srv.close(); } catch { /* ปิดไม่ได้ก็ช่างมัน */ } }
       connecting = false;
     }

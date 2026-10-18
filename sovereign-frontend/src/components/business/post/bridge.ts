@@ -99,6 +99,8 @@ export interface YoutubeStatus {
   connected: boolean;
   channelTitle: string;
   clientHint: string;
+  /** 'embedded' = รหัสแอปฝังมากับ Sovereign OS (ไม่ต้อง import ไฟล์) · 'imported' = ผู้ใช้ import เอง */
+  clientSource: string;
   freePerDay: number;
 }
 
@@ -114,6 +116,8 @@ export interface YoutubeResult {
   message?: string;
   code?: string;
   videoId?: string | null;
+  /** true = Google ไม่อยอมให้อนุญาตในหน้าต่างของแอป (ผู้ใช้จึงเห็นปุ่มทางเลือกสุดท้าย) */
+  blocked?: boolean;
 }
 
 export interface YoutubeProgress {
@@ -129,7 +133,7 @@ export interface YoutubeBridge {
   status: () => Promise<YoutubeStatus | null>;
   importDialog: () => Promise<YoutubeResult & { cancelled?: boolean }>;
   importText: (text: string) => Promise<YoutubeResult>;
-  connect: () => Promise<YoutubeResult & { channelTitle?: string }>;
+  connect: (external?: boolean) => Promise<YoutubeResult & { channelTitle?: string }>;
   disconnect: () => Promise<YoutubeResult>;
   cancel: () => Promise<YoutubeResult>;
   upload: (o: YoutubeUploadOpts) => Promise<YoutubeResult>;
@@ -171,6 +175,7 @@ export function youtubeBridge(win: unknown): YoutubeBridge | null {
         connected: o.connected === true,
         channelTitle: typeof o.channelTitle === 'string' ? o.channelTitle : '',
         clientHint: typeof o.clientHint === 'string' ? o.clientHint : '',
+        clientSource: o.clientSource === 'embedded' || o.clientSource === 'imported' ? o.clientSource : '',
         freePerDay: Number.isFinite(Number(o.freePerDay)) && Number(o.freePerDay) > 0 ? Number(o.freePerDay) : 6,
       };
     },
@@ -181,7 +186,7 @@ export function youtubeBridge(win: unknown): YoutubeBridge | null {
       return { ...v, cancelled: o.cancelled === true };
     },
     importText: async (text) => (await call('youtubeImportText', text)) || { ok: false, message: NO_YOUTUBE },
-    connect: async () => (await call('youtubeConnect')) || { ok: false, message: NO_YOUTUBE },
+    connect: async (external?: boolean) => (await call('youtubeConnect', { external: external === true })) || { ok: false, message: NO_YOUTUBE },
     disconnect: async () => (await call('youtubeDisconnect')) || { ok: false, message: NO_YOUTUBE },
     cancel: async () => (await call('youtubeCancel')) || { ok: false },
     upload: async (o) => (await call('youtubeUpload', o)) || { ok: false, message: NO_YOUTUBE },

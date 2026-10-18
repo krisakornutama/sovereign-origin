@@ -34,6 +34,8 @@ const ORIGINALS = { ...yt };
 let dir;
 let progressSeen;
 let openedUrls;
+let externalUrls;
+let consentClosed;
 /** ตัวรับผลลัพธ์ของ loopback ที่ startLoopback ปลอมสร้างไว้ (ให้เทสต์ยิง code กลับเข้าไปเองได้) */
 let pendingSrv = null;
 
@@ -46,12 +48,19 @@ async function waitSrv() {
   return s;
 }
 
-/** ของปลอมของ Electron — ไม่มีตัวไหนแตะดิสก์จริง/เน็ตจริง */
-function boot({ secure = true, winAlive = true } = {}) {
+/**
+ * ของปลอมของ Electron — ไม่มีตัวไหนแตะดิสก์จริง/เน็ตจริง
+ * @param {object} [opts]
+ * @param {string} [opts.embeddedDir] - โฟลเดอร์จำลอง "credential ที่ฝังมากับแอป"
+ *        ดีฟอลต์ = โฟลเดอร์เปล่า เพื่อไม่ให้ผลเทสต์ขึ้นกับไฟล์จริงบนเครื่อง
+ */
+function boot({ secure = true, winAlive = true, embeddedDir, openConsent } = {}) {
   const handlers = new Map();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ytipc-'));
   progressSeen = [];
   openedUrls = [];
+  externalUrls = [];
+  consentClosed = [];
   pendingSrv = null;
 
   const win = winAlive
@@ -62,7 +71,8 @@ function boot({ secure = true, winAlive = true } = {}) {
     ipcMain: { handle: (name, fn) => handlers.set(name, fn) },
     app: { getPath: () => dir },
     dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
-    shell: { openExternal: async (url) => { openedUrls.push(url); } },
+    // ห้ามถูกเรียกอีกแล้ว: การเชื่อมต่อบัญชีต้องอยู่ในหน้าต่างของแอปเท่านั้น
+    shell: { openExternal: async (url) => { externalUrls.push(url); } },
     safeStorage: {
       isEncryptionAvailable: () => secure,
       // ต้อง "เข้ารหัสจริง" ในเทสต์ด้วย ไม่งั้นเทสต์ที่ตรวจว่าไฟล์บนดิสก์ไม่มี plaintext จะผ่านแบบหลอก ๆ
@@ -71,6 +81,16 @@ function boot({ secure = true, winAlive = true } = {}) {
     },
     getWin: () => win,
     log: () => {},
+    // ของปลอมของหน้าต่างอนุญาตในแอป — เก็บ URL ไว้ให้เทสต์ตรวจ และเก็บว่า "ปิดหน้าต่างตอนจบ" ไหม
+    // ส่ง openConsent: null เข้ามาเพื่อจำลอง "แอปเวอร์ชันเก่าที่ไม่มีหน้าต่างในแอป"
+    openConsent: openConsent === null
+      ? undefined
+      : (openConsent || (async (url) => {
+        openedUrls.push(url);
+        return { close: () => { consentClosed.push(url); } };
+      })),
+    // โฟลเดอร์ที่ใช้ค้น youtube-client.json (ตัวที่ฝังมากับแอป)
+    embeddedDir: embeddedDir === undefined ? path.join(dir, 'no-embedded') : embeddedDir,
   });
 
   const call = (name, ...args) => {
@@ -522,5 +542,239 @@ describe('youtubeDisconnect', () => {
     const r = await call('sovereign:youtubeUpload', { filePath: path.join(dir, 'a.mp4'), title: 'x' });
     assert.equal(r.ok, false);
     assert.equal(tried, false);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ⭐ เจ้าของสั่งชัดเจน (19/10/69):
+//    "ให้การเชื่อมต่อบัญชี ผ่านใน Sovereign OS ทั้งหมดเลย อย่าทำด้านนอกเหนือจากนี้"
+//    ⇒ หน้าอนุญาตของ Google ต้องเปิด "ในหน้าต่างของแอป" เท่านั้น
+//      ห้ามเด้งออกไปเบราว์เซอร์ภายนอก (shell.openExternal) อีก
+//    ⇒ ไม่ต้องให้เจ้าของไป import ไฟล์ JSON เอง (credential ฝังมากับแอป)
+// เทสต์ชุดนี้คือด่านกันการถอยหลังกลับไปทำแบบเดิม
+// ────────────────────────────────────────────────────────────────────────────
+describe('เชื่อมต่อบัญชีในแอปเท่านั้น — ห้ามเด้งออกนอกแอป', () => {
+  test('⭐ connect เปิดหน้าต่างอนุญาตในแอป และไม่แตะ shell.openExternal เลย', async () => {
+    const { call } = boot();
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 77, redirectUri: 'http://127.0.0.1:77', close: () => {} };
+    };
+    yt.exchangeCode = async () => ({ ok: true, accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3 });
+    yt.fetchChannel = async () => ({ ok: true, title: 'ช่องในแอป' });
+
+    const p = call('sovereign:youtubeConnect');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(openedUrls.length, 1, 'ต้องเปิดหน้าอนุญาตในแอป 1 ครั้ง');
+    assert.equal(externalUrls.length, 0, '❌ ห้ามเด้งออกไปเบราว์เซอร์ภายนอก');
+    assert.equal(new URL(openedUrls[0]).searchParams.get('redirect_uri'), 'http://127.0.0.1:77');
+
+    const srv = await waitSrv();
+    srv('/?code=C&state=' + new URL(openedUrls[0]).searchParams.get('state'));
+    const r = await p;
+    assert.equal(r.ok, true);
+    assert.equal(externalUrls.length, 0, '❌ ห้ามเด้งออกไปเบราว์เซอร์ภายนอกแม้แต่ครั้งเดียว');
+    assert.equal(consentClosed.length, 1, 'ต้องปิดหน้าต่างอนุญาตเมื่อจบ');
+  });
+
+  test('หน้าต่างอนุญาตต้องถูกปิดแม้ flow ล้ม (state ไม่ตรง)', async () => {
+    const { call } = boot();
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 78, redirectUri: 'http://127.0.0.1:78', close: () => {} };
+    };
+    const p = call('sovereign:youtubeConnect');
+    await new Promise((r) => setImmediate(r));
+    const srv = await waitSrv();
+    srv('/?code=C&state=ปลอม');
+    const r = await p;
+    assert.equal(r.ok, false);
+    assert.equal(consentClosed.length, 1, 'หน้าต่างค้างบนจอไม่ได้');
+  });
+
+  test('⭐ แอปที่ไม่มีช่องทางเปิดหน้าต่างในแอป → ปฏิเสธ ไม่แอบเด้งเบราว์เซอร์นอก', async () => {
+    const { call } = boot({ openConsent: null });
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    let loopStarted = false;
+    yt.startLoopback = async () => {
+      loopStarted = true;
+      return { port: 79, redirectUri: 'http://127.0.0.1:79', close: () => {} };
+    };
+    const r = await call('sovereign:youtubeConnect');
+    assert.equal(r.ok, false);
+    assert.match(r.message, /[\u0E00-\u0E7F]/);
+    assert.equal(externalUrls.length, 0, '❌ ห้าม fallback ไปเบราว์เซอร์นอก');
+    assert.equal(loopStarted, false, 'ไม่มีทางให้ผู้ใช้อนุญาตในแอป → ไม่ต้องเปิด loopback ทิ้งไว้');
+  });
+
+  test('ผู้ใช้ปิดหน้าต่างเองก่อนกดอนุญาต → ตอบกลับทันที ไม่ต้องรอครบ 5 นาที', async () => {
+    let finishWindow;
+    const { call } = boot({
+      openConsent: async (url) => {
+        openedUrls.push(url);
+        const done = new Promise((r) => { finishWindow = r; });
+        return { close: () => { consentClosed.push(url); }, done };
+      },
+    });
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 80, redirectUri: 'http://127.0.0.1:80', close: () => {} };
+    };
+
+    const p = call('sovereign:youtubeConnect');
+    await new Promise((r) => setImmediate(r));
+    await waitSrv();
+    assert.equal(typeof finishWindow, 'function', 'ต้องส่งสัญญาณ "หน้าต่างปิด" กลับมาได้');
+    finishWindow(); // ผู้ใช้กดกากบาท
+    const r = await p;
+    assert.equal(r.ok, false);
+    assert.match(r.message, /ปิดหน้าต่าง/);
+    assert.equal(consentClosed.length, 1);
+  });
+
+  test('⭐ ทางเลือกสุดท้าย: ส่ง { external: true } → ใช้เบราว์เซอร์นอก และไม่เปิดหน้าต่างในแอป', async () => {
+    const { call } = boot();
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 82, redirectUri: 'http://127.0.0.1:82', close: () => {} };
+    };
+    yt.exchangeCode = async () => ({ ok: true, accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3 });
+    yt.fetchChannel = async () => ({ ok: true, title: 'ช่อง' });
+
+    const p = call('sovereign:youtubeConnect', { external: true });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(externalUrls.length, 1, 'ต้องใช้เบราว์เซอร์นอกเฉพาะเมื่อสั่ง external: true');
+    assert.equal(openedUrls.length, 0, 'ไม่ควรเปิดหน้าต่างในแอปเมื่อสั่ง external');
+    const srv = await waitSrv();
+    srv('/?code=C&state=' + new URL(externalUrls[0]).searchParams.get('state'));
+    assert.equal((await p).ok, true);
+  });
+
+  test('ไม่ส่ง opts มาเลย → ยังเป็นหน้าต่างในแอป (ดีฟอลต์ห้ามเปลี่ยน)', async () => {
+    const { call } = boot();
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 83, redirectUri: 'http://127.0.0.1:83', close: () => {} };
+    };
+    yt.exchangeCode = async () => ({ ok: false, message: 'ไม่แลก token ในเทสต์นี้' });
+
+    const p = call('sovereign:youtubeConnect');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(openedUrls.length, 1, 'ดีฟอลต์ต้องเปิดในแอป');
+    assert.equal(externalUrls.length, 0, '❌ ดีฟอลต์ห้ามเด้งออกนอกแอป');
+    const srv = await waitSrv();
+    srv('/?code=C&state=' + new URL(openedUrls[0]).searchParams.get('state'));
+    await p;
+    assert.equal(externalUrls.length, 0);
+  });
+
+  test('⭐ Google บล็อกหน้าต่างในแอป → ตอบกลับเร็วพร้อม blocked:true (ไม่ค้าง 5 นาที)', async () => {
+    const { call } = boot({
+      openConsent: async (url) => {
+        openedUrls.push(url);
+        return { close: () => {}, done: Promise.resolve({ blocked: true }) };
+      },
+    });
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 84, redirectUri: 'http://127.0.0.1:84', close: () => {} };
+    };
+    const r = await call('sovereign:youtubeConnect');
+    assert.equal(r.ok, false);
+    assert.equal(r.blocked, true, 'UI ต้องรู้ว่าโดนบล็อกเพื่อโชว์ทางเลือกสุดท้าย');
+    assert.match(r.message, /may not be secure/);
+    assert.equal(externalUrls.length, 0, 'ห้ามเด้งออกเองโดยไม่ได้รับคำสั่ง');
+  });
+});
+
+describe('credential ที่ฝังมากับแอป — เจ้าของไม่ต้อง import ไฟล์เอง', () => {
+  /** สร้างโฟลเดอร์จำลองที่มี youtube-client.json */
+  function embDir(content, name = 'youtube-client.json') {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ytemb-'));
+    if (content !== null) fs.writeFileSync(path.join(d, name), content, 'utf8');
+    return d;
+  }
+
+  test('⭐ มีไฟล์ฝังมา → hasClient=true ทันที โดยไม่ต้อง import และไม่เขียนดิสก์', async () => {
+    const { call } = boot({ embeddedDir: embDir(CLIENT_JSON) });
+    const s = await call('sovereign:youtubeStatus');
+    assert.equal(s.hasClient, true);
+    assert.equal(s.clientSource, 'embedded');
+    assert.equal(s.connected, false);
+    const dump = JSON.stringify(s);
+    assert.ok(!dump.includes(CLIENT_SECRET), '❌ รั่ว client secret ออกไปที่ renderer');
+    assert.ok(!dump.includes('GOCSPX'), '❌ รั่ว client secret ออกไปที่ renderer');
+    assert.equal(fs.readdirSync(dir).length, 0, 'ยังไม่เชื่อมต่อ = ต้องไม่เขียนอะไรลง userData');
+  });
+
+  test('⭐ กดเชื่อมต่อได้เลยด้วย credential ที่ฝังมา และความลับไม่หลุดลงดิสก์แบบ plaintext', async () => {
+    const { call } = boot({ embeddedDir: embDir(CLIENT_JSON) });
+    let exchanged = null;
+    yt.startLoopback = async ({ onResult }) => {
+      pendingSrv = onResult;
+      return { port: 81, redirectUri: 'http://127.0.0.1:81', close: () => {} };
+    };
+    yt.exchangeCode = async (o) => {
+      exchanged = o;
+      return { ok: true, accessToken: 'AT', refreshToken: 'RT-ยาว', expiresAt: Date.now() + 3600e3 };
+    };
+    yt.fetchChannel = async () => ({ ok: true, title: 'ช่องจริง' });
+
+    const p = call('sovereign:youtubeConnect');
+    await new Promise((r) => setImmediate(r));
+    assert.equal(openedUrls.length, 1, 'ต้องเปิดหน้าต่างอนุญาตในแอปได้ทันที');
+    const srv = await waitSrv();
+    srv('/?code=C&state=' + new URL(openedUrls[0]).searchParams.get('state'));
+    const r = await p;
+
+    assert.equal(r.ok, true);
+    assert.equal(exchanged.clientId, CLIENT_ID, 'ต้องใช้ client ที่ฝังมา');
+    assert.equal(exchanged.clientSecret, CLIENT_SECRET, 'ต้องใช้ secret ที่ฝังมา');
+    const raw = fs.readFileSync(path.join(dir, 'youtube-oauth.bin'), 'utf8');
+    assert.ok(!raw.includes(CLIENT_SECRET), '❌ เขียน secret ลงดิสก์แบบ plaintext');
+    assert.ok(!raw.includes('RT-ยาว'), '❌ เขียน refresh token ลงดิสก์แบบ plaintext');
+  });
+
+  test('ไฟล์ฝังมาเสีย → ไม่ throw และตกไปสถานะ "ยังไม่มี client"', async () => {
+    const { call } = boot({ embeddedDir: embDir('{ not json') });
+    const s = await call('sovereign:youtubeStatus');
+    assert.equal(s.ok, true);
+    assert.equal(s.hasClient, false);
+    assert.equal(s.clientSource, '');
+  });
+
+  test('import เองยังใช้ได้ (ทางสำรอง) → clientSource = imported', async () => {
+    const { call } = boot();
+    await call('sovereign:youtubeImportText', CLIENT_JSON);
+    const s = await call('sovereign:youtubeStatus');
+    assert.equal(s.hasClient, true);
+    assert.equal(s.clientSource, 'imported');
+  });
+
+  test('ไม่มีไฟล์ฝังมาและไม่ import → ยังบอกให้ผู้ใช้รู้ว่าต้องทำอะไร (ข้อความไทย)', async () => {
+    const { call } = boot();
+    const r = await call('sovereign:youtubeConnect');
+    assert.equal(r.ok, false);
+    assert.match(r.message, /[\u0E00-\u0E7F]/);
+  });
+
+  test('เครื่องที่ deploy ครบ: ถ้ามี sovereign-frontend/electron/youtube-client.json ต้อง parse ผ่าน', (t) => {
+    const p = path.join(EL, 'youtube-client.json');
+    if (!fs.existsSync(p)) {
+      t.skip('เครื่องนี้ไม่มีไฟล์ credential ที่ฝังมา (gitignored) — ข้าม');
+      return;
+    }
+    const parsed = yt.parseClientSecretFile(fs.readFileSync(p, 'utf8'));
+    assert.equal(parsed.ok, true, 'ไฟล์ credential ที่ฝังมาต้องอ่านได้');
+    const loaded = yt.loadEmbeddedClient({ dir: EL });
+    assert.ok(loaded && loaded.clientId === parsed.clientId, 'loadEmbeddedClient ต้องเจอไฟล์นี้');
+    assert.equal(typeof loaded.clientSecret, 'string');
+    assert.ok(loaded.clientSecret.length > 8);
   });
 });
