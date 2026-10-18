@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('sovereign', {
   youtubeStatus: () => ipcRenderer.invoke('sovereign:youtubeStatus'),
   youtubeImportDialog: () => ipcRenderer.invoke('sovereign:youtubeImportDialog'),
   youtubeImportText: (text) => ipcRenderer.invoke('sovereign:youtubeImportText', text),
-  youtubeConnect: () => ipcRenderer.invoke('sovereign:youtubeConnect'),
+  youtubeConnect: (opts) => ipcRenderer.invoke('sovereign:youtubeConnect', opts),
   youtubeDisconnect: () => ipcRenderer.invoke('sovereign:youtubeDisconnect'),
   youtubeUpload: (req) => ipcRenderer.invoke('sovereign:youtubeUpload', req),
   youtubeCancel: () => ipcRenderer.invoke('sovereign:youtubeCancel'),

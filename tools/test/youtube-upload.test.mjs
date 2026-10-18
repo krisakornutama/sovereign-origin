@@ -333,6 +333,64 @@ describe('parseClientSecretFile — นำเข้าไฟล์ที่ด�
   });
 });
 
+describe('loadEmbeddedClient — credential ที่ฝังมากับแอป (zero-setup)', () => {
+  const GOOD = JSON.stringify({ installed: { client_id: '1-x.apps.googleusercontent.com', client_secret: 'GOCSPX-aaa' } });
+  const EMB = 'C:' + path.sep + 'app' + path.sep + 'electron';
+  const PRIMARY = path.join(EMB, 'youtube-client.json');
+  const EXTRA = path.join('C:' + path.sep, 'ud', 'youtube-client.json');
+
+  /** fs ปลอมจาก Map path→content (ไม่แตะดิสก์จริง) */
+  function fake(files) {
+    return {
+      exists: (p) => Object.prototype.hasOwnProperty.call(files, p),
+      read: (p) => files[p],
+    };
+  }
+
+  test('เจอไฟล์ข้างแอป → คืน client พร้อม source', () => {
+    const f = fake({ [PRIMARY]: GOOD });
+    const r = yt.loadEmbeddedClient({ dir: EMB, readFile: f.read, exists: f.exists });
+    assert.ok(r);
+    assert.equal(r.ok, true);
+    assert.equal(r.clientId, '1-x.apps.googleusercontent.com');
+    assert.equal(r.clientSecret, 'GOCSPX-aaa');
+    assert.equal(r.source, PRIMARY);
+  });
+
+  test('ไม่มีไฟล์ข้างแอป → ไปหาที่ path สำรอง (userData)', () => {
+    const f = fake({ [EXTRA]: GOOD });
+    const r = yt.loadEmbeddedClient({ dir: EMB, extra: [EXTRA], readFile: f.read, exists: f.exists });
+    assert.ok(r);
+    assert.equal(r.source, EXTRA);
+  });
+
+  test('ไฟล์ข้างแอปเสีย → ตกไปใช้ตัวสำรอง', () => {
+    const f = fake({ [PRIMARY]: '{ ไม่ใช่ json', [EXTRA]: GOOD });
+    const r = yt.loadEmbeddedClient({ dir: EMB, extra: [EXTRA], readFile: f.read, exists: f.exists });
+    assert.ok(r);
+    assert.equal(r.source, EXTRA);
+  });
+
+  test('ไม่มีไฟล์เลย → คืน null (ไม่ throw)', () => {
+    const f = fake({});
+    assert.equal(yt.loadEmbeddedClient({ dir: EMB, readFile: f.read, exists: f.exists }), null);
+  });
+
+  test('ไฟล์เสียทั้งหมด → คืน null', () => {
+    const f = fake({ [PRIMARY]: 'nope', [EXTRA]: '{"installed":{"client_id":"evil.com"}}' });
+    assert.equal(yt.loadEmbeddedClient({ dir: EMB, extra: [EXTRA], readFile: f.read, exists: f.exists }), null);
+  });
+
+  test('exists/readFile โยน exception → ไม่ทำให้แอปพัง', () => {
+    const r = yt.loadEmbeddedClient({
+      dir: EMB,
+      exists: () => { throw new Error('EACCES'); },
+      readFile: () => { throw new Error('EIO'); },
+    });
+    assert.equal(r, null);
+  });
+});
+
 describe('exchangeCode / refreshAccessToken', () => {
   test('สำเร็จ → ได้ access + refresh + เวลาหมดอายุ', async () => {
     const t = fakeTransport([{ status: 200, headers: {}, text: JSON.stringify({ access_token: 'AT', refresh_token: 'RT', expires_in: 3600 }) }]);

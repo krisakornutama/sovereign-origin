@@ -714,9 +714,14 @@ describe('ไฟล์ประกอบแอปครบ (ของที่�
 
   test('หน้าเว็บทั้งสองปิด contextIsolation + ไม่เปิด nodeIntegration', () => {
     const src = fs.readFileSync(MAIN, 'utf8');
-    const occurrences = src.match(/nodeIntegration:\s*false/g) || [];
-    assert.equal(occurrences.length, 2, 'ทั้งหน้าหลักและ wizard ต้องปิด nodeIntegration');
-    assert.ok(src.includes('contextIsolation: true'), 'ต้องเปิด contextIsolation');
+    // นับจากจำนวน BrowserWindow จริง ⇒ หน้าต่างใหม่ (เช่น หน้าอนุญาต Google ของ YouTube)
+    // ถ้าลืมปิด nodeIntegration เพดานนี้จะฟ้องทันที ไม่ต้องมาไล่แก้ทีหลัง
+    const windows = (src.match(/new BrowserWindow\(/g) || []).length;
+    const occurrences = (src.match(/nodeIntegration:\s*false/g) || []).length;
+    assert.ok(windows >= 2, `ต้องมีหน้าต่างอย่างน้อย 2 (หน้าหลัก + wizard) เจอ ${windows}`);
+    assert.equal(occurrences, windows, 'ทุกหน้าต่างต้องปิด nodeIntegration');
+    const isolated = (src.match(/contextIsolation:\s*true/g) || []).length;
+    assert.equal(isolated, windows, 'ทุกหน้าต่างต้องเปิด contextIsolation');
   });
 
   test('package.json แพ็ก static export + sidecar API (ไม่งั้นแอปเปล่า)', () => {

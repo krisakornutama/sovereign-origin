@@ -20,6 +20,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const path = require('path');
 
 const SCOPE = 'https://www.googleapis.com/auth/youtube.upload';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -256,6 +257,30 @@ function parseClientSecretFile(text) {
   if (!clientId || !clientSecret) return { ok: false, message: 'ในไฟล์ไม่มี client_id/client_secret' };
   if (!/\.apps\.googleusercontent\.com$/.test(clientId)) return { ok: false, message: 'client_id หน้าตาไม่ถูกต้อง' };
   return { ok: true, clientId, clientSecret };
+}
+
+/**
+ * โหลด credential ที่ "ฝังมากับแอป" — เพื่อให้เจ้าของไม่ต้อง import ไฟล์ JSON เองเลย
+ * (เจ้าของสั่งชัดเจน: การเชื่อมต่อบัญชีต้องทำใน Sovereign OS ทั้งหมด)
+ *
+ * ⚠ ไฟล์นี้ "ห้ามเข้า git" (gitignore ไว้)
+ *   client_secret ของ installed app ไม่ใช่ความลับตามนิยามของ Google แต่ถ้าขึ้น GitHub
+ *   secret scanning ของ GitHub จะรายงานให้ Google แล้วอาจถูกเพิกถอนอัตโนมัติ → เสี่ยงเกินไป
+ *
+ * ลำดับการหา: <dir>/youtube-client.json → path ที่ส่งมาเพิ่ม (เช่น userData) — ตัวแรกที่ใช้ได้ชนะ
+ * ไม่มีไฟล์/ไฟล์เสีย = คืน null (ไม่ throw) แล้วให้ UI ตกไปใช้ทางเดิม (import ไฟล์เอง)
+ */
+function loadEmbeddedClient({ dir, extra = [], readFile = fs.readFileSync, exists = fs.existsSync } = {}) {
+  const base = dir || __dirname;
+  const candidates = [path.join(base, 'youtube-client.json'), ...extra.filter(Boolean)];
+  for (const p of candidates) {
+    try {
+      if (!exists(p)) continue;
+      const r = parseClientSecretFile(readFile(p, 'utf8'));
+      if (r.ok) return { ...r, source: p };
+    } catch { /* ไฟล์เสีย/อ่านไม่ได้ = ลองตัวถัดไป ไม่ทำให้แอปพัง */ }
+  }
+  return null;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -502,5 +527,6 @@ module.exports = {
   UNITS_PER_UPLOAD, UNITS_PER_DAY, FREE_UPLOADS_PER_DAY, MAX_TITLE, MAX_BYTES, MSG,
   makePkce, makeState, buildAuthUrl, parseRedirect, extractHashtags, buildVideoMetadata,
   describeApiError, checkVideoFile, planChunks, contentRange, makeStore, parseClientSecretFile,
+  loadEmbeddedClient,
   defaultTransport, exchangeCode, refreshAccessToken, fetchChannel, uploadVideo, startLoopback, donePage,
 };
