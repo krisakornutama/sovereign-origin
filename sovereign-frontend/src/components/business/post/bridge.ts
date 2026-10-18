@@ -81,3 +81,121 @@ export function postBridge(win: unknown): PostBridge | null {
     },
   };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// สะพาน YouTube (อัปโหลดอัตโนมัติ)
+//
+// ⚠ แยกจาก postBridge โดยตั้งใจ — ของเดิมมีเทสต์คุมรูปร่างอยู่ การเติมคีย์เข้าไป
+//   เสี่ยงทำให้เทสต์เดิมพังโดยไม่จำเป็น
+// ⚠ ทุกฟังก์ชันต้อง "มีอยู่จริง" ก่อนถึงจะเรียก — แอปที่ติดตั้งไว้ก่อนอัปเดตจะไม่มีคีย์เหล่านี้
+//   ถ้าเรียกตรง ๆ จะได้ TypeError แล้วหน้าโพสต์พังทั้งหน้า (บทเรียนเดิมจาก pickVideo)
+// ⚠ ความลับ (client secret / token) ไม่เคยผ่านสะพานนี้ — main เก็บและใช้เองทั้งหมด
+//   ที่นี่เห็นได้แค่ "มี/ไม่มี" กับชื่อช่อง
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface YoutubeStatus {
+  secure: boolean;
+  hasClient: boolean;
+  connected: boolean;
+  channelTitle: string;
+  clientHint: string;
+  freePerDay: number;
+}
+
+export interface YoutubeUploadOpts {
+  filePath: string;
+  title: string;
+  description: string;
+  privacy: string;
+}
+
+export interface YoutubeResult {
+  ok: boolean;
+  message?: string;
+  code?: string;
+  videoId?: string | null;
+}
+
+export interface YoutubeProgress {
+  sent?: number;
+  total?: number;
+  done?: boolean;
+  ok?: boolean;
+}
+
+export interface YoutubeBridge {
+  /** แอปนี้รองรับการอัปโหลดอัตโนมัติหรือยัง (แอปเวอร์ชันเก่า = false → UI ต้องซ่อนการ์ดทิ้ง) */
+  available: boolean;
+  status: () => Promise<YoutubeStatus | null>;
+  importDialog: () => Promise<YoutubeResult & { cancelled?: boolean }>;
+  importText: (text: string) => Promise<YoutubeResult>;
+  connect: () => Promise<YoutubeResult & { channelTitle?: string }>;
+  disconnect: () => Promise<YoutubeResult>;
+  cancel: () => Promise<YoutubeResult>;
+  upload: (o: YoutubeUploadOpts) => Promise<YoutubeResult>;
+  /** สมัครรับความคืบหน้า — คืนฟังก์ชันถอนการสมัคร (ไม่รองรับ = คืน no-op) */
+  onProgress: (cb: (p: YoutubeProgress) => void) => () => void;
+}
+
+export const NO_YOUTUBE = 'แอปเวอร์ชันนี้ยังไม่มีปุ่มอัปโหลดอัตโนมัติ — กรุณาอัปเดตแอป Sovereign OS ก่อน';
+
+/** คืน null เมื่อไม่ใช่แอปเดสก์ท็อป — คืนอ็อบเจ็กต์ที่ available=false เมื่อเป็นแอปเวอร์ชันเก่า */
+export function youtubeBridge(win: unknown): YoutubeBridge | null {
+  const src = (win as { sovereign?: Record<string, unknown> } | null | undefined)?.sovereign;
+  if (!src || typeof src !== 'object') return null;
+
+  const call = (name: string, arg?: unknown): Promise<YoutubeResult | null> => {
+    const fn = src[name];
+    if (typeof fn !== 'function') return Promise.resolve(null);
+    try {
+      return Promise.resolve((fn as (a?: unknown) => unknown).call(src, arg))
+        .then((v) => (v && typeof v === 'object' ? (v as YoutubeResult) : null))
+        .catch(() => null);
+    } catch {
+      return Promise.resolve(null);
+    }
+  };
+
+  const need = (name: string) => typeof src[name] === 'function';
+  const available = need('youtubeStatus') && need('youtubeUpload') && need('youtubeConnect');
+
+  return {
+    available,
+    status: async () => {
+      const v = await call('youtubeStatus');
+      if (!v) return null;
+      const o = v as unknown as Record<string, unknown>;
+      return {
+        secure: o.secure === true,
+        hasClient: o.hasClient === true,
+        connected: o.connected === true,
+        channelTitle: typeof o.channelTitle === 'string' ? o.channelTitle : '',
+        clientHint: typeof o.clientHint === 'string' ? o.clientHint : '',
+        freePerDay: Number.isFinite(Number(o.freePerDay)) && Number(o.freePerDay) > 0 ? Number(o.freePerDay) : 6,
+      };
+    },
+    importDialog: async () => {
+      const v = await call('youtubeImportDialog');
+      if (!v) return { ok: false, message: NO_YOUTUBE };
+      const o = v as unknown as { cancelled?: unknown };
+      return { ...v, cancelled: o.cancelled === true };
+    },
+    importText: async (text) => (await call('youtubeImportText', text)) || { ok: false, message: NO_YOUTUBE },
+    connect: async () => (await call('youtubeConnect')) || { ok: false, message: NO_YOUTUBE },
+    disconnect: async () => (await call('youtubeDisconnect')) || { ok: false, message: NO_YOUTUBE },
+    cancel: async () => (await call('youtubeCancel')) || { ok: false },
+    upload: async (o) => (await call('youtubeUpload', o)) || { ok: false, message: NO_YOUTUBE },
+    onProgress: (cb) => {
+      const fn = src.onYoutubeProgress;
+      if (typeof fn !== 'function') return () => {};
+      try {
+        const off = (fn as (c: (p: YoutubeProgress) => void) => unknown).call(src, (p: unknown) => {
+          // UI ที่ throw ต้องไม่ลามเข้า IPC ของ main
+          try { if (p && typeof p === 'object') cb(p as YoutubeProgress); } catch { /* ไม่มีอะไรต้องทำ */ }
+        });
+        // แอปเวอร์ชันใหม่คืนฟังก์ชันถอนการสมัครกลับมา — เก็บไว้ใช้ตอน unmount
+        return typeof off === 'function' ? (off as () => void) : () => {};
+      } catch { return () => {}; }
+    },
+  };
+}

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import PostComposer from './PostComposer';
 import PostCaptionEditor from './PostCaptionEditor';
 import PostTargets from './PostTargets';
+import PostYouTube from './PostYouTube';
 import { Alert, BTN_GHOST, Hint } from './ui';
 import { DRAFT_KEY, PLATFORMS, PLATFORM_KEYS, emptyDraft, normalizeDraft } from './post-model';
 import type { PlatformKey, PostDraft } from './post-model';
@@ -130,6 +131,14 @@ export default function PostHub() {
       <PostCaptionEditor draft={draft} editKey={editKey} onEditKey={setEditKey} patch={patch} />
 
       <PostTargets draft={draft} onToggle={toggleTarget} onMsg={onMsg} />
+
+      <PostYouTube
+        title={draft.title}
+        description={draft.captions.youtube}
+        videoPath={draft.videoPath}
+        videoName={draft.videoName}
+        onMsg={onMsg}
+      />
 
       <Hint>
         ร่างถูกบันทึกอัตโนมัติในเครื่องนี้ (ไม่ส่งขึ้นเซิร์ฟเวอร์) — ปิดแอปแล้วกลับมาพิมพ์ต่อได้เลย

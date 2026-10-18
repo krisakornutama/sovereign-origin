@@ -431,12 +431,20 @@ function loadShell(opts = {}) {
       showItemInFolder: (p) => calls.showItemInFolder.push(p),
     },
     Menu: { buildFromTemplate: (t) => t },
+    // main.js ส่งต่อให้ youtube-ipc ตอนเริ่ม — ต้องมี ไม่งั้นโหลด main.js ใน VM ไม่ผ่าน
+    safeStorage: {
+      isEncryptionAvailable: () => true,
+      encryptString: (s) => Buffer.from('ENC|' + Buffer.from(String(s), 'utf8').toString('base64'), 'utf8'),
+      decryptString: (b) => Buffer.from(String(b).slice(4), 'base64').toString('utf8'),
+    },
     Tray: class { constructor() { return { setToolTip() {}, setContextMenu() {}, on() {} }; } },
   };
   const sandbox = {
     require: (id) => {
       if (id === 'electron') return electron;
-      if (id === './verify-asset' || id === './download') return require(path.join(ELECTRON_DIR, `${id.slice(2)}.js`));
+      // โมดูลในเครื่องของ shell (./x) ทุกตัว resolve จากโฟลเดอร์ electron เสมอ
+      // ⚠ อย่ากลับไปไล่ชื่อทีละตัว — เพิ่มโมดูลใหม่แล้วเทสต์ทั้งไฟล์จะล้มโดยไม่เกี่ยวกับบั๊กจริง
+      if (typeof id === 'string' && id.startsWith('./')) return require(path.join(ELECTRON_DIR, `${id.slice(2)}.js`));
       return require(id);
     },
     console: { log() {}, error() {}, warn() {} },
