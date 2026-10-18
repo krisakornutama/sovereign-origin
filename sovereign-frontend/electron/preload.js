@@ -5,6 +5,21 @@ contextBridge.exposeInMainWorld('sovereign', {
   // แท็บ "📣 โพสต์": เลือกวิดีโอ (ได้แค่ metadata) + เปิดโฟลเดอร์ให้เห็นไฟล์
   pickVideo: () => ipcRenderer.invoke('sovereign:pickVideo'),
   showItemInFolder: (filePath) => ipcRenderer.invoke('sovereign:showItemInFolder', filePath),
+  // แท็บ "📣 โพสต์" → อัปโหลดขึ้น YouTube อัตโนมัติ (OAuth อยู่ใน main เท่านั้น
+  // ⚠ ห้ามส่ง client secret / refresh token ผ่านสะพานนี้เด็ดขาด — renderer ไม่ควรเห็นค่าลับ)
+  youtubeStatus: () => ipcRenderer.invoke('sovereign:youtubeStatus'),
+  youtubeImportDialog: () => ipcRenderer.invoke('sovereign:youtubeImportDialog'),
+  youtubeImportText: (text) => ipcRenderer.invoke('sovereign:youtubeImportText', text),
+  youtubeConnect: () => ipcRenderer.invoke('sovereign:youtubeConnect'),
+  youtubeDisconnect: () => ipcRenderer.invoke('sovereign:youtubeDisconnect'),
+  youtubeUpload: (req) => ipcRenderer.invoke('sovereign:youtubeUpload', req),
+  youtubeCancel: () => ipcRenderer.invoke('sovereign:youtubeCancel'),
+  // คืนฟังก์ชันถอนการสมัคร — ไม่งั้นสลับแท็บไปมาแล้วฟังซ้อนกันหลายรอบ (progress กระโดดมั่ว)
+  onYoutubeProgress: (cb) => {
+    const h = (_e, p) => { try { cb(p); } catch { /* UI พังไม่ควรทำให้ main พัง */ } };
+    ipcRenderer.on('sovereign:youtubeProgress', h);
+    return () => { try { ipcRenderer.removeListener('sovereign:youtubeProgress', h); } catch { /* ไม่มีอะไรต้องทำ */ } };
+  },
   // สถานะระบบ + ปุ่มควบคุม (หน้า offline)
   getStatus: () => ipcRenderer.invoke('sovereign:getStatus'),
   startSystem: () => ipcRenderer.invoke('sovereign:startSystem'),

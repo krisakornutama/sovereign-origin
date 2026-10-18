@@ -75,6 +75,13 @@ function makeElectronStub(opts = {}) {
     },
     Menu: { buildFromTemplate: (t) => t },
     Tray: class { constructor() { return tray; } },
+    // main.js ส่ง safeStorage ต่อให้ youtube-ipc — stub ต้องมี ไม่งั้นโหลด main.js ไม่ผ่าน
+    // (เข้ารหัสแบบ base64 ให้ "จริง" พอที่จะตรวจได้ว่าไฟล์บนดิสก์ไม่มี plaintext)
+    safeStorage: {
+      isEncryptionAvailable: () => opts.secure !== false,
+      encryptString: (s) => Buffer.from('ENC|' + Buffer.from(String(s), 'utf8').toString('base64'), 'utf8'),
+      decryptString: (b) => Buffer.from(String(b).slice(4), 'base64').toString('utf8'),
+    },
   };
   return { electron, calls, handlers, app, tray, ready: () => readyResolve() };
 }
@@ -115,8 +122,9 @@ function loadShell(opts = {}) {
   const sandbox = {
     require: (id) => {
       if (id === 'electron') return stub.electron;
-      if (id === './verify-asset') return require(path.join(ROOT, 'sovereign-frontend/electron/verify-asset.js'));
-      if (id === './download') return require(path.join(ROOT, 'sovereign-frontend/electron/download.js'));
+      // โมดูลในเครื่องของ shell (./x) ทุกตัว resolve จากโฟลเดอร์ electron เสมอ
+      // (เดิมไล่ชื่อทีละตัว — เพิ่มโมดูลใหม่แล้วเทสต์ล้มทั้งไฟล์โดยไม่เกี่ยวกับบั๊กจริง)
+      if (typeof id === 'string' && id.startsWith('./')) return require(path.join(ROOT, 'sovereign-frontend/electron', `${id.slice(2)}.js`));
       return require(id);
     },
     console: opts.quiet ? { log() {}, error() {}, warn() {} } : console,
