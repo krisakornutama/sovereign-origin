@@ -282,3 +282,10 @@ sovereign-os/infra/data/wal-archive/
 /sovereign-mesh-backup/
 /index.html
 /📊 PROJECT SOVEREIGN ORIGIN MASTER DIRECTORY TREE.txt
+
+# --- Google OAuth client for in-app YouTube connect (owner's credential) ---
+# client_secret of an installed app is not confidential per Google's docs, but
+# GitHub secret scanning reports it and Google may auto-revoke the credential.
+# => ship it with the packaged app, never commit it.
+sovereign-frontend/electron/youtube-client.json
+sovereign-frontend/electron/youtube-client.local.json
