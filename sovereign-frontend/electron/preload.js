@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('sovereign', {
   pickFile: () => ipcRenderer.invoke('sovereign:pickFile'),
   readDir: (dir) => ipcRenderer.invoke('sovereign:readDir', dir),
+  // แท็บ "📣 โพสต์": เลือกวิดีโอ (ได้แค่ metadata) + เปิดโฟลเดอร์ให้เห็นไฟล์
+  pickVideo: () => ipcRenderer.invoke('sovereign:pickVideo'),
+  showItemInFolder: (filePath) => ipcRenderer.invoke('sovereign:showItemInFolder', filePath),
   // สถานะระบบ + ปุ่มควบคุม (หน้า offline)
   getStatus: () => ipcRenderer.invoke('sovereign:getStatus'),
   startSystem: () => ipcRenderer.invoke('sovereign:startSystem'),
