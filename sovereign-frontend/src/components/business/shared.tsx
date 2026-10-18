@@ -15,12 +15,14 @@ export const POSITION_LABELS: Record<string, string> = {
 
 export const POSITION_RANK: Record<string, number> = { OWNER: 0, MANAGER: 1, SALES: 2, TECHNICIAN: 3, STOCK_KEEPER: 3, ACCOUNTANT: 3, VIEWER: 6 };
 
-export type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'tax' | 'agents' | 'team' | 'shop' | 'soverien';
+export type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'tax' | 'agents' | 'team' | 'shop' | 'soverien' | 'post';
 
 export const TABS: Array<{ key: Tab; label: string; minRank: number }> = [
   { key: 'overview', label: 'ภาพรวม', minRank: 6 },
   // 14/10/69: เครื่องมือร้าน Soverien (serial · สติกเกอร์ · ออเดอร์ · ประกัน · CRM)
   { key: 'soverien', label: '🏷️ Soverien', minRank: 6 },
+  // 18/10/69: โพสต์คลิปเดียว → YouTube/Facebook/TikTok (โหมด A เปิดหน้าเว็บอัปโหลดจริง)
+  { key: 'post', label: '📣 โพสต์', minRank: 6 },
   { key: 'products', label: 'สินค้า', minRank: 6 },
   { key: 'customers', label: 'ลูกค้า', minRank: 6 },
   { key: 'orders', label: 'ออเดอร์', minRank: 6 },

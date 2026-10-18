@@ -461,12 +461,65 @@ ipcMain.handle('sovereign:readDir', async (_e, dir) => {
   try { const list = fs.readdirSync(dir || 'C:\\', { withFileTypes: true }); return list.map(d => ({ name: d.name, isDir: d.isDirectory() })).slice(0, 200); } catch (e) { return { error: e.message }; }
 });
 
+// ── IPC: วิดีโอสำหรับแท็บ "📣 โพสต์" ──
+// pickVideo อ่านแค่ metadata (statSync) — ⛔ ห้าม readFileSync ทั้งไฟล์
+// คลิป 4 GB จะทำให้โปรเซสหลักของ Electron กินหน่วยความจำจนแอปค้างทั้งตัว
+// (sovereign:pickFile ด้านบนทำแบบนั้นอยู่ — ใช้ได้กับไฟล์เล็กเท่านั้น ห้ามลอกมาใช้กับวิดีโอ)
+ipcMain.handle('sovereign:pickVideo', async () => {
+  const filters = [{ name: 'วิดีโอ', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'] }];
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const fp = r.filePaths[0];
+  try { return { path: fp, name: path.basename(fp), size: fs.statSync(fp).size }; }
+  catch (e) { return { path: fp, name: path.basename(fp), size: 0, error: e.message }; }
+});
+
+// เปิดโฟลเดอร์ให้เห็นไฟล์ที่เลือก — เจ้าของจะได้ลากไฟล์จาก Explorer ไปวางบนหน้าเว็บต่อได้
+ipcMain.handle('sovereign:showItemInFolder', (_e, filePath) => {
+  if (typeof filePath !== 'string' || !filePath.trim()) return { ok: false, message: 'พาธไม่ถูกต้อง' };
+  if (!path.isAbsolute(filePath)) return { ok: false, message: 'ต้องเป็นพาธแบบเต็ม' };
+  try {
+    if (!fs.existsSync(filePath)) return { ok: false, message: 'ไม่พบไฟล์นี้แล้ว (อาจถูกย้าย/ลบ)' };
+    shell.showItemInFolder(filePath);
+    return { ok: true };
+  } catch (e) { return { ok: false, message: e.message }; }
+});
+
+// ── โดเมนที่ยอมให้เปิดด้วยเบราว์เซอร์จริง (แท็บ "📣 โพสต์") ──
+// ⚠ ต้องเทียบ "ชื่อโฮสต์ตรงตัว" เท่านั้น ห้ามใช้ regex/substring/endsWith
+//   เพราะ https://youtube.com.evil.com และ https://www.youtube.com@evil.com
+//   จะผ่านด่านแบบนั้นไปได้ — ทั้งสองเคสมีเทสต์คุมที่ tools/test/social-post.test.mjs
+// ⚠ รายการนี้ต้องตรงกับ hosts[] ใน sovereign-frontend/src/components/business/post/post-model.ts
+//   ถ้าฝั่ง UI เพิ่มโดเมนแต่ที่นี่ไม่เพิ่ม ผู้ใช้จะกดแล้ว "ไม่มีอะไรเกิดขึ้น"
+//   (มีเทสต์ cross-check สองฝั่งไว้แล้ว)
+const EXTERNAL_HOSTS = new Set([
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
+  'studio.youtube.com',
+  'facebook.com',
+  'www.facebook.com',
+  'm.facebook.com',
+  'web.facebook.com',
+  'tiktok.com',
+  'www.tiktok.com',
+]);
+
+function isAllowedExternalUrl(url) {
+  if (typeof url !== 'string') return false;
+  // ของเดิม: หน้าในเครื่อง (offline page / dev server) — คงไว้ให้ทำงานเหมือนเดิมเป๊ะ
+  if (/^https?:\/\/(localhost|127\.0\.0\.1):\d+/.test(url)) return true;
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  return u.protocol === 'https:' && EXTERNAL_HOSTS.has(u.hostname.toLowerCase());
+}
+
 // ── IPC: สถานะ + ปุ่มควบคุมระบบ ──
 ipcMain.handle('sovereign:getStatus', async () => probeStatus());
 ipcMain.handle('sovereign:startSystem', () => startSystem());
 ipcMain.handle('sovereign:isAutoStarted', () => autoStarted);
 ipcMain.handle('sovereign:openExternal', (_e, url) => {
-  if (typeof url === 'string' && /^https?:\/\/(localhost|127\.0\.0\.1):\d+/.test(url)) {
+  if (isAllowedExternalUrl(url)) {
     shell.openExternal(url);
     return { ok: true };
   }
