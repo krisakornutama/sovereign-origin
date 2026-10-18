@@ -12,6 +12,10 @@
 // ⚠ ความลับทั้งหมด (client secret / token) อยู่ใน main process
 //   หน้านี้เห็นได้แค่ "มี/ไม่มี" กับชื่อช่อง — ห้ามส่งค่าลับผ่านสะพาน
 // ⚠ แอปที่ติดตั้งไว้ก่อนอัปเดตจะไม่มีฟังก์ชันเหล่านี้ → ต้องซ่อนการ์ดทิ้ง ไม่ใช่พังทั้งหน้า
+// ⭐ เจ้าของสั่งชัดเจน: "การเชื่อมต่อบัญชีต้องผ่านใน Sovereign OS ทั้งหมด อย่าทำด้านนอก"
+//   ⇒ หน้าอนุญาตของ Google เปิดในหน้าต่างของแอป (BrowserWindow) ไม่ใช่เบราว์เซอร์ภายนอก
+//   ⇒ รหัสแอป Google ฝังมากับตัวแอป → เจ้าของไม่ต้อง import ไฟล์ JSON เอง
+//     (ขั้น import ยังเหลือไว้เป็นทางสำรอง เผื่อเครื่องที่ไฟล์ฝังมาหาย)
 // ────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, BTN_GHOST, BTN_GOOD, BTN_PRIMARY, Card, Hint, INPUT_CLS } from './ui';
@@ -49,6 +53,7 @@ export default function PostYouTube({
   const [paste, setPaste] = useState('');
   const [videoId, setVideoId] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [blocked, setBlocked] = useState(false);
 
   const refresh = useCallback(async (b: YoutubeBridge) => {
     const s = await b.status();
@@ -103,15 +108,24 @@ export default function PostYouTube({
     else onMsg(r.message || 'อ่าน JSON ไม่สำเร็จ', 'error');
   }, [bridge, guard, onMsg, paste, refresh]);
 
-  const doConnect = useCallback(async () => {
+  const doConnect = useCallback(async (external = false) => {
     if (!guard(bridge)) return;
     setJob('connect');
-    setNote('กำลังเปิดเบราว์เซอร์ให้อนุญาต — เลือกบัญชี Google แล้วกด "อนุญาต"');
-    const r = await bridge.connect();
+    setNote(external
+      ? 'กำลังเปิดหน้าเว็บให้อนุญาต (ครั้งเดียว — ทางเลือกสุดท้ายเมื่อ Google บล็อกหน้าต่างในแอป)'
+      : 'กำลังเปิดหน้าอนุญาตในแอปนี้ — เลือกบัญชี Google แล้วกด "อนุญาต" (ไม่ต้องสลับไปเบราว์เซอร์)');
+    const r = await bridge.connect(external);
     setJob('');
     setNote('');
-    if (r.ok) { await refresh(bridge); setVideoId(null); onMsg(`เชื่อมต่อแล้ว: ${r.channelTitle || 'ช่อง YouTube ของคุณ'}`, 'ok'); }
-    else onMsg(r.message || 'เชื่อมต่อไม่สำเร็จ', 'error');
+    if (r.ok) {
+      setBlocked(false);
+      await refresh(bridge);
+      setVideoId(null);
+      onMsg(`เชื่อมต่อแล้ว: ${r.channelTitle || 'ช่อง YouTube ของคุณ'}`, 'ok');
+    } else {
+      setBlocked(r.blocked === true);
+      onMsg(r.message || 'เชื่อมต่อไม่สำเร็จ', 'error');
+    }
   }, [bridge, guard, onMsg, refresh]);
 
   const doDisconnect = useCallback(async () => {
@@ -172,11 +186,12 @@ export default function PostYouTube({
         </Alert>
       )}
 
-      {/* ขั้นที่ 1 — ยังไม่มี Client ID/Secret */}
+      {/* ขั้นที่ 1 — ยังไม่มี Client ID/Secret (ปกติไม่ต้องทำ: รหัสแอปฝังมากับ Sovereign OS แล้ว) */}
       {!hasClient && (
         <div className="space-y-2">
           <p className="text-sm text-gray-300">
-            ขั้นแรก: นำเข้าไฟล์ JSON ที่ดาวน์โหลดจาก Google Cloud (หน้าจอ OAuth client ชนิด <b>Desktop app</b>)
+            แอปนี้ยังไม่มีรหัสแอป Google ติดตั้งมาด้วย — ถ้าเป็นการติดตั้งปกติไม่ต้องเห็นข้อความนี้
+            (ต้องมีไฟล์ <code className="text-cyan-300">youtube-client.json</code> ในโฟลเดอร์แอป)
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={BTN_GOOD} onClick={doImportDialog} disabled={job !== ''}>
@@ -208,16 +223,31 @@ export default function PostYouTube({
       {hasClient && !connected && (
         <div className="space-y-2">
           <p className="text-sm text-gray-300">
-            ขั้นต่อไป: กดเชื่อมต่อ แล้วอนุญาตในเบราว์เซอร์ที่เด้งขึ้นมา
+            กดเชื่อมต่อ — หน้าอนุญาตของ Google จะเปิดขึ้น <b>ในหน้าต่างของแอปนี้</b> (ไม่เด้งออกไปเบราว์เซอร์นอก)
             {status?.clientHint ? <span className="text-gray-500"> · client {status.clientHint}</span> : null}
           </p>
-          <button type="button" className={BTN_PRIMARY} onClick={doConnect} disabled={job !== ''}>
-            {job === 'connect' ? 'กำลังรออนุญาตในเบราว์เซอร์…' : '🔗 เชื่อมต่อบัญชี YouTube'}
+          <button type="button" className={BTN_PRIMARY} onClick={() => void doConnect(false)} disabled={job !== ''}>
+            {job === 'connect' ? 'กำลังรออนุญาตในหน้าต่างของแอป…' : '🔗 เชื่อมต่อบัญชี YouTube'}
           </button>
           {note && <Hint>{note}</Hint>}
-          <button type="button" className="text-xs text-gray-500 hover:text-gray-300 underline" onClick={doImportDialog} disabled={job !== ''}>
-            เปลี่ยนไฟล์ JSON เป็นอันอื่น
-          </button>
+          {blocked && (
+            <div className="space-y-2">
+              <Alert kind="warn">
+                Google ไม่ยอมให้อนุญาตในหน้าต่างของแอปเครื่องนี้ — ถ้าจำเป็นต้องเชื่อมต่อตอนนี้
+                ใช้ทางเลือกสุดท้ายด้านล่าง (เปิดเบราว์เซอร์ภายนอกครั้งเดียว)
+              </Alert>
+              <button type="button" className={BTN_GHOST} onClick={() => void doConnect(true)} disabled={job !== ''}>
+                🌐 เปิดในเบราว์เซอร์ (ทางเลือกสุดท้าย)
+              </button>
+            </div>
+          )}
+          {status?.clientSource === 'embedded' ? (
+            <Hint>รหัสแอป Google ฝังมากับ Sovereign OS แล้ว — ไม่ต้องดาวน์โหลดหรือวางไฟล์ใด ๆ</Hint>
+          ) : (
+            <button type="button" className="text-xs text-gray-500 hover:text-gray-300 underline" onClick={doImportDialog} disabled={job !== ''}>
+              เปลี่ยนไฟล์ JSON เป็นอันอื่น
+            </button>
+          )}
         </div>
       )}
 

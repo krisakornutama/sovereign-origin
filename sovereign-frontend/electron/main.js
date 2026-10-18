@@ -539,7 +539,79 @@ ipcMain.handle('sovereign:retryDashboard', async () => {
 // และไม่ต้อง restart backend เลย (โปรเจ็กอยู่ระหว่าง Cold Soak)
 // ⚠ credential เก็บด้วย safeStorage (Windows DPAPI) ที่ userData\youtube-oauth.bin
 //   ห้ามลง localStorage และห้ามลง repo เด็ดขาด — repo นี้เป็น public
-registerYouTubeIpc({ ipcMain, app, dialog, shell, safeStorage, getWin: () => win, log: dlog });
+//
+// ⭐ หน้าอนุญาตของ Google ต้องเปิด "ในหน้าต่างของแอปนี้" เท่านั้น (เจ้าของสั่งชัดเจน)
+//   ห้ามเด้งออกไปเบราว์เซอร์ภายนอกอีก ⇒ ต้องตั้ง User-Agent เป็น Chrome ล้วน
+//   เพราะ Google บล็อก OAuth ใน embedded webview ที่ UA มีคำว่า Electron
+//   (ถ้าไม่ตั้ง จะเจอหน้า "This browser or app may not be secure")
+function openConsentWindow(url) {
+  const parent = win && !win.isDestroyed() ? win : undefined;
+  const w = new BrowserWindow({
+    width: 540,
+    height: 740,
+    parent,
+    modal: false,
+    show: false,
+    autoHideMenuBar: true,
+    title: 'เชื่อมต่อบัญชี YouTube — Sovereign OS',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      // แยก session ของ Google ออกจากหน้าแอป (ล็อกอินครั้งเดียวแล้วจำไว้)
+      partition: 'persist:youtube-oauth',
+    },
+  });
+
+  const chromeVer = process.versions.chrome || '120.0.0.0';
+  try {
+    w.webContents.setUserAgent(
+      `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`,
+    );
+  } catch (e) { dlog('youtube: ตั้ง User-Agent ไม่สำเร็จ', e && e.message); }
+
+  let closedResolve;
+  let blocked = false;
+  const done = new Promise((r) => { closedResolve = r; });
+  w.once('ready-to-show', () => { try { w.show(); w.focus(); } catch { /* โชว์ไม่ได้ก็ยังโหลดอยู่ */ } });
+  w.on('closed', () => closedResolve({ blocked }));
+
+  // ⚠ Google บล็อก OAuth ใน embedded webview ("This browser or app may not be secure")
+  //   เราตั้ง UA เป็น Chrome ล้วนเพื่อไม่ให้โดน ⇒ หน้าปกติจะผ่าน
+  //   แต่ถ้า Google เปลี่ยนวิธีตรวจในอนาคต ต้องจับได้ทันที ไม่ปล่อยให้ผู้ใช้รอค้าง 5 นาที
+  w.webContents.on('did-finish-load', () => {
+    const probe = '(() => { const t = document.body ? document.body.innerText : ""; return String(t).slice(0, 4000); })()';
+    w.webContents.executeJavaScript(probe, true)
+      .then((text) => {
+        if (/may not be secure|disallowed_useragent/i.test(String(text || ''))) {
+          blocked = true;
+          dlog('youtube: Google ปฏิเสธหน้าต่างในแอป (disallowed_useragent)');
+          try { w.destroy(); } catch { /* ปิดไม่ได้ก็ช่างมัน */ }
+        }
+      })
+      .catch(() => { /* อ่านหน้าไม่ได้ = ปล่อยให้ผู้ใช้ทำต่อ */ });
+  });
+
+  // Google อาจสั่งเปิด popup — ให้เปิดในหน้าต่างเดิมแทนการเด้งหน้าต่างใหม่
+  w.webContents.setWindowOpenHandler(({ url: target }) => {
+    try { w.loadURL(target); } catch { /* โหลดไม่ได้ก็ปล่อย */ }
+    return { action: 'deny' };
+  });
+
+  w.loadURL(url).catch((e) => dlog('youtube: เปิดหน้าอนุญาตไม่สำเร็จ', e && e.message));
+
+  return Promise.resolve({
+    close: () => { try { if (!w.isDestroyed()) w.destroy(); } catch { /* ปิดไม่ได้ก็ช่างมัน */ } },
+    done,
+  });
+}
+
+registerYouTubeIpc({
+  ipcMain, app, dialog, shell, safeStorage,
+  getWin: () => win,
+  log: dlog,
+  openConsent: openConsentWindow,
+});
 
 // ── IPC: wizard + อัปเดต ──
 ipcMain.handle('sovereign:openWizard', (_e, focus) => { openWizard(focus); return { ok: true }; });

@@ -77,7 +77,7 @@ describe('youtubeBridge.status — ด่านกันข้อมูลเก
       }),
     }) });
     const s = await b.status();
-    assert.deepEqual(Object.keys(s).sort(), ['channelTitle', 'clientHint', 'connected', 'freePerDay', 'hasClient', 'secure']);
+    assert.deepEqual(Object.keys(s).sort(), ['channelTitle', 'clientHint', 'clientSource', 'connected', 'freePerDay', 'hasClient', 'secure']);
     assert.ok(!JSON.stringify(s).includes('ห้ามหลุด'));
   });
 
@@ -217,5 +217,77 @@ describe('⭐ สองฝั่งต้องตรงกัน (preload ↔ m
 
   test('main ต้องไม่ log ค่าลับ', () => {
     assert.ok(!/log\([^)]*clientSecret/.test(mainSrc.replace(/\s+/g, ' ')), '❌ มีการ log clientSecret');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ⭐ เจ้าของสั่ง: การเชื่อมต่อบัญชีต้องอยู่ใน Sovereign OS ทั้งหมด
+//   ⇒ bridge ต้องส่งต่อ clientSource ให้ UI ตัดสินใจ "ข้ามขั้น import ไฟล์"
+//   (ถ้าค่านี้เพี้ยน UI จะกลับไปโชว์ขั้นตอน import ที่ไม่จำเป็น = ผิดเจตนาเจ้าของ)
+// ────────────────────────────────────────────────────────────────────────────
+describe('youtubeBridge.status — clientSource (credential ที่ฝังมากับแอป)', () => {
+  test('embedded → ส่งต่อครบ', async () => {
+    const b = youtubeBridge({ sovereign: modernSovereign({
+      youtubeStatus: async () => ({ ok: true, secure: true, hasClient: true, clientSource: 'embedded' }),
+    }) });
+    const s = await b.status();
+    assert.equal(s.clientSource, 'embedded');
+    assert.equal(s.hasClient, true);
+  });
+
+  test('imported → ส่งต่อครบ', async () => {
+    const b = youtubeBridge({ sovereign: modernSovereign({
+      youtubeStatus: async () => ({ ok: true, secure: true, hasClient: true, clientSource: 'imported' }),
+    }) });
+    assert.equal((await b.status()).clientSource, 'imported');
+  });
+
+  test('ค่าประหลาด/ไม่ส่งมา → ตัดทิ้งเป็นสตริงว่าง (ไม่ให้ UI เข้าใจผิดว่าฝังมาแล้ว)', async () => {
+    const b = youtubeBridge({ sovereign: modernSovereign({
+      youtubeStatus: async () => ({ ok: true, secure: true, hasClient: true, clientSource: 'evil<script>' }),
+    }) });
+    assert.equal((await b.status()).clientSource, '');
+    const b2 = youtubeBridge({ sovereign: modernSovereign({ youtubeStatus: async () => ({ ok: true }) }) });
+    assert.equal((await b2.status()).clientSource, '');
+  });
+});
+// ────────────────────────────────────────────────────────────────────────────
+// ⭐ youtubeConnect รับธง { external } — ดีฟอลต์ต้องเป็นหน้าต่างในแอปเสมอ
+//   กับดักจริง: ถ้าเอา doConnect ไปผูกกับ onClick ตรง ๆ event จะไหลเข้ามาเป็น
+//   อาร์กิวเมนต์ตัวแรก (= truthy) แล้วแอปจะเด้งออกไปเบราว์เซอร์นอกโดยผู้ใช้ไม่ได้สั่ง
+// ────────────────────────────────────────────────────────────────────────────
+describe('youtubeBridge.connect — ธง external ต้องตรงตามคำสั่งเท่านั้น', () => {
+  function spy() {
+    const seen = [];
+    const b = youtubeBridge({ sovereign: modernSovereign({
+      youtubeConnect: async (opts) => { seen.push(opts); return { ok: true, channelTitle: 'ช่อง' }; },
+    }) });
+    return { b, seen };
+  }
+
+  test('ไม่ส่งอะไรเลย → external:false (หน้าต่างในแอป)', async () => {
+    const { b, seen } = spy();
+    await b.connect();
+    assert.deepEqual(seen[0], { external: false });
+  });
+
+  test('connect(true) → external:true (ทางเลือกสุดท้าย)', async () => {
+    const { b, seen } = spy();
+    await b.connect(true);
+    assert.deepEqual(seen[0], { external: true });
+  });
+
+  test('⭐ ค่าที่ไม่ใช่ true (เช่น event ของ onClick) → ต้องไม่กลายเป็น external', async () => {
+    const { b, seen } = spy();
+    await b.connect({ type: 'click' });
+    assert.deepEqual(seen[0], { external: false }, 'กันบั๊ก: ผูก onClick={doConnect} แล้วเด้งออกนอกแอปเอง');
+  });
+
+  test('blocked:true ต้องไหลผ่านสะพานกลับไปให้ UI', async () => {
+    const b = youtubeBridge({ sovereign: modernSovereign({
+      youtubeConnect: async () => ({ ok: false, blocked: true, message: 'บล็อก' }),
+    }) });
+    const r = await b.connect();
+    assert.equal(r.blocked, true);
   });
 });
