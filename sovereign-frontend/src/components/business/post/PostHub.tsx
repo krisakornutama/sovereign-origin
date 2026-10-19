@@ -1,7 +1,7 @@
 "use client";
 // components/business/post/PostHub.tsx
 // ────────────────────────────────────────────────────────────────────────────
-// แท็บ "📣 โพสต์" — คลิปเดียว (ชื่อเดียว + ไฟล์เดียว) → กระจายไป YouTube / Facebook / TikTok
+// แท็บ "📣 โพสต์" — คลิปเดียว (ชื่อเดียว + ไฟล์เดียว) → กระจายไป YouTube / Facebook / TikTok / Instagram
 //
 // โหมด A (เวอร์ชันนี้): เปิดหน้าเว็บอัปโหลดของแต่ละแพลตฟอร์มด้วยเบราว์เซอร์จริง
 //   ข้อดี: ไม่ต้องขอ API key · ไม่มีค่าใช้จ่าย · ไม่มีโควตารายวัน · ทำได้ทุกบัญชีทันที
@@ -99,7 +99,7 @@ export default function PostHub() {
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-gray-100">📣 โพสต์คลิปไปหลายแพลตฟอร์ม</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            เตรียมครั้งเดียว แล้วลง YouTube · Facebook · TikTok — เลือกไว้ {draft.targets.length} แพลตฟอร์ม
+            เตรียมครั้งเดียว แล้วลง YouTube · Facebook · TikTok · Instagram — เลือกไว้ {draft.targets.length} แพลตฟอร์ม
           </p>
         </div>
         <button type="button" className={BTN_GHOST} onClick={reset}>ล้างร่าง</button>

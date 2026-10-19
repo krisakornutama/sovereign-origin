@@ -303,7 +303,7 @@ export default function PostYouTube({
 
           <Hint>
             โควตาฟรีของ YouTube อยู่ที่ประมาณ {status?.freePerDay ?? 6} คลิป/วัน — เกินแล้วระบบจะบอก ไม่ใช่พังเงียบ ·
-            ถ้าต้องการลงทุกแพลตฟอร์ม ใช้การ์ดด้านล่างสำหรับ Facebook/TikTok ควบคู่ได้
+            ถ้าต้องการลงทุกแพลตฟอร์ม ใช้การ์ดด้านล่างสำหรับ Facebook/TikTok/Instagram ควบคู่ได้
           </Hint>
         </div>
       )}
