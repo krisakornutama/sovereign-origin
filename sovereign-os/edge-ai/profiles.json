@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "updated": "2026-10-19",
+  "notes": "Hardware tiers for the Sovereign Edge AI pack. Model tags are Ollama tags. Sizes are approximate Q4/Q8 pulls, not exact bytes.",
+  "profiles": {
+    "nano": {
+      "label": "Nano - 8 GB RAM / 4 cores / no usable GPU",
+      "when": { "minRamGB": 7, "maxRamGB": 11.9 },
+      "ollama": {
+        "numParallel": 1,
+        "maxLoadedModels": 1,
+        "contextLength": 2048,
+        "maxQueue": 8,
+        "keepAlive": "15m",
+        "flashAttention": 1,
+        "kvCacheType": "q8_0",
+        "multiUserCache": 1,
+        "numThreads": 4,
+        "forceCpu": true,
+        "loadTimeout": "10m"
+      },
+      "gateway": {
+        "maxConcurrent": 1,
+        "perUserConcurrent": 1,
+        "maxQueue": 8,
+        "queueTimeoutMs": 120000,
+        "cacheTtlMs": 300000,
+        "cacheMaxEntries": 100,
+        "maxHistoryMessages": 6,
+        "maxPromptChars": 8000
+      },
+      "models": {
+        "fast": "qwen3:0.6b",
+        "main": "gemma3:1b",
+        "deep": null,
+        "embed": "nomic-embed-text",
+        "vision": "gemma3:4b"
+      },
+      "rollout": {
+        "allowDeep": false,
+        "deepRequiresOptIn": false,
+        "deepPolicy": "downgrade"
+      }
+    },
+    "mini": {
+      "label": "Mini - 16 GB RAM / 8 cores / integrated GPU",
+      "when": { "minRamGB": 12, "maxRamGB": 27.9 },
+      "ollama": {
+        "numParallel": 2,
+        "maxLoadedModels": 2,
+        "contextLength": 4096,
+        "maxQueue": 24,
+        "keepAlive": "30m",
+        "flashAttention": 1,
+        "kvCacheType": "q8_0",
+        "multiUserCache": 1,
+        "numThreads": 8,
+        "forceCpu": true,
+        "loadTimeout": "10m"
+      },
+      "gateway": {
+        "maxConcurrent": 2,
+        "perUserConcurrent": 1,
+        "maxQueue": 24,
+        "queueTimeoutMs": 180000,
+        "cacheTtlMs": 600000,
+        "cacheMaxEntries": 200,
+        "maxHistoryMessages": 12,
+        "maxPromptChars": 24000
+      },
+      "models": {
+        "fast": "qwen3:0.6b",
+        "main": "gemma3:4b",
+        "deep": "qwen3:8b",
+        "embed": "bge-m3",
+        "vision": "gemma3:4b"
+      },
+      "rollout": {
+        "allowDeep": false,
+        "deepRequiresOptIn": true,
+        "deepPolicy": "downgrade"
+      }
+    },
+    "standard": {
+      "label": "Standard - 32 GB RAM / 8+ cores / optional GPU",
+      "when": { "minRamGB": 28, "maxRamGB": 63.9 },
+      "ollama": {
+        "numParallel": 2,
+        "maxLoadedModels": 2,
+        "contextLength": 8192,
+        "maxQueue": 32,
+        "keepAlive": "45m",
+        "flashAttention": 1,
+        "kvCacheType": "q8_0",
+        "multiUserCache": 1,
+        "numThreads": 8,
+        "forceCpu": false,
+        "loadTimeout": "10m"
+      },
+      "gateway": {
+        "maxConcurrent": 2,
+        "perUserConcurrent": 1,
+        "maxQueue": 32,
+        "queueTimeoutMs": 240000,
+        "cacheTtlMs": 600000,
+        "cacheMaxEntries": 300,
+        "maxHistoryMessages": 16,
+        "maxPromptChars": 48000
+      },
+      "models": {
+        "fast": "qwen3:1.7b",
+        "main": "qwen3:8b",
+        "deep": "qwen3:14b",
+        "embed": "bge-m3",
+        "vision": "qwen3-vl:8b"
+      },
+      "rollout": {
+        "allowDeep": false,
+        "deepRequiresOptIn": true,
+        "deepPolicy": "downgrade"
+      }
+    },
+    "gpu": {
+      "label": "GPU - 8 GB+ discrete VRAM / 16 GB+ RAM",
+      "when": { "minVramGB": 7, "minRamGB": 12 },
+      "ollama": {
+        "numParallel": 4,
+        "maxLoadedModels": 2,
+        "contextLength": 8192,
+        "maxQueue": 48,
+        "keepAlive": "45m",
+        "flashAttention": 1,
+        "kvCacheType": "q8_0",
+        "multiUserCache": 1,
+        "numThreads": 8,
+        "forceCpu": false,
+        "loadTimeout": "10m"
+      },
+      "gateway": {
+        "maxConcurrent": 4,
+        "perUserConcurrent": 2,
+        "maxQueue": 48,
+        "queueTimeoutMs": 240000,
+        "cacheTtlMs": 600000,
+        "cacheMaxEntries": 500,
+        "maxHistoryMessages": 20,
+        "maxPromptChars": 64000
+      },
+      "models": {
+        "fast": "qwen3:1.7b",
+        "main": "qwen3:8b",
+        "deep": "qwen3:14b",
+        "embed": "bge-m3",
+        "vision": "qwen3-vl:8b"
+      },
+      "rollout": {
+        "allowDeep": true,
+        "deepRequiresOptIn": false,
+        "deepPolicy": "downgrade"
+      }
+    }
+  }
+}
