@@ -16,6 +16,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   decideEnroll,
+  decideEnrollAttempt,
   safeEqual,
   sanitizeMachineName,
   normalizeExecutors,
@@ -66,6 +67,69 @@ describe('decideEnroll — ประตูลงทะเบียนเคร�
     const v = decideEnroll({ expectedCode: CODE, code: 'เดาผิด', name: 'คอม-3' });
     assert.ok(!v.reason.includes(CODE), 'ข้อความห้ามมีรหัสเชิญจริง');
     assert.ok(!v.reason.includes('เดาผิด'), 'ข้อความห้ามเอารหัสที่ผู้ยิงมากลับไป');
+  });
+});
+
+describe('decideEnrollAttempt — รหัสเดิม + รหัสฝูง', () => {
+  const FLEET = `enr_${'a'.repeat(48)}`;
+
+  it('ไม่มีรหัสเดิมและไม่ได้ส่งรหัสฝูง = disabled', () => {
+    assert.equal(decideEnrollAttempt({ expectedCode: '', code: 'อะไรก็ได้', name: 'คอม-1' }).action, 'disabled');
+    assert.equal(decideEnrollAttempt({ expectedCode: null, code: null, name: 'คอม-1' }).action, 'disabled');
+  });
+
+  it('มีแต่รหัสฝูง (ไม่มีรหัสเดิม) = ไปทาง fleet', () => {
+    const v = decideEnrollAttempt({
+      expectedCode: '',
+      code: FLEET,
+      name: 'คอม-1',
+      fleetTokenFormat: true,
+    });
+    assert.equal(v.action, 'fleet');
+    assert.equal(v.name, 'คอม-1');
+    assert.equal(v.failures, 0);
+  });
+
+  it('รหัสเดิมถูก = legacy (แม้ส่งรูปแบบ enr_ มาก็ไม่ consume)', () => {
+    const v = decideEnrollAttempt({ expectedCode: FLEET, code: FLEET, name: 'คอม-1', fleetTokenFormat: true });
+    assert.equal(v.action, 'legacy');
+  });
+
+  it('รหัสเดิมผิดและไม่ได้รูปแบบฝูง = bad_code + นับครั้ง', () => {
+    const v = decideEnrollAttempt({ expectedCode: CODE, code: 'ผิด', name: 'คอม-1', priorFailures: 2 });
+    assert.equal(v.action, 'bad_code');
+    assert.equal(v.failures, 3);
+  });
+
+  it('เกินโควตาล้มเหลว = rate_limited แม้รหัสฝูงจะถูก', () => {
+    const v = decideEnrollAttempt({
+      expectedCode: '',
+      code: FLEET,
+      name: 'คอม-1',
+      fleetTokenFormat: true,
+      priorFailures: DEFAULT_MAX_FAILURES,
+    });
+    assert.equal(v.action, 'rate_limited');
+    assert.equal(v.failures, DEFAULT_MAX_FAILURES);
+  });
+
+  it('ชื่อว่าง/ยาวเกิน = bad_request และไม่นับครั้งล้ม', () => {
+    const blank = decideEnrollAttempt({ expectedCode: '', code: FLEET, name: '  ', fleetTokenFormat: true, priorFailures: 2 });
+    assert.equal(blank.action, 'bad_request');
+    assert.equal(blank.failures, 2);
+    const long = decideEnrollAttempt({
+      expectedCode: '',
+      code: FLEET,
+      name: 'x'.repeat(MAX_NAME_LENGTH + 1),
+      fleetTokenFormat: true,
+    });
+    assert.equal(long.action, 'bad_request');
+  });
+
+  it('ข้อความ error ห้ามมีรหัสจริง', () => {
+    const v = decideEnrollAttempt({ expectedCode: CODE, code: FLEET, name: 'คอม-1', fleetTokenFormat: true });
+    assert.ok(!v.reason.includes(CODE));
+    assert.ok(!v.reason.includes(FLEET));
   });
 });
 

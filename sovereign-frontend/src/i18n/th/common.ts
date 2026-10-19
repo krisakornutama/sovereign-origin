@@ -20,6 +20,7 @@ export const common = {
     ai: 'ศูนย์บัญชาการ AI',
     aiOverview: 'ภาพรวม',
     machineConsole: 'คอนโซลเครื่อง',
+    fleet: 'ศูนย์ควบคุมฝูงเครื่อง',
     business: 'ธุรกิจของฉัน',
     vision: 'Vision AI',
     property: 'แผนที่ทรัพย์สิน',

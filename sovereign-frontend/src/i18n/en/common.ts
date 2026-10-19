@@ -18,6 +18,7 @@ export const common = {
     ai: 'AI Command Center',
     aiOverview: 'Overview',
     machineConsole: 'Machine Console',
+    fleet: 'Fleet Console',
     business: 'My Business',
     vision: 'Vision AI',
     property: 'Property Map',

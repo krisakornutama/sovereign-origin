@@ -63,44 +63,103 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(ha, hb);
 }
 
+export type EnrollAttemptAction =
+  | 'disabled'
+  | 'rate_limited'
+  | 'bad_request'
+  | 'bad_code'
+  | 'legacy'
+  | 'fleet';
+
+export interface EnrollAttemptInput {
+  /** รหัสเดิมฝั่ง HUB (MACHINE_ENROLL_CODE) */
+  expectedCode?: string | null;
+  /** รหัสที่เครื่องส่งมา */
+  code?: string | null;
+  name?: string | null;
+  priorFailures?: number;
+  maxFailures?: number;
+  /** true = รหัสที่ส่งมามีรูปแบบ enr_... (ให้ชั้น route ตรวจด้วย isEnrollTokenFormat) */
+  fleetTokenFormat?: boolean;
+}
+
+export interface EnrollAttempt {
+  action: EnrollAttemptAction;
+  failures: number;
+  reason: string;
+  /** ชื่อที่ sanitize แล้ว — มีเมื่อ action เป็น legacy/fleet */
+  name?: string;
+  maxFailures?: number;
+}
+
 /**
- * ตัดสินว่าจะให้ลงทะเบียนไหม
- * คืนเฉพาะการตัดสิน — การเขียน DB อยู่ชั้น agent-machines.service
+ * ตัดสิน "จะลองทางไหน" โดยไม่แตะ DB/ไฟล์
+ *
+ * แยกจาก decideEnroll เพราะ /enroll สมัยใหม่รับได้สองทาง:
+ *   1) รหัสเดิม MACHINE_ENROLL_CODE
+ *   2) รหัสฝูง enr_... (ไป consume จาก fleet-enrollment.service)
+ *
+ * ลำดับ: disabled → rate limit → ชื่อผิด → legacy → fleet → bad_code
+ * (ชื่อผิดไม่นับเป็นครั้งล้ม เพื่อไม่ให้ผู้ใช้ที่พิมพ์ชื่อผิดถูกพัก)
  */
-export function decideEnroll(input: EnrollInput): EnrollVerdict {
+export function decideEnrollAttempt(input: EnrollAttemptInput): EnrollAttempt {
   const maxFailures = Number.isFinite(input.maxFailures) ? Number(input.maxFailures) : DEFAULT_MAX_FAILURES;
   const prior = Math.max(0, Number(input.priorFailures ?? 0));
-
-  // ไม่ได้ตั้งรหัสเชิญ = ปิดช่องทางนี้ (fail-closed) — ไม่ใช่เปิดให้ทุกคน
   const expected = String(input.expectedCode ?? '').trim();
-  if (!expected) {
-    return { decision: 'disabled', reason: 'HUB ไม่ได้ตั้งรหัสเชิญ (MACHINE_ENROLL_CODE) — ปิดการลงทะเบียนอัตโนมัติ', failures: prior };
-  }
+  const given = String(input.code ?? '').trim();
+  const fleetTokenFormat = input.fleetTokenFormat === true;
+  const rawName = String(input.name ?? '').trim();
 
-  // พักการลองเกินโควตา — กันเดารหัสทีละตัว
-  if (prior >= maxFailures) {
+  // ไม่ได้ตั้งรหัสเดิมและไม่ได้ส่งรหัสฝูง = ปิดช่องทาง (fail-closed)
+  if (!expected && !fleetTokenFormat) {
     return {
-      decision: 'rate_limited',
-      reason: `ล้มเหลวเกิน ${maxFailures} ครั้ง — พักชั่วคราว`,
+      action: 'disabled',
       failures: prior,
+      reason: 'HUB ไม่ได้ตั้งรหัสเชิญ (MACHINE_ENROLL_CODE) — ปิดการลงทะเบียนอัตโนมัติ',
     };
   }
 
-  // ชื่อเครื่องขาด/ยาวผิด = คำขอเสีย ไม่ใช่รหัสผิด (ไม่ต้องนับเป็นครั้งล้ม)
-  const name = String(input.name ?? '').trim();
-  if (!name) {
-    return { decision: 'bad_request', reason: 'ไม่พบชื่อเครื่อง', failures: prior };
-  }
-  if (name.length > MAX_NAME_LENGTH) {
-    return { decision: 'bad_request', reason: `ชื่อเครื่องยาวเกิน ${MAX_NAME_LENGTH} ตัวอักษร`, failures: prior };
-  }
-
-  const given = String(input.code ?? '').trim();
-  if (!safeEqual(given, expected)) {
-    return { decision: 'bad_code', reason: 'รหัสเชิญไม่ถูกต้อง', failures: prior + 1 };
+  if (prior >= maxFailures) {
+    return {
+      action: 'rate_limited',
+      failures: prior,
+      maxFailures,
+      reason: `ล้มเหลวเกิน ${maxFailures} ครั้ง — พักชั่วคราว`,
+    };
   }
 
-  return { decision: 'accepted', reason: 'รหัสเชิญถูกต้อง', failures: 0 };
+  if (!rawName) {
+    return { action: 'bad_request', failures: prior, reason: 'ไม่พบชื่อเครื่อง' };
+  }
+  if (rawName.length > MAX_NAME_LENGTH) {
+    return {
+      action: 'bad_request',
+      failures: prior,
+      reason: `ชื่อเครื่องยาวเกิน ${MAX_NAME_LENGTH} ตัวอักษร`,
+    };
+  }
+
+  const name = sanitizeMachineName(rawName);
+  if (expected && safeEqual(given, expected)) {
+    return { action: 'legacy', failures: 0, reason: 'รหัสเชิญถูกต้อง', name };
+  }
+  if (fleetTokenFormat) {
+    return { action: 'fleet', failures: 0, reason: 'รหัสเชิญฝูงพร้อมตรวจ', name };
+  }
+  return { action: 'bad_code', failures: prior + 1, reason: 'รหัสเชิญไม่ถูกต้อง' };
+}
+
+/**
+ * ตัดสินว่าจะให้ลงทะเบียนไหม (รหัสเดิมอย่างเดียว — คงไว้ให้เทสต์/ผู้เรียกเก่า)
+ * คืนเฉพาะการตัดสิน — การเขียน DB อยู่ชั้น agent-machines.service
+ */
+export function decideEnroll(input: EnrollInput): EnrollVerdict {
+  const attempt = decideEnrollAttempt({ ...input, fleetTokenFormat: false });
+  const decision: EnrollDecision =
+    attempt.action === 'legacy' ? 'accepted'
+    : attempt.action === 'fleet' ? 'bad_code'
+    : attempt.action;
+  return { decision, reason: attempt.reason, failures: attempt.failures };
 }
 
 /** ตัดชื่อเครื่องให้ปลอดภัยก่อนบันทึกลง DB (ตัดอักขระควบคุม/ช่องว่างซ้ำ) */

@@ -58,10 +58,20 @@ import {
   screenshotDir,
 } from '../../services/orchestrator-screenshot.service';
 import {
-  decideEnroll,
-  sanitizeMachineName,
+  decideEnrollAttempt,
   normalizeExecutors,
 } from '../../services/machine-enroll.service';
+import {
+  consumeEnrollToken,
+  isEnrollTokenFormat,
+  markEnrollTokenMachine,
+  releaseEnrollTokenUse,
+} from '../../services/fleet-enrollment.service';
+import {
+  decideUpdateGate,
+  readFleetPolicy,
+  type FleetChannel,
+} from '../../services/fleet-policy.service';
 import {
   readNodeKitManifest,
   resolveVerifiedNodeKitAsset,
@@ -80,6 +90,68 @@ const enrollFailures = new Map<string, number>();
 /** hash ของไฟล์ที่ให้บริการ — เทียบกับ manifest ก่อนส่งออกทุกครั้ง (ไฟล์บนดิสก์อาจถูกแก้/หาย) */
 function sha256Hex(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex');
+}
+
+interface FleetUpdateGate {
+  channel: FleetChannel;
+  rolloutPercent: number;
+}
+
+/**
+ * ด่านช่องทางอัปเดตของเครื่องหนึ่ง:
+ *   • disabled = หยุดทันที (403) — เครื่องที่ถูกระงับต้องไม่ดึงโค้ดใหม่
+ *   • ไม่อยู่ในเปอร์เซ็นต์ rollout = ตอบ 404 แบบ "ยังไม่มีชุดอัปเดต"
+ *     (runner/desktop updater เดิมตีความ 404 เป็น "ไม่มีอะไรใหม่" อยู่แล้ว)
+ *   • ผ่าน = คืน channel/percent ให้ route ใส่ใน body (client เก่ามองข้ามได้)
+ */
+function gateFleetUpdate(machine: MachineRow, res: Response): FleetUpdateGate | null {
+  const decision = decideUpdateGate(machine, readFleetPolicy());
+  res.set('X-Fleet-Channel', decision.channel);
+  res.set('X-Fleet-Rollout', String(decision.rolloutPercent));
+
+  if (decision.reason === 'machine_disabled') {
+    res.status(403).json({
+      error: 'machine is disabled',
+      channel: decision.channel,
+      reason: decision.reason,
+    });
+    return null;
+  }
+  if (decision.reason === 'rollout_hold') {
+    res.set('X-Fleet-Hold', 'rollout');
+    res.status(404).json({
+      error: 'update held by rollout policy',
+      channel: decision.channel,
+      rolloutPercent: decision.rolloutPercent,
+      reason: decision.reason,
+    });
+    return null;
+  }
+  return { channel: decision.channel, rolloutPercent: decision.rolloutPercent };
+}
+
+/**
+ * คัดฟิลด์เครื่องสำหรับหน้าเว็บ — ห้ามส่ง token_hash / pair_code_hash ออกไป
+ * ของเดิม GET /api/agent-machines ใช้ spread ทั้ง row ทำให้แฮช token รั่วให้ผู้ใช้ที่ล็อกอินทุกคน
+ */
+function publicMachine(m: MachineRow) {
+  return {
+    id: m.id,
+    name: m.name,
+    os: m.os ?? 'unknown',
+    capabilities: m.capabilities ?? [],
+    executors: m.executors ?? [],
+    status: m.status ?? 'offline',
+    last_heartbeat: m.last_heartbeat ?? null,
+    version: m.version ?? null,
+    note: m.note ?? null,
+    role: m.role ?? null,
+    owner_user_id: m.owner_user_id ?? null,
+    lan_confirmed_at: m.lan_confirmed_at ?? null,
+    created_at: m.created_at ?? null,
+    updated_at: m.updated_at ?? null,
+    stale_sec: m.stale_sec ?? null,
+  };
 }
 
 /** นามสกุลภาพหน้าจอที่ยอมรับ — runner ส่ง PNG เสมอ แต่เปิดรับ jpeg/webp ด้วย */
@@ -146,7 +218,11 @@ router.get('/', authenticate, async (_req: Request, res: Response) => {
     res.json({
       machines: machines.map((m) => {
         const hit = machineIps.get(m.id);
-        return { ...m, ip: hit?.ip ?? null, ipSeenAt: hit ? new Date(hit.at).toISOString() : null };
+        return {
+          ...publicMachine(m),
+          ip: hit?.ip ?? null,
+          ipSeenAt: hit ? new Date(hit.at).toISOString() : null,
+        };
       }),
     });
   } catch (err) {
@@ -358,9 +434,11 @@ router.get('/update/manifest', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    const gate = gateFleetUpdate(machine, res);
+    if (!gate) return;
     const manifest = readUpdateManifest();
     if (!manifest) return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
-    res.json(manifest);
+    res.json({ ...manifest, channel: gate.channel, rolloutPercent: gate.rolloutPercent });
   } catch (err) {
     console.error('GET /api/agent-machines/update/manifest error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read update manifest' });
@@ -373,6 +451,7 @@ router.get('/update/file', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    if (!gateFleetUpdate(machine, res)) return;
     const rel = String(req.query.path ?? '');
     if (!isSafeRelPath(rel)) return res.status(400).json({ error: 'invalid file path' });
     const found = resolveUpdateFile(rel);
@@ -399,6 +478,8 @@ router.get('/desktop-update/manifest', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    const gate = gateFleetUpdate(machine, res);
+    if (!gate) return;
     const manifest = readDesktopManifest();
     if (!manifest) {
       return res.status(404).json({
@@ -406,7 +487,7 @@ router.get('/desktop-update/manifest', async (req: Request, res: Response) => {
         hint: 'ประกอบแอปที่ HUB (BUILD-DESKTOP.cmd) แล้วเผยแพร่ด้วย node PACK-DESKTOP.mjs --publish',
       });
     }
-    res.json(manifest);
+    res.json({ ...manifest, channel: gate.channel, rolloutPercent: gate.rolloutPercent });
   } catch (err) {
     console.error('GET /api/agent-machines/desktop-update/manifest error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read desktop update manifest' });
@@ -418,6 +499,7 @@ router.get('/desktop-update/asset', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
+    if (!gateFleetUpdate(machine, res)) return;
     const found = await resolveVerifiedDesktopAsset();
     if (!found) return res.status(404).json({ error: 'desktop asset missing or does not match manifest' });
     res.set({
@@ -458,7 +540,10 @@ router.get('/node-kits/manifest', async (_req: Request, res: Response) => {
     }
     // ส่งพาธสัมพัทธ์ ไม่ใช่ URL เต็ม — เครื่องลูกรู้ HUB_URL ของตัวเองอยู่แล้ว
     //   (HUB อาจอยู่หลัง tunnel/โดเมน ถ้ายัด URL เต็มตอนนี้จะผูกกับทางเดินของ HUB เท่านั้น)
-    res.json(nodeKitManifestForClient(manifest, '/api/agent-machines/node-kits/asset'));
+    const client = nodeKitManifestForClient(manifest, '/api/agent-machines/node-kits/asset');
+    if (!client) return res.status(404).json({ error: 'node kit manifest invalid' });
+    // เครื่องใหม่ยังไม่มี machine token จึงใช้ได้เฉพาะช่อง stable (ช่องอื่นต้องผูกเครื่องก่อน)
+    res.json({ ...client, channel: 'stable' });
   } catch (err) {
     console.error('GET /api/agent-machines/node-kits/manifest error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read node kit manifest' });
@@ -528,43 +613,105 @@ router.get('/node-kits/asset', async (_req: Request, res: Response) => {
 //   HUB มองเป็นเครื่องเดียว (ระบุตัวจาก token_hash) ⇒ ทำแบบนี้ใช้ไม่ได้จริง
 //
 // การรักษาความปลอดภัย:
-//   • ไม่ต้องล็อกอิน แต่ต้องมี "รหัสเชิญ" (MACHINE_ENROLL_CODE) — ไม่ตั้ง = ปิดช่องนี้
+//   • ไม่ต้องล็อกอิน แต่ต้องมี "รหัสเชิญ" — รหัสเดิม MACHINE_ENROLL_CODE หรือรหัสฝูง enr_...
+//     (ไม่มีทั้งสองทาง = ปิดช่องนี้)
 //   • เครื่องใหม่ได้ role = USER เสมอ (machine-access.service ข้อ 1) = คุมเครื่องอื่นไม่ได้
 //     ต้องไปผูกเจ้าของ + กดยืนยันในหน้า /machine-console อีกที
 //   • จำกัดครั้งล้มเหลวต่อผู้เรียก และไม่คืนรหัสเชิญกลับในข้อความ error
 router.post('/enroll', async (req: Request, res: Response) => {
   try {
     const ip = callerIp(req);
-    const verdict = decideEnroll({
+    const prior = Math.max(0, Number(enrollFailures.get(ip) ?? 0));
+    const given = String(req.body?.code ?? '').trim();
+    const attempt = decideEnrollAttempt({
       expectedCode: process.env.MACHINE_ENROLL_CODE,
-      code: req.body?.code,
+      code: given,
       name: req.body?.name,
-      os: req.body?.os,
-      executors: normalizeExecutors(req.body?.executors),
-      version: req.body?.version,
-      priorFailures: enrollFailures.get(ip) ?? 0,
+      priorFailures: prior,
+      fleetTokenFormat: isEnrollTokenFormat(given),
     });
-    enrollFailures.set(ip, verdict.failures);
 
-    if (verdict.decision !== 'accepted') {
-      // บันทึกไว้ล้วนๆ (ไม่มีรหัส) เผื่อเจ้าของจะเห็นว่ามีใครแอบลอง
-      console.warn(`POST /api/agent-machines/enroll ปฏิเสธ (${verdict.decision}) จาก ${ip}: ${verdict.reason}`);
-      // ตอบ 404 เมื่อปิดช่องทาง = ไม่บอกว่ามีช่องนี้อยู่จริง
-      const status = verdict.decision === 'disabled' ? 404 : verdict.decision === 'rate_limited' ? 429 : 400;
-      res.status(status).json({ error: verdict.reason, decision: verdict.decision });
+    // ไม่ตั้งรหัสเดิมและไม่ได้ส่งรหัสแบบ fleet = ปิดช่องทาง (ไม่บอกว่ามี endpoint)
+    if (attempt.action === 'disabled') {
+      console.warn(`POST /api/agent-machines/enroll ปฏิเสธ (disabled) จาก ${ip}`);
+      res.status(404).json({ error: attempt.reason, decision: 'disabled' });
       return;
     }
 
-    const name = sanitizeMachineName(String(req.body?.name ?? ''));
-    const created = await registerMachine({
-      name,
-      os: String(req.body?.os ?? 'windows'),
-      executors: normalizeExecutors(req.body?.executors),
-      version: String(req.body?.version ?? '') || undefined,
-      note: 'ลงทะเบียนเองผ่านรหัสเชิญ (POST /enroll)',
-    });
-    console.log(`ลงทะเบียนเครื่องใหม่ "${name}" (${created.machine.id}) จาก ${ip} — role เริ่มต้น USER`);
-    res.status(201).json({ id: created.machine.id, name: created.machine.name, token: created.token });
+    if (attempt.action === 'rate_limited') {
+      console.warn(`POST /api/agent-machines/enroll ปฏิเสธ (rate_limited) จาก ${ip}`);
+      res.status(429).json({ error: attempt.reason, decision: 'rate_limited' });
+      return;
+    }
+
+    // ชื่อเครื่องผิด = คำขอเสีย ไม่นับเป็นครั้งล้ม
+    if (attempt.action === 'bad_request') {
+      res.status(400).json({ error: attempt.reason, decision: 'bad_request' });
+      return;
+    }
+
+    if (attempt.action === 'bad_code') {
+      enrollFailures.set(ip, attempt.failures);
+      console.warn(`POST /api/agent-machines/enroll ปฏิเสธ (bad_code) จาก ${ip}`);
+      res.status(400).json({ error: attempt.reason, decision: 'bad_code' });
+      return;
+    }
+
+    const name = attempt.name;
+    if (!name) {
+      // defensive — decideEnrollAttempt ต้องคืนชื่อเมื่อ action เป็น legacy/fleet
+      res.status(400).json({ error: 'ไม่พบชื่อเครื่อง', decision: 'bad_request' });
+      return;
+    }
+
+    const acceptedBy = attempt.action;
+    let fleetTokenId: string | null = null;
+    let fleetLabel: string | null = null;
+
+    if (acceptedBy === 'fleet') {
+      const consumed = await consumeEnrollToken(given, { id: null, name });
+      if (!consumed.ok) {
+        enrollFailures.set(ip, prior + 1);
+        console.warn(`POST /api/agent-machines/enroll รหัสเชิญ fleet ใช้ไม่ได้ (${consumed.reason}) จาก ${ip}`);
+        res.status(400).json({ error: 'รหัสเชิญไม่ถูกต้อง', decision: 'bad_code' });
+        return;
+      }
+      fleetTokenId = consumed.tokenId;
+      fleetLabel = consumed.label;
+    }
+
+    enrollFailures.set(ip, 0);
+    const note =
+      acceptedBy === 'fleet'
+        ? `ลงทะเบียนเองผ่านรหัสเชิญองค์กร (${fleetLabel ?? 'fleet token'})`
+        : 'ลงทะเบียนเองผ่านรหัสเชิญ (POST /enroll)';
+
+    try {
+      const created = await registerMachine({
+        name,
+        os: String(req.body?.os ?? 'windows'),
+        executors: normalizeExecutors(req.body?.executors),
+        version: String(req.body?.version ?? '') || undefined,
+        note,
+      });
+      if (fleetTokenId) {
+        await markEnrollTokenMachine(fleetTokenId, created.machine.id, name).catch((err) => {
+          console.error('[fleet] mark enroll token machine failed:', err instanceof Error ? err.message : err);
+        });
+      }
+      console.log(
+        `ลงทะเบียนเครื่องใหม่ "${name}" (${created.machine.id}) จาก ${ip} — ${acceptedBy} · role เริ่มต้น USER`,
+      );
+      res.status(201).json({ id: created.machine.id, name: created.machine.name, token: created.token });
+    } catch (err) {
+      // คืนสิทธิ์การใช้รหัส ถ้าสร้างเครื่องไม่สำเร็จ — ไม่ให้ token ถูกเผาเปล่า
+      if (fleetTokenId) {
+        await releaseEnrollTokenUse(fleetTokenId).catch((releaseErr) => {
+          console.error('[fleet] release enroll token failed:', releaseErr instanceof Error ? releaseErr.message : releaseErr);
+        });
+      }
+      throw err;
+    }
   } catch (err) {
     console.error('POST /api/agent-machines/enroll error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to enroll machine' });
