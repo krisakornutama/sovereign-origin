@@ -9,6 +9,7 @@
 - Runtime: Ollama portable (pin `v0.40.6`) + Edge AI Gateway (Node built-ins, ไม่มี dependency ใหม่)
 - Profiles: `nano` (8 GB), `mini` (16 GB), `standard` (32 GB), `gpu` (8 GB+ VRAM)
 - Gateway: queue 2–4 concurrent, per-user limit, exact cache, single-flight, task routing, context trim
+- Thinking (`think`) ปิดโดยปริยายสำหรับ fast/main (qwen3 ที่มี thinking จะกิน token จน `response` ว่างเมื่อ `num_predict` น้อย) · deep เปิดไว้ · override ได้ด้วย `x-sovereign-think: 1`
 - ติดตั้ง: `sovereign-os\edge-ai\EDGE-AI-INSTALL.cmd`
 - pull โมเดลซ้ำ/เฉพาะที่ขาด: `EDGE-AI-PULL.cmd` (HTTP + retry, ไม่พึ่ง CLI)
 - เริ่ม/หยุด/วัดผล: `EDGE-AI-START.cmd`, `EDGE-AI-STOP.cmd`, `EDGE-AI-BENCH.cmd`
@@ -18,3 +19,6 @@
 ข้อจำกัดสำคัญ: โมเดล 8B/14B บน CPU 16 GB ใช้ได้แต่ไม่เร็วสำหรับ 2–5 คนพร้อมกัน
 profile `mini` จึงใช้ `qwen3:0.6b` เป็น fast (classify/routing) และ `gemma3:4b` เป็น main (chat/extract/JSON)
 ส่วน deep model เป็น opt-in; embed (`bge-m3`) เป็น optional และไม่ได้ pull ในค่าเริ่มต้น (ติดตั้งเริ่มต้น fast+main ~4 GB)
+
+วัดผลจริงบนเครื่องพัฒนา (Ryzen 7 7730U · CPU mode · 20/10/69): fast tier งานสั้น ~92 tok/s (ตอบใน ~2.3 วินาที)
+main tier ~8–10 tok/s · 2 ผู้ใช้พร้อมกันได้ ~8 tok/s ต่อคน — ตัวเลขดิบอยู่ที่ `sovereign-os/edge-ai/benchmarks/this-machine.json`

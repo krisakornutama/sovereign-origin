@@ -11,6 +11,8 @@ import {
   cacheKey,
   shouldCache,
   hasImage,
+  applyThinkingPolicy,
+  parseThinkHeader,
   ModelSelectionError
 } from '../lib/models.mjs';
 import { readConfig, validateConfig } from '../lib/config.mjs';
@@ -302,6 +304,11 @@ export function createGateway(config, deps = {}) {
     });
     const normalized = normalizeRequest({ endpoint: pathname, body, config });
     normalized.body.model = selection.model;
+    normalized.body = applyThinkingPolicy(normalized.body, {
+      endpoint: pathname,
+      tier: selection.tier,
+      requestedThink: parseThinkHeader(headerString(req.headers['x-sovereign-think']))
+    });
     const headers = edgeHeaders(selection, normalized.meta);
 
     const cacheable = shouldCache(normalized.body, pathname);
