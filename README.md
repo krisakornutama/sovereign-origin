@@ -17,7 +17,7 @@ tools\install\install.cmd
 node tools/install/install.mjs
 ```
 
-ตัวติดตั้งครั้งเดียวทำ **ทั้งโปรเจ็ก** ในเทิร์นเดียว: ตรวจ prerequisite → สร้าง env ทุกชั้น (`infra/.env`, `core-api/.env`, `frontend/.env`, `agent-runner/.env` — สุ่ม secret ให้ รันซ้ำไม่ทับค่าเดิม) → `docker compose up -d` → รอ healthy → ตรวจสุขภาพ API จริง → (ถ้า `--with-runner`) ลงทะเบียน scheduled task ของ agent runner แล้วตรวจสอบย้อนหลับด้วย `schtasks /Query` → พิมพ์ URL + รหัสล็อกอิน
+ตัวติดตั้งครั้งเดียวทำ **ทั้งโปรเจ็กต์** ในเทิร์นเดียว: ตรวจ prerequisite → สร้าง env ทุกชั้น (`infra/.env`, `core-api/.env`, `frontend/.env`, `agent-runner/.env` — สุ่ม secret ให้ รันซ้ำไม่ทับค่าเดิม) → `docker compose up -d` → รอ healthy → ตรวจสุขภาพ API จริง → (ถ้า `--with-runner`) ลงทะเบียน scheduled task ของ agent runner แล้วตรวจสอบย้อนหลับด้วย `schtasks /Query` → พิมพ์ URL + รหัสล็อกอิน
 
 ### Flags
 
