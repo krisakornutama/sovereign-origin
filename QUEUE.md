@@ -368,3 +368,26 @@
       (ไม่มีหน้าต่าง แต่ .bat อาจตายถ้าปิดแอปกลางทาง) ⇒ ถ้าต้องการครบ ให้ก๊อป `tools/hidden-launch.cjs`
       + `tools/run-hidden.vbs` เข้าแพ็กด้วย (แก้ `tools/build-desktop.mjs` — ยังไม่แตะรอบนี้)
 
+## J7 — Docker flap: watchdog ปลุก daemon แล้ว daemon ตายทันทีที่รอบจบ (เคสจริง 19/10/69) — ปิดแล้ว
+
+- [x] **J7a หลักฐาน** — `logs/docker-watchdog.jsonl`: `daemon-restart` 46 ครั้งในวันที่ 19/10
+      (44 ครั้งในช่วง ~1 ชม. เวลา 19:40–20:41 UTC) ทุกรอบรายงาน "daemon กลับมาใน 11–75 วิ"
+      แล้วตายอีกในรอบถัดไป ⇒ ชั่วโมงนั้น `sovereign-db` ถูก kill/start วน (วันปกติมี 1–5 ครั้ง)
+- [x] **J7b ต้นตอ** — `tools/docker-watchdog.mjs` ปลุก Docker Desktop ด้วย `spawn(exe, …, { windowsHide })`
+      เป็นลูกของ node · Task Scheduler ห่อแต่ละรอบด้วย **job object แบบ kill-on-close** ⇒ เมื่อรอบจบ
+      โปรเซสลูกทั้งหมด (รวม Docker Desktop ที่เพิ่งปลุก) ถูกปิดตาม · `detached`/`windowsHide` ไม่ช่วย
+      เพราะเป็นคนละกลไกกับ job (พิสูจน์กลไกแล้ว: sleeper ที่ explorer เปิด **รอด**หลังตัวเปิดจบ)
+- [x] **J7c ทางแก้** — ส่งต่อให้ `explorer.exe` เปิด Docker Desktop (โปรเซสของ session ผู้ใช้ อยู่นอก job)
+      · เป็น GUI ไม่มี console → ไม่มีหน้าต่างเด้ง · ถอยไปเปิดตรงเฉพาะเมื่อไม่มี explorer
+      · **ไม่ต้องลงทะเบียนงานใหม่** — task เดิมเรียกสคริปต์นี้ทุกนาทีอยู่แล้ว การแก้มีผลรอบถัดไป
+      (และไม่มีผลกับระบบตอน daemon ปกติ เพราะ path นี้ทำงานเฉพาะตอน daemon ดับ)
+- [x] **J7d flap guard** — `planRecovery()` (pure) + `logs/docker-watchdog.state.json`:
+      ปลุกเกิน 3 ครั้งใน 30 นาที = **หยุดปลุก** + แจ้ง Telegram ครั้งเดียวต่อชั่วโมง (กัน DB ตายวน + กันสแปม)
+      → มี action ใหม่ `flap-detected` (เดิมมี `containers-checked` / `daemon-restart`)
+- [x] **J7e เทสต์** — `tools/test/docker-watchdog-plan.test.mjs` 16/16 (flap guard · state เพี้ยน ·
+      ต้องเปิดผ่าน explorer · ของจริง: sleeper รอดหลังตัวเปิดจบ) · รันจริง 1 รอบได้
+      `{"action":"containers-checked","ok":true}` exit 0 · guard เดิม 42/42 ยังเขียว
+- [ ] **J7f ความไม่ตรงกันเล็ก ๆ:** งาน `Sovereign Docker Watch` ตั้งไว้ "ทุก 1 นาที" (โดย
+      `fix-window-flash.mjs`) แต่ `tools/register-docker-watch.ps1` เขียนว่า "ทุก 10 นาที" — ไม่กระทบ
+      พฤติกรรม (IgnoreNew กันซ้อนอยู่แล้ว) แต่ควรเลือกอย่างเดียวให้ตรงกันในรอบหน้า
+
