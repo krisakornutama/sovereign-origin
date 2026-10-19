@@ -51,6 +51,14 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'common.nav.group.remote',
     items: [
       {
+        href: '/fleet',
+        label: 'ศูนย์ควบคุมฝูงเครื่อง',
+        labelKey: 'common.nav.fleet',
+        icon: 'system',
+        keywords:
+          'fleet ฝูงเครื่อง ศูนย์ควบคุม เครื่องทั้งหมด สาขา site group channel rollout stable beta canary enrollment token compliance update',
+      },
+      {
         href: '/machine-console',
         label: 'คอนโซลเครื่อง',
         labelKey: 'common.nav.machineConsole',

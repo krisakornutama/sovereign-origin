@@ -34,6 +34,13 @@ export interface MachineRow {
   note?: string | null;
   /** อายุสัญญาณล่าสุดเป็นวินาที (คำนวณตอนอ่าน — null เมื่อเครื่องยังไม่เคย heartbeat) */
   stale_sec?: number | null;
+  // ── ฟิลด์ที่มีอยู่จริงในตาราง agent_machines (Prisma findMany คืนมาอยู่แล้ว) ──
+  // ประกาศไว้เพื่อให้ Fleet Control Plane อ่านได้โดยไม่ต้อง cast เป็น any
+  role?: string | null;
+  lan_confirmed_at?: Date | null;
+  owner_user_id?: string | null;
+  created_at?: Date | null;
+  updated_at?: Date | null;
 }
 
 export interface EnqueueInput {
@@ -108,6 +115,22 @@ export async function authenticateToken(token: string): Promise<MachineRow | nul
   const found = await prisma.agentMachine.findFirst({ where: { token_hash: hashToken(token) } });
   if (!found) return null;
   return found as unknown as MachineRow;
+}
+
+/**
+ * หมุน machine token — คืน token ใหม่ครั้งเดียว (เหมือนตอน register)
+ *
+ * ใช้เมื่อสงสัยว่า token รั่ว/เครื่องถูกก๊อป/ต้องการเพิกถอนเครื่องเก่าออกจากฝูง
+ * ผลข้างเคียง: token เดิมใช้ไม่ได้ทันที ⇒ เครื่องนั้นจะหลุดจาก HUB จนกว่าจะตั้งค่าใหม่
+ * (route ต้องเตือนผู้ใช้ก่อนเรียก และต้องบันทึก audit ทุกครั้ง)
+ */
+export async function rotateMachineToken(machineId: string): Promise<{ machine: MachineRow; token: string }> {
+  const token = generateToken();
+  const machine = await prisma.agentMachine.update({
+    where: { id: machineId },
+    data: { token_hash: hashToken(token) },
+  });
+  return { machine: machine as unknown as MachineRow, token };
 }
 
 /**

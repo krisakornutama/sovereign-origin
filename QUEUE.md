@@ -3,6 +3,19 @@
 เพิ่มงานด้านล่างได้โดยตรง (บรรทัดละ 1 งาน เริ่มด้วย `- [ ] `) หรือใช้คำสั่ง `/queue <งาน>`
 เมื่องานเสร็จ agent จะเปลี่ยนเป็น `- [x]` พร้อมหมายเหตุผลลัพธ์
 
+## Enterprise Fleet Control Plane v1 (19/10/69) — branch `ai/enterprise-fleet`
+
+- [x] File-backed fleet state (policy/enrollment tokens) ใต้ `core-api/data/fleet/` — ไม่มี migration
+- [x] ช่องทาง stable/beta/canary + rollout % แบบ deterministic ต่อ `(channel, machineId)`
+- [x] site/group/tags/channel override รายเครื่อง + compliance จาก heartbeat/version/LAN
+- [x] รหัสเชิญ `enr_...` แบบ hash-only, มีโควตา/วันหมดอายุ/เพิกถอน; รหัสเดิม `MACHINE_ENROLL_CODE` ยังใช้ได้
+- [x] หมุน machine token + audit ทุก mutation; แก้ `GET /api/agent-machines` ไม่ให้ส่ง `token_hash`
+- [x] ด่านอัปเดตทั้ง manifest และ asset (runner + desktop); node kit ยังสาธารณะ/stable
+- [x] หน้า `/fleet` + เมนู + i18n + เทสต์ policy/enrollment/UI wiring
+- [x] เอกสาร `docs/ENTERPRISE-READINESS.md` + `docs/modules/fleet.md`
+- [ ] หลัง Cold Soak: restart core-api + rebuild frontend แล้วทดสอบกับเครื่องจริง 1 เครื่อง
+- [ ] Phase 2 (หลัง Cold Soak): ย้าย state เข้า DB พร้อม migration/backfill
+
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์
   - ผ่าน `npm run verify` 4/4 + E2E 44/44

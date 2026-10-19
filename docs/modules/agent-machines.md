@@ -13,6 +13,11 @@ HUB กลางรับคำสั่งงานจากหน้าเว�
   ที่ประกาศไว้ใน `tools/boundary-baseline.json` แล้วเท่านั้น (เขียนตรง = arch-gate fail)
 - route ใหม่จะตอบ 404 จนกว่า `docker restart sovereign-core-api` — container mount `src` จาก MAIN
 - งานเสี่ยง (`awaiting_approval`) ห้ามปล่อยให้ runner ดึงไปทำเอง ไม่ว่ากรณีใด
+> **Fleet Control Plane (19/10/69):** `GET /update/manifest`, `GET /update/file`,
+> `GET /desktop-update/manifest`, `GET /desktop-update/asset` ผ่านด่านช่องทาง/rollout
+> (404 `rollout_hold` หรือ 403 `machine_disabled`) — ดู `docs/modules/fleet.md`
+> `GET /node-kits/manifest` และ `/node-kits/asset` ยังสาธารณะและระบุ `channel: "stable"`
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
