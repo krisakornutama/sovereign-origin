@@ -9,6 +9,7 @@
  */
 import { usePathname } from 'next/navigation';
 import { circadianClass } from '../../lib/useCircadian';
+import SectionTabs from './SectionTabs';
 
 export type PageTheme =
   | 'auto' | 'none' | 'circadian'
@@ -75,6 +76,7 @@ export default function PageHeader({
           {title}
         </h1>
         {subtitle && <p className="text-[13px] text-gray-400 mt-1.5 leading-relaxed max-w-2xl">{subtitle}</p>}
+        <SectionTabs />
       </div>
       {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
     </header>

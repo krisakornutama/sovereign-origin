@@ -316,3 +316,16 @@
       @BotFather (token ใหม่เข้ารหัสใน DB แล้ว)
 - [ ] **J4b export JSON สำรองข้อมูล** ก่อนเริ่มรอบพัฒนาใหม่
 - [ ] **J4c อัปโหลด template `Voltage 5V DC. in Thailand.png` กลับเข้า repo หรือไม่**
+
+## J5 — ปรับโครงเมนูให้กระชับ (คำสั่งเจ้าของ 19/10/69) — ✅ เสร็จแล้วบน branch
+
+- [x] **J5a ควบรวมเมนูเป็นศูนย์ (SECTIONS) + แท็บใน PageHeader** — `features/nav-consolidation`
+  - AI: `/predictive` `/governance-sim` `/learning` `/risk-monitor` `/property` `/alerts` `/knowledge` `/reports` → แท็บของ `/ai` (branch `ai/nav-consolidation`)
+  - ฟาร์ม: `/research/rice` → แท็บของ `/trace` · สุขภาพ: `/health/self-check` + `/mbti` → แท็บของ `/health`
+  - ระบบพื้นฐาน: `/energy` `/automation` `/relay` → แท็บของ `/infrastructure`
+  - ระบบ: `/system-health` `/alert-history` → แท็บของ `/system` · `/backup` `/change-password` → แท็บของ `/settings`
+  - Sidebar: ร้านอาหาร + คลัง&ลงทุน พับ/กางได้ จำสถานะใน `localStorage` (`sovereign:nav-open`)
+  - หน้าเดิม/ดีปลิงก์ไม่ถูกย้ายหรือลบ — `ALL_PAGES` ยังรวมแท็บทั้งหมดให้ CommandPalette ค้นเจอ
+  - เทสต์: `tools/test/nav-consolidation.test.mjs` 9/9 · `npm run verify` 6/6 (13.5 นาที)
+  - **ยังไม่เห็นบน :3000** เพราะ Cold Soak ห้าม rebuild/restart — จะขึ้นเมื่อ build frontend รอบถัดไป
+

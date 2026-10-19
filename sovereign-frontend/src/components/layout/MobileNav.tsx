@@ -9,7 +9,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { useHideInternalNav } from '../../lib/useHideInternalNav';
 import Icon from '../ui/Icon';
-import { NAV_GROUPS } from '../../lib/navigation';
+import { NAV_GROUPS, normalizeNavHref, sectionForPath } from '../../lib/navigation';
 import { themeClassForPath } from '../ui/PageHeader';
 import { useCircadianAtmo, atmoNavStyle } from '../../lib/useCircadian';
 
@@ -45,8 +45,12 @@ export default function MobileNav() {
   const visibleItems = ITEMS.filter(
     (item) => item.href === 'palette' || isSuperadmin || hasFeature(item.href)
   );
+  // อยู่แท็บลูกของศูนย์ไหน = ไฮไลต์เมนูแม่ (เช่น /predictive → /ai, /backup → /settings)
+  const section = sectionForPath(pathname || '/');
   const active = (href: string) =>
-    pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
+    pathname === href ||
+    (href !== '/dashboard' && pathname.startsWith(href + '/')) ||
+    Boolean(section && section.tabs.some((tab) => normalizeNavHref(tab.href) === normalizeNavHref(href)));
 
   // C4: แถบ fixed ทับเนื้อหาท้ายหน้า → ปุ่มโดนบังแล้วคลิกเจาะไปเมนูล่าง.
   // วัดความสูงตัวเองด้วย ResizeObserver (ครอบ wrap 2 แถว + safe-area) แล้ววาง spacer ใน flow —
