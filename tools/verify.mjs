@@ -12,6 +12,7 @@ import http from 'node:http';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, openSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeSystemTruth as writeTruthFile } from './verify-truth.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // โฟลเดอร์ที่ “deploy จริง” = รากโปรเจกตหลัก เสมอ (docker mount core-api จากที่นี่ ไม่ใช่จาก worktree)
@@ -63,10 +64,35 @@ if (RUN_E2E) {
   steps.push({ name: 'e2e: Playwright (headless)', cwd: FRONTEND, cmd: 'npm', args: ['run', 'e2e'], e2e: true });
 }
 
+const results = [];
+let truthWritten = false;
+
+// ── system-truth: เขียนผลเกตลง data/system-truth.json แม้เกตจะล้ม ──
+// เดิมเขียนเฉพาะเส้นทางที่จบสำเร็จ → คืนที่ tools test ล้มครั้งเดียว = ไม่มีไฟล์ใหม่
+// → nightly อ่าน lastGateOk = null ติดกัน 11 รอบ (5–18 ต.ค.) ทั้งที่ nightly ยังรันอยู่
+// เรียกจาก process.on('exit') → ครอบทุก process.exit(1) ในไฟล์นี้โดยไม่ต้องแก้ทีละจุด
+// ตรรกะการสร้าง/เขียนอยู่ใน verify-truth.mjs (มีเทสต์แยก: tools/test/verify-truth.test.mjs)
+function writeSystemTruth() {
+  if (truthWritten) return;
+  truthWritten = true;
+  try {
+    const data = writeTruthFile({
+      results,
+      truthPath: join(BACKEND, 'data', 'system-truth.json'),
+      // โฟลเดอร์ที่ deploy จริง (docker mount) — ไม่ใช่ dist ของ worktree (ดู MAIN_ROOT ด้านบน)
+      deployDist: join(DEPLOY_BACKEND, 'dist'),
+    });
+    console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${data.ok})`);
+  } catch (e) {
+    console.log(`ℹ️  เขียน system-truth ไม่สำเร็จ (${e.message?.slice(0, 80)}) — ไม่กระทบผลเกต`);
+  }
+}
+process.on('exit', writeSystemTruth);
+
 console.log('═══ Sovereign Quality Gate ═══');
 
 // Phase 0: Architecture Gate — ด่านแรกของทุกโหมด (fail fast ก่อนเสียเวลา build หลายนาที)
-// ตรวจ: schema-sync (postgres↔sqlite) · file-budget (เพดาน 800 บรรทัด/ไฟล์ที่เปลี่ยน)
+// ตรวจ: file-budget (เพดาน 800 บรรทัด/ไฟล์ที่เปลี่ยน)
 //       env-truth (DATABASE_URL ชี้ DB ที่ connect ได้จริง) · module-boundary (report-only)
 {
   const gate = spawnSync('node', [join(ROOT, 'arch-gate.mjs')], { windowsHide: true, cwd: ROOT, shell: false, stdio: 'inherit' });
@@ -145,7 +171,6 @@ if (RUN_E2E && !existsSync(join(FRONTEND, 'node_modules', '@playwright', 'test')
   process.exit(1);
 }
 
-const results = [];
 const t0 = Date.now();
 
 // e2e ต้องมี backend :3001 รันอยู่ (spec ชุดหลักยิง API จริง) — ถ้าลง → ข้ามพร้อมเตือน
@@ -380,31 +405,9 @@ const mins = ((Date.now() - t0) / 60000).toFixed(1);
 console.log(`\n✅ ผ่านครบ ${results.length}/${results.length} ขั้น (${mins} นาที) — พร้อม commit`);
 
 // ── Phase 1 (system-truth): เขียนผลเกตล่าสุดลง data/system-truth.json ──
-// หน้า /system-health อ่านผ่าน GET /api/health/truth — เห็นสถานะเกต + fingerprint ดิสก์ ณ รอบ verify ล่าสุด
-// (prod-truth เทียบดิสก์ ↔ runtime ให้แล้ว — disk.fingerprint ที่นี่จึงเป็นค่าที่ prod-truth ยืนยันแล้ว)
-// data/ เป็น mount ของ container อยู่แล้ว → backend อ่านถูกไฟล์เดียวกับที่ verify เขียน
-try {
-  const truthPath = join(BACKEND, 'data', 'system-truth.json');
-  let prodTruth = null;
-  try { prodTruth = JSON.parse(readFileSync(truthPath, 'utf8'))?.prodTruth ?? null; } catch { /* รอบแรกยังไม่มี */ }
-  let diskFp = null, diskFiles = null;
-  try {
-    const { computeDirFingerprintSync } = await import('./fingerprint-lib.mjs');
-    // โฟลเดอร์ที่ deploy จริง (docker mount) — ไม่ใช่ dist ของ worktree (ดู MAIN_ROOT ด้านบน)
-    const disk = computeDirFingerprintSync(join(DEPLOY_BACKEND, 'dist'));
-    diskFp = disk.fingerprint; diskFiles = disk.files;
-  } catch { /* dist ไม่มี = ไม่มีข้อมูลเทียบ */ }
-  writeFileSync(truthPath, JSON.stringify({
-    writtenAt: new Date().toISOString(),
-    ok: results.every((r) => r.ok),
-    steps: results.map((r) => ({ name: r.name, ok: r.ok, skipped: !!r.skipped })),
-    prodTruth: { diskFingerprint: diskFp, diskFiles, diskDir: 'sovereign-os/core-api/dist (deploy root)' },
-    _prevProdTruth: prodTruth,
-  }, null, 2) + '\n', 'utf8');
-  console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${results.every((r) => r.ok)})`);
-} catch (e) {
-  console.log(`ℹ️  เขียน system-truth ไม่สำเร็จ (${e.message?.slice(0, 80)}) — ไม่กระทบผลเกต`);
-}
+// ตัวเขียนอยู่ใน writeSystemTruth() ด้านบน และถูกเรียกซ้ำจาก process.on('exit')
+// จึงครอบทั้งเส้นทางสำเร็จและเส้นทาง process.exit(1) ทุกจุด
+writeSystemTruth();
 
 // ── กู้ dev server อัตโนมัติ: build ทับ .next แล้ว dev เดิมจะเสี่ยง chunk พัง ──
 // ห้าม kill จากใน process นี้ (taskkill /T อาจโดน tree ของ shell แม่)

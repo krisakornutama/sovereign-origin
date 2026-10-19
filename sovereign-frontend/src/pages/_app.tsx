@@ -21,7 +21,8 @@ import '../styles/globals.css';
 const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
 
 // หน้าสาธารณะ (ไม่ต้อง login) — ลูกค้าไม่ควรเห็นเมนู/แผงควบคุมภายในของระบบ
-const PUBLIC_PAGES = new Set(['/shop']);
+// 14/10/69: '/shop' ย้ายไปเว็บสาธารณะ (Sovereign-Web-Standalone) แล้ว — ไม่มีหน้า public ในแอปนี้
+const PUBLIC_PAGES = new Set<string>([]);
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const pathname = usePathname();
