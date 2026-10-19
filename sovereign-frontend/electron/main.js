@@ -14,6 +14,11 @@ const { downloadFile } = require('./download');
 const yt = require('./youtube');
 const { registerYouTubeIpc } = require('./youtube-ipc');
 
+// ตัวช่วยเปิดคำสั่งแบบไม่มีหน้าต่างเด้ง (ใช้ร่วมกับ autostart.mjs)
+// ห้าม throw ตอนโหลด: แพ็กที่ไม่ได้ก๊อปโฟลเดอร์ tools/ มาด้วยจะไม่มีไฟล์นี้ → ถอยไปใช้ cmd /c call แทน
+let hiddenLaunch = null;
+try { hiddenLaunch = require(path.join(__dirname, '..', '..', 'tools', 'hidden-launch.cjs')); } catch { /* ไม่มี tools/ */ }
+
 const DASHBOARD_URL = 'http://localhost:3000';
 const LAUNCHER_URL = 'http://localhost:4100';
 const API_URL = 'http://localhost:3001';
@@ -215,14 +220,29 @@ async function startSystem() {
     return { ok: false, message: 'Docker ยังไม่พร้อม — เปิด Docker Desktop รอจนขึ้น Running แล้วกดเริ่มระบบอีกครั้ง' };
   }
   try {
-    // cmd /d /c call — ปลอดภัยกับ path ที่มีเว้นวรรค ("E:\My work\...")
-    // (cmd start แบบฝัง quote และ PS Start-Process บน .bat เคยเงียบทั้งคู่ — call ผ่าน args array เชื่อถือได้)
-    // windowsHide → ไม่มีเทอร์มินัลแปล๊บเด้งมารบกวน (หน้าต่าง Frontend ยังโผล่จาก start ภายใน bat ตามดีไซน์เดิม)
-    const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'call', found.bat], {
-      cwd: found.cwd, detached: true, windowsHide: true, stdio: 'ignore',
+    // 20/10/69: ห้าม spawn .bat ตรง ๆ ด้วย { detached: true, windowsHide: true }
+    //   เจ้าของส่งภาพหน้าต่าง `powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri
+    //   http://localhost:3001/api/health …` เด้งขึ้นมาเองระหว่างเริ่มระบบ
+    //   เพราะ detached = ลูก "ไม่มี console" เลย ⇒ ทุกโปรเซส console ที่ .bat เรียกต่อ
+    //   (powershell ในลูป health check ทุก 3 วิ · docker info · npm run build) ต้องขอ console
+    //   ใหม่ของตัวเอง = หน้าต่างจริงเด้ง (windowsHide ซ่อนได้แค่ console ของลูกโดยตรง)
+    // ทางแก้: ให้ wscript (GUI host — ไม่มี console ของตัวเอง) รัน .bat ผ่าน tools/hidden-launch.cjs
+    //   → .bat ได้ console ของตัวเองแบบซ่อน ⇒ 0 หน้าต่าง และ .bat ยังทำงานจนจบแม้ปิดแอปไปแล้ว
+    //   (พิสูจน์บนเครื่องนี้: tools/test/hidden-launch.test.mjs + tools/window-flash-probe.ps1)
+    const plan = hiddenLaunch && hiddenLaunch.planHiddenLaunch({
+      rootDir: found.cwd,
+      cli: hiddenLaunch.buildHiddenCli({ file: found.bat }),
+      tag: 'sovereign-start-system',
     });
+    const child = plan
+      ? spawn(plan.file, plan.args, { cwd: found.cwd, detached: true, windowsHide: true, stdio: 'ignore' })
+      // ถอยเมื่อไม่มี tools/hidden-launch.cjs (แพ็กที่ไม่ก๊อป tools/): cmd /d /c call แบบ windowsHide
+      //   ห้ามใส่ detached ที่นี่ — detached = ลูกไม่มี console = ลูกของ .bat เด้งหน้าต่าง
+      : spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'call', found.bat], {
+          cwd: found.cwd, windowsHide: true, stdio: 'ignore',
+        });
     child.unref();
-    dlog('startSystem: launched', found.bat, 'engineSettled=true');
+    dlog('startSystem: launched', found.bat, plan ? 'via hidden launcher (wscript)' : 'directly (fallback, no tools/hidden-launch.cjs)', 'engineSettled=true');
     return { ok: true, message: 'กำลังเริ่มระบบ — รอ 1–2 นาที หน้านี้จะพาเข้า Dashboard เองเมื่อพร้อม' };
   } catch (e) {
     dlog('startSystem error:', e.message);

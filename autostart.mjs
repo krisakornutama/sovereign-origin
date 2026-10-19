@@ -10,6 +10,9 @@ import { existsSync, openSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
+// ตัวช่วยเปิดคำสั่งแบบไม่มีหน้าต่างเด้ง (ใช้ร่วมกับ sovereign-frontend/electron/main.js)
+// เป็น CJS — Node import จาก ESM ได้ตรง ๆ · ไฟล์อยู่ใน tools/ ของโปรเจ็กต์ (node kit ก๊อปมาด้วย)
+import hiddenLaunch from './tools/hidden-launch.cjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(ROOT, 'sovereign-frontend');
@@ -54,6 +57,25 @@ function waitFor(desc, pred, timeoutMs) {
 }
 
 function detachSpawn(file, args, cwd, logFile) {
+  // 20/10/69: เดิม spawn แบบ { detached: true, windowsHide: true } ตรง ๆ
+  //   ⇒ detached = ลูก "ไม่มี console" เลย ⇒ โปรเซส console ที่ลูกเรียกต่อ (worker ของ next dev,
+  //   npm, docker) ต้องขอ console ใหม่ของตัวเอง = หน้าต่างจริงเด้ง (พิสูจน์ด้วย probe:
+  //   จับได้หน้าต่าง `C:\Program Files\nodejs\node.exe` ตอน autostart ที่ไม่กดอะไรเลย)
+  //   ตอนนี้ส่งผ่าน wscript + tools/hidden-launch.cjs ⇒ ลูกได้ console ของตัวเองแบบซ่อน
+  //   · ไม่มีหน้าต่างเด้ง · ยังอยู่รอดหลัง autostart.mjs จบ (detached อยู่ที่ตัว wscript)
+  const plan = hiddenLaunch.planHiddenLaunch({
+    rootDir: ROOT,
+    cli: hiddenLaunch.buildHiddenCli({ file, args, logFile }),
+    tag: 'sovereign-autostart',
+  });
+  if (plan) {
+    const child = spawn(plan.file, plan.args, {
+      cwd, detached: true, windowsHide: true, stdio: 'ignore',
+    });
+    child.unref();
+    return child;
+  }
+  // ถอย (คำสั่งมีอักขระนอก ASCII / เขียนไฟล์ชั่วคราวไม่ได้): วิธีเดิม พร้อม log เหมือนเดิม
   // child หลุดจาก parent — อยู่รอดแม้ autostart.mjs จบ
   const out = logFile ? openSync(logFile, 'a') : 'ignore';
   const child = spawn(file, args, {
