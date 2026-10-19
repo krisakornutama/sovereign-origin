@@ -342,3 +342,29 @@
   - เทสต์: `tools/test/nav-consolidation.test.mjs` 9/9 · `npm run verify` 6/6 (13.5 นาที)
   - **ยังไม่เห็นบน :3000** เพราะ Cold Soak ห้าม rebuild/restart — จะขึ้นเมื่อ build frontend รอบถัดไป
 
+## J6 — หน้าต่าง PowerShell/cmd เด้งเอง (เคสจริง 20/10/69) — ปิดแล้ว
+
+- [x] **J6a หาต้นตอ** — เจ้าของส่งภาพหน้าต่าง
+      `powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://localhost:3001/api/health …`
+      เด้งขึ้นมาเอง ⇒ `sovereign-frontend/electron/main.js` เปิด `start-sovereign.bat` ด้วย
+      `spawn(cmd, …, { detached: true, windowsHide: true })`
+      · detached = ลูก "ไม่มี console" เลย ⇒ ทุกโปรเซส console ที่ .bat เรียกต่อ (powershell ในลูป health check
+      ทุก 3 วิ · docker info · npm run build) ต้องขอ console ใหม่ของตัวเอง = หน้าต่างจริงเด้ง
+      (windowsHide ซ่อนได้แค่ console ของ "ลูกโดยตรง" เท่านั้น)
+- [x] **J6b พิสูจน์ด้วยเครื่องมือ ไม่ใช่คำอธิบาย** — `tools/window-flash-probe.ps1` นับเฉพาะหน้าต่างที่
+      "มองเห็นได้จริง" (class ConsoleWindowClass) ⇒ detached+windowsHide จับได้ `powershell …` + `docker info`
+      · ส่งผ่าน wscript + `tools/run-hidden.vbs` = 0 หน้าต่าง และ .bat ทำงานจนจบแม้ปิดตัวเปิดไปแล้ว
+- [x] **J6c ทางแก้** — ตัวช่วยกลาง `tools/hidden-launch.cjs` (wscript = GUI host ไม่มี console → ให้ .bat
+      มี console ของตัวเองแบบซ่อน · มี VBS สำรองเมื่อแพ็กไม่มี tools/ · ปฏิเสธคำสั่งที่มีอักขระไทย เพราะ .cmd
+      อ่านด้วย codepage ของ console แล้วพังทั้งไฟล์) ใช้ทั้ง `electron/main.js` และ `autostart.mjs`
+      — เดิม autostart ก็เด้ง: probe จับได้หน้าต่าง `C:\Program Files\nodejs\node.exe` ตอน login
+- [x] **J6d เทสต์ล็อก** — `tools/test/hidden-launch.test.mjs` 10/10 (รวมเทสต์จริง ~9 วิ: probe ต้องได้ 0 หน้าต่าง
+      + .bat ต้องจบแม้ตัวเปิดออกไปก่อน) และกฎทั้งโปรเจ็กต์ใน `tools/test/windows-hide-guard.test.mjs`
+      (detached+windowsHide ต้องมีเหตุผลในรายการยกเว้น · ห้ามใช้กับ shell เด็ดขาด)
+- [ ] **J6e สแตก edge-AI / agent-runner ยังใช้ detached+windowsHide แบบลูกโดยตรง (node/ollama)** — อยู่ใน
+      รายการยกเว้นพร้อมเหตุผล "ยังไม่ได้พิสูจน์กับหน้าต่างจริง" (สแตกปิดอยู่ตอนตรวจ) ⇒ รอบหน้าที่เปิด edge-AI
+      ให้รัน `tools/window-flash-probe.ps1` ระหว่าง `start.mjs` ถ้าเห็นหน้าต่างให้ย้ายมาใช้ hidden-launch.cjs
+- [ ] **J6f แพ็ก desktop ที่ไม่มีโฟลเดอร์ tools/** — ตอนนี้ถอยไปใช้ `cmd /d /c call` แบบ windowsHide
+      (ไม่มีหน้าต่าง แต่ .bat อาจตายถ้าปิดแอปกลางทาง) ⇒ ถ้าต้องการครบ ให้ก๊อป `tools/hidden-launch.cjs`
+      + `tools/run-hidden.vbs` เข้าแพ็กด้วย (แก้ `tools/build-desktop.mjs` — ยังไม่แตะรอบนี้)
+

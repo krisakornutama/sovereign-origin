@@ -101,6 +101,10 @@ tools/*
 !tools/run-hidden.vbs
 !tools/set-tasks-hidden.ps1
 !tools/hidden-tasks/
+# 20/10/69: ตัวช่วยเปิดคำสั่งแบบไม่มีหน้าต่างเด้ง (wscript + run-hidden.vbs) และ probe นับหน้าต่าง
+# ที่เทสต์อ้างถึง — ต้อง track ไม่งั้น arch-gate (tool-files-tracked) ฟ้องว่าเครื่องมือหายจาก git
+!tools/hidden-launch.cjs
+!tools/window-flash-probe.ps1
 !tools/build-desktop.mjs
 !tools/desktop-app-running.mjs
 !tools/find-shadow-installs.mjs
