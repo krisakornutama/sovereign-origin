@@ -10,6 +10,7 @@ import { spawnSync, execSync } from 'node:child_process';
 import { writeFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeJsonWithChecksum } from './json-checksum.mjs';
 
 // REPO = root ของ repo (ไฟล์อยู่ tools/ → ต้องขึ้น 2 ชั้น: ไฟล์ → tools → root)
 // (บั๊กจริงรอบแรก: ขึ้นชั้นเดียว → REPO=tools → log หลุดไป tools/logs และไม่เรียก report)
@@ -208,7 +209,9 @@ try {
   hist = Array.isArray(hist) ? hist.filter((e) => e.day !== day) : [];
   hist.push(entry);
   while (hist.length > 30) hist.shift(); // เก็บ 30 วันล่าสุด
-  writeFileSync(histPath, JSON.stringify(hist, null, 2) + '\n');
+  // ต้องอัปเดต sidecar .sha256 ด้วย ไม่งั้น data-integrity (สแกนทุก boot/สัปดาห์)
+  // จะตีว่า checksum ไม่ตรง = BIT_ROT แล้ว quarantine สำเนาทุกครั้ง (เจอจริง 276 ไฟล์)
+  writeJsonWithChecksum(histPath, hist);
 } catch { /* soft-fail — history พังไม่กระทบ nightly */ }
 try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 

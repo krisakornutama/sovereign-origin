@@ -109,6 +109,8 @@ tools/*
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
 !tools/verify.mjs
+# helper เขียน JSON + sidecar .sha256 (verify/nightly/ops-status อ้าง) — ต้อง track ด้วยเหตุผลเดียวกับ verify.mjs
+!tools/json-checksum.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
 !tools/indexnow-shop-notify.mjs

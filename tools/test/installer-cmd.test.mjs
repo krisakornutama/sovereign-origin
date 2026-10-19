@@ -207,9 +207,11 @@ describe('เทสต์รวม — รันไฟล์จริงแบ�
       // pause ไม่มีคนกด → cmd คืนค่า 0 แต่ stdout ต้องบอกว่า DRY RUN จบ
       out = String(err.stdout ?? '') + String(err.stderr ?? '');
     }
+    // -DryRun ต้องไม่แตะเครือข่าย: HUB ไม่ตอบก็ต้องจบแบบ deterministic
+    // (ก่อนหน้านี้เทสต์นี้พึ่ง LAN/HUB จริง -> nightly แดงทั้งคืนเมื่อ :3000 ไม่ตอบ)
     assert.match(
       out,
-      /DRY RUN จบ|ไม่ได้แก้อะไร|Run as administrator/,
+      /DRY RUN complete|DRY RUN จบ|ไม่ได้แก้อะไร|Run as administrator/,
       `ผลลัพธ์ไม่คาดหวัง:\n${out.slice(0, 900)}`,
     );
     assert.ok(!/รันซ้ำหนึ่งครั้งหลังติดตั้ง Node\.js/.test(out), 'ไม่ควรไปติดตั้ง Node ซ้ำ');
