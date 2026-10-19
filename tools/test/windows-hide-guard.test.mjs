@@ -203,3 +203,154 @@ describe('ผลจริงบนเครื่องนี้ (กันแ�
     assert.fail(`offsite ถูกแจ้งวิกฤต แต่ offsiteAgeH = ${json.info?.offsiteAgeH}: ${offsite.message}`);
   });
 });
+
+// ═════════════════════════════════════════════════════════════
+//  detached:true + windowsHide ทั้งโปรเจ็กต์ (เคสจริง 20/10/69)
+// ═════════════════════════════════════════════════════════════
+//
+// เจ้าของส่งภาพหน้าต่างนี้มาเองระหว่างเริ่มระบบ:
+//   `powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri http://localhost:3001/api/health …`
+//
+// ต้นตอ: sovereign-frontend/electron/main.js เปิด start-sovereign.bat ด้วย
+//   spawn(cmd, ['/d','/c','call', bat], { detached: true, windowsHide: true, stdio: 'ignore' })
+//   · detached = ลูก "ไม่มี console" เลย
+//   · windowsHide ซ่อนได้แค่ console ของลูกโดยตรง (ไม่มีผลกับหลาน)
+//   ⇒ ทุกโปรเซส console ที่ .bat เรียกต่อ (powershell ในลูป health check ทุก 3 วิ ·
+//     docker info · npm run build) ต้องขอ console ใหม่ของตัวเอง = หน้าต่างจริงเด้งขึ้นมา
+//
+// พิสูจน์บนเครื่องนี้ (tools/window-flash-probe.ps1 นับเฉพาะหน้าต่างที่มองเห็นได้จริง):
+//   · detached + windowsHide        → จับได้ `powershell …` และ `docker info`
+//   · wscript + run-hidden.vbs      → 0 หน้าต่าง และ .bat ทำงานจนจบแม้ตัวเปิดจบไปก่อน
+//   (สคริปต์ทดลองเต็มชุด: .freebuff/flashlab · เทสต์ของตัวช่วย: tools/test/hidden-launch.test.mjs)
+//
+// กติกา: จุดที่ยังใช้ detached+windowsHide ต้องมีเหตุผลในรายการ ALLOWED_DETACHED_HIDE
+//   และ "ห้าม" เป็นการเปิด shell (cmd/.bat/powershell) เด็ดขาด → ใช้ tools/hidden-launch.cjs
+
+const SCAN_LANGS = ['*.mjs', '*.js', '*.cjs'];
+const isCommentLine = (l) => /^\s*(\/\/|\*|\/\*)/.test(l);
+
+/** ทุกบรรทัดที่เป็นโค้ด `detached: true` และมี windowsHide อยู่ในบริเวณเดียวกัน (±4 บรรทัด) */
+function scanDetachedHide() {
+  const files = SCAN_LANGS
+    .flatMap((g) => execFileSync('git', ['ls-files', g], { cwd: REPO, encoding: 'utf8' }).split('\n'))
+    .map((s) => s.trim())
+    .filter(Boolean)
+    // tools/test/** ไม่สแกน: ข้างในมีสตริง/ชื่อเทสต์ที่พูดถึงรูปแบบนี้เอง
+    // (ตัวเทสต์จริงที่พิสูจน์หน้าต่างอยู่ที่ tools/test/hidden-launch.test.mjs — เข้มกว่ากฎนี้)
+    .filter((f) => !f.startsWith('tools/test/'));
+  const hits = [];
+  for (const rel of files) {
+    const lines = fs.readFileSync(path.join(REPO, rel), 'utf8').split('\n');
+    lines.forEach((l, i) => {
+      if (isCommentLine(l) || !/detached:\s*true/.test(l)) return;
+      const around = lines.slice(Math.max(0, i - 4), i + 5).join('\n');
+      if (!/windowsHide/.test(around)) return;
+      const callLine = lines.slice(Math.max(0, i - 6), i + 1).reverse().find((x) => /(spawn|spawnSync|exec|execFile)\w*\s*\(/.test(x)) || '';
+      hits.push({ file: rel, line: i + 1, code: l.trim(), call: callLine.trim() });
+    });
+  }
+  return hits;
+}
+
+/**
+ * จุดที่ยกเว้นได้ — ต้องเขียนเหตุผลทุกครั้ง (ห้ามเพิ่มโดยไม่มีหลักฐาน)
+ * match = ข้อความในบรรทัดนั้น (ต้องตรงจริงในไฟล์ ไม่งั้นเทสต์จะฟ้องว่าเป็นรายการค้าง)
+ */
+const ALLOWED_DETACHED_HIDE = [
+  {
+    file: 'sovereign-frontend/electron/main.js',
+    match: 'spawn(exe, [], { detached: true, windowsHide: true',
+    why: 'Docker Desktop เป็นโปรแกรม GUI — ไม่มี console ให้เด้งตั้งแต่แรก และต้อง detached เพื่อให้รอดหลังปิดแอป',
+  },
+  {
+    file: 'sovereign-frontend/electron/main.js',
+    match: 'spawn(plan.file, plan.args',
+    why: 'wscript.exe เป็น GUI host (ไม่มี console) — ตัว .bat ถูกซ่อนโดย tools/hidden-launch.cjs แล้ว '
+      + '· พิสูจน์ด้วยเทสต์จริงใน tools/test/hidden-launch.test.mjs (0 หน้าต่าง) และต้อง detached เพื่อให้ .bat ทำงานต่อแม้ปิดแอป',
+  },
+  {
+    file: 'autostart.mjs',
+    match: 'spawn(plan.file, plan.args',
+    why: 'เหมือน electron: เปิดผ่าน wscript + hidden-launch.cjs · detached จำเป็นเพราะ autostart จบแล้วลูกต้องอยู่ต่อ',
+  },
+  {
+    file: 'autostart.mjs',
+    match: 'spawn(file, args, {',
+    why: 'ทางถอยของ detachSpawn — ใช้เฉพาะเมื่อ planHiddenLaunch คืน null (คำสั่งมีอักขระนอก ASCII) '
+      + '· ยังต้อง detached เพราะลูกต้องอยู่รอดหลัง autostart จบ (ยอมรับความเสี่ยงหน้าต่างเด้งเฉพาะกรณีนั้น)',
+  },
+  {
+    file: 'sovereign-os/agent-runner/src/selfUpdate.mjs',
+    match: 'detached: true',
+    why: 'spawn node.exe ตรง ๆ (ลูกโดยตรง ไม่ใช่ shell) + stdio ignore — พิสูจน์แบบ lab C: ไม่มีหน้าต่าง '
+      + '· ยังไม่ย้ายมาใช้ hidden-launch.cjs เพราะเส้น self-update ทดสอบยาก (ถ้าเห็นเด้งให้ย้าย)',
+  },
+  {
+    file: 'sovereign-os/edge-ai/lib/process.mjs',
+    match: 'detached: true',
+    why: 'spawn exe ของ Ollama ตรง ๆ (ลูกโดยตรง ไม่ใช่ shell) + stdio เป็นไฟล์ log · ยังไม่ได้พิสูจน์กับหน้าต่างจริง '
+      + '(สแตก edge-AI ปิดอยู่ตอนตรวจ) — ถ้าเห็นหน้าต่างเด้งให้ย้ายมาใช้ hidden-launch.cjs',
+  },
+  {
+    file: 'sovereign-os/edge-ai/scripts/install.mjs',
+    match: 'detached: true',
+    why: 'เหมือน lib/process.mjs — เปิด exe ตรง ๆ ไม่ผ่าน shell · ยังไม่ได้พิสูจน์ (สแตกปิดอยู่)',
+  },
+];
+
+const SHELL_HINT = /ComSpec|['"]cmd(\.exe)?['"]|cmd\.exe|powershell|pwsh|\bbash\b|\.bat\b|\.cmd\b|\bnpm\b/i;
+
+describe('detached:true + windowsHide ทั้งโปรเจ็กต์ (เคสจริง 20/10/69)', () => {
+  test('มีไฟล์ให้สแกนจริง (กันเทสต์ผ่านมั่วตอน clone สด)', () => {
+    const files = SCAN_LANGS.flatMap((g) => execFileSync('git', ['ls-files', g], { cwd: REPO, encoding: 'utf8' }).split('\n')).filter(Boolean);
+    assert.ok(files.length > 20, `สแกนได้แค่ ${files.length} ไฟล์ — น่าจะเรียก git ผิด`);
+  });
+
+  test('ทุกจุดต้องมีเหตุผลในรายการยกเว้น (เพิ่มใหม่ = เทสต์แดง จนกว่าจะเขียนเหตุผล)', () => {
+    const hits = scanDetachedHide();
+    const bad = hits.filter(
+      (h) => !ALLOWED_DETACHED_HIDE.some((a) => a.file === h.file && (h.code.includes(a.match) || h.call.includes(a.match))),
+    );
+    assert.deepEqual(
+      bad.map((h) => `${h.file}:${h.line}: ${h.code.slice(0, 110)}`),
+      [],
+      'เจอ detached:true + windowsHide ที่ไม่มีเหตุผลกำกับ — หน้าต่าง console จะเด้งขึ้นมาเอง:\n  ',
+    );
+  });
+
+  test('ห้ามใช้ detached+windowsHide กับการเปิด shell (cmd/.bat/powershell/npm) เด็ดขาด', () => {
+    const bad = [];
+    for (const h of scanDetachedHide()) {
+      if (!SHELL_HINT.test(h.call)) continue;
+      // ยกเว้นเฉพาะจุดที่พิสูจน์แล้วว่าเป็น GUI host หรือมีเทสต์จริงคุม
+      const provenGuiHost = ALLOWED_DETACHED_HIDE.some(
+        (a) =>
+          a.file === h.file &&
+          a.match.startsWith('spawn(plan.file') &&
+          (h.code.includes(a.match) || h.call.includes(a.match)),
+      );
+      if (provenGuiHost) continue; // wscript = GUI host (พิสูจน์ด้วยเทสต์จริงใน hidden-launch.test.mjs)
+      bad.push(`${h.file}:${h.line}: ${h.call.slice(0, 110)}`);
+    }
+    assert.deepEqual(
+      bad,
+      [],
+      'shell ที่ถูกเปิดแบบ detached จะไม่มี console ⇒ ลูกของมัน (powershell/docker/npm) เด้งหน้าต่าง:\n  ',
+    );
+  });
+
+  test('รายการยกเว้นต้องไม่ค้าง (ต้องยังมีบรรทัดนั้นจริงในไฟล์)', () => {
+    for (const a of ALLOWED_DETACHED_HIDE) {
+      const text = fs.readFileSync(path.join(REPO, a.file), 'utf8');
+      assert.ok(text.includes(a.match), `${a.file}: รายการยกเว้น "${a.match}" หาไม่เจอแล้ว — ลบรายการที่ค้างออก`);
+      assert.ok(a.why && a.why.length > 20, `${a.file}: ต้องเขียนเหตุผลให้คนอื่นอ่านรู้เรื่อง`);
+    }
+  });
+
+  test('ตัวเปิด .bat ต้องผ่าน tools/hidden-launch.cjs (ไม่ spawn shell เอง)', () => {
+    for (const f of ['sovereign-frontend/electron/main.js', 'autostart.mjs']) {
+      const text = fs.readFileSync(path.join(REPO, f), 'utf8');
+      assert.match(text, /hidden-launch\.cjs/, `${f}: ต้องใช้ tools/hidden-launch.cjs ในการเปิด .bat แบบไม่มีหน้าต่าง`);
+    }
+  });
+});
