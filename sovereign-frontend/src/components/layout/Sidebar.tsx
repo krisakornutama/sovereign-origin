@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/router';
 import { authFetch } from '../../lib/apiFetch';
-import { NAV_GROUPS } from '../../lib/navigation';
+import { NAV_GROUPS, normalizeNavHref, sectionForPath, type NavItem } from '../../lib/navigation';
 import { useFeatureStore } from '../../stores/useFeatureStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useHideInternalNav } from '../../lib/useHideInternalNav';
@@ -16,6 +16,9 @@ import { useLanguageStore } from '../../stores/useLanguageStore';
 // sidebar เป็น scroll container ของตัวเอง และหน้า (Pages Router) remount ใหม่ทุกครั้งที่สลับ
 // → scrollTop หายเป็น 0 ทุกครั้ง จำไว้ระดับ module (module อยู่ข้ามการสลับหน้า) แล้วคืนให้ตอน mount
 let savedSidebarScrollTop: number | null = null;
+
+// สถานะพับ/กางเมนูลูก (ร้านอาหาร · การลงทุน) — จำข้ามหน้า/รีเฟรช
+const NAV_OPEN_KEY = 'sovereign:nav-open';
 
 /**
  * 14/10/69 — กู้ "เปลี่ยนหน้าแล้วต้องขึ้นบนสุด"
@@ -57,6 +60,8 @@ export default function Sidebar() {
   const hideInternalNav = useHideInternalNav();
   // โมดูลที่เปิดใช้งาน (จาก GET /api/modules) — fetch ไม่สำเร็จ = แสดงทุกเมนู
   const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
+  // เมนูที่ผู้ใช้พับไว้ (คีย์ = href ของเมนูแม่)
+  const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +84,35 @@ export default function Sidebar() {
   useEffect(() => {
     if (user && !isSuperadmin) loadFeatures();
   }, [user, isSuperadmin, loadFeatures]);
+
+  // อ่านสถานะพับที่จำไว้ (หลัง hydration เท่านั้น — กัน markup ฝั่ง server ไม่ตรง client)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(NAV_OPEN_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') setOpenItems(parsed);
+    } catch {
+      // ข้อมูลเสีย — ใช้ค่าเริ่มต้น (กางเมื่ออยู่ใต้เมนูนั้น)
+    }
+  }, []);
+
+  // อยู่ใต้เมนูไหน = กางเมนูนั้นให้เห็นตำแหน่งปัจจุบันเสมอ
+  useEffect(() => {
+    setOpenItems((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const item of NAV_GROUPS.flatMap((g) => g.items)) {
+        if (!item.collapsible || !item.children?.length) continue;
+        const base = normalizeNavHref(item.href);
+        if ((pathname === base || pathname.startsWith(base + '/')) && next[item.href] !== true) {
+          next[item.href] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [pathname]);
 
   // บันทึกตำแหน่ง scroll ของ sidebar ก่อนเปลี่ยนหน้า (คลิกเมนู / Command Palette / Back)
   useEffect(() => {
@@ -123,8 +157,65 @@ export default function Sidebar() {
 
   // หน้าปัจจุบัน (มี hash ด้วย) — ใช้เป็น active state สำหรับ sub-view
   const asPath = router.asPath || pathname;
+  const section = sectionForPath(pathname);
+  // อยู่แท็บลูกของศูนย์ไหน = ไฮไลต์เมนูแม่ของศูนย์นั้น (เช่น /predictive → /ai)
+  const sectionHas = (href: string) =>
+    Boolean(section && section.tabs.some((tab) => normalizeNavHref(tab.href) === normalizeNavHref(href)));
+  const itemActive = (href: string) => {
+    const base = normalizeNavHref(href);
+    return base === normalizeNavHref(pathname) || (base !== '/dashboard' && pathname.startsWith(base + '/')) || sectionHas(base);
+  };
+  const childActive = (href: string) => {
+    const [base, hash] = href.split('#');
+    return pathname === base && (hash ? asPath.includes('#' + hash) : true);
+  };
+  const itemOpen = (item: NavItem) => {
+    if (!item.collapsible) return true;
+    const persisted = openItems[item.href];
+    if (typeof persisted === 'boolean') return persisted;
+    const base = normalizeNavHref(item.href);
+    return pathname === base || pathname.startsWith(base + '/');
+  };
+  const toggleItem = (item: NavItem) => {
+    const nextOpen = !itemOpen(item);
+    setOpenItems((prev) => {
+      const next = { ...prev, [item.href]: nextOpen };
+      try {
+        localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(next));
+      } catch {
+        // โหมดส่วนตัว/พื้นที่เต็ม — ยังพับได้ในรอบนี้
+      }
+      return next;
+    });
+  };
 
   if (hideInternalNav) return null;
+
+  const linkClass = (active: boolean, extra = '') =>
+    `flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all duration-150 ${extra} ${
+      active
+        ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shadow-[0_0_14px_rgba(52,211,153,0.15)]'
+        : 'text-gray-400 hover:bg-gray-800/70 hover:text-gray-200 border border-transparent'
+    }`;
+
+  const primaryLink = (item: NavItem, active: boolean, extra = '') => (
+    <Link href={item.href} scroll={false} className={linkClass(active, extra)}>
+      <Icon name={item.icon} size={15} className={active ? 'glow-text' : 'opacity-70'} />
+      <span className="truncate">{t(item.labelKey, item.label)}</span>
+      <span className="ml-auto flex items-center gap-1.5">
+        {item.href === '/governance-sim' && (
+          <span
+            title={t('common.simNoCard', 'Governance SIM — ไม่พบซิมการ์ด')}
+            className="text-[9px] font-bold px-1 py-px rounded bg-red-950/60 border border-red-800/70 text-red-400 glow-text-red"
+          >
+            X
+          </span>
+        )}
+        <span className={`w-1.5 h-1.5 rounded-full pulse-soft ${active ? 'bg-emerald-400 glow-dot' : 'bg-emerald-400/40'}`} />
+        {active && <span className="w-1 h-3.5 rounded-full bg-emerald-400/80" />}
+      </span>
+    </Link>
+  );
 
   return (
     <aside ref={asideRef} className="w-60 shrink-0 bg-gray-900/60 border-r border-gray-800 p-3 space-y-5 hidden md:flex flex-col overflow-y-auto h-screen sticky top-0">
@@ -155,37 +246,28 @@ export default function Sidebar() {
         <nav key={group.title} className="space-y-0.5">
           <div className="eyebrow px-2 mb-1.5">{t(group.titleKey, group.title)}</div>
           {group.items.map((item) => {
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
-            const childActive = (href: string) => {
-              const [base, hash] = href.split('#');
-              return pathname === base && (hash ? asPath.includes('#' + hash) : true);
-            };
+            const active = itemActive(item.href);
+            const open = itemOpen(item);
+            const hasChildren = Boolean(item.collapsible && item.children && item.children.length > 0);
             return (
               <div key={item.href} className="space-y-0.5">
-                <Link
-                  href={item.href} scroll={false}
-                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all duration-150 ${
-                    active
-                      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 shadow-[0_0_14px_rgba(52,211,153,0.15)]'
-                      : 'text-gray-400 hover:bg-gray-800/70 hover:text-gray-200 border border-transparent'
-                  }`}
-                >
-                  <Icon name={item.icon} size={15} className={active ? 'glow-text' : 'opacity-70'} />
-                  <span className="truncate">{t(item.labelKey, item.label)}</span>
-                  <span className="ml-auto flex items-center gap-1.5">
-                    {item.href === '/governance-sim' && (
-                      <span
-                        title={t('common.simNoCard', 'Governance SIM — ไม่พบซิมการ์ด')}
-                        className="text-[9px] font-bold px-1 py-px rounded bg-red-950/60 border border-red-800/70 text-red-400 glow-text-red"
-                      >
-                        X
-                      </span>
-                    )}
-                    <span className={`w-1.5 h-1.5 rounded-full pulse-soft ${active ? 'bg-emerald-400 glow-dot' : 'bg-emerald-400/40'}`} />
-                    {active && <span className="w-1 h-3.5 rounded-full bg-emerald-400/80" />}
-                  </span>
-                </Link>
-                {item.children && item.children.length > 0 && (
+                {hasChildren ? (
+                  <div className="flex items-center gap-0.5">
+                    {primaryLink(item, active, 'flex-1 min-w-0')}
+                    <button
+                      type="button"
+                      onClick={() => toggleItem(item)}
+                      aria-expanded={open}
+                      aria-label={t('common.navToggle', open ? 'พับเมนู' : 'กางเมนู')}
+                      className="shrink-0 p-1 rounded-md text-gray-500 hover:text-gray-200 hover:bg-gray-800/70 transition-colors"
+                    >
+                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={13} />
+                    </button>
+                  </div>
+                ) : (
+                  primaryLink(item, active)
+                )}
+                {item.children && item.children.length > 0 && (!item.collapsible || open) && (
                   <div className="ml-4 pl-2.5 border-l border-gray-800/80 space-y-0.5">
                     {item.children.map((child) => {
                       const isChildActive = childActive(child.href);
