@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "timestamp": "2026-10-19T11:54:01.893Z",
-  "target": "http://127.0.0.1:11438",
+  "timestamp": "2026-10-19T20:17:34.737Z",
+  "target": "http://127.0.0.1:11434",
   "profile": "mini",
   "hardware": {
     "platform": "win32",
@@ -10,8 +10,8 @@
     "physicalCores": 8,
     "logicalCores": 16,
     "ramGB": 13.8,
-    "freeRamGB": 1.8,
-    "freeDiskGB": 68.6,
+    "freeRamGB": 1,
+    "freeDiskGB": 69.2,
     "gpu": [
       {
         "name": "AMD Radeon (TM) Graphics",
@@ -21,7 +21,7 @@
         "sharedMemory": true
       }
     ],
-    "detectedAt": "2026-10-19T11:54:01.892Z",
+    "detectedAt": "2026-10-19T20:17:34.736Z",
     "recommendedProfile": "mini",
     "notes": [
       "Integrated GPU shares system RAM; this pack defaults to CPU inference for stable multi-user latency."
@@ -29,7 +29,7 @@
   },
   "runtime": {
     "ollamaHost": "127.0.0.1",
-    "ollamaPort": 11437,
+    "ollamaPort": 11435,
     "numParallel": 2,
     "maxLoadedModels": 2,
     "contextLength": 4096,
@@ -42,7 +42,7 @@
     "maxQueue": 24
   },
   "models": {
-    "fast": "gemma3:4b",
+    "fast": "qwen3:0.6b",
     "main": "gemma3:4b",
     "deep": "qwen3:8b",
     "embed": "bge-m3",
@@ -55,14 +55,14 @@
       "model": "gemma3:4b",
       "tier": "main",
       "cache": "miss",
-      "wallMs": 11486,
+      "wallMs": 11496,
       "promptTokens": 50,
-      "outputTokens": 104,
-      "outputTokensPerSecond": 9.3,
-      "promptTokensPerSecond": 217.5,
-      "loadMs": 4,
-      "responseChars": 322,
-      "responsePreview": "สำหรับเครื่องคอมพิวเตอร์ขนาดเล็กที่ต้องการรันโมเดล AI สำหรับผู้ใช้ 2-5 คน ควรเลือกโมเดลขนาดเล็ก เช่น Llama 2 7B หรือโมเด"
+      "outputTokens": 82,
+      "outputTokensPerSecond": 8.2,
+      "promptTokensPerSecond": 35.3,
+      "loadMs": 12,
+      "responseChars": 248,
+      "responsePreview": "สำหรับผู้ใช้ 2-5 คน เครื่องคอมพิวเตอร์ขนาดเล็ก ควรเลือกโมเดล AI ที่มีขนาดเล็กลง เช่น MobileNet หรือ TinyBERT เพื่อให้ประ"
     },
     {
       "id": "english_short",
@@ -70,27 +70,42 @@
       "model": "gemma3:4b",
       "tier": "main",
       "cache": "miss",
-      "wallMs": 6487,
+      "wallMs": 6579,
       "promptTokens": 30,
       "outputTokens": 53,
-      "outputTokensPerSecond": 9.1,
-      "promptTokensPerSecond": 45.2,
-      "loadMs": 4,
+      "outputTokensPerSecond": 9.2,
+      "promptTokensPerSecond": 38.4,
+      "loadMs": 6,
       "responseChars": 287,
       "responsePreview": "When multiple users access a local LLM simultaneously, request queueing prevents overwhelming the model and ensures fair"
     },
     {
-      "id": "json_extract",
+      "id": "classify_short",
       "task": "classify",
-      "model": "gemma3:4b",
+      "model": "qwen3:0.6b",
       "tier": "fast",
       "cache": "miss",
-      "wallMs": 2763,
+      "wallMs": 2297,
+      "promptTokens": 45,
+      "outputTokens": 2,
+      "outputTokensPerSecond": 92.5,
+      "promptTokensPerSecond": 266.9,
+      "loadMs": 2092,
+      "responseChars": 9,
+      "responsePreview": "technical"
+    },
+    {
+      "id": "json_extract",
+      "task": "extract",
+      "model": "gemma3:4b",
+      "tier": "main",
+      "cache": "miss",
+      "wallMs": 3623,
       "promptTokens": 47,
       "outputTokens": 25,
       "outputTokensPerSecond": 10,
-      "promptTokensPerSecond": 194.2,
-      "loadMs": 5,
+      "promptTokensPerSecond": 43,
+      "loadMs": 7,
       "responseChars": 60,
       "responsePreview": "```json { \"intent\": \"report_issue\", \"urgent\": true } ```"
     },
@@ -100,12 +115,12 @@
       "model": "gemma3:4b",
       "tier": "main",
       "cache": "miss",
-      "wallMs": 15351,
+      "wallMs": 13600,
       "promptTokens": 36,
       "outputTokens": 128,
-      "outputTokensPerSecond": 8.7,
-      "promptTokensPerSecond": 52.4,
-      "loadMs": 5,
+      "outputTokensPerSecond": 10,
+      "promptTokensPerSecond": 45.7,
+      "loadMs": 4,
       "responseChars": 677,
       "responsePreview": "Okay, here's an explanation in 3 bullet points why a fixed-size request queue is generally safer than unbounded concurre"
     },
@@ -115,30 +130,30 @@
       "model": "gemma3:4b",
       "tier": "main",
       "cache": "miss",
-      "wallMs": 3028,
+      "wallMs": 5804,
       "promptTokens": 149,
-      "outputTokens": 27,
-      "outputTokensPerSecond": 9.8,
-      "promptTokensPerSecond": 590,
+      "outputTokens": 28,
+      "outputTokensPerSecond": 10,
+      "promptTokensPerSecond": 49.9,
       "loadMs": 4,
-      "responseChars": 162,
-      "responsePreview": "The operator should first investigate whether the dashboard is experiencing a saturated LLM queue due to the intermitten"
+      "responseChars": 155,
+      "responsePreview": "The operator should first investigate whether the dashboard is experiencing a saturated Large Language Model (LLM) queue"
     }
   ],
   "concurrent": {
     "requests": 2,
-    "wallMs": 7603,
-    "throughputRequestsPerSecond": 0.26,
+    "wallMs": 7344,
+    "throughputRequestsPerSecond": 0.27,
     "perRequest": [
       {
         "model": "gemma3:4b",
-        "wallMs": 7603,
-        "outputTokensPerSecond": 7.9
+        "wallMs": 7343,
+        "outputTokensPerSecond": 8.1
       },
       {
         "model": "gemma3:4b",
-        "wallMs": 6893,
-        "outputTokensPerSecond": 7.9
+        "wallMs": 6695,
+        "outputTokensPerSecond": 8
       }
     ]
   }

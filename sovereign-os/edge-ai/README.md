@@ -304,6 +304,18 @@ backend เดิมมี route ไป `qwen3:8b`, `deepseek-r1:8b`, `qwen3-vl:
 ทุก response มี header `x-edge-model`, `x-edge-tier`, `x-edge-substituted`
 เพื่อให้ตรวจย้อนหลังได้ว่าใช้โมเดลอะไรจริง
 
+### Thinking (`think`) — ปิดโดยปริยายสำหรับ fast/main
+
+โมเดลตระกูล qwen3 "คิดก่อนตอบ" — ถ้าเปิด thinking ไว้ token จะถูกใช้ไปกับส่วนคิด
+จน `response` ว่างเปล่าเมื่อ `num_predict` น้อย (เจอจริงตอน benchmark: งาน `classify`
+ได้ `response` เป็นสตริงว่าง เพราะ 12 token หมดไปกับ thinking)
+
+- `fast` / `main` → gateway เติม `think: false` ให้อัตโนมัติ
+- `deep` → เปิด thinking ไว้ (ระดับเดียวที่ต้องการการคิดจริง)
+- ผู้เรียกส่ง `think` มาเองใน body ได้ — ค่านั้นชนะเสมอ
+- หรือส่ง header `x-sovereign-think: 1` (หรือ `0`) เพื่อบังคับเฉพาะ request นั้น
+- `think` ถูกนับรวมใน cache key — คำตอบแบบคิด/ไม่คิดจะไม่ปนกัน
+
 ---
 
 ## 8. Security / Cold Soak
@@ -333,8 +345,26 @@ EDGE-AI-BENCH.cmd
 - latency, output tok/s, prompt tok/s ต่อ prompt
 - concurrent throughput ตาม `maxConcurrent`
 
-ผลของเครื่องที่ใช้พัฒนา (Ryzen 7 7730U / 16 GB / Radeon iGPU) จะถูกบันทึกหลังรันจริง
-ตัวเลขจะแตกต่างตาม RAM, storage, background apps และโมเดล
+### ผลจริงบนเครื่องที่ใช้พัฒนา (รัน 20/10/69)
+
+เครื่อง: AMD Ryzen 7 7730U (8 physical / 16 logical) · RAM 16 GB (ระบบรายงาน 13.8 GB) · Radeon iGPU 2 GB (shared)
+โหมด: CPU inference (`OLLAMA_LLM_LIBRARY=cpu`) · `num_thread=8` · context 4096 · `OLLAMA_NUM_PARALLEL=2`
+โมเดล: fast `qwen3:0.6b` · main `gemma3:4b` · deep `qwen3:8b` **ยังไม่ติดตั้ง** (งาน code/deep ถูกลดเป็น main ตามนโยบาย)
+
+| งาน | tier | โมเดล | wall | output | prompt |
+|---|---|---|---|---|---|
+| `classify` (ตอบคำเดียว) | fast | qwen3:0.6b | 2,297 ms | **92.5 tok/s** (2 token) | 266.9 tok/s |
+| `json_extract` | main | gemma3:4b | 3,623 ms | 10.0 tok/s | 43.0 tok/s |
+| `long_context` (~149 prompt token) | main | gemma3:4b | 5,804 ms | 10.0 tok/s | 49.9 tok/s |
+| `chat` อังกฤษ | main | gemma3:4b | 6,579 ms | 9.2 tok/s | 38.4 tok/s |
+| `chat` ไทย | main | gemma3:4b | 11,496 ms | 8.2 tok/s | 35.3 tok/s |
+| `code` (deep → main) | main | gemma3:4b | 13,600 ms | 10.0 tok/s | 45.7 tok/s |
+
+- ค่าเฉลี่ย 6 prompt = **23.3 tok/s** (ตัวเลขเฉลี่ยสูงเพราะ `classify` ใช้ fast tier ที่เร็วกว่ามาก)
+- **2 ผู้ใช้พร้อมกัน** (คนละ user, `maxConcurrent=2`): wall **7,344 ms** · **0.27 req/s** · ~8 tok/s ต่อคน
+- งานสั้น/จำแนกประเภทที่ส่งไป fast tier ให้ผลตอบใน ~2 วินาที — เหมาะกับ chatbot ของร้าน/บ้าน
+
+ตัวเลขจะแตกต่างตาม RAM, storage, background apps และโมเดล — รัน `EDGE-AI-BENCH.cmd` บนเครื่องเป้าหมายเพื่อเทียบ
 
 ---
 
@@ -348,6 +378,7 @@ node --test tools/test/edge-ai.test.mjs
 
 - profile selection / auto-fit
 - model routing, alias, deep opt-in
+- thinking policy: fast/main ปิด, deep เปิด, header override ได้, cache key แยกตาม `think`
 - context trimming / cache key / cache eligibility
 - queue concurrency, per-user fairness, queue full, timeout
 - gateway กับ mock Ollama: model rewrite, cache hit, 429, streaming, auth

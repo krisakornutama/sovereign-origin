@@ -21,6 +21,8 @@ import {
   cacheKey,
   shouldCache,
   estimateMemoryGB,
+  applyThinkingPolicy,
+  parseThinkHeader,
   ModelSelectionError
 } from '../../sovereign-os/edge-ai/lib/models.mjs';
 import { RequestQueue, QueueError } from '../../sovereign-os/edge-ai/lib/queue.mjs';
@@ -223,6 +225,26 @@ test('normalizeRequest trims history, caps output, strips control fields and kee
   assert.ok(normalized.body.messages.length <= 13);
 });
 
+test('thinking is off for fast/main by default and stays available for deep', () => {
+  assert.equal(parseThinkHeader('1'), true);
+  assert.equal(parseThinkHeader('true'), true);
+  assert.equal(parseThinkHeader('off'), false);
+  assert.equal(parseThinkHeader(''), undefined);
+  assert.equal(parseThinkHeader(undefined), undefined);
+
+  const fast = applyThinkingPolicy({ prompt: 'x' }, { endpoint: '/api/generate', tier: 'fast' });
+  assert.equal(fast.think, false, 'qwen3 ระดับ fast ต้องไม่กิน token ไปกับ thinking');
+  const main = applyThinkingPolicy({ prompt: 'x' }, { endpoint: '/api/chat', tier: 'main' });
+  assert.equal(main.think, false);
+  const deep = applyThinkingPolicy({ prompt: 'x' }, { endpoint: '/api/generate', tier: 'deep' });
+  assert.equal(deep.think, true, 'deep คือระดับเดียวที่อยากได้การคิดจริง');
+
+  assert.equal(applyThinkingPolicy({ prompt: 'x', think: true }, { endpoint: '/api/generate', tier: 'main' }).think, true, 'ค่าที่ผู้เรียกส่งมาใน body ต้องชนะ');
+  assert.equal(applyThinkingPolicy({ prompt: 'x' }, { endpoint: '/api/generate', tier: 'main', requestedThink: true }).think, true, 'header x-sovereign-think: 1 ต้องเปิดได้');
+  assert.equal(applyThinkingPolicy({ prompt: 'x' }, { endpoint: '/api/generate', tier: 'deep', requestedThink: false }).think, false, 'header ปิดต้องชนะค่าตามระดับ');
+  assert.equal(applyThinkingPolicy({ input: 'x' }, { endpoint: '/api/embed', tier: 'main' }).think, undefined, 'embedding ต้องไม่ถูกเติม think');
+});
+
 test('cacheKey is stable and shouldCache only caches deterministic non-streaming requests', () => {
   const config = miniConfig();
   const a = normalizeRequest({
@@ -239,6 +261,11 @@ test('cacheKey is stable and shouldCache only caches deterministic non-streaming
   assert.notEqual(
     cacheKey({ endpoint: '/api/generate', model: 'gemma3:4b', body: a }),
     cacheKey({ endpoint: '/api/generate', model: 'gemma3:4b', body: { ...a, prompt: 'different' } })
+  );
+  assert.notEqual(
+    cacheKey({ endpoint: '/api/generate', model: 'gemma3:4b', body: { ...a, think: false } }),
+    cacheKey({ endpoint: '/api/generate', model: 'gemma3:4b', body: { ...a, think: true } }),
+    'think ต่างกัน = คำตอบคนละแบบ ห้ามใช้ cache ร่วมกัน'
   );
   assert.equal(shouldCache({ prompt: 'x', options: { temperature: 0 } }, '/api/generate'), true);
   assert.equal(shouldCache({ prompt: 'x', options: { temperature: 0 }, stream: true }, '/api/generate'), false);
@@ -450,6 +477,7 @@ test('gateway rewrites models, caps output, exposes headers and caches determini
     assert.equal(forwarded.options.num_predict, 2048);
     assert.equal(forwarded.options.num_ctx, 4096);
     assert.equal(forwarded.options.num_thread, 8);
+    assert.equal(forwarded.think, false, 'main tier ต้องปิด thinking โดยปริยาย');
 
     const second = await fetch(`${ctx.base}/api/generate`, {
       method: 'POST',
@@ -473,6 +501,15 @@ test('gateway rewrites models, caps output, exposes headers and caches determini
     assert.equal(classified.status, 200);
     assert.equal(classified.headers.get('x-edge-model'), 'qwen3:0.6b');
     assert.equal(ctx.mock.state.calls.at(-1).body.model, 'qwen3:0.6b');
+    assert.equal(ctx.mock.state.calls.at(-1).body.think, false, 'fast tier ปิด thinking เพื่อไม่ให้ response ว่าง');
+
+    const thinking = await fetch(`${ctx.base}/api/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-sovereign-think': '1' },
+      body: JSON.stringify({ model: 'auto', prompt: 'think please', cache: false, options: { temperature: 0 } })
+    });
+    assert.equal(thinking.status, 200);
+    assert.equal(ctx.mock.state.calls.at(-1).body.think, true, 'header x-sovereign-think: 1 ต้องเปิด thinking ได้');
   } finally {
     await closeAll(ctx);
   }

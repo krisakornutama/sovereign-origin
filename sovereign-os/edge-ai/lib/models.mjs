@@ -278,6 +278,36 @@ export function normalizeRequest({ endpoint, body, config }) {
   return { body: out, meta };
 }
 
+/**
+ * อ่านค่า header `x-sovereign-think` — คืน true/false เมื่อผู้เรียกระบุชัด, undefined เมื่อไม่ระบุ
+ * (รับทั้ง 1/0 และ true/false/yes/no เพราะผู้เรียกมีทั้งสคริปต์และคน)
+ */
+export function parseThinkHeader(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return undefined;
+  if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') return true;
+  if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') return false;
+  return undefined;
+}
+
+/**
+ * ตัดสินใจส่ง `think` ไปให้ Ollama หรือไม่ (0.40.x รับพารามิเตอร์นี้ที่ /api/generate และ /api/chat)
+ *
+ * ⚠ ทำไมต้องปิดโดยปริยาย: qwen3 เป็นโมเดล "คิดก่อนตอบ" — ถ้าเปิดไว้ โมเดลจะใช้ token
+ *   กินไปกับส่วน thinking จน `response` ว่างเปล่าเมื่อ `num_predict` น้อย (เจอจริงกับงาน classify:
+ *   12 token หมดไปกับ thinking ⇒ ผู้เรียกได้สตริงว่าง) — เครื่องเล็กเสียทั้งเวลาและคำตอบ
+ *   ส่วน deep เป็นตัวเดียวที่อยากได้การคิดจริง จึงเปิดไว้
+ *
+ * ลำดับความสำคัญ: `think` ที่ผู้เรียกส่งมาใน body > header x-sovereign-think > ค่าตามระดับโมเดล
+ */
+export function applyThinkingPolicy(body, { endpoint, tier, requestedThink } = {}) {
+  if (!body || typeof body !== 'object') return body;
+  if (endpoint !== '/api/generate' && endpoint !== '/api/chat') return body;
+  if (body.think !== undefined) return body;
+  const think = requestedThink === undefined ? tier === 'deep' : requestedThink === true;
+  return { ...body, think };
+}
+
 export function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -294,6 +324,7 @@ function cacheablePayload(endpoint, body) {
       system: body.system,
       template: body.template,
       format: body.format,
+      think: body.think,
       options: pickOptions(body.options),
       keep_alive: body.keep_alive
     };
@@ -303,6 +334,7 @@ function cacheablePayload(endpoint, body) {
       messages: body.messages,
       tools: body.tools,
       format: body.format,
+      think: body.think,
       options: pickOptions(body.options),
       keep_alive: body.keep_alive
     };
