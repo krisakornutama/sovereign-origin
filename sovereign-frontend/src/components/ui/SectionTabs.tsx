@@ -11,23 +11,35 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { normalizeNavHref, sectionForPath } from '../../lib/navigation';
 import { useLanguageStore } from '../../stores/useLanguageStore';
+import { useFeatureStore } from '../../stores/useFeatureStore';
+import { useIsSuperadmin } from '../../lib/roles';
 import Icon from './Icon';
 
 export default function SectionTabs() {
   const pathname = usePathname() || '/';
   const t = useLanguageStore((s) => s.t);
+  const hasFeature = useFeatureStore((s) => s.has);
+  const isSuperadmin = useIsSuperadmin();
   const section = sectionForPath(pathname);
   const current = normalizeNavHref(pathname);
 
+  // เคารพสิทธิ์รายหน้าเหมือน Sidebar — SUPERADMIN เห็นครบ, คนอื่นเห็นเฉพาะที่มีสิทธิ์
+  // (has() คืน true ระหว่างที่ยังไม่รู้สิทธิ์ = ไม่กระพริบ)
+  const tabs = section
+    ? isSuperadmin
+      ? section.tabs
+      : section.tabs.filter((tab) => hasFeature(tab.href.split('#')[0]))
+    : [];
+
   // ศูนย์ที่มีหน้าเดียวหรือไม่ใช่เส้นทางของศูนย์ = ไม่ต้องมีแถบแท็บ
-  if (!section || section.tabs.length < 2) return null;
+  if (!section || tabs.length < 2) return null;
 
   return (
     <nav
       aria-label={t(section.titleKey, section.title)}
       className="mt-4 flex gap-1.5 overflow-x-auto pb-1 -mb-1"
     >
-      {section.tabs.map((tab) => {
+      {tabs.map((tab) => {
         const active = normalizeNavHref(tab.href) === current;
         return (
           <Link
