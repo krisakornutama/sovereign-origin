@@ -10,4 +10,6 @@ for /f "usebackq tokens=1,* delims==" %%A in ("E:\My work\Project Sovereign Orig
 )
 cd /d "E:\My work\Project Sovereign Origin\sovereign-frontend"
 if not exist "..\sovereign-os\infra\logs" mkdir "..\sovereign-os\infra\logs"
+REM The task runs every 5 minutes - keep the log bounded (2 MB)
+if exist "..\sovereign-os\infra\logs\synthetic-check.log" for %%F in ("..\sovereign-os\infra\logs\synthetic-check.log") do if %%~zF GTR 2097152 del /q "..\sovereign-os\infra\logs\synthetic-check.log"
 "C:\Program Files\nodejs\node.exe" scripts\synthetic-browser-check.mjs >> "..\sovereign-os\infra\logs\synthetic-check.log" 2>&1

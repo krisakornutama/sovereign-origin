@@ -114,13 +114,26 @@ $manifestUrl = $hub + '/api/agent-machines/node-kits/manifest/'
 try {
   $m = Invoke-RestMethod -Uri $manifestUrl -TimeoutSec 25
 } catch {
+  if ($env:SOV_DRYRUN -eq '1') {
+    Write-Host '  [dry-run] HUB unreachable - skipping the download (nothing changed).' -ForegroundColor Yellow
+    Write-Host '  DRY RUN complete - nothing was changed.'
+    exit 0
+  }
   Die ("Cannot reach the HUB at $manifestUrl - check that it is on and you are on the same network.") 2
 }
 
 if (-not $m.bootstrapSha256) {
   Write-Host '  This HUB has not published the single-file installer yet.' -ForegroundColor Yellow
   Write-Host '  Ask the owner to run:  node tools/build-node-kit.mjs --publish'
+  if ($env:SOV_DRYRUN -eq '1') { Write-Host '  DRY RUN complete - nothing was changed.'; exit 0 }
   exit 3
+}
+
+if ($env:SOV_DRYRUN -eq '1') {
+  Write-Host '  [dry-run] HUB reachable and a bootstrap installer is published.'
+  Write-Host '  [dry-run] Would download + verify it, then hand over to the installer.'
+  Write-Host '  DRY RUN complete - nothing was changed.'
+  exit 0
 }
 
 # --- download the real installer ---

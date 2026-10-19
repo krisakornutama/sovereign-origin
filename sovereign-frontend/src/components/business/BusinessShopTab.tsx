@@ -2,9 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { authFetch } from '../../lib/apiFetch';
 import { fetchJsonObject } from '../../lib/fetchJson';
-import { getApiUrl } from '../../lib/config';
+import { getApiUrl, getPublicSiteUrl } from '../../lib/config';
 import Icon from '../ui/Icon';
 import type { ShopSettings } from './shared';
+
+// เปิดลิงก์สาธารณะออกเบราว์เซอร์ระบบ (Electron) หรือแท็บใหม่ (เบราว์เซอร์ปกติ)
+function openPublicUrl(url: string) {
+  const api = (window as unknown as { sovereign?: { openExternal?: (u: string) => unknown } }).sovereign;
+  if (api?.openExternal) { void api.openExternal(url); return; }
+  window.open(url, '_blank', 'noopener');
+}
 
 // ── แท็บร้านค้าชุมชน (แยกจาก BusinessWorkspace — phase 3) ──
 export function BusinessShopTab({ bizId, bizName, canManage, base, setNotice, refreshBiz }: { bizId: string; bizName: string; canManage: boolean; base: string; setNotice: (n: { ok: boolean; text: string } | null) => void; refreshBiz?: () => void }) {
@@ -65,14 +72,16 @@ export function BusinessShopTab({ bizId, bizName, canManage, base, setNotice, re
     }
   }
 
-  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/shop?id=${bizId}` : '';
+  // 14/10/69: หน้าร้านย้ายไปเว็บสาธารณะแล้ว — ลิงก์ต้องชี้โดเมนจริง ไม่ใช่ origin ของเดสก์ท็อป
+  const publicUrl = `${getPublicSiteUrl()}/shop?id=${bizId}`;
+  const communityUrl = `${getPublicSiteUrl()}/community`;
 
   return (
     <div className="space-y-4">
       <div className="card p-4 space-y-3">
         <div className="text-sm font-semibold">🏪 หน้าร้านสาธารณะ</div>
         <p className="text-xs text-slate-400">
-          เปิดร้านแล้วลูกค้าทั่วไปเข้า /shop ดูสินค้าและสั่งซื้อได้โดยไม่ต้อง login — ออเดอร์จะโผล่ที่แท็บออเดอร์ (สถานะ “ใบเสนอราคา” เลข S…)
+          เปิดร้านแล้วลูกค้าทั่วไปเปิดหน้าร้านบนเว็บ (sovereignoriginshop.dpdns.org) ดูสินค้าและสั่งซื้อได้โดยไม่ต้อง login — ออเดอร์จะโผล่ที่แท็บออเดอร์ (สถานะ “ใบเสนอราคา” เลข S…)
           กด “ยืนยัน (หักสต็อก)” ตามปกติ ลูกค้าเช็คสถานะ/แจ้งชำระเงินผ่านลิงก์ลับของออเดอร์
         </p>
         {!canManage ? (
@@ -82,24 +91,24 @@ export function BusinessShopTab({ bizId, bizName, canManage, base, setNotice, re
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={settings?.shopOpen ?? false} disabled={busy}
-                  onChange={(e) => save({ shopOpen: e.target.checked }, e.target.checked ? 'เปิดร้านแล้ว — ลูกค้าเข้า /shop ได้' : 'ปิดร้านแล้ว — /shop จะขึ้นว่าไม่พบร้าน')}
+                  onChange={(e) => save({ shopOpen: e.target.checked }, e.target.checked ? 'เปิดร้านแล้ว — ลูกค้าเปิดหน้าร้านบนเว็บได้' : 'ปิดร้านแล้ว — หน้าร้านบนเว็บจะขึ้นว่าไม่พบร้าน')}
                   className="w-4 h-4" />
                 <span>เปิดร้านให้ลูกค้าเข้าชม/สั่งซื้อ</span>
               </label>
               {settings?.shopOpen && (
-                <a href={`/shop?id=${bizId}`} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:underline">เปิดหน้าร้านดู →</a>
+                <button type="button" onClick={() => openPublicUrl(publicUrl)} className="text-xs text-cyan-400 hover:underline">เปิดหน้าร้านบนเว็บ →</button>
               )}
             </div>
             {settings?.shopOpen && (
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={settings?.shopInCommunity ?? false} disabled={busy}
-                    onChange={(e) => save({ shopInCommunity: e.target.checked }, e.target.checked ? 'ร้านเข้าร่วม catalog กลางชุมชนแล้ว — เห็นที่ /community' : 'ถอนร้านจาก catalog กลางชุมชนแล้ว')}
+                    onChange={(e) => save({ shopInCommunity: e.target.checked }, e.target.checked ? 'ร้านเข้าร่วม catalog กลางชุมชนแล้ว — เห็นบนเว็บ' : 'ถอนร้านจาก catalog กลางชุมชนแล้ว')}
                     className="w-4 h-4" />
-                  <span>รวมร้านเข้า catalog กลางชุมชน (/community — โชว์เฉพาะชื่อสินค้า/ราคาขาย ไม่มีต้นทุน)</span>
+                  <span>รวมร้านเข้า catalog กลางชุมชน (บนเว็บ — โชว์เฉพาะชื่อสินค้า/ราคาขาย ไม่มีต้นทุน)</span>
                 </label>
                 {settings?.shopInCommunity && (
-                  <a href="/community" target="_blank" rel="noreferrer" className="text-xs text-lime-400 hover:underline">ดู catalog กลาง →</a>
+                  <button type="button" onClick={() => openPublicUrl(communityUrl)} className="text-xs text-lime-400 hover:underline">ดู catalog กลาง →</button>
                 )}
               </div>
             )}

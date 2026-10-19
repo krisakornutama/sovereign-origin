@@ -102,7 +102,7 @@
 - [x] E2 watchdog อายุ backup + สุขภาพดิสก์ใน `tools/machine-health.mjs` — **เสร็จ 27/9/69**: ยิงรอบแรกจับของจริง (DB backup เก่า 113 ชม. + offsite เงียบ 70.6 ชม. = critical ทั้งคู่) · mutation เทส 7/7 (สด/failed/เก่า 30 ชม./ไม่มีไฟล์) · ตรวจด้วย — และพบ `machine-health.mjs` **ไม่เคยถูก git track** (บั๊กคลาสเดิมครั้งที่ 3) เพิ่ม whitelist เข้า git แล้ว
 - [x] E4 ยิง `offsite-push.mjs --restore-test` — **เสร็จ 27/9/69**: users 8 · audit_logs 26,383 · **sensor_telemetry 118,883 แถว** (live 121,026 — ตรงตามอายุ dump) · แก้สคริปต์ใช้ `timescaledb_pre/post_restore` แยก 3 ครั้งเรียก (บทเรียนใหม่: pg_dump เซ็ต search_path='' กลาง stream — ห้ามรวม post_restore ใน session เดียวกับ dump)
 - [x] E3 ช่องทาง offsite ที่สองไม่พึ่ง Telegram — **เสร็จ 27/9/69** (mirror ไฟล์ .enc ไป `C:\SovereignOffsite` ต่างดิสก์ + offsite-key-recovery.txt สำรอง key นอกสาย backup + `--send-key` ปุ่มของเจ้าของ + machine-health ตัดสินรายช่อง) — พิสูจน์: รอบเทส Telegram ล้มจริงแต่ mirror รับช่วง exit 0 + restore-test จากสำเนา C: ผ่าน 141 ตาราง · sensor_telemetry 121,951 แถว (มี NAS/USB แล้วตั้ง OFFSITE_MIRROR_DIR/MESH_SCP_TARGET ไม่แก้โค้ด — ยังกันเครื่องหายทั้งเครื่องไม่ได้)
-- [ ] E5 WAL archiving + ซ้อม PITR (RPO 24 ชม. → นาที) — ทำหลัง E4 เพราะใช้สายทดสอบเดียวกัน
+- [x] E5 WAL archiving + ซ้อม PITR — **ปิดด้วย I1 (28/9/69)**: archive_mode=on · archive_timeout=300s · ซ้อม replay ผ่านจริง + machine-health ด่าน WAL (ดู I1a–I1d) — ไม่ต้องทำซ้ำ
 - [x] E6 (พบต่อจาก E2) สาย backup ภายใน core-api ตายเงียบ 22–26/9 — **เสร็จ 27/9/69**: ราก = scheduler เทียบเวลา "นาทีเป๊ะ" (`sched.time !== current`) เครื่องหลับ/นาฬิกา VM เหลื่อม → นาที 02:00 ถูกข้ามทั้งวัน (task ภายนอก 03:00 ปกติทุกคืน — สองสายอยู่คนละชั้นจึงปลอมสมดุล) · แก้ = catch-up window 6 ชม. (เลยเวลา + ยังไม่มี marker วันนี้ = สร้างทันที)
 
 ## F — ความปลอดภัย (ยืนยันจากโค้ดแล้ว)
@@ -157,10 +157,8 @@
 - [x] I3a ✅ วัดจริง: 26,430 แถว/2เดือน (~600/วัน) → monthly partition พอ (ต่ำเกินกว่า weekly คุ้มความซับซ้อน)
 - [x] I3b ✅ migration declarative monthly (ส.ค.26–ม.ค.27 + default) — ย้ายครบ · PK (id,timestamp) · index timestamp DESC · probe เขียนจริงตก partition ถูก
 - [x] I3c ✅ auto-purge/export: เดือนจบเกิน 90 วัน = export NDJSON.gz → ตรวจจำนวน → drop → mirror · ensure 3 เดือนล่วงหน้าทุกรอบ nightly · probe ผ่าน · ด่าน default-partition ใน machine-health
-- [ ] I3a วัดจริงก่อน: แถว/ขนาด/อัตราเขียนต่อวัน → ตัดสิน monthly vs weekly partitioning
-- [ ] I3b migration declarative partitioning รายเดือน (สร้าง partition ล่วงหน้า 3 เดือน + default) — ย้ายข้อมูลเดิมชุด ๆ แบบล็อกสั้น (ตารางถูกเขียนทุก action)
-- [ ] I3c task รายวัน: export partition เกิน 90 วัน เป็น .json.gz ไป backups/cold/ (เข้าสาย mirror E3 อัตโนมัติ) → detach+drop
-- [ ] I3d machine-health เพิ่มด่านขนาด audit_logs — กันโตเงียบอีกสาย
+> **19/10/69:** 3 บรรทัด `I3a–I3c` ที่เคยค้างด้านล่างเป็น "สำเนาค้าง" ของงานที่ทำเสร็จแล้ว (157–159) — ลบออกแล้ว; เหลือ I3d ที่ยังไม่ทำจริง
+- [ ] I3d machine-health เพิ่มด่านขนาด audit_logs — กันโตเงียบอีกสาย (ยังไม่ได้ทำ)
 
 ## I4 — Cloudflare Tunnel เปิด /shop สู่อินเทอร์เน็ต (ตาม G2 — ต้องรอเจ้าของ: domain บน Cloudflare + token)
 - [x] I4a container cloudflared ทะลุ CGNAT/LTE (MR505) — **เสร็จ 30/9/69** (container `sovereign-cloudflared` รันจริงด้วย token ใน infra/.env · route `*`→:3000, `^/api`→:3001)
@@ -178,6 +176,9 @@
 - [x] I6 แจ้งเตือนปลอมจาก cleanup — **เสร็จ 28/9/69** (commit 8646191): afterAll ใน pos-flow ลอง psql ซ้ำ 3 รอบก่อนสรุปล้ม (ช่วงเครื่องเพิ่งตื่น psql สะดุดรอบเดียว = ปลอม "เคลียร์ไม่สำเร็จ" ทั้งที่ของจริงสำเร็จ)
 
 ## P — Publishing: GitHub เผยแพร่ผลิตภัณฑ์ + ร้านอุปกรณ์ IoT + สนามทดลองสาธารณะ (คำสั่งเจ้าของ 30/9/69)
+> **19/10/69:** งานที่แตะ **หน้าเว็บสาธารณะ** (WAF / SEO / sitemap / GSC / โดเมน) ย้ายไป repo
+> `Sovereign-Web-Standalone` แล้ว — เก็บรายละเอียดในหมวดนี้ไว้เป็นประวัติอ้างอิง
+> งาน backend/ธุรกิจ (P8, P18, P19, P23) ยังอยู่ใน repo นี้
 - [x] P0 กวาดความปลอดภัยก่อนเผยแพร่ — เฟิร์มแวร์ 6 ไฟล์สะอาด (config.example.py เป็น placeholder · config.py gitignored) · รายการห้ามเผยแพร่จดใน runbook §สิบเอ็ด
 - [x] P1 repo **krisakornutama/sovereign-dms** — README สองภาษา (EN หลัก/TH รอง) · CHANGELOG M0–M4 (v0.4.0) · BOM+ราคาจริง · quickstart ซิม 2 นาที · ลิงก์สั่งซื้อ → หน้าร้าน · โค้ด export ด้วย git archive (สะอาดจากสมุดงานบ้าน) · push สำเร็จ commit 391bfdd · **→ เปลี่ยนเป็น PRIVATE 30/9/69 (ตามคำสั่งเจ้าของ: เฟิร์มแวร์เป็นทรัพย์สินการค้า ไม่ส่งโค้ดสู่สาธารณะ) — ต้องถอดลิงก์ GitHub/คำว่า open source จากหน้าสาธารณะครบ (P9)**
 - [x] P2 ร้านเปิดเฉพาะอุปกรณ์ — seed-devices-shop.ts (idempotent): business "Sovereign Devices" + 3 SKU (KIT 1,290฿ / READY-PI 2,490฿ / SETUP-PRO 2,990฿) + ล็อตการผลิต LOT-DMS01A (ASSEMBLED→FLASHED v0.4.0→TESTED drill→PACKAGED) · **ปิดร้านผักจากสาธารณะ** (shopOpen=false — ข้อมูล/ล็อตครบเดิม เปิดคืนได้ทีเดียว)
@@ -242,3 +243,64 @@
   - **คู่มือฉบับเต็ม + ลำดับขั้น:** [`docs/seo-google-search-console.md`](docs/seo-google-search-console.md) หัวข้อ "🚨 งานที่ต้องให้เจ้าของทำเอง" · อ้างอิงระดับโค้ดอยู่ในคอมเมนต์ [`sovereign-frontend/src/pages/mbti/compare.tsx`](sovereign-frontend/src/pages/mbti/compare.tsx)
   - **AI แก้ให้ไม่ได้** — อยู่นอก repo + ต้องสิทธิ์ dashboard · ระหว่างนี้ห้ามแก้หน้าเอง (`noindex` ถูกต้อง ณ สภาพปัจจุบัน เพราะประกาศ URL ที่ตอบ 403 คือคำสัญญาที่ผิด)
 - [ ] **P24 รอเจ้าของ — ค่า TXT จาก GSC** (ต่อจาก P22/P24 รอบก่อน: ยัง Verify ไม่ได้ เพราะข้อความที่ส่งมาก่อนหน้าเป็น placeholder ไม่ใช่ค่าจริง)
+
+---
+
+# คิวหมวด J — Lean + Desktop Distribution (19/10/69)
+
+> บริบท: เจ้าของสั่ง "วิเคราะห์ทั้งโปรเจ็ก ว่าจะพัฒนาอะไรต่อได้อีก ... จัดระเบียบให้ lean ขึ้น"
+> + "ทำแอปสำหรับไปติดตั้งอีกเครื่อง" · รอบนี้ทำเฉพาะของที่พิสูจน์ได้ และ **ไม่แตะ infra/.env**
+> ไม่ restart runtime / ไม่ migration (โปรเจ็กอยู่ระหว่าง Cold Soak)
+
+## J1 — ปิดของที่ทำให้ nightly แดง/มีไฟล์ขยะ (เสร็จแล้ว 19/10/69 — commit `a46d918`)
+
+- [x] **J1a `-DryRun` ของตัวติดตั้งไม่แตะเครือข่าย** — เดิมเทสต์ `installer-cmd` ต้องยิง HUB จริง
+      (`192.168.1.102:3000`) → คืนที่ :3000 ไม่ตอบ = nightly แดงทั้งคืน · ตอนนี้ dry-run จบแบบ
+      deterministic (exit 0, "DRY RUN complete") ไม่ดาวน์โหลด/ไม่ติดตั้ง — เทสต์ 23/23
+- [x] **J1b `system-truth.json` ถูกเขียนแม้เกตล้ม** — เดิมเขียนเฉพาะเส้นทางสำเร็จ → `lastGateOk`
+      ค้าง `null` 11 รอบ (5–18 ต.ค.) · ย้ายไป `process.on('exit')` ครอบทุก `process.exit(1)`
+- [x] **J1c JSON sidecar ครบ + เก็บขยะ** — host tools (`nightly-verify`, `ops-status`, `verify`)
+      เขียน `.sha256` คู่ไฟล์แล้ว → data-integrity ไม่ตีเป็น BIT_ROT ปลอมอีก · ลบสำเนา
+      `.corrupt-*` **1,070 ไฟล์** ที่สะสมมา (เป็นสำเนาของไฟล์ดี ไม่ใช่ข้อมูลจริง)
+- [x] **J1d ลบ `prisma/schema.sqlite.prisma`** (2,248 บรรทัด ไม่มีใครใช้) + ถอดกฎ schema-sync
+      ออกจาก arch-gate/docs/CI/AGENTS — เหลือ Postgres ฉบับเดียวตามความจริงของระบบ
+- [x] **J1e ลิงก์ร้านชี้โดเมนจริง** — `BusinessShopTab` เปลี่ยนจาก `/shop` (404 ในแอป) เป็น
+      `https://sovereignoriginshop.dpdns.org` + เปิดผ่าน `shell.openExternal` (ไม่หลุดออกจากแอป)
+      · ถอด `/shop` ออกจาก `PUBLIC_PAGES` / `ALWAYS_VISIBLE`
+- [x] **J1f Synthetic check เลิกตรวจ `/shop`** — ชี้หน้า login ของเดสก์ท็อป + จำกัด log 2 MB
+      (เดิม FAIL 3/3 ทุก 5 นาที · log 4.15 MB)
+- [x] **J1g Watchdog เหลือตัวเดียว** — `autostart.mjs` ชี้ `tools/frontend-watchdog.mjs`
+      (one-shot ตัวเดียวกับ Scheduled Task) · ลบ `frontend-watchdog.mjs` ที่ราก (poller ซ้อน)
+
+## J2 — Desktop Distribution (เสร็จแล้ว 19/10/69)
+
+- [x] **J2a ชุดติดตั้งสำหรับอีกเครื่อง** — `PACK-DESKTOP.mjs` ประกอบใหม่จากซอร์สวันนี้ →
+      `Project Sovereign Origin Install\desktop\Sovereign-OS\` + portable exe + `DESKTOP-INFO.json`
+      (ถ้าแอปเปิดอยู่จะเขียน `dist-portable-staging/` — **ห้ามลบโฟลเดอร์นี้**)
+- [x] **J2b ชั้นส่งมอบใน repo** — `npm run stage:release` → `release/Sovereign-OS-<ver>-win-x64/`
+      (portable exe + zip + DESKTOP-INFO + README-INSTALL + SHA256SUMS) · ไฟล์ .exe/.zip gitignored
+- [x] **J2c เอกสารติดตั้ง** — `docs/DESKTOP-INSTALL.md` (เครื่องปลายทางต้องมีอะไร · 2 วิธีติดตั้ง ·
+      ตรวจแฮช · แก้ปัญหาจอดำ/offline · ความปลอดภัย)
+
+## J3 — ยังเปิด (ต้องอนุมัติ/ทำแยก branch)
+
+- [ ] **J3a WAL `archive_timeout` 300 → 900s** — ลด WAL 24 GB/วันลง ~3 เท่า · **ต้อง recreate
+      container** → ห้ามทำระหว่าง Cold Soak; ต้องให้เจ้าของอนุมัติ + ทำในหน้าต่างปิดระบบ
+- [ ] **J3b nightly-history หาย 5 วัน** (7/9/13/14/17 ต.ค. ไม่มี entry) — เขียน atomic แล้ว
+      แต่ยังไม่มี "ตรวจช่องว่าง" ใน nightly-report → ควรเตือนเมื่อเมื่อวานไม่มีแถว
+- [ ] **J3c แยกไฟล์ใหญ่** — pages: settings 1,254 · dashboard 1,219 · treasury 1,187 ·
+      ai-agent 1,064 · livestock 860 · knowledge 806 (baseline รับไว้ = หนี้ที่มองไม่เห็น)
+- [ ] **J3d รวมโมดูลจิ๋ว ≤70 บรรทัด** — war-room 10 · reports 27 · mesh 28 · notes 33 · audit 36 ·
+      search 36 · selfreliance 40 · clone 40 · dms 41 (62 → ~56) — ต้องแก้ `module-owners.json`
+      + boundary-baseline + docs/modules พร้อมกัน = branch แยก
+- [ ] **J3e รวม HTTP helper 3 ตัว** (`apiClient` / `apiFetch` / `fetchJson`) — ~50 หน้ายังเรียก
+      `fetch('/api…')` ตรง · เริ่มด้วยการทำตัวเดียวเป็น canonical + re-export ก่อน
+- [ ] **J3f `STATUS.md` 412 บรรทัด/344 KB** — เป็น journal ไม่ใช่สถานะปัจจุบัน → ย้ายไป
+      `docs/history/` แล้วทำ STATUS สั้นที่ gen จาก system-truth/ops-status
+
+## J4 — เจ้าของตัดสินใจ
+
+- [ ] **J4a Telegram bot token เก่า 2 ตัว** (`8807673052`, `8671099037`) — ยังไม่ revoke ที่
+      @BotFather (token ใหม่เข้ารหัสใน DB แล้ว)
+- [ ] **J4b export JSON สำรองข้อมูล** ก่อนเริ่มรอบพัฒนาใหม่
+- [ ] **J4c อัปโหลด template `Voltage 5V DC. in Thailand.png` กลับเข้า repo หรือไม่**

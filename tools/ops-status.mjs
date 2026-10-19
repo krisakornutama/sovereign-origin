@@ -14,6 +14,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeJsonWithChecksum } from './json-checksum.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 // log/ไฟล์ runtime อยู่ที่ MAIN tree เสมอ (worktree ไม่มี logs/ — กันอ่านผิดฝั่งแบบสาย backup)
@@ -183,7 +184,8 @@ if (SNAPSHOT) {
   };
   const target = join(MAIN_ROOT, 'sovereign-os', 'core-api', 'data', 'ops-status.json');
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, JSON.stringify(out, null, 2));
+  // sidecar ต้องตรงกับเนื้อไฟล์ ไม่งั้น bit-rot scan ตีเป็น corrupt ทุก boot
+  writeJsonWithChecksum(target, out);
   console.log(`\n📷 snapshot → ${target}`);
 }
 

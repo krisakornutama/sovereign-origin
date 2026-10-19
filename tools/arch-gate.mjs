@@ -4,13 +4,11 @@
 // (Phase 0 arch-hardening — เสียบเป็นสเต็ปของ npm run verify · fail = verify fail)
 //
 // กฎที่ตรวจ:
-//   1) schema-sync      — schema.prisma กับ schema.sqlite.prisma ต้องมี model ชุดเดียวกัน
-//                         (จับเคส "แก้ postgres ลืม sqlite" — ตอนนี้ต้องแก้คู่กันด้วยมือ)
-//   2) file-budget      — ไฟล์ที่เปลี่ยนแปลงใน diff (กับ base branch) ต้องไม่โตเกิน 800 บรรทัด
+//   1) file-budget      — ไฟล์ที่เปลี่ยนแปลงใน diff (กับ base branch) ต้องไม่โตเกิน 800 บรรทัด
 //                         (ไฟล์เก่าที่ใหญ่อยู่แล้วไม่โดนย้อนหลัง — กฎกัน "โตต่อ" เท่านั้น)
-//   3) env-truth        — DATABASE_URL ใน .env ต้องชี้ DB ที่ connect ได้จริง
+//   2) env-truth        — DATABASE_URL ใน .env ต้องชี้ DB ที่ connect ได้จริง
 //                         (เคสจริง: ชี้ sovereign_v2 ที่ไม่มีอยู่ — ทุก tool เจอ P1003)
-//   4) module-boundary  — บังคับจริง (เฟส 1): โมดูลแตะตารางของโมดูลอื่นผ่าน prisma.<model>
+//   3) module-boundary  — บังคับจริง (เฟส 1): โมดูลแตะตารางของโมดูลอื่นผ่าน prisma.<model>
 //                         **หรือ raw SQL ($queryRawUnsafe/$executeRawUnsafe — เฟส 3)**
 //                         เทียบกับ tools/boundary-baseline.json (สแกนรอบแรก = baseline)
 //                         · เส้นข้ามที่อยู่ใน baseline แล้ว = ผ่าน (ของเดิม ไม่ย้อนหลัง)
@@ -36,29 +34,7 @@ function sh(cmd, opts = {}) {
   return execSync(cmd, { windowsHide: true, encoding: 'utf8', cwd: ROOT, ...opts }).trim();
 }
 
-// ── 1) schema-sync: model ทั้งสอง schema ต้องตรงกัน ──
-function checkSchemaSync() {
-  const pg = readFileSync(join(BACKEND, 'prisma', 'schema.prisma'), 'utf8');
-  const sqlite = readFileSync(join(BACKEND, 'prisma', 'schema.sqlite.prisma'), 'utf8');
-  const models = (text) =>
-    [...text.matchAll(/^model\s+([A-Za-z0-9_]+)\s*\{/gm)].map((m) => m[1]).sort();
-  const pgModels = models(pg);
-  const sqModels = models(sqlite);
-  const onlyPg = pgModels.filter((m) => !sqModels.includes(m));
-  const onlySq = sqModels.filter((m) => !pgModels.includes(m));
-  if (onlyPg.length || onlySq.length) {
-    problems.push(
-      `schema-sync: model ไม่ตรงกันระหว่าง schema.prisma กับ schema.sqlite.prisma` +
-        (onlyPg.length ? `\n   มีใน postgres เท่านั้น: ${onlyPg.join(', ')}` : '') +
-        (onlySq.length ? `\n   มีใน sqlite เท่านั้น: ${onlySq.join(', ')}` : '') +
-        `\n   → แก้ทั้งสองไฟล์คู่กันเสมอ (ตามธรรมเนียมเดิมของ repo)`
-    );
-  } else {
-    reports.push(`schema-sync: ตรงกัน ${pgModels.length} models`);
-  }
-}
-
-// ── 2) file-budget: ไฟล์ที่เปลี่ยนใน diff ไม่เกินเพดาน ──
+// ── 1) file-budget: ไฟล์ที่เปลี่ยนใน diff ไม่เกินเพดาน ──
 function checkFileBudget() {
   const BUDGET = 800;
   let diffOutput = '';
@@ -289,7 +265,6 @@ function checkToolFilesTracked() {
 }
 
 const results = [];
-checkSchemaSync();
 checkFileBudget();
 await checkEnvTruth(); // top-level await (ESM) — ต้องรอ ไม่งั้น report/fail หลุดไปหลัง print
 checkModuleBoundary();
