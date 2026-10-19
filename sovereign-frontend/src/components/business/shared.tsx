@@ -22,6 +22,7 @@ export const TABS: Array<{ key: Tab; label: string; minRank: number }> = [
   // 14/10/69: เครื่องมือร้าน Soverien (serial · สติกเกอร์ · ออเดอร์ · ประกัน · CRM)
   { key: 'soverien', label: '🏷️ Soverien', minRank: 6 },
   // 18/10/69: โพสต์คลิปเดียว → YouTube/Facebook/TikTok (โหมด A เปิดหน้าเว็บอัปโหลดจริง)
+  // 20/10/69: เพิ่ม Instagram เป็นแพลตฟอร์มที่ 4 (เจ้าของขอ)
   { key: 'post', label: '📣 โพสต์', minRank: 6 },
   { key: 'products', label: 'สินค้า', minRank: 6 },
   { key: 'customers', label: 'ลูกค้า', minRank: 6 },

@@ -1,6 +1,6 @@
 // tools/test/social-post.test.mjs
 //
-// ── เทสต์ของแท็บ "📣 โพสต์" (โพสต์คลิปเดียว → YouTube / Facebook / TikTok) ──
+// ── เทสต์ของแท็บ "📣 โพสต์" (โพสต์คลิปเดียว → YouTube / Facebook / TikTok / Instagram) ──
 //
 // บริบทที่ต้องรู้ก่อนอ่านเทสต์ชุดนี้:
 //   1) โหมด A (เปิดหน้าเว็บของแพลตฟอร์ม) ทำงานได้ทุกแพลตฟอร์มโดยไม่ต้องขอ API
@@ -42,9 +42,9 @@ const fsReadFile = (p) => fs.readFileSync(p, 'utf8');
 // ── 1) แพลตฟอร์ม + เพดาน ────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════
 describe('นิยามแพลตฟอร์ม', () => {
-  test('มีครบ 3 แพลตฟอร์มที่เจ้าของขอ และเรียงลำดับคงที่', () => {
-    assert.deepEqual(model.PLATFORM_KEYS, ['youtube', 'facebook', 'tiktok']);
-    assert.equal(model.PLATFORMS.length, 3);
+  test('มีครบ 4 แพลตฟอร์มที่เจ้าของขอ และเรียงลำดับคงที่', () => {
+    assert.deepEqual(model.PLATFORM_KEYS, ['youtube', 'facebook', 'tiktok', 'instagram']);
+    assert.equal(model.PLATFORMS.length, 4);
   });
 
   test('ทุกแพลตฟอร์มมีเพดานเป็นตัวเลขจริง ไม่ใช่ 0/undefined', () => {
@@ -65,6 +65,9 @@ describe('นิยามแพลตฟอร์ม', () => {
     assert.equal(model.platformByKey('tiktok').descMax, 2200);
     // Facebook: ยาวกว่าเพื่อน แต่ต้องไม่เกิน 63,206 ของโพสต์
     assert.equal(model.platformByKey('facebook').descMax, 5000);
+    // Instagram: แคปชัน 2,200 ตัวอักษร (รวมแฮชแท็ก) · ไฟล์วิดีโอสูงสุด 4 GB
+    assert.equal(model.platformByKey('instagram').descMax, 2200);
+    assert.equal(model.platformByKey('instagram').fileMaxBytes, 4 * 1024 ** 3);
   });
 
   test('แพลตฟอร์มที่ไม่รู้จักต้องคืน null ไม่ใช่เดา', () => {
@@ -107,6 +110,8 @@ describe('URL หน้าอัปโหลด (ความปลอดภั�
   test('⛔ ข้ามแพลตฟอร์มไม่ได้ (เอา host ของ TikTok ไปใส่ช่อง YouTube)', () => {
     assert.equal(model.isAllowedUploadUrl('facebook', 'https://www.tiktok.com/upload'), false);
     assert.equal(model.isAllowedUploadUrl('tiktok', 'https://www.facebook.com/'), false);
+    assert.equal(model.isAllowedUploadUrl('instagram', 'https://www.tiktok.com/upload'), false, 'host ของ TikTok ใช้กับ Instagram ไม่ได้');
+    assert.equal(model.isAllowedUploadUrl('tiktok', 'https://www.instagram.com/'), false, 'host ของ Instagram ใช้กับ TikTok ไม่ได้');
   });
 
   test('⛔ ยัดชื่อโดเมนไว้ใน userinfo ก็ไม่ผ่าน', () => {
@@ -388,6 +393,7 @@ describe('ช่องชื่อคลิปของแต่ละแพล�
     assert.equal(model.platformByKey('youtube').hasTitleField, true);
     assert.equal(model.platformByKey('facebook').hasTitleField, true);
     assert.equal(model.platformByKey('tiktok').hasTitleField, false);
+    assert.equal(model.platformByKey('instagram').hasTitleField, false, 'Instagram ไม่มีช่องชื่อคลิปแยก — ชื่ออยู่ในแคปชัน');
   });
 
   test('ปุ่ม "คัดลอกชื่อคลิป" ควรโผล่เฉพาะแพลตฟอร์มที่มีช่องชื่อจริง', () => {
@@ -464,7 +470,7 @@ describe('Electron shell — เปิดหน้าเว็บ', () => {
     const { handlers, calls } = loadShell();
     const open = handlers.get('sovereign:openExternal');
     assert.ok(open, 'ต้องมี sovereign:openExternal');
-    for (const u of ['https://www.youtube.com/upload', 'https://www.facebook.com/', 'https://www.tiktok.com/tiktokstudio/upload']) {
+    for (const u of ['https://www.youtube.com/upload', 'https://www.facebook.com/', 'https://www.tiktok.com/tiktokstudio/upload', 'https://www.instagram.com/']) {
       assert.equal(open(null, u).ok, true, `${u} ต้องเปิดได้`);
       assert.equal(calls.openExternal.at(-1), u);
     }

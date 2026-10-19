@@ -505,6 +505,8 @@ const EXTERNAL_HOSTS = new Set([
   'web.facebook.com',
   'tiktok.com',
   'www.tiktok.com',
+  'instagram.com',
+  'www.instagram.com',
 ]);
 
 function isAllowedExternalUrl(url) {
