@@ -13,7 +13,7 @@
 //   → tools/test/social-post.test.mjs ล็อกตัวเลขชุดนี้ไว้
 // ────────────────────────────────────────────────────────────────────────────
 
-export type PlatformKey = 'youtube' | 'facebook' | 'tiktok';
+export type PlatformKey = 'youtube' | 'facebook' | 'tiktok' | 'instagram';
 
 export interface PlatformSpec {
   key: PlatformKey;
@@ -75,6 +75,21 @@ export const PLATFORMS: PlatformSpec[] = [
     fileMaxBytes: 4 * GB,
     hasTitleField: false,
     hint: 'แคปชัน 2,200 ตัวอักษร — ใส่แฮชแท็กได้เยอะกว่าแพลตฟอร์มอื่น',
+  },
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    emoji: '📸',
+    // ⚠ เหมือน Facebook: ไม่มีหน้า /upload กลางสำหรับทุกบัญชี
+    //   → ค่าเริ่มต้นคือหน้าแรก ให้เจ้าของวาง URL โปรไฟล์/เพจตัวเองทับได้ในช่อง "หน้าปลายทาง"
+    //   แล้วกดสร้าง (+) → เลือกคลิป (Reels แนวตั้ง 9:16 · 3 วินาที – 15 นาที)
+    uploadUrl: 'https://www.instagram.com/',
+    hosts: ['instagram.com', 'www.instagram.com'],
+    titleMax: 100,
+    descMax: 2200,
+    fileMaxBytes: 4 * GB,
+    hasTitleField: false,
+    hint: 'แคปชัน 2,200 ตัวอักษร — คลิปแนวตั้ง 9:16 สำหรับ Reels · เปิดโปรไฟล์แล้วกดสร้าง (+)',
   },
 ];
 
