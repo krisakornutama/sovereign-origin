@@ -135,6 +135,7 @@ tools/*
 !tools/frontend-baseline.json
 !tools/nightly-verify.mjs
 !tools/nightly-report.mjs
+!tools/stage-release.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md
 !tools/test/
@@ -291,3 +292,6 @@ sovereign-os/infra/data/wal-archive/
 # => ship it with the packaged app, never commit it.
 sovereign-frontend/electron/youtube-client.json
 sovereign-frontend/electron/youtube-client.local.json
+
+# ── ชุดส่งมอบเดสก์ท็อป (binaries ใหญ่ — สร้างใหม่ได้ด้วย npm run stage:release) ──
+release/Sovereign-OS-*/
