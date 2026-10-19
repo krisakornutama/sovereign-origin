@@ -12,8 +12,7 @@ import http from 'node:http';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, openSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { computeDirFingerprintSync } from './fingerprint-lib.mjs';
-import { writeJsonWithChecksum } from './json-checksum.mjs';
+import { writeSystemTruth as writeTruthFile } from './verify-truth.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // โฟลเดอร์ที่ “deploy จริง” = รากโปรเจกตหลัก เสมอ (docker mount core-api จากที่นี่ ไม่ใช่จาก worktree)
@@ -72,29 +71,18 @@ let truthWritten = false;
 // เดิมเขียนเฉพาะเส้นทางที่จบสำเร็จ → คืนที่ tools test ล้มครั้งเดียว = ไม่มีไฟล์ใหม่
 // → nightly อ่าน lastGateOk = null ติดกัน 11 รอบ (5–18 ต.ค.) ทั้งที่ nightly ยังรันอยู่
 // เรียกจาก process.on('exit') → ครอบทุก process.exit(1) ในไฟล์นี้โดยไม่ต้องแก้ทีละจุด
-// ใช้ sidecar .sha256 ด้วย กัน data-integrity ตีเป็น BIT_ROT (ไฟล์ system-truth ถูกสแกนทุก boot)
+// ตรรกะการสร้าง/เขียนอยู่ใน verify-truth.mjs (มีเทสต์แยก: tools/test/verify-truth.test.mjs)
 function writeSystemTruth() {
   if (truthWritten) return;
   truthWritten = true;
   try {
-    const truthPath = join(BACKEND, 'data', 'system-truth.json');
-    let prodTruth = null;
-    try { prodTruth = JSON.parse(readFileSync(truthPath, 'utf8'))?.prodTruth ?? null; } catch { /* รอบแรกยังไม่มี */ }
-    let diskFp = null, diskFiles = null;
-    try {
+    const data = writeTruthFile({
+      results,
+      truthPath: join(BACKEND, 'data', 'system-truth.json'),
       // โฟลเดอร์ที่ deploy จริง (docker mount) — ไม่ใช่ dist ของ worktree (ดู MAIN_ROOT ด้านบน)
-      const disk = computeDirFingerprintSync(join(DEPLOY_BACKEND, 'dist'));
-      diskFp = disk.fingerprint; diskFiles = disk.files;
-    } catch { /* dist ไม่มี = ไม่มีข้อมูลเทียบ */ }
-    const ok = results.length > 0 && results.every((r) => r.ok);
-    writeJsonWithChecksum(truthPath, {
-      writtenAt: new Date().toISOString(),
-      ok,
-      steps: results.map((r) => ({ name: r.name, ok: r.ok, skipped: !!r.skipped })),
-      prodTruth: { diskFingerprint: diskFp, diskFiles, diskDir: 'sovereign-os/core-api/dist (deploy root)' },
-      _prevProdTruth: prodTruth,
+      deployDist: join(DEPLOY_BACKEND, 'dist'),
     });
-    console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${ok})`);
+    console.log(`ℹ️  เขียน system-truth → data/system-truth.json (ok=${data.ok})`);
   } catch (e) {
     console.log(`ℹ️  เขียน system-truth ไม่สำเร็จ (${e.message?.slice(0, 80)}) — ไม่กระทบผลเกต`);
   }
