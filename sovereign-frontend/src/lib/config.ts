@@ -46,6 +46,15 @@ export function getWsUrl(): string {
   return getStored(API_URL_KEY)?.trim() || DEFAULT_WS_URL;
 }
 
+// ---------- โดเมนเว็บสาธารณะ (ร้าน/catalog) ----------
+// 14/10/69: หน้า public (shop/community/trace...) ย้ายออกไป repo เว็บแล้ว
+// แอปเดสก์ท็อปจึงต้องลิงก์ออกไปที่โดเมนจริง ไม่ใช่ path ในแอป (ซึ่งตอบ 404)
+export const DEFAULT_PUBLIC_SITE_URL = 'https://sovereignoriginshop.dpdns.org';
+
+export function getPublicSiteUrl(): string {
+  return (process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, '');
+}
+
 export function setApiUrl(url: string | null): void {
   setStored(API_URL_KEY, url);
 }

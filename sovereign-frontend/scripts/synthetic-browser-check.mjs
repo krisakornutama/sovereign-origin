@@ -11,7 +11,9 @@
 //   node scripts/synthetic-browser-check.mjs --loop             # วนตรวจทุก 5 นาที (default)
 //   node scripts/synthetic-browser-check.mjs --loop --interval-min 15
 // env:
-//   SYNTHETIC_TARGET_URL   หน้าที่จะตรวจ (default http://localhost:3000/shop — หน้าสาธารณะ)
+//   SYNTHETIC_TARGET_URL   หน้าที่จะตรวจ (default http://localhost:3000/ — หน้า login ของเดสก์ท็อป)
+//                          หมายเหตุ 14/10/69: เว็บร้าน/หน้าสาธารณะย้ายไป Sovereign-Web-Standalone แล้ว
+//                          → /shop ในโปรเจกนี้ตอบ 404 ทำให้ task นี้ FAIL 3/3 ทุก 5 นาที (log บวม 4 MB)
 //   SYNTHETIC_API_URL      API ที่รายงานเข้า (default http://localhost:3001)
 //   SYNTHETIC_ENGINE       chromium (default) | webkit
 //                          webkit = engine จริงของ iOS (รัน `npx playwright install webkit` ก่อน)
@@ -24,7 +26,7 @@ const LOOP = args.includes('--loop');
 const intervalIdx = args.indexOf('--interval-min');
 const INTERVAL_MIN = intervalIdx >= 0 ? Math.max(1, Number(args[intervalIdx + 1]) || 5) : 5;
 
-const TARGET_URL = process.env.SYNTHETIC_TARGET_URL || 'http://localhost:3000/shop';
+const TARGET_URL = process.env.SYNTHETIC_TARGET_URL || 'http://localhost:3000/';
 const API_URL = (process.env.SYNTHETIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 const ENGINE = (process.env.SYNTHETIC_ENGINE || 'chromium').toLowerCase();
 

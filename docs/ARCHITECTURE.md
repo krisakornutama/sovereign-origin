@@ -13,14 +13,13 @@
 | Backend | Node.js + Express + Prisma | `sovereign-os/core-api/` | Docker container `sovereign-core-api` (mount `dist/` จากเครื่อง, CMD = generate + tsc + start) |
 | Database | PostgreSQL + TimescaleDB | Docker `sovereign-db` | DB จริงชื่อ **`sovereign`** (user `sovereign`) — ดูความจริงจาก env ของ container เสมอ |
 
-## กฎเหล็ก 5 ข้อ (มีกลไกตรวจ ไม่ใช่ธรรมเนียม)
+## กฎเหล็ก 4 ข้อ (มีกลไกตรวจ ไม่ใช่ธรรมเนียม)
 
 1. **DB จริงฉบับเดียว** — `DATABASE_URL` ใน `sovereign-os/core-api/.env` ต้องชี้ DB ที่ connect ได้จริง → ตรวจโดย **arch-gate (env-truth)**
-2. **Schema สองไฟล์แก้คู่กัน** — `schema.prisma` (postgres) + `schema.sqlite.prisma` ต้องมี model ชุดเดียวกัน → ตรวจโดย **arch-gate (schema-sync)**
-3. **ไฟล์ไม่โตเกิน 800 บรรทัด** — ไฟล์ใหม่/ที่แก้ใน branch ห้ามโตเกินเพดาน (ไฟล์เก่าไม่ย้อนหลัง) → ตรวจโดย **arch-gate (file-budget)**
-4. **ตารางมีเจ้าของ + เส้นข้ามต้องประกาศ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json` (ครอบครบทุกตาราง · shared: system_settings/security_events) · การแตะตารางคนอื่นต้องมีอยู่ใน `tools/boundary-baseline.json` แล้วเท่านั้น — **เส้นข้ามใหม่ = verify fail** (เพิ่ม baseline พร้อมเหตุผลเมื่อจำเป็นจริง · เติมเจ้าของตารางใหม่ด้วย `node tools/map-owners.mjs --apply`)
+2. **ไฟล์ไม่โตเกิน 800 บรรทัด** — ไฟล์ใหม่/ที่แก้ใน branch ห้ามโตเกินเพดาน (ไฟล์เก่าไม่ย้อนหลัง) → ตรวจโดย **arch-gate (file-budget)**
+3. **ตารางมีเจ้าของ + เส้นข้ามต้องประกาศ** — แผนที่ตาราง→โมดูล อยู่ที่ `tools/module-owners.json` (ครอบครบทุกตาราง · shared: system_settings/security_events) · การแตะตารางคนอื่นต้องมีอยู่ใน `tools/boundary-baseline.json` แล้วเท่านั้น — **เส้นข้ามใหม่ = verify fail** (เพิ่ม baseline พร้อมเหตุผลเมื่อจำเป็นจริง · เติมเจ้าของตารางใหม่ด้วย `node tools/map-owners.mjs --apply`)
    - ⚠️ blind spot ที่รู้ตัว: เกตจับเฉพาะ `prisma.<delegate>` — การเขียนผ่าน **raw SQL** (`INSERT INTO sensor_telemetry` จาก mqttIngest/wan-monitor/ups-monitor ฯลฯ) มองไม่เห็น ถ้าจะเพิ่มการเขียนตารางโมดูลอื่นด้วย raw SQL ให้ระบุใน PR และ baseline เอง
-5. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full` · parity ของอัลกอริทึมสองฝั่งถูกตรวจบน CI (`tools/check-parity.mjs`) · เห็นผลได้ทันทีที่หน้า **/system-health**
+4. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full` · parity ของอัลกอริทึมสองฝั่งถูกตรวจบน CI (`tools/check-parity.mjs`) · เห็นผลได้ทันทีที่หน้า **/system-health**
 
 ## ด่านคุณภาพ (npm run verify ที่ root)
 
@@ -36,7 +35,7 @@ verify:full   = เพิ่ม Prod-Truth Gate (fingerprint disk↔runtime) + E
 |---|---|---|
 | 1 | **red-first**: `cd sovereign-os/core-api && npx tsx --test tests/<ไฟล์ใหม่>.test.ts` — เขียนเทสต์ก่อนแก้ ต้องเห็นแดงก่อน | **1** ก่อนแก้ → **0** หลังแก้ |
 | 2 | `cd sovereign-os/core-api && ./node_modules/.bin/tsc --noEmit` (อย่าใช้ `npx tsc` — ค้างบน Windows) | **0** |
-| 3 | `node tools/arch-gate.mjs` (schema-sync · file-budget · env-truth · boundary) | **0** |
+| 3 | `node tools/arch-gate.mjs` (file-budget · env-truth · boundary) | **0** |
 | 4 | `cd sovereign-os/core-api && npm test` — จำนวนเคสต้อง **≥ baseline ของรอบก่อนหน้า** (ห้ามลดลง) | **0** |
 | 5 | `cd sovereign-frontend && npm run typecheck` แล้ว `npm run build` | **0** และ **0** |
 | 6 | `npm run test:tools` (เทสต์ตรรกะเครื่องมือใน tools/ — อยู่ใน verify ด้วย) | **0** |
@@ -68,7 +67,7 @@ sovereign-os/core-api/src/
 
 | เครื่องมือ | หน้าที่ |
 |---|---|
-| `arch-gate.mjs` | ด่านแรกของ verify: schema-sync · file-budget · env-truth · boundary (baseline แบบ fail) |
+| `arch-gate.mjs` | ด่านแรกของ verify: file-budget · env-truth · boundary (baseline แบบ fail) |
 | `module-owners.json` | ตาราง→เจ้าของ + serviceAliases (แหล่งเดียว ทั้ง gate และ map-owners ใช้ร่วม) |
 | `map-owners.mjs` | เติมเจ้าของตาราง unmapped จากการใช้จริง (`--apply` เขียน) |
 | `boundary-baseline.json` | เส้นข้ามโมดูลที่ยอมรับแล้ว — นอกไฟล์นี้ = fail |
