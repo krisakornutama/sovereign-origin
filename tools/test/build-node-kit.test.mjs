@@ -58,9 +58,13 @@ describe('isSkipped — ตัดของที่ทำให้เครื�
       'sovereign-os/core-api/.env',
       'sovereign-os/infra/.env',
       'sovereign-os/agent-runner/.env.local',
+      'sovereign-os/core-api/.env.bak.20261004-004100',
+      'sovereign-os/infra/.env.bak.20261005-005219',
+      'sovereign-frontend/.env.playwright',
       'join.json',
       'age-identity.key',
       'server.pem',
+      'server.pem.bak',
       'backup.enc',
     ]) {
       assert.equal(isSkipped(p, { withOllama: false }), true, `${p} ต้องถูกตัด — ถ้าหลุดไปของเครื่อง HUB ไปอยู่เครื่องอื่น`);
@@ -74,6 +78,9 @@ describe('isSkipped — ตัดของที่ทำให้เครื�
       'start-sovereign.bat',
       'sovereign-os/infra/docker-compose.prod.yml',
       'sovereign-os/infra/.env.example',
+      'sovereign-os/core-api/.env.example',
+      'sovereign-frontend/.env.local.example',
+      'tools/install/sovereign.env.template',
       'tools/agent-pack/setup-machine.mjs',
       'tools/setup-node.mjs',
       'sovereign-os/agent-runner/src/main.mjs',
@@ -81,6 +88,19 @@ describe('isSkipped — ตัดของที่ทำให้เครื�
     ]) {
       assert.equal(isSkipped(p, { withOllama: false }), false, `${p} ต้องอยู่ในชุด`);
     }
+  });
+
+  test('ชุดส่งมอบ/ตัวติดตั้งที่ build แล้ว ต้องไม่หลุดเข้าชุดเครื่องใหม่', () => {
+    for (const p of [
+      'release/Sovereign-OS-1.1.1-win-x64/Sovereign-OS-1.1.1-portable.exe',
+      'release/README.md',
+      'dist-portable-prev-20261019/Sovereign OS.exe',
+      'dist-portable-staging/Sovereign OS.exe',
+      'sovereign-frontend/out/index.html',
+    ]) {
+      assert.equal(isSkipped(p, { withOllama: false }), true, `${p} ต้องถูกตัด — เป็น artifact ไม่ใช่ source`);
+    }
+    assert.equal(isSkipped('sovereign-frontend/src/pages/index.tsx'), false);
   });
 });
 
@@ -90,7 +110,8 @@ describe('collectKitFiles — เดินได้จริงและไม�
     assert.ok(files.length > 100, `ควรเก็บได้หลายร้อยไฟล์ แต่ได้ ${files.length}`);
     for (const f of files) {
       assert.ok(!/node_modules/.test(f.rel), `node_modules ต้องไม่หลุด: ${f.rel}`);
-      assert.ok(!/\.env$/.test(f.rel) || f.rel.endsWith('.env.example'), `.env หลุด: ${f.rel}`);
+      const base = f.rel.split('/').pop();
+      assert.ok(!base.startsWith('.env') || base.endsWith('.example'), `.env หลุด: ${f.rel}`);
       assert.ok(!f.rel.includes('join.json'), `join.json (มี token) หลุด: ${f.rel}`);
       assert.ok(f.size < 1024 * 1024 * 1024, `ไฟล์ใหญ่ผิดปกติหลุด: ${f.rel} (${f.size})`);
     }

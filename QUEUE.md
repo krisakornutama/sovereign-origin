@@ -281,11 +281,18 @@
       (portable exe + zip + DESKTOP-INFO + README-INSTALL + SHA256SUMS) · ไฟล์ .exe/.zip gitignored
 - [x] **J2c เอกสารติดตั้ง** — `docs/DESKTOP-INSTALL.md` (เครื่องปลายทางต้องมีอะไร · 2 วิธีติดตั้ง ·
       ตรวจแฮช · แก้ปัญหาจอดำ/offline · ความปลอดภัย)
+- [x] **J2d เผยแพร่ node kit ปัจจุบัน** — `node tools/build-node-kit.mjs --publish` →
+      1,969 ไฟล์ / 35.1 MB · manifest 19/10/69 · ตัวติดตั้งเครื่องใหม่ดึงจาก HUB ได้
+      · กรอง `release/`, `dist-portable-*`, `sovereign-frontend/out`, `.env.bak`, `.env.playwright`
+- [x] **J2e สลับ desktop shell เครื่องนี้** — `dist-portable` = ชุดใหม่ (boot frontend/api true)
+      · เก็บ `dist-portable-prev-20261019-1035/` ไว้ย้อนกลับ
 
 ## J3 — ยังเปิด (ต้องอนุมัติ/ทำแยก branch)
 
 - [ ] **J3a WAL `archive_timeout` 300 → 900s** — ลด WAL 24 GB/วันลง ~3 เท่า · **ต้อง recreate
       container** → ห้ามทำระหว่าง Cold Soak; ต้องให้เจ้าของอนุมัติ + ทำในหน้าต่างปิดระบบ
+      → **19/10/69: แก้ compose เป็น 900s + เทสต์ `wal-config.test.mjs` แล้ว** · runtime ยัง `SHOW = 5min`
+      เพราะ `-c` ของ container เดิม override — ค่าใหม่มีผลเมื่อ recreate เท่านั้น (ยังไม่ทำ)
 - [ ] **J3b nightly-history หาย 5 วัน** (7/9/13/14/17 ต.ค. ไม่มี entry) — เขียน atomic แล้ว
       แต่ยังไม่มี "ตรวจช่องว่าง" ใน nightly-report → ควรเตือนเมื่อเมื่อวานไม่มีแถว
 - [ ] **J3c แยกไฟล์ใหญ่** — pages: settings 1,254 · dashboard 1,219 · treasury 1,187 ·
@@ -297,6 +304,11 @@
       `fetch('/api…')` ตรง · เริ่มด้วยการทำตัวเดียวเป็น canonical + re-export ก่อน
 - [ ] **J3f `STATUS.md` 412 บรรทัด/344 KB** — เป็น journal ไม่ใช่สถานะปัจจุบัน → ย้ายไป
       `docs/history/` แล้วทำ STATUS สั้นที่ gen จาก system-truth/ops-status
+- [ ] **J3g ความลับจาก node kit รอบก่อน** — ชุด 12/10 มี `.env.bak.*` + `.env.playwright` หลุด;
+      ชุด 19/10 กรองแล้ว (`.env*` ยกเว้น `.example`) + เทสต์ · ต้อง rotate ความลับและตรวจ access log
+      ของ `/api/agent-machines/node-kits/asset` **หลัง Cold Soak** (ห้ามแตะ `.env`/restart ตอนนี้)
+- [ ] **J3h จำกัดสิทธิ์เส้น `/api/agent-machines/node-kits/*`** — ตัวติดตั้งดึงได้โดยไม่ต้องมี token
+      (ตามดีไซน์) → ตรวจ WAF/allowlist ว่าไม่เปิดสู่สาธารณะ + พิจารณา signed URL ในรอบถัดไป
 
 ## J4 — เจ้าของตัดสินใจ
 
