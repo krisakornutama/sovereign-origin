@@ -96,10 +96,10 @@ node PACK-DESKTOP.mjs
 | ระดับ | ต้องมี | ได้อะไร |
 |---|---|---|
 | Shell-only | ไม่มีอะไรเพิ่ม | เปิดหน้าต่างได้ แต่ถ้าไม่มี Dashboard `:3000` จะเห็นหน้า offline/Setup Wizard |
-| ต่อกับ HUB / เครื่องหลัก | เครือข่ายถึง HUB | ใช้ Dashboard/API ของเครื่องหลักผ่าน LAN |
+| ต่อกับ HUB / เครื่องหลัก | เครือข่ายถึง HUB | **ยังไม่รองรับการโหลด Dashboard ของ HUB ใน shell นี้** — shell probe `localhost:3000` เท่านั้น; `sovereign-hub.json` ใช้ตรวจ update · ถ้าต้องการใช้ Dashboard ของ HUB ให้เปิดในเบราว์เซอร์ หรือติดตั้ง Full node |
 | Full node (ทั้งระบบ) | **Node.js 20+**, **Docker Desktop**, Postgres (compose) | Dashboard `:3000` + API `:3001` + DB ครบ — ใช้ `INSTALL-SOVEREIGN-NODE.cmd` จาก HUB |
 
-`INSTALL-SOVEREIGN-NODE.cmd` คือเส้นติดตั้งเครื่องลูกแบบเต็ม (ดาวน์โหลด node kit ~36 MB จาก HUB,
+`INSTALL-SOVEREIGN-NODE.cmd` คือเส้นติดตั้งเครื่องลูกแบบเต็ม (ดาวน์โหลด node kit ~35 MB ที่เผยแพร่แล้ว 19/10/69 จาก HUB,
 ตรวจ SHA-256 แบบ fail-closed) — ใช้เมื่อต้องการให้เครื่องนั้นรันระบบเองทั้งหมด
 
 ---

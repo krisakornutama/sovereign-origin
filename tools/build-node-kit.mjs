@@ -73,14 +73,16 @@ const SKIP_PATH_PREFIX = [
   'sovereign-os/infra/data',      // WAL 25 GB + pgdata — ของเครื่องนี้เท่านั้น
   'sovereign-os/infra/offsite',    // backup ที่เข้ารหัสแล้ว
   'sovereign-frontend/dist-electron',
+  'sovereign-frontend/out',
   'dist-portable', 'dist-portable-staging',
+  'release',
   'portfolio',
   '.opencode',
 ];
 
 /** ไฟล์ที่ห้ามหลุดเด็ดขาด — ความลับของเครื่อง HUB */
 const SECRET_NAMES = new Set(['.env', 'join.json', '.env.local', '.env.production', 'daemon.json']);
-const SECRET_PATTERN = /\.(key|pem|p12|pfx|age|enc)$/i;
+const SECRET_PATTERN = /\.(key|pem|p12|pfx|age|enc|bak|old|orig)$/i;
 
 function isSkipped(rel, opts = {}) {
   const withOllama = opts.withOllama ?? WITH_OLLAMA;
@@ -88,7 +90,13 @@ function isSkipped(rel, opts = {}) {
   // จะกลายเป็นโค้ดตาย (เคสจริง 12/10/69: เทสต์จับได้ตอนรันครั้งแรก)
   if (!withOllama && (rel === 'Ollama' || rel.startsWith('Ollama/'))) return true;
   if (SKIP_PATH_PREFIX.some((p) => rel === p || rel.startsWith(`${p}/`))) return true;
+  // ตัวติดตั้งที่ build ไว้แล้ว (dist-portable-prev-<วันที่>/ ฯลฯ) ห้ามหลุดเข้าชุด:
+  // เดิมตัดเฉพาะชื่อเป๊ะ → โฟลเดอร์ที่เปลี่ยนชื่อเก็บไว้ (654 MB) จะถูก copy เข้า kit
+  if (rel === 'dist-portable' || rel.startsWith('dist-portable/') || rel.startsWith('dist-portable-')) return true;
   const base = rel.split('/').pop();
+  // .env ทุกชนิดห้ามหลุด — ยกเว้น template ที่ลงท้าย .example (ต้องมีไว้ให้เครื่องใหม่สร้าง env)
+  // เคสจริง 19/10/69: ชุดที่ build มี .env.bak.* (ค่าจริงของ HUB) + .env.playwright ติดไปด้วย
+  if (base.startsWith('.env') && !base.endsWith('.example')) return true;
   if (SECRET_NAMES.has(base)) return true;
   if (SECRET_PATTERN.test(base)) return true;
   return false;
