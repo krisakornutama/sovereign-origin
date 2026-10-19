@@ -107,6 +107,11 @@ Project Sovereign Origin Install/
 ถ้าไม่มี dashboard → launcher/offline · sidecar `resources/core-api/dist/server.js` รันด้วย `node` ของเครื่อง
 (ไม่ใช้ Docker ภายใน) → เครื่องปลายทางต้องมี Node.js ถ้าอยากให้ API ขึ้นเอง
 
+> ข้อเท็จจริงที่เจอ 19/10/69: `resources/out/` (static export ~5 MB) ถูก bundle ในชุดติดตั้ง
+> แต่ `electron/main.js` **ไม่เคยอ่าน/เสิร์ฟ** — `resourcesPath` ถูกใช้แค่ `core-api/dist/server.js`
+> ⇒ portable exe เดี่ยว ๆ = shell + offline/setup; หน้าเว็บต้องมาจาก `:3000` (node kit/launcher)
+> ถ้าจะทำให้ชุดเดียวจบ ต้องเพิ่มตัวเสิร์ฟ `out/` ใน shell (ยังไม่ทำ — ต้องออกแบบ offline mode ก่อน)
+
 ---
 
 ## 5) กติกาความปลอดภัยที่ห้ามละเมิด

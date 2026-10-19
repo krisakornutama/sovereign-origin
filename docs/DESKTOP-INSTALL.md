@@ -34,6 +34,10 @@ E:\My work\Project Sovereign Origin\release\Sovereign-OS-<version>-win-x64\
 
 > ไฟล์ `.exe` / `.zip` ถูก gitignore — ตัวติดตั้งไม่ขึ้น GitHub (ใหญ่เกิน) แต่ **สคริปต์ + เอกสาร** ขึ้นครบ
 > เพื่อให้ agent ตัวอื่นประกอบชุดเองได้
+>
+> ⚠️ `resources/out/` (หน้า static) ถูก bundle ไว้ในชุดก็จริง แต่ `electron/main.js` **ไม่ได้เสิร์ฟ** —
+> shell โหลดจาก `http://localhost:3000` เท่านั้น · ตัวที่เสิร์ฟ static/launcher คือ node kit ที่แยกออกไป
+> ⇒ portable exe อย่างเดียว = หน้าต่าง + Setup/Offline ไม่ใช่ระบบเต็ม (ดูตารางข้อ 4)
 
 ---
 
