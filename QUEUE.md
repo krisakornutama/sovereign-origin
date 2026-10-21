@@ -456,6 +456,10 @@
       "self-heal 30 วิ/60 วิ" ไม่จริง (Task ตรวจทุก 1 นาที + รอ backend ถึง 180 วิ) · "PDF อัตโนมัติ" = พร้อมพิมพ์ + Save as PDF เท่านั้น
 - [ ] **J9j Nice-level ให้ Ollama (ข้อเสนอในเอกสาร ยังไม่ทำ):** ต้องวัดภาระจริงก่อน設定 priority ของ process —
       ยังไม่แตะเพราะอาจทำให้ AI ถูก starvation จนฟีเจอร์อื่นพัง; ค่อยทำหลัง soak พร้อมตัววัด CPU/RAM
+- **นโยบายเจ้าของ 21/10/69:** "อนุมัติเลย ถ้าทำแล้วไม่เสียเงิน และข้าม ถ้าทำแล้วเสียเงิน"
+  ⇒ ทำทันทีเฉพาะงานฟรี: แก้ CI smoke ที่ชี้ `/shop` (ตายแล้ว) → `/` · ปรับ docs/Cron ให้ตรงจริง (Docker Watch 1 นาที) · รวม Dependabot patch/minor
+  ⇒ **ข้ามจนเจ้าของเปิดงบ:** สลิป API (SlipOK/EasySlip), e-Tax (certificate/ผู้ให้บริการ), cloud object storage
+  ⇒ **เลื่อนหลัง Cold Soak:** major upgrades (tailwind 4 / electron-builder) — ฟรีแต่ต้อง rebuild + ตรวจภาพทั้งระบบ
 
 
 
