@@ -115,7 +115,7 @@ Sovereign OS ต้องตอบคำถามเหล่านี้ได�
 - บทบาท `SITE_ADMIN`, `SITE_OPERATOR`, `AUDITOR`
 - SSO/OIDC (ถ้าต้องการ) โดยไม่ทำให้ local login เดิมพัง
 - Per-tenant encryption keys สำหรับ field-level secrets
-- Billing/entitlement (ถ้าเป็น produkต์ขาย)
+- Billing/entitlement (ถ้าเป็นผลิตภัณฑ์ที่ขาย)
 
 > Phase 5 ต้องออกแบบ data model ใหม่รอบใหญ่ — ไม่ควรทำพร้อม Phase 2
 

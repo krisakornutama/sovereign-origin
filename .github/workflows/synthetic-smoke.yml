@@ -49,7 +49,8 @@ jobs:
         run: npm run build
 
       # backend รันใน process เดียวกับ job (mock DB ไม่ต้องมี — synthetic ไม่แตะ DB
-      # และหน้า /shop ที่ synthetic ตรวจเป็นหน้าสาธารณะไม่เรียก API ที่ต้อง auth)
+      # และหน้า `/` (login) ที่ synthetic ตรวจเป็นหน้าสาธารณะไม่เรียก API ที่ต้อง auth)
+      # หมายเหตุ 21/10/69: หน้า /shop ย้ายไป Sovereign-Web-Standalone แล้ว → ใช้ / ของเดสก์ท็อปแทน
       - name: Start backend (fire-and-forget)
         working-directory: sovereign-os/core-api
         run: |
@@ -68,17 +69,17 @@ jobs:
           npx next start -p 3000 &
           echo $! > frontend.pid
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:3000/shop >/dev/null 2>&1 && break
+            curl -sf http://127.0.0.1:3000/ >/dev/null 2>&1 && break
             sleep 1
           done
-          curl -sf http://127.0.0.1:3000/shop >/dev/null
+          curl -sf http://127.0.0.1:3000/ >/dev/null
 
       # พัง = exit 1 = PR บล็อก · SYNTHETIC_ENGINE=webkit รองรับในอนาคต
       # (ubuntu runner ติดตั้ง webkit deps ได้ ถ้าอยากเข้มขึ้นเปลี่ยน ENGINE + install webkit)
       - name: Run synthetic browser check
         run: node scripts/synthetic-browser-check.mjs
         env:
-          SYNTHETIC_TARGET_URL: http://127.0.0.1:3000/shop
+          SYNTHETIC_TARGET_URL: http://127.0.0.1:3000/
           SYNTHETIC_API_URL: http://127.0.0.1:3001
 
       - name: Stop servers
