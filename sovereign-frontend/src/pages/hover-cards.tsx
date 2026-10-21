@@ -8,6 +8,7 @@ import Icon from '../components/ui/Icon';
 import Sidebar from '../components/layout/Sidebar';
 import { FounderCredit } from '../components/public/FounderCredit';
 import PageHeader from '../components/ui/PageHeader';
+import GlassLabSection from '../components/glass/GlassLabSection';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
 // Simulated live data for demo
@@ -95,6 +96,9 @@ export default function HoverCardsDemo() {
             Hover over any card to reveal detailed metrics, sparkline trends, and action buttons.
             Cards flip in 3D (left column) or expand downward (right column) to show dynamic content.
           </p>
+
+      {/* Liquid Glass — วัสดุชุดใหม่ (shader gradient + 3D + กระจกหักเหแสง) */}
+      <GlassLabSection />
 
       {/* Cards Grid */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
