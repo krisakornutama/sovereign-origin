@@ -446,6 +446,15 @@
 - [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —
       ห้ามเขียนเองแบบเดา; เลือกผู้ให้บริการก่อนแล้วทำ adapter
 - [ ] **J9g Cloud backup:** S3/R2 uploader (SigV4 เอง ไม่เพิ่ม dep) หลังได้ creds จากเจ้าของ + restore drill รายไตรมาส
+- [x] **J9h Tax Rules config (ทำแล้ว รอบ 2):** `tax-rules.ts` + `getTaxRules()` — ค่าเริ่มต้น = `RATES` เดิมเป๊ะ ·
+      override ผ่าน `core-api/data/tax-rules.json` (gitignored, ไม่สร้างอัตโนมัติ) · ตรวจเข้ม (rate 0–1, ขั้นเรียงขึ้น,
+      ขั้นสุดท้าย null, คีย์พิมพ์ผิด, effectiveFrom อนาคต) แล้ว **fallback ค่าเดิมทั้งใบ** · เทสต์ 12 + boundary 3 ·
+      red-first พิสูจน์แล้ว (ปล่อย rate 1.5 ผ่าน → แดง)
+- [x] **J9i ตรวจเอกสารฉบับขยาย (รอบ 2):** 61 หน้า (45+ จริง) · KDS/ใบกำกับพร้อมพิมพ์/สมุดบัญชี/QR PromptPay มีจริง ·
+      `/shop` + "แนบสลิปผ่านลิงก์ลับ" **ไม่จริงใน repo นี้** (ย้ายไป Sovereign-Web-Standalone) ·
+      "self-heal 30 วิ/60 วิ" ไม่จริง (Task ทุก 10 นาที) · "PDF อัตโนมัติ" = พร้อมพิมพ์ + Save as PDF เท่านั้น
+- [ ] **J9j Nice-level ให้ Ollama (ข้อเสนอในเอกสาร ยังไม่ทำ):** ต้องวัดภาระจริงก่อน設定 priority ของ process —
+      ยังไม่แตะเพราะอาจทำให้ AI ถูก starvation จนฟีเจอร์อื่นพัง; ค่อยทำหลัง soak พร้อมตัววัด CPU/RAM
 
 
 
