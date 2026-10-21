@@ -426,4 +426,26 @@
 - [ ] **J8h ทางเลือกสำรอง:** ถ้าเจ้าของต้องการ "แก้วเต็มจอ" ทุกหน้า ให้ย้าย shader ไปชั้นเดียวระดับ `_app`
       (1 canvas ค้างไว้ทั้งแอป) แทนการวางใหม่ทุกการ์ด — ต้องวัดเพิ่มก่อน เพราะ `_app` เป็นไฟล์ critical
 
+## J9 — ตรวจข้อกล่าวอ้าง B2B/SaaS กับของจริง + ปิดช่องว่างที่ปลอดภัย (21/10/69) — ทำแล้ว
+
+- [x] **J9a ตรวจ 9 ข้อกล่าวอ้างกับโค้ดจริง** — ผลอยู่ `docs/B2B-READINESS-AUDIT-2026-10-21.md`
+      (SQLite/ไม่มี off-site/ไม่มี WAF-rate limit/ไม่มี installer/ภาษี hardcode = **ไม่จริง** มีหลักฐาน file:line ครบ ·
+      ขาดจริง 3 เรื่อง: ตรวจสลิปอัตโนมัติ · e-Tax XML+ลายเซ็น · cloud object storage สำหรับ backup)
+- [x] **J9b ทางเข้า `/hover-cards` — ถูกด่านบล็อก (ไม่ใช่บั๊ก):** พยายามเพิ่มเป็นรายการ ⌘K แบบไม่ขึ้น Sidebar
+      แต่ `tools/test/desktop-only.test.mjs:83` ห้ามเมนูทุกรูปแบบลิงก์ `/hover-cards` (อยู่ในรายการ "หน้าเว็บที่ถูกถอด")
+      ⇒ เลือกทางปลอดภัย: **คืน `navigation.ts` ทั้งไฟล์ (ไม่มี diff)** คงหน้าไว้ที่ URL ตรง · ถ้าเจ้าของต้องการให้เข้าจาก ⌘K
+      ต้องอนุมัติแก้ policy ก่อน (พร้อมเหตุผลว่าหน้านี้ยังใช้เป็น Design System lab)
+- [x] **J9c แกนตัดสินสลิป (ไม่แตะ DB/เครือข่าย/env)** — `slip-verify.service.ts` เทียบเงินเป็นสตางค์ ·
+      เทียบชื่อผู้รับแบบไทย + 4 หลักท้ายบัญชี · กันสลิปซ้ำด้วย `provider:transRef` · กันสลิปเก่า/อนาคต ·
+      เทสต์ 22 เคส + boundary 3 เคส · พิสูจน์ red-first (ปิดกฎ UNDERPAID → แดง 2, exit 1 → คืน → เขียว)
+- [x] **J9d ปิดช่องโหว่ dependency ที่ปลอดภัย** — backend `follow-redirects 1.16.0 → 1.16.1` (transitive ของ axios)
+      → `npm audit` = 0 · frontend prod deps = 0 (15 รายการเป็น devDeps ล้วน — major upgrade เลื่อนไปหลัง soak)
+- [ ] **J9e หลัง Cold Soak (ต้อง migrate):** ตาราง `payment_slips` + `UNIQUE(provider, trans_ref)` +
+      endpoint `POST /api/shop/orders/:token/slip` + adapter ผู้ให้บริการ (เจ้าของเลือก) + UI เหตุผลการตัดสิน ·
+      ห้าม auto-ปิดยอดเมื่อ `PAYEE_UNVERIFIED`/`AMOUNT_MISMATCH`
+- [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —
+      ห้ามเขียนเองแบบเดา; เลือกผู้ให้บริการก่อนแล้วทำ adapter
+- [ ] **J9g Cloud backup:** S3/R2 uploader (SigV4 เอง ไม่เพิ่ม dep) หลังได้ creds จากเจ้าของ + restore drill รายไตรมาส
+
+
 
