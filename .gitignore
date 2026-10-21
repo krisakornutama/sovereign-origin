@@ -12,6 +12,7 @@ node_modules/
 # (ทางแก้ครั้งนั้นคือ filter-repo; กลับมาอีก = เจ็บกว่าเดิมหลายเท่า — ต้องกันตั้งแต่ commit เดียว)
 .next/
 .next-verify/
+.next.broken-*/
 out/
 dist/
 dist-*/

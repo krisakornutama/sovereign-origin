@@ -3,6 +3,12 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** กู้ระบบ — :3000 ค้าง "กำลังโหลด..." (22/10/69 ~01:25) · สาขา: main (hotfix)
+  - **อาการ:** เปิด Sovereign OS แล้วค้างที่ "กำลังโหลด..." ทุกหน้า · backend/DB/tunnel ปกติ (`/api/health` ok)
+  - **สาเหตุจริง:** process `next start` เปิดมาตั้งแต่ 15:13 น. แต่มี build ใหม่เขียนทับ `.next` ตอน 15:53 น. โดยไม่ restart → HTML อ้าง `_buildManifest.js`/`_ssgManifest.js`/`_clientMiddlewareManifest.js` ของ build เก่า ซึ่ง 404 ทั้ง 3 ไฟล์ → hydration ล้ม เหลือแต่ข้อความโหลด
+  - **การแก้:** หยุด watchdog ชั่วคราว → stop :3000 → เก็บ `.next` เดิมเป็น `.next.broken-20261022-012543` → promote build ที่ verify 6/6 แล้ว (`.next-verify`, BUILD_ID `q6-sZTTBVSy9n815Je1q3`, มี QuickDeck) → regenerate `sw-precache.json` → เริ่มผ่าน `frontend-watchdog` → เปิด task กลับ
+  - **ผลตรวจ:** `/` = 200, `_buildManifest.js` ของ build ใหม่ = 200, หน้า login เรนเดอร์จริง (ไม่มี request 404 / ไม่มี console error) · แดชบอร์ด (session ทดสอบ) เห็น QuickDeck ที่ด้านบนและไม่มี scroll jump
+  - **หมายเหตุ Cold Soak:** จำเป็นต้อง restart frontend 1 ครั้งเพื่อกู้แอปที่ดาวน์ — ไม่แตะ backend/DB/migration/deploy อื่น · rollback พร้อมใช้ที่ `sovereign-frontend/.next.broken-20261022-012543`
 - **งาน:** กราฟิก + ใช้งานเร็ว — QuickDeck บนแดชบอร์ด (21–22/10/69) · สาขา: ai/quickdeck-speed
   - **QuickDeck (ของจริง):** แผงทางลัด 5 งานหลักบนสุดของแดชบอร์ด — ขาย/หน้าร้าน · สินค้า/สต็อก · จอครัว (KDS) · เงิน/ภาษี · ฟาร์ม · ใช้ `GlassSurface` (Liquid Glass แบบ SVG, ไม่ใช้ WebGL ตามกติกา J8g) · ปุ่มสูง ≥56px · ข้อความ th/en ผ่าน `t()` · ไม่ขึ้นกับเลย์เอาต์วิดเจ็ตที่ผู้ใช้จัด (เห็นทุกครั้งที่เปิดหน้า)
   - **เร็วขึ้น:** `AiChatPanel` + `VoiceCommand` ย้ายไป `next/dynamic` + `ssr:false` (ไฟล์ `components/dashboard/lazy-widgets.tsx`) — ลด JS ก้อนแรกของแดชบอร์ด; การ์ด "ทางลัด" เดิมลดเหลือปุ่มเครื่องมือ 3 ปุ่ม (รีเฟรช · ความเสี่ยง · สุขภาพระบบ)
