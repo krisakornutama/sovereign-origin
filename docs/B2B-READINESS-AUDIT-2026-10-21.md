@@ -18,7 +18,7 @@
 | 5 | ไม่มีระบบตรวจสลิปโอนเงิน | **จริงบางส่วน** | ไม่มีตัวตรวจ/อ่านสลิปเลย · มีแค่ "อัปโหลดหลักฐานโอน" ฝั่ง Treasury (`treasury.routes.ts:37,533`) และร้านให้ลูกค้า **แจ้งยอดเอง** (`business-shop.service.ts:172-222`) เจ้าของกดยืนยันมือ (`:230-275`) |
 | 6 | ไม่มี e-Tax Invoice XML + ลายเซ็นดิจิทัล | **จริง — และห้ามทำครึ่ง ๆ** | ไม่มีโมเดลใบกำกับภาษี (มีแค่ `BusinessOrder:2133`, `BusinessOrderLine:2167`, `BusinessPayment`) · ไม่มี XML builder/signature · `xml` ที่ grep เจอเป็นเรื่องแผนที่/ฟาร์ม ไม่เกี่ยวกับภาษี |
 | 7 | ภาษี hardcode 7% ทุกที่ | **ไม่จริง** | VAT ต่อธุรกิจ `Business.vatRate` (`schema.prisma:2040`) · อัตรากลาง `thai-tax.service.ts:16` (`RATES`) · `computeVatMonthly` ใช้ `input.vatRate` |
-| 8 | health check 30 วิ / self-heal 60 วิ | **ไม่จริง — ช้ากว่า** | Task `Sovereign Docker Watch` ทำงาน **ทุก 10 นาที** (`docker-watchdog.mjs:3`, `tools/register-docker-watch.ps1:23`); หลังปลุก Docker รอ backend ได้ถึง 180 วิ (`docker-watchdog.mjs:189`) |
+| 8 | health check 30 วิ / self-heal 60 วิ | **ไม่จริง — ช้ากว่า** | Task `Sovereign Docker Watch` ทำงาน **ทุก 1 นาที** (ยืนยันจาก Task Scheduler 21/10/69 · สคริปต์ legacy เขียน 10 นาที — แก้ให้ตรงแล้ว); หลังปลุก Docker รอ backend ได้ถึง 180 วิ (`docker-watchdog.mjs:189`) ⇒ ฟื้นจริง ~1–4 นาที |
 | 9 | ไม่มีระบบสิทธิ์/แพ็กเกจให้ต่อยอด SaaS | **มี entitlements แล้ว** | `GET /api/features/me` (`modules/features/feature.routes.ts:5,22`) + `useFeatureStore` ฝั่งหน้าเว็บ |
 
 **ข้อสรุป:** เอกสารต้นทางประเมินต่ำเกินจริงในเรื่องพื้นฐาน (DB/backup/WAF/installer) — เสี่ยงตัดสินใจลงทุนซ้ำในของที่ทำแล้ว
@@ -162,7 +162,7 @@ npm run verify
 | "สมุดบัญชี + แยก VAT 7%" | **จริง** — ledger + แยก VAT ตามอัตราร้าน + แผ่น ภ.พ.30 | `business.service.ts:324,459,800` · `BusinessTaxTab.tsx:98-115` |
 | "KDS / จอครัว" | **จริง** | `pages/restaurant/kds.tsx`, `pages/restaurant/kitchen.tsx` |
 | "ลูกค้าแนบสลิปผ่านลิงก์ลับ" | **ไม่จริงใน repo นี้** — รับแค่ `amount`; ไม่มีฟิลด์สลิปใน schema (อัปโหลดหลักฐานที่มีเป็นของ Treasury) | `business-shop.service.ts:172-192` · `treasury.routes.ts:37,533` |
-| "Self-healing ทุก 30 วิ / ฟื้นใน 60 วิ" | **ไม่จริง** — Task ทุก 10 นาที; หลังปลุก Docker รอ backend ได้ถึง 180 วิ | `docker-watchdog.mjs:3,189` · `register-docker-watch.ps1:23` |
+| "Self-healing ทุก 30 วิ / ฟื้นใน 60 วิ" | **ไม่จริง** — Task ตรวจทุก 1 นาที; หลังปลุก Docker รอ backend ได้ถึง 180 วิ ⇒ ฟื้นจริง ~1–4 นาที | `docker-watchdog.mjs:3,189` · Task Scheduler (21/10/69) |
 | "เปิด Rate Limiting + WAF" (เป็นข้อเสนอ) | **ทำแล้ว** | `rateLimit.middleware.ts:58` · `docs/ops-runbook.md:330-332,346` |
 | "SQLite/PostgreSQL" | **PostgreSQL เท่านั้น** | `schema.prisma:6` |
 | "Nice level ให้ AI ใช้ CPU ต่ำกว่าระบบขาย" | **ยังไม่มี** — ไม่พบ `setPriority`/nice ในโค้ด | ค้นทั้ง `core-api/src` + `tools/*.mjs` |
