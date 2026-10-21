@@ -117,6 +117,14 @@ describe('collectKitFiles — เดินได้จริงและไม�
     }
   });
 
+  test('โฟลเดอร์ build สำรอง (.next-verify) ถูกตัดออกจากชุด', () => {
+    const { files } = collectKitFiles(REPO);
+    assert.ok(
+      !files.some((f) => f.rel.startsWith('sovereign-frontend/.next-verify/')),
+      '.next-verify เป็น artifact ของ verify — ห้ามหลุดเข้าชุดเครื่องใหม่',
+    );
+  });
+
   test('ไม่มี Ollama เว้นแต่สั่ง --with-ollama', () => {
     const noO = collectKitFiles(REPO, { withOllama: false });
     const withO = collectKitFiles(REPO, { withOllama: true });
