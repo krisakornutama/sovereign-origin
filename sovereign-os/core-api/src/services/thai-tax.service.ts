@@ -9,8 +9,17 @@
 // ทุกฟังก์ชันเป็น pure function (ไม่แตะ prisma) → เทสได้ตรง ๆ ทุกกรณี
 // การเงินเป็นบาท 2 ตำแหน่ง (round ตอนท้ายเสมอ ไม่ปัดกลางทาง)
 
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  mergeTaxRules,
+  validateTaxRulesFile,
+  type TaxRules,
+  type TaxRulesFile,
+} from './tax-rules';
+
 // ────────────────────────────────────────────────────────────────────────────
-// RATES — ที่มาเดียวของตัวเลขภาษีทั้งระบบ
+// RATES — ค่าเริ่มต้นของตัวเลขภาษีทั้งระบบ (แก้ผ่าน `data/tax-rules.json` ได้)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const RATES = {
@@ -50,6 +59,80 @@ export const RATES = {
 } as const;
 // หมายเหตุ หัก ณ ที่จ่าย (WHT): ระบบ "เก็บยอดที่ถูกหักจริง" เท่านั้น (business_payments.whtAmount /
 // business_ledger_entries.whtAmount) — อัตราตาม ท.ป.4/ท.ป.6 (เช่า 5%, ค่าจ้างทั่วไป 3%, ขนส่ง 1%) กรอกตอนออกบิล/จ่ายเงิน
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tax Rules override — `data/tax-rules.json` (วางเอง ไม่สร้างอัตโนมัติ)
+//   · ไฟล์เสีย/ผิดรูป = ใช้ค่าเริ่มต้นในโค้ด (fail-closed) + console.warn
+//   · ทุกค่าที่รับเข้ามาผ่าน validateTaxRulesFile (อัตรา 0–1, ขั้นบันไดเรียงขึ้น, ขั้นสุดท้าย null)
+//   · effectiveFrom ในอนาคต = ยังไม่ใช้ไฟล์ (เตรียมกฎหมายล่วงหน้าได้)
+// ────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_RULES: TaxRules = {
+  VAT: { ...RATES.VAT },
+  SME_CIT: {
+    CAPITAL_CAP: RATES.SME_CIT.CAPITAL_CAP,
+    REVENUE_CAP: RATES.SME_CIT.REVENUE_CAP,
+    BRACKETS: RATES.SME_CIT.BRACKETS.map((b) => ({ upTo: b.upTo, rate: b.rate })),
+  },
+  CIT_STANDARD: RATES.CIT_STANDARD,
+  PIT: {
+    PERSONAL_ALLOWANCE: RATES.PIT.PERSONAL_ALLOWANCE,
+    BRACKETS: RATES.PIT.BRACKETS.map((b) => ({ upTo: b.upTo, rate: b.rate })),
+  },
+};
+
+export type TaxRulesStatus = {
+  source: 'default' | 'file';
+  version: string | null;
+  path: string;
+  errors: string[];
+};
+
+let rulesCache: { rules: TaxRules; status: TaxRulesStatus } | null = null;
+
+function taxRulesPath(): string {
+  return process.env.TAX_RULES_PATH || path.join(process.cwd(), 'data', 'tax-rules.json');
+}
+
+function loadRules(): { rules: TaxRules; status: TaxRulesStatus } {
+  const filePath = taxRulesPath();
+  const status: TaxRulesStatus = { source: 'default', version: null, path: filePath, errors: [] };
+  if (!fs.existsSync(filePath)) return { rules: DEFAULT_RULES, status };
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
+    const checked = validateTaxRulesFile(raw);
+    if (checked.ok && checked.value) {
+      status.source = 'file';
+      status.version = checked.value.version ?? null;
+      return { rules: mergeTaxRules(DEFAULT_RULES, checked.value as TaxRulesFile), status };
+    }
+    status.errors = checked.errors;
+  } catch (err) {
+    status.errors = [`อ่าน/แปลง JSON ไม่ได้: ${err instanceof Error ? err.message : String(err)}`];
+  }
+  console.warn(`[tax-rules] ใช้ค่าเริ่มต้นในโค้ด — ${status.errors.join(' · ')} (ไฟล์: ${filePath})`);
+  return { rules: DEFAULT_RULES, status };
+}
+
+function ensureRules(): { rules: TaxRules; status: TaxRulesStatus } {
+  if (!rulesCache) rulesCache = loadRules();
+  return rulesCache;
+}
+
+/** กฎภาษีที่ใช้จริง (ค่าเริ่มต้น + override ที่ผ่านการตรวจแล้ว) */
+export function getTaxRules(): TaxRules {
+  return ensureRules().rules;
+}
+
+/** แหล่งที่มา/ปัญหา ของกฎที่โหลดอยู่ — ให้หน้า System Health แสดงได้ */
+export function getTaxRulesStatus(): TaxRulesStatus {
+  return ensureRules().status;
+}
+
+/** เทสต์เท่านั้น: ล้าง cache เพื่ออ่านไฟล์ใหม่ */
+export function resetTaxRulesCacheForTests(): void {
+  rulesCache = null;
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // helpers — ปัดเงินบาท 2 ตำแหน่ง, แปลง "ราคารวม VAT" → "ราคาสินค้า + VAT"
@@ -115,7 +198,8 @@ export function computeVatMonthly(input: VatMonthlyInput): VatMonthlyResult {
 /** อัตรา VAT ที่ควรใช้ ณ วันที่กำหนด (วันนี้ถ้าไม่ส่งมา) — 7% จนถึง 30 ก.ย. 2027, หลังจากนั้น 10% */
 export function currentVatRate(onDate: Date = new Date()): number {
   const d = onDate.toISOString().slice(0, 10);
-  return d <= RATES.VAT.REDUCED_UNTIL ? RATES.VAT.REDUCED : RATES.VAT.STANDARD;
+  const vat = getTaxRules().VAT;
+  return d <= vat.REDUCED_UNTIL ? vat.REDUCED : vat.STANDARD;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -140,17 +224,19 @@ export interface CitResult {
 }
 
 export function isSme(capitalRegistered: number, totalRevenue: number): boolean {
-  return capitalRegistered <= RATES.SME_CIT.CAPITAL_CAP && totalRevenue <= RATES.SME_CIT.REVENUE_CAP;
+  const sme = getTaxRules().SME_CIT;
+  return capitalRegistered <= sme.CAPITAL_CAP && totalRevenue <= sme.REVENUE_CAP;
 }
 
 export function computeCit(input: CitInput): CitResult {
+  const rules = getTaxRules();
   const profit = Math.max(0, Number(input.netProfit) || 0);
   const sme = isSme(input.capitalRegistered, input.totalRevenue);
   const breakdown: CitResult['breakdown'] = [];
   let grossTax = 0;
   if (sme) {
     let prev = 0;
-    for (const b of RATES.SME_CIT.BRACKETS) {
+    for (const b of rules.SME_CIT.BRACKETS) {
       if (profit <= prev) break;
       const base = Math.min(profit, b.upTo) - prev;
       const tax = round2(base * b.rate);
@@ -159,8 +245,8 @@ export function computeCit(input: CitInput): CitResult {
       prev = b.upTo;
     }
   } else {
-    const tax = round2(profit * RATES.CIT_STANDARD);
-    breakdown.push({ from: 0, to: profit, rate: RATES.CIT_STANDARD, base: round2(profit), tax });
+    const tax = round2(profit * rules.CIT_STANDARD);
+    breakdown.push({ from: 0, to: profit, rate: rules.CIT_STANDARD, base: round2(profit), tax });
     grossTax = tax;
   }
   const whtCredits = Math.max(0, Number(input.whtCredits) || 0);
@@ -198,12 +284,13 @@ export interface PitResult {
 }
 
 export function computePit(input: PitInput): PitResult {
+  const rules = getTaxRules();
   const income = Math.max(0, Number(input.totalIncome) || 0);
-  const taxable = Math.max(0, income - RATES.PIT.PERSONAL_ALLOWANCE);
+  const taxable = Math.max(0, income - rules.PIT.PERSONAL_ALLOWANCE);
   let grossTax = 0;
   const breakdown: PitResult['breakdown'] = [];
   let prev = 0;
-  for (const b of RATES.PIT.BRACKETS) {
+  for (const b of rules.PIT.BRACKETS) {
     if (taxable <= prev) break;
     const base = Math.min(taxable, b.upTo) - prev;
     const tax = round2(base * b.rate);
