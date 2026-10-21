@@ -391,3 +391,39 @@
       `fix-window-flash.mjs`) แต่ `tools/register-docker-watch.ps1` เขียนว่า "ทุก 10 นาที" — ไม่กระทบ
       พฤติกรรม (IgnoreNew กันซ้อนอยู่แล้ว) แต่ควรเลือกอย่างเดียวให้ตรงกันในรอบหน้า
 
+## J8 — Liquid Glass + React Three Fiber + shader gradient (คำสั่งเจ้าของ 21/10/69) — ปิดแล้ว
+
+- [x] **J8a คัดไลบรารีจาก GitHub ให้เข้ากับ React 18 จริง** — โปรเจกต์ใช้ React 18.3.1:
+      • `@vepando/liquid-glass-react@1.0.1` (MIT · กระจกหักเหแสงด้วย SVG `feDisplacementMap`
+        ตามกฎของสเนลล์ · **ไม่ใช้ WebGL** ⇒ วางซ้อนได้หลายใบโดยไม่กิน context) — ประกาศรองรับ React 18+
+      • `@react-three/fiber@8.18.0` — ไลน์ 8 คือคู่กับ React 18 (v9 บังคับ React ≥ 19)
+      • `@shadergradient/react@2.4.20` — ฉากไล่สีแบบ shader · dist import `three`/`@react-three/fiber`
+        จากโปรเจกต์ (ไม่พก three สำเนาที่สอง)
+- [x] **J8b ตัวที่ต้องตัดออก (กับดักจริง)** — `liquid-glass-react` (6.4k ดาว ดาวเยอะสุดในหมวดนี้)
+      ประกาศ `peer react >= 19` **ทุกเวอร์ชัน** ⇒ `npm install` บน React 18 ล้ม (ERESOLVE) หรือถ้าฝืนด้วย
+      `--legacy-peer-deps` จะพังตอน `tsc`/เรนเดอร์ ⇒ เทสต์ล็อกไว้ว่าห้ามกลับไปใช้ (ทั้ง package.json + lock)
+- [x] **J8c คอมโพเนนต์ใหม่** `sovereign-frontend/src/components/glass/` —
+      `GlassSurface` (3 โทน panel/contrast/light · `refraction` ปิดชั้นหักเหได้) ·
+      `ShaderGradientBackdrop` → `ShaderGradientScene` · `GlassOrb` → `GlassOrbScene`
+      (ShaderMaterial เขียนเอง: เฟรสเนลขอบแก้ว + สีไหล 2 ชั้น, ไม่โหลด HDR/รูปนอกเครื่อง) ·
+      `useReducedMotion` (SSR-safe) · `glassPalettes` (ข้อมูลล้วน ไม่ลาก WebGL เข้า bundle หน้า) ·
+      `GlassLabSection` (เวทีสาธิต วางบนหน้า Design System `/hover-cards`)
+- [x] **J8d กันหน้าเว็บพัง** — ฉาก WebGL เข้าได้ทาง `next/dynamic` + `ssr:false` เท่านั้น (เทสต์สแกนทั้ง `src/`)
+      · shader ใช้ `lightType="3d"` เพราะโหมด `env` จะไปโหลดไฟล์ `.hdr` จากภายนอก ซึ่งโดน CSP
+      (`connect-src` ไม่ได้เปิด host นอก) · CSS ของไลบรารี import ครั้งเดียวที่ `_app.tsx`
+      (Pages Router import global CSS ได้เฉพาะที่นั่น) · ทุกฉากหยุดเองเมื่อ OS ตั้ง Reduced motion
+- [x] **J8e พิสูจน์ด้วยภาพจริง (ไม่แตะ :3000)** — build แล้วเปิด `next start -p 3124` (โปรเซสชั่วคราว
+      แยกจาก runtime ที่ serve อยู่) แล้วถ่ายภาพด้วย Playwright: 6 กระจก (`.lg`) + 2 canvas
+      (1102×336 shader · 475×280 orb) · WebGL ทำงาน · **ไม่มี page error** (แปลว่า shader คอมไพล์ผ่าน) ·
+      ภาพเดสก์ท็อป/มือถือผ่าน · กดสลับชุดสีเป็น "ถ่านทอง" แล้วสีเปลี่ยนจริง (`aria-pressed=true`)
+      (รูปอยู่ `logs/glass-lab-*.png`)
+- [x] **J8f เทสต์** — `tools/test/glass-stack.test.mjs` 11/11: React 18 peer guard · ห้าม
+      `liquid-glass-react` · ขอบเขต client-only ของฉาก WebGL · CSS ที่ `_app.tsx` เท่านั้น ·
+      reduced motion · เพดาน 400 บรรทัด
+- [ ] **J8g รอบถัดไป (หลัง Cold Soak):** ยก `GlassSurface` ไปใช้กับหน้าจริง (การ์ดแดชบอร์ด/เฮิร์บ +
+      แผงควบคุม) และวัด FPS/แรมบนเครื่องจริงก่อนตัดสินใจเปิด shader ในหน้าแรก — ตอนนี้ตั้งใจให้
+      WebGL ทำงานเฉพาะหน้า `/hover-cards` เพื่อไม่ให้ทุกหน้าต้องแบก GPU
+- [ ] **J8h ทางเลือกสำรอง:** ถ้าเจ้าของต้องการ "แก้วเต็มจอ" ทุกหน้า ให้ย้าย shader ไปชั้นเดียวระดับ `_app`
+      (1 canvas ค้างไว้ทั้งแอป) แทนการวางใหม่ทุกการ์ด — ต้องวัดเพิ่มก่อน เพราะ `_app` เป็นไฟล์ critical
+
+

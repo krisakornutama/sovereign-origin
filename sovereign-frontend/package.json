@@ -16,7 +16,10 @@
     "electron:build": "npm run build:static && electron-builder --win --x64"
   },
   "dependencies": {
+    "@react-three/fiber": "^8.18.0",
+    "@shadergradient/react": "^2.4.20",
     "@types/three": "^0.186.0",
+    "@vepando/liquid-glass-react": "^1.0.1",
     "next": "^16.3.6",
     "react": "^18",
     "react-dom": "^18",
