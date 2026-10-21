@@ -38,7 +38,7 @@ const nextConfig = {
   // (`next start` ต้องการ server build ปกติ — ถ้า force export จะ error "output: export")
   ...(process.env.SOVEREIGN_STATIC_EXPORT === '1'
     ? { output: 'export', distDir: 'out' }
-    : { distDir: '.next' }),
+    : { distDir: process.env.NEXT_DIST_DIR || '.next' }),
   images: { unoptimized: true },
   trailingSlash: true,
   // P24 (3/10/69): โหมดสาธารณะสำหรับ HTML ที่ server ส่ง (SSR/static)
