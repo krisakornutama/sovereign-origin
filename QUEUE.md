@@ -387,9 +387,10 @@
 - [x] **J7e เทสต์** — `tools/test/docker-watchdog-plan.test.mjs` 16/16 (flap guard · state เพี้ยน ·
       ต้องเปิดผ่าน explorer · ของจริง: sleeper รอดหลังตัวเปิดจบ) · รันจริง 1 รอบได้
       `{"action":"containers-checked","ok":true}` exit 0 · guard เดิม 42/42 ยังเขียว
-- [ ] **J7f ความไม่ตรงกันเล็ก ๆ:** งาน `Sovereign Docker Watch` ตั้งไว้ "ทุก 1 นาที" (โดย
-      `fix-window-flash.mjs`) แต่ `tools/register-docker-watch.ps1` เขียนว่า "ทุก 10 นาที" — ไม่กระทบ
-      พฤติกรรม (IgnoreNew กันซ้อนอยู่แล้ว) แต่ควรเลือกอย่างเดียวให้ตรงกันในรอบหน้า
+- [x] **J7f ความไม่ตรงกันเล็ก ๆ (ปิดแล้ว 21/10/69):** ของจริงคือ Task `Sovereign Docker Watch`
+      **ทุก 1 นาที** (ยืนยันจาก Task Scheduler · Last Result 0) แต่ `tools/register-docker-watch.ps1`
+      และคอมเมนต์ `docker-watchdog.mjs:3` เขียน "ทุก 10 นาที" → แก้ให้ตรงเป็น 1 นาทีทั้งสองที่
+      (ไม่ต้องลงทะเบียน task ใหม่ — ของจริงเร็วกว่าอยู่แล้ว)
 
 ## J8 — Liquid Glass + React Three Fiber + shader gradient (คำสั่งเจ้าของ 21/10/69) — ปิดแล้ว
 
@@ -446,6 +447,15 @@
 - [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —
       ห้ามเขียนเองแบบเดา; เลือกผู้ให้บริการก่อนแล้วทำ adapter
 - [ ] **J9g Cloud backup:** S3/R2 uploader (SigV4 เอง ไม่เพิ่ม dep) หลังได้ creds จากเจ้าของ + restore drill รายไตรมาส
+- [x] **J9h Tax Rules config (ทำแล้ว รอบ 2):** `tax-rules.ts` + `getTaxRules()` — ค่าเริ่มต้น = `RATES` เดิมเป๊ะ ·
+      override ผ่าน `core-api/data/tax-rules.json` (gitignored, ไม่สร้างอัตโนมัติ) · ตรวจเข้ม (rate 0–1, ขั้นเรียงขึ้น,
+      ขั้นสุดท้าย null, คีย์พิมพ์ผิด, effectiveFrom อนาคต) แล้ว **fallback ค่าเดิมทั้งใบ** · เทสต์ 12 + boundary 3 ·
+      red-first พิสูจน์แล้ว (ปล่อย rate 1.5 ผ่าน → แดง)
+- [x] **J9i ตรวจเอกสารฉบับขยาย (รอบ 2):** 61 หน้า (45+ จริง) · KDS/ใบกำกับพร้อมพิมพ์/สมุดบัญชี/QR PromptPay มีจริง ·
+      `/shop` + "แนบสลิปผ่านลิงก์ลับ" **ไม่จริงใน repo นี้** (ย้ายไป Sovereign-Web-Standalone) ·
+      "self-heal 30 วิ/60 วิ" ไม่จริง (Task ตรวจทุก 1 นาที + รอ backend ถึง 180 วิ) · "PDF อัตโนมัติ" = พร้อมพิมพ์ + Save as PDF เท่านั้น
+- [ ] **J9j Nice-level ให้ Ollama (ข้อเสนอในเอกสาร ยังไม่ทำ):** ต้องวัดภาระจริงก่อน設定 priority ของ process —
+      ยังไม่แตะเพราะอาจทำให้ AI ถูก starvation จนฟีเจอร์อื่นพัง; ค่อยทำหลัง soak พร้อมตัววัด CPU/RAM
 
 
 
