@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // tools/docker-watchdog.mjs — ให้ระบบฟื้นเองเมื่อ Docker daemon ดับ (SPOF ที่ดับจริง 27/9/69)
-// เรียกโดย task 'Sovereign Docker Watch' ทุก 10 นาที (StartWhenAvailable — เครื่องตื่นช้าก็รันชดเชย)
+// เรียกโดย task 'Sovereign Docker Watch' ทุก 1 นาที (StartWhenAvailable — เครื่องตื่นช้าก็รันชดเชย)
 // หลักการ: start-only — ไม่ kill/restart ตัวที่ยังมีชีวิต · ทุกเหตุการณ์จด log + แจ้ง Telegram แบบ soft
 // kill-switch: สร้างไฟล์ data/docker-watchdog.disabled แล้ว watchdog จะไม่ปลุก Docker (เผื่อเจ้าของปิดจำกัดตอนงานหนัก)
 import { execFileSync, spawn, spawnSync } from 'node:child_process';

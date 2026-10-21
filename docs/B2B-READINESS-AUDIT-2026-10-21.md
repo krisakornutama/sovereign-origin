@@ -18,7 +18,7 @@
 | 5 | ไม่มีระบบตรวจสลิปโอนเงิน | **จริงบางส่วน** | ไม่มีตัวตรวจ/อ่านสลิปเลย · มีแค่ "อัปโหลดหลักฐานโอน" ฝั่ง Treasury (`treasury.routes.ts:37,533`) และร้านให้ลูกค้า **แจ้งยอดเอง** (`business-shop.service.ts:172-222`) เจ้าของกดยืนยันมือ (`:230-275`) |
 | 6 | ไม่มี e-Tax Invoice XML + ลายเซ็นดิจิทัล | **จริง — และห้ามทำครึ่ง ๆ** | ไม่มีโมเดลใบกำกับภาษี (มีแค่ `BusinessOrder:2133`, `BusinessOrderLine:2167`, `BusinessPayment`) · ไม่มี XML builder/signature · `xml` ที่ grep เจอเป็นเรื่องแผนที่/ฟาร์ม ไม่เกี่ยวกับภาษี |
 | 7 | ภาษี hardcode 7% ทุกที่ | **ไม่จริง** | VAT ต่อธุรกิจ `Business.vatRate` (`schema.prisma:2040`) · อัตรากลาง `thai-tax.service.ts:16` (`RATES`) · `computeVatMonthly` ใช้ `input.vatRate` |
-| 8 | health check 30 วิ / self-heal 60 วิ | **ไม่จริง — ช้ากว่า** | Task `Sovereign Docker Watch` ทำงาน **ทุก 10 นาที** (`docker-watchdog.mjs:3`, `tools/register-docker-watch.ps1:23`); หลังปลุก Docker รอ backend ได้ถึง 180 วิ (`docker-watchdog.mjs:189`) |
+| 8 | health check 30 วิ / self-heal 60 วิ | **ไม่จริง — ช้ากว่า** | Task `Sovereign Docker Watch` ทำงาน **ทุก 1 นาที** (ยืนยันจาก Task Scheduler 21/10/69 · สคริปต์ legacy เขียน 10 นาที — แก้ให้ตรงแล้ว); หลังปลุก Docker รอ backend ได้ถึง 180 วิ (`docker-watchdog.mjs:189`) ⇒ ฟื้นจริง ~1–4 นาที |
 | 9 | ไม่มีระบบสิทธิ์/แพ็กเกจให้ต่อยอด SaaS | **มี entitlements แล้ว** | `GET /api/features/me` (`modules/features/feature.routes.ts:5,22`) + `useFeatureStore` ฝั่งหน้าเว็บ |
 
 **ข้อสรุป:** เอกสารต้นทางประเมินต่ำเกินจริงในเรื่องพื้นฐาน (DB/backup/WAF/installer) — เสี่ยงตัดสินใจลงทุนซ้ำในของที่ทำแล้ว
@@ -100,6 +100,7 @@
 | ปิดช่องโหว่ dependency ฝั่ง backend (patch) | `follow-redirects 1.16.0 → 1.16.1` ใน `sovereign-os/core-api/package-lock.json`; `npm audit` = **0** |
 | ตรวจ dependency ฝั่ง frontend | prod deps = **0 ช่องโหว่**; 15 รายการเป็น devDependency ล้วน (tailwind 4 / electron-builder major) → **เลื่อนไปหลัง Cold Soak** |
 | แกนตัดสินสลิป + เทสต์ 25 เคส | `src/services/slip-verify.service.ts`, `tests/slipVerify.test.ts`, `tools/test/slip-verify-boundary.test.mjs` |
+| **Tax Rules config (fail-closed)** | `src/services/tax-rules.ts` + `getTaxRules()` ใน `thai-tax.service.ts` · ไฟล์ `core-api/data/tax-rules.json` (ไม่ commit) · เทสต์ 12 เคส + boundary 3 เคส |
 | เอกสารนี้ | `docs/B2B-READINESS-AUDIT-2026-10-21.md` |
 
 ### ไม่ทำ (เจตนา)
@@ -138,6 +139,41 @@ cd sovereign-os/core-api && npx tsx --test tests/slipVerify.test.ts
 node --test tools/test/slip-verify-boundary.test.mjs
 node --test tools/test/nav-consolidation.test.mjs
 
+# กฎภาษี (config)
+cd sovereign-os/core-api && npx tsx --test tests/taxRules.test.ts tests/thaiTax.test.ts
+node --test tools/test/tax-rules-boundary.test.mjs
+
 # ด่านรวม (ที่ MAIN)
 npm run verify
 ```
+
+---
+
+## 6. ภาคผนวก — ตรวจเอกสารฉบับขยาย (รอบ 2)
+
+เอกสารรอบสองมีข้อความที่ควรแก้ก่อนใช้ขาย/คุยกับลูกค้า เพราะตรวจโค้ดแล้วไม่ตรง:
+
+| ข้อความในเอกสาร | ของจริง | หลักฐาน |
+|---|---|---|
+| "45+ หน้าจอ" | **จริง (มากกว่า)** — 61 ไฟล์หน้า `.tsx` + 85 route module | `sovereign-frontend/src/pages/**/*.tsx`, `core-api/src/modules/**/*.routes.ts` |
+| "ระบบหน้าร้าน `/shop`" | **ไม่จริงใน repo นี้** — หน้า `shop.tsx` ถูกลบ และ backend ไม่ mount `/api/shop` แล้ว (ย้ายไป `Sovereign-Web-Standalone`) | `routes.ts:110` (คอมเมนต์ "ย้ายไป…") · `tools/test/desktop-only.test.mjs:40-49,88-96` |
+| "Dynamic PromptPay QR 0% fee" | **โค้ดมีจริง** — `buildPromptPayPayload` + `QRCode.toDataURL` | `business-shop.service.ts:278-291` (แต่ endpoint สาธารณะอยู่ใน repo ร้าน) |
+| "ออกใบกำกับภาษี/ใบเสร็จ PDF อัตโนมัติ" | **จริงบางส่วน** — เป็นเอกสาร A4 พร้อมพิมพ์ + แปลงจำนวนเงินเป็นตัวอักษรไทย แล้ว **Print/Save as PDF** จากเบราว์เซอร์; ไม่ได้สร้างไฟล์ PDF เองและไม่เก็บถาวร | `components/business/TaxInvoice.tsx`, `lib/bahtText.ts` (ไม่มีไลบรารี PDF ใน package.json) |
+| "สมุดบัญชี + แยก VAT 7%" | **จริง** — ledger + แยก VAT ตามอัตราร้าน + แผ่น ภ.พ.30 | `business.service.ts:324,459,800` · `BusinessTaxTab.tsx:98-115` |
+| "KDS / จอครัว" | **จริง** | `pages/restaurant/kds.tsx`, `pages/restaurant/kitchen.tsx` |
+| "ลูกค้าแนบสลิปผ่านลิงก์ลับ" | **ไม่จริงใน repo นี้** — รับแค่ `amount`; ไม่มีฟิลด์สลิปใน schema (อัปโหลดหลักฐานที่มีเป็นของ Treasury) | `business-shop.service.ts:172-192` · `treasury.routes.ts:37,533` |
+| "Self-healing ทุก 30 วิ / ฟื้นใน 60 วิ" | **ไม่จริง** — Task ตรวจทุก 1 นาที; หลังปลุก Docker รอ backend ได้ถึง 180 วิ ⇒ ฟื้นจริง ~1–4 นาที | `docker-watchdog.mjs:3,189` · Task Scheduler (21/10/69) |
+| "เปิด Rate Limiting + WAF" (เป็นข้อเสนอ) | **ทำแล้ว** | `rateLimit.middleware.ts:58` · `docs/ops-runbook.md:330-332,346` |
+| "SQLite/PostgreSQL" | **PostgreSQL เท่านั้น** | `schema.prisma:6` |
+| "Nice level ให้ AI ใช้ CPU ต่ำกว่าระบบขาย" | **ยังไม่มี** — ไม่พบ `setPriority`/nice ในโค้ด | ค้นทั้ง `core-api/src` + `tools/*.mjs` |
+| "Tax Rules แก้ผ่าน config" | **เพิ่มให้แล้วรอบนี้** (ค่าเริ่มต้นในโค้ด + override ผ่าน `data/tax-rules.json`, fail-closed) | `tax-rules.ts` · `thai-tax.service.ts` (`getTaxRules`) |
+
+### Tax Rules config — กติกาที่ล็อกไว้
+
+- ไม่มีไฟล์ = ใช้ `RATES` เดิมเป๊ะ (ผลคำนวณไม่เปลี่ยน; เทสต์ยืนยัน 105,000 และ 21,500)
+- ไฟล์ผิดรูป/คีย์พิมพ์ผิด/อัตรา > 1/ขั้นบันไดไม่เรียง/ขั้นสุดท้ายไม่เปิด → **ไม่ใช้ไฟล์ทั้งใบ** + `getTaxRulesStatus().errors`
+- `effectiveFrom` ในอนาคต = ยังไม่ใช้ (เตรียมกฎหมายล่วงหน้าได้)
+- ไฟล์อยู่ `core-api/data/tax-rules.json` (gitignored) — ไม่ commit ค่า override ลง repo
+- เทสต์: `tests/taxRules.test.ts` 12 เคส + `tools/test/tax-rules-boundary.test.mjs` 3 เคส · พิสูจน์ red-first (ปล่อยให้ rate 1.5 ผ่าน → แดง 1 ตัว)
+
+**ข้อความที่ควรใช้แทนในเอกสารขาย:** "ออกใบกำกับภาษี/ใบเสร็จพร้อมพิมพ์ (Save as PDF ได้)" · "ตรวจสลิปด้วยคน + แกนตัดสินพร้อมต่อ API" · "สำรองข้อมูลเข้ารหัสออกรอบเครื่องผ่าน 2 ช่องทาง (Telegram + mirror)" · "ฟื้นระบบอัตโนมัติภายในรอบ 10 นาที"
