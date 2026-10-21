@@ -16,6 +16,8 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useFeatureStore } from '../stores/useFeatureStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import '../styles/globals.css';
+// วัสดุ Liquid Glass (@vepando/liquid-glass-react) — global CSS ของ Pages Router import ได้เฉพาะ _app
+import '@vepando/liquid-glass-react/style.css';
 
 // หน้าเฉพาะ SUPERADMIN — ซ่อน/ปิดให้สมาชิกเสมอ (กันเดา URL เข้า)
 const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
