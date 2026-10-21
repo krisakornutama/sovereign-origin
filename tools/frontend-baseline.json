@@ -10,7 +10,7 @@
   "violations": [
     "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",
     "line-budget|sovereign-frontend/src/pages/ai-agent.tsx|1064 บรรทัด > เพดาน 800 (pages)",
-    "line-budget|sovereign-frontend/src/pages/dashboard.tsx|1219 บรรทัด > เพดาน 800 (pages)",
+    "line-budget|sovereign-frontend/src/pages/dashboard.tsx|1228 บรรทัด > เพดาน 800 (pages)",
     "line-budget|sovereign-frontend/src/pages/knowledge.tsx|806 บรรทัด > เพดาน 800 (pages)",
     "line-budget|sovereign-frontend/src/pages/livestock.tsx|860 บรรทัด > เพดาน 800 (pages)",
     "line-budget|sovereign-frontend/src/pages/settings.tsx|1254 บรรทัด > เพดาน 800 (pages)",

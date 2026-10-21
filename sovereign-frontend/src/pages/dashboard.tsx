@@ -6,12 +6,12 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { API_RECONNECTED_EVENT } from '../hooks/useApiConnection';
-import AiChatPanel from '../components/dashboard/AiChatPanel';
+import QuickDeck from '../components/ui/QuickDeck';
+import { AiChatPanel, VoiceCommand } from '../components/dashboard/lazy-widgets';
 import GlobalMap from '../components/dashboard/GlobalMap';
 import AlertsPanel from '../components/dashboard/AlertsPanel';
 import DefconWidget from '../components/dashboard/DefconWidget';
 import WealthWidget from '../components/dashboard/WealthWidget';
-import VoiceCommand from '../components/dashboard/VoiceCommand';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
@@ -909,12 +909,18 @@ export default function Dashboard() {
         );
       }
       case 'actions': {
+        // ทางลัดหลักย้ายไป QuickDeck (อยู่บนสุดแล้ว) — เหลือเฉพาะปุ่มเครื่องมือที่ไม่ต้องเปิดบ่อย
         return (
           <div className="flex flex-wrap gap-2 py-1">
-            <Link href="/sensors" scroll={false} className="btn-primary text-xs px-3 py-1.5">{t('dashboard.actions.manageSensors', 'จัดการอุปกรณ์และเซ็นเซอร์')}</Link>
-            <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5">รีเฟรชข้อมูล</button>
-            <Link href="/treasury" scroll={false} className="btn-secondary text-xs px-3 py-1.5">คลัง & พอร์ต</Link>
-            <Link href="/risk-monitor" scroll={false} className="btn-secondary text-xs px-3 py-1.5">เฝ้าระวังความเสี่ยง</Link>
+            <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5">
+              {t('common.refresh', 'รีเฟรชข้อมูล')}
+            </button>
+            <Link href="/risk-monitor" scroll={false} className="btn-secondary text-xs px-3 py-1.5">
+              {t('dashboard.actions.risk', 'เฝ้าระวังความเสี่ยง')}
+            </Link>
+            <Link href="/system-health" scroll={false} className="btn-secondary text-xs px-3 py-1.5">
+              {t('dashboard.actions.health', 'สุขภาพระบบ')}
+            </Link>
           </div>
         );
       }
@@ -962,6 +968,9 @@ export default function Dashboard() {
             </div>
           </div>
           {editMode && <div className="text-[10px] font-mono text-gray-500 mb-2">ลากบล็อกเพื่อสลับตำแหน่ง · กดซ่อนเพื่อซ่อน — {visibleOrder.length}/{order.length} แสดง</div>}
+
+          {/* ทางลัดงานประจำ — อยู่บนสุดเสมอ ไม่ขึ้นกับเลย์เอาต์ที่ผู้ใช้จัด */}
+          <QuickDeck />
 
           {/* Dense 12-col command grid */}
           <div className="grid grid-cols-12 gap-2.5 auto-rows-min">

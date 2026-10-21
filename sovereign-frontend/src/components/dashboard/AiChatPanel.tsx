@@ -34,7 +34,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // โทนหลวงพี่ปัจจุบัน — อ่านจากผล MBTI ล่าสุดใน localStorage (client-only, รอ hydrate)
   // ทำไม: ผู้ใช้ควรเห็นว่า AI กำลังปรับโทนตามอะไร — และเมื่อยังไม่เคยทำแบบทดสอบ ให้ชวนอย่างอ่อนโยน
@@ -45,7 +45,11 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
   const careTone = careToneFor(mbtiCode);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // เลื่อนเฉพาะกล่องข้อความของแชท — ห้ามใช้ scrollIntoView เพราะมันลากทั้งหน้า
+    // dashboard ให้กระโดดลงมาที่วิดเจ็ตแชท (เจอจริง 21/10/69: เปิดหน้าแล้วไม่เห็น QuickDeck)
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
   const clearHistory = async () => {
@@ -204,7 +208,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-gray-500 text-sm text-center py-8">
             {t('dashboard.aiChat.emptyHint', 'ถามอะไรเกี่ยวกับ Sovereign Hub ได้เลย...')}
@@ -261,7 +265,7 @@ export default function AiChatPanel({ compact = false }: { compact?: boolean }) 
             </div>
           </div>
         )}
-        <div ref={chatEndRef} />
+        {/* ท้ายรายการ — ไม่ต้องมี sentinel แล้ว เพราะเลื่อนด้วย scrollRef โดยตรง */}
       </div>
 
       {/* ชิปโทนหลวงพี่ — บอกผู้ใช้ว่า AI กำลังปรับโทนตามผล MBTI ล่าสุด (หรือชวนไปทำแบบทดสอบ) */}

@@ -108,6 +108,7 @@ export const FULL_KIT_SKIP_DIRS = new Set([
   '.git',
   '.freebuff',
   '.next',
+  '.next-verify',
   '.turbo',
   '.cache',
   '.playwright-browsers',
