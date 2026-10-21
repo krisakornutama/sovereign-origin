@@ -45,7 +45,7 @@ const die = (m) => { say(`[build-node-kit] ${m}`); process.exit(1); };
 // ── โฟลเดอร์ที่ "ตัดแน่นอน" ไม่ว่าจะอยู่ตรงไหน ────────────────────────────
 // (ปรับปรุงแล้วจาก FULL_KIT_SKIP_DIRS ของ pack.mjs — ถ้าแก้ที่นี่ให้แก้ที่นั่นด้วย)
 const SKIP_DIRS = new Set([
-  '.git', '.freebuff', '.next', '.turbo', '.cache', '.playwright-browsers',
+  '.git', '.freebuff', '.next', '.next-verify', '.turbo', '.cache', '.playwright-browsers',
   'node_modules', 'backups', 'logs', 'data', '__pycache__', 'build', 'dist', 'coverage',
   // เคสจริง 11-12/10/69: ต้องมี ไม่งั้น build-node-kit จะพยายามอ่าน vhdx 88 GB
   //   แล้วล้ม ERR_FS_FILE_TOO_LARGE แบบเดียวกับ BUILD-KIT รอบแรก

@@ -3,6 +3,14 @@
 > อัปเดตอัตโนมัติทุกครั้งที่เริ่ม/จบงาน — ผู้ใช้ดูไฟล์นี้แทนการเดา
 
 - **สถานะ:** ✅ เว็บโชว์ผลงานขึ้น production แล้ว (deploy อัตโนมัติจาก main) · แอป desktop **v1.1.1 เผยแพร่จริง** — เวอร์ชันแรกที่ตัวติดตั้งมีด่านตรวจ SHA-256 + downloadFile ที่ settle ทุกเส้นทาง ในตัว (v1.1.0 บน release ยังไม่มีด่านในตัว — updater จะถูกต้องเมื่อผู้ใช้มาถึง v1.1.1 เป็นต้นไป) · คำเคลมทั้งเว็บผ่านกติกา "โฆษณาเฉพาะสิ่งที่มีโค้ดจริง" · ความปลอดภัย: Socket.IO และ ai-models ถูกล็อกแล้ว (19 ก.ย. 2026) — รายละเอียดในบันทึกด้านล่าง
+- **งาน:** กราฟิก + ใช้งานเร็ว — QuickDeck บนแดชบอร์ด (21–22/10/69) · สาขา: ai/quickdeck-speed
+  - **QuickDeck (ของจริง):** แผงทางลัด 5 งานหลักบนสุดของแดชบอร์ด — ขาย/หน้าร้าน · สินค้า/สต็อก · จอครัว (KDS) · เงิน/ภาษี · ฟาร์ม · ใช้ `GlassSurface` (Liquid Glass แบบ SVG, ไม่ใช้ WebGL ตามกติกา J8g) · ปุ่มสูง ≥56px · ข้อความ th/en ผ่าน `t()` · ไม่ขึ้นกับเลย์เอาต์วิดเจ็ตที่ผู้ใช้จัด (เห็นทุกครั้งที่เปิดหน้า)
+  - **เร็วขึ้น:** `AiChatPanel` + `VoiceCommand` ย้ายไป `next/dynamic` + `ssr:false` (ไฟล์ `components/dashboard/lazy-widgets.tsx`) — ลด JS ก้อนแรกของแดชบอร์ด; การ์ด "ทางลัด" เดิมลดเหลือปุ่มเครื่องมือ 3 ปุ่ม (รีเฟรช · ความเสี่ยง · สุขภาพระบบ)
+  - **บั๊กที่เจอด้วยเบราว์เซอร์จริง:** `AiChatPanel` เรียก `scrollIntoView` ทำให้ทั้งแดชบอร์ดกระโดดลง ~1,710px ทันทีที่เปิดหน้า (QuickDeck หลุดจอ) — แก้เป็นเลื่อน `scrollTop` ของกล่องแชทตัวเองเท่านั้น · เทสต์ล็อกไว้แล้ว (`tools/test/quick-deck.test.mjs`)
+  - **ความปลอดภัยของ verify (Cold Soak):** เพิ่ม `NEXT_DIST_DIR` ใน `next.config.js` (ค่าเริ่มต้นยังเป็น `.next` เป๊ะ) → รอบนี้ build ลง `.next-verify` **ไม่แตะ `.next` ที่ prod :3000 เสิร์ฟอยู่** · เพิ่ม `.gitignore` + ตัดออกจากชุดติดตั้ง (`build-node-kit`/`pack`) + เทสต์ `next-dist-dir.test.mjs`
+  - **ด่านคุณภาพ:** `npm run verify` ผ่าน 6/6 (16.0 นาที · backend flake 1 ครั้งผ่านตอน retry) · `tsc --noEmit` 0 · เทสต์ใหม่ 6 (QuickDeck) + 4 (distDir) + 1 (kit skip) · ภาพตรวจ UI: `.freebuff/quickdeck-top.png` (พอร์ต 3124 + fake session)
+  - **ยังไม่ live:** Cold Soak ห้าม restart — :3000 ยังเสิร์ฟบิลด์เดิม · เมื่อสิ้น soak ให้ build ลง `.next` แล้ว restart frontend (หรือเปิด preview ด้วย `NEXT_DIST_DIR=.next-verify next start -p 3124`)
+  - **baseline:** `dashboard.tsx` 1219 → 1228 บรรทัด (ตั้งใจ +9 จาก QuickDeck/lazy import — อัปเดต baseline พร้อมเหตุผลใน commit)
 - **งาน:** ตรวจเอกสาร B2B ฉบับขยาย + Tax Rules config (21/10/69) · สาขา: ai/b2b-readiness
   - **เอกสารรอบสองตรวจแล้ว:** 61 ไฟล์หน้า (45+ จริง) · KDS/จอครัวมีจริง · ใบกำกับภาษี/ใบเสร็จเป็น **เอกสารพร้อมพิมพ์ + Save as PDF** (ไม่ได้สร้างไฟล์ PDF เอง/ไม่เก็บถาวร) · สมุดบัญชี+VAT/ภ.พ.30 มีจริง · PromptPay QR มีจริง
   - **ข้อความที่ต้องแก้ก่อนใช้ขาย:** `/shop` และ "ลูกค้าแนบสลิปผ่านลิงก์ลับ" **ไม่จริงใน repo นี้** (ย้ายไป `Sovereign-Web-Standalone` แล้ว) · "self-heal ทุก 30 วิ/60 วิ" ไม่จริง (Task ตรวจทุก 1 นาที + รอ backend ถึง 180 วิ) · WAF/rate limit ทำแล้ว
