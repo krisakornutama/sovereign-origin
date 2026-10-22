@@ -6,9 +6,9 @@
 - **งาน:** Runtime Layers — แบ่งชั้นการทำงาน + หยุดของที่ไม่จำเป็น (22/10/69) · สาขา: ai/runtime-layers
   - **วัดจริง:** Wazuh 472 MB / agents 0 → หยุด; EMQX 353 MB / clients 6 ตัวเป็นของ core-api ทั้งหมด (ภายนอก 0) → เก็บไว้เพราะ backend ที่รันอยู่ยังใช้ MQTT; tunnel 23 MB → เก็บ; core db+api+web ~490 MB
   - **โหมด:** core (db/api/web) · connected (+tunnel) · iot (+emqx) · full (+wazuh) · ปัจจุบัน **iot** (ตัด Wazuh) · เปลี่ยนด้วย `node tools/runtime-layers.mjs use <mode>` / ดูด้วย `status` / `evidence`
-  - **ทำแล้ว:** docker-watchdog + frontend-watchdog อ่านโหมด · nightly เป็น non-e2e + `.next-verify` · nightly-gate ไม่ kill prod ที่ healthy · verify auto-isolate + คืน `next-env.d.ts` · synthetic 5→30 นาที · เพิ่ม MQTT error listener 5 จุด (กัน backend ตายเมื่อ EMQX ถูกหยุดหลัง restart) · ตัด `.next*` ออกจากชุดเครื่องใหม่
+  - **ทำแล้ว:** docker-watchdog + frontend-watchdog อ่านโหมด · nightly เป็น non-e2e + `.next-verify` · nightly-gate ไม่ kill prod ที่ healthy + timeout 20 นาที · verify auto-isolate + คืน `next-env.d.ts` · synthetic 5→30 นาที · เพิ่ม MQTT error listener 5 จุด (กัน backend ตายเมื่อ EMQX ถูกหยุดหลัง restart) · ตัด `.next*` ออกจากชุดเครื่องใหม่
   - **ผล:** คืน ~472 MB (active ~876 MB จาก ~1,327 MB) · ลด browser session ~83% · ไม่ restart backend/DB/migration/deploy — หยุดเฉพาะ container Wazuh
-  - **ด่านคุณภาพ:** ✅ ผ่าน 6/6 (12.6 นาที) · prod build `5hH9...` ไม่เปลี่ยน · `next-env.d.ts` คืนค่าแล้ว · live `/` = 200, `/healthz` = 200
+  - **ด่านคุณภาพ:** ✅ ผ่าน 6/6 (13.3 นาที) · prod build `5hH9...` ไม่เปลี่ยน · `next-env.d.ts` คืนค่าแล้ว · live `/` = 200, `/healthz` = 200
 - **งาน:** กู้ระบบ — :3000 ค้าง "กำลังโหลด..." (22/10/69 ~01:25) · สาขา: main (hotfix)
   - **อาการ:** เปิด Sovereign OS แล้วค้างที่ "กำลังโหลด..." ทุกหน้า · backend/DB/tunnel ปกติ (`/api/health` ok)
   - **สาเหตุจริง:** process `next start` เปิดมาตั้งแต่ 15:13 น. แต่มี build ใหม่เขียนทับ `.next` ตอน 15:53 น. โดยไม่ restart → HTML อ้าง `_buildManifest.js`/`_ssgManifest.js`/`_clientMiddlewareManifest.js` ของ build เก่า ซึ่ง 404 ทั้ง 3 ไฟล์ → hydration ล้ม เหลือแต่ข้อความโหลด

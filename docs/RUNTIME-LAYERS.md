@@ -101,8 +101,8 @@ node tools/runtime-layers.mjs use connected --force
   + คืน `next-env.d.ts` ตอนจบ (แม้ verify ล้ม) → **ไม่ทำ chunk/manifest 404 แบบเหตุการณ์ 15:53 อีก**
 - `tools/nightly-verify.mjs`: เปลี่ยนเป็น `verify` (non-e2e) + `NEXT_DIST_DIR=.next-verify`
   → nightly ไม่แตะ `.next` ของ prod · e2e ยังรันมือด้วย `npm run verify:full`
-- `tools/verify/nightly-gate.mjs`: verify ลง `.next-verify` และ **ไม่ kill prod ที่ healthy**
-  (เดิม gate ฆ่า :3000 ทุกคืนเพื่อให้รับ build ใหม่ — ตอนนี้ไม่จำเป็นและลด restart โดยไม่จำเป็น)
+- `tools/verify/nightly-gate.mjs`: verify ลง `.next-verify` + timeout 20 นาที และ **ไม่ kill prod ที่ healthy**
+  (เดิม gate ฆ่า :3000 ทุกคืนเพื่อให้รับ build ใหม่ + timeout 5 นาที ซึ่งสั้นกว่า verify จริง — ตอนนี้ไม่จำเป็นและลด restart โดยไม่จำเป็น)
 - `sovereign-frontend/scripts/synthetic-browser-check.mjs`: คุมความถี่เองที่ 30 นาที/รอบ
   (Task Scheduler ยังยิงทุก 5 นาที แต่ 5 ใน 6 รอบจะจบก่อนเปิด browser) · `--force` สำหรับรันมือ
 - MQTT clients 5 ตัวที่ขาด error listener ถูกเติมแล้ว (`mqttIngest`, `start.ts` DEFCON, relay, OTA status, relay scheduler)

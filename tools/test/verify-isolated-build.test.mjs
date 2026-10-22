@@ -52,6 +52,7 @@ describe('wiring', () => {
   test('nightly-gate: verify ลง .next-verify และไม่ kill prod ที่ healthy', () => {
     const src = read('tools/verify/nightly-gate.mjs');
     assert.match(src, /NEXT_DIST_DIR:\s*'\.next-verify'/);
+    assert.match(src, /timeoutMs:\s*20\s*\*\s*60\s*\*\s*1000/, 'verify ใช้เวลา >5 นาที — ต้องมี timeout 20 นาที');
     const body = src.slice(src.indexOf('async function ensureProdFrontend'), src.indexOf('// ── gate'));
     assert.ok(body.length > 0, 'ต้องพบ ensureProdFrontend');
     assert.doesNotMatch(body, /taskkill|netstat/);
