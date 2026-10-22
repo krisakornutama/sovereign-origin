@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // ────────────────────────────────────────────────────────────────────────────
-// nightly-verify.mjs — รัน verify:full ทุกคืนโดยอัตโนมัติ (Phase 3: ระบบพิสูจน์สุขภาพตัวเอง)
-// โครง: lock กันรันซ้อน → รัน verify:full → เก็บ status/log บน E: → ส่งสรุป Telegram
+// nightly-verify.mjs — รัน quality gate (non-e2e) ทุกคืนโดยอัตโนมัติ (Phase 3: ระบบพิสูจน์สุขภาพตัวเอง)
+// โครง: lock กันรันซ้อน → รัน verify → เก็บ status/log บน E: → ส่งสรุป Telegram
+// หมายเหตุ 22/10/69: เปลี่ยนจาก verify:full เป็น verify (non-e2e) + NEXT_DIST_DIR=.next-verify
+//   เพราะ 02:00 มี production :3000 serve อยู่ — build ทับ .next แล้วไม่ restart = ค้าง "กำลังโหลด..."
+//   (e2e ยังรันได้ด้วย `npm run verify:full` ตอนมีคนเฝ้า หรือใน CI)
 // หลักการ fail-safe: ล้มเหลวทุกจุด = เขียน status + รายงานเสมอ (ไม่มีความพังแบบเงียบ)
 // log ทั้งหมดอยู่บน E: ตามกฎ PROJECT DRIVE ONLY (ข้อ 7)
 // ติดตั้ง: tools/register-nightly-task.ps1 (Task Scheduler 02:00 ทุกคืน)
@@ -84,9 +87,10 @@ async function backendAlive(timeoutMs = 0) {
 }
 const backend = { up: await backendAlive(0), startedByUs: false, error: null };
 if (!backend.up) {
-  console.log('⚠️  backend :3001 ไม่ตอบ — บูต docker stack ก่อน (ไม่งั้น e2e จะถูกข้ามเงียบ)');
+  console.log('⚠️  backend :3001 ไม่ตอบ — บูตเฉพาะ db/api (ไม่ลาก emqx ขึ้นมาด้วย)');
   const infra = join(REPO, 'sovereign-os', 'infra');
-  const up = spawnSync('docker', ['compose', '-f', join(infra, 'docker-compose.yml'), 'up', '-d'],
+  // --no-deps: core-api มี depends_on emqx — ถ้าไม่ใส่ compose จะปลุก emqx กลับทั้งที่โหมดไม่ได้เปิด
+  const up = spawnSync('docker', ['compose', '-f', join(infra, 'docker-compose.yml'), 'up', '-d', '--no-deps', 'timescaledb', 'core-api'],
     { windowsHide: true, cwd: infra, encoding: 'utf8', timeout: 300_000 });
   backend.startedByUs = true;
   backend.up = await backendAlive(180_000);
@@ -98,12 +102,13 @@ if (!backend.up) {
 
 let ok = false;
 try {
-  // E2E_REQUIRE_BACKEND=1 = e2e ห้ามถูกข้ามเงียบ (ถ้า backend ตายกลางทาง = ต้อง fail ให้เห็น ไม่ใช่รายงานผ่าน)
-  const script = backend.up ? 'verify:full' : 'verify';
-  console.log(`▶ gate: npm run ${script}${backend.up ? ' (e2e บังคับรัน)' : ' (e2e ไม่รวม — backend ไม่ขึ้น)'}`);
+  // nightly = quality gate แบบ non-e2e และ build ลง .next-verify เท่านั้น
+  // (เหตุผลด้านบน: 02:00 มี prod serve อยู่ — ห้ามแตะ .next)
+  const script = 'verify';
+  console.log('▶ gate: npm run verify (non-e2e · NEXT_DIST_DIR=.next-verify)');
   const r = spawnSync('npm', ['run', script], { windowsHide: true,
     cwd: REPO, encoding: 'utf8', timeout: 30 * 60_000, shell: true,
-    env: backend.up ? { ...process.env, E2E_REQUIRE_BACKEND: '1' } : process.env,
+    env: { ...process.env, NEXT_DIST_DIR: '.next-verify' },
   });
   ok = r.status === 0;
   const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
@@ -164,7 +169,7 @@ for (const st of steps) {
   if (st.skipped) skipped.push({ name: st.name, why: 'เงื่อนไขขั้นตอนไม่ครบ (ดู logs/nightly/last-run.log)' });
 }
 if (!backend.up) {
-  skipped.push({ name: 'e2e: prod-truth + Playwright', why: `backend :3001 ขึ้นไม่ได้${backend.error ? ` · ${backend.error.slice(0, 140)}` : ''}` });
+  skipped.push({ name: 'backend :3001', why: `บูตไม่ขึ้น${backend.error ? ` · ${backend.error.slice(0, 140)}` : ''}` });
 }
 if (restore?.skipped) skipped.push({ name: 'backup restore-check', why: 'NIGHTLY_SKIP_RESTORE=1' });
 if (!indexnow) skipped.push({ name: 'IndexNow', why: 'สคริปต์ไม่คืนผลลัพธ์' });

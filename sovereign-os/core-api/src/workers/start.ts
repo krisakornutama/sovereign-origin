@@ -407,6 +407,8 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
     port: Number(process.env.MQTT_PORT) || 1883,
     protocol: 'mqtt',
   });
+  // กัน process ตายเมื่อ EMQX ถูกหยุดในโหมดที่ไม่มีชั้น IoT
+  defconMqtt.on('error', (err) => console.error('DEFCON MQTT error:', err instanceof Error ? err.message : err));
   const DEFAULT_NODE_ID = config.defaults.telemetryNodeId;
 
   // ── Phase 7: Closed-Loop Actuation Sandbox — ใส่ตัวอ่าน snapshot จริง (TimescaleDB) ──

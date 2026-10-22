@@ -20,11 +20,22 @@
 //
 // ไม่เพิ่ม dependency — ใช้ @playwright/test ที่มีอยู่ใน devDependencies แล้ว
 import { chromium, webkit } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { shouldRunSynthetic, readLastRunMs } from '../../tools/synthetic-schedule.mjs';
 
 const args = process.argv.slice(2);
 const LOOP = args.includes('--loop');
+const FORCE = args.includes('--force');
 const intervalIdx = args.indexOf('--interval-min');
 const INTERVAL_MIN = intervalIdx >= 0 ? Math.max(1, Number(args[intervalIdx + 1]) || 5) : 5;
+const MIN_INTERVAL_MIN = Math.max(1, Number(process.env.SYNTHETIC_MIN_INTERVAL_MIN) || 30);
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, '..', '..');
+const STATE_FILE = process.env.SYNTHETIC_STATE_FILE
+  || path.join(REPO, 'sovereign-os', 'infra', 'logs', 'synthetic-check.last-run');
 
 const TARGET_URL = process.env.SYNTHETIC_TARGET_URL || 'http://localhost:3000/';
 const API_URL = (process.env.SYNTHETIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
@@ -57,6 +68,20 @@ const PROFILES = [
 
 function log(msg) {
   console.log(`[${new Date().toISOString()}] ${msg}`);
+}
+
+// Task Scheduler ยิงทุก 5 นาที — แต่การเปิด browser 3 โปรไฟล์ทุก 5 นาทีนั้นเกินจำเป็น
+// ใช้ state file กันเอง (ไม่ต้องแก้ trigger ของ task) · ค่าเริ่มต้น 30 นาที · --force สำหรับรันมือ
+if (!LOOP) {
+  const last = readLastRunMs(STATE_FILE);
+  if (!shouldRunSynthetic({ lastRunMs: last, minIntervalMs: MIN_INTERVAL_MIN * 60_000, force: FORCE })) {
+    log(`ข้ามรอบ — เพิ่งตรวจไม่ถึง ${MIN_INTERVAL_MIN} นาที (state: ${STATE_FILE})`);
+    process.exit(0);
+  }
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    fs.writeFileSync(STATE_FILE, String(Date.now()));
+  } catch { /* เขียน state ไม่ได้ = รันต่อ ไม่บล็อก */ }
 }
 
 async function reportToApi(result) {

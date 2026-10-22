@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "defaultMode": "full",
+  "modes": {
+    "core": {
+      "label": "ใช้แอปในเครื่อง",
+      "description": "DB + API + เว็บ localhost — ไม่มีบริการภายนอก",
+      "services": ["db", "api", "web"]
+    },
+    "connected": {
+      "label": "ใช้งาน + เว็บสาธารณะ",
+      "description": "core + Cloudflare Tunnel (ลิงก์สาธารณะ/ร้านออนไลน์)",
+      "services": ["db", "api", "web", "tunnel"]
+    },
+    "iot": {
+      "label": "connected + MQTT",
+      "description": "เพิ่ม EMQX สำหรับเซนเซอร์/รีเลย์/OTA",
+      "services": ["db", "api", "web", "tunnel", "emqx"]
+    },
+    "full": {
+      "label": "ทุกชั้น",
+      "description": "เพิ่ม Wazuh SIEM — ใช้เมื่อมี agent หรือต้องการ security lab",
+      "services": ["db", "api", "web", "tunnel", "emqx", "wazuh"]
+    }
+  },
+  "services": {
+    "db": {
+      "kind": "docker",
+      "container": "sovereign-db",
+      "watch": true,
+      "essential": true,
+      "memoryHintMb": 163,
+      "purpose": "ฐานข้อมูลหลัก TimeScaleDB — ต้องมีเมื่อใช้แอป/backup"
+    },
+    "api": {
+      "kind": "docker",
+      "container": "sovereign-core-api",
+      "watch": true,
+      "essential": true,
+      "memoryHintMb": 216,
+      "purpose": "Backend API :3001"
+    },
+    "web": {
+      "kind": "process",
+      "port": 3000,
+      "watch": true,
+      "essential": true,
+      "memoryHintMb": 150,
+      "purpose": "Next.js frontend :3000 (desktop app + เว็บ)"
+    },
+    "tunnel": {
+      "kind": "docker",
+      "container": "sovereign-cloudflared",
+      "watch": false,
+      "essential": false,
+      "memoryHintMb": 23,
+      "purpose": "Cloudflare Tunnel → sovereignoriginshop.dpdns.org"
+    },
+    "emqx": {
+      "kind": "docker",
+      "container": "sovereign-emqx",
+      "watch": true,
+      "essential": false,
+      "memoryHintMb": 353,
+      "purpose": "MQTT broker — เซนเซอร์/รีเลย์/OTA (ตอนนี้มีแต่ client ภายในจาก core-api)"
+    },
+    "wazuh": {
+      "kind": "docker",
+      "container": "wazuh-manager",
+      "watch": false,
+      "essential": false,
+      "memoryHintMb": 472,
+      "purpose": "Wazuh SIEM — ปัจจุบันไม่มี agent เชื่อมต่อ"
+    }
+  }
+}

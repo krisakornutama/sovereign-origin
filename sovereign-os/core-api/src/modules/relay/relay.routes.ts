@@ -13,6 +13,8 @@ const mqttClient = mqtt.connect({
   protocol: 'mqtt',
 });
 
+// กัน process ตายเมื่อ EMQX ถูกหยุดในโหมดที่ไม่มีชั้น IoT
+mqttClient.on('error', (err) => console.error('Relay MQTT error:', err instanceof Error ? err.message : err));
 mqttClient.on('connect', () => console.log('Relay MQTT connected'));
 
 const DEFAULT_NODE_ID = config.defaults.telemetryNodeId;

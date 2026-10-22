@@ -10,6 +10,8 @@ const mqttClient = mqtt.connect({
   protocol: 'mqtt',
 });
 
+// กัน process ตายเมื่อ EMQX ถูกหยุดในโหมดที่ไม่มีชั้น IoT
+mqttClient.on('error', (err) => console.error('Relay scheduler MQTT error:', err instanceof Error ? err.message : err));
 mqttClient.on('connect', () => console.log('⏰ Relay Scheduler MQTT connected'));
 
 function pad(n: number): string {
