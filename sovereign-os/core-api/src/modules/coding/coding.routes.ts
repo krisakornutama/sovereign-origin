@@ -1,7 +1,7 @@
 // src/modules/coding/coding.routes.ts
 // Coding Agent — พิมพ์ภาพรวมครั้งเดียว → AI วางแผน เขียนโค้ด ตรวจงาน เสนอทางต่อ (ทำงานเบื้องหลัง)
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   createCodingJob,
   listCodingJobs,
@@ -51,7 +51,7 @@ router.delete('/jobs/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/coding/jobs/:id/apply — เขียนไฟล์จากงานที่เสร็จ ลงโปรเจ็กจริง (path ในแผน)
-router.post('/jobs/:id/apply', authenticate, async (req, res) => {
+router.post('/jobs/:id/apply', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const result = await applyFilesToProject(req.params.id);
     res.json({ success: true, ...result });

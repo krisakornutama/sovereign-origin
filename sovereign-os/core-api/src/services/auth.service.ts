@@ -8,6 +8,20 @@ import crypto from 'node:crypto';
 
 export { prisma };
 
+/** Minimal user row used by HTTP/socket authentication (owned by auth module). */
+export async function getSessionUser(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      assigned_node_id: true,
+      token_version: true,
+      must_change_password: true,
+    },
+  });
+}
+
 export class AuthService {
   // ── MFA backup codes (ใช้ครั้งเดียวทิ้ง กัน lockout ตอนโทรศัพท์หาย) ──
   // เก็บเฉพาะ sha256 hash ใน users.mfa_backup_hash (JSON array) — plaintext แสดงให้ผู้ใช้ครั้งเดียวตอน generate

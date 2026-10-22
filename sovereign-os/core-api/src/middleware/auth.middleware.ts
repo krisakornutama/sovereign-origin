@@ -40,25 +40,43 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
     // Token versioning — เทียบเลขใน token กับ DB ทุก request: รหัสผ่านถูกเปลี่ยน/รีเซ็ตเมื่อไหร่
     // token เก่าทุกใบ (อุปกรณ์/session เดิม) หมดอายุ "ทันที" ไม่ต้องรอครบ 24 ชม.
-    // DB ล่ม → fail open: token ยัง verify ด้วย secret อยู่ ไม่ล็อกทั้งระบบเพราะ DB ชั่วคราว
+    // DB คือแหล่งความจริงของ role/assigned_node_id ด้วย — ห้ามเชื่อ claims ใน JWT
+    // (user ถูกลบ/ถูกลดสิทธิ์แล้ว token เดิมต้องใช้ไม่ได้ทันที)
+    let dbUser: any;
     try {
-      const dbUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { token_version: true } });
-      if (dbUser && (decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
-        return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
-      }
-    } catch { /* fail open */ }
-    // บังคับเปลี่ยนรหัสผ่านให้เป็น server-side (เดิมฝั่ง client เท่านั้น — เรียก API ตรง ๆ ข้ามได้)
+      dbUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          role: true,
+          assigned_node_id: true,
+          token_version: true,
+          must_change_password: true,
+        },
+      });
+    } catch (err: any) {
+      // DB ล่ม = ตรวจสิทธิ์ไม่ได้ → ปฏิเสธแบบ 503 ไม่ปล่อยผ่านด้วย claims เก่า
+      console.error('[auth] user lookup failed:', err?.message || err);
+      return res.status(503).json({ error: 'Authentication temporarily unavailable', code: 'AUTH_UNAVAILABLE' });
+    }
+    if (!dbUser) {
+      return res.status(401).json({ error: 'User no longer exists', code: 'USER_NOT_FOUND' });
+    }
+    if ((decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+      return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
+    }
+    // บังคับเปลี่ยนรหัสผ่านให้เป็น server-side (อ่านจาก DB ไม่ใช่ claim ที่อาจค้าง)
     // /api/auth/change-password ใช้ authenticatePartial พอดี จึงยังเป็นทางออกของ flow นี้
     // (เช็คหลัง version — token ที่หมดอายุเพราะรหัสเปลี่ยนต้องบอกว่า "session ตาย" ไม่ใช่ "ต้องเปลี่ยนรหัส")
-    if (decoded.must_change_password === true) {
+    if (dbUser.must_change_password === true) {
       return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
     }
     req.user = {
-      id: decoded.userId,
-      role: decoded.role,
-      assigned_node_id: decoded.assigned_node_id,
+      id: dbUser.id,
+      role: dbUser.role,
+      assigned_node_id: dbUser.assigned_node_id ?? null,
       mfa_verified: true,
-      must_change_password: decoded.must_change_password === true,
+      must_change_password: false,
     };
     warRoomPulse(); // ข้อ 3: ทุก request ที่ผ่าน auth = สัญญาณ "มนุษย์กำลังใช้ War Room"
     next();
@@ -171,19 +189,35 @@ export async function authenticatePartial(req: Request, res: Response, next: Nex
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     // Token versioning (เช่น admin รีเซ็ตรหัสซ้ำระหว่าง user ค้างอยู่หน้าบังคับเปลี่ยน)
-    // → token ชั่วคราวใบเก่าตายทันที — fail open เมื่อ DB ล่ม เช่นเดียวกับ authenticate
+    // → token ชั่วคราวใบเก่าตายทันที · DB คือแหล่งความจริงของ role/สถานะ user
+    let dbUser: any;
     try {
-      const dbUser = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { token_version: true } });
-      if (dbUser && (decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
-        return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
-      }
-    } catch { /* fail open */ }
+      dbUser = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          role: true,
+          assigned_node_id: true,
+          token_version: true,
+          must_change_password: true,
+        },
+      });
+    } catch (err: any) {
+      console.error('[auth] partial user lookup failed:', err?.message || err);
+      return res.status(503).json({ error: 'Authentication temporarily unavailable', code: 'AUTH_UNAVAILABLE' });
+    }
+    if (!dbUser) {
+      return res.status(401).json({ error: 'User no longer exists', code: 'USER_NOT_FOUND' });
+    }
+    if ((decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+      return res.status(401).json({ error: 'Session expired — password was changed', code: 'TOKEN_VERSION_STALE' });
+    }
     req.user = {
-      id: decoded.userId,
-      role: decoded.role,
-      assigned_node_id: decoded.assigned_node_id,
+      id: dbUser.id,
+      role: dbUser.role,
+      assigned_node_id: dbUser.assigned_node_id ?? null,
       mfa_verified: decoded.mfa_verified,   // เก็บสถานะเดิมไว้ (false)
-      must_change_password: decoded.must_change_password === true,
+      must_change_password: dbUser.must_change_password === true,
     };
     next();
   } catch (err) {

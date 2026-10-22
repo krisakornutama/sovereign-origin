@@ -77,6 +77,11 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
     // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
     if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
+    // เปลี่ยนสิทธิ์/โหนด/สถานะบังคับรหัส = เพิ่ม token_version ทันที
+    // token เก่าของ user คนนั้นใช้ไม่ได้อีก (middleware เทียบ version ทุก request)
+    if (role !== undefined || assigned_node_id !== undefined || must_change_password !== undefined) {
+      data.token_version = { increment: 1 };
+    }
     // ทุก PUT นี้ลง audit อัตโนมัติผ่าน auditStateChange (server.ts) — actionType = "PUT /api/users/:id"
     await prisma.user.update({ where: { id: req.params.id }, data });
     res.json({ success: true });
