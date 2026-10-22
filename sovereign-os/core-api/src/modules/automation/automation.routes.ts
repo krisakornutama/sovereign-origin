@@ -2,6 +2,7 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+import { getSessionUser } from '../../services/auth.service';
 import { automationEngine, automationEmitter } from '../../services/automation.service';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
 
@@ -93,14 +94,27 @@ router.post('/check', authenticate, (req, res) => {
 
 // GET /api/automation/alerts/stream (SSE) — ด่าน query-token แบบเดียวกับ nextgen/events
 // (EventSource ฝั่ง browser ส่ง Authorization header ไม่ได้ จึงรับ token ทาง query)
-router.get('/alerts/stream', (req, res) => {
+router.get('/alerts/stream', async (req, res) => {
   const token = String(req.query.token || '');
   if (!token) return res.status(401).json({ error: 'Missing token' });
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as any;
     if (!decoded.mfa_verified) return res.status(403).json({ error: 'MFA verification required' });
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+    if (!decoded.userId) return res.status(401).json({ error: 'Invalid token' });
+    const dbUser = await getSessionUser(String(decoded.userId));
+    if (!dbUser) return res.status(401).json({ error: 'User no longer exists', code: 'USER_NOT_FOUND' });
+    if ((decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+      return res.status(401).json({ error: 'Session expired', code: 'TOKEN_VERSION_STALE' });
+    }
+    if (dbUser.must_change_password === true) {
+      return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
+    }
+  } catch (err: any) {
+    if (err?.name === 'JsonWebTokenError' || err?.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('[automation-sse] auth lookup failed:', err?.message || err);
+    return res.status(503).json({ error: 'Authentication temporarily unavailable', code: 'AUTH_UNAVAILABLE' });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');

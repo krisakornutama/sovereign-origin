@@ -2,6 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { getSessionUser } from '../../services/auth.service';
 import { threatIntel } from '../../services/threat-intel.service';
 import { piHole } from '../../services/pihole.service';
 import { idsReader } from '../../services/ids-reader.service';
@@ -332,13 +333,30 @@ export async function securityEventsSse(req: any, res: any) {
   const token = String(req.query.token || '');
   if (!token) return res.status(401).json({ error: 'Missing token' });
   let user: { id: string; role: string; mfa_verified: boolean } | null = null;
+  let decoded: any;
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    decoded = jwt.verify(token, config.jwtSecret) as any;
     if (!decoded.mfa_verified) return res.status(403).json({ error: 'MFA verification required' });
-    user = { id: decoded.userId, role: decoded.role, mfa_verified: true };
+    if (!decoded.userId) return res.status(401).json({ error: 'Invalid token' });
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
+
+  let dbUser: any;
+  try {
+    dbUser = await getSessionUser(String(decoded.userId));
+  } catch (err: any) {
+    console.error('[security-sse] auth lookup failed:', err?.message || err);
+    return res.status(503).json({ error: 'Authentication temporarily unavailable', code: 'AUTH_UNAVAILABLE' });
+  }
+  if (!dbUser) return res.status(401).json({ error: 'User no longer exists', code: 'USER_NOT_FOUND' });
+  if ((decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+    return res.status(401).json({ error: 'Session expired', code: 'TOKEN_VERSION_STALE' });
+  }
+  if (dbUser.must_change_password === true) {
+    return res.status(403).json({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
+  }
+  user = { id: String(dbUser.id), role: String(dbUser.role), mfa_verified: true };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');

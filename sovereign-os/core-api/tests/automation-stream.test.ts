@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import automationRoutes from '../src/modules/automation/automation.routes';
 import { automationEmitter } from '../src/services/automation.service';
 import { createTestServer, makeToken, TestServer } from './helpers';
+import { unregisterTestUser } from './auth-user-registry';
 
 // ── ด่าน SSE /alerts/stream: ต้อง query-token (JWT + mfa_verified) แบบเดียวกับ nextgen/events ──
 // เดิมเส้นทางนี้เปิดหมด — จับได้จากการทดสอบระบบ 19 ก.ย. 2026 (frontend ไม่ได้ใช้เส้นนี้ แต่มันเปิดอยู่จริง)
@@ -31,6 +32,13 @@ describe('automation /alerts/stream — ด่าน query-token (SSE)', () => {
     const token = makeToken('SUPERADMIN', { mfa_verified: false });
     const res = await fetch(`${server.baseUrl}/api/automation/alerts/stream?token=${encodeURIComponent(token)}`);
     assert.equal(res.status, 403);
+  });
+
+  test('token ของ user ที่ถูกลบ → 401', async () => {
+    const token = makeToken('SUPERADMIN', { userId: 'automation-deleted-user' });
+    unregisterTestUser('automation-deleted-user');
+    const res = await fetch(`${server.baseUrl}/api/automation/alerts/stream?token=${encodeURIComponent(token)}`);
+    assert.equal(res.status, 401);
   });
 
   test('token ถูก → 200 event-stream และได้ข้อมูลจริงเมื่อมี alert', async () => {
