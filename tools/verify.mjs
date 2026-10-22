@@ -13,6 +13,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync, openSync, appendFil
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeSystemTruth as writeTruthFile } from './verify-truth.mjs';
+import { shouldIsolateProdBuild } from './verify-plan.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // โฟลเดอร์ที่ “deploy จริง” = รากโปรเจกตหลัก เสมอ (docker mount core-api จากที่นี่ ไม่ใช่จาก worktree)
@@ -160,11 +161,32 @@ const devIsProd = (() => {
 })();
 if (devPidBefore) {
   console.log(devIsProd === true
-    ? `ℹ️  :${DEV_PORT} มี production server serve อยู่ (PID ${devPidBefore}) — verify จะไม่แตะพอร์ต/.next ตอนท้าย`
+    ? `ℹ️  :${DEV_PORT} มี production server serve อยู่ (PID ${devPidBefore}) — ${RUN_E2E ? 'e2e: จะ build .next + restart prod ตอนท้าย' : 'verify จะไม่แตะพอร์ต/.next'}`
     : devIsProd === false
       ? `ℹ️  พบ dev server บน :${DEV_PORT} (PID ${devPidBefore}) — หลัง verify จะกู้ dev ให้เอง (restart)`
       : `⚠️  :${DEV_PORT} มี server แต่ระบุชนิดไม่ได้ (cmdline อ่านไม่ได้) — โหมด fail-safe: verify จะไม่ kill/restart อะไรทั้งสิ้น`);
 }
+
+// ── Cold Soak safety (22/10/69): ห้าม build ทับ .next ที่ production กำลัง serve ──
+// ต้นเหตุจริง: server เปิดตั้งแต่ 15:13 แต่ build เขียน .next ตอน 15:53 โดยไม่ restart
+// → HTML อ้าง _buildManifest.js ของ build เก่าที่หายไป → 404 → ค้าง "กำลังโหลด..." ทั้งระบบ
+// แก้: prod + ไม่มี e2e → build ลง .next-verify (prod ไม่ถูกแตะ) · e2e คงพฤติกรรมเดิม (build .next + restart)
+const ISOLATED_BUILD = shouldIsolateProdBuild({ e2e: RUN_E2E, listenerPid: devPidBefore, serverKind: devIsProd });
+if (ISOLATED_BUILD) {
+  if (!process.env.NEXT_DIST_DIR) process.env.NEXT_DIST_DIR = '.next-verify';
+  console.log(`ℹ️  build ลง ${process.env.NEXT_DIST_DIR} — production .next ไม่ถูกแตะ (กัน chunk/manifest 404)`);
+}
+// next build เขียน next-env.d.ts ให้ชี้ dist ใหม่ — คืนค่าเดิมตอนจบ (แม้ verify ล้ม)
+// ไม่งั้นไฟล์ source จะเปลี่ยนเป็น .next-verify/types และหลุดเข้า commit/CI
+const NEXT_ENV_FILE = join(FRONTEND, 'next-env.d.ts');
+const nextEnvBefore = (() => { try { return readFileSync(NEXT_ENV_FILE, 'utf8'); } catch { return null; } })();
+function restoreNextEnv() {
+  if (!ISOLATED_BUILD || nextEnvBefore == null) return;
+  try {
+    if (readFileSync(NEXT_ENV_FILE, 'utf8') !== nextEnvBefore) writeFileSync(NEXT_ENV_FILE, nextEnvBefore);
+  } catch { /* คืนไม่ได้ = อย่าทำให้ gate ล้มเพิ่ม */ }
+}
+process.on('exit', restoreNextEnv);
 
 if (RUN_E2E && !existsSync(join(FRONTEND, 'node_modules', '@playwright', 'test'))) {
   console.error('❌ ยังไม่ได้ติดตั้ง @playwright/test — รัน: cd sovereign-frontend && npm install -D @playwright/test && npx playwright install chromium');

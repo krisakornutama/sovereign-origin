@@ -19,6 +19,9 @@ export class OtaStatusService {
       reconnectPeriod: 5000,
     });
 
+    // กัน process ตายเมื่อ broker ไม่พร้อม (ดู tools/test/mqtt-error-listeners.test.mjs)
+    this.client.on('error', (err) => console.error('OTA status MQTT error:', err instanceof Error ? err.message : err));
+
     this.client.on('connect', () => {
       console.log('🚀 OTA Status listener connected');
       this.client.subscribe('sovereign/+/ota/status', { qos: 1 });

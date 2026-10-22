@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRuntimeMode, modeHasWeb } from './runtime-layers.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAIN_ROOT = (() => {
@@ -82,6 +83,15 @@ async function waitUp(maxMs) {
 
 const t0 = Date.now();
 if (fs.existsSync(KILL_SWITCH)) { console.log('kill-switch มีอยู่ — ข้าม'); process.exit(0); }
+
+// เคารพ runtime-layer: โหมดที่ไม่มี web (เช่นอนาคต sleep/core-only) ห้ามบูต :3000 กลับ
+// (ถ้าไม่เช็คตรงนี้ การ stop frontend ของผู้ใช้จะถูกปลุกทุก 1 นาที)
+const activeMode = (() => { try { return readRuntimeMode({ root: MAIN_ROOT }).mode; } catch { return 'unknown'; } })();
+if (!modeHasWeb(activeMode)) {
+  log({ action: 'skip-mode', mode: activeMode, ms: Date.now() - t0 });
+  console.log(`mode=${activeMode} ไม่มี web — ข้าม`);
+  process.exit(0);
+}
 
 let code = await httpCode();
 if (code === 200) {

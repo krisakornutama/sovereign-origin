@@ -23,32 +23,23 @@ const checks = [
   { name: 'full-system-check (mounts ปิดสนิท + lifecycle จริง)', cmd: 'node', args: ['tools/verify/full-system-check.mjs'] },
   // I3c: audit_logs เก็บ 90 วัน — เดือนไหนจบเกินเกณฑ์ = export json.gz → drop partition (เจอปัญหา = gate ล้มแจ้งเลย)
   { name: 'audit-retention (90 วัน export+drop)', cmd: 'node', args: ['tools/verify/audit-retention.mjs'] },
-  { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'] },
+  { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'], env: { ...process.env, NEXT_DIST_DIR: '.next-verify' } },
   { name: 'ui-sweep (หน้าจอจริงผ่าน Chromium)', cmd: 'node', args: ['tools/verify/ui-sweep.mjs'] },
   // security-audit ต้องเป็นตัวสุดท้าย: brute-force test กิน per-IP login window (10/15 นาที) —
   // ถ้ารันก่อน check อื่นจะบล็อก API จาก IP เดิมใน window
   { name: 'security-audit (headers/SQLi/rate-limit/IDOR)', cmd: 'node', args: ['tools/verify/security-audit.mjs'] },
 ];
 
-// ── โหมด :3000 — verify (next build) เขียน .next ทับตัวที่ prod serve อยู่ → ช่วง build watchdog อาจชุบเป็น dev
-// (บทเรียนจริง 20 ก.ย. 2026 · runbook §๓) ui-sweep ต้องวัด prod จริง: มี BUILD_ID → ฆ่า listener
-// แล้วรอ watchdog ชุบ prod (~1 วิ) · ไม่มี BUILD_ID = สถานะ rollback จริง ปล่อยเป็น dev ตามปกติ
+// ── โหมด :3000 — verify สร้างลง .next-verify (ไม่แตะ .next ที่ prod serve อยู่) ──
+// จึงไม่ต้องฆ่า prod เพื่อให้รับ build ใหม่ · แค่รอให้ :3000 ตอบ (ถ้าดับ watchdog จะปลุกเอง)
+// การ kill/restart prod ทุกคืนเป็นสิ่งที่ไม่จำเป็นและเสี่ยงช่วง Cold Soak
 async function ensureProdFrontend() {
-  if (!fs.existsSync(path.join(ROOT, 'sovereign-frontend', '.next', 'BUILD_ID'))) return;
-  let pid;
-  try {
-    pid = execFileSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 15_000, windowsHide: true })
-      .split(/\r?\n/).find((l) => l.includes('LISTENING') && /:3000\s/.test(l))?.trim().split(/\s+/).pop();
-  } catch { /* อ่าน netstat ไม่ได้ — ข้าม kill แล้วรอตื่นข้างล่าง */ }
-  if (pid && pid !== '0') {
-    try { execFileSync('taskkill', ['/PID', pid, '/T', '/F'], { timeout: 15_000, windowsHide: true, stdio: 'ignore' }); } catch { /* มีคนฆ่าไปก่อน */ }
-  }
   const t0 = Date.now();
   while (Date.now() - t0 < 90_000) {
     try { const r = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(4_000) }); if (r.ok) return; } catch { /* ยังไม่ตื่น */ }
     await new Promise((r) => setTimeout(r, 3_000));
   }
-  throw new Error(':3000 ยังไม่ตอบหลัง verify 90 วิ — watchdog อาจตาย (ปลุก: Start-Process node -ArgumentList \'frontend-watchdog.mjs\' -WorkingDirectory <repo root>)');
+  throw new Error(':3000 ยังไม่ตอบหลัง verify 90 วิ — ตรวจ frontend-watchdog (ห้ามฆ่า prod ที่ healthy)');
 }
 
 // ── gate ──
@@ -65,6 +56,7 @@ async function main() {
       const out = execFileSync(c.cmd, c.args, {
         cwd: ROOT, encoding: 'utf8', timeout: 300_000, windowsHide: true,
         maxBuffer: 10 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+        env: c.env ?? process.env,
       });
       results.push({ ...c, code: 0, out });
     } catch (e) {

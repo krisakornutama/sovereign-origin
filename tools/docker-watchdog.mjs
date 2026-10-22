@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readRuntimeMode, watchContainerNamesForMode } from './runtime-layers.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 // ชี้ MAIN เสมอ — log/kill-switch ต้องอยู่ที่เดียวกันไม่ว่าจะรันจาก worktree หรือ MAIN
@@ -22,7 +23,16 @@ const LOG = join(MAIN_ROOT, 'logs', 'docker-watchdog.jsonl');
 // ความจำของ flap guard — logs/ ถูก gitignore อยู่แล้ว (ไม่ใช่ไฟล์โปรเจ็กต์)
 const STATE = join(MAIN_ROOT, 'logs', 'docker-watchdog.state.json');
 
-const CONTAINERS = ['sovereign-db', 'sovereign-core-api', 'sovereign-emqx'];
+// ชั้นที่ต้องเฝ้า = ตาม mode ปัจจุบัน (core/connected ไม่เฝ้า emqx ⇒ stop แล้วไม่ถูกปลุกกลับ)
+// registry เสีย/โหมดไม่รู้จัก = fallback รายชื่อเดิม (db/api/emqx) เพื่อไม่ให้ระบบดับเงียบ
+function containersForMode() {
+  try {
+    return watchContainerNamesForMode(readRuntimeMode({ root: MAIN_ROOT }).mode);
+  } catch {
+    return ['sovereign-db', 'sovereign-core-api', 'sovereign-emqx'];
+  }
+}
+
 const DOCKER_EXE = join(
   process.env.LOCALAPPDATA || `C:/Users/${process.env.USERNAME || 'com'}/AppData/Local`,
   'Programs', 'DockerDesktop', 'Docker Desktop.exe'
@@ -56,10 +66,11 @@ async function notify(text) {
 function startStoppedContainers() {
   const out = sh('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.State}}'], 20_000);
   if (!out.ok) return 'ps-failed';
+  const containers = containersForMode();
   let started = [];
   for (const line of out.out.split('\n')) {
     const [name, state] = line.trim().split('\t');
-    if (CONTAINERS.includes(name) && state === 'exited') {
+    if (containers.includes(name) && state === 'exited') {
       sh('docker', ['start', name], 60_000);
       started.push(name);
     }
@@ -187,7 +198,8 @@ async function main() {
 
   // ยืนยันสุดท้ายด้วย healthz — พาธปลุกให้รอยาว (backend บูต ~1 นาที) · พาธปกติเช็คสั้น ๆ
   const healthy = await waitBackend(action === 'daemon-restart' && ok ? 180_000 : 15_000);
-  const entry = { action, ok: ok && healthy, detail, healthy, ms: Date.now() - t0 };
+  const activeMode = (() => { try { return readRuntimeMode({ root: MAIN_ROOT }).mode; } catch { return 'unknown'; } })();
+  const entry = { action, mode: activeMode, ok: ok && healthy, detail, healthy, ms: Date.now() - t0 };
   log(entry);
   console.log(JSON.stringify(entry));
   if (action === 'daemon-restart' && ok && healthy) {

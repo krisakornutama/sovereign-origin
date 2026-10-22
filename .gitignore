@@ -115,6 +115,10 @@ tools/*
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
 !tools/verify.mjs
+!tools/verify-plan.mjs
+!tools/runtime-layers.mjs
+!tools/runtime-layers.json
+!tools/synthetic-schedule.mjs
 # helper เขียน JSON + sidecar .sha256 (verify/nightly/ops-status อ้าง) — ต้อง track ด้วยเหตุผลเดียวกับ verify.mjs
 !tools/json-checksum.mjs
 !tools/verify-truth.mjs

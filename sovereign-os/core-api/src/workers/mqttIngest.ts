@@ -77,6 +77,9 @@ export class MqttIngestionWorker {
       reconnectPeriod: 5000,
     });
 
+    // mqtt.js emit 'error' เมื่อ broker ล่ม/ถูก stop — ไม่มี listener = EventEmitter throw = process ตาย
+    this.client.on('error', (err) => console.error('MQTT ingest error:', err instanceof Error ? err.message : err));
+
     // ข้อ 4: flush buffer ทุก 1 นาที (batch INSERT แทน write ทุกวินาที)
     this.flushTimer = setInterval(() => {
       flushTelemetry().catch(() => {});

@@ -102,6 +102,16 @@ describe('isSkipped — ตัดของที่ทำให้เครื�
     }
     assert.equal(isSkipped('sovereign-frontend/src/pages/index.tsx'), false);
   });
+
+  test('.next ทุกพันธุ์ (รวม .next.broken-*) ถูกตัด — เคสจริง 22/10/69', () => {
+    for (const p of [
+      'sovereign-frontend/.next/BUILD_ID',
+      'sovereign-frontend/.next-verify/BUILD_ID',
+      'sovereign-frontend/.next.broken-20261022-012543/dev/server/chunks/ssr/node_modules_1_aarlg._.js',
+    ]) {
+      assert.equal(isSkipped(p, { withOllama: false }), true, `${p} ต้องถูกตัด — เป็น build artifact`);
+    }
+  });
 });
 
 describe('collectKitFiles — เดินได้จริงและไม่หลุดของต้องห้าม', () => {

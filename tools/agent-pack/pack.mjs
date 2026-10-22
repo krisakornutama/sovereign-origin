@@ -125,6 +125,10 @@ export const FULL_KIT_SKIP_DIRS = new Set([
 /** ไฟล์นามสกุลที่ไม่ยกไป (บันทึก/ไฟล์ชั่วคราว) */
 export const FULL_KIT_SKIP_EXT = ['.log', '.tmp', '.pid'];
 
+// .next ทุกพันธุ์เป็น artifact ของ build (รวม .next.broken-* ที่เก็บไว้สอบสวน)
+// ห้ามหลุดเข้า kit — ตรงกับ tools/build-node-kit.mjs
+const isBuildArtifactDir = (name) => name === '.next' || name.startsWith('.next-') || name.startsWith('.next.');
+
 /** ไฟล์ระบบปฏิบัติการที่ไม่มีความหมายบนเครื่องอื่น */
 export const FULL_KIT_SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 
@@ -198,7 +202,7 @@ export function fullKitFiles(root = REPO_ROOT, opts = {}) {
     }
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-      if (FULL_KIT_SKIP_DIRS.has(entry.name)) continue;
+      if (FULL_KIT_SKIP_DIRS.has(entry.name) || isBuildArtifactDir(entry.name)) continue;
       if (FULL_KIT_SKIP_FILES.has(entry.name)) continue;
       if (isSecretEnvName(entry.name)) continue; // ความลับห้ามหลุดออกจากเครื่องนี้ (.env.example ผ่านได้)
       if (!withOllama && childRel === 'Ollama') continue;

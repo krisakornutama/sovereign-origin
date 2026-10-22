@@ -53,6 +53,12 @@ const SKIP_DIRS = new Set([
   'Docker', '.venv', 'venv',
 ]);
 
+// .next ทุกพันธุ์เป็น artifact ของ build (รวม .next.broken-* ที่เก็บไว้สอบสวน)
+// ห้ามหลุดเข้า kit — เคสจริง 22/10/69: เศษ .next.broken มี chunk ชื่อ node_modules_*.js
+// ทำให้เทสต์กัน node_modules ฟ้อง และชุดเครื่องใหม่บวมโดยไม่จำเป็น
+const isBuildArtifactDir = (name) => name === '.next' || name.startsWith('.next-') || name.startsWith('.next.');
+
+
 const SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 const SKIP_EXT = new Set(['.log', '.tmp', '.pid', '.lock']);
 
@@ -90,6 +96,8 @@ function isSkipped(rel, opts = {}) {
   // จะกลายเป็นโค้ดตาย (เคสจริง 12/10/69: เทสต์จับได้ตอนรันครั้งแรก)
   if (!withOllama && (rel === 'Ollama' || rel.startsWith('Ollama/'))) return true;
   if (SKIP_PATH_PREFIX.some((p) => rel === p || rel.startsWith(`${p}/`))) return true;
+  // .next / .next-verify / .next.broken-* = build artifact ทุกชนิด
+  if (rel.split('/').some((seg) => isBuildArtifactDir(seg))) return true;
   // ตัวติดตั้งที่ build ไว้แล้ว (dist-portable-prev-<วันที่>/ ฯลฯ) ห้ามหลุดเข้าชุด:
   // เดิมตัดเฉพาะชื่อเป๊ะ → โฟลเดอร์ที่เปลี่ยนชื่อเก็บไว้ (654 MB) จะถูก copy เข้า kit
   if (rel === 'dist-portable' || rel.startsWith('dist-portable/') || rel.startsWith('dist-portable-')) return true;
@@ -122,7 +130,7 @@ export function collectKitFiles(root = ROOT, opts = {}) {
       const full = path.join(dir, e.name);
       if (e.isSymbolicLink()) continue;
       if (e.isDirectory()) {
-        if (SKIP_DIRS.has(e.name) || SKIP_FILES.has(e.name)) continue;
+        if (SKIP_DIRS.has(e.name) || SKIP_FILES.has(e.name) || isBuildArtifactDir(e.name)) continue;
         walk(full, childRel);
         continue;
       }
