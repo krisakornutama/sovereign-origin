@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import fs from 'fs';
 import { config } from './config';
 import { auditStateChange } from './middleware/auth.middleware';
+import { errorHandler } from './middleware/error.middleware';
+import { applyJsonBodyParsers } from './lib/http-body';
 import { mountRoutes } from './routes';
 import { createSocketServer } from './realtime/socket';
 import { startWorkers } from './workers/start';
@@ -54,8 +56,8 @@ app.use(cors({
 }));
 // Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
 // express.json() ทั้งแอปจะ parse ทิ้ง (แบบเดียวกับ client-monitor ที่ใช้ parser เฉพาะ route)
-app.use('/api/payments/webhook', express.raw({ type: 'application/json', limit: '256kb' }));
-app.use(express.json({ limit: '25mb' })); // 25MB — รองรับแพ็กเกจ Export & Clone (ฐานข้อมูลเต็ม) + การนำเข้า
+// Global JSON = 1 MB; /api/clone/import เท่านั้นที่ได้ 25 MB (ดู src/lib/http-body.ts)
+applyJsonBodyParsers(app);
 app.use(auditStateChange);
 
 mountRoutes(app);
@@ -85,16 +87,8 @@ startListener();
 console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
 
 // ── Reliability: กัน request เดียวพังทั้งระบบ ──
-// 1) error middleware — 500 ที่อ่านง่ายแทน crash
-app.use((err: any, _req: any, res: any, _next: any) => {
-  console.error('❌ Unhandled route error:', err?.message || err);
-  if (err?.stack) console.error(err.stack);
-  if (!res.headersSent) {
-    res.status(500).json({ error: 'Internal server error' });
-  } else {
-    res.end();
-  }
-});
+// 1) error middleware — 4xx ของ body-parser (413/400) คงสถานะเดิม, ที่เหลือ 500
+app.use(errorHandler);
 
 // 2) uncaughtException / unhandledRejection — log แล้วอยู่ต่อ (appliance ต้องไม่ตายง่าย)
 process.on('uncaughtException', (err) => {

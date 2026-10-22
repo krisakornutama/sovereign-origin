@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import { findTestUser } from './auth-user-registry';
 
 // ⚠️ ต้อง import ไฟล์นี้เป็นอันดับแรกในทุก test file
 // เพราะ config/index.ts จะ throw ถ้าไม่มี JWT_SECRET / DATABASE_URL
@@ -57,6 +58,17 @@ if (process.env.RUN_DB_TESTS !== '1') {
       for (const [m, fn] of Object.entries(noopDefaults)) {
         if (typeof delegate[m] !== 'function') delegate[m] = fn;
       }
+    }
+    // Auth middleware reads the user row from the DB (role/token_version are
+    // not trusted from the JWT anymore). Route tests mint tokens without a DB,
+    // so makeToken() registers the matching row in this test-only registry.
+    // Do not replace a test-specific user stub (mockModel marks its delegate).
+    const userDelegate = (p.user ??= {});
+    if (!(userDelegate as any).__sovereignTestMock) {
+      userDelegate.findUnique = async (args?: any) => {
+        const id = args?.where?.id;
+        return id ? findTestUser(String(id)) : null;
+      };
     }
   })();
 }

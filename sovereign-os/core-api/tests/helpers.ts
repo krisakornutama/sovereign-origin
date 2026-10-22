@@ -1,7 +1,9 @@
+import './setup-env';
 import express from 'express';
 import type { Express } from 'express';
 import type { Server } from 'http';
 import jwt from 'jsonwebtoken';
+import { registerTestUser } from './auth-user-registry';
 
 // ────────────────────────────────────────────────────────────────────────────
 // mockModel — mock Prisma model delegate ที่เข้ากับ Node 24
@@ -27,6 +29,9 @@ export function mockModel(prisma: any, model: string, methods: Record<string, an
     byModel.set(model, delegate);
     prisma[model] = delegate; // assign ครั้งเดียว — method เพิ่มทีหลัง merge เข้า object เดียวกัน
   }
+  // setup-env uses this marker to avoid overwriting a test-specific user stub
+  // when its async no-op installer finishes after a test has already mocked.
+  (delegate as any).__sovereignTestMock = true;
   for (const [name, fn] of Object.entries(methods)) {
     (delegate as any)[name] = fn;
   }
@@ -58,14 +63,27 @@ export async function createTestServer(mount: (app: Express) => void): Promise<T
 
 /** สร้าง JWT ที่ผ่าน authenticate (mfa_verified = true) */
 export function makeToken(role = 'SUPERADMIN', overrides: Record<string, unknown> = {}): string {
-  return jwt.sign(
-    {
-      userId: 'test-user',
-      role,
-      assigned_node_id: null,
-      mfa_verified: true,
-      ...overrides,
-    },
-    process.env.JWT_SECRET as string
-  );
+  // Keep 'test-user' for the common SUPERADMIN token (some route tests assert
+  // ownership on that id), but give other roles their own row so a file that
+  // mints both admin and operator tokens does not make the registry flip roles.
+  const defaultUserId = role === 'SUPERADMIN' ? 'test-user' : `test-user-${role.toLowerCase()}`;
+  const payload = {
+    userId: defaultUserId,
+    role,
+    assigned_node_id: null,
+    mfa_verified: true,
+    ...overrides,
+  };
+
+  if (process.env.RUN_DB_TESTS !== '1') {
+    registerTestUser({
+      id: String(payload.userId),
+      role: String(payload.role),
+      assigned_node_id: (payload.assigned_node_id as string | null | undefined) ?? null,
+      token_version: Number((payload as any).token_version ?? 0),
+      must_change_password: (payload as any).must_change_password === true,
+    });
+  }
+
+  return jwt.sign(payload, process.env.JWT_SECRET as string);
 }

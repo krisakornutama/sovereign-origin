@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { getSessionUser } from '../services/auth.service';
 import { setIo } from './io-registry';
 import { registerMachineControl } from './machine-control.socket';
 
@@ -53,19 +54,43 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   });
 
   // ด่าน 1: ตรวจ JWT (+MFA) ตอน handshake — ไม่ผ่านตัดการเชื่อมต่อทันที
-  io.use((socket, next) => {
+  // ตรวจ user/token_version/role กับ DB ด้วย เพื่อให้ user ที่ถูกลบ/ถูกลดสิทธิ์
+  // หรือ token ที่ถูก revoke ใช้ socket เดิมต่อไม่ได้
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     try {
       const decoded = jwt.verify(String(token || ''), config.jwtSecret) as {
         userId?: string;
         role?: string;
         mfa_verified?: boolean;
+        token_version?: number;
       };
       if (!decoded.mfa_verified) return next(new Error('MFA verification required'));
+      if (!decoded.userId) return next(new Error('Unauthorized'));
+
+      let dbUser: any;
+      try {
+        dbUser = await getSessionUser(decoded.userId);
+      } catch (err: any) {
+        console.error('[socket-auth] user lookup failed:', err?.message || err);
+        return next(new Error('Authentication temporarily unavailable'));
+      }
+      if (!dbUser) return next(new Error('User no longer exists'));
+      if ((decoded.token_version ?? 0) !== (dbUser.token_version ?? 0)) {
+        return next(new Error('Session expired'));
+      }
+      if (dbUser.must_change_password === true) {
+        return next(new Error('Password change required'));
+      }
+
       // เก็บผู้ใช้ไว้บน socket — ช่องควบคุมเครื่องต้องรู้ว่า "ใคร" สั่ง
-      // (ด่านนี้ตรวจแค่ความถูกต้องของ token + MFA · ส่วนสิทธิ์เจาะจง
-      //  เช่น SUPERADMIN ของ machine-control ถูกตรวจที่ handler ของ event นั้น)
-      socket.data.user = { id: String(decoded.userId ?? ''), role: String(decoded.role ?? '') };
+      // role มาจาก DB ไม่ใช่ claim ใน token (สิทธิ์เจาะจง เช่น SUPERADMIN
+      // ของ machine-control ยังถูกตรวจที่ handler ของ event นั้น)
+      socket.data.user = {
+        id: String(dbUser.id),
+        role: String(dbUser.role ?? ''),
+        assigned_node_id: dbUser.assigned_node_id ?? null,
+      };
       return next();
     } catch {
       return next(new Error('Unauthorized'));

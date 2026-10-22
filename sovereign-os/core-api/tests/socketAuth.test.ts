@@ -6,6 +6,15 @@ import express from 'express';
 import WebSocket from 'ws';
 import jwt from 'jsonwebtoken';
 import { createSocketServer, sanitizeSocketEvent } from '../src/realtime/socket';
+import { registerTestUser, unregisterTestUser } from './auth-user-registry';
+
+registerTestUser({
+  id: 'socket-test',
+  role: 'SUPERADMIN',
+  assigned_node_id: null,
+  token_version: 0,
+  must_change_password: false,
+});
 
 // ── ด่าน Socket.IO: handshake ต้องมี JWT (mfa_verified) + payload ถูกตัดตาม allowlist ──
 // พูดโปรโตคอล Socket.IO (EIO=4) ตรงผ่าน ws — ไม่ต้องเพิ่ม dependency ใหม่:
@@ -98,6 +107,24 @@ describe('realtime/socket — ด่าน handshake + sanitize payload', () => 
     const reply = await s.next();
     assert.ok(reply.startsWith('44'), 'ต้องถูกปฏิเสธ แต่ได้: ' + reply);
     assert.ok(reply.includes('MFA'), 'ข้อความต้องบอกเรื่อง MFA: ' + reply);
+  });
+
+  test('token ของ user ที่ถูกลบ → CONNECT_ERROR', async () => {
+    unregisterTestUser('socket-test');
+    try {
+      const s = await wsHandshake(url, { token: makeToken() });
+      sessions.push(s);
+      const reply = await s.next();
+      assert.ok(reply.startsWith('44'), 'ต้องถูกปฏิเสธ แต่ได้: ' + reply);
+    } finally {
+      registerTestUser({
+        id: 'socket-test',
+        role: 'SUPERADMIN',
+        assigned_node_id: null,
+        token_version: 0,
+        must_change_password: false,
+      });
+    }
   });
 
   test('sanitizeSocketEvent — ตัดเหลือเฉพาะฟิลด์ allowlist ของ event นั้น', () => {

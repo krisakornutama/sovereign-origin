@@ -106,12 +106,14 @@ test('token ที่มี must_change_password → API ทั่วไป 403 
   assert.strictEqual(body.code, 'MUST_CHANGE_PASSWORD');
 });
 
-test('token ปกติ (ไม่มี flag) → ผ่าน authenticate เหมือนเดิม', async () => {
+test('token ปกติ (ไม่มี flag) แต่ DB บังคับเปลี่ยน → 403 (DB คือแหล่งความจริง)', async () => {
   const ok = makeToken('OPERATOR', { userId: USER_ID });
   const res = await fetch(server.baseUrl + '/api/auth/mfa/status', {
     headers: { Authorization: `Bearer ${ok}` },
   });
-  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.status, 403);
+  const body = await res.json();
+  assert.strictEqual(body.code, 'MUST_CHANGE_PASSWORD');
 });
 
 test('change-password ยังเป็นทางออกของ flow บังคับเปลี่ยน (authenticatePartial)', async () => {
