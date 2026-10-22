@@ -5,6 +5,7 @@ import './setup-env';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestServer, makeToken, mockModel, type TestServer } from './helpers';
+import { unregisterTestUser } from './auth-user-registry';
 
 describe('Security routes (firewall engine CRUD + events)', () => {
   let s: TestServer;
@@ -209,6 +210,11 @@ describe('NextGen routes (kill-switch / first-responder / reality / drill / SSE)
       assert.equal(ok.status, 200);
       assert.ok((ok.headers.get('content-type') || '').includes('text/event-stream'));
       await ok.body?.cancel(); // ปิดฝั่ง client → req.on('close') ต้องไม่ค้าง
+
+      const deletedToken = makeToken('SUPERADMIN', { userId: 'nextgen-deleted-user' });
+      unregisterTestUser('nextgen-deleted-user');
+      const deleted = await fetch(`${s2.baseUrl}/api/security/nextgen/events?token=${deletedToken}`);
+      assert.equal(deleted.status, 401);
     } finally {
       await s2?.close();
     }
