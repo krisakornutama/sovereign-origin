@@ -23,7 +23,7 @@ const checks = [
   { name: 'full-system-check (mounts ปิดสนิท + lifecycle จริง)', cmd: 'node', args: ['tools/verify/full-system-check.mjs'] },
   // I3c: audit_logs เก็บ 90 วัน — เดือนไหนจบเกินเกณฑ์ = export json.gz → drop partition (เจอปัญหา = gate ล้มแจ้งเลย)
   { name: 'audit-retention (90 วัน export+drop)', cmd: 'node', args: ['tools/verify/audit-retention.mjs'] },
-  { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'], env: { ...process.env, NEXT_DIST_DIR: '.next-verify' } },
+  { name: 'verify (backend build+test + frontend typecheck+build)', cmd: 'node', args: [NPM_CLI, 'run', 'verify'], env: { ...process.env, NEXT_DIST_DIR: '.next-verify' }, timeoutMs: 20 * 60 * 1000 },
   { name: 'ui-sweep (หน้าจอจริงผ่าน Chromium)', cmd: 'node', args: ['tools/verify/ui-sweep.mjs'] },
   // security-audit ต้องเป็นตัวสุดท้าย: brute-force test กิน per-IP login window (10/15 นาที) —
   // ถ้ารันก่อน check อื่นจะบล็อก API จาก IP เดิมใน window
@@ -54,7 +54,7 @@ async function main() {
       // ไม่ใช่ unhandled rejection ที่ทำให้ gate ตายเงียบทั้งกระบวนการ
       if (c.name.startsWith('ui-sweep')) await ensureProdFrontend();
       const out = execFileSync(c.cmd, c.args, {
-        cwd: ROOT, encoding: 'utf8', timeout: 300_000, windowsHide: true,
+        cwd: ROOT, encoding: 'utf8', timeout: c.timeoutMs ?? 300_000, windowsHide: true,
         maxBuffer: 10 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
         env: c.env ?? process.env,
       });
