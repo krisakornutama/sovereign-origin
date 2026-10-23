@@ -12,6 +12,9 @@ import './setup-env';
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { RUN_DB, SKIP_REASON, primeDbEnv, setupCore, teardownCore, type CoreCtx } from './db-harness';
 
 describe('fleet phase 2 — persisted model', { skip: RUN_DB ? false : SKIP_REASON }, () => {
@@ -30,6 +33,15 @@ describe('fleet phase 2 — persisted model', { skip: RUN_DB ? false : SKIP_REAS
     await ctx.prisma.fleetRollout.deleteMany({});
     await ctx.prisma.fleetChannel.deleteMany({});
     await ctx.prisma.fleetSetting.deleteMany({});
+
+    // `prisma db push` (ที่ใช้สร้าง DB เทส) ไม่รู้จัก view — production สร้างจาก migration
+    // สร้างซ้ำแบบเดียวกันเพื่อให้เทสต์ตรวจการอ่านผ่าน view ได้จริง
+    await ctx.prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE VIEW "fleet_audit_view" AS
+      SELECT "id", "timestamp", "user_id", "action_type", "payload"
+      FROM "audit_logs"
+      WHERE "action_type" LIKE 'FLEET\\_%' ESCAPE '\\'
+    `);
 
     const machine = await ctx.prisma.agentMachine.create({
       data: {
@@ -170,6 +182,89 @@ describe('fleet phase 2 — persisted model', { skip: RUN_DB ? false : SKIP_REAS
     assert.equal((await revokeEnrollToken(created.record.id, undefined, 'dbtest revoke')).ok, true);
     const afterRevoke = await consumeEnrollToken(created.token, { id: machineId, name: 'fleet-phase2-dbtest' });
     assert.deepEqual(afterRevoke, { ok: false, reason: 'revoked' });
+  });
+
+  test('backfill จาก JSON รันซ้ำได้ ไม่สร้าง site/group/override/token ซ้ำ', async () => {
+    const tmpBase = process.env.TEST_TMPDIR || path.join(process.cwd(), '.dbtest-tmp');
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const root = fs.mkdtempSync(path.join(tmpBase, 'fleet-backfill-'));
+    const tokenHash = crypto.createHash('sha256').update('fleet-backfill-idempotency').digest('hex');
+    const policy = {
+      version: 1,
+      defaultChannel: 'beta',
+      requireLanVerification: false,
+      notes: 'backfill idempotency',
+      channels: {
+        stable: { label: 'Stable', rolloutPercent: 100 },
+        beta: { label: 'Beta', rolloutPercent: 33 },
+      },
+      machines: {
+        [machineId]: {
+          channel: 'canary',
+          site: 'Backfill Site',
+          group: 'Backfill Group',
+          tags: ['pos', 'pos', 'backfill'],
+          notes: 'from json',
+        },
+      },
+    };
+    const store = {
+      version: 1,
+      tokens: [
+        {
+          label: 'Backfill Token',
+          prefix: `enr_${tokenHash.slice(0, 8)}`,
+          tokenHash,
+          expiresAt: null,
+          maxUses: 2,
+          usedCount: 0,
+          lastUsedAt: null,
+          lastMachineId: null,
+          lastMachineName: null,
+          revokedAt: null,
+        },
+      ],
+    };
+    fs.writeFileSync(path.join(root, 'policy.json'), JSON.stringify(policy), 'utf8');
+    fs.writeFileSync(path.join(root, 'enrollment-tokens.json'), JSON.stringify(store), 'utf8');
+
+    const script = path.resolve(process.cwd(), 'scripts', 'fleet-backfill.mjs');
+    const run = () =>
+      execFileSync(process.execPath, [script, '--apply', '--root', root], {
+        cwd: process.cwd(),
+        env: { ...process.env },
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+
+    try {
+      assert.match(run(), /applied/);
+      const first = {
+        settings: await ctx.prisma.fleetSetting.findUnique({ where: { id: 1 } }),
+        channel: await ctx.prisma.fleetChannel.findUnique({ where: { channel: 'beta' } }),
+        site: await ctx.prisma.fleetSite.findUnique({ where: { name: 'Backfill Site' } }),
+        group: await ctx.prisma.fleetGroup.findUnique({ where: { name: 'Backfill Group' } }),
+        override: await ctx.prisma.fleetMachineOverride.findUnique({ where: { machine_id: machineId } }),
+        token: await ctx.prisma.fleetEnrollmentToken.findUnique({ where: { token_hash: tokenHash } }),
+      };
+      assert.equal(first.settings?.default_channel, 'beta');
+      assert.equal(first.settings?.require_lan_verification, false);
+      assert.equal(first.channel?.rollout_percent, 33);
+      assert.equal(first.group?.site_id, first.site?.id);
+      assert.equal(first.override?.channel, 'canary');
+      assert.deepEqual(first.override?.tags, ['pos', 'backfill']);
+      assert.equal(first.token?.max_uses, 2);
+      assert.equal(first.token?.expires_at, null);
+
+      // รันซ้ำ: upsert ต้องไม่เพิ่มแถว
+      assert.match(run(), /applied/);
+      assert.equal(await ctx.prisma.fleetSite.count({ where: { name: 'Backfill Site' } }), 1);
+      assert.equal(await ctx.prisma.fleetGroup.count({ where: { name: 'Backfill Group' } }), 1);
+      assert.equal(await ctx.prisma.fleetMachineOverride.count({ where: { machine_id: machineId } }), 1);
+      assert.equal(await ctx.prisma.fleetEnrollmentToken.count({ where: { token_hash: tokenHash } }), 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('audit อ่านจาก audit_logs ผ่าน view ได้', async () => {

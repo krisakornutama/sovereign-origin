@@ -141,6 +141,7 @@ const TESTS = [
   'tests/vision-detections-db.test.ts',
   'tests/security-events-db.test.ts',
   'tests/dime-db.test.ts',
+  'tests/fleetPhase2-db.test.ts',
 ];
 const TEST_TMPDIR = path.join(API, '.dbtest-tmp');
 fs.mkdirSync(TEST_TMPDIR, { recursive: true });
