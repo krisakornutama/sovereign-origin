@@ -224,8 +224,8 @@ bucket = sha256(`${channel}:${machineId}`) → UInt32BE ตัวแรก → %
 7. ตั้ง `site` / `group` ให้เครื่องที่ลงทะเบียนแล้ว
 8. ปรับ rollout: canary น้อย → beta → stable 100
 
-> ระหว่าง Cold Soak: ห้าม restart/migrate/deploy — หน้า `/fleet` จะตอบ 404
-> จนกว่าจะ restart ตามขั้นตอนข้างบน และหน้าเว็บจะยังไม่เห็นจนกว่า rebuild
+> สถานะ 23/10/69: migration + backfill + restart production เรียบร้อยแล้ว — `/fleet` และ API ตอบ 200
+> (backup/restore drill ผ่าน) · หากต้อง migrate ครั้งถัดไปให้ทำ backup + restore test ทุกครั้ง
 
 ## เทสต์
 

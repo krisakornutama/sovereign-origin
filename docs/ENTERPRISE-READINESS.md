@@ -73,7 +73,8 @@ Sovereign OS ต้องตอบคำถามเหล่านี้ได�
 - [x] ทุก mutation เขียน audit
 - [x] `GET /api/agent-machines` ไม่ส่ง hash ออกไป
 - [x] หน้า `/fleet` มี Sidebar, อยู่ใต้เพดาน 800 บรรทัด, component ใต้ 400
-- [ ] live หลัง Cold Soak: restart core-api + rebuild frontend + ทดสอบกับเครื่องจริง
+- [x] live: restart core-api + rebuild frontend (23/10/69)
+- [ ] ทดสอบกับเครื่องจริง 1 เครื่อง (สร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI)
 
 ## 4. Phase 2 — Persisted fleet model (implemented)
 

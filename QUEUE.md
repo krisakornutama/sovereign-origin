@@ -13,7 +13,8 @@
 - [x] ด่านอัปเดตทั้ง manifest และ asset (runner + desktop); node kit ยังสาธารณะ/stable
 - [x] หน้า `/fleet` + เมนู + i18n + เทสต์ policy/enrollment/UI wiring
 - [x] เอกสาร `docs/ENTERPRISE-READINESS.md` + `docs/modules/fleet.md`
-- [ ] หลัง Cold Soak: restart core-api + rebuild frontend แล้วทดสอบกับเครื่องจริง 1 เครื่อง
+- [x] หลัง Cold Soak: restart core-api + rebuild frontend — **เสร็จแล้ว 23/10/69**
+- [ ] ทดสอบกับเครื่องจริง 1 เครื่อง (สร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI)
 - [x] Phase 2 (หลัง Cold Soak): ย้าย state เข้า DB พร้อม migration/backfill — **เสร็จแล้ว 23/10/69** (`ai/fleet-phase-2`)
   - backup `backups/postgres/sovereign_20261023_150414.dump` + restore drill ผ่าน
   - apply migration `20261023150000_fleet_persisted_model` บน production + restart core-api healthy
