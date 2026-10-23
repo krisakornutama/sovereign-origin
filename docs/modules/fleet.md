@@ -10,7 +10,7 @@ Phase 2 ย้าย state จาก JSON เข้า **PostgreSQL** เพื�
 
 - policy, channel rollout, site/group, machine override → ตาราง `fleet_*`
 - enrollment token เก็บเฉพาะ hash + **use log** (`fleet_enrollment_uses`)
-- audit ของ Fleet อ่านผ่าน `fleet_audit_view` ที่สร้างบน `audit_logs`
+- audit ของ Fleet อ่านจาก `audit_logs` (มี `fleet_audit_view` สำหรับ SQL read-only)
 
 ไฟล์ JSON เดิมยังอยู่เพื่อ **backfill เท่านั้น** และโค้ดทดสอบ/file fallback ยังอ่านได้:
 
