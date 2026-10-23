@@ -22,6 +22,7 @@
   - [ ] ทดสอบสร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI กับเครื่องจริง 1 เครื่อง
 - [x] P0 regression: BOM ใน migration + backfill idempotency — **เสร็จแล้ว 23/10/69** (`cdfe425`)
   - `tools/test/migration-bom.test.mjs` + `fleetPhase2-db.test.ts` (backfill รันซ้ำไม่สร้างแถวซ้ำ) + เพิ่มใน `test:db`
+  - `npm run test:db` ผ่าน **36/36** (fleet DB suite 6/6) หลังแก้ harness ให้ token ชี้ UUID ของ user จริงใน DB (`51afe01`)
 - [x] Phase 3A: signed runner manifest (Ed25519) + ตรวจสองชั้น — **implement + tests แล้ว 23/10/69**
   - pack เซ็น, HUB ตรวจก่อนตอบ (503 เมื่อไม่ผ่าน), runner ตรวจก่อนแตะไฟล์
   - public key ฝังสองฝั่ง + static test เทียบ; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
