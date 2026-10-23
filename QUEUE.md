@@ -14,7 +14,11 @@
 - [x] หน้า `/fleet` + เมนู + i18n + เทสต์ policy/enrollment/UI wiring
 - [x] เอกสาร `docs/ENTERPRISE-READINESS.md` + `docs/modules/fleet.md`
 - [ ] หลัง Cold Soak: restart core-api + rebuild frontend แล้วทดสอบกับเครื่องจริง 1 เครื่อง
-- [ ] Phase 2 (หลัง Cold Soak): ย้าย state เข้า DB พร้อม migration/backfill
+- [x] Phase 2 (หลัง Cold Soak): ย้าย state เข้า DB พร้อม migration/backfill — **เสร็จแล้ว 23/10/69** (`ai/fleet-phase-2`)
+  - backup `backups/postgres/sovereign_20261023_150414.dump` + restore drill ผ่าน
+  - apply migration `20261023150000_fleet_persisted_model` บน production + restart core-api healthy
+  - smoke API DB-backed: policy/overview/enroll-tokens/sites/audit = 200, `/fleet/` = 200
+  - [ ] ทดสอบสร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI กับเครื่องจริง 1 เครื่อง
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์

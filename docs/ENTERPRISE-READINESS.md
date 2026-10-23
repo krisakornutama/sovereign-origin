@@ -97,7 +97,7 @@ Acceptance:
 - [x] policy/override/enrollment ใช้ DB เป็นแหล่งความจริง; JSON ใช้เฉพาะ backfill/tests
 - [x] token ยัง hash-only และมี use log
 - [x] audit ค้นตาม `machineId`/`actionType`/ช่วงเวลาได้
-- [ ] production migration + backfill + restart (ต้องมี backup/restore test ก่อน)
+- [x] production migration + backfill + restart (backup 23/10/69 + restore drill ผ่าน; API DB smoke 200)
 
 ## 5. Phase 3 — Supply chain และความน่าเชื่อถือของอัปเดต
 
