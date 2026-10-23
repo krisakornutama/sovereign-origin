@@ -1274,6 +1274,7 @@ model AgentMachine {
   // ⇒ เครื่องหนึ่งอยู่ใต้ได้หลายคน ไม่ใช่ parent เดียว)
   hub_users AgentMachineHub[]
   owner    User?                  @relation("MachineOwner", fields: [owner_user_id], references: [id], onDelete: SetNull)
+  fleet_override FleetMachineOverride?
 
   @@index([role])
   @@index([owner_user_id])
@@ -1292,6 +1293,129 @@ model AgentMachineHub {
   @@id([machine_id, user_id])
   @@index([user_id])
   @@map("agent_machine_hubs")
+}
+
+// ─────────────────────────────────────────────
+// Fleet Phase 2 — persisted control-plane state
+// ย้าย policy/enrollment/override ออกจาก JSON มาอยู่ DB เพื่อ query/audit/FK
+// ─────────────────────────────────────────────
+model FleetSite {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @unique
+  notes      String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  groups            FleetGroup[]
+  machine_overrides FleetMachineOverride[]
+
+  @@map("fleet_sites")
+}
+
+model FleetGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  site_id    String?  @db.Uuid
+  name       String   @unique
+  notes      String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  site              FleetSite?              @relation(fields: [site_id], references: [id], onDelete: SetNull)
+  machine_overrides FleetMachineOverride[]
+
+  @@index([site_id])
+  @@map("fleet_groups")
+}
+
+model FleetSetting {
+  id                       Int      @id @default(1)
+  default_channel          String   @default("stable")
+  require_lan_verification Boolean  @default(true)
+  notes                    String?
+  updated_at               DateTime @updatedAt @db.Timestamptz
+  updated_by               String?  @db.Uuid
+
+  @@map("fleet_settings")
+}
+
+model FleetChannel {
+  channel         String   @id
+  label           String
+  rollout_percent Int      @default(0)
+  updated_at      DateTime @updatedAt @db.Timestamptz
+  updated_by      String?  @db.Uuid
+
+  @@map("fleet_channels")
+}
+
+model FleetRollout {
+  id              String   @id @default(uuid()) @db.Uuid
+  channel         String
+  rollout_percent Int
+  changed_by      String?  @db.Uuid
+  reason          String?
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  @@index([channel, created_at])
+  @@map("fleet_rollouts")
+}
+
+model FleetMachineOverride {
+  machine_id String   @id @db.Uuid
+  channel    String?
+  site_id    String?  @db.Uuid
+  group_id   String?  @db.Uuid
+  tags       Json     @default("[]")
+  notes      String?
+  updated_at DateTime @updatedAt @db.Timestamptz
+  updated_by String?  @db.Uuid
+
+  machine AgentMachine @relation(fields: [machine_id], references: [id], onDelete: Cascade)
+  site    FleetSite?   @relation(fields: [site_id], references: [id], onDelete: SetNull)
+  group   FleetGroup?  @relation(fields: [group_id], references: [id], onDelete: SetNull)
+
+  @@index([channel])
+  @@index([site_id])
+  @@index([group_id])
+  @@map("fleet_machine_overrides")
+}
+
+model FleetEnrollmentToken {
+  id                String    @id @default(uuid()) @db.Uuid
+  label             String
+  prefix            String
+  token_hash        String    @unique
+  created_at        DateTime  @default(now()) @db.Timestamptz
+  created_by        String?   @db.Uuid
+  expires_at        DateTime? @db.Timestamptz
+  max_uses          Int
+  used_count        Int       @default(0)
+  last_used_at      DateTime? @db.Timestamptz
+  last_machine_id   String?
+  last_machine_name String?
+  revoked_at        DateTime? @db.Timestamptz
+  revoke_reason     String?
+
+  uses FleetEnrollmentUse[]
+
+  @@index([expires_at])
+  @@index([revoked_at])
+  @@index([created_at])
+  @@map("fleet_enrollment_tokens")
+}
+
+model FleetEnrollmentUse {
+  id           String    @id @default(uuid()) @db.Uuid
+  token_id     String    @db.Uuid
+  machine_id   String?
+  machine_name String?
+  used_at      DateTime  @default(now()) @db.Timestamptz
+  released_at  DateTime? @db.Timestamptz
+
+  token FleetEnrollmentToken @relation(fields: [token_id], references: [id], onDelete: Cascade)
+
+  @@index([token_id, used_at])
+  @@map("fleet_enrollment_uses")
 }
 
 // ─────────────────────────────────────────────

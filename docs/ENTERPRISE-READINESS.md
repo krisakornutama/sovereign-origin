@@ -28,7 +28,7 @@ Sovereign OS ต้องตอบคำถามเหล่านี้ได�
 | Node kit สำหรับเครื่องที่สอง | มี (35.1 MB, hash ตรวจได้) |
 | Audit log กลาง | มี |
 | Feature grants รายหน้า | มี |
-| DB migration | **ห้ามระหว่าง Cold Soak** |
+| DB migration | มี (Fleet Phase 2 — `fleet_*` + `fleet_audit_view`) |
 
 ช่องว่างหลัก: ไม่มีมุมมองฝูงเครื่อง, ไม่มี site/group, ไม่มี staged rollout,
 รหัสเชิญเป็นค่าเดี่ยวใน env, ไม่มีเพิกถอนรายเครื่องจาก UI, และ
@@ -75,20 +75,29 @@ Sovereign OS ต้องตอบคำถามเหล่านี้ได�
 - [x] หน้า `/fleet` มี Sidebar, อยู่ใต้เพดาน 800 บรรทัด, component ใต้ 400
 - [ ] live หลัง Cold Soak: restart core-api + rebuild frontend + ทดสอบกับเครื่องจริง
 
-## 4. Phase 2 — Persisted fleet model (หลัง Cold Soak)
+## 4. Phase 2 — Persisted fleet model (implemented)
 
 เป้าหมาย: ย้าย state จากไฟล์เข้า DB เมื่ออนุญาตให้ migrate
 
-| งาน | เหตุผล |
+| งาน | สถานะ |
 |---|---|
-| ตาราง `fleet_sites` / `fleet_groups` | query ตามสาขา, unique name, ลบแล้วไม่กระทบเครื่อง |
-| ตาราง `fleet_channels` / `fleet_rollouts` | ประวัติการเปลี่ยน %, ผูกกับผู้เปลี่ยน |
-| ตาราง `fleet_machine_overrides` | FK ไป `AgentMachine`, cascade |
-| ตาราง `fleet_enrollment_tokens` | expiry index, revoke reason, use log |
-| ตาราง `fleet_audit_view` (หรือใช้ `audit_logs`) | ค้นย้อนหลังตามเครื่อง/สาขา |
-| migration + backfill จาก JSON | idempotent, rollback ได้ |
+| ตาราง `fleet_sites` / `fleet_groups` | ✅ unique name + FK site |
+| ตาราง `fleet_channels` / `fleet_rollouts` | ✅ ประวัติการเปลี่ยน % + ผู้เปลี่ยน |
+| ตาราง `fleet_settings` | ✅ default channel / require LAN / notes (singleton) |
+| ตาราง `fleet_machine_overrides` | ✅ FK `agent_machines` + cascade |
+| ตาราง `fleet_enrollment_tokens` | ✅ expiry index, revoke reason, last machine |
+| ตาราง `fleet_enrollment_uses` | ✅ use log + released_at |
+| `fleet_audit_view` | ✅ view บน `audit_logs` + API `/api/fleet/audit` |
+| migration + backfill จาก JSON | ✅ `20261023150000_fleet_persisted_model` + `scripts/fleet-backfill.mjs` (dry-run/`--apply`, idempotent) |
 
-**ยังไม่ทำ** จนกว่าจะพ้น Cold Soak และมี backup/restore test ที่ผ่าน
+Acceptance:
+
+- [x] `npm run verify` ผ่าน (backend build/test + frontend typecheck/build + tools)
+- [x] DB contract test บน Postgres จริง (`tests/fleetPhase2-db.test.ts`, gated)
+- [x] policy/override/enrollment ใช้ DB เป็นแหล่งความจริง; JSON ใช้เฉพาะ backfill/tests
+- [x] token ยัง hash-only และมี use log
+- [x] audit ค้นตาม `machineId`/`actionType`/ช่วงเวลาได้
+- [ ] production migration + backfill + restart (ต้องมี backup/restore test ก่อน)
 
 ## 5. Phase 3 — Supply chain และความน่าเชื่อถือของอัปเดต
 

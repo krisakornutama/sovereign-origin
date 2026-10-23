@@ -1,4 +1,4 @@
-# โมดูล fleet — Fleet Control Plane v1
+# โมดูล fleet — Fleet Control Plane v2 (Phase 2)
 
 ## เจตนา
 
@@ -6,95 +6,65 @@
 เครื่องไหนออนไลน์/ออฟไลน์ อยู่สาขาไหน อยู่ช่องทางอัปเดตไหน ควรได้อัปเดตหรือยัง
 และใครถือรหัสเชิญที่ยังใช้ได้
 
-เวอร์ชันนี้เป็น **file-backed** โดยเจตนา — ไม่เพิ่มตาราง/คอลัมน์ และไม่ต้อง migration
-ระหว่าง Cold Soak ข้อมูลอยู่ใต้ volume เดียวกับ manifest อัปเดต:
+Phase 2 ย้าย state จาก JSON เข้า **PostgreSQL** เพื่อให้ query/audit/FK ทำงานได้จริง:
+
+- policy, channel rollout, site/group, machine override → ตาราง `fleet_*`
+- enrollment token เก็บเฉพาะ hash + **use log** (`fleet_enrollment_uses`)
+- audit ของ Fleet อ่านผ่าน `fleet_audit_view` ที่สร้างบน `audit_logs`
+
+ไฟล์ JSON เดิมยังอยู่เพื่อ **backfill เท่านั้น** และโค้ดทดสอบ/file fallback ยังอ่านได้:
 
 ```
 core-api/data/fleet/policy.json
 core-api/data/fleet/enrollment-tokens.json
 ```
 
-> เป้าหมายของ v1 คือ “ควบคุมได้จริงและตรวจสอบย้อนหลังได้” ไม่ใช่ระบบ SaaS หลายองค์กรเต็มรูปแบบ
-> ข้อจำกัดที่ยังไม่ทำอยู่ในหัวข้อ [ยังไม่ทำใน v1](#ยังไม่ทำใน-v1)
+> เป้าหมายของ Phase 2 คือ “state อยู่ที่เดียวและตรวจย้อนหลังได้” ไม่ใช่ระบบ SaaS หลายองค์กรเต็มรูปแบบ
+> สิทธิ์รายสาขา/tenant แยกอยู่ใน Phase 4–5
 
 ## ไฟล์
 
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `src/services/fleet-store.service.ts` | อ่าน/เขียน JSON แบบ atomic, lock ภายในโปรเซส, sanitizer พื้นฐาน |
-| `src/services/fleet-policy.service.ts` | นโยบายช่องทาง, override ต่อเครื่อง, rollout bucket, compliance, ด่านอัปเดต |
-| `src/services/fleet-enrollment.service.ts` | รหัสเชิญแบบ hash + วันหมดอายุ + จำนวนเครื่อง + เพิกถอน |
-| `src/services/fleet-overview.service.ts` | ประกอบภาพรวมสำหรับหน้า `/fleet` (อ่านจากแหล่งเดิมทั้งหมด) |
+| `src/services/fleet-persistence.service.ts` | อ่าน/เขียน policy, override, site/group จาก DB (+ UUID guard) |
+| `src/services/fleet-policy.service.ts` | นโยบายช่องทาง, override, rollout bucket, compliance, ด่านอัปเดต |
+| `src/services/fleet-enrollment.service.ts` | รหัสเชิญแบบ hash + expiry/โควตา + use log + เพิกถอน |
+| `src/services/fleet-overview.service.ts` | ประกอบภาพรวมสำหรับหน้า `/fleet` จาก DB + agent machines |
+| `src/services/fleet-store.service.ts` | legacy JSON atomic store — ใช้โดย tests/backfill |
 | `src/modules/fleet/fleet.routes.ts` | API `/api/fleet/*` — SUPERADMIN เท่านั้น |
+| `scripts/fleet-backfill.mjs` | backfill JSON → DB (idempotent, dry-run เป็นค่าเริ่มต้น) |
 | `sovereign-frontend/src/pages/fleet.tsx` | หน้า Fleet Console |
 | `sovereign-frontend/src/components/fleet/*` | แผงนโยบาย/รหัสเชิญ/ตารางเครื่อง |
 
-## สถานะที่เก็บ (ไม่มี DB)
+## สถานะที่เก็บ (DB)
 
-### `policy.json`
-
-```json
-{
-  "version": 1,
-  "updatedAt": "2026-10-19T00:00:00.000Z",
-  "updatedBy": "user-id หรือ null",
-  "defaultChannel": "stable",
-  "channels": {
-    "stable": { "label": "Stable", "rolloutPercent": 100 },
-    "beta":   { "label": "Beta",   "rolloutPercent": 25 },
-    "canary": { "label": "Canary", "rolloutPercent": 5 }
-  },
-  "requireLanVerification": true,
-  "notes": null,
-  "machines": {
-    "<machine-id>": {
-      "channel": "beta",
-      "site": "สาขาเชียงใหม่",
-      "group": "ครัว",
-      "tags": ["pos"],
-      "notes": "ชั้น 2",
-      "updatedAt": "...",
-      "updatedBy": "..."
-    }
-  }
-}
-```
+| ตาราง | เก็บอะไร | กุญแจ/ความสัมพันธ์ |
+|---|---|---|
+| `fleet_settings` | default channel, require LAN, notes (singleton id=1) | `id` |
+| `fleet_channels` | label + rollout % ต่อช่องทาง | `channel` (stable/beta/canary) |
+| `fleet_rollouts` | ประวัติการเปลี่ยน % + ผู้เปลี่ยน | `id`, index `(channel, created_at)` |
+| `fleet_sites` | ชื่อสาขา unique + notes | `id`, `name` unique |
+| `fleet_groups` | กลุ่ม unique + สังกัดสาขา | `id`, `site_id → fleet_sites` |
+| `fleet_machine_overrides` | channel/site/group/tags/notes ต่อเครื่อง | `machine_id → agent_machines` (cascade) |
+| `fleet_enrollment_tokens` | hash-only token + expiry/โควตา/revoke | `id`, `token_hash` unique |
+| `fleet_enrollment_uses` | log ทุกครั้งที่ใช้ token + release | `token_id → fleet_enrollment_tokens` |
 
 - `rolloutPercent` เป็นจำนวนเต็ม 0–100
 - ช่องทางที่รองรับมีสามค่าเท่านั้น: `stable`, `beta`, `canary`
-- `machines` เป็น override รายเครื่อง; ไม่มีรายการ = ใช้ค่าเริ่มต้น
-- ไฟล์หาย/เสีย → ใช้ค่าเริ่มต้นแบบ fail-closed (ไม่ throw ทำให้ API ล่ม)
+- ไม่มี override = ใช้ค่าเริ่มต้น; ค่าใน DB ผิดรูปจะถูก normalize แบบ fail-closed
+- `fleet_audit_view` เป็น read-only view บน `audit_logs` (`action_type LIKE 'FLEET_%'`)
 
-### `enrollment-tokens.json`
+### รูปแบบ JSON เดิม (ใช้เฉพาะ backfill)
 
-```json
-{
-  "version": 1,
-  "tokens": [
-    {
-      "id": "uuid",
-      "label": "สาขาเชียงใหม่",
-      "prefix": "enr_ab12cd34",
-      "tokenHash": "<sha256 64 hex>",
-      "createdAt": "...",
-      "createdBy": "user-id",
-      "expiresAt": "...",
-      "maxUses": 5,
-      "usedCount": 0,
-      "lastUsedAt": null,
-      "lastMachineId": null,
-      "lastMachineName": null,
-      "revokedAt": null
-    }
-  ]
-}
-```
+`policy.json` มี `defaultChannel`, `channels.*.rolloutPercent`, `requireLanVerification`, `notes`,
+และ `machines.<id>` ที่มี `channel/site/group/tags/notes`; `enrollment-tokens.json` มี
+`label/prefix/tokenHash/expiresAt/maxUses/usedCount/revokedAt` — backfill จะ upsert ตามชื่อ/hash
+และข้าม override ที่ machine ไม่มีอยู่ใน DB
 
 - รหัสจริงรูปแบบ `enr_` + hex 48 ตัว (24 ไบต์สุ่ม) แสดงครั้งเดียวตอนสร้าง
 - เก็บเฉพาะ `sha256(token)` — ห้ามเก็บรหัสจริง
 - ใช้ได้ไม่เกิน `maxUses` (1–1000) และไม่เกิน `expiresInHours` (1–8760)
-- เพิกถอนแล้วใช้ไม่ได้ทันที; รายการที่ใช้ครบ/หมดอายุ/เพิกถอนยังดูย้อนหลังได้
-- ถ้าเขียนไฟล์ไม่ได้ ให้ถือว่าสร้างรหัสไม่สำเร็จ (ไม่ตอบ token ที่ใช้ไม่ได้)
+- เพิกถอนแล้วใช้ไม่ได้ทันที; use log ยังดูย้อนหลังได้
 
 ## API
 
@@ -105,9 +75,12 @@ core-api/data/fleet/enrollment-tokens.json
 | GET | `/api/fleet/overview` | ภาพรวม + summary + ช่องทาง + เวอร์ชันที่เผยแพร่ + เครื่องทั้งหมด |
 | GET | `/api/fleet/policy` | นโยบายสำหรับหน้าเว็บ (ไม่มี override ดิบทั้งก้อน) |
 | PUT | `/api/fleet/policy` | แก้ `defaultChannel`, `channels.*.rolloutPercent`, `requireLanVerification` |
+| GET | `/api/fleet/sites` | รายชื่อสาขา + notes |
+| GET | `/api/fleet/groups` | รายชื่อกลุ่ม + สาขาที่สังกัด |
+| GET | `/api/fleet/audit` | audit ของ Fleet (`limit`, `before`, `actionType`, `machineId`) |
 | GET | `/api/fleet/enroll-tokens` | รายการรหัสเชิญ (ไม่คืนรหัสจริง/hash) |
 | POST | `/api/fleet/enroll-tokens` | สร้างรหัส — คืน `token` จริงครั้งเดียว |
-| POST | `/api/fleet/enroll-tokens/:id/revoke` | เพิกถอน |
+| POST | `/api/fleet/enroll-tokens/:id/revoke` | เพิกถอน (รับ `reason` ได้) |
 | PUT | `/api/fleet/machines/:id` | ตั้ง `channel` / `site` / `group` / `tags` / `notes` |
 | POST | `/api/fleet/machines/:id/rotate-token` | หมุน machine token — คืน token ใหม่ครั้งเดียว |
 
@@ -230,30 +203,34 @@ bucket = sha256(`${channel}:${machineId}`) → UInt32BE ตัวแรก → %
 - หมุน token แล้ว token เดิมใช้ไม่ได้ทันที — เครื่องนั้นจะหลุดจาก HUB จนกว่าจะตั้งค่าใหม่
   (route ไม่ได้ส่ง token เก่าออกมา และเตือนใน response)
 
-## ข้อจำกัด / ยังไม่ทำใน v1
+## ข้อจำกัด / ยังไม่ทำใน Phase 2
 
-- ไม่มีตาราง DB — ไม่ query ย้อนหลังแบบ SQL, ไม่มี foreign key กับ `AgentMachine`
-- สิทธิ์เป็นระดับ HUB ทั้งฝูง ยังไม่มี “ผู้ดูแลเฉพาะสาขา”
-- ยังไม่มี signed manifest (ใช้ SHA-256 ตรวจไฟล์เทียบ manifest)
-- ยังไม่มี automatic rollback / health-gated rollout
+- สิทธิ์เป็นระดับ HUB ทั้งฝูง ยังไม่มี “ผู้ดูแลเฉพาะสาขา” (Phase 4)
+- ยังไม่มี signed manifest (ใช้ SHA-256 ตรวจไฟล์เทียบ manifest) (Phase 3)
+- ยังไม่มี automatic rollback / health-gated rollout (Phase 3)
 - ยังไม่มี fleet-wide job orchestration (ใช้ Agent Queue เดิม)
 - ยังไม่มี HUB client mode — shell ตรวจ `localhost` เท่านั้น
 - ตัวเลข rollout เป็นเปอร์เซ็นต์ของเครื่องในช่องทาง ไม่ใช่เปอร์เซ็นต์ของ artifact
+- `fleet_audit_view` เป็น view อ่านอย่างเดียว; การเขียน audit ยังผ่าน `AuditService`
 
 ## การใช้งานหลัง Cold Soak
 
-1. `docker restart sovereign-core-api` — ให้ route `/api/fleet` ถูกโหลด
-2. rebuild frontend ตามขั้นตอนปกติ — ให้เมนู/หน้า `/fleet` ปรากฏ
-3. เปิด `/fleet` ด้วยบัญชี SUPERADMIN
-4. สร้างรหัสเชิญสำหรับสาขาใหม่ แล้วนำไปใส่ในตัวติดตั้งเครื่องใหม่
-5. ตั้ง `site` / `group` ให้เครื่องที่ลงทะเบียนแล้ว
-6. ปรับ rollout: canary น้อย → beta → stable 100
+1. backup DB และทดสอบ restore (ตาม `docs/BACKUP-RESTORE.md` ถ้ามี)
+2. `npx prisma migrate deploy` ใน `sovereign-os/core-api` — สร้างตาราง `fleet_*` + view
+3. `node scripts/fleet-backfill.mjs` (dry-run) แล้ว `--apply` ถ้ามี JSON เดิม
+4. `docker restart sovereign-core-api` — ให้ route `/api/fleet` ใช้ DB-backed services
+5. เปิด `/fleet` ด้วยบัญชี SUPERADMIN
+6. สร้างรหัสเชิญสำหรับสาขาใหม่ แล้วนำไปใส่ในตัวติดตั้งเครื่องใหม่
+7. ตั้ง `site` / `group` ให้เครื่องที่ลงทะเบียนแล้ว
+8. ปรับ rollout: canary น้อย → beta → stable 100
 
 > ระหว่าง Cold Soak: ห้าม restart/migrate/deploy — หน้า `/fleet` จะตอบ 404
 > จนกว่าจะ restart ตามขั้นตอนข้างบน และหน้าเว็บจะยังไม่เห็นจนกว่า rebuild
 
 ## เทสต์
 
-- `sovereign-os/core-api/tests/fleetPolicy.test.ts` — validation, rollout, compliance, override, store
+- `sovereign-os/core-api/tests/fleetPolicy.test.ts` — validation, rollout, compliance, override, file store
 - `sovereign-os/core-api/tests/fleetEnrollment.test.ts` — token lifecycle, hash-only, expiry, revoke, release
+- `sovereign-os/core-api/tests/fleetPhase2-db.test.ts` — DB tables/view/policy/override/token/use log/audit (gated `RUN_DB_TESTS=1`)
 - `tools/test/fleet-control-plane.test.mjs` — หน้า/เมนู/route wiring/ด่านอัปเดต/กัน token_hash รั่ว
+- `tools/test/fleet-phase2-persistence.test.mjs` — migration/schema/owners/routes/backfill guards

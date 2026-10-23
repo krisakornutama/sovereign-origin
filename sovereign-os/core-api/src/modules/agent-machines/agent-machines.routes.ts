@@ -68,8 +68,8 @@ import {
   releaseEnrollTokenUse,
 } from '../../services/fleet-enrollment.service';
 import {
+  currentFleetPolicy,
   decideUpdateGate,
-  readFleetPolicy,
   type FleetChannel,
 } from '../../services/fleet-policy.service';
 import {
@@ -104,8 +104,8 @@ interface FleetUpdateGate {
  *     (runner/desktop updater เดิมตีความ 404 เป็น "ไม่มีอะไรใหม่" อยู่แล้ว)
  *   • ผ่าน = คืน channel/percent ให้ route ใส่ใน body (client เก่ามองข้ามได้)
  */
-function gateFleetUpdate(machine: MachineRow, res: Response): FleetUpdateGate | null {
-  const decision = decideUpdateGate(machine, readFleetPolicy());
+async function gateFleetUpdate(machine: MachineRow, res: Response): Promise<FleetUpdateGate | null> {
+  const decision = decideUpdateGate(machine, currentFleetPolicy());
   res.set('X-Fleet-Channel', decision.channel);
   res.set('X-Fleet-Rollout', String(decision.rolloutPercent));
 
@@ -434,7 +434,7 @@ router.get('/update/manifest', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
-    const gate = gateFleetUpdate(machine, res);
+    const gate = await gateFleetUpdate(machine, res);
     if (!gate) return;
     const manifest = readUpdateManifest();
     if (!manifest) return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
@@ -451,7 +451,7 @@ router.get('/update/file', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
-    if (!gateFleetUpdate(machine, res)) return;
+    if (!(await gateFleetUpdate(machine, res))) return;
     const rel = String(req.query.path ?? '');
     if (!isSafeRelPath(rel)) return res.status(400).json({ error: 'invalid file path' });
     const found = resolveUpdateFile(rel);
@@ -478,7 +478,7 @@ router.get('/desktop-update/manifest', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
-    const gate = gateFleetUpdate(machine, res);
+    const gate = await gateFleetUpdate(machine, res);
     if (!gate) return;
     const manifest = readDesktopManifest();
     if (!manifest) {
@@ -499,7 +499,7 @@ router.get('/desktop-update/asset', async (req: Request, res: Response) => {
   try {
     const machine = await authenticateMachineToken(req, res);
     if (!machine) return;
-    if (!gateFleetUpdate(machine, res)) return;
+    if (!(await gateFleetUpdate(machine, res))) return;
     const found = await resolveVerifiedDesktopAsset();
     if (!found) return res.status(404).json({ error: 'desktop asset missing or does not match manifest' });
     res.set({
