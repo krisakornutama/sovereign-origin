@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
-import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
+import { hardenUpload, verifyUploadedContent, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import {
   prisma,
   runVisionAnalysis,
@@ -28,11 +29,16 @@ function toDataUri(buffer: Buffer, mimetype: string): string {
 }
 
 // POST /api/vision/analyze — อัปโหลดภาพ → VL model → บันทึก DetectionEvent (ถ้าให้ camera_id)
-router.post('/analyze', authenticate, (req, res) => {
+router.post('/analyze', authenticate, uploadLimiter, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: 'Invalid image upload', detail: err.message });
     try {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+      try {
+        verifyUploadedContent(req.file);
+      } catch (e: any) {
+        return res.status(400).json({ error: e?.message || 'เนื้อหาไฟล์ไม่ถูกต้อง' });
+      }
       const cameraId = typeof req.body?.camera_id === 'string' && req.body.camera_id.trim() ? req.body.camera_id.trim() : null;
       if (cameraId && !isUuid(cameraId)) {
         return res.status(400).json({ error: 'Invalid camera_id format' });

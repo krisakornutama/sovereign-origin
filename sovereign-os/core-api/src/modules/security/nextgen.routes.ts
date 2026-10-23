@@ -18,6 +18,7 @@ import { timeConsensus } from '../../services/time-consensus.service';
 import { config } from '../../config';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
 import { hardenUpload } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
 
 const router = Router();
 // harden: memory mode (ไม่ลงดิสก์) + whitelist .pdf/.txt/.md + จำกัด 25MB
@@ -178,7 +179,7 @@ router.get('/av/status', authenticate, async (_req, res) => {
   res.json(hashEngine.status());
 });
 
-router.post('/av/scan', authenticate, requireRole('SUPERADMIN'), upload.single('file'), async (req, res) => {
+router.post('/av/scan', authenticate, requireRole('SUPERADMIN'), uploadLimiter, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์ (multipart field: file)' });
   const result = await hashEngine.scanBuffer(req.file.buffer, { originalName: req.file.originalname });
   res.json({ fileName: req.file.originalname, ...result });

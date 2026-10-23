@@ -20,7 +20,7 @@ import type { Server } from 'node:http';
 import knowledgeRoutes from '../src/modules/knowledge/knowledge.routes';
 import { prisma } from '../src/lib/prisma';
 import { mockModel, makeToken, createTestServer, type TestServer } from './helpers';
-import { hardenUpload, safeDisplayName, resolveInsideRoot, randomDiskName } from '../src/lib/harden-upload';
+import { hardenUpload, safeDisplayName, resolveInsideRoot, randomDiskName, verifyUploadedContent } from '../src/lib/harden-upload';
 
 const CORE_ROOT = path.resolve(__dirname, '..');
 const KNOWLEDGE_ROOT = path.join(CORE_ROOT, 'knowledge');
@@ -120,6 +120,28 @@ describe('knowledge upload route (HTTP จริงผ่าน express จร�
     } finally {
       await ts.close();
     }
+  });
+
+  test('ไฟล์ .txt ที่เนื้อหาเป็น executable (MZ) → 400 และไม่ลงดิสก์/ไม่สร้าง row', async () => {
+    const created = mockUploadDeps();
+    const before = walk(KNOWLEDGE_ROOT);
+    const ts = await createTestServer((app: Express) => app.use('/', knowledgeRoutes));
+    try {
+      const res = await postUpload(ts, token, 'notes.txt', Buffer.from('MZ fake executable'), 'text/plain');
+      assert.equal(res.status, 400, `body=${JSON.stringify(res.json).slice(0, 200)}`);
+      assert.match(res.json.error, /executable|magic|เนื้อหา/i);
+      assert.equal(created.length, 0, 'ต้องไม่มี row ถูกสร้าง');
+      assert.deepEqual(walk(KNOWLEDGE_ROOT), before, 'ไฟล์ที่เนื้อหาไม่ผ่านต้องไม่ลงดิสก์');
+    } finally {
+      await ts.close();
+    }
+  });
+
+  test('verifyUploadedContent ปฏิเสธรูปที่ magic bytes ไม่ตรงนามสกุล', () => {
+    assert.throws(
+      () => verifyUploadedContent({ originalname: 'fake.png', buffer: Buffer.from('not a png') }),
+      /magic|เนื้อหา|png/i,
+    );
   });
 
   test('upload → DELETE → ไฟล์หายจากดิสก์จริง + file_path เป็น POSIX เสมอ (กัน regression บั๊ก Windows)', async () => {

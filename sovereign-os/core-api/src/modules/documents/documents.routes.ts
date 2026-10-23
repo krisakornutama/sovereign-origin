@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
+import { hardenUpload, verifyUploadedContent, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import {
   prisma,
   analyzeProductLabel,
@@ -53,11 +54,16 @@ function applyOverrides(label: ProductLabel, body: Record<string, unknown>): Pro
 }
 
 // POST /api/documents/analyze — อัปโหลดรูปฉลาก → AI อ่าน → คืน preview (ยังไม่บันทึก)
-router.post('/analyze', authenticate, (req, res) => {
+router.post('/analyze', authenticate, uploadLimiter, (req, res) => {
   upload.single('image')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: 'Invalid image upload', detail: err.message });
     try {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+      try {
+        verifyUploadedContent(req.file);
+      } catch (e: any) {
+        return res.status(400).json({ error: e?.message || 'เนื้อหาไฟล์ไม่ถูกต้อง' });
+      }
       const base64 = toBase64DataUri(req.file.buffer, req.file.mimetype);
       const label = await analyzeProductLabel(base64, visionDeps);
       res.json(label);
@@ -71,7 +77,7 @@ router.post('/analyze', authenticate, (req, res) => {
 // รองรับ 2 แบบ:
 //   multipart: image + override fields (เรียก AI ใหม่)
 //   JSON:      { parsed: {...} } หรือส่ง fields ตรง ๆ จาก preview (ไม่ต้องส่งภาพซ้ำ)
-router.post('/scan-to-inventory', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+router.post('/scan-to-inventory', authenticate, uploadLimiter, requireRole(...WRITE_ROLES), async (req, res) => {
   if (req.is('application/json')) {
     try {
       const raw = (req.body?.parsed && typeof req.body.parsed === 'object' ? req.body.parsed : req.body) as Record<string, unknown>;
@@ -89,6 +95,11 @@ router.post('/scan-to-inventory', authenticate, requireRole(...WRITE_ROLES), asy
     if (err) return res.status(400).json({ error: 'Invalid image upload', detail: err.message });
     try {
       if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+      try {
+        verifyUploadedContent(req.file);
+      } catch (e: any) {
+        return res.status(400).json({ error: e?.message || 'เนื้อหาไฟล์ไม่ถูกต้อง' });
+      }
       const base64 = toBase64DataUri(req.file.buffer, req.file.mimetype);
       let label = await analyzeProductLabel(base64, visionDeps);
       label = applyOverrides(label, (req.body || {}) as Record<string, unknown>);

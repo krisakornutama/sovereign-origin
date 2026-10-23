@@ -21,7 +21,7 @@ export default function MfaInput() {
   const [cooldown, setCooldown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const { token, login, logout } = useAuthStore();
+  const { token, login, logoutLocal } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   const router = useRouter();
 
@@ -265,7 +265,7 @@ export default function MfaInput() {
 
           <button
             type="button"
-            onClick={logout}
+            onClick={logoutLocal}
             className="mt-1 mx-auto block text-xs text-gray-500 hover:text-gray-300"
           >
             {t('login.mfaCancel', 'ยกเลิกและกลับไปหน้าเข้าสู่ระบบ')}

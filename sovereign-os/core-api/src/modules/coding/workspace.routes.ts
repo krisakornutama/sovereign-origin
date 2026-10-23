@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireRole } from '../../middleware/auth.middleware';
+import { rateLimit } from '../../middleware/rateLimit.middleware';
 import {
   getProjectPath,
   saveSettings,
@@ -13,8 +14,16 @@ import {
 
 const router = Router();
 
-// GET /api/coding/workspace — ตำแหน่งโปรเจ็กปัจจุบัน
-router.get('/workspace', authenticate, (_req, res) => {
+// จำกัดการอ่าน/สั่งงาน coding ต่อบัญชี — กันการวนอ่านไฟล์หรือยิง terminal ถี่ผิดปกติ
+export const codingLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  message: 'คำขอ Coding ถี่เกินไป กรุณาลองใหม่ภายหลัง',
+  keyBy: (req) => String(req.user?.id ?? ''),
+});
+
+// GET /api/coding/workspace — ตำแหน่งโปรเจ็กปัจจุบัน (SUPERADMIN เท่านั้น — ไม่เปิดเผย path ให้ user ทั่วไป)
+router.get('/workspace', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
   try {
     res.json({ projectPath: getProjectPath() });
   } catch (err: any) {
@@ -23,7 +32,7 @@ router.get('/workspace', authenticate, (_req, res) => {
 });
 
 // PUT /api/coding/workspace { projectPath } — เปลี่ยนตำแหน่งโปรเจ็ก (SUPERADMIN)
-router.put('/workspace', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/workspace', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
   try {
     const saved = saveSettings({ projectPath: String(req.body?.projectPath || '') });
     res.json({ success: true, projectPath: saved.projectPath });
@@ -33,7 +42,7 @@ router.put('/workspace', authenticate, requireRole('SUPERADMIN'), (req, res) => 
 });
 
 // GET /api/coding/files?path=... — รายการไฟล์ในโปรเจ็ก
-router.get('/files', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/files', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
   try {
     res.json({ entries: listFiles(String(req.query?.path || '')) });
   } catch (err: any) {
@@ -42,7 +51,7 @@ router.get('/files', authenticate, requireRole('SUPERADMIN'), (req, res) => {
 });
 
 // GET /api/coding/file?path=... — เนื้อหาไฟล์ (preview)
-router.get('/file', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/file', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
   try {
     const result = readProjectFile(String(req.query?.path || ''));
     res.json(result);
@@ -52,7 +61,7 @@ router.get('/file', authenticate, requireRole('SUPERADMIN'), (req, res) => {
 });
 
 // POST /api/coding/terminal { command } — รันคำสั่งในเครื่อง (cwd = โปรเจ็ก)
-router.post('/terminal', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/terminal', authenticate, codingLimiter, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const result = await runTerminal(String(req.body?.command || ''));
     res.json(result);
