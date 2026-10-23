@@ -52,8 +52,9 @@ export async function setupCore(): Promise<CoreCtx> {
   const username = 'db-upload-test';
   const user = await prisma.user.upsert({
     where: { username },
-    update: {},
-    create: { username, password_hash: 'not-a-real-login' },
+    // auth middleware อ่าน role จาก DB (ไม่เชื่อ claim) — token ของเทสจึงต้องมี row ที่เป็น SUPERADMIN จริง
+    update: { role: 'SUPERADMIN', must_change_password: false },
+    create: { username, password_hash: 'not-a-real-login', role: 'SUPERADMIN' },
   });
 
   /* ล้างเศษจากรอบก่อน (CI รอบแรกไม่มีอยู่แล้ว) — ครอบเฉพาะตารางที่ชุดเทสนี้เขียน */
@@ -61,7 +62,15 @@ export async function setupCore(): Promise<CoreCtx> {
   await prisma.transferOrder.deleteMany({ where: { user_id: user.id } });
   await prisma.treasuryEvent.deleteMany({ where: { user_id: user.id } });
 
-  return { prisma, makeToken, createTestServer, userId: user.id };
+  /* token ต้องชี้ไปที่ user UUID จริงใน DB — `test-user` ใช้กับ mock registry เท่านั้น
+     (auth middleware ทำ findUnique where id ซึ่งเป็น @db.Uuid ⇒ 'test-user' โยน P2023) */
+  return {
+    prisma,
+    makeToken: (role = 'SUPERADMIN', overrides: Record<string, unknown> = {}) =>
+      makeToken(role, { userId: user.id, ...overrides }),
+    createTestServer,
+    userId: user.id,
+  };
 }
 
 /** teardown — ลบ user ทดสอบ (FK cascade ลบ inventory/transfer ที่เหลือ) + ปิด connection */
