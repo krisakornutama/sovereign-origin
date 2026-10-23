@@ -11,11 +11,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 // สูตรคำนวณเวอร์ชัน/แฮชต้องเป็นตัวเดียวกับฝั่งเครื่องลูก — import โมดูลของ runner ตรง ๆ
 // (ถ้าเขียนสูตรซ้ำสองที่ วันหนึ่งสองฝั่งจะตกลงกันไม่ได้ แล้วเครื่องลูกจะอัปเดตวนไม่จบ)
 import { computeVersionFromEntries, sha256Hex } from '../../sovereign-os/agent-runner/src/selfUpdate.mjs';
+import { UPDATE_SIGNING_KEY_ID, canonicalManifestPayload } from '../../sovereign-os/agent-runner/src/updateTrust.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -244,13 +246,58 @@ export function kitPartSummary(files) {
     .sort((a, b) => b.files - a.files || a.part.localeCompare(b.part));
 }
 
+/** ชื่อไฟล์ private key เริ่มต้น (อยู่นอก data dir ที่ mount เข้า container; gitignore ผ่าน *.pem) */
+export const UPDATE_SIGNING_KEY_FILE = 'signing-key.pem';
+/** path ของ private key เมื่อเทียบกับ repo root — ห้ามอยู่ใน core-api/data เพราะ container มองเห็น */
+export const UPDATE_SIGNING_KEY_PATH = 'tools/agent-pack/keys/signing-key.pem';
+
+/**
+ * หา private key สำหรับเซ็น manifest
+ * ลำดับ: signingKey (ส่งตรง) → env AGENT_UPDATE_SIGNING_KEY → ไฟล์ signingKeyPath/env → repo/tools/agent-pack/keys
+ * ต้องมีก่อนเขียนชุดเสมอ — ไม่มี key = ไม่เผยแพร่ manifest ที่ยังไม่เซ็น
+ * หมายเหตุ: private key ต้องไม่อยู่ใน core-api/data (container mount เห็น) — HUB มีไว้ตรวจ public key เท่านั้น
+ */
+export function resolveUpdateSigningKey({ root = REPO_ROOT, signingKey = '', signingKeyPath = '' } = {}) {
+  const keyId = String(process.env.AGENT_UPDATE_SIGNING_KEY_ID || UPDATE_SIGNING_KEY_ID).trim() || UPDATE_SIGNING_KEY_ID;
+  const normalizePem = (pem) => String(pem).replace(/\\n/g, '\n');
+  const inline = signingKey || process.env.AGENT_UPDATE_SIGNING_KEY;
+  if (inline) return { privateKeyPem: normalizePem(inline), keyId, keyPath: null };
+
+  const file = path.resolve(signingKeyPath || process.env.AGENT_UPDATE_SIGNING_KEY_PATH || path.join(root, UPDATE_SIGNING_KEY_PATH));
+  if (!fs.existsSync(file)) {
+    throw new Error(
+      `ไม่พบ private key สำหรับเซ็น manifest: ${file} — ` +
+        'สร้าง Ed25519 keypair แล้วเก็บ private key ไว้ที่ path นี้ (ดู docs/modules/fleet.md)',
+    );
+  }
+  return { privateKeyPem: normalizePem(fs.readFileSync(file, 'utf8')), keyId, keyPath: file };
+}
+
 /**
  * เผยแพร่ชุดอัปเดตให้ "เครื่องลูกที่ออนไลน์อยู่" ดึงไปใช้เอง (ไม่ต้องก็อปไฟล์ผ่าน USB อีก)
  * เขียนลง core-api/data/agent-updates/ = โฟลเดอร์ที่คอนเทนเนอร์ HUB มองเห็นอยู่แล้ว
- * คืน { version, files } · throw เมื่อไฟล์ต้นทางหาย (จะได้ไม่เผยแพร่ชุดที่ไม่ครบ)
+ * เซ็น manifest ด้วย Ed25519; ไม่มี private key = throw ก่อนแตะไฟล์เดิม
+ * คืน { version, files, dir, signature } · throw เมื่อไฟล์ต้นทางหาย (จะได้ไม่เผยแพร่ชุดที่ไม่ครบ)
  */
-export function publishUpdateBundle({ root = REPO_ROOT, dataDir = '', log = () => {} } = {}) {
+export function publishUpdateBundle({
+  root = REPO_ROOT,
+  dataDir = '',
+  log = () => {},
+  signingKey = '',
+  signingKeyPath = '',
+} = {}) {
   const dir = path.resolve(dataDir || path.join(root, UPDATE_DATA_DIR));
+  const signing = resolveUpdateSigningKey({ root, signingKey, signingKeyPath });
+  let privateKey;
+  try {
+    privateKey = crypto.createPrivateKey(signing.privateKeyPem);
+  } catch {
+    throw new Error(`private key สำหรับเซ็น manifest อ่านไม่ได้ (${signing.keyPath || 'inline key'})`);
+  }
+  if (privateKey.asymmetricKeyType !== 'ed25519') {
+    throw new Error(`private key ต้องเป็น Ed25519 (พบ ${privateKey.asymmetricKeyType || 'unknown'})`);
+  }
+
   const files = bundleFiles(root);
   const entries = files.map((rel) => {
     const from = bundleSource(root, rel);
@@ -260,6 +307,15 @@ export function publishUpdateBundle({ root = REPO_ROOT, dataDir = '', log = () =
   });
   const version = computeVersionFromEntries(entries);
 
+  // เซ็นก่อนลบ/เขียนไฟล์ใด ๆ: ถ้า key ผิดหรือ sign ล้ม ต้องไม่ทิ้งชุดเดิมให้เสียหาย
+  const base = { version, generatedAt: new Date().toISOString(), files: entries };
+  const signature = {
+    alg: 'ed25519',
+    keyId: signing.keyId,
+    value: crypto.sign(null, canonicalManifestPayload(base), privateKey).toString('base64'),
+  };
+  const manifest = { ...base, signature };
+
   // เขียนทับทั้งชุด: ลบของเก่าก่อน เพื่อไม่ให้ไฟล์ที่ถูกถอดออกจากชุดค้างอยู่ในโฟลเดอร์ files/
   fs.rmSync(path.join(dir, 'files'), { recursive: true, force: true });
   for (const rel of files) {
@@ -267,11 +323,10 @@ export function publishUpdateBundle({ root = REPO_ROOT, dataDir = '', log = () =
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(bundleSource(root, rel), to);
   }
-  const manifest = { version, generatedAt: new Date().toISOString(), files: entries };
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
-  log(`[agent-pack] เผยแพร่ชุดอัปเดตเวอร์ชัน ${version} (${files.length} ไฟล์) ที่ ${dir}`);
-  return { version, files: entries, dir };
+  log(`[agent-pack] เผยแพร่ชุดอัปเดตเวอร์ชัน ${version} (${files.length} ไฟล์) ที่ ${dir} — เซ็นด้วย ${signing.keyId}`);
+  return { version, files: entries, dir, signature };
 }
 
 /** ข้อความหน้าแรกที่คนอ่านเจอในโฟลเดอร์ชุดติดตั้ง (ห้ามมี token) */

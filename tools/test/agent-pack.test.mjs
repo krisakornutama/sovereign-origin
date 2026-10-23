@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -21,9 +22,17 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 /** ที่พักชั่วคราวต้องอยู่บนไดรฟ์โปรเจ็กเท่านั้น (AGENTS.md ข้อ 7) */
 const TMP_ROOT = path.join(ROOT, '.freebuff', 'tmp');
 
+// Phase 3A: ให้ทุก publish ในเทสต์เซ็นด้วย key ชั่วคราว (ไม่แตะ private key จริง)
+const TEST_KEY_ID = 'agent-pack-test-key';
+const TEST_PAIR = crypto.generateKeyPairSync('ed25519');
+const TEST_PUBLIC_PEM = TEST_PAIR.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+process.env.AGENT_UPDATE_SIGNING_KEY = TEST_PAIR.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+process.env.AGENT_UPDATE_SIGNING_KEY_ID = TEST_KEY_ID;
+
 const pack = await import('../agent-pack/pack.mjs');
 // สูตรแฮช/เวอร์ชันตัวเดียวกับที่เครื่องลูกใช้ (ตัวแพ็ก import โมดูลนี้จริง)
 const { sha256Hex, computeVersionFromEntries } = await import('../../sovereign-os/agent-runner/src/selfUpdate.mjs');
+const { canonicalManifestPayload } = await import('../../sovereign-os/agent-runner/src/updateTrust.mjs');
 const REPO_ROOT_TEST = () => ROOT;
 const setup = await import('../agent-pack/setup-machine.mjs');
 
@@ -383,7 +392,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
     const manifest = JSON.parse(fs.readFileSync(path.join(updateDir, 'manifest.json'), 'utf8'));
     assert.match(manifest.version, /^[0-9a-f]{12}$/);
     const paths = manifest.files.map((f) => f.path);
-    for (const rel of ['src/main.mjs', 'src/selfUpdate.mjs', 'package.json', 'run-runner.cmd']) {
+    for (const rel of ['src/main.mjs', 'src/selfUpdate.mjs', 'src/updateTrust.mjs', 'package.json', 'run-runner.cmd']) {
       assert.ok(paths.includes(rel), `ชุดอัปเดตขาด ${rel}`);
     }
     assert.equal(paths.includes('.env'), false, 'ห้ามเผยแพร่ .env');
@@ -397,6 +406,28 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
     }
     const recomputed = computeVersionFromEntries(manifest.files.map((f) => ({ path: f.path, sha256: f.sha256 })));
     assert.equal(recomputed, manifest.version, 'เครื่องลูกคำนวณเวอร์ชันจาก manifest แล้วต้องตรงกับที่ HUB ประกาศ');
+    assert.equal(manifest.signature.alg, 'ed25519');
+    assert.equal(manifest.signature.keyId, TEST_KEY_ID);
+    assert.equal(
+      crypto.verify(null, canonicalManifestPayload(manifest), TEST_PAIR.publicKey, Buffer.from(manifest.signature.value, 'base64')),
+      true,
+      'manifest ที่แพ็กต้องมีลายเซ็น Ed25519 ที่ตรวจได้',
+    );
+  });
+
+  test('ไม่มี private key = ไม่เขียน manifest ที่ยังไม่เซ็น (fail-closed)', () => {
+    const oldKey = process.env.AGENT_UPDATE_SIGNING_KEY;
+    delete process.env.AGENT_UPDATE_SIGNING_KEY;
+    try {
+      const updateDir = path.join(sandbox, 'agent-updates-no-key');
+      assert.throws(
+        () => pack.publishUpdateBundle({ root: ROOT, dataDir: updateDir, signingKeyPath: path.join(sandbox, 'missing-key.pem') }),
+        /private key|signing|ไม่พบ/i,
+      );
+      assert.equal(fs.existsSync(path.join(updateDir, 'manifest.json')), false, 'ห้ามเหลือ manifest ที่ไม่ได้เซ็น');
+    } finally {
+      process.env.AGENT_UPDATE_SIGNING_KEY = oldKey;
+    }
   });
 
   test('เผยแพร่ซ้ำ: ไฟล์ที่ถูกถอดออกจากชุดต้องหายไปจากที่ให้บริการ (ไม่ค้างเก่า)', () => {

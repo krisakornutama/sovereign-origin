@@ -27,6 +27,12 @@ export interface UpdateManifest {
   version: string;
   generatedAt: string;
   files: UpdateFileEntry[];
+  /** Phase 3A: Ed25519 signature over {version, generatedAt, files} */
+  signature?: {
+    alg: 'ed25519';
+    keyId: string;
+    value: string;
+  };
 }
 
 /** อ่าน manifest ที่ตัวแพ็กเขียนไว้ — คืน null เมื่อยังไม่มีชุดอัปเดต/ไฟล์เสีย */

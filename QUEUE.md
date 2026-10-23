@@ -20,6 +20,12 @@
   - apply migration `20261023150000_fleet_persisted_model` บน production + restart core-api healthy
   - smoke API DB-backed: policy/overview/enroll-tokens/sites/audit = 200, `/fleet/` = 200
   - [ ] ทดสอบสร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI กับเครื่องจริง 1 เครื่อง
+- [x] P0 regression: BOM ใน migration + backfill idempotency — **เสร็จแล้ว 23/10/69** (`cdfe425`)
+  - `tools/test/migration-bom.test.mjs` + `fleetPhase2-db.test.ts` (backfill รันซ้ำไม่สร้างแถวซ้ำ) + เพิ่มใน `test:db`
+- [x] Phase 3A: signed runner manifest (Ed25519) + ตรวจสองชั้น — **implement + tests แล้ว 23/10/69**
+  - pack เซ็น, HUB ตรวจก่อนตอบ (503 เมื่อไม่ผ่าน), runner ตรวจก่อนแตะไฟล์
+  - public key ฝังสองฝั่ง + static test เทียบ; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
+  - [ ] repack + restart core-api หลังได้รับอนุญาต (ยังไม่ deploy ระหว่าง Cold Soak)
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์

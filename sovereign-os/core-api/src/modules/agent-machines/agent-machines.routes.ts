@@ -12,7 +12,8 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import fs from 'node:fs';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { hardenUpload, handledUpload, resolveInsideRoot, IMAGE_MIME } from '../../lib/harden-upload';
-import { readUpdateManifest, resolveUpdateFile, isSafeRelPath } from '../../services/agent-update.service';
+import { resolveUpdateFile, isSafeRelPath } from '../../services/agent-update.service';
+import { readVerifiedUpdateManifest } from '../../services/update-manifest-trust.service';
 import { readDesktopManifest, resolveVerifiedDesktopAsset } from '../../services/desktop-update.service';
 import { createHash } from 'node:crypto';
 import {
@@ -436,9 +437,19 @@ router.get('/update/manifest', async (req: Request, res: Response) => {
     if (!machine) return;
     const gate = await gateFleetUpdate(machine, res);
     if (!gate) return;
-    const manifest = readUpdateManifest();
-    if (!manifest) return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
-    res.json({ ...manifest, channel: gate.channel, rolloutPercent: gate.rolloutPercent });
+    const verified = readVerifiedUpdateManifest();
+    if (!verified.ok) {
+      if (verified.code === 'no-bundle') {
+        return res.status(404).json({ error: 'no update bundle published', hint: 'รัน node tools/agent-pack/pack.mjs ที่ HUB' });
+      }
+      console.error(`[agent-update] ปฏิเสธ manifest: ${verified.code} — ${verified.reason}`);
+      return res.status(503).json({
+        error: 'update manifest is not signed by a trusted key',
+        code: verified.code,
+        hint: 'ตรวจ private key ที่ใช้แพ็ก + public key ใน update-manifest-trust.service.ts / updateTrust.mjs',
+      });
+    }
+    res.json({ ...verified.manifest, channel: gate.channel, rolloutPercent: gate.rolloutPercent });
   } catch (err) {
     console.error('GET /api/agent-machines/update/manifest error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to read update manifest' });
@@ -454,7 +465,14 @@ router.get('/update/file', async (req: Request, res: Response) => {
     if (!(await gateFleetUpdate(machine, res))) return;
     const rel = String(req.query.path ?? '');
     if (!isSafeRelPath(rel)) return res.status(400).json({ error: 'invalid file path' });
-    const found = resolveUpdateFile(rel);
+    // ตรวจ manifest ก่อนเสิร์ฟไฟล์ด้วย: manifest ที่ไม่ผ่าน trust = ห้ามส่งโค้ดออกไปแม้ไฟล์จะตรง hash
+    const verified = readVerifiedUpdateManifest();
+    if (!verified.ok) {
+      if (verified.code === 'no-bundle') return res.status(404).json({ error: 'not part of the published bundle' });
+      console.error(`[agent-update] ปฏิเสธ manifest ตอนส่งไฟล์: ${verified.code} — ${verified.reason}`);
+      return res.status(503).json({ error: 'update manifest is not signed by a trusted key', code: verified.code });
+    }
+    const found = resolveUpdateFile(rel, undefined, verified.manifest);
     if (!found) return res.status(404).json({ error: 'not part of the published bundle' });
     const body = fs.readFileSync(found.abs);
     if (sha256Hex(body) !== found.entry.sha256) {

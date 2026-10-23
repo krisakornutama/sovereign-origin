@@ -1,9 +1,9 @@
 # Enterprise Readiness — Sovereign OS
 
-> สถานะ: 19/10/69 · ระหว่าง Cold Soak
+> สถานะ: 23/10/69 · ระหว่าง Cold Soak
 > เอกสารนี้เป็นแผนยกระดับผลิตภัณฑ์ให้พร้อมใช้หลายเครื่อง/หลายสาขาในระดับองค์กร
-> **Phase 1 ถูก implement แล้วบน branch `ai/enterprise-fleet`** แต่ยังไม่ live
-> จนกว่าจะ restart `sovereign-core-api` และ rebuild frontend หลัง Cold Soak
+> **Phase 1 + Phase 2 live แล้ว**; **Phase 3A (signed runner manifest) implement + tests แล้ว
+> แต่ยังไม่ deploy** — ต้อง repack และ restart หลังได้รับอนุญาตเท่านั้น
 
 ## 1. เป้าหมาย
 
@@ -102,9 +102,19 @@ Acceptance:
 
 ## 5. Phase 3 — Supply chain และความน่าเชื่อถือของอัปเดต
 
-- เซ็น manifest ด้วยคีย์ (Ed25519) และฝัง public key ใน runner/desktop
+### 5.1 Phase 3A — signed runner manifest (implemented, ยังไม่ deploy)
+
+- [x] manifest ของ runner ถูกเซ็น Ed25519 ที่ตัวแพ็ก; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
+- [x] public key ฝังใน runner + HUB; static test เทียบสองฝั่ง (`tools/test/update-trust-key.test.mjs`)
+- [x] HUB ตรวจลายเซ็นก่อนตอบ manifest — unsigned/bad signature = 503
+- [x] runner ตรวจซ้ำก่อนแตะไฟล์ — unsigned/bad signature = `untrusted-manifest`
+- [x] canonical payload ครอบ `version`, `generatedAt`, `files[{path,sha256,size}]`
+- [ ] repack + restart core-api เพื่อให้ manifest ปัจจุบันมีลายเซ็น (ต้องได้รับอนุญาตหลัง Cold Soak)
+- [ ] desktop updater ยังใช้ SHA-256 อย่างเดียว (Phase 3B)
+
+### 5.2 งานที่ยังเหลือใน Phase 3
+
 - แยก artifact ต่อช่องทาง (stable/beta/canary) ไม่ใช้ manifest เดียว
-- บังคับ SHA-256 + size + signature ก่อนติดตั้ง
 - เก็บผลติดตั้ง (success/fail/rollback) ต่อเครื่อง
 - health-gated rollout: หยุดอัตโนมัติถ้าเครื่องในกลุ่มล้มเกิน threshold
 - รองรับ rollback ไปเวอร์ชันก่อนหน้า
@@ -155,14 +165,16 @@ Acceptance:
 
 1. ตรวจว่า backup/restore ล่าสุดผ่าน
 2. `npm run verify` ที่ MAIN (ต้องเขียว)
-3. merge `ai/enterprise-fleet` → `main`
-4. `docker restart sovereign-core-api` (โหลด route ใหม่)
-5. rebuild frontend ตามขั้นตอนปกติ (ให้เมนู/หน้าใหม่ขึ้น)
-6. เปิด `/fleet` ด้วย SUPERADMIN
-7. สร้างรหัสเชิญทดสอบ 1 ใบ ติดตั้งเครื่องทดสอบ 1 เครื่อง
-8. ตั้งเครื่องทดสอบเป็น canary 5% → beta → stable ตามผล
-9. ตรวจ audit log ว่ามีรายการครบ
-10. ประกาศใช้กับเครื่องจริง
+3. merge branch งาน → `main`
+4. ตรวจว่ามี `tools/agent-pack/keys/signing-key.pem` แล้ว repack:
+   `node -e "import('./tools/agent-pack/pack.mjs').then(m => m.publishUpdateBundle())"`
+5. `docker restart sovereign-core-api` (โหลด route ใหม่ + manifest ที่เซ็นแล้ว)
+6. rebuild frontend ตามขั้นตอนปกติ (ให้เมนู/หน้าใหม่ขึ้น)
+7. เปิด `/fleet` ด้วย SUPERADMIN
+8. สร้างรหัสเชิญทดสอบ 1 ใบ ติดตั้งเครื่องทดสอบ 1 เครื่อง
+9. ตั้งเครื่องทดสอบเป็น canary 5% → beta → stable ตามผล
+10. ตรวจ audit log ว่ามีรายการครบ
+11. ประกาศใช้กับเครื่องจริง
 
 ## 11. คำถามที่ต้องตัดสินใจก่อน Phase 2
 
@@ -171,7 +183,7 @@ Acceptance:
 - ต้องการเก็บประวัติ rollout ทุกครั้งหรือแค่ค่าล่าสุด?
 - ใครมีสิทธิ์หมุน token — SUPERADMIN เท่านั้นหรือ site admin ด้วย?
 - นโยบาย `requireLanVerification` ควรบังคับจริงหรือเป็นแค่คำแนะนำ?
-- ต้องการ signed manifest ใน Phase 3 หรือใช้ SHA-256 ต่อ?
+- Phase 3A ใช้ signed manifest กับ runner แล้ว; จะขยายไป desktop updater เมื่อไร?
 
 ---
 
