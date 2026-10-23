@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `relay_schedules` · `relays`
 
 ### Routes
-- `relay/relay.routes.ts` (198 บรรทัด)
+- `relay/relay.routes.ts` (200 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `whisper/whisper.routes.ts` (101 บรรทัด)
+- `whisper/whisper.routes.ts` (102 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

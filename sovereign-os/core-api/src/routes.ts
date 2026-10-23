@@ -56,6 +56,7 @@ import workspaceRoutes from './modules/coding/workspace.routes';
 import skillsRoutes from './modules/coding/skills.routes';
 import notesRoutes from './modules/notes/notes.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
+import paymentSlipsRoutes from './modules/payments/payment-slips.routes';
 import cloneRoutes from './modules/clone/clone.routes';
 import riskRoutes from './modules/risk/risk.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
@@ -158,6 +159,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/coding', featureGuard('/ai-agent'), workspaceRoutes); // Coding Agent — workspace (ตำแหน่งโปรเจ็ก/ไฟล์/เทอร์มินัล)
   app.use('/api/coding', featureGuard('/ai-agent'), skillsRoutes); // Coding Agent — skill queue (คิวทักษะ + ระดับอัตโนมัติ)
   app.use('/api/notes', featureGuard('/ai-agent'), notesRoutes); // Note — ปุ่มโน้ต
+  app.use('/api/payments/slips', paymentSlipsRoutes); // FREE-FIRST: payment slips + manual review (no paid provider)
   app.use('/api/payments', paymentsRoutes); // PAYMENTS — Checkout Session (THB) · transport เป็นของปลอมจนกว่าจะเปิด STRIPE_LIVE_ENABLED
   app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
   app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);

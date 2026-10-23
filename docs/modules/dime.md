@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `asset_prices`
 
 ### Routes
-- `dime/dime.routes.ts` (119 บรรทัด)
+- `dime/dime.routes.ts` (126 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

@@ -17,6 +17,8 @@
 | `services/stripe-checkout.ts` | ขอบเขตของ Stripe ฝั่งเรา: บาท↔สตางค์ (`toThbMinorUnit`), ค่าคงที่ที่มาจากเอกสาร Stripe, `normalizeRefCode`, payload builder, transport (fake/live) | ห้าม import `config` — โมดูลนี้ต้องทดสอบได้ด้วยเทสต์ล้วน |
 | `services/stripe-webhook.service.ts` | ตรวจลายเซ็น Stripe (pure) | ไม่รู้จัก order / DB / business |
 | `modules/payments/payments.routes.ts` | **เฉพาะชั้น HTTP**: auth, raw body, สถานะ/รูปร่าง response, และการเดินสาย config→transport | ห้ามใส่ตรรกะทางธุรกิจ — ถ้าเริ่มเป็น `if (...) return 400` หลาย ๆ ที่ แปลว่าตรรกะหลุดมาอยู่ผิดชั้น · **ห้ามเขียน DB ตรง ๆ ในไฟล์นี้** — ทุกจุดที่แตะ order/payment เพื่อบันทึกการจ่ายของ Stripe ต้องอยู่ที่ `payment-apply.service` (CAS ที่ซ่อนใน route คือจุดที่ทำให้ `any` หลุดเข้ามาและบั๊กที่เทสต์ด้วย mock ไม่จับ) |
+| `services/payment-slip.service.ts` | **สลิปโอนเงินแบบ free-first**: validate ภาพ/ยอด/เลขอ้างอิง · sha256 + `(provider, transRef)` กันซ้ำ · เก็บ `payment_slips` · review ด้วยมือ + audit | ไม่เรียกผู้ให้บริการเสียเงิน · ไม่อนุมัติ/ลงบัญชีการชำระเงินอัตโนมัติ (ใช้ `business.service.addPayment` แยก) · adapter ใหม่ต้องไม่ย้ายกติกาตรวจไปจาก `slip-verify.service.ts` |
+| `modules/payments/payment-slips.routes.ts` | **HTTP ของสลิป**: multipart upload, list, image, review | auth + `hasBusinessAccess` ทุกเส้น · ไม่ส่ง `imageData` ใน list · ไม่เรียก adapter ที่ยิงเครือข่าย |
 
 **ทิศทางข้อมูล (ทางเดียว):**
 `HTTP → verify ลายเซ็น → หา order → decideCompletion()/decideStorefrontCompletion() → payment-apply (CAS + แถวเงิน) → ตอบ`
@@ -58,8 +60,8 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 - **ห้ามยิง Stripe จริงโดยไม่ตั้งใจ** — บัญชีเป็น live mode เงินจริงหายทันที
   `createLiveStripeTransport` โยน error ถ้า `enabled !== true`
 - **ห้ามเชื่อ `session.amount_total`** — ตัวเลขที่เชื่อได้คือ `TransferOrder.amount_thb`
-- **ห้ามแก้ schema** — ไม่มี `provider_ref`; `cs_…` เก็บใน `TransferOrder.txid`
-  (`ref_code` เป็น `@unique` อยู่แล้ว)
+- **ห้ามแก้ schema ของเส้น Stripe** — ไม่มี `provider_ref`; `cs_…` เก็บใน `TransferOrder.txid`
+  (`ref_code` เป็น `@unique` อยู่แล้ว) · ตาราง `payment_slips` เป็นคนละเส้น (free-first) และมี migration ของตัวเอง
 - **ห้ามแก้ `.env`** — เป็นของเจ้าของ และห้าม commit ค่าจริง
 - ลำดับของ `if` ใน `decideCompletion` คือสัญญา — branch แรกที่ match คือคำตอบ
   การสลับลำดับเปลี่ยน reason ที่ลูกค้าเห็นและที่ log
@@ -77,21 +79,59 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 
 **การ deploy โมดูลนี้ = restart container** — `sovereign-core-api` mount `src` จาก MAIN และรัน `prisma generate && tsc && node dist/server.js` ทุกครั้งที่บูต ⇒ โค้ดใหม่ขึ้นเมื่อ container restart เท่านั้น (ถ้า `/api/payments/*` ตอบ 404 ให้ restart ก่อนไปสงสัยโค้ด · และรัน `npm run build` ใน MAIN ให้ผ่านก่อน restart เพราะถ้า tsc ในคอนเทนเนอร์ล้ม API จะไม่ขึ้นเลย)
 
+## Payment slips — free-first (พร้อม migrate แต่ยังไม่ deploy)
+
+### เจตนา
+รับภาพสลิปโอนเงิน + ข้อมูลที่พนักงานกรอก แล้วให้เจ้าของ/ผู้จัดการ **ตรวจด้วยมือ** โดยไม่เรียก
+ผู้ให้บริการอ่านสลิป (SlipOK/EasySlip) และไม่แตะ Stripe live mode — ต้นทุน 0 บาท
+การอนุมัติสลิป = "ตรวจแล้ว" **ไม่ใช่** การบันทึกการชำระเงิน; การลงบัญชียังใช้
+`business.service.addPayment` ตามเดิม (แยกหน้าที่กันเพื่อไม่ให้ตรวจสลิปเขียน ledger เอง)
+
+### ตาราง `payment_slips` (owner: payments)
+- ภาพเก็บใน DB (`imageData` BYTEA, เพดาน 5 MB) — กันภาพซ้ำด้วย `imageSha256 @unique`
+- `UNIQUE(provider, transRef)` — NULL ซ้ำได้ (สลิปที่ไม่มีเลขอ้างอิง)
+- `amountSatang` เป็นจำนวนเต็มสตางค์ · `status` = `PENDING | APPROVED | REJECTED`
+- `uploadedBy` / `reviewedBy` เป็น FK ไป `users` (SET NULL เมื่อลบ user)
+- ยังไม่มี public `/shop` ใน repo นี้ ⇒ รอบนี้เป็น API ภายในสำหรับพนักงาน/เจ้าของธุรกิจ
+
+### Endpoints (ต้อง auth + `hasBusinessAccess`)
+| Method | Path | สิทธิ์ขั้นต่ำ |
+|---|---|---|
+| POST | `/api/payments/slips/:businessId` (multipart: `file`, `amount`, `provider?`, `transRef?`, `orderId?`, `note?`) | SALES |
+| GET | `/api/payments/slips/:businessId?status=&limit=` | VIEWER |
+| GET | `/api/payments/slips/:businessId/:id/image` | VIEWER |
+| POST | `/api/payments/slips/:businessId/:id/review` (`{decision:"APPROVED"|"REJECTED", note?}`) | MANAGER |
+
+- Review ครั้งแรกเท่านั้นที่เปลี่ยนสถานะ; คำตัดสินเดิม = idempotent 200, คำตัดสินตรงข้าม = 409
+- ทุก upload/review เขียน `audit_logs` (`PAYMENT_SLIP_UPLOAD` / `PAYMENT_SLIP_REVIEW`) โดย mask เลขอ้างอิง
+- Adapter interface: `SlipProviderAdapter` ใน service; รอบนี้ลงทะเบียนเฉพาะ `MANUAL` ที่คืนค่าว่างและไม่ยิงเน็ต
+- **ยังไม่ทำ** `POST /api/shop/orders/:token/slip` + UI เหตุผล เพราะหน้าร้าน `/shop` อยู่ใน repo
+  `Sovereign-Web-Standalone` — ต้องตัดสินใจเรื่องที่วาง UI ก่อน (J9e)
+- **ยังไม่ apply migration นี้ใน production** (Cold Soak) — เทสต์รันบน schema ชั่วคราวด้วย `prisma db push`
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
 
 ### ตารางที่เป็นเจ้าของ
-_(ยังไม่มีตารางใน owners map)_
+`payment_slips`
 
 ### Routes
+- `payments/payment-slips.routes.ts` (118 บรรทัด)
 - `payments/payments.routes.ts` (314 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
+POST /:businessId
+GET /:businessId
+GET /:businessId/:id/image
+POST /:businessId/:id/review
 POST /checkout-session
 POST /webhook
 ```
+
+### Services ที่ทำงานให้โมดูลนี้
+`payment-slip.service`
 
 <!-- auto:end -->
 

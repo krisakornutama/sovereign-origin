@@ -26,7 +26,7 @@ HUB กลางรับคำสั่งงานจากหน้าเว�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `agent-machines/agent-machines.routes.ts` (373 บรรทัด)
+- `agent-machines/agent-machines.routes.ts` (934 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -44,9 +44,24 @@ POST /queue/:id/cancel
 POST /queue/:id/approve
 POST /queue/:id/reject
 POST /queue/:id/repeat
+GET /update/manifest
+GET /update/file
+GET /desktop-update/manifest
+GET /desktop-update/asset
+GET /node-kits/manifest
+GET /node-kits/bootstrap
+GET /node-kits/asset
+POST /enroll
 POST /heartbeat
 POST /jobs/pull
 POST /jobs/:id/result
+GET /mine
+POST /:id/link
+DELETE /:id/link
+PUT /:id/role
+POST /:id/pair
+DELETE /:id/pair
+POST /:id/pair/confirm
 ```
 
 <!-- auto:end -->

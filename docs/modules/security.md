@@ -16,7 +16,7 @@
 `firewall_config` · `firewall_rules` · `threat_intel_items`
 
 ### Routes
-- `security/nextgen.routes.ts` (365 บรรทัด)
+- `security/nextgen.routes.ts` (384 บรรทัด)
 - `security/security.routes.ts` (315 บรรทัด)
 
 ### Endpoints (จาก router)

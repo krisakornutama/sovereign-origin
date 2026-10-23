@@ -16,7 +16,7 @@
 
 ### Routes
 - `knowledge/knowledge-files.routes.ts` (61 บรรทัด)
-- `knowledge/knowledge.routes.ts` (356 บรรทัด)
+- `knowledge/knowledge.routes.ts` (357 บรรทัด)
 - `knowledge/teach.routes.ts` (676 บรรทัด)
 
 ### Endpoints (จาก router)

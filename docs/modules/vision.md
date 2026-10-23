@@ -16,7 +16,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 
 ### Routes
 - `vision/vision-rule.routes.ts` (112 บรรทัด)
-- `vision/vision.routes.ts` (93 บรรทัด)
+- `vision/vision.routes.ts` (99 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

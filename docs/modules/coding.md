@@ -17,7 +17,7 @@
 ### Routes
 - `coding/coding.routes.ts` (74 บรรทัด)
 - `coding/skills.routes.ts` (65 บรรทัด)
-- `coding/workspace.routes.ts` (64 บรรทัด)
+- `coding/workspace.routes.ts` (73 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

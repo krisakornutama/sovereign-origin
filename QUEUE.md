@@ -459,6 +459,11 @@
 - [ ] **J9e หลัง Cold Soak (ต้อง migrate):** ตาราง `payment_slips` + `UNIQUE(provider, trans_ref)` +
       endpoint `POST /api/shop/orders/:token/slip` + adapter ผู้ให้บริการ (เจ้าของเลือก) + UI เหตุผลการตัดสิน ·
       ห้าม auto-ปิดยอดเมื่อ `PAYEE_UNVERIFIED`/`AMOUNT_MISMATCH`
+  - [x] **free-first backend (23/10/69):** `payment_slips` + internal endpoints `/api/payments/slips/*` +
+        manual review/audit + adapter interface (`MANUAL` เท่านั้น) · DB suite 43/43 · migration
+        `20261023170000_payment_slips` **ยังไม่ apply production**
+  - [ ] public `POST /api/shop/orders/:token/slip` + UI เหตุผล + paid adapter — หน้าร้านอยู่
+        `Sovereign-Web-Standalone`; ต้องให้เจ้าของเลือกที่วาง UI/ผู้ให้บริการก่อน
 - [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —
       ห้ามเขียนเองแบบเดา; เลือกผู้ให้บริการก่อนแล้วทำ adapter
 - [ ] **J9g Cloud backup:** S3/R2 uploader (SigV4 เอง ไม่เพิ่ม dep) หลังได้ creds จากเจ้าของ + restore drill รายไตรมาส
