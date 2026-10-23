@@ -247,6 +247,17 @@ export class AuthService {
     return p;
   }
 
+  /** revoke session ทั้งหมดของผู้ใช้ (logout ฝั่ง server / ถูกบังคับออก)
+   *  bump token_version ⇒ token เก่าทุกอุปกรณ์ใช้ไม่ได้ทันที */
+  static async revokeSessions(userId: string) {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { token_version: { increment: 1 } },
+      select: { token_version: true },
+    });
+    return { token_version: user.token_version };
+  }
+
   /** รีเซ็ตรหัสผ่านให้ user (SUPERADMIN): สุ่มรหัสชั่วคราว + บังคับเปลี่ยน + bump token version
    *  → token เดิมทุกอุปกรณ์ตายทันที (เคส "สงสัยรหัสรั่ว" ปิดจบในคลิกเดียว) */
   static async adminResetPassword(userId: string) {

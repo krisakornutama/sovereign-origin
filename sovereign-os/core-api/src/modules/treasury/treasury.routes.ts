@@ -8,7 +8,8 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { hardenUpload, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
+import { hardenUpload, verifyUploadedContent, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import { resolveOwnerId } from '../portfolio/portfolio.routes';
 import {
   STRATEGY_FAMILIES,
@@ -528,6 +529,7 @@ router.post('/transfers/:id/cancel', authenticate, async (req, res) => {
 router.post(
   '/transfers/:id/evidence',
   authenticate,
+  uploadLimiter,
   (req, res, next) => {
     // multer ปิด error ด้วย next(err) — เปลี่ยนเป็นตอบ 400 JSON ทันที (กันหลุดไป error handler กลาง)
     slipUpload.single('file')(req, res, (err?: any) => {
@@ -546,6 +548,11 @@ router.post(
       if (order.status !== 'PENDING')
         return res.status(400).json({ error: 'อัปโหลดสลิปได้เฉพาะคำสั่งที่ยัง PENDING' });
       if (!req.file) return res.status(400).json({ error: 'ต้องแนบไฟล์ภาพ (form-data field: file)' });
+      try {
+        verifyUploadedContent(req.file);
+      } catch (e: any) {
+        return res.status(400).json({ error: e?.message || 'เนื้อหาไฟล์ไม่ถูกต้อง' });
+      }
       const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
       const updated = await prisma.transferOrder.update({
         where: { id: order.id },

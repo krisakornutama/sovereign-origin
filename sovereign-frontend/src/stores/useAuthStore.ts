@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { JwtPayload, UserProfile } from '../types';
 import { decodeJwt } from '../lib/jwt';
+import { getApiUrl } from '../lib/config';
 
 interface AuthState {
   token: string | null;
@@ -12,14 +13,17 @@ interface AuthState {
   mustChangePassword: boolean;
   isHydrated: boolean;
   login: (token: string) => void;
+  /** ปุ่มออกจากระบบ: revoke token ที่ server ก่อนล้าง session ฝั่ง browser */
   logout: () => void;
+  /** ล้าง session ฝั่ง browser เท่านั้น — ใช้กับ 401 และการยกเลิก MFA (ไม่ยิง revoke) */
+  logoutLocal: () => void;
   setMfaRequired: (required: boolean) => void;
   setMustChangePassword: (required: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       token: null,
       isAuthenticated: false,
       user: null,
@@ -60,6 +64,25 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        const token = get().token;
+        if (token && typeof window !== 'undefined') {
+          // keepalive: ให้ request ไปถึง server แม้หน้าถูกนำทางทันทีหลัง logout
+          try {
+            void fetch(`${getApiUrl()}/api/auth/logout`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              keepalive: true,
+            }).catch(() => {
+              /* server ไม่ตอบ/ออฟไลน์ — การล้าง session ฝั่ง browser ยังต้องเกิด */
+            });
+          } catch {
+            /* fetch ถูกบล็อก — ยังล้าง session ฝั่ง browser ต่อ */
+          }
+        }
+        get().logoutLocal();
+      },
+
+      logoutLocal: () => {
         set({ token: null, isAuthenticated: false, user: null, mfaRequired: false, mustChangePassword: false });
         // เคลียร์ localStorage ทันที เพื่อให้แน่ใจว่าไม่เหลือ token ค้าง
         if (typeof window !== 'undefined') {

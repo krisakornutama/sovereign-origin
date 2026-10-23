@@ -8,7 +8,8 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { hardenUpload } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
+import { hardenUpload, verifyUploadedContent } from '../../lib/harden-upload';
 import { dimeProcessor } from '../../services/dime.service';
 import { isDimeConfigured, loadDimeImapConfig } from '../../services/dime-imap.service';
 
@@ -51,7 +52,7 @@ router.post('/fetch', authenticate, requireRole('SUPERADMIN'), async (_req, res)
 });
 
 // POST /api/dime/import — อัปโหลด PDF ตรงๆ (ไม่มี password ในไฟล์นี้ — ใช้ env)
-router.post('/import', authenticate, async (req: any, res) => {
+router.post('/import', authenticate, uploadLimiter, async (req: any, res) => {
   pdfUpload.single('file')(req, res, async (err: unknown) => {
     if (err) {
       res.status(400).json({ success: false, error: (err as Error).message });
@@ -59,6 +60,12 @@ router.post('/import', authenticate, async (req: any, res) => {
     }
     if (!req?.file) {
       res.status(400).json({ success: false, error: 'ต้องแนบไฟล์ PDF (field name: file)' });
+      return;
+    }
+    try {
+      verifyUploadedContent(req.file);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e?.message || 'เนื้อหาไฟล์ไม่ถูกต้อง' });
       return;
     }
     try {

@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { AuditService } from '../../services/audit.service';
+import { disconnectUserSockets } from '../../realtime/io-registry';
 
 // ────────────────────────────────────────────────────────────────────────────
 // User Management (SUPERADMIN) — ย้ายมาจาก inline routes ใน server.ts
@@ -38,6 +39,8 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
 router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     await prisma.user.delete({ where: { id: req.params.id } });
+    // ตัด socket ที่ค้างอยู่ทันที — user ที่ถูกลบต้องไม่ได้รับ realtime ต่อ
+    disconnectUserSockets(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     // เคสจริง: Prisma error ถูก catch-all กลืนเงียบ ๆ วินิจฉัยไม่ได้ — log เต็ม + ส่ง reason เสมอ
@@ -57,6 +60,7 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
       actionType: 'USER_PASSWORD_RESET_BY_ADMIN',
       payload: { target_user_id: req.params.id, target_username: targetUsername, ip: req.ip },
     });
+    disconnectUserSockets(req.params.id);
     res.json({ temporaryPassword });
   } catch (err: any) {
     // เคสจริง: PrismaClientValidationError จาก client ไม่ตรง schema ถูกกลืนเป็น "Reset failed" เงียบ ๆ
@@ -84,6 +88,8 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     }
     // ทุก PUT นี้ลง audit อัตโนมัติผ่าน auditStateChange (server.ts) — actionType = "PUT /api/users/:id"
     await prisma.user.update({ where: { id: req.params.id }, data });
+    // role/โหนด/สถานะรหัสเปลี่ยน → token version ใหม่แล้ว; ตัด socket เดิมไม่ให้ค้างสิทธิ์เก่า
+    disconnectUserSockets(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Update failed' });

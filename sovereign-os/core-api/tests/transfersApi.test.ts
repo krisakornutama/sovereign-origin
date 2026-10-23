@@ -299,9 +299,11 @@ test('GET /transfers — filter status + รายการแสดงครบ
 
 // ═══════ Evidence (สลิป) ═══════
 
+const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 async function uploadSlip(orderId: string, token = adminToken, mime = 'image/png', body?: Buffer): Promise<Response> {
   const fd = new FormData();
-  fd.append('file', new Blob([body || Buffer.alloc(256, 7)], { type: mime }), 'slip.png');
+  fd.append('file', new Blob([body || Buffer.concat([PNG_HEADER, Buffer.alloc(248, 7)])], { type: mime }), 'slip.png');
   return fetch(server.baseUrl + `/api/treasury/transfers/${orderId}/evidence`, { method: 'POST', headers: auth(token), body: fd });
 }
 
@@ -323,6 +325,13 @@ test('POST /transfers/:id/evidence — ไฟล์ไม่ใช่ภาพ �
   assert.strictEqual(bad.status, 400);
   const big = await uploadSlip(created.order.id, adminToken, 'image/png', Buffer.alloc(3 * 1024 * 1024));
   assert.strictEqual(big.status, 400);
+});
+
+test('POST /transfers/:id/evidence — PNG ปลอม (magic bytes ไม่ตรง) → 400', async () => {
+  const created = await (await createOrder({ direction: 'OUT', category: 'OTHER', amountUsd: 1 })).json();
+  const res = await uploadSlip(created.order.id, adminToken, 'image/png', Buffer.from('not a png'));
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /magic|เนื้อหา/i);
 });
 
 test('POST /transfers/:id/evidence — คำสั่งที่ VERIFIED แล้ว/ของคนอื่น → 400/404', async () => {

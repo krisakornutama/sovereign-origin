@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { unlinkSync, existsSync } from 'fs';
 import { authenticate } from '../../middleware/auth.middleware';
 import { hardenUpload, handledUpload } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
 
 const router = Router();
 
@@ -50,7 +51,7 @@ function runWhisperCli(cmd: string, args: string[]): Promise<{ stdout: string; s
 }
 
 // POST /api/whisper/transcribe
-router.post('/transcribe', authenticate, handledUpload(upload, 'audio'), async (req, res) => {
+router.post('/transcribe', authenticate, uploadLimiter, handledUpload(upload, 'audio'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file uploaded' });

@@ -21,7 +21,8 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   if (res.status === 401) {
     const hadToken = Boolean(token);
     // token หมดอายุ หรือถูก logout ไปแล้ว → ล้าง session และกลับหน้า login (/)
-    useAuthStore.getState().logout();
+    // ใช้ logoutLocal: token นี้ถูกปฏิเสธแล้ว ไม่ต้องยิง /logout ซ้ำ
+    useAuthStore.getState().logoutLocal();
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       window.location.href = '/';
     }

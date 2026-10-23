@@ -3,6 +3,7 @@ import { authenticate, authenticatePartial, requireRole } from '../../middleware
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { AuthService, prisma } from '../../services/auth.service';
 import { AuditService } from '../../services/audit.service';
+import { disconnectUserSockets } from '../../realtime/io-registry';
 
 const router = Router();
 
@@ -80,6 +81,14 @@ const changePasswordLimiter = rateLimit({
   message: 'Too many password change attempts, please try again later',
 });
 
+// logout ฝั่ง server — จำกัดต่อบัญชี กัน token ที่ถูกขโมยยิงถี่เพื่อไล่ revoke คนอื่น
+const logoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many logout attempts, please try again later',
+  keyBy: (req) => String(req.user?.id ?? ''),
+});
+
 // POST /api/auth/login (ไม่ต้องใช้ middleware แต่มี rate-limit ทั้ง per-IP และ per-account)
 router.post('/login', loginLimiter, accountLimiter, async (req, res) => {
   try {
@@ -120,9 +129,27 @@ router.post('/change-password', changePasswordLimiter, authenticatePartial, asyn
       return res.status(400).json({ error: 'newPassword is required' });
     }
     const { token } = await AuthService.changePassword(req.user!.id, currentPassword, newPassword);
+    // token เก่าตายแล้ว — ตัด socket ที่ยังถือ session เดิมด้วย (client ใหม่จะ reconnect ด้วย token ใหม่)
+    disconnectUserSockets(req.user!.id);
     res.json({ token });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/logout — revoke token ฝั่ง server (ไม่ใช่แค่ล้าง localStorage ฝั่ง browser)
+// ใช้ authenticatePartial เพื่อให้ logout ได้แม้อยู่ใน flow บังคับเปลี่ยนรหัส/MFA ค้าง
+router.post('/logout', authenticatePartial, logoutLimiter, async (req, res) => {
+  try {
+    await AuthService.revokeSessions(req.user!.id);
+    disconnectUserSockets(req.user!.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      return res.status(401).json({ error: 'User no longer exists', code: 'USER_NOT_FOUND' });
+    }
+    console.error('[auth:logout] failed:', err?.code || '', err?.message || err);
+    res.status(500).json({ error: 'Logout failed' });
   }
 });
 

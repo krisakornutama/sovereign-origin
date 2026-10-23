@@ -6,11 +6,20 @@ import express from 'express';
 import WebSocket from 'ws';
 import jwt from 'jsonwebtoken';
 import { createSocketServer, sanitizeSocketEvent } from '../src/realtime/socket';
+import { disconnectUserSockets } from '../src/realtime/io-registry';
 import { registerTestUser, unregisterTestUser } from './auth-user-registry';
 
 registerTestUser({
   id: 'socket-test',
   role: 'SUPERADMIN',
+  assigned_node_id: null,
+  token_version: 0,
+  must_change_password: false,
+});
+
+registerTestUser({
+  id: 'socket-disconnect',
+  role: 'OPERATOR',
   assigned_node_id: null,
   token_version: 0,
   must_change_password: false,
@@ -30,6 +39,7 @@ function makeToken(overrides: Record<string, unknown> = {}): string {
 interface WsSession {
   next: () => Promise<string>;
   close: () => void;
+  waitClose: () => Promise<void>;
 }
 
 /** เปิด websocket + จบ handshake ด้าน engine.io แล้วส่ง CONNECT พร้อม auth payload */
@@ -38,10 +48,16 @@ function wsHandshake(url: string, auth: unknown): Promise<WsSession> {
     const ws = new WebSocket(`${url}/socket.io/?EIO=4&transport=websocket`);
     const queue: string[] = [];
     let waiter: ((m: string) => void) | null = null;
+    let closed = false;
+    const closeWaiters: Array<() => void> = [];
     const fail = (e: Error) => { try { ws.close(); } catch { /* ignore */ } reject(e); };
     ws.on('message', (data) => {
       const m = String(data);
       if (waiter) { const w = waiter; waiter = null; w(m); } else queue.push(m);
+    });
+    ws.on('close', () => {
+      closed = true;
+      for (const done of closeWaiters.splice(0)) done();
     });
     ws.on('error', fail);
     ws.on('open', () => {
@@ -51,7 +67,12 @@ function wsHandshake(url: string, auth: unknown): Promise<WsSession> {
         .then((open) => {
           if (!open.startsWith('0')) return fail(new Error('no engine.io OPEN: ' + open));
           ws.send('40' + (auth === undefined ? '' : JSON.stringify(auth)));
-          resolve({ next: take, close: () => ws.close() });
+          resolve({
+            next: take,
+            close: () => ws.close(),
+            waitClose: () =>
+              closed ? Promise.resolve() : new Promise<void>((res) => closeWaiters.push(res)),
+          });
         })
         .catch(fail);
     });
@@ -125,6 +146,19 @@ describe('realtime/socket — ด่าน handshake + sanitize payload', () => 
         must_change_password: false,
       });
     }
+  });
+
+  test('disconnectUserSockets ตัดเฉพาะ connection ของ user ที่ถูกเปลี่ยนสิทธิ์/ลบ', async () => {
+    const s = await wsHandshake(url, {
+      token: makeToken({ userId: 'socket-disconnect', role: 'OPERATOR' }),
+    });
+    sessions.push(s);
+    await s.next(); // CONNECT ผ่าน
+
+    const closed = s.waitClose();
+    assert.strictEqual(disconnectUserSockets('socket-disconnect'), 1);
+    await closed;
+    assert.strictEqual(disconnectUserSockets('socket-disconnect'), 0);
   });
 
   test('sanitizeSocketEvent — ตัดเหลือเฉพาะฟิลด์ allowlist ของ event นั้น', () => {

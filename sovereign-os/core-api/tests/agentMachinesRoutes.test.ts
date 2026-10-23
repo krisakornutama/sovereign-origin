@@ -338,7 +338,8 @@ describe('agent-machines routes — ภาพหน้าจอตอนจบ�
     const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
     try {
       const fd = new FormData();
-      fd.append('file', new Blob([Buffer.from('fake-png-bytes')], { type: 'image/png' }), 'shot.png');
+      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      fd.append('file', new Blob([png], { type: 'image/png' }), 'shot.png');
       const res = await fetch(`${srv.baseUrl}/api/agent-machines/jobs/j-1/screenshot`, {
         method: 'POST',
         headers: { 'x-machine-token': 'valid-token' },
@@ -414,8 +415,9 @@ describe('agent-machines routes — ภาพหน้าจอตอนจบ�
         hubUrl: srv.baseUrl,
         token: 'valid-token',
         jobId: 'j-1',
-        buffer: Buffer.from('PNG-BYTES'),
-      });      assert.match(out.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
+        buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
+      });
+      assert.match(out.screenshotUrl, /^\/api\/agent-machines\/screenshots\//);
       const fname = out.screenshotUrl.split('/').pop();
       assert.ok(fs.existsSync(path.join(shotsDir, fname)), 'ไฟล์ที่ runner ส่งต้องถึงดิสก์จริง');
     } finally {

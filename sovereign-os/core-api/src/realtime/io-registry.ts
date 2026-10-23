@@ -25,6 +25,24 @@ export function getIo(): SocketIOServer | null {
   return current;
 }
 
+/** ห้องต่อผู้ใช้ — ใช้ตัด connection ทั้งหมดเมื่อ role เปลี่ยน/ถูกลบ/ถูก revoke */
+export function userRoom(userId: string): string {
+  return `user:${userId}`;
+}
+
+/**
+ * ตัด Socket.IO connection ที่ค้างอยู่ของผู้ใช้นี้ทันที
+ * คืนจำนวน connection ที่ถูกตัด (0 = ไม่มี socket server หรือไม่มี connection)
+ */
+export function disconnectUserSockets(userId: string): number {
+  if (!current || !userId) return 0;
+  const room = userRoom(userId);
+  const sockets = current.sockets.adapter.rooms.get(room);
+  const count = sockets?.size ?? 0;
+  if (count > 0) current.in(room).disconnectSockets(true);
+  return count;
+}
+
 /** สำหรับเทสต์: ล้างค่า ไม่ให้ instance รั่วข้ามเคส */
 export function resetIo(): void {
   current = null;

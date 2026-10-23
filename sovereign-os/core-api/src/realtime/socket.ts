@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { getSessionUser } from '../services/auth.service';
-import { setIo } from './io-registry';
+import { setIo, userRoom } from './io-registry';
 import { registerMachineControl } from './machine-control.socket';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -91,6 +91,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
         role: String(dbUser.role ?? ''),
         assigned_node_id: dbUser.assigned_node_id ?? null,
       };
+      // ทุก connection ของ user คนเดียวกันอยู่ในห้องเดียว → route/admin ตัดได้ทันที
+      await socket.join(userRoom(String(dbUser.id)));
       return next();
     } catch {
       return next(new Error('Unauthorized'));

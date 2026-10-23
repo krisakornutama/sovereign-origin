@@ -10,6 +10,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { hardenUpload, handledUpload, safeDisplayName, resolveInsideRoot } from '../../lib/harden-upload';
+import { uploadLimiter } from '../../middleware/upload-rate-limit';
 import axios from 'axios';
 import { authenticate } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
@@ -265,7 +266,7 @@ router.post('/import', authenticate, async (req, res) => {
 // ── Upload ไฟล์ PDF / TXT ──
 
 // POST /api/knowledge/upload (multipart: file + title?, tags?, notes?)
-router.post('/upload', authenticate, handledUpload(upload, 'file'), async (req, res) => {
+router.post('/upload', authenticate, uploadLimiter, handledUpload(upload, 'file'), async (req, res) => {
   try {
     const file = req.file as Express.Multer.File | undefined;
     if (!file) return res.status(400).json({ error: 'file is required (.pdf / .txt / .md)' });
