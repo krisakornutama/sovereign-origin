@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 import {
   computeVersionFromEntries,
@@ -29,6 +30,23 @@ import {
   REJECT_COOLDOWN_MS,
   selfUpdateOnce,
 } from '../src/selfUpdate.mjs';
+import { canonicalManifestPayload, verifyUpdateManifest } from '../src/updateTrust.mjs';
+
+const TEST_KEY_ID = 'runner-test';
+const TEST_PAIR = crypto.generateKeyPairSync('ed25519');
+const TEST_PUBLIC_PEM = TEST_PAIR.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+const TEST_TRUST = [{ keyId: TEST_KEY_ID, publicKeyPem: TEST_PUBLIC_PEM }];
+
+function signManifest(manifest) {
+  return {
+    ...manifest,
+    signature: {
+      alg: 'ed25519',
+      keyId: TEST_KEY_ID,
+      value: crypto.sign(null, canonicalManifestPayload(manifest), TEST_PAIR.privateKey).toString('base64'),
+    },
+  };
+}
 
 function tmpDir(tag) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `runner-selfupd-${tag}-`));
@@ -145,17 +163,52 @@ test('applyUpdate: ชื่อไฟล์จาก HUB ใช้เป็น�
 test('ติดตั้งโดยไม่รีสตาร์ท = ห้ามทิ้ง state ค้าง (state มีไว้ระหว่าง "ส่งงานต่อ" เท่านั้น)', async () => {
   const dir = seedRunner(tmpDir('nostate'), FILES);
   const remote = seedRunner(tmpDir('remote-nostate'), { ...FILES, 'src/main.mjs': 'export const b = 9;\n' });
-  const man = manifestOf(remote);
+  const man = signManifest(manifestOf(remote));
   const fetchImpl = async (url) => {
     if (String(url).includes('update/manifest')) return { ok: true, status: 200, json: async () => man };
     const rel = decodeURIComponent(String(url).split('path=')[1]);
     const buf = fs.readFileSync(path.join(remote, rel));
     return { ok: true, status: 200, arrayBuffer: async () => buf };
   };
-  const out = await selfUpdateOnce({ hubUrl: 'http://hub', token: 't', dir, fetchImpl, apply: true, restart: false, checkFile: () => {} });
+  const out = await selfUpdateOnce({ hubUrl: 'http://hub', token: 't', dir, fetchImpl, apply: true, restart: false, checkFile: () => {}, trustedKeys: TEST_TRUST });
   assert.equal(out.status, 'updated');
   assert.equal(fs.existsSync(path.join(dir, STATE_FILE)), false, 'ไม่มีผู้ดูแลเฝ้าอยู่ = ต้องไม่ทิ้ง state ค้าง');
   assert.equal(localVersion(dir, man.files.map((f) => f.path)), man.version);
+});
+
+test('selfUpdateOnce: manifest ไม่มีลายเซ็น/ถูกแก้ = ปฏิเสธก่อนแตะไฟล์', async () => {
+  const dir = seedRunner(tmpDir('untrusted'), FILES);
+  const remote = seedRunner(tmpDir('remote-untrusted'), { ...FILES, 'src/main.mjs': 'export const c = 7;\n' });
+  const before = fs.readFileSync(path.join(dir, 'src/main.mjs'), 'utf8');
+
+  const fetchFor = (manifest) => async (url) => {
+    if (String(url).includes('update/manifest')) return { ok: true, status: 200, json: async () => manifest };
+    throw new Error('ต้องไม่ดาวน์โหลดไฟล์เมื่อ manifest ไม่ผ่าน trust');
+  };
+
+  const unsigned = manifestOf(remote);
+  const out1 = await selfUpdateOnce({ hubUrl: 'http://hub', token: 't', dir, fetchImpl: fetchFor(unsigned), apply: true, restart: false, trustedKeys: TEST_TRUST });
+  assert.equal(out1.status, 'untrusted-manifest');
+  assert.equal(out1.code, 'unsigned');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/main.mjs'), 'utf8'), before);
+
+  const tampered = signManifest(manifestOf(remote));
+  tampered.files[0].sha256 = '00'.repeat(32);
+  const out2 = await selfUpdateOnce({ hubUrl: 'http://hub', token: 't', dir, fetchImpl: fetchFor(tampered), apply: true, restart: false, trustedKeys: TEST_TRUST });
+  assert.equal(out2.status, 'untrusted-manifest');
+  assert.equal(out2.code, 'bad-signature');
+  assert.equal(fs.readFileSync(path.join(dir, 'src/main.mjs'), 'utf8'), before);
+});
+
+test('verifyUpdateManifest: ตรวจโครงสร้าง/ลายเซ็น/key ที่ไม่รู้จัก', () => {
+  const dir = seedRunner(tmpDir('verify'), FILES);
+  const man = signManifest(manifestOf(dir));
+  assert.deepEqual(verifyUpdateManifest(man, TEST_TRUST), { ok: true, keyId: TEST_KEY_ID });
+  assert.equal(verifyUpdateManifest(manifestOf(dir), TEST_TRUST).code, 'unsigned');
+  assert.equal(verifyUpdateManifest(man, [{ keyId: 'other', publicKeyPem: TEST_PUBLIC_PEM }]).code, 'unknown-key');
+  assert.equal(verifyUpdateManifest({ ...man, version: 'tampered' }, TEST_TRUST).code, 'bad-signature');
+  const badPath = { ...man, files: man.files.map((f) => ({ ...f, path: '../escape.mjs' })) };
+  assert.equal(verifyUpdateManifest(badPath, TEST_TRUST).code, 'bad-manifest');
 });
 
 test('planBoot: บูตแรกของเวอร์ชันใหม่ประกาศตัว · บูตถัดไปที่ยังไม่สุขภาพดี = ให้ผู้ดูแลตัดสิน · สุขภาพดีแล้ว = ล้าง state', () => {

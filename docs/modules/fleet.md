@@ -171,6 +171,39 @@ bucket = sha256(`${channel}:${machineId}`) → UInt32BE ตัวแรก → %
 `GET /api/agent-machines/node-kits/manifest` และ `/node-kits/asset` คงเป็นสาธารณะ
 เพราะเครื่องใหม่ยังไม่มี machine token; manifest ระบุ `channel: "stable"` เสมอ
 
+## ลายเซ็น manifest ของ runner (Phase 3A)
+
+manifest ของ runner ถูกเซ็นด้วย **Ed25519** ก่อนเผยแพร่ และถูกตรวจสองชั้น:
+
+1. `tools/agent-pack/pack.mjs` เซ็น `{version, generatedAt, files:[{path,sha256,size}]}`
+   ด้วย private key ที่ `tools/agent-pack/keys/signing-key.pem`
+   (gitignored — ห้าม commit และต้องสำรองแยกจาก repo)
+2. `GET /api/agent-machines/update/manifest` ตรวจลายเซ็นก่อนตอบ — manifest ที่ไม่ได้เซ็น
+   หรือลายเซ็นไม่ตรงตอบ **503** (ไม่ส่งต่อให้ runner)
+3. runner ตรวจซ้ำใน `src/updateTrust.mjs` ก่อนอ่าน/ติดตั้งไฟล์ใด ๆ — manifest ที่ไม่ผ่าน
+   จะได้ `status: "untrusted-manifest"` และไม่แตะไฟล์เดิม
+
+public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` และ
+`src/services/update-manifest-trust.service.ts` — มี static test
+`tools/test/update-trust-key.test.mjs` เทียบว่า PEM/keyId ตรงกัน
+
+### หลัง merge (ยังไม่ทำระหว่าง Cold Soak)
+
+0. ถ้ายังไม่มี private key (ทำครั้งเดียว; เก็บให้ปลอดภัย):
+   ```bash
+   node -e "const c=require('node:crypto'),f=require('node:fs');const {publicKey,privateKey}=c.generateKeyPairSync('ed25519');f.mkdirSync('tools/agent-pack/keys',{recursive:true});f.writeFileSync('tools/agent-pack/keys/signing-key.pem',privateKey.export({type:'pkcs8',format:'pem'}));console.log(publicKey.export({type:'spki',format:'pem'}))"
+   ```
+   แล้วนำ public key ที่พิมพ์ออกมาไปแทนใน `updateTrust.mjs` และ
+   `update-manifest-trust.service.ts` **ทั้งสองไฟล์** ก่อน repack
+1. ตรวจว่ามี private key ที่ `tools/agent-pack/keys/signing-key.pem`
+2. repack เพื่อเซ็น manifest ปัจจุบัน:
+   `node -e "import('./tools/agent-pack/pack.mjs').then(m => m.publishUpdateBundle())"`
+3. restart `sovereign-core-api` ตามขั้นตอน deploy ปกติ
+4. ตรวจ `GET /api/agent-machines/update/manifest` ด้วย machine token ว่าได้ `signature.alg = "ed25519"`
+
+ถ้า private key หาย: ต้องสร้าง keypair ใหม่, แก้ public key ทั้งสองไฟล์, repack และ
+แจก runner ชุดใหม่ — เครื่องที่ถือ public key เก่าจะปฏิเสธ manifest ใหม่จนกว่าจะได้ runner ใหม่
+
 ## การลงทะเบียนเครื่องใหม่
 
 `POST /api/agent-machines/enroll` รับได้สองทาง:
@@ -206,7 +239,7 @@ bucket = sha256(`${channel}:${machineId}`) → UInt32BE ตัวแรก → %
 ## ข้อจำกัด / ยังไม่ทำใน Phase 2
 
 - สิทธิ์เป็นระดับ HUB ทั้งฝูง ยังไม่มี “ผู้ดูแลเฉพาะสาขา” (Phase 4)
-- ยังไม่มี signed manifest (ใช้ SHA-256 ตรวจไฟล์เทียบ manifest) (Phase 3)
+- signed manifest ของ runner ทำแล้วใน Phase 3A; desktop updater ยังใช้ SHA-256 อย่างเดียว (Phase 3B)
 - ยังไม่มี automatic rollback / health-gated rollout (Phase 3)
 - ยังไม่มี fleet-wide job orchestration (ใช้ Agent Queue เดิม)
 - ยังไม่มี HUB client mode — shell ตรวจ `localhost` เท่านั้น
@@ -234,3 +267,7 @@ bucket = sha256(`${channel}:${machineId}`) → UInt32BE ตัวแรก → %
 - `sovereign-os/core-api/tests/fleetPhase2-db.test.ts` — DB tables/view/policy/override/token/use log/audit (gated `RUN_DB_TESTS=1`)
 - `tools/test/fleet-control-plane.test.mjs` — หน้า/เมนู/route wiring/ด่านอัปเดต/กัน token_hash รั่ว
 - `tools/test/fleet-phase2-persistence.test.mjs` — migration/schema/owners/routes/backfill guards
+- `sovereign-os/core-api/tests/agentUpdate.test.ts` — manifest/ลายเซ็น Ed25519 + route 503 เมื่อไม่ผ่าน trust
+- `sovereign-os/agent-runner/test/selfUpdate.test.mjs` — runner ตรวจลายเซ็นก่อนแตะไฟล์
+- `tools/test/update-trust-key.test.mjs` — public key/keyId ตรงกันสองฝั่ง
+- `tools/test/migration-bom.test.mjs` — กัน BOM ใน migration (เคสจริง 23/10/69)

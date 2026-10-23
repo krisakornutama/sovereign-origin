@@ -8,7 +8,8 @@
 //   1) เทียบเวอร์ชัน: เวอร์ชัน = sha256 ของ (ชื่อไฟล์ + hash เนื้อหา) ทุกไฟล์ เรียงชื่อ
 //      ⇒ ฝั่ง HUB คำนวณด้วยสูตรเดียวกัน (tools/agent-pack/pack.mjs import ไฟล์นี้)
 //      ⇒ ไม่มีไฟล์เก็บเวอร์ชันให้เพี้ยน: คำนวณจากเนื้อไฟล์จริงทั้งสองฝั่ง
-//   2) ดาวน์โหลดทั้งชุดลงโฟลเดอร์พัก + ตรวจ sha256 ให้ครบก่อน
+//   2) ดาวน์โหลด manifest + ตรวจลายเซ็น Ed25519 ด้วย public key ที่ฝังใน updateTrust.mjs
+//      → ดาวน์โหลดทั้งชุดลงโฟลเดอร์พัก + ตรวจ sha256 ให้ครบก่อน
 //   3) ตรวจไวยากรณ์ (node --check) → เก็บสำเนาของเดิม → สลับไฟล์ → เขียน state ค้าง
 //   4) ปล่อยโปรเซสใหม่ (detached) แล้ว "เฝ้า": ถ้าโปรเซสใหม่ไม่ประกาศตัวในเวลาที่กำหนด
 //      ⇒ ย้อนกลับไฟล์ชุดเดิมทันที + จำเวอร์ชันนั้นไว้ (ไม่ให้วนอัปเดตซ้ำ)
@@ -20,6 +21,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { UPDATE_TRUSTED_KEYS, verifyUpdateManifest } from './updateTrust.mjs';
 
 export const STATE_FILE = '.update-state.json';
 export const REJECT_FILE = '.update-rejected.json';
@@ -295,9 +297,20 @@ export async function selfUpdateOnce({
   now = Date.now(),
   fsImpl = fsSync,
   log = () => {},
+  trustedKeys = UPDATE_TRUSTED_KEYS,
   ...rest
 }) {
   const manifest = await fetchManifest({ hubUrl, token, fetchImpl });
+
+  // ตรวจ trust ก่อนแตะไฟล์/คำนวณเวอร์ชัน — manifest ที่ไม่ได้ลงนามหรือถูกแก้ต้องไม่ถูกใช้
+  if (manifest) {
+    const trust = verifyUpdateManifest(manifest, trustedKeys);
+    if (!trust.ok) {
+      log(`[update] ปฏิเสธ manifest: ${trust.reason} (${trust.code})`);
+      return { status: 'untrusted-manifest', localVersion: null, remoteVersion: null, reason: trust.reason, code: trust.code };
+    }
+  }
+
   const local = manifest ? localVersion(dir, manifest.files.map((f) => f.path), fsImpl) : null;
   const decision = decideUpdate({ localVersion: local, manifest, rejected: readRejected(dir, fsImpl), now });
   if (decision.action !== 'update') return { status: decision.action, localVersion: local, remoteVersion: manifest?.version ?? null, reason: decision.reason };

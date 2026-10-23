@@ -22,6 +22,7 @@ import {
   STATE_FILE,
   HANDOFF_EXIT_CODE,
 } from '../src/selfUpdate.mjs';
+import { verifyUpdateManifest } from '../src/updateTrust.mjs';
 
 const RUNNER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(RUNNER_ROOT, '..', '..');
@@ -50,6 +51,16 @@ const HUB = (env.HUB_URL || '').replace(/\/$/, '');
 const TOKEN = env.MACHINE_TOKEN || '';
 /** ไม่มี HUB_URL/token ใน .env = เครื่องนี้ไม่ได้ตั้งเป็น runner → ข้าม */
 const skip = !HUB || !TOKEN ? 'ไม่มี HUB_URL/MACHINE_TOKEN ใน .env (เครื่องนี้ไม่ได้เป็น runner)' : false;
+
+/** integration test นี้ต้องมี manifest ที่ลงนามแล้ว — HUB รุ่นก่อน Phase 3A จะข้าม */
+function trustedOrSkip(t, manifest) {
+  const trust = verifyUpdateManifest(manifest);
+  if (!trust.ok) {
+    t.skip(`HUB manifest ยังไม่ผ่าน trust (${trust.code}: ${trust.reason}) — ต้องแพ็กด้วย key ใหม่ก่อน`);
+    return false;
+  }
+  return true;
+}
 
 function newSandbox(tag) {
   fs.mkdirSync(SANDBOX_ROOT, { recursive: true });
@@ -96,6 +107,7 @@ test('อัปเดตโค้ดเองจาก HUB จริง: ดา�
     t.skip('HUB ยังไม่เผยแพร่ชุดอัปเดต — รัน node tools/agent-pack/pack.mjs ที่ HUB ก่อน');
     return;
   }
+  if (!trustedOrSkip(t, manifest)) return;
 
   const dir = newSandbox('apply');
   stale(dir);
@@ -132,6 +144,7 @@ test('โปรเซสใหม่ไม่ขึ้นจริง (ปล่
     t.skip('HUB ยังไม่เผยแพร่ชุดอัปเดต');
     return;
   }
+  if (!trustedOrSkip(t, manifest)) return;
 
   const dir = newSandbox('rollback');
   stale(dir);
@@ -171,6 +184,7 @@ test('โปรเซสใหม่ประกาศตัวจริง (ป
     t.skip('HUB ยังไม่เผยแพร่ชุดอัปเดต');
     return;
   }
+  if (!trustedOrSkip(t, manifest)) return;
 
   const dir = newSandbox('handoff');
   stale(dir);

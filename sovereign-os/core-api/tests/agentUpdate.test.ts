@@ -11,14 +11,44 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign, verify } from 'node:crypto';
 import { createTestServer, makeToken, mockModel } from './helpers';
 import { prisma } from '../src/lib/prisma';
 
 const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
 
+// Phase 3A: route ตรวจลายเซ็นด้วย public key — เทสต์ใช้ key ชั่วคราวของตัวเอง
+const TEST_KEY_ID = 'test-key';
+const TEST_PAIR = generateKeyPairSync('ed25519');
+const TEST_PUBLIC_PEM = TEST_PAIR.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+process.env.AGENT_UPDATE_PUBLIC_KEY = TEST_PUBLIC_PEM;
+process.env.AGENT_UPDATE_PUBLIC_KEY_ID = TEST_KEY_ID;
+
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-update-test-'));
 process.env.AGENT_UPDATE_DIR = ROOT;
+
+/** canonical payload ต้องตรงกับ update-manifest-trust.service.ts */
+function manifestPayload(manifest: { version: string; generatedAt: string; files: Array<{ path: string; sha256: string; size: number }> }) {
+  return Buffer.from(
+    JSON.stringify({
+      version: manifest.version,
+      generatedAt: manifest.generatedAt,
+      files: manifest.files.map((f) => ({ path: f.path, sha256: f.sha256, size: f.size })),
+    }),
+    'utf8',
+  );
+}
+
+function signTestManifest<T extends { version: string; generatedAt: string; files: Array<{ path: string; sha256: string; size: number }> }>(manifest: T) {
+  return {
+    ...manifest,
+    signature: {
+      alg: 'ed25519',
+      keyId: TEST_KEY_ID,
+      value: sign(null, manifestPayload(manifest), TEST_PAIR.privateKey).toString('base64'),
+    },
+  };
+}
 
 // ตั้งค่า env ก่อนจะ require เพราะ service อ่านค่านี้ตอนโหลดโมดูล
 const serviceMod = require('../src/services/agent-update.service') as typeof import('../src/services/agent-update.service');
@@ -42,8 +72,9 @@ function seedBundle(files: Record<string, string> = FILES, version = 'v-test-1')
     return { path: rel, sha256: sha256(body), size: Buffer.byteLength(body) };
   });
   fs.mkdirSync(ROOT, { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'manifest.json'), JSON.stringify({ version, generatedAt: '2026-01-01T00:00:00.000Z', files: entries }, null, 2));
-  return { version, entries };
+  const manifest = signTestManifest({ version, generatedAt: '2026-01-01T00:00:00.000Z', files: entries });
+  fs.writeFileSync(path.join(ROOT, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  return { version, entries, manifest };
 }
 
 beforeEach(() => {
@@ -140,6 +171,42 @@ describe('agent-update routes (machine token)', () => {
     assert.equal(body.version, 'v-live');
     assert.deepEqual(body.files.map((f: { path: string }) => f.path), seeded.entries.map((e) => e.path));
     assert.equal(body.files[0].sha256, seeded.entries[0].sha256);
+    assert.equal(body.signature.alg, 'ed25519');
+    assert.equal(body.signature.keyId, TEST_KEY_ID);
+    assert.equal(
+      verify(null, manifestPayload(body), TEST_PAIR.publicKey, Buffer.from(body.signature.value, 'base64')),
+      true,
+      'manifest ที่ HUB ส่งออกต้องมีลายเซ็นที่ตรวจได้ด้วย public key ที่ runner ถือ',
+    );
+  });
+
+  test('manifest ที่ไม่ได้ลงนาม/ถูกแก้หลังเซ็น = 503 ไม่ส่งต่อให้ runner', async () => {
+    const seeded = seedBundle(FILES, 'v-unsigned');
+    const router = loadRouter();
+    const token = await makeToken();
+    const manifestPath = path.join(ROOT, 'manifest.json');
+    const original = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+    delete original.signature;
+    fs.writeFileSync(manifestPath, JSON.stringify(original, null, 2));
+    const unsigned = await call(router, 'GET', '/api/agent-machines/update/manifest', token);
+    assert.equal(unsigned.status, 503);
+    assert.match(unsigned.text, /not signed|unsigned/i);
+
+    const unsignedFile = await call(
+      router,
+      'GET',
+      `/api/agent-machines/update/file?path=${encodeURIComponent(seeded.entries[0].path)}`,
+      token,
+    );
+    assert.equal(unsignedFile.status, 503, 'manifest ไม่ผ่าน trust = ต้องไม่เสิร์ฟไฟล์โค้ดออกไป');
+
+    const tampered = seeded.manifest;
+    tampered.files[0].sha256 = '00'.repeat(32);
+    fs.writeFileSync(manifestPath, JSON.stringify(tampered, null, 2));
+    const bad = await call(router, 'GET', '/api/agent-machines/update/manifest', token);
+    assert.equal(bad.status, 503);
+    assert.match(bad.text, /bad-signature|not signed/i);
   });
 
   test('ยังไม่เผยแพร่ชุด = 404 พร้อมบอกวิธีเผยแพร่ (ไม่ใช่ 500)', async () => {
