@@ -17,12 +17,14 @@ _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
 - `system/client-monitor.routes.ts` (56 บรรทัด)
+- `system/qr.routes.ts` (46 บรรทัด)
 - `system/system.routes.ts` (166 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 POST /error
 POST /synthetic-round
+GET /qr
 GET /healthz
 GET /health
 GET /processes

@@ -38,18 +38,10 @@
 `business_agents` · `business_customers` · `business_installations` · `business_ledger_entries` · `business_members` · `business_order_lines` · `business_orders` · `business_payments` · `business_products` · `business_purchase_orders` · `business_suppliers` · `businesses`
 
 ### Routes
-- `business/business-shop.routes.ts` (108 บรรทัด)
 - `business/business.routes.ts` (468 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
-GET /transparency
-GET /community
-GET /:businessId
-POST /:businessId/orders
-GET /orders/:token
-POST /orders/:token/pay
-GET /:businessId/promptpay
 GET /
 POST /
 POST /:businessId/agents/seed
@@ -64,6 +56,7 @@ POST /:businessId/customers
 GET /:businessId/orders
 GET /:businessId/orders/:id
 GET /:businessId/orders/:id/lots
+POST /:businessId/orders
 POST /:businessId/orders/:id/shipping
 POST /:businessId/orders/:id/transition
 POST /:businessId/orders/:id/payments
@@ -83,7 +76,11 @@ POST /:businessId/purchase-orders
 POST /:businessId/purchase-orders/:id/receive
 GET /:businessId/agents
 POST /:businessId/agents/:agentId/run
-… อีก 5 เส้น
+POST /:businessId/agents/:agentId/enabled
+GET /:businessId/agent-jobs
+GET /:businessId/shop
+PUT /:businessId/shop
+GET /user-lookup
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้

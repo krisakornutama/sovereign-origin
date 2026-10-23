@@ -12,7 +12,7 @@
 ## ของจริงในโค้ด (auto-generated)
 
 ### ตารางที่เป็นเจ้าของ
-`agent_jobs` · `agent_roles`
+`agent_jobs` · `agent_machine_hubs` · `agent_machines` · `agent_roles`
 
 ### Routes
 - `agent/agent.routes.ts` (122 บรรทัด)

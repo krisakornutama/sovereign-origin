@@ -271,3 +271,33 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 - `sovereign-os/agent-runner/test/selfUpdate.test.mjs` — runner ตรวจลายเซ็นก่อนแตะไฟล์
 - `tools/test/update-trust-key.test.mjs` — public key/keyId ตรงกันสองฝั่ง
 - `tools/test/migration-bom.test.mjs` — กัน BOM ใน migration (เคสจริง 23/10/69)
+
+<!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
+
+## ของจริงในโค้ด (auto-generated)
+
+### ตารางที่เป็นเจ้าของ
+`fleet_channels` · `fleet_enrollment_tokens` · `fleet_enrollment_uses` · `fleet_groups` · `fleet_machine_overrides` · `fleet_rollouts` · `fleet_settings` · `fleet_sites`
+
+### Routes
+- `fleet/fleet.routes.ts` (248 บรรทัด)
+
+### Endpoints (จาก router)
+```
+GET /overview
+GET /policy
+PUT /policy
+GET /sites
+GET /groups
+GET /audit
+GET /enroll-tokens
+POST /enroll-tokens
+POST /enroll-tokens/:id/revoke
+PUT /machines/:id
+POST /machines/:id/rotate-token
+```
+
+### Services ที่ทำงานให้โมดูลนี้
+`fleet-enrollment.service` · `fleet-overview.service` · `fleet-persistence.service` · `fleet-policy.service`
+
+<!-- auto:end -->

@@ -32,13 +32,14 @@
 `audit_logs` · `feature_grants` · `nodes` · `user_feature_grants` · `users`
 
 ### Routes
-- `auth/auth.routes.ts` (228 บรรทัด)
+- `auth/auth.routes.ts` (255 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 POST /login
 POST /verify-mfa
 POST /change-password
+POST /logout
 POST /mfa/enroll
 POST /mfa/confirm
 POST /mfa/disable

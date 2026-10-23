@@ -40,6 +40,8 @@ model User {
   // ── สิทธิ์คุมเครื่อง (เพิ่ม 11/10/69) ──
   owned_machines AgentMachine[]     @relation("MachineOwner") // เครื่องที่ตัวเองเป็นเจ้าของ
   hub_machines   AgentMachineHub[]  // เครื่องที่คุมได้ (ผูกได้หลายเครื่อง, หลายคนก็ผูกเครื่องเดียวกันได้)
+  payment_slips_uploaded PaymentSlip[] @relation("PaymentSlipUploader")
+  payment_slips_reviewed PaymentSlip[] @relation("PaymentSlipReviewer")
 
   // ── สมาชิกในครอบครัว: แต่ละคนมีพอร์ต Wealth ของตัวเอง (พอร์ตแยกต่อคน) ──
   asset_positions     AssetPosition[]
@@ -2184,6 +2186,7 @@ model Business {
   installations  BusinessInstallation[]
   ledger         BusinessLedgerEntry[]
   agents         BusinessAgent[]
+  paymentSlips   PaymentSlip[]
 
   @@map("businesses")
 }
@@ -2281,6 +2284,7 @@ model BusinessOrder {
   customer      BusinessCustomer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
   lines         BusinessOrderLine[]
   payments      BusinessPayment[]
+  paymentSlips  PaymentSlip[]
   installations BusinessInstallation[]
 
   @@unique([businessId, orderNo])
@@ -2319,6 +2323,38 @@ model BusinessPayment {
 
   @@index([orderId])
   @@map("business_payments")
+}
+
+model PaymentSlip {
+  id           String    @id @default(uuid()) @db.Uuid
+  businessId   String    @db.Uuid
+  orderId      String?   @db.Uuid
+  provider     String    @default("MANUAL") // MANUAL | adapter key (BANK/SLIPOK/...) — ยังไม่เรียกผู้ให้บริการใด ๆ
+  transRef     String? // เลขอ้างอิงจากสลิป; unique คู่กับ provider (NULL ซ้ำได้)
+  amountSatang Int // เก็บเป็นสตางค์ (จำนวนเต็ม) — กันทศนิยมเพี้ยน
+  currency     String    @default("THB")
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  imageMime    String
+  imageSha256  String    @unique // กันอัปโหลดภาพเดิมซ้ำ
+  imageSize    Int
+  imageData    Bytes
+  note         String?
+  uploadedBy   String?   @db.Uuid
+  reviewedBy   String?   @db.Uuid
+  reviewedAt   DateTime? @db.Timestamptz
+  reviewNote   String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
+
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  order    BusinessOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  uploader User?         @relation("PaymentSlipUploader", fields: [uploadedBy], references: [id], onDelete: SetNull)
+  reviewer User?         @relation("PaymentSlipReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@unique([provider, transRef])
+  @@index([businessId, status, createdAt])
+  @@index([orderId])
+  @@map("payment_slips")
 }
 
 model BusinessSupplier {

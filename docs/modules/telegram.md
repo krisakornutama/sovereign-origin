@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `alert_events`
 
 ### Routes
-- `telegram/telegram.routes.ts` (309 บรรทัด)
+- `telegram/telegram.routes.ts` (397 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -26,6 +26,11 @@ DELETE /config
 GET /updates
 POST /test
 POST /notify
+GET /biz
+PUT /biz
+DELETE /biz
+POST /biz/test
+POST /biz/notify
 POST /photo
 ```
 

@@ -16,7 +16,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 
 ### Routes
 - `automation/alerts.routes.ts` (38 บรรทัด)
-- `automation/automation.routes.ts` (125 บรรทัด)
+- `automation/automation.routes.ts` (139 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
