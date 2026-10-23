@@ -11,6 +11,7 @@ import { applyJsonBodyParsers } from './lib/http-body';
 import { mountRoutes } from './routes';
 import { createSocketServer } from './realtime/socket';
 import { startWorkers } from './workers/start';
+import { initFleetPolicyCache } from './services/fleet-policy.service';
 import './services/livestock-cron.service'; // ปลดล็อก withdrawal + เตือนวัคซีน รายวัน
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -83,8 +84,10 @@ function startListener() {
   });
 }
 
-startListener();
-console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
+void initFleetPolicyCache().finally(() => {
+  startListener();
+  console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
+});
 
 // ── Reliability: กัน request เดียวพังทั้งระบบ ──
 // 1) error middleware — 4xx ของ body-parser (413/400) คงสถานะเดิม, ที่เหลือ 500

@@ -18,12 +18,13 @@ import {
   evaluateMachineCompliance,
   fleetPolicyForClient,
   isRolloutEligible,
-  readFleetPolicy,
+  loadFleetPolicy,
   rolloutBucket,
   type FleetChannel,
   type FleetComplianceState,
+  type FleetPolicy,
 } from './fleet-policy.service';
-import { enrollTokenSummary, type EnrollTokenSummary } from './fleet-enrollment.service';
+import { enrollTokenSummaryDb, type EnrollTokenSummary } from './fleet-enrollment.service';
 import { readUpdateManifest } from './agent-update.service';
 import { readDesktopManifest } from './desktop-update.service';
 import { readNodeKitManifest } from './node-kit.service';
@@ -100,7 +101,7 @@ function iso(value: Date | string | null | undefined): string | null {
 
 function toView(
   row: MachineRow,
-  policy: ReturnType<typeof readFleetPolicy>,
+  policy: FleetPolicy,
   now: number,
   publishedVersion: string | null,
 ): FleetMachineView {
@@ -148,7 +149,11 @@ function toView(
 }
 
 export async function buildFleetOverview(now = Date.now()): Promise<FleetOverview> {
-  const [machines, policy] = await Promise.all([listMachines(), Promise.resolve(readFleetPolicy())]);
+  const [machines, policy, enrollment] = await Promise.all([
+    listMachines(),
+    loadFleetPolicy(),
+    enrollTokenSummaryDb(now),
+  ]);
   const runner = readUpdateManifest();
   const desktop = readDesktopManifest();
   const nodeKit = readNodeKitManifest();
@@ -187,7 +192,7 @@ export async function buildFleetOverview(now = Date.now()): Promise<FleetOvervie
     policy: fleetPolicyForClient(policy),
     summary,
     channels,
-    enrollment: enrollTokenSummary(undefined, now),
+    enrollment,
     published: {
       runner: {
         published: Boolean(runner),

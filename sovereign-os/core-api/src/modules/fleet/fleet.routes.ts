@@ -20,7 +20,7 @@ import { AuditService } from '../../services/audit.service';
 import { buildFleetOverview } from '../../services/fleet-overview.service';
 import {
   fleetPolicyForClient,
-  readFleetPolicy,
+  loadFleetPolicy,
   setMachineOverride,
   updateFleetPolicy,
   validateMachineOverride,
@@ -28,9 +28,10 @@ import {
 } from '../../services/fleet-policy.service';
 import {
   createEnrollToken,
-  listEnrollTokens,
+  listEnrollTokensDb,
   revokeEnrollToken,
 } from '../../services/fleet-enrollment.service';
+import { listFleetGroups, listFleetSites } from '../../services/fleet-persistence.service';
 import { getMachineWithAccess } from '../../services/agent-machine-hub.service';
 import { rotateMachineToken, type MachineRow } from '../../services/agent-machines.service';
 
@@ -73,9 +74,9 @@ router.get('/overview', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/policy', (_req: Request, res: Response) => {
+router.get('/policy', async (_req: Request, res: Response) => {
   try {
-    res.json({ policy: fleetPolicyForClient(readFleetPolicy()) });
+    res.json({ policy: fleetPolicyForClient(await loadFleetPolicy()) });
   } catch (err) {
     console.error('[fleet] read policy failed:', err instanceof Error ? err.message : err);
     fail(res, 500, 'อ่านนโยบายไม่ได้');
@@ -104,9 +105,55 @@ router.put('/policy', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/enroll-tokens', (_req: Request, res: Response) => {
+router.get('/sites', async (_req: Request, res: Response) => {
   try {
-    res.json({ tokens: listEnrollTokens() });
+    res.json({ sites: await listFleetSites() });
+  } catch (err) {
+    console.error('[fleet] list sites failed:', err instanceof Error ? err.message : err);
+    fail(res, 500, 'อ่านรายการสาขาไม่ได้');
+  }
+});
+
+router.get('/groups', async (_req: Request, res: Response) => {
+  try {
+    res.json({ groups: await listFleetGroups() });
+  } catch (err) {
+    console.error('[fleet] list groups failed:', err instanceof Error ? err.message : err);
+    fail(res, 500, 'อ่านรายการกลุ่มไม่ได้');
+  }
+});
+
+router.get('/audit', async (req: Request, res: Response) => {
+  try {
+    const limitRaw = Number(req.query.limit ?? 50);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, Math.round(limitRaw))) : 50;
+    const beforeRaw = typeof req.query.before === 'string' ? req.query.before : '';
+    const before = beforeRaw ? new Date(beforeRaw) : null;
+    if (beforeRaw && Number.isNaN(before?.getTime())) return fail(res, 400, 'before ต้องเป็น ISO date');
+    const actionTypeRaw = typeof req.query.actionType === 'string' ? req.query.actionType.trim() : '';
+    if (actionTypeRaw && !actionTypeRaw.startsWith('FLEET_')) {
+      return fail(res, 400, 'actionType ต้องขึ้นต้นด้วย FLEET_');
+    }
+    const machineId = typeof req.query.machineId === 'string' ? req.query.machineId.trim() : '';
+    const events = await AuditService.listFleetEvents({
+      limit,
+      before,
+      actionType: actionTypeRaw || null,
+      machineId: machineId || null,
+    });
+    res.json({
+      events,
+      nextBefore: events.length ? events[events.length - 1]?.timestamp ?? null : null,
+    });
+  } catch (err) {
+    console.error('[fleet] list audit failed:', err instanceof Error ? err.message : err);
+    fail(res, 500, 'อ่าน audit ของฝูงเครื่องไม่ได้');
+  }
+});
+
+router.get('/enroll-tokens', async (_req: Request, res: Response) => {
+  try {
+    res.json({ tokens: await listEnrollTokensDb() });
   } catch (err) {
     console.error('[fleet] list enroll tokens failed:', err instanceof Error ? err.message : err);
     fail(res, 500, 'อ่านรายการรหัสเชิญไม่ได้');
@@ -138,7 +185,8 @@ router.post('/enroll-tokens/:id/revoke', async (req: Request, res: Response) => 
   try {
     const id = machineIdOf(req);
     if (!id) return fail(res, 400, 'id ไม่ถูกต้อง');
-    const revoked = await revokeEnrollToken(id);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+    const revoked = await revokeEnrollToken(id, undefined, reason);
     if (!revoked.ok) return fail(res, 404, 'ไม่พบรหัสเชิญนี้');
     await AuditService.logAction({
       userId: req.user!.id,

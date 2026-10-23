@@ -21,6 +21,11 @@ import {
   sanitizeText,
   writeJsonAtomic,
 } from './fleet-store.service';
+import {
+  loadFleetPolicyFromDb,
+  saveFleetPolicyToDb,
+  saveMachineOverrideToDb,
+} from './fleet-persistence.service';
 
 export const FLEET_CHANNELS = ['stable', 'beta', 'canary'] as const;
 export type FleetChannel = (typeof FLEET_CHANNELS)[number];
@@ -223,10 +228,40 @@ export function normalizeFleetPolicy(raw: unknown, now = new Date()): FleetPolic
   };
 }
 
+/** legacy/file-backed — tests + backfill เท่านั้น */
 export function readFleetPolicy(root?: string, now = new Date()): FleetPolicy {
   const raw = readJsonFile<unknown>(fleetFile(POLICY_FILE, root), null);
   // ไฟล์ยังไม่มี = ใช้ค่าเริ่มต้นและบอกว่ายังไม่เคยตั้ง (epoch) ไม่ใช่ "เพิ่งแก้เมื่อกี้"
   return normalizeFleetPolicy(raw, raw ? now : new Date(0));
+}
+
+/** แหล่งความจริงของ production (Phase 2) — อ่านจาก DB */
+export async function loadFleetPolicy(now = new Date()): Promise<FleetPolicy> {
+  const raw = await loadFleetPolicyFromDb(defaultFleetPolicy(new Date(0)));
+  const configured = raw.updatedAt !== new Date(0).toISOString();
+  return normalizeFleetPolicy(raw, configured ? now : new Date(0));
+}
+
+// ── cache สำหรับด่านอัปเดต (hot path) ─────────────────────────────────────
+// ทำไมต้องมี: ทุก request ของ update/manifest + ไฟล์จริงเคยอ่านไฟล์ sync อยู่แล้ว
+// Phase 2 เปลี่ยนเป็น DB — ถ้าอ่าน DB ทุก request จะช้าและทำให้เทสต์ route ที่ไม่ใช้ DB พัง
+// ทางออก: โหลดครั้งเดียวตอน boot, อัปเดต cache ทันทีเมื่อมี mutation ผ่าน API
+let cachedPolicy: FleetPolicy | null = null;
+
+export async function initFleetPolicyCache(): Promise<void> {
+  try {
+    cachedPolicy = await loadFleetPolicy();
+  } catch (err) {
+    // DB ล่มตอน boot = ยังไม่เริ่มรับ request; ปล่อยให้ fallback ไฟล์/ค่าเริ่มต้น
+    // (route policy/overview ยังตอบ error ตามจริงเมื่อ DB ใช้ไม่ได้)
+    cachedPolicy = null;
+    console.error('[fleet] policy cache init failed:', err instanceof Error ? err.message : err);
+  }
+}
+
+/** อ่าน cache แบบ sync — ใช้ในด่านอัปเดตเท่านั้น; ถ้ายังไม่ init ใช้ไฟล์เดิม */
+export function currentFleetPolicy(): FleetPolicy {
+  return cachedPolicy ?? readFleetPolicy();
 }
 
 export function writeFleetPolicy(policy: FleetPolicy, root?: string): FleetPolicy {
@@ -343,11 +378,18 @@ export async function updateFleetPolicy(
   actor: string | null,
   root?: string,
 ): Promise<FleetPolicy> {
-  return policyLock(() => {
-    const current = readFleetPolicy(root);
-    const next = applyPolicyPatch(current, patch, actor);
-    return writeFleetPolicy(next, root);
-  });
+  if (root) {
+    return policyLock(() => {
+      const current = readFleetPolicy(root);
+      const next = applyPolicyPatch(current, patch, actor);
+      return writeFleetPolicy(next, root);
+    });
+  }
+  const current = await loadFleetPolicy();
+  const next = applyPolicyPatch(current, patch, actor);
+  await saveFleetPolicyToDb(next, current, actor);
+  cachedPolicy = next;
+  return next;
 }
 
 export type MachineOverrideValidation =
@@ -471,12 +513,18 @@ export async function setMachineOverride(
   actor: string | null,
   root?: string,
 ): Promise<{ policy: FleetPolicy; override: FleetMachineOverride | null }> {
-  return policyLock(() => {
-    const current = readFleetPolicy(root);
-    const out = applyMachineOverride(current, machineId, input, actor);
-    const written = writeFleetPolicy(out.policy, root);
-    return { policy: written, override: out.override };
-  });
+  if (root) {
+    return policyLock(() => {
+      const current = readFleetPolicy(root);
+      const out = applyMachineOverride(current, machineId, input, actor);
+      const written = writeFleetPolicy(out.policy, root);
+      return { policy: written, override: out.override };
+    });
+  }
+  const saved = await saveMachineOverrideToDb(machineId, input, actor);
+  const policy = await loadFleetPolicy();
+  cachedPolicy = policy;
+  return { policy, override: saved };
 }
 
 /** ช่องทางที่มีผลกับเครื่องนี้ + ที่มา (override หรือ default) */
