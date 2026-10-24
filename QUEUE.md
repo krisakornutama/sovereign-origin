@@ -40,7 +40,14 @@
   - `/api/fleet/overview|policy|sites|groups|audit` เปิดให้อ่านแบบจำกัดสาขา (summary/channels คิดใหม่, audit กรอง `machineIds`)
   - เส้นเขียน/กุญแจทั้งหมดยังเป็น SUPERADMIN · เปลี่ยน `assigned_site_id` = bump `token_version`
   - เทสต์: `tests/fleetScope.test.ts` 15/15 · `tools/test/fleet-site-scope.test.mjs` 25/25 (แดง exit 1 เมื่อถอด scope ของ `/overview`)
-  - [ ] apply migration + restart core-api (รอเจ้าของอนุมัติรอบนี้)
+  - [x] apply migration + restart — **เสร็จแล้ว 24/10/69 13:36** (เจ้าของอนุมัติ)
+    - backup `backups/postgres/sovereign_20261024_133607.dump` (5.9 MB) + restore drill เข้าฐานชั่วคราวผ่าน
+      (TimescaleDB `pre/post_restore`) — ทุกตารางตรงเป๊ะ (users 8 · audit_logs 26,725 · agent_machines 2 · payment_slips 0)
+    - `prisma migrate deploy` = 66 migrations, apply `20261024130000_site_admin_role` สำเร็จ (ไม่มี drift)
+    - ตรวจบน production: enum มี `SITE_ADMIN` · `users.assigned_site_id` uuid · index 1 · FK `ON DELETE SET NULL` 1
+      · migration record finished (ไม่ rollback) · users ยัง 8 แถว
+    - restart แล้ว healthy, restarts=0 · `/api/health` 200 · เส้น `/api/fleet/*` + `/api/users` ตอบ 401 (ต้องล็อกอิน)
+    - Prisma client ใน container รู้จัก `SITE_ADMIN` และ `assigned_site_id` แล้ว
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์

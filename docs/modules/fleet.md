@@ -92,6 +92,7 @@ core-api/data/fleet/enrollment-tokens.json
 เพิ่มใน Phase 3B เพราะก่อนหน้านี้สิทธิ์เป็นระดับ HUB ทั้งฝูงเท่านั้น
 
 - ผูกบัญชีกับสาขาด้วย `users.assigned_site_id` (FK → `fleet_sites.id`, `ON DELETE SET NULL`)
+  — migration `20261024130000_site_admin_role` **apply production แล้ว 24/10/69** (66 migrations, ไม่มี drift)
 - **fail closed:** ไม่ได้ผูกสาขา → `403 SITE_SCOPE_MISSING` · สาขาถูกลบ/ไม่ตรงกับที่โหลดมา →
   `403 SITE_SCOPE_UNKNOWN` · role อื่นทั้งหมด → `403 ROLE_NOT_ALLOWED` (ไม่ใช่ "เห็นทั้งฝูง")
 - เครื่องถูกจับคู่ด้วย **ชื่อสาขา** จาก `fleet_machine_overrides → fleet_sites.name`
