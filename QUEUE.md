@@ -39,7 +39,9 @@
   - fail closed: ไม่ผูกสาขา/สาขาหาย = 403 (`fleet-scope.service.ts`) — ไม่ใช่เห็นทั้งฝูง
   - `/api/fleet/overview|policy|sites|groups|audit` เปิดให้อ่านแบบจำกัดสาขา (summary/channels คิดใหม่, audit กรอง `machineIds`)
   - เส้นเขียน/กุญแจทั้งหมดยังเป็น SUPERADMIN · เปลี่ยน `assigned_site_id` = bump `token_version`
-  - เทสต์: `tests/fleetScope.test.ts` 15/15 · `tools/test/fleet-site-scope.test.mjs` 25/25 (แดง exit 1 เมื่อถอด scope ของ `/overview`)
+  - ปิดทางอ้อม: `SITE_ADMIN` ถูกปฏิเสธที่ `/api/agent-machines` (403 `SITE_SCOPE_FLEET_ONLY`)
+    เพราะเส้นนั้นเปิดให้ทุก role ที่ล็อกอินและคืนเครื่อง/IP ของทุกสาขา
+  - เทสต์: `tests/fleetScope.test.ts` 15/15 · `tools/test/fleet-site-scope.test.mjs` 26/26 (แดง exit 1 เมื่อถอด scope ของ `/overview` และเมื่อถอด guard ของ agent-machines)
   - [x] apply migration + restart — **เสร็จแล้ว 24/10/69 13:36** (เจ้าของอนุมัติ)
     - backup `backups/postgres/sovereign_20261024_133607.dump` (5.9 MB) + restore drill เข้าฐานชั่วคราวผ่าน
       (TimescaleDB `pre/post_restore`) — ทุกตารางตรงเป๊ะ (users 8 · audit_logs 26,725 · agent_machines 2 · payment_slips 0)

@@ -211,6 +211,19 @@ function requireMachineToken(req: Request, res: Response, next: NextFunction) {
 
 // ── ฝั่งผู้ใช้ (JWT) ──
 
+// SITE_ADMIN เห็นข้อมูลเครื่องได้เฉพาะผ่าน /api/fleet (ซึ่งถูกจำกัดสาขาแล้ว)
+// โมดูลนี้เปิด GET / ให้ทุก role ที่ล็อกอิน (OPERATOR ใช้หน้า Agent Queue) —
+// ถ้าไม่กันไว้ บทบาทสาขาจะเห็นชื่อ/IP/สถานะของเครื่องทุกสาขา = หลุดขอบเขตทางอ้อม
+// วางไว้ก่อนทุกเส้นของฝั่ง JWT; เส้นที่ใช้ machine token ไม่มี req.user จึงผ่านได้ตามปกติ
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.user?.role === 'SITE_ADMIN') {
+    return res
+      .status(403)
+      .json({ error: 'บทบาทนี้ดูข้อมูลเครื่องได้เฉพาะผ่าน /api/fleet', code: 'SITE_SCOPE_FLEET_ONLY' });
+  }
+  next();
+});
+
 // GET /api/agent-machines — รายการเครื่องที่ลงทะเบียน (หน้าเว็บใช้วาด)
 router.get('/', authenticate, async (_req: Request, res: Response) => {
   try {
