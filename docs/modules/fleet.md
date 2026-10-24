@@ -103,6 +103,8 @@ core-api/data/fleet/enrollment-tokens.json
   (เช่น `FLEET_POLICY_UPDATE` ที่ไม่มี `machineId`) จะไม่โผล่ให้บัญชีนี้ และสาขาที่ยังไม่มีเครื่องได้ชุดว่าง
 - `assigned_site_id` เปลี่ยนเมื่อไหร่ `token_version` ถูก bump → token เก่าตายทันที (เหมือนเปลี่ยน role)
 - ตรรกะทั้งหมดอยู่ใน `src/services/fleet-scope.service.ts` (pure — เทสต์ได้โดยไม่ต้องมี DB)
+- **ปิดทางอ้อม:** `SITE_ADMIN` ถูกปฏิเสธที่ `/api/agent-machines` ด้วย `403 SITE_SCOPE_FLEET_ONLY`
+  เพราะโมดูลนั้นเปิด `GET /` ให้ทุก role ที่ล็อกอินและคืนชื่อ/IP/สถานะเครื่องของทุกสาขา
 
 
 ### ตัวอย่างสร้างรหัสเชิญ

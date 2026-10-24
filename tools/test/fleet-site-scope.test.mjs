@@ -211,6 +211,23 @@ describe('audit.service — กรองตามเครื่องในข�
   });
 });
 
+describe('agent-machines routes — กัน SITE_ADMIN หลุดขอบเขต', () => {
+  const AGENT_MACHINES = `${BACKEND}/src/modules/agent-machines/agent-machines.routes.ts`;
+
+  test('SITE_ADMIN ถูกปฏิเสธก่อนถึงเส้นรายการเครื่อง', () => {
+    const src = read(AGENT_MACHINES);
+    const lines = src.split(/\r?\n/);
+    // GET / เปิดให้ทุก role ที่ล็อกอิน (เดิมออกแบบให้ OPERATOR ใช้) — ถ้าไม่กัน SITE_ADMIN
+    // บทบาทนี้จะเห็นเครื่อง/IP ของทุกสาขา ซึ่งขัดกับเจตนาของ Phase 3B
+    const guard = lines.findIndex((line) => /req\.user\?\.role === 'SITE_ADMIN'/.test(line));
+    const listRoute = lines.findIndex((line) => /^router\.get\('\/', authenticate/.test(line));
+    assert.ok(guard >= 0, 'ต้องมี guard ปฏิเสธ SITE_ADMIN ในโมดูล agent-machines');
+    assert.ok(listRoute >= 0, 'ไม่พบเส้น GET / (รายการเครื่อง)');
+    assert.ok(guard < listRoute, 'guard ต้องอยู่ก่อนเส้นรายการเครื่อง (Express เรียงตามลำดับประกาศ)');
+    assert.match(src, /SITE_SCOPE_FLEET_ONLY/);
+  });
+});
+
 describe('users.routes — ผูกสาขาได้อย่างปลอดภัย', () => {
   const src = read(USERS);
 

@@ -135,7 +135,9 @@ Acceptance:
 - [x] `/api/fleet/overview|policy|sites|groups|audit` เปิดให้ SITE_ADMIN แบบจำกัดสาขา —
       `summary`/`channels` คิดใหม่จากชุดที่กรองแล้ว, audit กรองด้วย `machineIds`
 - [x] เส้นเขียน/จัดการกุญแจทั้งหมด (policy PUT, enroll-tokens, machines) ยังเป็น SUPERADMIN เท่านั้น
-- [x] เทสต์: `tests/fleetScope.test.ts` (15 เคส) + `tools/test/fleet-site-scope.test.mjs` (25 เคส static wiring)
+- [x] ปิดทางอ้อม: `SITE_ADMIN` ถูกปฏิเสธที่ `/api/agent-machines` (403 `SITE_SCOPE_FLEET_ONLY`) —
+      เส้นนั้นเปิดให้ทุก role ที่ล็อกอินและคืนเครื่อง/IP ของทุกสาขา
+- [x] เทสต์: `tests/fleetScope.test.ts` (15 เคส) + `tools/test/fleet-site-scope.test.mjs` (26 เคส static wiring)
 - [ ] หน้า Fleet ยังไม่รู้จัก SITE_ADMIN (ผู้ใช้ role นี้ใช้ API ได้; UI ยังเช็ค SUPERADMIN)
 
 ## 6. Phase 4 — Operations at scale
