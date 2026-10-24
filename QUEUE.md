@@ -466,6 +466,12 @@
   - [x] **free-first backend (23/10/69):** `payment_slips` + internal endpoints `/api/payments/slips/*` +
         manual review/audit + adapter interface (`MANUAL` เท่านั้น) · DB suite 43/43 · migration
         `20261023170000_payment_slips` **ยังไม่ apply production**
+  - [x] **ซ้อม migrate บน schema จริง (24/10/69):** dump schema-only ของ production (142 ตาราง) ลงฐานชั่วคราว
+        `sovereign_migrate_dryrun` → apply migration ผ่าน **9/9 statement (exit 0)** → ตรวจพฤติกรรมจริง
+        (sha256 ซ้ำ/`provider+transRef` ซ้ำถูกปฏิเสธ · `transRef` NULL ซ้ำได้ · FK cascade/set-null ถูก)
+        → ลบฐานชั่วคราวแล้ว · production ยังไม่มีตาราง (`to_regclass` = NULL)
+        · เทสต์กันถอยหลัง `tools/test/payment-slips-migration.test.mjs` 10/10 (แดง exit 1 เมื่อตัด unique ออก)
+  - [ ] apply migration + restart core-api เมื่อเจ้าของอนุญาต (Cold Soak)
   - [ ] public `POST /api/shop/orders/:token/slip` + UI เหตุผล + paid adapter — หน้าร้านอยู่
         `Sovereign-Web-Standalone`; ต้องให้เจ้าของเลือกที่วาง UI/ผู้ให้บริการก่อน
 - [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —

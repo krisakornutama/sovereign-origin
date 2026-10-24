@@ -109,6 +109,25 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
   `Sovereign-Web-Standalone` — ต้องตัดสินใจเรื่องที่วาง UI ก่อน (J9e)
 - **ยังไม่ apply migration นี้ใน production** (Cold Soak) — เทสต์รันบน schema ชั่วคราวด้วย `prisma db push`
 
+### ซ้อม migrate บน schema จริงของ production (ทำแล้ว 24/10/69 — ไม่แตะ production)
+เพื่อลดความเสี่ยงของขั้นที่ยังติด Cold Soak: dump **schema-only** ของ production (142 ตาราง) ลงฐานชั่วคราว
+`sovereign_migrate_dryrun` ใน container เดียวกัน แล้ว apply `migration.sql` ด้วย `psql -v ON_ERROR_STOP=1`
+ของจริง — **ผล: ผ่าน 9/9 statement (exit 0)** และตรวจพฤติกรรมกับแถวจริงในฐานชั่วคราว:
+
+| ตรวจ | ผล |
+|---|---|
+| default ของคอลัมน์ | `provider=MANUAL`, `currency=THB`, `status=PENDING` |
+| `transRef` เป็น NULL หลายแถว | ผ่าน (2 แถว) — Postgres ถือ NULL ต่างกัน |
+| `imageSha256` ซ้ำ | ถูกปฏิเสธ (`unique_violation`) |
+| `(provider, transRef)` ซ้ำ | ถูกปฏิเสธ (`unique_violation`) |
+| provider ต่างกัน + `transRef` เดียวกัน | ผ่าน (2 แถว) |
+| FK on delete | `businessId` = CASCADE · `orderId`/`uploadedBy`/`reviewedBy` = SET NULL |
+
+ฐานชั่วคราวถูกลบและ `pg_database` ยืนยันแล้วว่าเหลือ 0 — **production ยังไม่มีตารางนี้** (`to_regclass` = NULL)
+เทสต์กันถอยหลังอยู่ที่ `tools/test/payment-slips-migration.test.mjs` (10 เคส: BOM, ชนิดคอลัมน์, NOT NULL,
+unique 2 ตัว, FK rules, ห้ามแตะตารางอื่น, migration สร้างตารางซ้ำ, MANUAL-only adapter)
+— พิสูจน์แล้วว่าจับได้จริงโดยตัด unique index ออกแล้วเทสต์แดง (exit 1) ก่อนคืนไฟล์
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
