@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { AuthService } from '../../services/auth.service';
 import { AuditService } from '../../services/audit.service';
+import { getFleetSiteById } from '../../services/fleet-persistence.service';
 import { disconnectUserSockets } from '../../realtime/io-registry';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -14,7 +15,7 @@ const router = Router();
 router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true, role: true, assigned_node_id: true, must_change_password: true },
+      select: { id: true, username: true, role: true, assigned_node_id: true, assigned_site_id: true, must_change_password: true },
     });
     res.json(users);
   } catch (err) {
@@ -71,19 +72,35 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
 });
 router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
-    const { role, assigned_node_id, must_change_password } = req.body;
-    const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI'];
+    const { role, assigned_node_id, assigned_site_id, must_change_password } = req.body;
+    const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI', 'SITE_ADMIN'];
     if (role !== undefined && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
     const data: any = {};
     if (role !== undefined) data.role = role;
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
+    // สาขาของ SITE_ADMIN — ตรวจว่ามีสาขานี้จริงก่อนเขียน (FK จะกันอยู่แล้ว แต่ 400 อ่านง่ายกว่า 500)
+    // ใช้ service ของ fleet ไม่ query ตาราง fleet_* จากโมดูลนี้ (module-boundary)
+    if (assigned_site_id !== undefined) {
+      if (assigned_site_id === null || assigned_site_id === '') {
+        data.assigned_site_id = null;
+      } else {
+        const site = await getFleetSiteById(String(assigned_site_id));
+        if (!site) return res.status(400).json({ error: 'ไม่พบสาขาที่ระบุ' });
+        data.assigned_site_id = site.id;
+      }
+    }
     // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
     if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
-    // เปลี่ยนสิทธิ์/โหนด/สถานะบังคับรหัส = เพิ่ม token_version ทันที
+    // เปลี่ยนสิทธิ์/โหนด/สาขา/สถานะบังคับรหัส = เพิ่ม token_version ทันที
     // token เก่าของ user คนนั้นใช้ไม่ได้อีก (middleware เทียบ version ทุก request)
-    if (role !== undefined || assigned_node_id !== undefined || must_change_password !== undefined) {
+    if (
+      role !== undefined ||
+      assigned_node_id !== undefined ||
+      assigned_site_id !== undefined ||
+      must_change_password !== undefined
+    ) {
       data.token_version = { increment: 1 };
     }
     // ทุก PUT นี้ลง audit อัตโนมัติผ่าน auditStateChange (server.ts) — actionType = "PUT /api/users/:id"

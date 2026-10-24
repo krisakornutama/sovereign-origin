@@ -4,6 +4,7 @@
 > เอกสารนี้เป็นแผนยกระดับผลิตภัณฑ์ให้พร้อมใช้หลายเครื่อง/หลายสาขาในระดับองค์กร
 > **Phase 1 + Phase 2 live แล้ว**; **Phase 3A (signed runner manifest) deploy แล้ว 24/10/69** —
 > HUB ตรวจ manifest ที่เซ็นด้วย `fleet-update-v1` ก่อนตอบเครื่องลูก (restart container ตามที่เจ้าของอนุมัติ)
+> **Phase 3B (`SITE_ADMIN` อ่านอย่างเดียว จำกัดสาขา) โค้ด + เทสต์เสร็จแล้ว 24/10/69 — migration รอ apply**
 
 ## 1. เป้าหมาย
 
@@ -121,9 +122,23 @@ Acceptance:
 - health-gated rollout: หยุดอัตโนมัติถ้าเครื่องในกลุ่มล้มเกิน threshold
 - รองรับ rollback ไปเวอร์ชันก่อนหน้า
 
+### 5.3 Phase 3B — `SITE_ADMIN` (จำกัดสาขา, อ่านอย่างเดียว)
+
+เจ้าของเลือกรูปแบบ "เพิ่ม role" และมอบการออกแบบความปลอดภัยให้ผู้พัฒนา — เลือกแบบ least privilege:
+บัญชีสาขา **อ่านได้อย่างเดียว** และเห็นเฉพาะเครื่องของสาขาตัวเอง (ทุกเส้นที่เขียนยังเป็น SUPERADMIN)
+
+- [x] enum `SITE_ADMIN` + `users.assigned_site_id` (FK → `fleet_sites.id`, `ON DELETE SET NULL`)
+- [x] migration `20261024130000_site_admin_role` (ยังไม่ apply production — รอเจ้าของอนุมัติ)
+- [x] `fleet-scope.service.ts` — fail closed: ไม่ผูกสาขา = `SITE_SCOPE_MISSING`, สาขาหาย = `SITE_SCOPE_UNKNOWN`
+- [x] `/api/fleet/overview|policy|sites|groups|audit` เปิดให้ SITE_ADMIN แบบจำกัดสาขา —
+      `summary`/`channels` คิดใหม่จากชุดที่กรองแล้ว, audit กรองด้วย `machineIds`
+- [x] เส้นเขียน/จัดการกุญแจทั้งหมด (policy PUT, enroll-tokens, machines) ยังเป็น SUPERADMIN เท่านั้น
+- [x] เทสต์: `tests/fleetScope.test.ts` (15 เคส) + `tools/test/fleet-site-scope.test.mjs` (25 เคส static wiring)
+- [ ] หน้า Fleet ยังไม่รู้จัก SITE_ADMIN (ผู้ใช้ role นี้ใช้ API ได้; UI ยังเช็ค SUPERADMIN)
+
 ## 6. Phase 4 — Operations at scale
 
-- มุมมองรายสาขา (site-scoped operator) โดยไม่ให้เห็นข้ามสาขา
+- มุมมองรายสาขาแบบเขียนได้ (site-scoped operator) — v1 อ่านอย่างเดียวทำแล้วใน Phase 3B (§5.3)
 - Remote config ที่ลงนามแล้ว (poll + version)
 - Drift detection: เวอร์ชัน/ไฟล์/บริการไม่ตรง manifest
 - Fleet-wide job orchestration พร้อม concurrency limit ต่อเครื่อง
@@ -134,7 +149,7 @@ Acceptance:
 ## 7. Phase 5 — Multi-tenant / partner
 
 - แยกขอบเขตข้อมูลตามองค์กร (tenant id) ในทุกตารางที่เกี่ยวข้อง
-- บทบาท `SITE_ADMIN`, `SITE_OPERATOR`, `AUDITOR`
+- บทบาท `SITE_ADMIN`, `SITE_OPERATOR`, `AUDITOR` (SITE_ADMIN v1 มาก่อนแล้วใน Phase 3B — §5.3)
 - SSO/OIDC (ถ้าต้องการ) โดยไม่ทำให้ local login เดิมพัง
 - Per-tenant encryption keys สำหรับ field-level secrets
 - Billing/entitlement (ถ้าเป็นผลิตภัณฑ์ที่ขาย)

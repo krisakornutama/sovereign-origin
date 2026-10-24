@@ -16,6 +16,8 @@ declare global {
         id: string;
         role: string;
         assigned_node_id?: string | null;
+        /** สาขาที่ผูกไว้ — มีผลเฉพาะ role = SITE_ADMIN (อ่านจาก DB ทุก request) */
+        assigned_site_id?: string | null;
         mfa_verified: boolean;
         must_change_password?: boolean;
       };
@@ -50,6 +52,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
           id: true,
           role: true,
           assigned_node_id: true,
+          assigned_site_id: true,
           token_version: true,
           must_change_password: true,
         },
@@ -75,6 +78,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       id: dbUser.id,
       role: dbUser.role,
       assigned_node_id: dbUser.assigned_node_id ?? null,
+      assigned_site_id: dbUser.assigned_site_id ?? null,
       mfa_verified: true,
       must_change_password: false,
     };
@@ -198,6 +202,7 @@ export async function authenticatePartial(req: Request, res: Response, next: Nex
           id: true,
           role: true,
           assigned_node_id: true,
+          assigned_site_id: true,
           token_version: true,
           must_change_password: true,
         },
@@ -216,6 +221,7 @@ export async function authenticatePartial(req: Request, res: Response, next: Nex
       id: dbUser.id,
       role: dbUser.role,
       assigned_node_id: dbUser.assigned_node_id ?? null,
+      assigned_site_id: dbUser.assigned_site_id ?? null,
       mfa_verified: decoded.mfa_verified,   // เก็บสถานะเดิมไว้ (false)
       must_change_password: dbUser.must_change_password === true,
     };

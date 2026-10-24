@@ -263,3 +263,44 @@ export async function listFleetSites() {
 export async function listFleetGroups() {
   return prisma.fleetGroup.findMany({ orderBy: { name: 'asc' }, include: { site: true } });
 }
+
+/**
+ * อ่านสาขาตาม id — ใช้ทั้งฝั่ง fleet (resolveFleetScope) และ users (ตรวจก่อนผูกบัญชี)
+ * คืน null เมื่อ id ไม่ใช่ UUID (กัน P2023 จากคอลัมน์ @db.Uuid) หรือไม่พบแถว
+ */
+export async function getFleetSiteById(id: string | null | undefined): Promise<{ id: string; name: string } | null> {
+  if (typeof id !== 'string') return null;
+  const safe = uuidOrNull(id);
+  if (!safe) return null;
+  return prisma.fleetSite.findUnique({ where: { id: safe }, select: { id: true, name: true } });
+}
+
+/**
+ * รายการสาขาตามขอบเขต — siteId = null คือทั้งหมด (SUPERADMIN)
+ * SITE_ADMIN เห็นเฉพาะสาขาของตัวเอง: ไม่เห็นแม้แต่ "ชื่อ" สาขาอื่นผ่าน API
+ */
+export async function listFleetSitesScoped(siteId: string | null) {
+  if (siteId !== null) {
+    const safe = uuidOrNull(siteId);
+    if (!safe) return [];
+    return prisma.fleetSite.findMany({ where: { id: safe }, orderBy: { name: 'asc' } });
+  }
+  return prisma.fleetSite.findMany({ orderBy: { name: 'asc' } });
+}
+
+/**
+ * รายการกลุ่มตามขอบเขต — siteId = null คือทั้งหมด
+ * กลุ่มที่ไม่ได้ผูกสาขา (site_id NULL) ต้องไม่โผล่ให้ SITE_ADMIN (fail closed)
+ */
+export async function listFleetGroupsScoped(siteId: string | null) {
+  if (siteId !== null) {
+    const safe = uuidOrNull(siteId);
+    if (!safe) return [];
+    return prisma.fleetGroup.findMany({
+      where: { site_id: safe },
+      orderBy: { name: 'asc' },
+      include: { site: true },
+    });
+  }
+  return prisma.fleetGroup.findMany({ orderBy: { name: 'asc' }, include: { site: true } });
+}
