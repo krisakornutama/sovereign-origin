@@ -68,21 +68,41 @@ core-api/data/fleet/enrollment-tokens.json
 
 ## API
 
-ทุก route ผ่าน `authenticate` + `requireRole('SUPERADMIN')`
+ทุก route ผ่าน `authenticate` แล้วแยกสิทธิ์รายเส้น (ไม่ใช้ `requireRole` ทั้งโมดูล):
 
-| Method | Path | ความหมาย |
-|---|---|---|
-| GET | `/api/fleet/overview` | ภาพรวม + summary + ช่องทาง + เวอร์ชันที่เผยแพร่ + เครื่องทั้งหมด |
-| GET | `/api/fleet/policy` | นโยบายสำหรับหน้าเว็บ (ไม่มี override ดิบทั้งก้อน) |
-| PUT | `/api/fleet/policy` | แก้ `defaultChannel`, `channels.*.rolloutPercent`, `requireLanVerification` |
-| GET | `/api/fleet/sites` | รายชื่อสาขา + notes |
-| GET | `/api/fleet/groups` | รายชื่อกลุ่ม + สาขาที่สังกัด |
-| GET | `/api/fleet/audit` | audit ของ Fleet (`limit`, `before`, `actionType`, `machineId`) |
-| GET | `/api/fleet/enroll-tokens` | รายการรหัสเชิญ (ไม่คืนรหัสจริง/hash) |
-| POST | `/api/fleet/enroll-tokens` | สร้างรหัส — คืน `token` จริงครั้งเดียว |
-| POST | `/api/fleet/enroll-tokens/:id/revoke` | เพิกถอน (รับ `reason` ได้) |
-| PUT | `/api/fleet/machines/:id` | ตั้ง `channel` / `site` / `group` / `tags` / `notes` |
-| POST | `/api/fleet/machines/:id/rotate-token` | หมุน machine token — คืน token ใหม่ครั้งเดียว |
+- **อ่านอย่างเดียว** → `SUPERADMIN` + `SITE_ADMIN` (SITE_ADMIN ถูกจำกัดสาขา — ดูหัวข้อถัดไป)
+- **เขียน / จัดการกุญแจ** → `SUPERADMIN` เท่านั้น
+
+| Method | Path | สิทธิ์ | ความหมาย |
+|---|---|---|---|
+| GET | `/api/fleet/overview` | SUPERADMIN · SITE_ADMIN (scoped) | ภาพรวม + summary + ช่องทาง + เวอร์ชันที่เผยแพร่ + เครื่องทั้งหมด |
+| GET | `/api/fleet/policy` | SUPERADMIN · SITE_ADMIN | นโยบายสำหรับหน้าเว็บ (ไม่มี override ดิบทั้งก้อน) |
+| PUT | `/api/fleet/policy` | SUPERADMIN | แก้ `defaultChannel`, `channels.*.rolloutPercent`, `requireLanVerification` |
+| GET | `/api/fleet/sites` | SUPERADMIN · SITE_ADMIN (เฉพาะสาขาตัวเอง) | รายชื่อสาขา + notes |
+| GET | `/api/fleet/groups` | SUPERADMIN · SITE_ADMIN (เฉพาะกลุ่มในสาขา) | รายชื่อกลุ่ม + สาขาที่สังกัด |
+| GET | `/api/fleet/audit` | SUPERADMIN · SITE_ADMIN (เฉพาะเครื่องในสาขา) | audit ของ Fleet (`limit`, `before`, `actionType`, `machineId`) |
+| GET | `/api/fleet/enroll-tokens` | SUPERADMIN | รายการรหัสเชิญ (ไม่คืนรหัสจริง/hash) |
+| POST | `/api/fleet/enroll-tokens` | SUPERADMIN | สร้างรหัส — คืน `token` จริงครั้งเดียว |
+| POST | `/api/fleet/enroll-tokens/:id/revoke` | SUPERADMIN | เพิกถอน (รับ `reason` ได้) |
+| PUT | `/api/fleet/machines/:id` | SUPERADMIN | ตั้ง `channel` / `site` / `group` / `tags` / `notes` |
+| POST | `/api/fleet/machines/:id/rotate-token` | SUPERADMIN | หมุน machine token — คืน token ใหม่ครั้งเดียว |
+
+### บทบาท `SITE_ADMIN` — ผู้ดูแลสาขา (อ่านอย่างเดียว, จำกัดสาขา)
+
+เพิ่มใน Phase 3B เพราะก่อนหน้านี้สิทธิ์เป็นระดับ HUB ทั้งฝูงเท่านั้น
+
+- ผูกบัญชีกับสาขาด้วย `users.assigned_site_id` (FK → `fleet_sites.id`, `ON DELETE SET NULL`)
+- **fail closed:** ไม่ได้ผูกสาขา → `403 SITE_SCOPE_MISSING` · สาขาถูกลบ/ไม่ตรงกับที่โหลดมา →
+  `403 SITE_SCOPE_UNKNOWN` · role อื่นทั้งหมด → `403 ROLE_NOT_ALLOWED` (ไม่ใช่ "เห็นทั้งฝูง")
+- เครื่องถูกจับคู่ด้วย **ชื่อสาขา** จาก `fleet_machine_overrides → fleet_sites.name`
+  เครื่องที่ยังไม่ระบุสาขา (หรือสาขาอื่น) จึงมองไม่เห็นจากบัญชีนี้
+- `/overview` คิด `summary` และ `channels` ใหม่จากชุดที่กรองแล้ว — ตัวเลขของสาขาอื่นไม่รั่วผ่าน API
+  (ส่วน `policy` / `published` / `enrollment` คงเดิม เพราะไม่มี id ของเครื่อง)
+- `/audit` ส่ง `machineIds` ของสาขาลง `AuditService.listFleetEvents` — เหตุการณ์ระดับระบบ
+  (เช่น `FLEET_POLICY_UPDATE` ที่ไม่มี `machineId`) จะไม่โผล่ให้บัญชีนี้ และสาขาที่ยังไม่มีเครื่องได้ชุดว่าง
+- `assigned_site_id` เปลี่ยนเมื่อไหร่ `token_version` ถูก bump → token เก่าตายทันที (เหมือนเปลี่ยน role)
+- ตรรกะทั้งหมดอยู่ใน `src/services/fleet-scope.service.ts` (pure — เทสต์ได้โดยไม่ต้องมี DB)
+
 
 ### ตัวอย่างสร้างรหัสเชิญ
 
@@ -224,7 +244,7 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 
 ## ความปลอดภัย
 
-- ทุก route ของ `/api/fleet` เป็น SUPERADMIN
+- `/api/fleet` ทุกเส้นต้องล็อกอิน; เส้นอ่านเปิดให้ `SITE_ADMIN` แบบจำกัดสาขา ที่เหลือ `SUPERADMIN` เท่านั้น
 - `GET /api/agent-machines` ถูกแก้ให้คัดฟิลด์แล้ว — ไม่ส่ง `token_hash` / `pair_code_hash`
 - รหัสเชิญและ machine token แสดงครั้งเดียว; เก็บเฉพาะ hash
 - ทุกการเปลี่ยนนโยบาย/สร้างหรือเพิกถอนรหัส/หมุน token เขียน audit log:
@@ -238,7 +258,7 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 
 ## ข้อจำกัด / ยังไม่ทำใน Phase 2
 
-- สิทธิ์เป็นระดับ HUB ทั้งฝูง ยังไม่มี “ผู้ดูแลเฉพาะสาขา” (Phase 4)
+- สิทธิ์ระดับสาขาทำแล้วใน Phase 3B (`SITE_ADMIN` อ่านอย่างเดียว + จำกัดสาขา); ยังไม่มีผู้ดูแลสาขาแบบเขียนได้
 - signed manifest ของ runner ทำแล้วใน Phase 3A; desktop updater ยังใช้ SHA-256 อย่างเดียว (Phase 3B)
 - ยังไม่มี automatic rollback / health-gated rollout (Phase 3)
 - ยังไม่มี fleet-wide job orchestration (ใช้ Agent Queue เดิม)
@@ -273,6 +293,8 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 - `sovereign-os/core-api/tests/fleetPolicy.test.ts` — validation, rollout, compliance, override, file store
 - `sovereign-os/core-api/tests/fleetEnrollment.test.ts` — token lifecycle, hash-only, expiry, revoke, release
 - `sovereign-os/core-api/tests/fleetPhase2-db.test.ts` — DB tables/view/policy/override/token/use log/audit (gated `RUN_DB_TESTS=1`)
+- `sovereign-os/core-api/tests/fleetScope.test.ts` — SITE_ADMIN scope: fail closed, กรองเครื่อง/summary/channels, machineIds
+- `tools/test/fleet-site-scope.test.mjs` — static wiring: enum/FK/index/migration, guard รายเส้น, auth select, audit machineIds, users ผูกสาขา
 - `tools/test/fleet-control-plane.test.mjs` — หน้า/เมนู/route wiring/ด่านอัปเดต/กัน token_hash รั่ว
 - `tools/test/fleet-phase2-persistence.test.mjs` — migration/schema/owners/routes/backfill guards
 - `sovereign-os/core-api/tests/agentUpdate.test.ts` — manifest/ลายเซ็น Ed25519 + route 503 เมื่อไม่ผ่าน trust

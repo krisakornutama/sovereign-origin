@@ -148,6 +148,15 @@ function toView(
   };
 }
 
+/**
+ * id + ชื่อสาขา (จาก override) ของทุกเครื่อง — ใช้จำกัดขอบเขตโดยไม่ต้องสร้าง view เต็ม
+ * (audit endpoint ใช้ฟังก์ชันนี้แทน buildFleetOverview เพื่อไม่ให้อ่าน manifest โดยไม่จำเป็น)
+ */
+export async function listMachineSitePairs(): Promise<Array<{ id: string; site: string | null }>> {
+  const [machines, policy] = await Promise.all([listMachines(), loadFleetPolicy()]);
+  return machines.map((row) => ({ id: row.id, site: policy.machines[row.id]?.site ?? null }));
+}
+
 export async function buildFleetOverview(now = Date.now()): Promise<FleetOverview> {
   const [machines, policy, enrollment] = await Promise.all([
     listMachines(),

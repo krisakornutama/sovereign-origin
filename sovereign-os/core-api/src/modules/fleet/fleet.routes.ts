@@ -1,23 +1,36 @@
 // src/modules/fleet/fleet.routes.ts
 //
 // ── Fleet Control Plane API ─────────────────────────────────────────────────
-// ทุก route ในไฟล์นี้ = SUPERADMIN เท่านั้น (จัดการเครื่องทั้งฝูง)
+// สิทธิ์แยกเป็นรายเส้น (ไม่ใช้ router.use(requireRole) ทั้งโมดูล):
+//   • อ่านอย่างเดียว → SUPERADMIN + SITE_ADMIN
+//     SITE_ADMIN ถูกจำกัดด้วย assigned_site_id (ดู fleet-scope.service) — เห็นเฉพาะเครื่อง/กลุ่ม
+//     ของสาขาตัวเอง และไม่เห็นเหตุการณ์ audit ของสาขาอื่น
+//   • เขียน/จัดการกุญแจ → SUPERADMIN เท่านั้น (SITE_ADMIN สั่งการฝูงเครื่องไม่ได้เลย)
 //
-//   GET    /api/fleet/overview                     ภาพรวม + compliance + เวอร์ชันที่เผยแพร่
-//   GET    /api/fleet/policy                       นโยบายช่องทาง/rollout
-//   PUT    /api/fleet/policy                       แก้ rollout / default channel
-//   GET    /api/fleet/enroll-tokens                รายการรหัสเชิญ (ไม่คืนรหัสจริง)
-//   POST   /api/fleet/enroll-tokens                สร้างรหัสเชิญ (คืนรหัสจริงครั้งเดียว)
-//   POST   /api/fleet/enroll-tokens/:id/revoke     เพิกถอนรหัส
-//   PUT    /api/fleet/machines/:id                 ตั้ง channel / site / group / tags
-//   POST   /api/fleet/machines/:id/rotate-token    หมุน machine token (คืนครั้งเดียว)
+//   GET    /api/fleet/overview                     ภาพรวม + compliance + เวอร์ชันที่เผยแพร่ (scoped)
+//   GET    /api/fleet/policy                       นโยบายช่องทาง/rollout (อ่านได้ทั้งสองบทบาท)
+//   PUT    /api/fleet/policy                       แก้ rollout / default channel          [SUPERADMIN]
+//   GET    /api/fleet/sites                        รายการสาขา (SITE_ADMIN เห็นเฉพาะของตัวเอง)
+//   GET    /api/fleet/groups                       รายการกลุ่ม (SITE_ADMIN เห็นเฉพาะของสาขา)
+//   GET    /api/fleet/audit                        เหตุการณ์ FLEET_* (SITE_ADMIN เฉพาะเครื่องในสาขา)
+//   GET    /api/fleet/enroll-tokens                รายการรหัสเชิญ (ไม่คืนรหัสจริง)        [SUPERADMIN]
+//   POST   /api/fleet/enroll-tokens                สร้างรหัสเชิญ (คืนรหัสจริงครั้งเดียว)  [SUPERADMIN]
+//   POST   /api/fleet/enroll-tokens/:id/revoke     เพิกถอนรหัส                            [SUPERADMIN]
+//   PUT    /api/fleet/machines/:id                 ตั้ง channel / site / group / tags      [SUPERADMIN]
+//   POST   /api/fleet/machines/:id/rotate-token    หมุน machine token (คืนครั้งเดียว)     [SUPERADMIN]
 //
 // ⚠️ Express 4: async handler ที่ throw จะค้างไม่ตอบ — ทุก handler จึงมี try/catch
 // ⚠️ ห้ามส่ง token_hash หรือ token จริงออกไป ยกเว้น field ที่ตั้งใจคืนครั้งเดียว
 import { Router, type Request, type Response } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { AuditService } from '../../services/audit.service';
-import { buildFleetOverview } from '../../services/fleet-overview.service';
+import { buildFleetOverview, listMachineSitePairs } from '../../services/fleet-overview.service';
+import {
+  filterFleetOverviewForScope,
+  machineIdsForScope,
+  resolveFleetScope,
+  type FleetScope,
+} from '../../services/fleet-scope.service';
 import {
   fleetPolicyForClient,
   loadFleetPolicy,
@@ -31,14 +44,39 @@ import {
   listEnrollTokensDb,
   revokeEnrollToken,
 } from '../../services/fleet-enrollment.service';
-import { listFleetGroups, listFleetSites } from '../../services/fleet-persistence.service';
+import { listFleetGroupsScoped, listFleetSitesScoped, getFleetSiteById } from '../../services/fleet-persistence.service';
 import { getMachineWithAccess } from '../../services/agent-machine-hub.service';
 import { rotateMachineToken, type MachineRow } from '../../services/agent-machines.service';
 
 const router = Router();
 
-// ทั้งโมดูลเป็นพื้นที่ของผู้ดูแลระบบ — ไม่มี route ย่อยที่เปิดให้ USER
-router.use(authenticate, requireRole('SUPERADMIN'));
+// ทุกเส้นต้องล็อกอิน — สิทธิ์รายเส้นกำหนดด้านล่าง (ห้ามเปลี่ยนกลับเป็น router.use(requireRole) ทั้งโมดูล)
+router.use(authenticate);
+
+const readOnly = requireRole('SUPERADMIN', 'SITE_ADMIN');
+const superOnly = requireRole('SUPERADMIN');
+
+/**
+ * แปลงผู้ใช้เป็นขอบเขตข้อมูล
+ *   SUPERADMIN → เห็นทั้งหมด
+ *   SITE_ADMIN → ต้องมีสาขาที่มีอยู่จริง ไม่งั้น 403 (fail closed ไม่ใช่เห็นทั้งฝูง)
+ * ตอบ 403 เองแล้วคืน null เมื่อไม่ผ่าน
+ */
+async function scopeOf(req: Request, res: Response): Promise<FleetScope | null> {
+  const assigned = req.user?.assigned_site_id ?? null;
+  // โหลดเฉพาะ SITE_ADMIN — SUPERADMIN ไม่ต้องแตะตารางสาขาเลย
+  const site = req.user?.role === 'SITE_ADMIN' && assigned ? await getFleetSiteById(assigned) : null;
+  const resolved = resolveFleetScope({ role: req.user?.role ?? '', assigned_site_id: assigned }, site);
+  if (!resolved.ok) {
+    res.status(resolved.status).json({ error: resolved.error, code: resolved.code });
+    return null;
+  }
+  return resolved.scope;
+}
+
+function siteIdOfScope(scope: FleetScope): string | null {
+  return scope.kind === 'site' ? scope.siteId : null;
+}
 
 function fail(res: Response, status: number, message: string): void {
   res.status(status).json({ error: message });
@@ -65,17 +103,24 @@ function machineForClient(row: MachineRow) {
   };
 }
 
-router.get('/overview', async (_req: Request, res: Response) => {
+router.get('/overview', readOnly, async (req: Request, res: Response) => {
   try {
-    res.json(await buildFleetOverview());
+    const scope = await scopeOf(req, res);
+    if (!scope) return;
+    res.json(filterFleetOverviewForScope(await buildFleetOverview(), scope));
   } catch (err) {
     console.error('[fleet] overview failed:', err instanceof Error ? err.message : err);
     fail(res, 500, 'อ่านภาพรวมฝูงเครื่องไม่ได้');
   }
 });
 
-router.get('/policy', async (_req: Request, res: Response) => {
+// อ่านนโยบายได้ทั้งสองบทบาท — ข้อมูลชุดนี้ถูกส่งไปใน /overview อยู่แล้ว
+// (การซ่อนเส้นนี้จึงไม่ได้ลดข้อมูลที่ SITE_ADMIN เข้าถึงได้จริง)
+// แต่ยังต้อง resolve scope เพื่อให้บัญชีที่ยังไม่ผูกสาขาถูกปฏิเสธเหมือนเส้นอื่น
+router.get('/policy', readOnly, async (req: Request, res: Response) => {
   try {
+    const scope = await scopeOf(req, res);
+    if (!scope) return;
     res.json({ policy: fleetPolicyForClient(await loadFleetPolicy()) });
   } catch (err) {
     console.error('[fleet] read policy failed:', err instanceof Error ? err.message : err);
@@ -83,7 +128,7 @@ router.get('/policy', async (_req: Request, res: Response) => {
   }
 });
 
-router.put('/policy', async (req: Request, res: Response) => {
+router.put('/policy', superOnly, async (req: Request, res: Response) => {
   try {
     const checked = validatePolicyPatch(req.body);
     if (!checked.ok) return fail(res, 400, checked.error);
@@ -105,26 +150,32 @@ router.put('/policy', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/sites', async (_req: Request, res: Response) => {
+router.get('/sites', readOnly, async (req: Request, res: Response) => {
   try {
-    res.json({ sites: await listFleetSites() });
+    const scope = await scopeOf(req, res);
+    if (!scope) return;
+    res.json({ sites: await listFleetSitesScoped(siteIdOfScope(scope)) });
   } catch (err) {
     console.error('[fleet] list sites failed:', err instanceof Error ? err.message : err);
     fail(res, 500, 'อ่านรายการสาขาไม่ได้');
   }
 });
 
-router.get('/groups', async (_req: Request, res: Response) => {
+router.get('/groups', readOnly, async (req: Request, res: Response) => {
   try {
-    res.json({ groups: await listFleetGroups() });
+    const scope = await scopeOf(req, res);
+    if (!scope) return;
+    res.json({ groups: await listFleetGroupsScoped(siteIdOfScope(scope)) });
   } catch (err) {
     console.error('[fleet] list groups failed:', err instanceof Error ? err.message : err);
     fail(res, 500, 'อ่านรายการกลุ่มไม่ได้');
   }
 });
 
-router.get('/audit', async (req: Request, res: Response) => {
+router.get('/audit', readOnly, async (req: Request, res: Response) => {
   try {
+    const scope = await scopeOf(req, res);
+    if (!scope) return;
     const limitRaw = Number(req.query.limit ?? 50);
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, Math.round(limitRaw))) : 50;
     const beforeRaw = typeof req.query.before === 'string' ? req.query.before : '';
@@ -135,11 +186,14 @@ router.get('/audit', async (req: Request, res: Response) => {
       return fail(res, 400, 'actionType ต้องขึ้นต้นด้วย FLEET_');
     }
     const machineId = typeof req.query.machineId === 'string' ? req.query.machineId.trim() : '';
+    // null = ไม่จำกัด (SUPERADMIN) · [] = สาขาที่ยังไม่มีเครื่อง → ไม่มีเหตุการณ์ให้ดู
+    const machineIds = scope.kind === 'all' ? null : machineIdsForScope(await listMachineSitePairs(), scope);
     const events = await AuditService.listFleetEvents({
       limit,
       before,
       actionType: actionTypeRaw || null,
       machineId: machineId || null,
+      machineIds,
     });
     res.json({
       events,
@@ -151,7 +205,7 @@ router.get('/audit', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/enroll-tokens', async (_req: Request, res: Response) => {
+router.get('/enroll-tokens', superOnly, async (_req: Request, res: Response) => {
   try {
     res.json({ tokens: await listEnrollTokensDb() });
   } catch (err) {
@@ -160,7 +214,7 @@ router.get('/enroll-tokens', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/enroll-tokens', async (req: Request, res: Response) => {
+router.post('/enroll-tokens', superOnly, async (req: Request, res: Response) => {
   try {
     const created = await createEnrollToken(req.body ?? {}, req.user?.id ?? null);
     if (!created.ok) return fail(res, 400, created.error);
@@ -181,7 +235,7 @@ router.post('/enroll-tokens', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/enroll-tokens/:id/revoke', async (req: Request, res: Response) => {
+router.post('/enroll-tokens/:id/revoke', superOnly, async (req: Request, res: Response) => {
   try {
     const id = machineIdOf(req);
     if (!id) return fail(res, 400, 'id ไม่ถูกต้อง');
@@ -200,7 +254,7 @@ router.post('/enroll-tokens/:id/revoke', async (req: Request, res: Response) => 
   }
 });
 
-router.put('/machines/:id', async (req: Request, res: Response) => {
+router.put('/machines/:id', superOnly, async (req: Request, res: Response) => {
   try {
     const id = machineIdOf(req);
     if (!id) return fail(res, 400, 'machine id ไม่ถูกต้อง');
@@ -221,7 +275,7 @@ router.put('/machines/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/machines/:id/rotate-token', async (req: Request, res: Response) => {
+router.post('/machines/:id/rotate-token', superOnly, async (req: Request, res: Response) => {
   try {
     const id = machineIdOf(req);
     if (!id) return fail(res, 400, 'machine id ไม่ถูกต้อง');

@@ -34,6 +34,13 @@
 - [x] P0 test isolation: `agent-pack.test.mjs` ห้ามเขียน production manifest — **เสร็จแล้ว 23/10/69**
   - incident: `runPack` ที่ไม่ได้ส่ง `updateDataDir` เผยแพร่ทับ production ด้วย `agent-pack-test-key` ระหว่าง full verify
   - แก้ทุกจุดให้ใช้ sandbox + guard ใน `afterEach`; เทสต์ 30/30 ผ่าน; repack production กลับเป็น key จริงแล้ว
+- [x] Phase 3B: role `SITE_ADMIN` (จำกัดสาขา, อ่านอย่างเดียว) — **โค้ด + tests แล้ว 24/10/69**
+  - enum `SITE_ADMIN` + `users.assigned_site_id` (FK → `fleet_sites`, `ON DELETE SET NULL`) · migration `20261024130000_site_admin_role`
+  - fail closed: ไม่ผูกสาขา/สาขาหาย = 403 (`fleet-scope.service.ts`) — ไม่ใช่เห็นทั้งฝูง
+  - `/api/fleet/overview|policy|sites|groups|audit` เปิดให้อ่านแบบจำกัดสาขา (summary/channels คิดใหม่, audit กรอง `machineIds`)
+  - เส้นเขียน/กุญแจทั้งหมดยังเป็น SUPERADMIN · เปลี่ยน `assigned_site_id` = bump `token_version`
+  - เทสต์: `tests/fleetScope.test.ts` 15/15 · `tools/test/fleet-site-scope.test.mjs` 25/25 (แดง exit 1 เมื่อถอด scope ของ `/overview`)
+  - [ ] apply migration + restart core-api (รอเจ้าของอนุมัติรอบนี้)
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์

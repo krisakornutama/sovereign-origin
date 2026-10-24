@@ -12,6 +12,7 @@ enum Role {
   NODE_ADMIN
   OPERATOR
   SYSTEM_AI
+  SITE_ADMIN // ผู้ดูแลสาขา — เห็นเฉพาะเครื่องของสาขาที่ผูกไว้ และอ่านได้เท่านั้น (ไม่สั่งการฝูงเครื่อง)
   KID // ลูก/สมาชิกในครอบครัว (มีอยู่ใน DB จริงแล้ว — สอดคล้องกับ teach-kids)
 }
 
@@ -32,8 +33,12 @@ model User {
   // หมดอายุ "ทันที" เมื่อรหัสผ่านเปลี่ยน ไม่ต้องรอครบ 24 ชม.
   token_version        Int     @default(0)
   assigned_node_id     String? @db.Uuid
+  // สาขาที่ผู้ใช้รายนี้ดูแล — มีผลเฉพาะ role = SITE_ADMIN (NULL = ยังไม่ผูก → ถูกปฏิเสธ ไม่ใช่เห็นทั้งฝูง)
+  assigned_site_id     String? @db.Uuid
 
   assigned_node Node?         @relation("NodeAdmins", fields: [assigned_node_id], references: [id])
+  // ลบสาขา = ผู้ใช้ยังอยู่แต่หลุดขอบเขต (SetNull → resolveFleetScope จะปฏิเสธแบบ fail closed)
+  assigned_site FleetSite?    @relation("SiteAdmins", fields: [assigned_site_id], references: [id], onDelete: SetNull)
   audit_logs    AuditLog[]
   skill_matrix  SkillMatrix[]
 
@@ -1310,6 +1315,7 @@ model FleetSite {
 
   groups            FleetGroup[]
   machine_overrides FleetMachineOverride[]
+  admins            User[]              @relation("SiteAdmins")
 
   @@map("fleet_sites")
 }
