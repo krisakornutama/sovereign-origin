@@ -264,8 +264,9 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 > `updateDataDir` ไปเผยแพร่ทับ `core-api/data/agent-updates/` ด้วย key ของเทสต์ (`agent-pack-test-key`)
 > ทำให้ HUB เห็น manifest ที่ runner จริงไม่ trust · แก้โดยให้ทุก `runPack` ในเทสต์ส่ง `updateDataDir`
 > ลง sandbox + เพิ่ม guard ใน `afterEach` ห้าม production manifest เปลี่ยน · repack production ใหม่ด้วย
-> key `fleet-update-v1` เป็นเวอร์ชัน `ab6b8b43b256` (ตรวจลายเซ็นผ่าน) — **ไม่ restart container**
-> ดังนั้นโค้ด API ที่รันอยู่ยังเป็นรุ่นก่อน Phase 3A; ต้อง restart หลังได้รับอนุญาตเท่านั้น
+> key `fleet-update-v1` เป็นเวอร์ชัน `ab6b8b43b256` (ตรวจลายเซ็นผ่าน) — **ยังไม่ restart ในรอบนั้น**
+> (โค้ด API ยังเป็นรุ่นก่อน Phase 3A) · **24/10/69 12:32 เจ้าของอนุมัติ → restart แล้ว** และพิสูจน์ที่รันจริง:
+> `readVerifiedUpdateManifest()` = `ok:true` (`ab6b8b43b256`, ed25519, 20 ไฟล์) · container healthy, restarts=0
 
 ## เทสต์
 

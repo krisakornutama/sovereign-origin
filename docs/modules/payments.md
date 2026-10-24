@@ -79,7 +79,7 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 
 **การ deploy โมดูลนี้ = restart container** — `sovereign-core-api` mount `src` จาก MAIN และรัน `prisma generate && tsc && node dist/server.js` ทุกครั้งที่บูต ⇒ โค้ดใหม่ขึ้นเมื่อ container restart เท่านั้น (ถ้า `/api/payments/*` ตอบ 404 ให้ restart ก่อนไปสงสัยโค้ด · และรัน `npm run build` ใน MAIN ให้ผ่านก่อน restart เพราะถ้า tsc ในคอนเทนเนอร์ล้ม API จะไม่ขึ้นเลย)
 
-## Payment slips — free-first (พร้อม migrate แต่ยังไม่ deploy)
+## Payment slips — free-first (migrate + deploy แล้ว 24/10/69)
 
 ### เจตนา
 รับภาพสลิปโอนเงิน + ข้อมูลที่พนักงานกรอก แล้วให้เจ้าของ/ผู้จัดการ **ตรวจด้วยมือ** โดยไม่เรียก
@@ -107,7 +107,9 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 - Adapter interface: `SlipProviderAdapter` ใน service; รอบนี้ลงทะเบียนเฉพาะ `MANUAL` ที่คืนค่าว่างและไม่ยิงเน็ต
 - **ยังไม่ทำ** `POST /api/shop/orders/:token/slip` + UI เหตุผล เพราะหน้าร้าน `/shop` อยู่ใน repo
   `Sovereign-Web-Standalone` — ต้องตัดสินใจเรื่องที่วาง UI ก่อน (J9e)
-- **ยังไม่ apply migration นี้ใน production** (Cold Soak) — เทสต์รันบน schema ชั่วคราวด้วย `prisma db push`
+- **apply production แล้ว 24/10/69 12:32** — `prisma migrate deploy` สำเร็จ (`payment_slips` + 5 index + 4 FK,
+  `_prisma_migrations` finished 1 แถว) หลัง backup `sovereign_20261024_122912.dump` + restore drill ผ่าน
+  · เส้น `/api/payments/slips/<uuid>` ตอบ **401** บนระบบจริง (route ขึ้นแล้ว ไม่ใช่ 404)
 
 ### ซ้อม migrate บน schema จริงของ production (ทำแล้ว 24/10/69 — ไม่แตะ production)
 เพื่อลดความเสี่ยงของขั้นที่ยังติด Cold Soak: dump **schema-only** ของ production (142 ตาราง) ลงฐานชั่วคราว
@@ -123,7 +125,7 @@ body ที่ `applied:false` ต้องห้ามอ่านเป็น 
 | provider ต่างกัน + `transRef` เดียวกัน | ผ่าน (2 แถว) |
 | FK on delete | `businessId` = CASCADE · `orderId`/`uploadedBy`/`reviewedBy` = SET NULL |
 
-ฐานชั่วคราวถูกลบและ `pg_database` ยืนยันแล้วว่าเหลือ 0 — **production ยังไม่มีตารางนี้** (`to_regclass` = NULL)
+ฐานชั่วคราวถูกลบและ `pg_database` ยืนยันแล้วว่าเหลือ 0 (ขณะซ้อม production ยังไม่มีตารางนี้ — ตอนนี้ apply จริงแล้ว)
 เทสต์กันถอยหลังอยู่ที่ `tools/test/payment-slips-migration.test.mjs` (10 เคส: BOM, ชนิดคอลัมน์, NOT NULL,
 unique 2 ตัว, FK rules, ห้ามแตะตารางอื่น, migration สร้างตารางซ้ำ, MANUAL-only adapter)
 — พิสูจน์แล้วว่าจับได้จริงโดยตัด unique index ออกแล้วเทสต์แดง (exit 1) ก่อนคืนไฟล์

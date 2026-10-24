@@ -1,10 +1,9 @@
 # Enterprise Readiness — Sovereign OS
 
-> สถานะ: 23/10/69 · ระหว่าง Cold Soak
+> สถานะ: 24/10/69 · ระหว่าง Cold Soak
 > เอกสารนี้เป็นแผนยกระดับผลิตภัณฑ์ให้พร้อมใช้หลายเครื่อง/หลายสาขาในระดับองค์กร
-> **Phase 1 + Phase 2 live แล้ว**; **Phase 3A (signed runner manifest) implement + tests แล้ว
-> และ production manifest ถูก repack ด้วย key จริงแล้ว — แต่โค้ด API รุ่น Phase 3A ยังไม่ deploy**
-> (ต้อง restart หลังได้รับอนุญาตเท่านั้น)
+> **Phase 1 + Phase 2 live แล้ว**; **Phase 3A (signed runner manifest) deploy แล้ว 24/10/69** —
+> HUB ตรวจ manifest ที่เซ็นด้วย `fleet-update-v1` ก่อนตอบเครื่องลูก (restart container ตามที่เจ้าของอนุมัติ)
 
 ## 1. เป้าหมาย
 
@@ -103,7 +102,7 @@ Acceptance:
 
 ## 5. Phase 3 — Supply chain และความน่าเชื่อถือของอัปเดต
 
-### 5.1 Phase 3A — signed runner manifest (implemented, ยังไม่ deploy)
+### 5.1 Phase 3A — signed runner manifest (deployed 24/10/69)
 
 - [x] manifest ของ runner ถูกเซ็น Ed25519 ที่ตัวแพ็ก; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
 - [x] public key ฝังใน runner + HUB; static test เทียบสองฝั่ง (`tools/test/update-trust-key.test.mjs`)
@@ -111,7 +110,8 @@ Acceptance:
 - [x] runner ตรวจซ้ำก่อนแตะไฟล์ — unsigned/bad signature = `untrusted-manifest`
 - [x] canonical payload ครอบ `version`, `generatedAt`, `files[{path,sha256,size}]`
 - [x] repack production manifest ด้วย key จริงแล้ว (23/10/69 · `ab6b8b43b256` · `fleet-update-v1` · verify ผ่าน)
-- [ ] restart core-api เพื่อให้โค้ด HUB รุ่น Phase 3A ขึ้นใช้งาน (manifest พร้อมแล้ว แต่ต้องได้รับอนุญาตหลัง Cold Soak)
+- [x] restart core-api ให้โค้ด HUB รุ่น Phase 3A ขึ้นใช้งาน — **เสร็จ 24/10/69 12:32** (เจ้าของอนุมัติ)
+      · พิสูจน์ที่รันจริง: `readVerifiedUpdateManifest()` = `ok:true` (`ab6b8b43b256`, ed25519, 20 ไฟล์)
 - [ ] desktop updater ยังใช้ SHA-256 อย่างเดียว (Phase 3B)
 
 ### 5.2 งานที่ยังเหลือใน Phase 3

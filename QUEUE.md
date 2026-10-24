@@ -27,7 +27,10 @@
   - pack เซ็น, HUB ตรวจก่อนตอบ (503 เมื่อไม่ผ่าน), runner ตรวจก่อนแตะไฟล์
   - public key ฝังสองฝั่ง + static test เทียบ; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
   - [x] repack production manifest ด้วย key จริงแล้ว (23/10/69 · version `ab6b8b43b256` · `fleet-update-v1` · verify ผ่าน)
-  - [ ] restart core-api หลังได้รับอนุญาต (ยังไม่ deploy ระหว่าง Cold Soak — โค้ด API ที่รันอยู่ยังเป็นรุ่นก่อน Phase 3A)
+  - [x] restart core-api หลังได้รับอนุญาต — **เสร็จแล้ว 24/10/69 12:32** (เจ้าของอนุมัติ)
+    - `prisma migrate deploy` = 65 migrations, ไม่มี drift · `_prisma_migrations` up to date
+    - container healthy, restarts=0 · `/api/health` 200 · `/fleet/` 200
+    - HUB ตรวจ manifest ตอนรันจริง: `readVerifiedUpdateManifest()` → `ok:true` (`ab6b8b43b256`, ed25519 `fleet-update-v1`, 20 ไฟล์)
 - [x] P0 test isolation: `agent-pack.test.mjs` ห้ามเขียน production manifest — **เสร็จแล้ว 23/10/69**
   - incident: `runPack` ที่ไม่ได้ส่ง `updateDataDir` เผยแพร่ทับ production ด้วย `agent-pack-test-key` ระหว่าง full verify
   - แก้ทุกจุดให้ใช้ sandbox + guard ใน `afterEach`; เทสต์ 30/30 ผ่าน; repack production กลับเป็น key จริงแล้ว
@@ -465,13 +468,18 @@
       ห้าม auto-ปิดยอดเมื่อ `PAYEE_UNVERIFIED`/`AMOUNT_MISMATCH`
   - [x] **free-first backend (23/10/69):** `payment_slips` + internal endpoints `/api/payments/slips/*` +
         manual review/audit + adapter interface (`MANUAL` เท่านั้น) · DB suite 43/43 · migration
-        `20261023170000_payment_slips` **ยังไม่ apply production**
+        `20261023170000_payment_slips` (ตอนนั้นยังไม่ apply — ดูรายการถัดไป)
   - [x] **ซ้อม migrate บน schema จริง (24/10/69):** dump schema-only ของ production (142 ตาราง) ลงฐานชั่วคราว
         `sovereign_migrate_dryrun` → apply migration ผ่าน **9/9 statement (exit 0)** → ตรวจพฤติกรรมจริง
         (sha256 ซ้ำ/`provider+transRef` ซ้ำถูกปฏิเสธ · `transRef` NULL ซ้ำได้ · FK cascade/set-null ถูก)
         → ลบฐานชั่วคราวแล้ว · production ยังไม่มีตาราง (`to_regclass` = NULL)
         · เทสต์กันถอยหลัง `tools/test/payment-slips-migration.test.mjs` 10/10 (แดง exit 1 เมื่อตัด unique ออก)
-  - [ ] apply migration + restart core-api เมื่อเจ้าของอนุญาต (Cold Soak)
+  - [x] **apply migration + restart (24/10/69 12:32 — เจ้าของอนุมัติ):**
+        backup `backups/postgres/sovereign_20261024_122912.dump` (5.9 MB) + restore drill เข้าฐานชั่วคราว
+        (TimescaleDB `pre/post_restore`) → ทุกตารางตรงเป๊ะ (sensor_telemetry 239,660 แถว ณ เวลาที่ dump;
+        ผลต่าง 9 แถวคือข้อมูลไหลเข้าหลัง dump ไม่ใช่ข้อมูลหาย) → `prisma migrate deploy` สำเร็จ
+        → `payment_slips=true`, index 5, FK 4, migration record 1 (finished, ไม่ rollback)
+        → restart container healthy · `/api/payments/slips/<uuid>` ตอบ **401** (registered; ก่อนหน้านี้ 404)
   - [ ] public `POST /api/shop/orders/:token/slip` + UI เหตุผล + paid adapter — หน้าร้านอยู่
         `Sovereign-Web-Standalone`; ต้องให้เจ้าของเลือกที่วาง UI/ผู้ให้บริการก่อน
 - [ ] **J9f e-Tax:** ต้องมี invoice + เลขรัน + ETDA schema + XMLDSig/C14N + certificate + ช่องทางที่รับรอง —
