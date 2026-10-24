@@ -29,6 +29,11 @@ const TEST_PUBLIC_PEM = TEST_PAIR.publicKey.export({ type: 'spki', format: 'pem'
 process.env.AGENT_UPDATE_SIGNING_KEY = TEST_PAIR.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 process.env.AGENT_UPDATE_SIGNING_KEY_ID = TEST_KEY_ID;
 
+/** production manifest ต้องไม่ถูกเทสต์เขียน — กันเหตุจริง 23/10/69 (test key หลุดไป HUB) */
+const PROD_MANIFEST_PATH = path.join(ROOT, 'sovereign-os', 'core-api', 'data', 'agent-updates', 'manifest.json');
+const prodManifestSnapshot = () => (fs.existsSync(PROD_MANIFEST_PATH) ? fs.readFileSync(PROD_MANIFEST_PATH, 'utf8') : null);
+const PROD_MANIFEST_BEFORE = prodManifestSnapshot();
+
 const pack = await import('../agent-pack/pack.mjs');
 // สูตรแฮช/เวอร์ชันตัวเดียวกับที่เครื่องลูกใช้ (ตัวแพ็ก import โมดูลนี้จริง)
 const { sha256Hex, computeVersionFromEntries } = await import('../../sovereign-os/agent-runner/src/selfUpdate.mjs');
@@ -42,7 +47,15 @@ beforeEach(() => {
   sandbox = fs.mkdtempSync(path.join(TMP_ROOT, 'agentpack-test-'));
 });
 afterEach(() => {
-  fs.rmSync(sandbox, { recursive: true, force: true });
+  try {
+    assert.equal(
+      prodManifestSnapshot(),
+      PROD_MANIFEST_BEFORE,
+      'เทสต์เขียน production agent-updates/manifest.json — ต้องส่ง updateDataDir ลง sandbox ทุกครั้ง',
+    );
+  } finally {
+    fs.rmSync(sandbox, { recursive: true, force: true });
+  }
 });
 
 /** fetch ปลอม — จำ URL/header ไว้ให้ตรวจว่ายิงจริง */
@@ -294,6 +307,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       hubUrl: 'http://192.168.1.102:3000',
       dryRun: true,
       exec,
+      updateDataDir: path.join(sandbox, 'agent-updates-dry'),
     });
     assert.equal(exec.calls.length, 0, `dry-run ห้ามรันคำสั่ง: ${JSON.stringify(exec.calls)}`);
     assert.equal(fs.existsSync(path.join(sandbox, 'bundle', 'join.json')), false, 'dry-run ห้ามเขียนไฟล์');
@@ -316,6 +330,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       name: 'คอมเครื่องที่ 2',
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
+      updateDataDir: path.join(sandbox, 'agent-updates-reuse'),
     });
     assert.equal(out.exitCode, 0, out.report);
     const join = JSON.parse(fs.readFileSync(path.join(sandbox, 'bundle-reuse', 'join.json'), 'utf8'));
@@ -336,6 +351,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       name: 'คอมเครื่องที่ 2',
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
+      updateDataDir: path.join(sandbox, 'agent-updates-conflict'),
     });
     assert.equal(out.exitCode, 1);
     assert.match(out.report, /ชื่ออื่น|--force/);
@@ -356,6 +372,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       name: 'คอมเครื่องที่ 2',
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
+      updateDataDir: path.join(sandbox, 'agent-updates-real'),
     });
 
     assert.equal(out.exitCode, 0, out.report);

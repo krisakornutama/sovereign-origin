@@ -260,6 +260,13 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 > สถานะ 23/10/69: migration + backfill + restart production เรียบร้อยแล้ว — `/fleet` และ API ตอบ 200
 > (backup/restore drill ผ่าน) · หากต้อง migrate ครั้งถัดไปให้ทำ backup + restore test ทุกครั้ง
 
+> **Incident 23/10/69 (แก้แล้ว):** full verify เคยรัน `agent-pack.test.mjs` แล้ว `runPack` ที่ไม่ได้ส่ง
+> `updateDataDir` ไปเผยแพร่ทับ `core-api/data/agent-updates/` ด้วย key ของเทสต์ (`agent-pack-test-key`)
+> ทำให้ HUB เห็น manifest ที่ runner จริงไม่ trust · แก้โดยให้ทุก `runPack` ในเทสต์ส่ง `updateDataDir`
+> ลง sandbox + เพิ่ม guard ใน `afterEach` ห้าม production manifest เปลี่ยน · repack production ใหม่ด้วย
+> key `fleet-update-v1` เป็นเวอร์ชัน `ab6b8b43b256` (ตรวจลายเซ็นผ่าน) — **ไม่ restart container**
+> ดังนั้นโค้ด API ที่รันอยู่ยังเป็นรุ่นก่อน Phase 3A; ต้อง restart หลังได้รับอนุญาตเท่านั้น
+
 ## เทสต์
 
 - `sovereign-os/core-api/tests/fleetPolicy.test.ts` — validation, rollout, compliance, override, file store
@@ -271,6 +278,7 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 - `sovereign-os/agent-runner/test/selfUpdate.test.mjs` — runner ตรวจลายเซ็นก่อนแตะไฟล์
 - `tools/test/update-trust-key.test.mjs` — public key/keyId ตรงกันสองฝั่ง
 - `tools/test/migration-bom.test.mjs` — กัน BOM ใน migration (เคสจริง 23/10/69)
+- `tools/test/agent-pack.test.mjs` — ชุดแพ็ก + guard กันเทสต์เขียน production `agent-updates/manifest.json` (incident 23/10/69)
 
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
