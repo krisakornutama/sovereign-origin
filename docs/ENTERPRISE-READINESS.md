@@ -4,7 +4,8 @@
 > เอกสารนี้เป็นแผนยกระดับผลิตภัณฑ์ให้พร้อมใช้หลายเครื่อง/หลายสาขาในระดับองค์กร
 > **Phase 1 + Phase 2 live แล้ว**; **Phase 3A (signed runner manifest) deploy แล้ว 24/10/69** —
 > HUB ตรวจ manifest ที่เซ็นด้วย `fleet-update-v1` ก่อนตอบเครื่องลูก (restart container ตามที่เจ้าของอนุมัติ)
-> **Phase 3B (`SITE_ADMIN` อ่านอย่างเดียว จำกัดสาขา) โค้ด + เทสต์เสร็จแล้ว 24/10/69 — migration รอ apply**
+> **Phase 3B (`SITE_ADMIN` อ่านอย่างเดียว จำกัดสาขา) deploy แล้ว 24/10/69** —
+> migration `20261024130000_site_admin_role` apply บน production + restart core-api แล้ว
 
 ## 1. เป้าหมาย
 
@@ -128,7 +129,8 @@ Acceptance:
 บัญชีสาขา **อ่านได้อย่างเดียว** และเห็นเฉพาะเครื่องของสาขาตัวเอง (ทุกเส้นที่เขียนยังเป็น SUPERADMIN)
 
 - [x] enum `SITE_ADMIN` + `users.assigned_site_id` (FK → `fleet_sites.id`, `ON DELETE SET NULL`)
-- [x] migration `20261024130000_site_admin_role` (ยังไม่ apply production — รอเจ้าของอนุมัติ)
+- [x] migration `20261024130000_site_admin_role` — **apply production แล้ว 24/10/69 13:36** (backup + restore drill ผ่าน,
+      66 migrations, ไม่มี drift) และ restart core-api (healthy, restarts=0)
 - [x] `fleet-scope.service.ts` — fail closed: ไม่ผูกสาขา = `SITE_SCOPE_MISSING`, สาขาหาย = `SITE_SCOPE_UNKNOWN`
 - [x] `/api/fleet/overview|policy|sites|groups|audit` เปิดให้ SITE_ADMIN แบบจำกัดสาขา —
       `summary`/`channels` คิดใหม่จากชุดที่กรองแล้ว, audit กรองด้วย `machineIds`
