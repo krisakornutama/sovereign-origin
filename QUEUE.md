@@ -26,7 +26,11 @@
 - [x] Phase 3A: signed runner manifest (Ed25519) + ตรวจสองชั้น — **implement + tests แล้ว 23/10/69**
   - pack เซ็น, HUB ตรวจก่อนตอบ (503 เมื่อไม่ผ่าน), runner ตรวจก่อนแตะไฟล์
   - public key ฝังสองฝั่ง + static test เทียบ; private key อยู่ `tools/agent-pack/keys/signing-key.pem` (gitignored)
-  - [ ] repack + restart core-api หลังได้รับอนุญาต (ยังไม่ deploy ระหว่าง Cold Soak)
+  - [x] repack production manifest ด้วย key จริงแล้ว (23/10/69 · version `ab6b8b43b256` · `fleet-update-v1` · verify ผ่าน)
+  - [ ] restart core-api หลังได้รับอนุญาต (ยังไม่ deploy ระหว่าง Cold Soak — โค้ด API ที่รันอยู่ยังเป็นรุ่นก่อน Phase 3A)
+- [x] P0 test isolation: `agent-pack.test.mjs` ห้ามเขียน production manifest — **เสร็จแล้ว 23/10/69**
+  - incident: `runPack` ที่ไม่ได้ส่ง `updateDataDir` เผยแพร่ทับ production ด้วย `agent-pack-test-key` ระหว่าง full verify
+  - แก้ทุกจุดให้ใช้ sandbox + guard ใน `afterEach`; เทสต์ 30/30 ผ่าน; repack production กลับเป็น key จริงแล้ว
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์
