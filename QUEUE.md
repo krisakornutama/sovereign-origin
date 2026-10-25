@@ -80,10 +80,16 @@
   - เครื่องลูกเขียน `MACHINE-PROFILE.txt`/`machine-profile.json` + เปิด `ENABLED_MODULES`/
     `PARENT_NAME`/`PARENT_HUB_URL` ใน `infra\.env` (แก้เฉพาะบรรทัดนั้น, idempotent);
     `setup-first-time.bat` เรียก `--apply-modules` ต่อท้ายขั้น [1/5]
-  - เทสต์: `install-modules` 21/21 · `install-plan` 17/17 · `pack-install-plan` 7/7 ·
-    `setup-install-plan` 7/7 · `wizard-modules`+`pack-machine-wizard` 45/45 ·
+  - เทสต์: `install-modules` 21/21 · `install-plan` 18/18 · `pack-install-plan` 7/7 ·
+    `setup-install-plan` 8/8 · `wizard-modules`+`pack-machine-wizard` 45/45 ·
     `machineOwnerWiring.test.ts` 10/10 · `issueMachineTokenArgs.test.ts` 2/2 (แดง exit 1 ก่อนมีโค้ด)
-  - [ ] `npm run verify` ที่ root + commit/merge — ยังไม่รัน (รอปิดรอบนี้)
+  - เจอเพิ่มระหว่างทำ: `kit-coverage.test.mjs` ฟ้องว่าชุด OTA มี `install-plan.mjs` แต่ชุดเต็มไม่มี —
+    แก้ที่ต้นเหตุ: ให้เทสต์derive ที่มาจาก `bundleSource()` ของตัวแพ็กเอง (เดิมฮาร์ดโค้ด 3 ชื่อ
+    ⇒ เพิ่มไฟล์ใหม่แล้วสองรายการตกลงกันไม่ได้) · อ่าน JSON ทน BOM (Notepad/PowerShell 5.1
+    เติม BOM ⇒ `JSON.parse` ล้ม = เครื่องลูกไม่เปิดโมดูลโดยไม่มีใครรู้สาเหตุ)
+  - [x] `npm run verify` ที่ root — **ผ่าน 6/6 ขั้น (12.4 นาที) 25/10/69**
+  - [x] merge เข้า `main` — **เสร็จแล้ว 25/10/69** (`242e2dd`)
+  - [ ] push ขึ้น GitHub — **ต้องรอเจ้าของอนุมัติ (ถือเป็น deploy ระหว่าง Cold Soak)**
   - [ ] restart core-api ให้ `--owner` มีผลบนเครื่องจริง — **ต้องรอเจ้าของอนุมัติ (Cold Soak)**
   - [ ] ทดสอบกับเครื่องจริง: แพ็กชุด → `INSTALL.cmd` ที่เครื่องปลายทาง → เห็นชื่อเครื่องแม่บนหน้าจอ
 
