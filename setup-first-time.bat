@@ -200,6 +200,15 @@ if "!NEED_REWRITE!"=="1" (
     )
 )
 call :note "== [1/5] เสร็จ =="
+:: ── ใช้แผนติดตั้งของชุดเครื่องลูก (ถ้ามี): เปิด ENABLED_MODULES + จำว่าเป็นลูกของเครื่องไหน ──
+::   ต้องรัน "หลัง" เขียน infra\.env เท่านั้น (ค่าว่าง/ไม่มีไฟล์ = ไม่ทำอะไร)
+if exist "%~dp0install-plan.json" (
+    if exist "%~dp0tools\agent-pack\setup-machine.mjs" (
+        call :note "  - ใช้แผนติดตั้ง: เปิดฟังก์ชั่นที่เลือกไว้ใน infra\.env"
+        node "%~dp0tools\agent-pack\setup-machine.mjs" --apply-modules --dir="%~dp0" >> "%LOG%" 2>&1
+        if errorlevel 1 call :note "  ! ใช้แผนติดตั้งไม่สำเร็จ - ดู setup-first-time.log (ไม่กระทบการติดตั้งที่เหลือ)"
+    )
+)
 echo.
 
 :: ============ [2/5] เริ่ม Docker containers ============

@@ -150,6 +150,83 @@ export async function setMachineOwner(machineId: string, userId: string | null):
 }
 
 // ─────────────────────────────────────────────────────────────
+//  ตั้งเจ้าของตั้งแต่ "แพ็กชุดติดตั้ง" (เจ้าของสั่ง 25/10/69)
+//
+//  "พอติดตั้งเสร็จ … มีสิทธิ์เชื่อมเข้าควบคุมเครื่องลูกได้ทันที"
+//  ทำได้โดยไม่ต้อง migration: owner_user_id + agent_machine_hubs + lan_confirmed_at
+//  มีอยู่แล้ว ⇒ เครื่องลูก heartbeat ครั้งแรกก็อยู่ในรายการที่ HUB คุมได้เลย
+//
+//  ความปลอดภัย:
+//   · ตั้งได้เฉพาะบัญชี SUPERADMIN (คนที่คุมกองเครื่องอยู่แล้ว)
+//   · ตรวจชื่อก่อน แล้วค่อยเขียน — ชื่อผิดต้องไม่ทิ้งแถวครึ่ง ๆ กลาง ๆ
+//   · lan_confirmed_at ตั้งเฉพาะเมื่อผู้เรียกสั่งชัดเจน (confirmLan) เพราะมันคือ
+//     "ยืนยันว่าเครื่องนี้อยู่ในวงเดียวกัน" ซึ่งปกติต้องกดบนเครื่องเป้าหมาย
+//     การแพ็กชุดติดตั้งที่เครื่อง HUB + ถือชุดไปติดตั้งเอง ถือเป็นการยืนยันเดียวกัน
+// ─────────────────────────────────────────────────────────────
+
+/** ส่วนของ prisma ที่ต้องใช้ — รับเป็นพารามิเตอร์เพื่อเทสต์ได้โดยไม่มี DB */
+export interface OwnerDb {
+  user: { findUnique: (args: any) => Promise<any> };
+  agentMachine: { update: (args: any) => Promise<any> };
+  agentMachineHub: { upsert: (args: any) => Promise<any> };
+}
+
+export interface OwnerCandidate {
+  id: string;
+  username: string;
+  role: string;
+}
+
+export type OwnerLookup =
+  | { ok: true; user: OwnerCandidate }
+  | { ok: false; code: 'owner_required' | 'owner_not_found' | 'owner_not_superadmin'; username: string };
+
+/** หาผู้ใช้ที่จะเป็นเจ้าของเครื่อง — ต้องเป็น SUPERADMIN เท่านั้น (fail-closed) */
+export async function resolveOwnerUser(username: unknown, db: OwnerDb = prisma as unknown as OwnerDb): Promise<OwnerLookup> {
+  const name = String(username ?? '').trim();
+  if (!name) return { ok: false, code: 'owner_required', username: '' };
+  const user = await db.user.findUnique({
+    where: { username: name },
+    select: { id: true, username: true, role: true },
+  });
+  if (!user?.id) return { ok: false, code: 'owner_not_found', username: name };
+  if (String(user.role ?? '').trim().toUpperCase() !== 'SUPERADMIN') {
+    return { ok: false, code: 'owner_not_superadmin', username: name };
+  }
+  return { ok: true, user: { id: user.id, username: user.username ?? name, role: 'SUPERADMIN' } };
+}
+
+/** ตั้งเจ้าของ + ผูก hub + (ถ้าสั่ง) ยืนยัน LAN ให้เครื่องนี้ */
+export async function wireMachineOwner({
+  machineId,
+  user,
+  confirmLan = false,
+  now = new Date(),
+  db = prisma as unknown as OwnerDb,
+}: {
+  machineId: string;
+  user: OwnerCandidate;
+  confirmLan?: boolean;
+  now?: Date;
+  db?: OwnerDb;
+}): Promise<void> {
+  await db.agentMachine.update({
+    where: { id: machineId },
+    data: {
+      owner_user_id: user.id,
+      ...(confirmLan ? { lan_confirmed_at: now } : {}),
+    },
+  });
+  // upsert = แพ็กซ้ำ/ผูกซ้ำไม่พัง (คีย์ประกอบ machine_id + user_id)
+  await db.agentMachineHub.upsert({
+    where: { machine_id_user_id: { machine_id: machineId, user_id: user.id } },
+    create: { machine_id: machineId, user_id: user.id },
+    update: {},
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────
 //  ข้อ 3 — ยืนยัน "อยู่ LAN เดียวกัน" ด้วยการกดบนเครื่องเป้าหมาย
 // ─────────────────────────────────────────────────────────────
 

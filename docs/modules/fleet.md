@@ -250,11 +250,14 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 การแพ็กชุดติดตั้งทำได้โดยไม่ต้องพิมพ์คำสั่ง (ไฟล์อยู่ที่รากโปรเจ็ก **บนเครื่อง HUB**):
 
 1. ดับเบิลคลิก `PACK-MACHINE.cmd`
-2. ตอบชื่อเครื่อง (Enter = ใช้ชื่อเครื่องนี้) → ถามว่าจะรวมโมเดล Ollama (~20GB) ไหม → ยืนยัน
-3. เสร็จแล้วระบบเปิด Explorer ที่โฟลเดอร์ชุดติดตั้งให้ — ก็อป **ทั้งโฟลเดอร์** ไปเครื่องปลายทาง
-   แล้วดับเบิลคลิก `tools\agent-pack\SETUP-MACHINE.cmd` ที่เครื่องนั้น
+2. ตอบชื่อเครื่อง (Enter = ใช้ชื่อเครื่องนี้) → ถามว่าจะรวมโมเดล Ollama (~20GB) ไหม
+3. เลือก **ฟังก์ชั่นที่จะติดตั้ง** (Enter = ชุดที่แนะนำ · `a` = ทั้งหมด · เลข เช่น `1,2,5`)
+4. ระบุ **เครื่องแม่** = บัญชี SUPERADMIN ที่จะคุมเครื่องนี้ (Enter ใช้ `SOVEREIGN_OWNER` ถ้าตั้งไว้ · `-` = ไม่ผูก)
+   แล้วตอบว่าจะให้คุมได้ทันทีที่ออนไลน์หรือไม่
+5. ยืนยัน → เสร็จแล้วระบบเปิด Explorer ที่โฟลเดอร์ชุดติดตั้งให้ — ก็อป **ทั้งโฟลเดอร์** ไปเครื่องปลายทาง
+   แล้วดับเบิลคลิก **`INSTALL.cmd` ที่รากโฟลเดอร์** (ไฟล์เดียว ไม่ต้องไล่เข้าโฟลเดอร์ย่อย)
 
-พฤติกรรมที่ตั้งใจ (ล็อกด้วย `tools/test/pack-machine-wizard.test.mjs`):
+พฤติกรรมที่ตั้งใจ (ล็อกด้วย `tools/test/pack-machine-wizard.test.mjs` + `wizard-modules.test.mjs`):
 
 | กรณี | ผล |
 |---|---|
@@ -263,9 +266,17 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 | โฟลเดอร์ของชื่อนั้นมีอยู่ | ถามก่อนทับ + เตือนว่าเครื่องที่ออนไลน์อยู่จะหลุดจาก HUB |
 | กด Ctrl+C | ยกเลิก — ไม่เขียนไฟล์/ไม่ออก token |
 | ไม่พบ IP ในวง LAN | เตือนพร้อมบอกให้ระบุ `--hub-url=http://<IP ของ HUB>:3000` |
+| พิมพ์ชื่อฟังก์ชั่นผิด | ถามซ้ำพร้อมบอกว่าคำไหนไม่รู้จัก (ไม่ติดตั้งด้วยของที่พิมพ์ผิด) |
+| ชื่อเครื่องแม่ไม่มีจริง / ไม่ใช่ SUPERADMIN | หยุดก่อนเขียนชุด (`owner_failed`) — ไม่ปล่อยชุดที่ไม่มีใครคุมได้ |
 
 ทำแบบไม่ถาม (สคริปต์) ได้ด้วย:
-`node tools/agent-pack/pack-machine.mjs --name="เครื่องที่-4" --yes` (`--dry-run` เพื่อดูแผนก่อน)
+
+```bat
+node tools\agent-pack\pack-machine.mjs --name="เครื่องที่-4" --yes ^
+  --modules=iot,kids --owner=krisakorn --confirm-lan
+```
+
+(`--dry-run` เพื่อดูแผนก่อน · `--minimal` = เฉพาะ agent-runner)
 
 คำสั่งเดิม `node tools/agent-pack/pack.mjs --name="..." --full` ยังใช้ได้เหมือนเดิม
 (แต่ต้องระบุ `--out` เองถ้าไม่อยากให้ทุกเครื่องเขียนลงโฟลเดอร์เดียวกัน) ·
@@ -274,6 +285,61 @@ public key ฝังที่ `sovereign-os/agent-runner/src/updateTrust.mjs` �
 
 > token ถูกฝังใน `join.json` ของชุดติดตั้งเท่านั้น — ตัวช่วยนี้ไม่พิมพ์ token ออกหน้าจอ
 > และไม่ควรแชร์โฟลเดอร์ชุดติดตั้งให้ผู้อื่น
+
+### เลือกฟังก์ชั่น + "เครื่องนี้เป็นลูกของใคร" (25/10/69)
+
+แคตตาล็อกฟังก์ชั่นอยู่ใน `tools/agent-pack/modules.mjs` — ที่เดียวที่รู้ว่ามีอะไรให้เลือก
+และแต่ละฟังก์ชั่นไปเปิดอะไรจริง:
+
+| ฟังก์ชั่น (`id`) | เปิดประตู backend (`ENABLED_MODULES`) | หน้าหลัก |
+|---|---|---|
+| `core` (บังคับ) | — | `/dashboard` `/fleet` `/machine-console` `/agent-queue` `/system` `/settings` |
+| `iot` | — | `/sensors` `/automation` `/relay` `/infrastructure` `/business` `/property` |
+| `kids` | — | `/skills` `/lifestyle` `/mbti` |
+| `farm` | `farm` | `/farm` `/livestock` `/trace` `/selfreliance` |
+| `restaurant` | `restaurant` | `/restaurant` `/restaurant/kds` `/restaurant/reports` `/restaurant/kitchen` |
+| `inventory` | `inventory` | `/inventory` |
+| `vision` | `vision` | `/vision` |
+| `documents` | `documents` | `/knowledge` |
+| `energy` · `treasury` · `health` · `ai` · `security` | — | ตามชื่อ (ดู `pages` ในแคตตาล็อก) |
+
+**หลักการ:** ชื่อที่ backend ไม่รู้จัก (iot/kids/…) จะไม่ถูกเขียนลง `ENABLED_MODULES` เพราะ
+`AVAILABLE_MODULES` ของ core-api มีแค่ `inventory|farm|vision|documents|restaurant` —
+เขียนชื่ออื่นไปจะโดนเตือนแล้วทิ้งเงียบ ๆ (หน้าฟาร์มยังขึ้น empty state ทั้งที่เลือกแล้ว)
+ชื่อที่เหลือถูกเก็บใน `install-plan.json` ให้หน้าเว็บรุ่นต่อไปใช้
+
+ผลลัพธ์ในชุดติดตั้ง:
+
+| ไฟล์ | มีอะไร | แชร์ได้ไหม |
+|---|---|---|
+| `join.json` | token ของเครื่องนี้ | **ห้าม** |
+| `install-plan.json` | ชื่อเครื่อง · HUB · เครื่องแม่ · ฟังก์ชั่น · `ENABLED_MODULES` | ได้ (ไม่มี token) |
+| `START-HERE.txt` | คู่มือ 3 บรรทัด + เครื่องแม่ + ฟังก์ชั่น | ได้ |
+
+ที่เครื่องปลายทาง `INSTALL.cmd` → `setup-machine.mjs` จะ:
+
+1. หา `join.json`/`install-plan.json` จาก **รากชุด** (แม้ถูกเรียกจาก `tools\agent-pack` ในชุด `--full`)
+2. เขียน `.env` ที่โฟลเดอร์ของ runner จริง (`sovereign-os\agent-runner` ในชุดเต็ม)
+3. พิสูจน์ token ด้วย heartbeat — ไม่ผ่าน = ไม่แตะ config ที่เหลือ
+4. เขียน `MACHINE-PROFILE.txt` + `machine-profile.json` ที่รากชุด แล้วพิมพ์
+   "เครื่องแม่ : <ชื่อ>" กับรายการฟังก์ชั่นบนหน้าจอ
+5. ถ้ามี `sovereign-os\infra\.env` แล้ว → เขียน `ENABLED_MODULES` / `PARENT_NAME` / `PARENT_HUB_URL`
+   (แก้เฉพาะบรรทัดนั้น · รันซ้ำได้ผลเท่าเดิม) · ถ้ายังไม่มี → เตือนว่าต้องติดตั้ง stack ก่อน
+6. สร้าง `RUN-RUNNER.cmd` ในโฟลเดอร์ runner แล้วตั้ง scheduled task ให้ชี้ไฟล์ที่มีอยู่จริง
+
+`setup-first-time.bat` เรียก `setup-machine.mjs --apply-modules` ต่อท้ายขั้น [1/5]
+⇒ เครื่องที่ติดตั้ง stack ทีหลังก็ได้ `ENABLED_MODULES` ตามแผนโดยไม่ต้องรันซ้ำด้วยมือ
+
+**สิทธิ์ควบคุมทันที:** `--owner=<username>` ตั้ง `owner_user_id` + ผูก `agent_machine_hubs`
+และ `--confirm-lan` ตั้ง `lan_confirmed_at` ตั้งแต่ตอนแพ็ก ⇒ เครื่องลูก heartbeat ครั้งแรก
+ก็อยู่ในรายการที่เจ้าของคุมได้ (`listControllableMachines` ต้องการครบทั้งสามอย่าง)
+ไม่ต้อง migration — คอลัมน์/ตารางมีอยู่แล้ว
+
+> ⚠️ ความหมายของ `--confirm-lan`: กติกาเดิมคือ "ต้องกดยืนยันบนเครื่องเป้าหมาย" เพื่อกัน
+> เครื่องแปลกปลอมในวง LAN ยึดเครื่องเรา การแพ็กที่เครื่อง HUB แล้วถือชุดไปติดตั้งเอง
+> ถือเป็นการยืนยันเดียวกัน (token ออกครั้งเดียวและอยู่ในชุดที่เจ้าของถืออยู่)
+> ถ้าไม่ต้องการ ให้ตอบ "ไม่" ตอนถาม หรือไม่ใส่ `--confirm-lan` — เครื่องจะรอผู้ใช้กดยืนยันเอง
+
 
 ## ความปลอดภัย
 

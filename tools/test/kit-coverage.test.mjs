@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fullKitFiles, bundleFiles } from '../agent-pack/pack.mjs';
+import { fullKitFiles, bundleFiles, bundleSource } from '../agent-pack/pack.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -40,12 +40,15 @@ function walkRel(dir, out = [], prefix = '') {
   return out;
 }
 
-/** ไฟล์ชุด OTA (rel แบบ bundleFiles) → path จริงในชุดเต็ม */
+/**
+ * ไฟล์ชุด OTA (rel แบบ bundleFiles) → path จริงในชุดเต็ม
+ *
+ * ใช้ `bundleSource()` ของตัวแพ็กเอง — ไม่คัดลอกความรู้เรื่อง "ไฟล์ไหนมาจากโฟลเดอร์ไหน"
+ * มาอีกชุด (เคยมี 3 ชื่อฮาร์ดโค้ด; พอเพิ่ม install-plan.mjs/modules.mjs/INSTALL.cmd
+ * เทสต์ก็ตกลงกันไม่ได้ทั้งที่ของจริงถูก) ต่อไปเพิ่มไฟล์ในชุดแล้วลืมประกาศที่มา = แดงทันที
+ */
 function otaPathInKit(rel) {
-  if (rel === 'setup-machine.mjs' || rel === 'SETUP-MACHINE.cmd' || rel === 'run-runner.cmd') {
-    return `tools/agent-pack/${rel}`;
-  }
-  return `sovereign-os/agent-runner/${rel}`;
+  return path.relative(ROOT, bundleSource(ROOT, rel)).split(path.sep).join('/');
 }
 
 describe('ชุดติดตั้ง = ทั้งโปรเจ็ก (ไม่ใช่แค่ agent-runner)', () => {

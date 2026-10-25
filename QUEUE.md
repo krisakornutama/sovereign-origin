@@ -62,6 +62,30 @@
   - แถม: `pack.mjs --force` ส่งต่อไปถึง `scripts/issue-machine-token.ts` แล้ว
     (เดิม flag ถูกกลืน → แพ็กทับเครื่องที่เคยออนไลน์ไม่สำเร็จ ทั้งที่ข้อความช่วยเหลือบอกว่าทำได้)
     พิสูจน์ด้วยเทสต์ใหม่ใน `agent-pack.test.mjs` (แดง exit 1 เมื่อถอดบรรทัดส่ง flag)
+- [x] ชุดติดตั้ง "ทั้งระบบ เลือกฟังก์ชั่นได้ + รู้ว่าเป็นลูกของใคร" — **โค้ด + tests แล้ว 25/10/69**
+  - เจ้าของสั่ง: "ก็อปปี้เป็นไฟล์ใหญ่เลย ทั้งระบบ เป็นตัวติดตั้ง ให้เลือกฟังก์ชั่นที่จะติดตั้ง
+    เช่น IOT ระบบเลี้ยงดูลูก · พอติดตั้งเสร็จ ระบบจะขึ้นข้อมูลในเครื่องเลยว่าเครื่องนี้เป็นลูกของ
+    เครื่องไหน และมีสิทธิ์เชื่อมเข้าควบคุมเครื่องลูกได้ทันที"
+  - แคตตาล็อกฟังก์ชั่น `tools/agent-pack/modules.mjs` (13 แพ็ก: `core` บังคับ + iot/kids/farm/
+    restaurant/inventory/energy/treasury/health/vision/documents/ai/security) — เมนูเลข, พิมพ์รหัส,
+    `a` = ทั้งหมด, Enter = ชุดแนะนำ; ชื่อที่ backend ไม่รู้จัก (iot/kids/…) **ไม่**ถูกเขียนลง
+    `ENABLED_MODULES` (backend จะเตือนแล้วทิ้ง) เก็บไว้ใน `install-plan.json` แทน
+  - เครื่องแม่: `--owner=<username>` (SUPERADMIN เท่านั้น) ตั้ง `owner_user_id` + upsert
+    `agent_machine_hubs` + `--confirm-lan` ตั้ง `lan_confirmed_at` **ตอนแพ็ก** ⇒ heartbeat ครั้งแรก
+    ก็อยู่ใน `listControllableMachines` — **ไม่ต้อง migration** (คอลัมน์/ตารางมีอยู่แล้ว)
+  - `INSTALL.cmd` ที่รากชุด = ไฟล์เดียวที่ต้องดับเบิลคลิก (เดิมต้องไล่เข้า `tools\agent-pack`)
+  - แก้บั๊กชุด `--full`: `setup-machine.mjs` หา `join.json` ไม่เจอ (อยู่ราก แต่สคริปต์อยู่ลึก 2 ชั้น)
+    → `findBundleRoot` · เขียน `.env` ผิดที่ → เขียนที่ `sovereign-os\agent-runner` ·
+    scheduled task ชี้ `src\main.mjs` ที่ไม่มี → สร้าง `RUN-RUNNER.cmd` ให้ก่อน
+  - เครื่องลูกเขียน `MACHINE-PROFILE.txt`/`machine-profile.json` + เปิด `ENABLED_MODULES`/
+    `PARENT_NAME`/`PARENT_HUB_URL` ใน `infra\.env` (แก้เฉพาะบรรทัดนั้น, idempotent);
+    `setup-first-time.bat` เรียก `--apply-modules` ต่อท้ายขั้น [1/5]
+  - เทสต์: `install-modules` 21/21 · `install-plan` 17/17 · `pack-install-plan` 7/7 ·
+    `setup-install-plan` 7/7 · `wizard-modules`+`pack-machine-wizard` 45/45 ·
+    `machineOwnerWiring.test.ts` 10/10 · `issueMachineTokenArgs.test.ts` 2/2 (แดง exit 1 ก่อนมีโค้ด)
+  - [ ] `npm run verify` ที่ root + commit/merge — ยังไม่รัน (รอปิดรอบนี้)
+  - [ ] restart core-api ให้ `--owner` มีผลบนเครื่องจริง — **ต้องรอเจ้าของอนุมัติ (Cold Soak)**
+  - [ ] ทดสอบกับเครื่องจริง: แพ็กชุด → `INSTALL.cmd` ที่เครื่องปลายทาง → เห็นชื่อเครื่องแม่บนหน้าจอ
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์
