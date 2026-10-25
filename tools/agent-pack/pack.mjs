@@ -364,14 +364,14 @@ function defaultExec(cmd, args, opts = {}) {
 }
 
 /** ออก token ให้เครื่องใหม่ (ค่าเริ่มต้น: เรียกสคริปต์ฝั่ง core-api ซึ่งต่อ DB ของ HUB) */
-async function issueToken({ root, name, executors, exec, issueCommand = null }) {
+async function issueToken({ root, name, executors, exec, issueCommand = null, force = false }) {
   const coreDir = path.join(root, 'sovereign-os', 'core-api');
   let cmd;
   let args;
   let cwd = coreDir;
   if (issueCommand) {
     cmd = issueCommand.cmd;
-    args = issueCommand.args;
+    args = [...issueCommand.args];
     cwd = issueCommand.cwd ?? coreDir;
   } else {
     // ห้ามเรียก npx.cmd ตรง ๆ — Node 20+ โยน spawn EINVAL ให้ไฟล์ .cmd
@@ -383,6 +383,9 @@ async function issueToken({ root, name, executors, exec, issueCommand = null }) 
     cmd = process.execPath;
     args = [tsxCli, 'scripts/issue-machine-token.ts', `--name=${name}`, `--executors=${executors}`, '--json'];
   }
+  // --force ของ pack ต้องไปถึงสคริปต์ด้วย ไม่งั้น "แพ็กทับด้วย token ใหม่" ของเครื่องที่
+  // เคยออนไลน์แล้วจะถูกปฏิเสธที่สคริปต์ (เอกสาร/ข้อความช่วยเหลือสัญญาไว้แบบนั้น)
+  if (force) args.push('--force');
   const res = await exec(cmd, args, { cwd });
   const lines = String(res.stdout ?? '')
     .split(/\r?\n/)
@@ -406,7 +409,9 @@ async function issueToken({ root, name, executors, exec, issueCommand = null }) 
 
 /**
  * แพ็กชุดติดตั้งเครื่องลูก
- * @returns {{ exitCode: number, report: string, plan: string[], bundleDir: string, steps: Array<{name:string,status:string,detail:string}> }}
+ * `code` เป็นรหัสเครื่องอ่านได้ (ไม่ใช่ข้อความไทย) ให้ตัวเรียกเช่น pack-machine.mjs
+ * ตัดสินใจต่อได้ — เช่น 'name_conflict' = ถามชื่อใหม่, 'out_exists' = ถามก่อนทับ
+ * @returns {{ exitCode: number, code: string, report: string, plan: string[], bundleDir: string, steps: Array<{name:string,status:string,detail:string}> }}
  */
 export async function runPack({
   root = REPO_ROOT,
@@ -467,37 +472,37 @@ export async function runPack({
     for (const p of plan) lines.push(`  · ${p}`);
     lines.push('');
     lines.push('  ขั้นถัดไป: ตัด --dry-run ออกเพื่อแพ็กจริง แล้วเอาโฟลเดอร์ไปเครื่องปลายทาง');
-    return { exitCode: 0, report: render(), plan, bundleDir: target, steps };
+    return { exitCode: 0, code: 'dry_run', report: render(), plan, bundleDir: target, steps };
   }
 
   if (!target) {
     add('output', 'fail', 'ไม่พบโฟลเดอร์ปลายทางที่เขียนได้');
     lines.push('  ✘ เขียนโฟลเดอร์ปลายทางในโปรเจ็กและที่สำรองไม่ได้ — ระบุเองด้วย --out="E:\\ที่ของคุณ" ');
-    return { exitCode: 1, report: render(), plan, bundleDir: "", steps };
+    return { exitCode: 1, code: 'no_out_dir', report: render(), plan, bundleDir: '', steps };
   }
   const joinPath = path.join(target, 'join.json');
   if (fs.existsSync(joinPath) && !force) {
     add('output', 'fail', `${joinPath} มีอยู่แล้ว`);
     lines.push(`  ✘ ${target} มีชุดติดตั้งอยู่แล้ว — ใช้ --force ถ้าตั้งใจแพ็กทับ (จะออก token ใหม่)`);
-    return { exitCode: 1, report: render(), plan, bundleDir: target, steps };
+    return { exitCode: 1, code: 'out_exists', report: render(), plan, bundleDir: target, steps };
   }
 
   // 1) token
   let machineToken = String(token ?? '').trim();
   if (!machineToken) {
-    const issued = await issueToken({ root, name: machineName, executors, exec, issueCommand });
+    const issued = await issueToken({ root, name: machineName, executors, exec, issueCommand, force });
     if (!issued.ok && issued.conflict) {
       add('token', 'fail', `ชื่อ "${machineName}" ตรงกับเครื่องที่เคยออนไลน์แล้ว`);
       lines.push('  ✘ ชื่อนี้มีเครื่องที่เคยออนไลน์ใช้อยู่ — เลือกอย่างใดอย่างหนึ่ง:');
       lines.push('     · ใช้ชื่ออื่น:  --name="คอมเครื่องที่ 3"');
       lines.push('     · หรือถ้าตั้งใจเปลี่ยน token ของเครื่องนั้น (เครื่องเดิมจะหลุดจาก HUB):  --force');
-      return { exitCode: 1, report: render(), plan, bundleDir: target, steps };
+      return { exitCode: 1, code: 'name_conflict', report: render(), plan, bundleDir: target, steps };
     }
     if (!issued.ok) {
       add('token', 'fail', issued.error);
       lines.push('  ✘ ออก token ไม่สำเร็จ — ตรวจว่า core-api ต่อ DB ได้ (DATABASE_URL) หรือชื่อเครื่องซ้ำ');
       lines.push(`     ${issued.error}`);
-      return { exitCode: 1, report: render(), plan, bundleDir: target, steps };
+      return { exitCode: 1, code: 'token_failed', report: render(), plan, bundleDir: target, steps };
     }
     machineToken = issued.token;
     if (issued.reused) {
@@ -517,7 +522,7 @@ export async function runPack({
     if (!fs.existsSync(from)) {
       add('copy', 'fail', `ไม่พบไฟล์ต้นทาง ${from}`);
       lines.push(`  ✘ แพ็กไม่สำเร็จ — ขาด ${from}`);
-      return { exitCode: 1, report: render(), plan, bundleDir: target, steps };
+      return { exitCode: 1, code: 'copy_failed', report: render(), plan, bundleDir: target, steps };
     }
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
@@ -557,7 +562,7 @@ export async function runPack({
   lines.push('    2) ที่เครื่องนั้น: ดับเบิลคลิก SETUP-MACHINE.cmd');
   lines.push('    3) เปิดหน้าเว็บ HUB → คิวเอเจนต์ → เครื่องนี้จะขึ้นออนไลน์');
   lines.push('  หลังจากนี้ไม่ต้องก็อปไฟล์อีก: เครื่องลูกเช็คเวอร์ชันกับ HUB เองแล้วอัปเดต+รีสตาร์ทตัวเอง');
-  return { exitCode: 0, report: render(), plan, bundleDir: target, steps };
+  return { exitCode: 0, code: 'ok', report: render(), plan, bundleDir: target, steps };
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
@@ -579,6 +584,9 @@ if (isMain) {
     console.log(`แพ็กชุดติดตั้งเครื่องลูก (รันบนเครื่อง HUB)
 
   node tools/agent-pack/pack.mjs --name="ชื่อเครื่องลูก" [options]
+
+  ไม่อยากพิมพ์คำสั่งยาว: ดับเบิลคลิก PACK-MACHINE.cmd ที่รากโปรเจ็ก (ถาม–ตอบ 2–3 ข้อ)
+  เทียบเท่า: node tools/agent-pack/pack-machine.mjs --help
 
   --name=..        ชื่อเครื่องที่จะโชว์บนหน้าเว็บ (ค่าเริ่มต้น = ชื่อเครื่องนี้)
   --out=..         โฟลเดอร์ปลายทางบนเครื่อง HUB (ค่าเริ่มต้น ${OUT_DIR_CANDIDATES[0]})

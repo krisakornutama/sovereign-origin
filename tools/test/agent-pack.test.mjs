@@ -338,6 +338,37 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
     assert.match(out.report, /แถวเดิม|ยังไม่เคยออนไลน์/);
   });
 
+  // คำสัญญาในข้อความช่วยเหลือ: "--force = แพ็กทับได้ (ออก token ใหม่) ให้เครื่องที่เคยออนไลน์แล้ว"
+  // ⇒ flag ต้องไปถึงสคริปต์ออก token ด้วย ไม่ใช่หยุดแค่ที่ pack.mjs
+  test('--force ส่งต่อไปยังสคริปต์ออก token (เปลี่ยน token เครื่องที่เคยออนไลน์ได้จริง)', async () => {
+    // ใช้ exec ปลอม (ไม่ใช่ issueCommand) เพื่อตรวจ "อาร์กิวเมนต์จริง" ที่ pack สร้างให้สคริปต์
+    const seen = [];
+    const exec = async (cmd, args = []) => {
+      seen.push(args);
+      const force = args.includes('--force');
+      return {
+        code: 0,
+        stdout:
+          JSON.stringify(force ? { id: 'm-live', name: 'คอมเครื่องที่ 2', token: 'tok-forced' } : { error: 'name_exists', id: 'm-live' }) +
+          '\n',
+        stderr: '',
+      };
+    };
+    const out = await pack.runPack({
+      root: ROOT,
+      outDir: path.join(sandbox, 'bundle-force'),
+      name: 'คอมเครื่องที่ 2',
+      hubUrl: 'http://192.168.1.102:3000',
+      force: true,
+      exec,
+      updateDataDir: path.join(sandbox, 'agent-updates-force'),
+    });
+    assert.equal(out.exitCode, 0, out.report);
+    assert.ok(seen[0].includes('--force'), `ต้องส่ง --force ให้สคริปต์ (args: ${seen[0].join(' ')})`);
+    const join = JSON.parse(fs.readFileSync(path.join(sandbox, 'bundle-force', 'join.json'), 'utf8'));
+    assert.equal(join.machineToken, 'tok-forced');
+  });
+
   test('ชื่อเครื่องเคยออนไลน์แล้ว → หยุดพร้อมบอกให้ใช้ชื่ออื่นหรือ --force (ไม่ทับเงียบ ๆ)', async () => {
     const fakeIssue = path.join(sandbox, 'issue-conflict.mjs');
     fs.writeFileSync(
