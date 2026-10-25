@@ -182,6 +182,9 @@ tools/agent-pack/*
 !tools/agent-pack/pack-machine.mjs
 !tools/agent-pack/setup-machine.mjs
 !tools/agent-pack/SETUP-MACHINE.cmd
+!tools/agent-pack/install-plan.mjs
+!tools/agent-pack/modules.mjs
+!tools/agent-pack/INSTALL.cmd
 Ollama/
 
 # ── Keys & certificates (เพิ่มเติม) ─────────────

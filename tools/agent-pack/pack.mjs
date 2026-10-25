@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 // (ถ้าเขียนสูตรซ้ำสองที่ วันหนึ่งสองฝั่งจะตกลงกันไม่ได้ แล้วเครื่องลูกจะอัปเดตวนไม่จบ)
 import { computeVersionFromEntries, sha256Hex } from '../../sovereign-os/agent-runner/src/selfUpdate.mjs';
 import { UPDATE_SIGNING_KEY_ID, canonicalManifestPayload } from '../../sovereign-os/agent-runner/src/updateTrust.mjs';
+import { buildInstallPlan, writeInstallPlan } from './install-plan.mjs';
+import { recommendedIds, summarizeModules } from './modules.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -82,12 +84,21 @@ export function bundleFiles(root = REPO_ROOT) {
     .filter((f) => f.endsWith('.mjs'))
     .sort()
     .map((f) => `src/${f}`);
-  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd'];
+  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd', 'install-plan.mjs', 'modules.mjs', 'INSTALL.cmd'];
 }
 
 /** ที่มาของไฟล์ในชุดติดตั้ง (ไฟล์ตัวติดตั้งมาจาก tools/agent-pack, ที่เหลือมาจาก agent-runner) */
 export function bundleSource(root, rel) {
-  if (rel === 'setup-machine.mjs' || rel === 'SETUP-MACHINE.cmd' || rel === 'run-runner.cmd') return path.join(root, 'tools', 'agent-pack', rel);
+  if (
+    rel === 'setup-machine.mjs' ||
+    rel === 'SETUP-MACHINE.cmd' ||
+    rel === 'run-runner.cmd' ||
+    rel === 'install-plan.mjs' ||
+    rel === 'modules.mjs' ||
+    rel === 'INSTALL.cmd'
+  ) {
+    return path.join(root, 'tools', 'agent-pack', rel);
+  }
   return path.join(root, RUNNER_DIR, rel);
 }
 
@@ -330,20 +341,26 @@ export function publishUpdateBundle({
 }
 
 /** ข้อความหน้าแรกที่คนอ่านเจอในโฟลเดอร์ชุดติดตั้ง (ห้ามมี token) */
-export function renderStartHere({ machineName, hubUrl }) {
-  return [
+export function renderStartHere({ machineName, hubUrl, plan = null }) {
+  const lines = [
     '══════════════════════════════════════════════════',
     '  Sovereign OS — ชุดติดตั้ง "เครื่องลูก"',
     '══════════════════════════════════════════════════',
     `  เครื่องนี้จะลงทะเบียนกับ HUB: ${hubUrl}`,
     `  ชื่อที่จะโชว์บนหน้าเว็บ: ${machineName}`,
+  ];
+  if (plan?.parent?.username) {
+    lines.push(`  เครื่องแม่ (เจ้าของ): ${plan.parent.username} — ควบคุมเครื่องนี้ได้ทันทีที่ออนไลน์`);
+  }
+  if (plan?.modules?.length) {
+    lines.push(`  ฟังก์ชั่นที่ติดตั้ง: ${summarizeModules(plan.modules)}`);
+  }
+  lines.push(
     '',
     '  วิธีใช้ (ที่เครื่องปลายทาง)',
     '   1) ก็อป "ทั้งโฟลเดอร์นี้" ไปวางบนไดรฟ์ E: ของเครื่องนั้น',
-    '   2) ดับเบิลคลิก  tools\\agent-pack\\SETUP-MACHINE.cmd',
-    // เคสจริง 11/10/69: เดิมบอกแค่ "SETUP-MACHINE.cmd" แต่ไฟล์อยู่ลึก 2 ชั้น
-    //   (tools\agent-pack\) → ผู้ใช้ไล่หาไม่เจอ คิดว่าชุดเสีย
-    '      (ไฟล์อยู่ในโฟลเดอร์ tools\\agent-pack\\ — ไม่ได้อยู่ระดับบนสุด)',
+    '   2) ดับเบิลคลิก  INSTALL.cmd  ที่อยู่ในโฟลเดอร์นี้ (ไฟล์เดียวจบ)',
+    '      ถ้าไม่มี ให้ใช้  tools\\agent-pack\\SETUP-MACHINE.cmd  แทน',
     '   3) รอจนขึ้น "ออนไลน์แล้ว" → เปิดหน้าเว็บ HUB → คิวเอเจนต์ จะเห็นเครื่องนี้',
     '',
     '  ต้องมี: Node.js 20+ (ถ้าไม่มี ตัวติดตั้งจะพาไปติดตั้งให้) · Windows + PowerShell',
@@ -352,7 +369,8 @@ export function renderStartHere({ machineName, hubUrl }) {
     '  ⚠️ ไฟล์นี้มี token ของเครื่องนี้อยู่ใน join.json — อย่าแชร์โฟลเดอร์นี้ให้คนอื่น',
     '     ถ้าติดตั้งเสร็จแล้ว เก็บ join.json ไว้เป็นหลักฐานได้ แต่ถ้าไม่ใช้แล้วให้ลบทิ้ง',
     '',
-  ].join('\r\n');
+  );
+  return lines.join('\r\n');
 }
 
 function defaultExec(cmd, args, opts = {}) {
@@ -364,7 +382,7 @@ function defaultExec(cmd, args, opts = {}) {
 }
 
 /** ออก token ให้เครื่องใหม่ (ค่าเริ่มต้น: เรียกสคริปต์ฝั่ง core-api ซึ่งต่อ DB ของ HUB) */
-async function issueToken({ root, name, executors, exec, issueCommand = null, force = false }) {
+async function issueToken({ root, name, executors, exec, issueCommand = null, force = false, owner = '', confirmLan = false }) {
   const coreDir = path.join(root, 'sovereign-os', 'core-api');
   let cmd;
   let args;
@@ -386,6 +404,11 @@ async function issueToken({ root, name, executors, exec, issueCommand = null, fo
   // --force ของ pack ต้องไปถึงสคริปต์ด้วย ไม่งั้น "แพ็กทับด้วย token ใหม่" ของเครื่องที่
   // เคยออนไลน์แล้วจะถูกปฏิเสธที่สคริปต์ (เอกสาร/ข้อความช่วยเหลือสัญญาไว้แบบนั้น)
   if (force) args.push('--force');
+  // เจ้าของเครื่อง: ตั้งตอนแพ็ก ⇒ HUB คุมเครื่องลูกได้ทันทีที่เครื่องออนไลน์
+  if (owner) {
+    args.push(`--owner=${owner}`);
+    if (confirmLan) args.push('--confirm-lan');
+  }
   const res = await exec(cmd, args, { cwd });
   const lines = String(res.stdout ?? '')
     .split(/\r?\n/)
@@ -396,9 +419,21 @@ async function issueToken({ root, name, executors, exec, issueCommand = null, fo
     if (!line.startsWith('{')) continue;
     try {
       const parsed = JSON.parse(line);
-      if (parsed?.token) return { ok: true, token: parsed.token, id: parsed.id, reused: Boolean(parsed.reused) };
+      if (parsed?.token) {
+        return {
+          ok: true,
+          token: parsed.token,
+          id: parsed.id,
+          reused: Boolean(parsed.reused),
+          owner: parsed.owner ?? null,
+          lanConfirmed: Boolean(parsed.lanConfirmed),
+        };
+      }
       if (parsed?.error === 'name_exists') {
         return { ok: false, conflict: { id: parsed.id, lastHeartbeat: parsed.lastHeartbeat ?? null } };
+      }
+      if (parsed?.error === 'owner_not_found' || parsed?.error === 'owner_not_superadmin' || parsed?.error === 'owner_wire_failed') {
+        return { ok: false, ownerError: { code: parsed.error, username: parsed.username ?? owner } };
       }
     } catch {
       // ไม่ใช่ JSON ของเรา — ลองบรรทัดก่อนหน้า
@@ -426,6 +461,12 @@ export async function runPack({
   fullKit = false,
   /** withOllama = ยกโมเดล Ollama (~20GB) ไปด้วย (มีผลเมื่อ fullKit) */
   withOllama = false,
+  /** ฟังก์ชั่นที่เลือก (id จาก tools/agent-pack/modules.mjs) — ว่าง = ชุดที่แนะนำ */
+  modules = [],
+  /** ชื่อผู้ใช้ SUPERADMIN ที่จะเป็น "เครื่องแม่" ของเครื่องนี้ (ว่าง = ไม่ผูก) */
+  owner = '',
+  /** ยืนยัน LAN ให้เลยตอนแพ็ก ⇒ คุมได้ทันทีที่เครื่องออนไลน์ */
+  confirmLan = false,
   exec = defaultExec,
   issueCommand = null,
   platform = process.platform,
@@ -447,11 +488,15 @@ export async function runPack({
       ...lines,
     ].join('\n');  const machineName = String(name || os.hostname()).trim();
   const hub = String(hubUrl || detectHubUrl(interfaces)).replace(/\/$/, '');
+  const ownerName = String(owner ?? '').trim();
+  const selectedModules = Array.isArray(modules) && modules.length ? modules : recommendedIds();
   let target = outDir ? path.resolve(outDir) : dryRun ? OUT_DIR_CANDIDATES[0] : pickWritableOutDir();
   if (!target) target = '';
 
   plan.push(`เครื่องใหม่: ${machineName} (executors: ${executors})`);
   plan.push(`HUB_URL ที่จะฝังในชุดติดตั้ง: ${hub}`);
+  plan.push(`เครื่องแม่ (เจ้าของ): ${ownerName || 'ไม่ผูก — ต้องไปผูกเองที่หน้า HUB'}`);
+  plan.push(`ฟังก์ชั่นที่จะติดตั้ง: ${summarizeModules(selectedModules)}`);
   plan.push(`โฟลเดอร์ปลายทาง (บนเครื่อง HUB): ${target || '(ไม่พบที่ที่เขียนได้ — ใช้ --out=<พาธของคุณ> )'}`);
   if (!outDir) plan.push(`เลือกอัตโนมัติจาก: ${OUT_DIR_CANDIDATES.join(' → ')}`);
   // ชุดเต็ม = ทั้งโปรเจ็ก (ทุกฟังก์ชั่น) · ชุดเล็ก = เฉพาะ runner ตามเดิม
@@ -489,14 +534,28 @@ export async function runPack({
 
   // 1) token
   let machineToken = String(token ?? '').trim();
+  let issuedOwner = null;
   if (!machineToken) {
-    const issued = await issueToken({ root, name: machineName, executors, exec, issueCommand, force });
+    const issued = await issueToken({ root, name: machineName, executors, exec, issueCommand, force, owner: ownerName, confirmLan });
     if (!issued.ok && issued.conflict) {
       add('token', 'fail', `ชื่อ "${machineName}" ตรงกับเครื่องที่เคยออนไลน์แล้ว`);
       lines.push('  ✘ ชื่อนี้มีเครื่องที่เคยออนไลน์ใช้อยู่ — เลือกอย่างใดอย่างหนึ่ง:');
       lines.push('     · ใช้ชื่ออื่น:  --name="คอมเครื่องที่ 3"');
       lines.push('     · หรือถ้าตั้งใจเปลี่ยน token ของเครื่องนั้น (เครื่องเดิมจะหลุดจาก HUB):  --force');
       return { exitCode: 1, code: 'name_conflict', report: render(), plan, bundleDir: target, steps };
+    }
+    if (!issued.ok && issued.ownerError) {
+      const { code, username } = issued.ownerError;
+      add('owner', 'fail', `ตั้งเครื่องแม่ "${username}" ไม่ได้ (${code})`);
+      lines.push('  ✘ ชุดติดตั้งจะถูกใช้โดยไม่มีใครคุมได้ — หยุดก่อนเขียนไฟล์');
+      lines.push(
+        code === 'owner_not_found'
+          ? '     ไม่พบบัญชีนี้บน HUB — ตรวจชื่อผู้ใช้ (ดูรายชื่อ SUPERADMIN ได้ที่หน้า ผู้ใช้)'
+          : code === 'owner_not_superadmin'
+            ? '     บัญชีนี้ไม่ใช่ SUPERADMIN — ตั้งเครื่องแม่ได้เฉพาะ SUPERADMIN'
+            : '     ผูกเจ้าของไม่สำเร็จ (ฐานข้อมูลของ HUB) — ลองใหม่ หรือแพ็กโดยไม่ระบุ --owner'
+      );
+      return { exitCode: 1, code: 'owner_failed', report: render(), plan, bundleDir: target, steps };
     }
     if (!issued.ok) {
       add('token', 'fail', issued.error);
@@ -505,10 +564,18 @@ export async function runPack({
       return { exitCode: 1, code: 'token_failed', report: render(), plan, bundleDir: target, steps };
     }
     machineToken = issued.token;
+    issuedOwner = issued.owner ?? null;
     if (issued.reused) {
       add('token', 'warn', `ชื่อ "${machineName}" มีแถวเดิมอยู่แล้วแต่ยังไม่เคยออนไลน์ — หมุน token ของแถวเดิม (ไม่สร้างซ้ำ)`);
     } else {
       add('token', 'ok', `ออก token ให้ "${machineName}" แล้ว (เก็บใน join.json ไม่แสดงที่นี่)`);
+    }
+    if (ownerName) {
+      add(
+        'owner',
+        'ok',
+        `เครื่องนี้เป็นลูกของ "${issuedOwner?.username ?? ownerName}"${confirmLan ? ' — ยืนยัน LAN แล้ว คุมได้ทันทีที่ออนไลน์' : ' — รอผู้ใช้กดยืนยันบนเครื่องลูก'}`,
+      );
     }
   } else {
     add('token', 'warn', 'ใช้ token ที่ผู้ใช้ส่งมา (ไม่เรียก DB)');
@@ -529,7 +596,7 @@ export async function runPack({
   }
   add('copy', 'ok', `ก็อป ${files.length} ไฟล์ไป ${target}${fullKit ? ' (ทั้งโปรเจ็ก)' : ''}`);
 
-  // 3) join.json + หน้าคู่มือ
+  // 3) join.json + install-plan.json + หน้าคู่มือ
   const join = {
     hubUrl: hub,
     machineToken,
@@ -538,8 +605,25 @@ export async function runPack({
     note: 'สร้างโดย tools/agent-pack/pack.mjs — ไฟล์นี้มี token ของเครื่องนี้ อย่าแชร์',
   };
   fs.writeFileSync(joinPath, JSON.stringify(join, null, 2) + '\n', 'utf8');
-  fs.writeFileSync(path.join(target, 'START-HERE.txt'), renderStartHere({ machineName, hubUrl: hub }), 'utf8');
-  add('bundle', 'ok', 'เขียน join.json + START-HERE.txt');
+
+  // แผนติดตั้ง = "เครื่องนี้เป็นลูกของใคร + ติดตั้งฟังก์ชั่นอะไร" (ไม่มี token ⇒ ส่งให้ใครดูก็ได้)
+  // เครื่องลูกอ่านไฟล์นี้ตอนติดตั้ง แล้วเขียน MACHINE-PROFILE.txt + ENABLED_MODULES ให้เอง
+  const installPlan = buildInstallPlan({
+    machineName,
+    hubUrl: hub,
+    parent: ownerName ? { id: issuedOwner?.id, username: issuedOwner?.username ?? ownerName } : null,
+    modules: selectedModules,
+  });
+  writeInstallPlan(target, installPlan);
+  // หนึ่งไฟล์ที่รากชุด: ดับเบิลคลิกได้เลย ไม่ต้องไล่เข้า tools\agent-pack
+  const rootInstaller = path.join(root, 'tools', 'agent-pack', 'INSTALL.cmd');
+  if (fs.existsSync(rootInstaller)) fs.copyFileSync(rootInstaller, path.join(target, 'INSTALL.cmd'));
+  fs.writeFileSync(
+    path.join(target, 'START-HERE.txt'),
+    renderStartHere({ machineName, hubUrl: hub, plan: installPlan }),
+    'utf8',
+  );
+  add('bundle', 'ok', 'เขียน join.json + install-plan.json + START-HERE.txt (+ INSTALL.cmd ที่ราก)');
 
   // 4) เผยแพร่ชุดอัปเดตบน HUB — เครื่องลูกที่ออนไลน์อยู่จะดึงไปใช้เองในรอบถัดไป
   try {

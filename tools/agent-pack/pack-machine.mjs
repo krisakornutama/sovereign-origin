@@ -24,6 +24,13 @@ import readline from 'node:readline/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { OUT_DIR_CANDIDATES, detectHubUrl, pickWritableOutDir, runPack } from './pack.mjs';
+import {
+  MODULE_CATALOG,
+  parseModuleSelection,
+  recommendedIds,
+  renderModuleMenu,
+  summarizeModules,
+} from './modules.mjs';
 
 /** ชื่อที่ Windows ห้ามใช้เป็นชื่อโฟลเดอร์ (แม้จะมีนามสกุลต่อท้าย) */
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
@@ -108,6 +115,9 @@ export function openInExplorer(dir) {
  * @param {boolean|undefined} [opts.withOllama]  undefined = ถาม (โหมด interactive)
  * @param {boolean} [opts.assumeYes]  true = ไม่ถามอะไรเลย (สำหรับสคริปต์)
  * @param {boolean} [opts.dryRun]
+ * @param {string} [opts.presetModules]  ฟังก์ชั่นที่เลือกไว้แล้ว (เช่น "iot,kids" หรือ "1,2")
+ * @param {string} [opts.presetOwner]    ชื่อผู้ใช้ SUPERADMIN ที่เป็นเครื่องแม่ ('' = ไม่ผูก)
+ * @param {boolean} [opts.confirmLan]    true = ผูกแล้วคุมได้ทันที (ไม่ต้องกดยืนยันบนเครื่องลูก)
  * @returns {Promise<{ exitCode: number, code: string, bundleDir?: string, machineName?: string }>}
  */
 export async function runWizard(opts = {}) {
@@ -126,6 +136,9 @@ export async function runWizard(opts = {}) {
     withOllama = undefined,
     assumeYes = false,
     dryRun = false,
+    presetModules = '',
+    presetOwner = '',
+    confirmLan: presetConfirmLan = false,
   } = opts;
 
   if (typeof ask !== 'function') throw new Error('runWizard ต้องได้รับฟังก์ชัน ask');
@@ -144,6 +157,22 @@ export async function runWizard(opts = {}) {
     log(`  ✘ ชื่อเครื่องที่ให้มาใช้ไม่ได้ — ${NAME_ERRORS[picked.error] ?? picked.error}`);
     return { exitCode: 1, code: 'bad_name' };
   }
+  // ── ฟังก์ชั่นที่จะติดตั้ง + เครื่องแม่ (เครื่องที่คุมเครื่องนี้) ──
+  let moduleIds = null;
+  let askedModules = false;
+  if (presetModules) {
+    const r = parseModuleSelection(presetModules);
+    if (!r.ok) {
+      log(`  ✘ --modules ใช้ไม่ได้ — ${r.error === 'out_of_range' ? `ไม่มีลำดับที่ ${r.token}` : `ไม่รู้จัก "${r.token}"`}`);
+      log(`     เลือกได้: ${MODULE_CATALOG.map((m) => m.id).join(', ')} หรือเลข 1-${MODULE_CATALOG.length}`);
+      return { exitCode: 1, code: 'bad_modules' };
+    }
+    moduleIds = r.ids;
+    askedModules = true;
+  }
+  let owner = String(presetOwner ?? '').trim();
+  let confirmLan = presetConfirmLan === true;
+  let askedOwner = Boolean(owner);
   let ollama = withOllama === true;
   let askedOllama = withOllama !== undefined || !fullKit;
   let force = false;
@@ -192,12 +221,52 @@ export async function runWizard(opts = {}) {
       ollama = /^(y|yes|ใช่)$/i.test(String(raw).trim());
     }
 
+    // ฟังก์ชั่นที่จะติดตั้ง — ถามครั้งเดียว (Enter = ชุดที่แนะนำ)
+    if (interactive && !askedModules) {
+      askedModules = true;
+      log('');
+      log(renderModuleMenu(MODULE_CATALOG, moduleIds ?? recommendedIds()));
+      for (;;) {
+        const raw = await ask('  ฟังก์ชั่นที่จะติดตั้ง — Enter = ชุดที่แนะนำ: ');
+        if (raw === null) return canceled();
+        const r = parseModuleSelection(raw);
+        if (r.ok) {
+          moduleIds = r.ids;
+          break;
+        }
+        const why = r.error === 'out_of_range' ? `ไม่มีลำดับที่ ${r.token}` : `ไม่รู้จัก "${r.token}"`;
+        log(`  ! ${why} — พิมพ์ใหม่ หรือกด Enter ใช้ชุดที่แนะนำ`);
+      }
+    }
+
+    // เครื่องแม่: บัญชี SUPERADMIN บน HUB ที่จะคุมเครื่องนี้
+    if (interactive && !askedOwner) {
+      askedOwner = true;
+      const hint = String(process.env.SOVEREIGN_OWNER ?? '').trim();
+      log('');
+      const raw = await ask(
+        `  ชื่อบัญชี SUPERADMIN ที่จะคุมเครื่องนี้ (Enter = ${hint || 'ไม่ผูก'}, พิมพ์ - = ไม่ผูก): `,
+      );
+      if (raw === null) return canceled();
+      const ans = String(raw).trim();
+      owner = ans === '' ? hint : ans;
+      if (owner === '-') owner = '';
+      if (owner) {
+        const c = await ask('    ให้ HUB ควบคุมเครื่องนี้ได้ทันทีที่ออนไลน์ (ไม่ต้องกดยืนยันบนเครื่องลูก)? [Y/n]: ');
+        if (c === null) return canceled();
+        confirmLan = !/^(n|no|ไม่)$/i.test(String(c).trim());
+      }
+    }
+    if (!moduleIds) moduleIds = recommendedIds();
+
     const target = outDirFor({ name: machineName, outRoot: root, explicitOut: presetOutDir });
 
     if (interactive) {
       log('');
       log(`  เครื่องใหม่ : ${machineName}`);
       log(`  HUB        : ${hub}`);
+      log(`  เครื่องแม่  : ${owner ? `${owner}${confirmLan ? ' (คุมได้ทันทีที่ออนไลน์)' : ' (รอกดยืนยันบนเครื่องลูก)'}` : 'ไม่ผูก — ผูกเองได้ที่หน้า HUB'}`);
+      log(`  ฟังก์ชั่น   : ${summarizeModules(moduleIds)}`);
       log(
         `  ชุดติดตั้ง : ${target || '(ให้ pack.mjs เลือกโฟลเดอร์เอง)'}` +
           ` — ${fullKit ? 'ทั้งโปรเจ็ก' : 'เฉพาะ runner'}${ollama ? ' + Ollama' : ''}`,
@@ -223,6 +292,9 @@ export async function runWizard(opts = {}) {
         withOllama: ollama,
         dryRun,
         force,
+        modules: moduleIds,
+        owner,
+        confirmLan,
       });
 
       if (res?.report) log(res.report);
@@ -233,10 +305,12 @@ export async function runWizard(opts = {}) {
           log('');
           log('  ✔ เสร็จแล้ว — ชุดติดตั้งพร้อมก็อปไปเครื่องปลายทาง');
           log(`     ${dir}`);
+          if (owner) log(`     เครื่องนี้เป็นลูกของ "${owner}" — คุมได้ทันทีที่เครื่องออนไลน์`);
+          log(`     ฟังก์ชั่น: ${summarizeModules(moduleIds)}`);
           log('');
           log('  ขั้นต่อไป:');
           log('    1) ก็อป "ทั้งโฟลเดอร์" นี้ไปไว้บนไดรฟ์ E: ของเครื่องปลายทาง (USB/แชร์ LAN)');
-          log('    2) ที่เครื่องนั้น ดับเบิลคลิก  tools\\agent-pack\\SETUP-MACHINE.cmd');
+          log('    2) ที่เครื่องนั้น ดับเบิลคลิก  INSTALL.cmd  (อยู่ที่รากโฟลเดอร์)');
           log('    3) เปิดหน้าเว็บ HUB → คิวเอเจนต์ → เครื่องนี้จะขึ้นออนไลน์');
           log('  หลังจากนั้นไม่ต้องก็อปไฟล์อีก: เครื่องลูกอัปเดตตัวเองจาก HUB');
           // เปิด Explorer ให้เฉพาะคนที่นั่งอยู่หน้าจอ — โหมดสคริปต์ (--yes) ต้องไม่เด้งหน้าต่าง
@@ -294,6 +368,9 @@ const HELP = `ชุดติดตั้งเครื่องใหม่ �
   --out=..         โฟลเดอร์ปลายทางตรง ๆ (ค่าเริ่มต้น = ${OUT_DIR_CANDIDATES[0]}\\<ชื่อเครื่อง>)
   --hub-url=..     ที่อยู่ HUB ที่จะฝังให้เครื่องลูก (ค่าเริ่มต้น = IP ในวง LAN :3000)
   --executors=..   executor ของเครื่องลูก เช่น echo หรือ echo,opencode (ค่าเริ่มต้น echo)
+  --modules=..     ฟังก์ชั่นที่จะติดตั้ง เช่น iot,kids หรือ 1,2,5 (ไม่ระบุ = ชุดที่แนะนำ)
+  --owner=..       ชื่อบัญชี SUPERADMIN ที่จะคุมเครื่องนี้ (ไม่ระบุ = ไม่ผูก)
+  --confirm-lan    ให้คุมได้ทันทีที่เครื่องออนไลน์ (ใช้คู่กับ --owner)
   --full           ยกทั้งโปรเจ็ก (ค่าเริ่มต้น)
   --minimal        เฉพาะ agent-runner
   --with-ollama    รวมโมเดล Ollama (~20GB) โดยไม่ถาม
@@ -336,6 +413,9 @@ async function main() {
       // ไม่มี console ให้ตอบ (CI/สคริปต์) = ห้ามค้างรอตลอดกาล
       assumeYes: flags.has('yes') || flags.has('y') || !process.stdin.isTTY,
       dryRun: flags.has('dry-run'),
+      presetModules: values.modules ?? '',
+      presetOwner: values.owner ?? '',
+      confirmLan: flags.has('confirm-lan'),
     });
     return res.exitCode;
   } finally {

@@ -135,7 +135,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
     const calls = [];
     const logs = [];
     const opened = [];
-    const ask = scripted(['เครื่องที่-4', 'n', 'y']);
+    const ask = scripted(['เครื่องที่-4', 'n', '', '', 'y']);
     const res = await wizard({
       ask,
       pack: okPack(calls),
@@ -158,14 +158,14 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
 
   test('กด Enter ที่ช่องชื่อ = ใช้ชื่อเครื่องนี้ (ไม่ต้องพิมพ์)', async () => {
     const calls = [];
-    await wizard({ ask: scripted(['', 'n', '']), pack: okPack(calls), openFolder: () => {}, log: () => {} });
+    await wizard({ ask: scripted(['', 'n', '', '', '']), pack: okPack(calls), openFolder: () => {}, log: () => {} });
     assert.equal(calls[0].name, 'HUB-PC');
   });
 
   test('ตอบไม่ (n) ที่ขั้นยืนยัน = ยกเลิก ไม่แตะ DB/ไม่เขียนไฟล์', async () => {
     const calls = [];
     const res = await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'n']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'n']),
       pack: okPack(calls),
       openFolder: () => {},
       log: () => {},
@@ -192,7 +192,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
       return { exitCode: 0, code: 'ok', report: 'ok', bundleDir: opts.outDir };
     };
     const res = await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'y', 'เครื่องที่-5', 'y']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y', 'เครื่องที่-5', 'y']),
       pack,
       openFolder: () => {},
       log: () => {},
@@ -214,7 +214,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
       return { exitCode: 0, code: 'ok', report: 'ok', bundleDir: opts.outDir };
     };
     const res = await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'y', 'y']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y', 'y']),
       pack,
       openFolder: () => {},
       log: () => {},
@@ -226,7 +226,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
   test('โฟลเดอร์เดิมมีอยู่ + ตอบไม่ทับ = จบด้วยรหัส 1 พร้อมบอกทางออก', async () => {
     const calls = [];
     const res = await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'y', 'n']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y', 'n']),
       pack: async (opts) => {
         calls.push(opts);
         return { exitCode: 1, code: 'out_exists', report: '  ✘ มีอยู่แล้ว' };
@@ -263,7 +263,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
     const calls = [];
     const opened = [];
     const res = await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'y']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y']),
       dryRun: true,
       pack: okPack(calls),
       openFolder: (d) => opened.push(d),
@@ -278,7 +278,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
     const logs = [];
     const calls = [];
     await wizard({
-      ask: scripted(['เครื่องที่-4', 'n', 'y']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y']),
       pack: okPack(calls),
       openFolder: () => {},
       log: (m) => logs.push(m),
@@ -293,7 +293,7 @@ describe('runWizard: ตอบคำถามแล้วจบ', () => {
     await wizard({
       hostname: 'HUB-PC',
       hubUrl: 'http://127.0.0.1:3000',
-      ask: scripted(['เครื่องที่-4', 'n', 'y']),
+      ask: scripted(['เครื่องที่-4', 'n', '', '', 'y']),
       pack: okPack([]),
       openFolder: () => {},
       log: (m) => logs.push(m),
