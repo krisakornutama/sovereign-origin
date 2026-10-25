@@ -50,6 +50,18 @@
       · migration record finished (ไม่ rollback) · users ยัง 8 แถว
     - restart แล้ว healthy, restarts=0 · `/api/health` 200 · เส้น `/api/fleet/*` + `/api/users` ตอบ 401 (ต้องล็อกอิน)
     - Prisma client ใน container รู้จัก `SITE_ADMIN` และ `assigned_site_id` แล้ว
+- [x] ทางลัดสำหรับเจ้าของ: ดับเบิลคลิก `PACK-MACHINE.cmd` (ไม่ต้องพิมพ์คำสั่ง) — **เสร็จแล้ว 25/10/69**
+  - เดิมต้องเปิด PowerShell แล้วพิมพ์ `node tools/agent-pack/pack.mjs --name="..." --full` เอง
+    (ลืม flag / แพ็กทับชุดเดิม / ชื่อชนเครื่องที่เคยออนไลน์แล้วจบด้วย error = เริ่มใหม่ทั้งรอบ)
+  - ตอนนี้: ดับเบิลคลิก → ตอบชื่อเครื่อง (Enter = ชื่อเครื่องนี้) → ถาม Ollama (~20GB, ค่าเริ่มต้นไม่รวม)
+    → ยืนยัน → แพ็กชุดเต็มให้เอง แล้วเปิด Explorer ที่โฟลเดอร์
+  - เครื่องละโฟลเดอร์ `dist-machine-setup/<ชื่อเครื่อง>` ⇒ แพ็กเครื่องที่ 2 ไม่ทับชุดของเครื่องแรก
+  - ชื่อชนเครื่องที่เคยออนไลน์ = ถามชื่อใหม่ต่อทันที · โฟลเดอร์เดิมมีอยู่ = ถามก่อนทับ (ไม่ force เอง)
+  - ตรรกะอยู่ใน `tools/agent-pack/pack-machine.mjs` (`.cmd` เหลือตัวเรียก ASCII ล้วน + `pause`)
+  - เทสต์: `tools/test/pack-machine-wizard.test.mjs` 32/32 (แดง exit 1 ตอนยังไม่มีไฟล์)
+  - แถม: `pack.mjs --force` ส่งต่อไปถึง `scripts/issue-machine-token.ts` แล้ว
+    (เดิม flag ถูกกลืน → แพ็กทับเครื่องที่เคยออนไลน์ไม่สำเร็จ ทั้งที่ข้อความช่วยเหลือบอกว่าทำได้)
+    พิสูจน์ด้วยเทสต์ใหม่ใน `agent-pack.test.mjs` (แดง exit 1 เมื่อถอดบรรทัดส่ง flag)
 
 - [x] ปรับ frontend ให้สวยขึ้น (ผู้ใช้ขอ) — **เสร็จแล้ว 23/8/69** (`master d235a67`)
   - ทำแล้วทั้ง 4 ลำดับ: login redesign, dashboard command center, POS premium, สี/คอนทราสต์
