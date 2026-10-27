@@ -560,5 +560,38 @@
   ⇒ **ข้ามจนเจ้าของเปิดงบ:** สลิป API (SlipOK/EasySlip), e-Tax (certificate/ผู้ให้บริการ), cloud object storage
   ⇒ **เลื่อนหลัง Cold Soak:** major upgrades (tailwind 4 / electron-builder) — ฟรีแต่ต้อง rebuild + ตรวจภาพทั้งระบบ
 
+---
+
+# คิวใหม่: "มองเห็นได้" (เส้นทาง A) — 27/10/69
+
+> เจ้าของเลือก **A: มองเห็นได้** เป็นงานแรกหลังเทียบกับระบบระดับโลก (balena/Sentry/OTel)
+> และตอบคำถามสถาปัตยกรรมว่า **"ขายให้คนอื่นติดตั้งเอง"** + **"ต้องขายต่อได้"** → บันทึกที่ `docs/PRODUCT-DIRECTION.md`
+> ข้อจำกัด: Cold Soak — ห้าม restart/migration/deploy · งานนี้ **ไม่ต้อง migration** แต่ **ต้อง restart core-api** ก่อนมีผลจริง
+
+- [x] **A-obs1 request-id ไล่ทั้งเส้น** — **โค้ด + tests แล้ว 27/10/69** (`ai/observability-a` → `main`)
+  - `src/lib/observability.ts`: `normalizeRequestId` (รับ id ที่ปลอดภัย ≤64 ตัวอักษร / อักขระแปลก = สร้าง uuid ใหม่ กัน log injection)
+  - `src/middleware/observability.middleware.ts`: `createObservability()` → `requestContext` + `metricsHandler` · instance กลาง `getObservability()`
+  - frontend `src/lib/requestId.ts` + `apiFetch.ts`: ทุกคำขอแนบ `x-request-id`
+  - error response พา `requestId` กลับไป (ผู้ใช้แจ้งเลข → ไล่ log เจอทันที)
+- [x] **A-obs2 access log JSON + /api/metrics** — **โค้ด + tests แล้ว 27/10/69**
+  - log ไม่มี query string/header/cookie/body · ตัด `/healthz` + `/api/health` ออกจาก log (ยังนับ metrics)
+  - `/api/metrics` text format Prometheus · label เป็น **route pattern** (กัน cardinality ระเบิด) · `tenant` label รอ multi-tenant
+  - **ปิดโดยปริญญา**: ไม่ตั้ง `METRICS_TOKEN` = 401 (timingSafeEqual) · รับ `x-metrics-token` หรือ `Authorization: Bearer`
+  - `ACCESS_LOG=off` = สวิตช์ปิด log (metrics ยังนับ) · `TENANT_ID` = ชื่อผู้เช่า
+  - เทสต์: `observability.test.ts` 19/19 · `observabilityWiring.test.ts` 5/5 · `requestId.test.ts` ผ่าน (แดง exit 1 ก่อนมีโค้ด)
+  - `npm run verify` ที่ root — **ผ่าน 6/6 (16.5 นาที) 27/10/69** · merge เข้า `main` แล้ว (`b733213`)
+- [x] **A-obs3 เอกสาร SLO** — `docs/SLO.md` (SLI/SLO/error budget + PromQL + นโยบาย budget หมด)
+- [ ] **A-obs4 เปิดใช้จริง** — ต้อง **restart core-api** (รอ Cold Soak / อนุมัติเจ้าของ)
+      `METRICS_TOKEN` + `TENANT_ID` + `ACCESS_LOG` อยู่ใน `sovereign-os/infra/.env` (เจ้าของแก้เอง)
+      ขั้นตอน: ตั้ง token → `docker restart sovereign-core-api` → `curl -H "x-metrics-token: …" :3001/api/metrics` → ต้องได้ 200 / ไม่ส่ง token ต้องได้ 401
+- [ ] **A-obs5 push ขึ้น GitHub** — ยัง **hold** ตามคำสั่งเจ้าของ (`origin/main` = `0e00b79`, local main นำอยู่ 6 commits)
+- [ ] **A-obs6 ตัวเก็บ log/metrics (ยังไม่ตัดสิน)** — Prometheus+Grafana ในเครื่อง หรือสรุป JSON log ด้วย `tools/` — ขึ้นกับสเปก RAM เครื่อง HUB
+- [ ] **A-obs7 ต่อยอดหลัง A-obs4** — DB latency ผ่าน Prisma middleware · queue depth (offline queue/agent/MQTT) · alert "error budget กำลังหมด" · span ระดับ OTel
+
+## คิวถัดไปที่เจ้าของเลือกไว้ (ยังไม่เริ่ม)
+- [ ] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง (ต้อง migration → รออนุมัติ) + local read model + กติกา conflict resolution
+- [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
+
+
 
 
