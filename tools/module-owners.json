@@ -207,6 +207,7 @@
   },
   "sharedTables": [
     "system_settings",
-    "security_events"
+    "security_events",
+    "idempotency_keys"
   ]
 }
