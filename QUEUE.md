@@ -636,7 +636,7 @@
   - **fail-open เมื่อตารางยังไม่มี (P2021)** ⇒ deploy โค้ดก่อน migrate ได้ · DB ล่มจริง = **503** (ไม่ยอมให้ทำเงินซ้ำ)
   - ต่อ 4 endpoint: `business.order` · `business.payment` · `restaurant.order` · `restaurant.purchase` (หลัง `authenticate`/`requireRole`)
   - frontend: `newIdempotencyKey()` + `authFetch` แนบให้ทุก POST/PUT/PATCH/DELETE (caller ตั้งเองได้) · คิวออฟไลน์เก็บ header ไว้ replay
-  - เทสต์: backend `tests/idempotency.test.ts` **22/22** · `tools/test/idempotency-migration.test.mjs` 12 · `tools/test/idempotency-wiring.test.mjs` 12
+  - เทสต์: backend `tests/idempotency.test.ts` **22/22** · `tools/test/idempotency-migration.test.mjs` 14 · `tools/test/idempotency-wiring.test.mjs` 10
   - mutation พิสูจน์แล้ว (exit 1 ทั้งหมด): ถอด `idempotent()` ออกจาก route · สลับก่อน `requireRole` · `authFetch` ทับคีย์ caller · แก้ชื่อคอลัมน์ migration
   - [ ] apply migration `20261027120000_idempotency_keys` + restart core-api — **รออนุมัติ/จบ Cold Soak** (ตอนนี้ระบบทำงานได้แต่ยังไม่กันซ้ำ)
   - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ

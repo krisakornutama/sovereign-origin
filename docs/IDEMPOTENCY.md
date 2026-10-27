@@ -76,8 +76,8 @@
 ## เทสต์ที่คุมพฤติกรรมนี้
 
 - `sovereign-os/core-api/tests/idempotency.test.ts` — **22/22** (service + middleware บน HTTP จริง)
-- `tools/test/idempotency-migration.test.mjs` — **12 เคส**: schema ↔ migration ตรงกัน, ไม่มี BOM, ไม่มี FK, unique/index ครบ
-- `tools/test/idempotency-wiring.test.mjs` — **12 เคส**: route จริงติด middleware, frontend แนบ header, คิวออฟไลน์เก็บ header
+- `tools/test/idempotency-migration.test.mjs` — **14 เคส**: schema ↔ migration ตรงกัน, ไม่มี BOM, ไม่มี FK, unique/index ครบ
+- `tools/test/idempotency-wiring.test.mjs` — **10 เคส**: route จริงติด middleware, frontend แนบ header, คิวออฟไลน์เก็บ header
 - mutation ที่พิสูจน์แล้วว่าเทสต์จับได้จริง (exit 1 ทั้งหมด):
   ถอด `idempotent()` ออกจาก route · สลับให้ middleware อยู่ก่อน `requireRole` · ให้ `authFetch` ทับคีย์ของ caller · แก้ชื่อคอลัมน์ใน migration
 
