@@ -9,6 +9,7 @@ import { auditStateChange } from './middleware/auth.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import { applyJsonBodyParsers } from './lib/http-body';
 import { mountRoutes } from './routes';
+import { getObservability } from './middleware/observability.middleware';
 import { createSocketServer } from './realtime/socket';
 import { startWorkers } from './workers/start';
 import { initFleetPolicyCache } from './services/fleet-policy.service';
@@ -50,10 +51,14 @@ app.use((_req, res, next) => {
 });
 // อยู่หลัง proxy (nginx/caddy) → rate-limit นับ IP จริงได้
 app.set('trust proxy', 1);
+// request-id + access log (JSON) + ตัวนับ/metrics — ต้องอยู่ต้น stack เพื่อให้ครอบทุกคำขอ
+// (รวมคำขอที่ถูกปฏิเสธด้วย 401/413/429 ซึ่งเป็นคำขอที่อยากเห็นที่สุดเวลามีปัญหา)
+app.use(getObservability().requestContext);
 app.use(cors({
   origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
   // เปิดให้ browser อ่าน Retry-After ได้ (ใช้แสดง countdown ตอนโดน rate limit)
-  exposedHeaders: ['Retry-After'],
+  // x-request-id: ผู้ใช้แจ้งเลขนี้มา = ไล่ log ได้ทันทีว่าคำขอนั้นเกิดอะไรขึ้น
+  exposedHeaders: ['Retry-After', 'x-request-id'],
 }));
 // Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
 // express.json() ทั้งแอปจะ parse ทิ้ง (แบบเดียวกับ client-monitor ที่ใช้ parser เฉพาะ route)
