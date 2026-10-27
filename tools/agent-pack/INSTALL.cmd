@@ -42,6 +42,7 @@ goto end
 echo [NOT FINISHED] read the messages above (also saved to install-log.txt)
 echo.
 echo   If it says the token was rejected (401), pack a fresh bundle on the HUB.
+echo   Then double-click INSTALL-CHECK.cmd here - it writes SUPPORT.txt you can send.
 goto end
 
 :no_script

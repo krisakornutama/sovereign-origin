@@ -185,6 +185,8 @@ tools/agent-pack/*
 !tools/agent-pack/install-plan.mjs
 !tools/agent-pack/modules.mjs
 !tools/agent-pack/INSTALL.cmd
+!tools/agent-pack/doctor.mjs
+!tools/agent-pack/INSTALL-CHECK.cmd
 Ollama/
 
 # ── Keys & certificates (เพิ่มเติม) ─────────────
