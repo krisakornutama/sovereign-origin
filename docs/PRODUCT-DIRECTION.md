@@ -103,5 +103,6 @@
 - `docs/INSTALL-DIAGNOSTICS.md` — `INSTALL-CHECK` / `SUPPORT.txt` / `--post` (คนอื่นติดตั้งเองแล้วส่งใบตรวจกลับ)
 - `docs/SLO.md` — SLO/error budget + วิธีใช้ `/api/metrics`
 - `docs/ENTERPRISE-READINESS.md` — แผน phase 5 multi-tenant/partner (มีโครงเดิมอยู่แล้ว)
+- `docs/IDEMPOTENCY.md` — เน็ตหลุดก็ขายได้: idempotency key กลาง (สัญญา / env / ลำดับเปิดใช้)
 - `docs/ARCHITECTURE.md` — กฎที่ arch-gate ตรวจอัตโนมัติ
 - `QUEUE.md` — งานที่ค้าง/รออนุมัติ

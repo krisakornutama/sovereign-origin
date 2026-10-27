@@ -5,6 +5,8 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+// IDEMPOTENCY - กันออเดอร์/การชำระเงินซ้ำเมื่อ retry หรือเน็ตหลุด (ไม่ส่ง header = ผ่านปกติ)
+import { idempotent } from '../../middleware/idempotency.middleware';
 import { hasBusinessAccess, BUSINESS_POSITIONS } from '../../lib/business';
 import * as svc from '../../services/business.service';
 import * as shopSvc from '../../services/business-shop.service'; // เฟส 4: สถานะจัดส่งแบบเบา
@@ -179,7 +181,7 @@ router.get('/:businessId/orders/:id/lots', authenticate, async (req, res) => {
 });
 
 // เปิดใบเสนอราคา/ออเดอร์ — SALES ขึ้นไป
-router.post('/:businessId/orders', authenticate, async (req, res) => {
+router.post('/:businessId/orders', authenticate, idempotent('business.order'), async (req, res) => {
   if (!(await guard(req, res, 'SALES'))) return;
   try {
     res.status(201).json(await svc.createOrder(req.params.businessId, req.body));
@@ -213,7 +215,7 @@ router.post('/:businessId/orders/:id/transition', authenticate, async (req, res)
 });
 
 // ── Payments — SALES รับเงินได้ ──
-router.post('/:businessId/orders/:id/payments', authenticate, async (req, res) => {
+router.post('/:businessId/orders/:id/payments', authenticate, idempotent('business.payment'), async (req, res) => {
   if (!(await guard(req, res, 'SALES'))) return;
   try {
     res.status(201).json(await svc.addPayment(req.params.businessId, req.params.id, req.body));

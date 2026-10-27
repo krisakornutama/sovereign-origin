@@ -3,6 +3,8 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
 import { markLotsConsumedByRecipes } from '../../services/trace.service'; // TRACEABILITY เฟส 2
+// IDEMPOTENCY - กันออเดอร์/การรับซื้อซ้ำเมื่อ retry หรือเน็ตหลุด (ไม่ส่ง header = ผ่านปกติ)
+import { idempotent } from '../../middleware/idempotency.middleware';
 import { encryptField, decryptOrNull, hashField } from '../../services/field-crypto.service'; // F2b: เบอร์ลูกค้าเข้ารหัสก่อนลง DB
 
 const router = Router();
@@ -167,7 +169,7 @@ function genOrderNo() {
   return `ORD-${d}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
-router.post('/orders', authenticate, async (req, res) => {
+router.post('/orders', authenticate, idempotent('restaurant.order'), async (req, res) => {
   try {
     const { restaurantId, items, tableNo, type, customerId } = req.body || {};
     if (!restaurantId || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'restaurantId and items required' });
@@ -328,7 +330,7 @@ router.get('/kitchen-sensors', authenticate, async (_req, res) => {
 
 // POST /purchases — สั่ง/รับวัตถุดิบเข้าสต็อก + บันทึกรายจ่ายร้านพร้อมกัน
 // body: { name, qtyKg, priceTHB, supplier?, note? } → InventoryItem(FOOD) + TreasuryEvent(PURCHASE)
-router.post('/purchases', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
+router.post('/purchases', authenticate, requireRole(...WRITE_ROLES), idempotent('restaurant.purchase'), async (req, res) => {
   try {
     const name = String(req.body?.name || '').trim();
     const qtyKg = Number(req.body?.qtyKg);
