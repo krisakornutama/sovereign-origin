@@ -592,6 +592,33 @@
 - [ ] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง (ต้อง migration → รออนุมัติ) + local read model + กติกา conflict resolution
 - [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
 
+---
+
+# คิวใหม่: "ติดตั้งเองได้ + บอกเราได้ว่าติดตรงไหน" (27/10/69)
+
+> เจ้าของ: *"ผมไม่รู้ความต้องการของลูกค้า ผมรู้แค่ว่าอยากพัฒนา"*
+> ⇒ เปลี่ยนหลักคิดเป็น **no-regret**: ลงทุนเฉพาะสิ่งที่ต้องมีไม่ว่าลูกค้าจะต้องการอะไร
+> และ **ไม่ลงทุน** กับสมมติฐานที่ยังไม่มีหลักฐาน (multi-tenant RLS / billing / license — ดู `docs/PRODUCT-DIRECTION.md`)
+>
+> เหตุผลที่เลือกงานนี้: จะขายให้ใครก็ต้อง "ติดตั้งจบโดยไม่ต้องมีเรา" และเมื่อไม่จบ ต้องมีใบรายงานที่ส่งกลับมาได้
+> (นี่คือจุดที่ balena/Home Assistant ชนะใจคนติดตั้งเอง — ไม่ใช่ฟีเจอร์)
+
+- [x] **D1 `tools/agent-pack/doctor.mjs` — INSTALL-CHECK (อ่านอย่างเดียว)** — **เสร็จ 27/10/69**
+  - ตรวจ 10 ข้อ: Node ≥20 · ไฟล์ติดตั้งครบ · `install-plan.json` (ทน BOM) · สิทธิ์เขียนโฟลเดอร์ · พื้นที่ดิสก์ (<1 GB = fail, <6 GB = warn)
+    · วิธีลงทะเบียน (join.json หรือรหัสเชิญ) · HUB `/api/health` · Docker (warn) · ของเดิมบนเครื่อง · `--heartbeat` (opt-in พิสูจน์ token)
+  - เขียน `SUPPORT.txt` ข้าง ๆ ชุดติดตั้ง — **redact token 64-hex / `enr_...` / ค่า `*TOKEN*|SECRET|PASSWORD|API_KEY`** ก่อนเขียนทุกครั้ง
+  - exit 0 = พร้อมติดตั้ง · exit 1 = ต้องแก้ก่อน (สคริปต์/คนตัดสินใจได้)
+  - `INSTALL-CHECK.cmd` (ASCII ล้วน + chcp 65001 + CRLF + pause ทุกเส้นทาง) — ดับเบิลคลิกได้
+  - `INSTALL.cmd` เมื่อล้มจะบอกให้รัน `INSTALL-CHECK.cmd` เพื่อได้ `SUPPORT.txt`
+  - เทสต์ `tools/test/doctor.test.mjs` **27/27** · mutation พิสูจน์แล้ว: ถอด redact 64-hex = **exit 1** · บังคับ heartbeat = **exit 1**
+  - ต่อสายเข้าชุดติดตั้งแล้ว (`bundleFiles`/`bundleSource`) + `.gitignore` allow-list (ไฟล์ใน `tools/agent-pack/*` ถูก ignore โดยปริยาย)
+- [ ] **D2 ทดสอบบนเครื่องลูกจริง** — เจ้าของดับเบิลคลิก `INSTALL-CHECK.cmd` บนเครื่องปลายทาง → ส่ง `SUPPORT.txt` กลับมา
+      (ไม่ต้องให้ผมไปนั่งเครื่องนั้น และไม่ต้องส่งรหัสอะไรให้ใคร)
+- [ ] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — `tools/install/install.mjs` มี preflight เบา ๆ แล้ว (ตรวจ root/HUB URL)
+      ควรเรียกตรวจดิสก์/สิทธิ์/Docker ชุดเดียวกัน เพื่อให้ข้อความตรงกันทั้งสองเส้นทาง
+- [ ] **D4 ให้ doctor ตรวจ "หลังติดตั้ง" ลึกขึ้น** — autostart task มีจริง · runner process ยังมีชีวิต · heartbeat ล่าสุดบน HUB (ต้องมี token)
+
+
 
 
 
