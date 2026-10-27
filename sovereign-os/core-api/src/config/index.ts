@@ -128,6 +128,14 @@ export const config = {
     // ACCESS_LOG=off = ปิด access log (ยังนับ metrics ตามปกติ) — เผื่อกรณีดิสก์เล็ก/ต้องการ log น้อย
     accessLog: (process.env.ACCESS_LOG || 'on').trim().toLowerCase() !== 'off',
   },
+  // Idempotency (กลาง) — กันงานซ้ำจาก retry/เน็ตหลุด/คิวออฟไลน์
+  // IDEMPOTENCY=off = ปิดทั้งระบบ (ไม่ตรวจ header) เผื่อกรณีฉุกเฉิน
+  // ttlSec = เก็บผลสำเร็จไว้นานแค่ไหน · leaseSec = คำขอที่ยังทำงานอยู่ถูกกันไว้นานแค่ไหน
+  idempotency: {
+    enabled: (process.env.IDEMPOTENCY || 'on').trim().toLowerCase() !== 'off',
+    ttlSec: Math.max(60, parseInt(process.env.IDEMPOTENCY_TTL_SEC || '86400', 10) || 86400),
+    leaseSec: Math.max(5, parseInt(process.env.IDEMPOTENCY_LEASE_SEC || '60', 10) || 60),
+  },
   // AI agent policy — autonomy level + protected targets for action tools
   agent: {
     autonomy: getAgentAutonomy(),

@@ -1,6 +1,9 @@
 import { useAuthStore } from '../stores/useAuthStore';
 import { getApiUrl } from './config';
-import { newRequestId } from './requestId';
+import { newIdempotencyKey, newRequestId } from './requestId';
+
+// วิธีที่ถือว่า "เปลี่ยนข้อมูล" → ต้องมี idempotency-key กันทำซ้ำ
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
  * authFetch – fetch wrapper ที่แนบ token และ handle 401 โดย logout
@@ -16,6 +19,13 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   // อย่าทับของที่ caller ตั้งมาเอง (เผื่อส่งต่อ id จากคำขอเดิม)
   const requestId = headers['x-request-id'] || headers['X-Request-Id'] || newRequestId();
   headers['x-request-id'] = requestId;
+
+  // idempotency-key: 1 คีย์ต่อการกระทำ — caller ตั้งมาเองได้ (เช่นกด retry ด้วยคีย์เดิม)
+  // ไม่ส่ง header มาก็ยังทำงานปกติ (backend ผ่านให้) — ใส่ให้เฉพาะวิธีที่เปลี่ยนข้อมูล
+  const method = String(options.method || 'GET').toUpperCase();
+  if (MUTATING_METHODS.has(method) && !headers['x-idempotency-key'] && !headers['Idempotency-Key']) {
+    headers['x-idempotency-key'] = newIdempotencyKey();
+  }
 
   // แทนที่ origin ของ url ด้วย API URL ที่ผู้ใช้ตั้งค่า (ถ้ามี override)
   const apiUrl = getApiUrl();
