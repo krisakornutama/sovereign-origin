@@ -119,6 +119,15 @@ export const config = {
   },
   // จำกัด origin ที่เชื่อม API ได้ (production ควรตั้งเป็นโดเมนหน้าเว็บ ไม่ใช่ *)
   corsOrigin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? 'http://localhost:3000' : 'http://localhost:3000,http://127.0.0.1:3000'),
+  // Observability — request-id + access log (JSON) + /metrics (Prometheus)
+  // METRICS_TOKEN ว่าง = /metrics ตอบ 401 (ปิดโดยปริญญา) ไม่ใช่เปิดโล่ง
+  // TENANT_ID = ชื่อผู้เช่า ใส่เป็น label เพื่อแยกข้อมูลลูกค้าแต่ละราย (multi-tenant)
+  observability: {
+    metricsToken: (process.env.METRICS_TOKEN || '').trim(),
+    tenantId: (process.env.TENANT_ID || 'default').trim() || 'default',
+    // ACCESS_LOG=off = ปิด access log (ยังนับ metrics ตามปกติ) — เผื่อกรณีดิสก์เล็ก/ต้องการ log น้อย
+    accessLog: (process.env.ACCESS_LOG || 'on').trim().toLowerCase() !== 'off',
+  },
   // AI agent policy — autonomy level + protected targets for action tools
   agent: {
     autonomy: getAgentAutonomy(),
