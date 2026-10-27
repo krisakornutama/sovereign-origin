@@ -5,18 +5,21 @@
 // ⇒ สิ่งที่ต้องมีไม่ว่าลูกค้าจะต้องการอะไร คือ "คนที่ไม่ใช่เราติดตั้งเองได้ และบอกเราได้ว่าติดตรงไหน"
 //
 // หลักการ:
-//   · อ่านอย่างเดียว (ไม่เขียน .env / ไม่ตั้ง task / ไม่ heartbeat เว้นแต่สั่ง --heartbeat)
+//   · อ่านอย่างเดียว (ไม่เขียน .env / ไม่ตั้ง task / ไม่ heartbeat เว้นแต่สั่ง --heartbeat หรือ --post)
 //   · ไม่พิมพ์ความลับลงรายงานเลย (token/รหัสเชิญถูก redact ก่อนเขียนไฟล์)
 //   · ทุกข้อที่ "ไม่ผ่าน" ต้องมี hint เป็นภาษาคน + วิธีแก้
 //   · exit code: 0 = พร้อมติดตั้ง · 1 = มีข้อที่ไม่ผ่าน (ci/สคริปต์ตัดสินใจได้)
 //
 // ใช้บนเครื่องปลายทาง:  ดับเบิลคลิก INSTALL-CHECK.cmd   (หรือ node tools\agent-pack\doctor.mjs)
+//   --profile=hub   ตรวจเครื่องแม่ (ต้องมี compose + template + Docker) — ถูกเรียกจาก tools/install/install.mjs
+//   --post          ตรวจหลังติดตั้ง (autostart task · runner process · heartbeat ถึง HUB)
+//   --dry-run       ไม่รันคำสั่ง/ไม่ยิงเน็ต/ไม่เขียนไฟล์ทดสอบ (ใช้ตอน installer ทำ dry-run)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findBundleRoot, readEnrollmentFile, readJoin, resolveRunnerDir } from './setup-machine.mjs';
+import { findBundleRoot, readEnrollmentFile, readJoin, resolveRunnerDir, TASK_NAME } from './setup-machine.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +30,7 @@ export const MIN_FREE_BYTES_WARN = 6 * 1024 ** 3; // ต่ำกว่านี
 export const REPORT_NAME = 'SUPPORT.txt';
 
 /** ป้ายสถานะให้อ่านง่ายในไฟล์รายงาน */
-const MARK = { ok: '[ok]  ', warn: '[warn]', fail: '[FAIL]' };
+const MARK = { ok: '[ok]  ', warn: '[warn]', fail: '[FAIL]', skip: '[skip]' };
 
 /**
  * ปิดความลับก่อนออกจากเครื่อง — token ของเครื่องคือ 64 hex, รหัสเชิญคือ enr_+hex
@@ -57,6 +60,19 @@ export function canWrite(dir) {
   try {
     fs.writeFileSync(probe, 'ok');
     fs.unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * ตรวจสิทธิ์เขียนแบบ "ไม่เขียนไฟล์" — ใช้ตอน dry-run ที่ห้ามแตะดิสก์
+ * (หยาบกว่า canWrite: ACL บางแบบตอบผ่านแต่เขียนจริงไม่ได้ ⇒ รายงานบอกไว้ตรง ๆ)
+ */
+export function accessWritable(dir) {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
     return true;
   } catch {
     return false;
@@ -93,6 +109,17 @@ function defaultExec(cmd, args) {
   });
 }
 
+/** อ่าน JSON จาก response แบบทนทาน (fetch จริงมี .json · ตัวปลอมในเทสต์อาจมีแค่ status) */
+async function readJsonSafe(res) {
+  try {
+    if (typeof res?.json === 'function') return await res.json();
+    if (typeof res?.text === 'function') return JSON.parse(await res.text());
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** แปลงผลตรวจเป็นข้อความรายงาน (pure — เทสต์ได้โดยไม่ต้องมีเครื่องจริง) */
 export function renderReport({ checks, meta }) {
   const lines = [];
@@ -101,6 +128,7 @@ export function renderReport({ checks, meta }) {
   lines.push('══════════════════════════════════════════════════════');
   lines.push(`  เวลา      : ${meta.time}`);
   lines.push(`  เครื่อง   : ${meta.hostname} (${meta.platform}/${meta.arch})`);
+  lines.push(`  รูปแบบ    : ${meta.profile === 'hub' ? 'เครื่องแม่ (ทั้ง stack)' : 'เครื่องลูก (runner)'}${meta.postInstall ? ' · หลังติดตั้ง' : ''}`);
   lines.push(`  โฟลเดอร์ : ${meta.bundleRoot}`);
   lines.push(`  Node.js   : v${meta.nodeVersion}`);
   lines.push('');
@@ -110,7 +138,8 @@ export function renderReport({ checks, meta }) {
   }
   const count = (s) => checks.filter((c) => c.status === s).length;
   lines.push('');
-  lines.push(`  สรุป: ผ่าน ${count('ok')} · เตือน ${count('warn')} · ไม่ผ่าน ${count('fail')}`);
+  const skippedText = count('skip') > 0 ? ` · ข้าม ${count('skip')}` : '';
+  lines.push(`  สรุป: ผ่าน ${count('ok')} · เตือน ${count('warn')} · ไม่ผ่าน ${count('fail')}${skippedText}`);
   if (count('fail') > 0) {
     lines.push('  ➜ แก้ข้อ [FAIL] ข้างบนก่อน แล้วรัน INSTALL-CHECK.cmd อีกครั้ง');
   } else if (count('warn') > 0) {
@@ -125,9 +154,20 @@ export function renderReport({ checks, meta }) {
 /**
  * รันการตรวจทั้งหมด — คืน { ok, exitCode, checks, report, reportPath }
  * ทุก dependency ที่แตะโลกภายนอกฉีดได้ (fetch/exec/statfs/nodeVersion) เพื่อเทสต์บน CI
+ *
+ * profile : 'child' (เครื่องลูก) | 'hub' (เครื่องแม่ = ทั้ง stack)
+ * allowCommands : false = dry-run → ห้าม exec / ห้ามเน็ต / ห้ามเขียนไฟล์ทดสอบ
+ * postInstall   : true = ตรวจของที่ต้องยังอยู่หลังติดตั้ง (task/process/heartbeat)
  */
 export async function runDoctor({
   dir = HERE,
+  profile = 'child',
+  allowCommands = true,
+  postInstall = false,
+  root = '',
+  composeFile = '',
+  templateFile = '',
+  taskName = TASK_NAME,
   fetchImpl = fetch,
   exec = defaultExec,
   platform = process.platform,
@@ -144,7 +184,8 @@ export async function runDoctor({
   const checks = [];
   const add = (id, status, label, detail = '', hint = '') => checks.push({ id, status, label, detail, hint });
 
-  const bundleRoot = findBundleRoot(dir);
+  const isHub = profile === 'hub';
+  const bundleRoot = isHub ? path.resolve(root || dir) : findBundleRoot(dir);
   const runnerDir = resolveRunnerDir(dir, bundleRoot);
 
   // 1) Node.js — ขั้นต่ำที่โค้ด runner ใช้จริง
@@ -157,37 +198,59 @@ export async function runDoctor({
     major >= MIN_NODE_MAJOR ? '' : `ต้องใช้ Node.js ${MIN_NODE_MAJOR}+ — ดาวน์โหลด LTS ที่ nodejs.org แล้วเปิดไฟล์นี้ใหม่`,
   );
 
-  // 2) ไฟล์ติดตั้งครบไหม (หาได้ทั้งชุดแบนและชุดเต็มที่มี tools\agent-pack)
-  const setupFlat = path.join(bundleRoot, 'setup-machine.mjs');
-  const setupNested = path.join(bundleRoot, 'tools', 'agent-pack', 'setup-machine.mjs');
-  const hasSetup = fs.existsSync(setupFlat) || fs.existsSync(setupNested) || fs.existsSync(path.join(dir, 'setup-machine.mjs'));
-  add(
-    'bundle',
-    hasSetup ? 'ok' : 'fail',
-    'ไฟล์ติดตั้ง (setup-machine.mjs)',
-    hasSetup ? `พบใน ${bundleRoot}` : `ไม่พบใน ${bundleRoot}`,
-    hasSetup ? '' : 'ก๊อปโฟลเดอร์ชุดติดตั้งมาทั้งโฟลเดอร์ (อย่าลากมาแค่ไฟล์เดียว)',
-  );
-
-  // 3) แผนติดตั้ง (ไม่มี = ติดตั้งเฉพาะ core ซึ่งใช้ได้)
-  const planFile = path.join(bundleRoot, 'install-plan.json');
-  const plan = readJsonLoose(planFile);
-  if (plan.missing) {
-    add('plan', 'warn', 'แผนติดตั้ง (install-plan.json)', 'ไม่มีไฟล์', 'จะติดตั้งเฉพาะ core — ถ้าต้องการโมดูลอื่น ให้แพ็กชุดใหม่จากเครื่องแม่');
-  } else if (!plan.ok) {
-    add('plan', 'warn', 'แผนติดตั้ง (install-plan.json)', 'อ่านไม่ได้', `ไฟล์เสีย/มีอักขระแปลก: ${redact(plan.error)} — แพ็กชุดใหม่`);
+  if (isHub) {
+    // 2) เครื่องแม่ต้องมีชิ้นส่วนของ stack ครบ (installer ตรวจเองก่อนแล้ว — ที่นี่คือตาข่ายชั้นที่สอง)
+    const wanted = [
+      { file: composeFile, label: 'docker-compose.yml' },
+      { file: templateFile, label: 'เทมเพลต env (sovereign.env.template)' },
+    ].filter((w) => w.file);
+    const missing = wanted.filter((w) => !fs.existsSync(w.file));
+    if (!wanted.length) {
+      add('bundle', 'warn', 'ไฟล์ตัวติดตั้ง', 'ไม่ได้ระบุพาธให้ตรวจ', 'เรียกผ่าน tools/install/install.mjs เพื่อตรวจอัตโนมัติ');
+    } else if (missing.length) {
+      add(
+        'bundle',
+        'fail',
+        'ไฟล์ตัวติดตั้ง',
+        `ไม่พบ ${missing.map((m) => m.label).join(', ')}`,
+        'รันตัวติดตั้งจากรากโปรเจ็กที่ครบทั้งโฟลเดอร์ (หรือส่ง --root=<พาธราก>)',
+      );
+    } else {
+      add('bundle', 'ok', 'ไฟล์ตัวติดตั้ง', wanted.map((w) => w.label).join(' · '));
+    }
   } else {
-    const mods = Array.isArray(plan.data?.modules) ? plan.data.modules : [];
-    add('plan', 'ok', 'แผนติดตั้ง (install-plan.json)', mods.length ? `โมดูล: ${mods.join(', ')}` : 'เฉพาะ core');
+    // 2) ไฟล์ติดตั้งครบไหม (หาได้ทั้งชุดแบนและชุดเต็มที่มี tools\agent-pack)
+    const setupFlat = path.join(bundleRoot, 'setup-machine.mjs');
+    const setupNested = path.join(bundleRoot, 'tools', 'agent-pack', 'setup-machine.mjs');
+    const hasSetup = fs.existsSync(setupFlat) || fs.existsSync(setupNested) || fs.existsSync(path.join(dir, 'setup-machine.mjs'));
+    add(
+      'bundle',
+      hasSetup ? 'ok' : 'fail',
+      'ไฟล์ติดตั้ง (setup-machine.mjs)',
+      hasSetup ? `พบใน ${bundleRoot}` : `ไม่พบใน ${bundleRoot}`,
+      hasSetup ? '' : 'ก๊อปโฟลเดอร์ชุดติดตั้งมาทั้งโฟลเดอร์ (อย่าลากมาแค่ไฟล์เดียว)',
+    );
+
+    // 3) แผนติดตั้ง (ไม่มี = ติดตั้งเฉพาะ core ซึ่งใช้ได้)
+    const planFile = path.join(bundleRoot, 'install-plan.json');
+    const plan = readJsonLoose(planFile);
+    if (plan.missing) {
+      add('plan', 'warn', 'แผนติดตั้ง (install-plan.json)', 'ไม่มีไฟล์', 'จะติดตั้งเฉพาะ core — ถ้าต้องการโมดูลอื่น ให้แพ็กชุดใหม่จากเครื่องแม่');
+    } else if (!plan.ok) {
+      add('plan', 'warn', 'แผนติดตั้ง (install-plan.json)', 'อ่านไม่ได้', `ไฟล์เสีย/มีอักขระแปลก: ${redact(plan.error)} — แพ็กชุดใหม่`);
+    } else {
+      const mods = Array.isArray(plan.data?.modules) ? plan.data.modules : [];
+      add('plan', 'ok', 'แผนติดตั้ง (install-plan.json)', mods.length ? `โมดูล: ${mods.join(', ')}` : 'เฉพาะ core');
+    }
   }
 
   // 4) เขียนไฟล์ในโฟลเดอร์ได้ไหม (ตัวติดตั้งต้องเขียน .env/launcher)
-  const writable = canWrite(bundleRoot);
+  const writable = allowCommands ? canWrite(bundleRoot) : accessWritable(bundleRoot);
   add(
     'writable',
     writable ? 'ok' : 'fail',
     'สิทธิ์เขียนโฟลเดอร์',
-    writable ? 'เขียนได้' : 'เขียนไม่ได้',
+    writable ? (allowCommands ? 'เขียนได้' : 'เขียนได้ (ตรวจแบบไม่เขียนไฟล์ — dry-run)') : 'เขียนไม่ได้',
     writable ? '' : 'ย้ายชุดติดตั้งไปที่เช่น C:\\Sovereign หรือรันด้วยบัญชีที่มีสิทธิ์ (หลีกเลี่ยง C:\\Program Files)',
   );
 
@@ -203,72 +266,110 @@ export async function runDoctor({
     add('disk', 'ok', 'พื้นที่ดิสก์', `เหลือ ${formatBytes(free)}`);
   }
 
-  // 6) วิธีลงทะเบียนกับเครื่องแม่ (join.json หรือ enroll-code.txt)
-  const join = readJoin(bundleRoot);
-  const enroll = readEnrollmentFile(bundleRoot);
   const hubFromEnv = String(env.HUB_URL ?? '').trim().replace(/\/$/, '');
-  const hubUrl = join.ok ? join.hubUrl : String(enroll.hubUrl || hubFromEnv || '').replace(/\/$/, '');
-  const canEnroll = Boolean(enroll.code || env.MACHINE_ENROLL_CODE);
-  if (join.ok) {
-    add('join', 'ok', 'วิธีลงทะเบียน', `join.json (เครื่อง "${join.machineName}")`);
-  } else if (hubUrl && canEnroll) {
-    add('join', 'ok', 'วิธีลงทะเบียน', 'ชุดสากล (รหัสเชิญ + HUB_URL)');
-  } else if (canEnroll) {
-    add('join', 'warn', 'วิธีลงทะเบียน', 'มีรหัสเชิญแต่ไม่รู้ HUB_URL', 'ต้องมี HUB_URL ใน enroll-code.txt หรือใส่มาเป็น --hub-url=...');
-  } else {
-    add(
-      'join',
-      'fail',
-      'วิธีลงทะเบียน',
-      'ไม่มี join.json และไม่มีรหัสเชิญ',
-      'แพ็กชุดใหม่จากเครื่องแม่ (ได้ join.json) หรือใช้ชุดสากล + รหัสเชิญจากหน้า /fleet',
-    );
-  }
+  let join = { ok: false };
+  let hubUrl = isHub ? hubFromEnv : '';
 
-  // 7) ต่อ HUB ได้ไหม (ปัญหาอันดับ 1 ของการติดตั้ง: firewall/เน็ตคนละวง)
-  if (!hubUrl) {
-    add('hub', 'warn', 'ติดต่อเครื่องแม่ (HUB)', 'ยังไม่มี HUB_URL ให้ตรวจ', 'จะตรวจได้หลังระบุ HUB_URL');
-  } else {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    try {
-      const res = await fetchImpl(`${hubUrl}/api/health`, { method: 'GET', signal: ac.signal });
-      const status = Number(res?.status ?? 0);
-      if (status > 0 && status < 400) add('hub', 'ok', 'ติดต่อเครื่องแม่ (HUB)', `${hubUrl} → HTTP ${status}`);
-      else add('hub', 'fail', 'ติดต่อเครื่องแม่ (HUB)', `${hubUrl} → HTTP ${status}`, 'HUB ตอบแต่ไม่ปกติ — ตรวจหน้า /system-health บนเครื่องแม่');
-    } catch (err) {
+  if (!isHub) {
+    // 6) วิธีลงทะเบียนกับเครื่องแม่ (join.json หรือ enroll-code.txt)
+    join = readJoin(bundleRoot);
+    const enroll = readEnrollmentFile(bundleRoot);
+    hubUrl = join.ok ? join.hubUrl : String(enroll.hubUrl || hubFromEnv || '').replace(/\/$/, '');
+    const canEnroll = Boolean(enroll.code || env.MACHINE_ENROLL_CODE);
+    if (join.ok) {
+      add('join', 'ok', 'วิธีลงทะเบียน', `join.json (เครื่อง "${join.machineName}")`);
+    } else if (hubUrl && canEnroll) {
+      add('join', 'ok', 'วิธีลงทะเบียน', 'ชุดสากล (รหัสเชิญ + HUB_URL)');
+    } else if (canEnroll) {
+      add('join', 'warn', 'วิธีลงทะเบียน', 'มีรหัสเชิญแต่ไม่รู้ HUB_URL', 'ต้องมี HUB_URL ใน enroll-code.txt หรือใส่มาเป็น --hub-url=...');
+    } else {
       add(
-        'hub',
+        'join',
         'fail',
-        'ติดต่อเครื่องแม่ (HUB)',
-        `${hubUrl} → ${redact(err?.name === 'AbortError' ? `timeout ${timeoutMs} ms` : err?.message ?? err)}`,
-        'เครื่องนี้กับเครื่องแม่อยู่วงเดียวกันหรือไม่ · ไฟร์วอลล์ของเครื่องแม่เปิดพอร์ต 3000 ไหม · HUB เปิดอยู่ไหม',
+        'วิธีลงทะเบียน',
+        'ไม่มี join.json และไม่มีรหัสเชิญ',
+        'แพ็กชุดใหม่จากเครื่องแม่ (ได้ join.json) หรือใช้ชุดสากล + รหัสเชิญจากหน้า /fleet',
       );
-    } finally {
-      clearTimeout(timer);
+    }
+
+    // 7) ต่อ HUB ได้ไหม (ปัญหาอันดับ 1 ของการติดตั้ง: firewall/เน็ตคนละวง)
+    if (!allowCommands) {
+      add('hub', 'skip', 'ติดต่อเครื่องแม่ (HUB)', 'ข้าม (dry-run — ไม่ยิงเน็ต)');
+    } else if (!hubUrl) {
+      add('hub', 'warn', 'ติดต่อเครื่องแม่ (HUB)', 'ยังไม่มี HUB_URL ให้ตรวจ', 'จะตรวจได้หลังระบุ HUB_URL');
+    } else {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), timeoutMs);
+      try {
+        const res = await fetchImpl(`${hubUrl}/api/health`, { method: 'GET', signal: ac.signal });
+        const status = Number(res?.status ?? 0);
+        if (status > 0 && status < 400) add('hub', 'ok', 'ติดต่อเครื่องแม่ (HUB)', `${hubUrl} → HTTP ${status}`);
+        else add('hub', 'fail', 'ติดต่อเครื่องแม่ (HUB)', `${hubUrl} → HTTP ${status}`, 'HUB ตอบแต่ไม่ปกติ — ตรวจหน้า /system-health บนเครื่องแม่');
+      } catch (err) {
+        add(
+          'hub',
+          'fail',
+          'ติดต่อเครื่องแม่ (HUB)',
+          `${hubUrl} → ${redact(err?.name === 'AbortError' ? `timeout ${timeoutMs} ms` : err?.message ?? err)}`,
+          'เครื่องนี้กับเครื่องแม่อยู่วงเดียวกันหรือไม่ · ไฟร์วอลล์ของเครื่องแม่เปิดพอร์ต 3000 ไหม · HUB เปิดอยู่ไหม',
+        );
+      } finally {
+        clearTimeout(timer);
+      }
     }
   }
 
-  // 8) Docker — ไม่บังคับสำหรับเครื่องลูกที่ทำแค่ runner แต่จำเป็นถ้าจะรันทั้ง stack
-  try {
-    const r = await exec('docker', ['--version']);
-    const first = String(r?.stdout || r?.stderr || '').split(/\r?\n/)[0].trim();
-    if (r?.code === 0) add('docker', 'ok', 'Docker', first || 'พร้อมใช้');
-    else add('docker', 'warn', 'Docker', 'ไม่พบ/ยังไม่รัน', 'ติดตั้ง Docker Desktop ถ้าเครื่องนี้จะรันฐานข้อมูล+เว็บเอง');
-  } catch (err) {
-    add('docker', 'warn', 'Docker', `ตรวจไม่ได้ (${redact(err?.message ?? err)})`, 'ไม่จำเป็นถ้าเครื่องนี้ทำแค่ runner');
+  // 8) Docker — เครื่องลูกไม่บังคับ (ทำแค่ runner) แต่เครื่องแม่ขาดไม่ได้
+  if (!allowCommands) {
+    add('docker', 'skip', 'Docker', 'ข้าม (dry-run — ไม่รันคำสั่ง)');
+  } else {
+    try {
+      const r = await exec('docker', ['--version']);
+      const first = String(r?.stdout || r?.stderr || '').split(/\r?\n/)[0].trim();
+      if (r?.code === 0) add('docker', 'ok', isHub ? 'Docker (เครื่องแม่)' : 'Docker', first || 'พร้อมใช้');
+      else if (isHub) {
+        add(
+          'docker',
+          'fail',
+          'Docker (เครื่องแม่)',
+          'ไม่พบ/ยังไม่รัน',
+          'เครื่องแม่ต้องรันฐานข้อมูล+เว็บ — ติดตั้ง Docker Desktop (หรือ docker engine + compose v2) แล้วเปิดให้ทำงานก่อน',
+        );
+      } else {
+        add('docker', 'warn', 'Docker', 'ไม่พบ/ยังไม่รัน', 'ติดตั้ง Docker Desktop ถ้าเครื่องนี้จะรันฐานข้อมูล+เว็บเอง');
+      }
+    } catch (err) {
+      const detail = `ตรวจไม่ได้ (${redact(err?.message ?? err)})`;
+      if (isHub) add('docker', 'fail', 'Docker (เครื่องแม่)', detail, 'ติดตั้ง Docker Desktop แล้วเปิดให้ทำงานก่อน');
+      else add('docker', 'warn', 'Docker', detail, 'ไม่จำเป็นถ้าเครื่องนี้ทำแค่ runner');
+    }
   }
 
   // 9) ของเดิมบนเครื่อง (ติดตั้งซ้ำ)
-  const envFile = path.join(runnerDir, '.env');
-  if (fs.existsSync(envFile)) {
-    add('existing', 'warn', 'มีติดตั้งเดิมอยู่', path.join(runnerDir, '.env'), 'ตัวติดตั้งจะอัปเดตค่าในไฟล์นี้ (ไม่ลบของเดิม) — ถ้าไม่แน่ใจให้สำรองไว้ก่อน');
+  if (isHub) {
+    const infraEnv = path.join(bundleRoot, 'sovereign-os', 'infra', '.env');
+    if (fs.existsSync(infraEnv)) {
+      add(
+        'existing',
+        'warn',
+        'มี env ของ stack เดิม',
+        path.join('sovereign-os', 'infra', '.env'),
+        'ตัวติดตั้งจะใช้ค่าเดิม ไม่ทับ (ถ้าตั้งใจสร้างใหม่ให้ใช้ --force) — สำรองไฟล์ไว้ก่อนถ้าไม่แน่ใจ',
+      );
+    } else {
+      add('existing', 'ok', 'ยังไม่มี env ของ stack บนเครื่องนี้');
+    }
   } else {
-    add('existing', 'ok', 'ยังไม่เคยติดตั้งบนเครื่องนี้');
+    const envFile = path.join(runnerDir, '.env');
+    if (fs.existsSync(envFile)) {
+      add('existing', 'warn', 'มีติดตั้งเดิมอยู่', path.join(runnerDir, '.env'), 'ตัวติดตั้งจะอัปเดตค่าในไฟล์นี้ (ไม่ลบของเดิม) — ถ้าไม่แน่ใจให้สำรองไว้ก่อน');
+    } else {
+      add('existing', 'ok', 'ยังไม่เคยติดตั้งบนเครื่องนี้');
+    }
   }
 
-  // 10) ทางเลือก: พิสูจน์ token กับ HUB (เขียน heartbeat 1 ครั้ง — ต้องสั่งเอง)
-  if (heartbeat) {
+  // 10) พิสูจน์ token กับ HUB (เขียน heartbeat 1 ครั้ง — ต้องสั่ง --heartbeat หรือ --post)
+  if (allowCommands && (heartbeat || postInstall)) {
     if (!join.ok || !hubUrl) {
       add('token', 'warn', 'ทดสอบ token กับ HUB', 'ข้าม', 'ต้องมี join.json (ชุดสากลจะได้ token ตอนติดตั้ง)');
     } else {
@@ -279,10 +380,84 @@ export async function runDoctor({
           body: JSON.stringify({ version: `doctor/${nodeVersion}` }),
         });
         const status = Number(res?.status ?? 0);
-        if (status >= 200 && status < 300) add('token', 'ok', 'ทดสอบ token กับ HUB', `HTTP ${status}`);
-        else add('token', 'fail', 'ทดสอบ token กับ HUB', `HTTP ${status}`, status === 401 ? 'token ถูกยกเลิก/หมดอายุ — แพ็กชุดใหม่จากเครื่องแม่' : 'ดู log ของ core-api บนเครื่องแม่');
+        if (status >= 200 && status < 300) {
+          const body = postInstall ? await readJsonSafe(res) : null;
+          const machine = body?.machine;
+          if (postInstall && machine) {
+            const seen = machine.last_heartbeat ? new Date(machine.last_heartbeat) : null;
+            const ageSec = seen && Number.isFinite(seen.getTime()) ? Math.max(0, Math.round((now().getTime() - seen.getTime()) / 1000)) : null;
+            add(
+              'token',
+              'ok',
+              'ส่งสัญญาณถึง HUB (heartbeat)',
+              `เครื่อง "${machine.name ?? '?'}" · อัปเดตล่าสุด ${ageSec === null ? 'ไม่ทราบเวลา' : `${ageSec} วินาทีที่แล้ว`}`,
+            );
+          } else {
+            add('token', 'ok', 'ทดสอบ token กับ HUB', `HTTP ${status}`);
+          }
+        } else {
+          add(
+            'token',
+            'fail',
+            'ทดสอบ token กับ HUB',
+            `HTTP ${status}`,
+            status === 401 ? 'token ถูกยกเลิก/หมดอายุ — แพ็กชุดใหม่จากเครื่องแม่' : 'ดู log ของ core-api บนเครื่องแม่',
+          );
+        }
       } catch (err) {
         add('token', 'fail', 'ทดสอบ token กับ HUB', redact(err?.message ?? err), 'ตรวจเน็ต/ไฟร์วอลล์ก่อน');
+      }
+    }
+  }
+
+  // 11) หลังติดตั้ง: ของที่ต้อง "ยังอยู่" หลังจากปิดหน้าต่างติดตั้งไปแล้ว
+  if (postInstall && !isHub) {
+    // 11.1 งานอัตโนมัติ (autostart) — ต้องมีจริง ไม่งั้นรีบูตแล้วเครื่องหลุดจาก HUB
+    if (platform !== 'win32') {
+      add('task', 'skip', 'งานอัตโนมัติ (autostart)', 'ข้าม — ตรวจเฉพาะ Windows');
+    } else if (!allowCommands) {
+      add('task', 'skip', 'งานอัตโนมัติ (autostart)', 'ข้าม (dry-run — ไม่รันคำสั่ง)');
+    } else {
+      try {
+        const r = await exec('schtasks', ['/query', '/tn', taskName]);
+        if (r?.code === 0) add('task', 'ok', 'งานอัตโนมัติ (autostart)', `พบ "${taskName}"`);
+        else
+          add(
+            'task',
+            'fail',
+            'งานอัตโนมัติ (autostart)',
+            `ไม่พบ "${taskName}"`,
+            'เปิด INSTALL.cmd ใหม่ (หรือรัน setup-machine.mjs) เพื่อสร้าง task แล้วตรวจอีกครั้ง',
+          );
+      } catch (err) {
+        add('task', 'warn', 'งานอัตโนมัติ (autostart)', `ตรวจไม่ได้ (${redact(err?.message ?? err)})`, `เปิด Task Scheduler แล้วดูงานชื่อ "${taskName}"`);
+      }
+    }
+
+    // 11.2 process ของ runner — task มีแล้วแต่ process ตาย = ยังไม่พร้อมใช้งาน
+    if (platform !== 'win32') {
+      add('runner', 'skip', 'runner กำลังทำงาน', 'ข้าม — ตรวจเฉพาะ Windows');
+    } else if (!allowCommands) {
+      add('runner', 'skip', 'runner กำลังทำงาน', 'ข้าม (dry-run — ไม่รันคำสั่ง)');
+    } else {
+      const like = `*${path.basename(runnerDir) || 'agent-runner'}*main.mjs*`;
+      const script = `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like '${like}' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+      try {
+        const r = await exec('powershell', ['-NoProfile', '-NonInteractive', '-Command', script]);
+        const pid = String(r?.stdout ?? '').trim().split(/\r?\n/).pop() ?? '';
+        if (r?.code === 0 && /^\d+$/.test(pid)) {
+          add('runner', 'ok', 'runner กำลังทำงาน', `PID ${pid}`);
+        } else {
+          add(
+            'runner',
+            'fail',
+            'runner กำลังทำงาน',
+            'ไม่พบ process',
+            'เปิด RUN-RUNNER.cmd หนึ่งครั้ง (หรือตรวจ Task Scheduler) — ถ้าเพิ่งติดตั้ง ให้รอ ~30 วินาทีแล้วตรวจใหม่',
+          );
+        }
+      } catch (err) {
+        add('runner', 'warn', 'runner กำลังทำงาน', `ตรวจไม่ได้ (${redact(err?.message ?? err)})`, 'เปิด Task Manager ดูว่ามี node.exe ที่รัน main.mjs อยู่');
       }
     }
   }
@@ -295,6 +470,8 @@ export async function runDoctor({
     bundleRoot,
     nodeVersion,
     runnerDir,
+    profile,
+    postInstall,
   };
   const report = renderReport({ checks, meta });
   const failed = checks.some((c) => c.status === 'fail');
@@ -317,9 +494,18 @@ export async function runDoctor({
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const argv = process.argv.slice(2);
-  const dirArg = (argv.find((a) => a.startsWith('--dir=')) ?? '').slice(6);
+  const arg = (name) => {
+    const hit = argv.find((a) => a.startsWith(`--${name}=`));
+    return hit ? hit.slice(name.length + 3) : '';
+  };
   const out = await runDoctor({
-    dir: dirArg || HERE,
+    dir: arg('dir') || HERE,
+    profile: arg('profile') || (argv.includes('--hub') ? 'hub' : 'child'),
+    root: arg('root'),
+    composeFile: arg('compose'),
+    templateFile: arg('template'),
+    postInstall: argv.includes('--post') || argv.includes('--after-install'),
+    allowCommands: !argv.includes('--dry-run'),
     heartbeat: argv.includes('--heartbeat'),
     writeReport: !argv.includes('--no-report'),
   });
