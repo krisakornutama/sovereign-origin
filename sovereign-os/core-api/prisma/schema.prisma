@@ -2493,3 +2493,25 @@ model TraceEvent {
   @@index([lotId])
   @@map("trace_events")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IDEMPOTENCY (กลาง) — กันงานซ้ำจาก retry/เน็ตหลุด/คิวออฟไลน์
+// 1 แถว = 1 คีย์ของ 1 endpoint scope · เก็บเฉพาะผลสำเร็จไว้ replay ตาม TTL
+// ─────────────────────────────────────────────────────────────────────────────
+model IdempotencyKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  scope        String // เช่น "business.order" — กันคีย์ชนกันข้าม endpoint
+  key          String // ค่าจาก header Idempotency-Key (client สร้างต่อ 1 การกระทำ)
+  fingerprint  String // sha256(ผู้ใช้ + method + path + body) — กันใช้คีย์เดิมกับคนละงาน
+  status       String   @default("in_flight") // in_flight | done
+  responseCode Int?
+  responseBody Json?
+  userId       String? // TEXT ไม่ใช่ UUID — id ของผู้ใช้ใน test/ระบบอาจไม่ใช่ uuid
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  updatedAt    DateTime @updatedAt @db.Timestamptz
+  expiresAt    DateTime @db.Timestamptz
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

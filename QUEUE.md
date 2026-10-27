@@ -589,7 +589,9 @@
 - [ ] **A-obs7 ต่อยอดหลัง A-obs4** — DB latency ผ่าน Prisma middleware · queue depth (offline queue/agent/MQTT) · alert "error budget กำลังหมด" · span ระดับ OTel
 
 ## คิวถัดไปที่เจ้าของเลือกไว้ (ยังไม่เริ่ม)
-- [ ] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง (ต้อง migration → รออนุมัติ) + local read model + กติกา conflict resolution
+- [x] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง — **โค้ด + tests แล้ว 27/10/69** (`docs/IDEMPOTENCY.md`)
+      ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · **ยังไม่ apply migration / ไม่ restart** (รอ Cold Soak)
+- [ ] **B2 local read model + กติกา conflict resolution** — ยังไม่เริ่ม (ต้องมี sync จริงก่อน)
 - [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
 
 ---
@@ -626,6 +628,19 @@
       - **runner process**: PowerShell CIM `Win32_Process` จับ `node.exe` ที่ CommandLine มี `agent-runner…main.mjs` → รายงาน PID
       - **heartbeat ถึง HUB**: POST 1 ครั้ง อ่าน `{ machine: { name, last_heartbeat } }` → พิสูจน์ token + DB + เวลา
       - เทสต์ `tools/test/doctor.test.mjs` **41/41** · mutation พิสูจน์ 3 แบบ: ถอดการกัน dry-run = **exit 1** · ปิดการตรวจหลังติดตั้ง = **exit 1** · ลด Docker ของเครื่องแม่เป็น warn = **exit 1**
+
+- [x] **B idempotency กลาง — "เน็ตหลุดก็ขายได้"** — **โค้ด + tests แล้ว 27/10/69** (`docs/IDEMPOTENCY.md`)
+  - ตาราง `idempotency_keys` (scope + key + fingerprint + ผล 2xx + TTL) · middleware `idempotent(scope)` · config `IDEMPOTENCY*`
+  - **ไม่ส่ง header = ผ่านปกติ ไม่เขียนตาราง** (client เก่าไม่พัง) · คีย์เดิม + payload เดิม = ตอบผลเดิม (`Idempotency-Replayed: true`)
+  - คีย์เดิม + payload ต่าง / คนละผู้ใช้ = **409** · คำขอแรกยังไม่จบ = **409 + Retry-After** · 4xx/5xx = ไม่แคช (ลองใหม่ได้)
+  - **fail-open เมื่อตารางยังไม่มี (P2021)** ⇒ deploy โค้ดก่อน migrate ได้ · DB ล่มจริง = **503** (ไม่ยอมให้ทำเงินซ้ำ)
+  - ต่อ 4 endpoint: `business.order` · `business.payment` · `restaurant.order` · `restaurant.purchase` (หลัง `authenticate`/`requireRole`)
+  - frontend: `newIdempotencyKey()` + `authFetch` แนบให้ทุก POST/PUT/PATCH/DELETE (caller ตั้งเองได้) · คิวออฟไลน์เก็บ header ไว้ replay
+  - เทสต์: backend `tests/idempotency.test.ts` **22/22** · `tools/test/idempotency-migration.test.mjs` 12 · `tools/test/idempotency-wiring.test.mjs` 12
+  - mutation พิสูจน์แล้ว (exit 1 ทั้งหมด): ถอด `idempotent()` ออกจาก route · สลับก่อน `requireRole` · `authFetch` ทับคีย์ caller · แก้ชื่อคอลัมน์ migration
+  - [ ] apply migration `20261027120000_idempotency_keys` + restart core-api — **รออนุมัติ/จบ Cold Soak** (ตอนนี้ระบบทำงานได้แต่ยังไม่กันซ้ำ)
+  - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ
+
 
 
 
