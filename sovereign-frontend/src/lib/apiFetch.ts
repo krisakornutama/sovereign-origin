@@ -1,5 +1,6 @@
 import { useAuthStore } from '../stores/useAuthStore';
 import { getApiUrl } from './config';
+import { newRequestId } from './requestId';
 
 /**
  * authFetch – fetch wrapper ที่แนบ token และ handle 401 โดย logout
@@ -11,6 +12,10 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+  // ทุกคำขอมีเลขประจำตัว → backend log เลขเดียวกัน (trace ข้าม frontend → API)
+  // อย่าทับของที่ caller ตั้งมาเอง (เผื่อส่งต่อ id จากคำขอเดิม)
+  const requestId = headers['x-request-id'] || headers['X-Request-Id'] || newRequestId();
+  headers['x-request-id'] = requestId;
 
   // แทนที่ origin ของ url ด้วย API URL ที่ผู้ใช้ตั้งค่า (ถ้ามี override)
   const apiUrl = getApiUrl();

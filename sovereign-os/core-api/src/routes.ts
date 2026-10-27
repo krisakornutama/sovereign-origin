@@ -5,6 +5,7 @@ import { config } from './config';
 import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
 import { buildOpsSummary } from './services/ops-summary.service';
 import { prisma } from './lib/prisma';
+import { getObservability } from './middleware/observability.middleware';
 
 // อ่านไฟล์ JSON แบบ "ไม่มีก็ได้" — ใช้กับ data/system-truth.json (ผลเกตล่าสุดที่ verify เขียน)
 const readJsonIfExists = async (p: string): Promise<unknown | null> =>
@@ -197,6 +198,12 @@ export function mountRoutes(app: Express): void {
       res.json({ status: 'ok' }); // enrich ล้ม = ยอมรับเฉย ๆ — สัญญา status:'ok' ต้องไม่พัง
     }
   });
+
+  // ── GET /api/metrics — ตัวเลขสำหรับ Prometheus/Grafana (SLO, error budget) ──
+  // ปิดโดยปริญญา: ไม่ตั้ง METRICS_TOKEN = 401 ทุกคำขอ (ไม่เปิดโล่งให้ใครอ่านภารกิจทั้งระบบ)
+  // รับ token ทาง header x-metrics-token หรือ Authorization: Bearer <token> (มาตรฐานของ Prometheus)
+  // ไม่ต้อง auth ของแอป — Prometheus ไม่มี user; token เดียวคือสิทธิ์อ่าน metrics
+  app.get('/api/metrics', getObservability().metricsHandler);
 
   // ── GET /api/health/truth — ความจริง runtime ฉบับเดียวสำหรับหน้า /system-health ──
   // รวม 3 แหล่ง: (1) fingerprint ของ dist ที่โปรเซสนี้โหลดจริง (2) migration head จริงจาก DB
