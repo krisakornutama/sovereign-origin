@@ -614,9 +614,18 @@
   - ต่อสายเข้าชุดติดตั้งแล้ว (`bundleFiles`/`bundleSource`) + `.gitignore` allow-list (ไฟล์ใน `tools/agent-pack/*` ถูก ignore โดยปริยาย)
 - [ ] **D2 ทดสอบบนเครื่องลูกจริง** — เจ้าของดับเบิลคลิก `INSTALL-CHECK.cmd` บนเครื่องปลายทาง → ส่ง `SUPPORT.txt` กลับมา
       (ไม่ต้องให้ผมไปนั่งเครื่องนั้น และไม่ต้องส่งรหัสอะไรให้ใคร)
-- [ ] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — `tools/install/install.mjs` มี preflight เบา ๆ แล้ว (ตรวจ root/HUB URL)
-      ควรเรียกตรวจดิสก์/สิทธิ์/Docker ชุดเดียวกัน เพื่อให้ข้อความตรงกันทั้งสองเส้นทาง
-- [ ] **D4 ให้ doctor ตรวจ "หลังติดตั้ง" ลึกขึ้น** — autostart task มีจริง · runner process ยังมีชีวิต · heartbeat ล่าสุดบน HUB (ต้องมี token)
+- [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
+      `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
+      - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
+      - **Docker ของเครื่องแม่ = fail** (ขาดไม่ได้ เพราะต้องรัน DB+เว็บ) ต่างจากเครื่องลูกที่แค่ warn
+      - `allowCommands: !dryRun` ⇒ `--dry-run` ยังบริสุทธิ์: **ไม่ exec / ไม่ยิงเน็ต / ไม่เขียนไฟล์ทดสอบ**
+      - ข้อความ/hint มาจากชุดเดียวกัน ⇒ คนติดตั้งเห็นภาษาเดียวกันทั้งสองเส้นทาง
+- [x] **D4 ให้ doctor ตรวจ "หลังติดตั้ง" ลึกขึ้น** — **เสร็จ 27/10/69**
+      `node tools\agent-pack\doctor.mjs --post` (หรือ `INSTALL-CHECK.cmd --post`)
+      - **autostart task**: `schtasks /query /tn "Sovereign Agent Runner"` — ไม่มี = fail (รีบูตแล้วเครื่องหลุดจาก HUB)
+      - **runner process**: PowerShell CIM `Win32_Process` จับ `node.exe` ที่ CommandLine มี `agent-runner…main.mjs` → รายงาน PID
+      - **heartbeat ถึง HUB**: POST 1 ครั้ง อ่าน `{ machine: { name, last_heartbeat } }` → พิสูจน์ token + DB + เวลา
+      - เทสต์ `tools/test/doctor.test.mjs` **41/41** · mutation พิสูจน์ 3 แบบ: ถอดการกัน dry-run = **exit 1** · ปิดการตรวจหลังติดตั้ง = **exit 1** · ลด Docker ของเครื่องแม่เป็น warn = **exit 1**
 
 
 

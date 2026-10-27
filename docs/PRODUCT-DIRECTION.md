@@ -100,6 +100,7 @@
 ---
 
 ## เอกสารที่เกี่ยวข้อง
+- `docs/INSTALL-DIAGNOSTICS.md` — `INSTALL-CHECK` / `SUPPORT.txt` / `--post` (คนอื่นติดตั้งเองแล้วส่งใบตรวจกลับ)
 - `docs/SLO.md` — SLO/error budget + วิธีใช้ `/api/metrics`
 - `docs/ENTERPRISE-READINESS.md` — แผน phase 5 multi-tenant/partner (มีโครงเดิมอยู่แล้ว)
 - `docs/ARCHITECTURE.md` — กฎที่ arch-gate ตรวจอัตโนมัติ
