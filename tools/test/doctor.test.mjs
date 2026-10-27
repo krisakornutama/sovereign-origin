@@ -20,6 +20,7 @@ const ROOT = path.resolve(HERE, '..', '..');
 const TMP_ROOT = path.join(ROOT, '.freebuff', 'tmp');
 const doctor = await import('../agent-pack/doctor.mjs');
 const pack = await import('../agent-pack/pack.mjs');
+const installMod = await import('../install/install.mjs');
 
 const made = [];
 function tmpDir(name) {
@@ -281,6 +282,255 @@ describe('SUPPORT.txt: ไฟล์ที่ส่งต่อได้โดย
     const r2 = await doctor.runDoctor({ dir: blocker, ...base({ writeReport: true }) });
     assert.equal(r2.reportPath, '', 'เขียนไม่ได้ต้องคืนค่าว่าง ไม่ใช่ throw');
     assert.equal(r2.exitCode, 1, 'ยังต้องรายงานผลตรวจตามจริง');
+  });
+});
+
+describe('เครื่องแม่ (profile=hub): ตรวจชุดเดียวกับ INSTALL-CHECK', () => {
+  /** รากโปรเจ็กจำลองของเครื่องแม่ — มี compose + template เท่านั้น */
+  function hubRoot() {
+    const dir = tmpDir('hub');
+    fs.mkdirSync(path.join(dir, 'sovereign-os', 'infra'), { recursive: true });
+    const compose = path.join(dir, 'sovereign-os', 'infra', 'docker-compose.yml');
+    fs.writeFileSync(compose, 'services: {}\n');
+    const template = path.join(dir, 'sovereign.env.template');
+    fs.writeFileSync(template, 'PORT=3001\n');
+    return { dir, compose, template };
+  }
+  const hubArgs = ({ dir, compose, template }, over = {}) => ({
+    dir,
+    root: dir,
+    profile: 'hub',
+    composeFile: compose,
+    templateFile: template,
+    ...base(),
+    ...over,
+  });
+
+  test('compose + template + Docker ครบ = ผ่านหมด และไม่ถามเรื่อง join/แผนติดตั้ง', async () => {
+    const root = hubRoot();
+    const r = await doctor.runDoctor(hubArgs(root));
+    const bad = r.checks.filter((c) => c.status !== 'ok').map((c) => `${c.id}:${c.status}:${c.detail}`);
+    assert.deepEqual(bad, [], `ต้องผ่านทุกข้อ — ที่ไม่ผ่าน: ${bad.join(' | ')}`);
+    assert.equal(r.exitCode, 0);
+    assert.equal(r.checks.some((c) => c.id === 'join'), false, 'เครื่องแม่ไม่ต้องมี join.json');
+    assert.equal(r.checks.some((c) => c.id === 'plan'), false, 'เครื่องแม่ไม่ใช้ install-plan.json');
+    assert.match(r.report, /เครื่องแม่/);
+  });
+
+  test('ไม่มี Docker = fail (เครื่องแม่ขาดไม่ได้ ต่างจากเครื่องลูกที่แค่ warn)', async () => {
+    const root = hubRoot();
+    const r = await doctor.runDoctor(
+      hubArgs(root, { exec: async () => ({ code: 1, stdout: '', stderr: 'docker: not found' }) }),
+    );
+    const c = r.checks.find((x) => x.id === 'docker');
+    assert.equal(c.status, 'fail');
+    assert.match(c.hint, /Docker Desktop/);
+    assert.equal(r.exitCode, 1);
+  });
+
+  test('compose หายไป = fail พร้อมบอกให้รันจากรากโปรเจ็ก', async () => {
+    const root = hubRoot();
+    const r = await doctor.runDoctor(hubArgs(root, { composeFile: path.join(root.dir, 'ไม่มีจริง.yml') }));
+    const c = r.checks.find((x) => x.id === 'bundle');
+    assert.equal(c.status, 'fail');
+    assert.match(c.hint, /รากโปรเจ็ก/);
+    assert.equal(r.exitCode, 1);
+  });
+
+  test('มี sovereign-os/infra/.env เดิม = warn ว่าจะใช้ค่าเดิม (ไม่ทับ)', async () => {
+    const root = hubRoot();
+    fs.writeFileSync(path.join(root.dir, 'sovereign-os', 'infra', '.env'), 'POSTGRES_PASSWORD=old\n');
+    const r = await doctor.runDoctor(hubArgs(root));
+    const c = r.checks.find((x) => x.id === 'existing');
+    assert.equal(c.status, 'warn');
+    assert.match(c.hint, /--force/);
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('dry-run: ไม่ exec · ไม่ยิงเน็ต · ไม่เขียนไฟล์แม้แต่ไฟล์เดียว', async () => {
+    const root = hubRoot();
+    const execCalls = [];
+    const fetchCalls = [];
+    const before = fs.readdirSync(root.dir).sort();
+    const r = await doctor.runDoctor(
+      hubArgs(root, {
+        allowCommands: false,
+        exec: async (...a) => {
+          execCalls.push(a);
+          return { code: 0, stdout: 'unexpected', stderr: '' };
+        },
+        fetchImpl: async (...a) => {
+          fetchCalls.push(a);
+          return { status: 200, ok: true };
+        },
+      }),
+    );
+    assert.deepEqual(execCalls, [], 'dry-run ต้องไม่รันคำสั่งเลย');
+    assert.deepEqual(fetchCalls, [], 'dry-run ต้องไม่ยิงเน็ตเลย');
+    assert.deepEqual(fs.readdirSync(root.dir).sort(), before, 'dry-run ต้องไม่เขียนไฟล์');
+    assert.equal(r.checks.find((x) => x.id === 'docker').status, 'skip');
+    assert.match(r.report, /\[skip\]/);
+  });
+
+  test('เครื่องลูก + dry-run: ไม่ยิง heartbeat แม้สั่ง --heartbeat', async () => {
+    const dir = readyBundle();
+    const calls = [];
+    const r = await doctor.runDoctor({
+      dir,
+      ...base({ allowCommands: false, heartbeat: true, fetchImpl: okFetch(calls) }),
+    });
+    assert.deepEqual(calls, []);
+    assert.equal(r.checks.find((x) => x.id === 'token'), undefined, 'โหมด dry-run ต้องไม่สร้างข้อ token เลย');
+  });
+});
+
+describe('หลังติดตั้ง (--post): ของที่ต้องยังอยู่', () => {
+  const heartbeatOk = (machine) => async (url) =>
+    url.includes('/heartbeat')
+      ? { status: 200, ok: true, json: async () => ({ machine }) }
+      : { status: 200, ok: true };
+
+  const postExec = ({ task = 0, pid = '4321' } = {}) => async (cmd) => {
+    if (cmd === 'schtasks') return { code: task, stdout: task === 0 ? 'TaskName: Sovereign Agent Runner' : '', stderr: task === 0 ? '' : 'ERROR: not found' };
+    if (cmd === 'powershell') return { code: 0, stdout: pid, stderr: '' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+
+  test('task + process + heartbeat ครบ = ok ทุกข้อ (exit 0)', async () => {
+    const dir = readyBundle();
+    const r = await doctor.runDoctor({
+      dir,
+      ...base({
+        postInstall: true,
+        exec: postExec(),
+        fetchImpl: heartbeatOk({ name: 'PC-ทดสอบ', last_heartbeat: new Date().toISOString() }),
+      }),
+    });
+    assert.equal(r.checks.find((x) => x.id === 'task').status, 'ok');
+    assert.match(r.checks.find((x) => x.id === 'runner').detail, /4321/);
+    const token = r.checks.find((x) => x.id === 'token');
+    assert.equal(token.status, 'ok');
+    assert.match(token.detail, /PC-ทดสอบ/);
+    assert.match(token.detail, /วินาทีที่แล้ว/);
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('ไม่มี autostart task = fail (รีบูตแล้วเครื่องหลุดจาก HUB)', async () => {
+    const dir = readyBundle();
+    const r = await doctor.runDoctor({
+      dir,
+      ...base({
+        postInstall: true,
+        exec: postExec({ task: 1 }),
+        fetchImpl: heartbeatOk({ name: 'PC', last_heartbeat: new Date().toISOString() }),
+      }),
+    });
+    const c = r.checks.find((x) => x.id === 'task');
+    assert.equal(c.status, 'fail');
+    assert.match(c.hint, /INSTALL\.cmd/);
+    assert.equal(r.exitCode, 1);
+  });
+
+  test('task มีแต่ process ตาย = fail พร้อมบอกให้เปิด RUN-RUNNER', async () => {
+    const dir = readyBundle();
+    const r = await doctor.runDoctor({
+      dir,
+      ...base({
+        postInstall: true,
+        exec: postExec({ pid: '' }),
+        fetchImpl: heartbeatOk({ name: 'PC', last_heartbeat: new Date().toISOString() }),
+      }),
+    });
+    const c = r.checks.find((x) => x.id === 'runner');
+    assert.equal(c.status, 'fail');
+    assert.match(c.hint, /RUN-RUNNER/);
+  });
+
+  test('heartbeat 401 = fail (token ถูกยกเลิก)', async () => {
+    const dir = readyBundle();
+    const fetchImpl = async (url) => ({ status: url.includes('/heartbeat') ? 401 : 200, ok: false });
+    const r = await doctor.runDoctor({ dir, ...base({ postInstall: true, exec: postExec(), fetchImpl }) });
+    const c = r.checks.find((x) => x.id === 'token');
+    assert.equal(c.status, 'fail');
+    assert.match(c.hint, /แพ็กชุดใหม่/);
+    assert.equal(r.exitCode, 1);
+  });
+
+  test('ไม่ใช่ Windows = ข้าม task/process แต่ยังตรวจที่เหลือ', async () => {
+    const dir = readyBundle();
+    const r = await doctor.runDoctor({
+      dir,
+      ...base({
+        postInstall: true,
+        platform: 'linux',
+        exec: postExec(),
+        fetchImpl: heartbeatOk({ name: 'PC', last_heartbeat: new Date().toISOString() }),
+      }),
+    });
+    assert.equal(r.checks.find((x) => x.id === 'task').status, 'skip');
+    assert.equal(r.checks.find((x) => x.id === 'runner').status, 'skip');
+    assert.equal(r.exitCode, 0);
+  });
+
+  test('ปกติ (ไม่สั่ง --post) ยังไม่ตรวจ task/process เลย', async () => {
+    const dir = readyBundle();
+    const r = await doctor.runDoctor({ dir, ...base() });
+    assert.equal(r.checks.some((x) => x.id === 'task'), false);
+    assert.equal(r.checks.some((x) => x.id === 'runner'), false);
+  });
+});
+
+describe('ต่อสายกับ HUB installer (D3): preflight ใช้ชุดตรวจเดียวกัน', () => {
+  /** รากโปรเจ็กจำลองแบบเดียวกับที่ install.mjs ต้องการ (compose) */
+  function rootSkeleton() {
+    const dir = tmpDir('hub-root');
+    fs.mkdirSync(path.join(dir, 'sovereign-os', 'infra'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sovereign-os', 'infra', 'docker-compose.yml'), 'services:\n  db:\n    image: x\n');
+    return dir;
+  }
+
+  test('dry-run ของ installer ยังบริสุทธิ์ (doctor ไม่รันคำสั่ง/ไม่เขียนไฟล์) + มีขั้น doctor', async () => {
+    const root = rootSkeleton();
+    const execCalls = [];
+    const before = fs.readdirSync(root).sort();
+    const out = await installMod.runInstall({
+      root,
+      dryRun: true,
+      noFrontend: true,
+      withRunner: false,
+      exec: async (...a) => {
+        execCalls.push(a);
+        return { code: 0, stdout: '', stderr: '' };
+      },
+      fetchImpl: async () => ({ status: 200, ok: true }),
+      sleep: async () => {},
+      platform: 'linux',
+    });
+    assert.deepEqual(execCalls, [], `dry-run ต้องไม่รันคำสั่ง: ${JSON.stringify(execCalls)}`);
+    assert.deepEqual(fs.readdirSync(root).sort(), before, 'dry-run ต้องไม่เขียนไฟล์');
+    const step = out.steps.find((s) => s.name === 'doctor');
+    assert.ok(step, `ต้องมีขั้น doctor: ${JSON.stringify(out.steps.map((s) => s.name))}`);
+    assert.notEqual(step.status, 'fail');
+  });
+
+  test('Docker ใช้ไม่ได้บนเครื่องแม่ = หยุดที่ preflight ก่อนเขียน env', async () => {
+    const root = rootSkeleton();
+    const out = await installMod.runInstall({
+      root,
+      noFrontend: true,
+      withRunner: false,
+      exec: async (cmd, args = []) =>
+        cmd === 'docker' && args[0] === '--version'
+          ? { code: 1, stdout: '', stderr: 'docker: not found' }
+          : { code: 0, stdout: '', stderr: '' },
+      fetchImpl: async () => ({ status: 200, ok: true }),
+      sleep: async () => {},
+      platform: 'linux',
+    });
+    assert.equal(out.exitCode, 1);
+    assert.ok(out.failed.includes('preflight'), `ต้องรายงาน preflight: ${JSON.stringify(out.failed)}`);
+    assert.match(out.report, /ตรวจเครื่องไม่ผ่าน/);
+    assert.equal(fs.existsSync(path.join(root, 'sovereign-os', 'infra', '.env')), false, 'ห้ามเขียน env เมื่อ preflight ไม่ผ่าน');
   });
 });
 

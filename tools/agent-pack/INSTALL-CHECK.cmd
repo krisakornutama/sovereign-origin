@@ -29,6 +29,7 @@ type "%LOG%"
 echo.
 if not "%RC%"=="0" goto failed
 echo [OK] no blocking problem found - next: double-click INSTALL.cmd
+echo      After installing, run: INSTALL-CHECK.cmd --post  (proves the runner stays alive)
 goto end
 
 :failed

@@ -22,6 +22,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as lib from './lib.mjs';
+import { runDoctor } from '../agent-pack/doctor.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = path.join(HERE, 'sovereign.env.template');
@@ -142,6 +143,40 @@ export async function runInstall(opts = {}) {
     }
     hubUrl = lib.assertHubUrl(hubUrlRaw);
     if (!templateOk) throw new Error(`ไม่พบเทมเพลต ${path.relative(root, TEMPLATE_PATH)}`);
+
+    // ── D3: ตรวจเครื่องด้วยชุดเดียวกับ INSTALL-CHECK (ข้อความ/hint ตรงกันทั้งสองเส้นทาง) ──
+    // dry-run: allowCommands=false ⇒ ไม่ exec/ไม่ยิงเน็ต/ไม่เขียนไฟล์ทดสอบ (preflight ยังบริสุทธิ์)
+    const doc = await runDoctor({
+      dir: root,
+      root,
+      profile: 'hub',
+      composeFile,
+      templateFile: TEMPLATE_PATH,
+      allowCommands: !dryRun,
+      writeReport: false,
+      exec,
+      fetchImpl,
+      platform,
+    });
+    const docFail = doc.checks.filter((c) => c.status === 'fail');
+    if (docFail.length) {
+      throw new Error(
+        `ตรวจเครื่องไม่ผ่าน — ${docFail.map((c) => `${c.label}: ${c.detail}${c.hint ? ` → ${c.hint}` : ''}`).join(' · ')}`,
+      );
+    }
+    const docOk = doc.checks.filter((c) => c.status === 'ok').length;
+    const docWarn = doc.checks.filter((c) => c.status === 'warn');
+    if (docWarn.length) {
+      add(
+        'doctor',
+        'warn',
+        `ผ่าน ${docOk} ข้อ · เตือน ${docWarn.length}`,
+        docWarn.map((c) => `${c.label}: ${c.detail}`).join(' · '),
+      );
+    } else {
+      add('doctor', 'ok', `ผ่าน ${docOk} ข้อ (Node/Docker/สิทธิ์/ดิสก์)`);
+    }
+
     add('preflight', 'ok', `รากโปรเจ็ก=${root} · HUB=${hubUrl}`);
     checkDeploySource();
   } catch (err) {

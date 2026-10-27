@@ -36,6 +36,8 @@ echo.
 if not "%RC%"=="0" goto failed
 echo Done - this machine reports to the HUB every 15 seconds.
 echo Open the HUB web UI - Agent queue - to see this machine online.
+echo.
+echo Optional check: INSTALL-CHECK.cmd --post  (task + runner process + heartbeat)
 goto end
 
 :failed
