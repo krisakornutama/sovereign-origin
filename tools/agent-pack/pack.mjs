@@ -84,7 +84,7 @@ export function bundleFiles(root = REPO_ROOT) {
     .filter((f) => f.endsWith('.mjs'))
     .sort()
     .map((f) => `src/${f}`);
-  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd', 'install-plan.mjs', 'modules.mjs', 'INSTALL.cmd'];
+  return [...srcFiles, 'package.json', '.env.example', 'README.md', 'INSTALL-HUB.md', 'setup-machine.mjs', 'SETUP-MACHINE.cmd', 'run-runner.cmd', 'install-plan.mjs', 'modules.mjs', 'INSTALL.cmd', 'doctor.mjs', 'INSTALL-CHECK.cmd'];
 }
 
 /** ที่มาของไฟล์ในชุดติดตั้ง (ไฟล์ตัวติดตั้งมาจาก tools/agent-pack, ที่เหลือมาจาก agent-runner) */
@@ -95,6 +95,8 @@ export function bundleSource(root, rel) {
     rel === 'run-runner.cmd' ||
     rel === 'install-plan.mjs' ||
     rel === 'modules.mjs' ||
+    rel === 'doctor.mjs' ||
+    rel === 'INSTALL-CHECK.cmd' ||
     rel === 'INSTALL.cmd'
   ) {
     return path.join(root, 'tools', 'agent-pack', rel);
