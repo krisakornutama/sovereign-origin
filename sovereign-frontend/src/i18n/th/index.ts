@@ -41,6 +41,7 @@ import securityComponents from './pages/securityComponents';
 import sensorsHub from './pages/sensorsHub';
 import settings from './pages/settings';
 import system from './pages/system';
+import start from './pages/start';
 import { treasury } from './pages/treasury';
 import users from './pages/users';
 import vision from './pages/vision';
@@ -85,6 +86,7 @@ export default {
   sensorsHub,
 settings,
   system,
+  start,
   treasury,
   users,
   vision,

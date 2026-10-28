@@ -4,6 +4,7 @@ import { useLanguageStore } from '../../stores/useLanguageStore';
 import { useRouter } from 'next/navigation';
 import Icon from '../ui/Icon';
 import LanguageToggle from '../ui/LanguageToggle';
+import { loginLandingPath } from '../../lib/firstRun';
 
 const DIGIT_COUNT = 6;
 
@@ -95,7 +96,7 @@ export default function MfaInput() {
       // token เต็ม (mfa_verified=true)
       login(data.token);
       // ยังไม่ได้เปลี่ยนรหัสผ่านครั้งแรก → บังคับไปเปลี่ยนก่อนเข้า dashboard
-      router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
+      router.push(loginLandingPath(useAuthStore.getState().mustChangePassword));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -128,7 +129,7 @@ export default function MfaInput() {
       }
       login(data.token);
       setBackupCode('');
-      router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
+      router.push(loginLandingPath(useAuthStore.getState().mustChangePassword));
     } catch (err: any) {
       setError(err.message);
     } finally {
