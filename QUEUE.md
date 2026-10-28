@@ -610,7 +610,17 @@
         - เทสต์รวมเป็น **45 เคส** · sweep ทั้ง `src/**/*.tsx` เหลือ label ลอย **0 จุด** (ไม่นับ 2 wrapper)
         - red proof: เอาไฟล์ชุดนี้จาก `HEAD` (ก่อนแก้) มารัน → **exit 1 ทั้ง 10 ไฟล์** · mutation เพิ่ม 6/6 จับได้ (ถอด `htmlFor` · ถอด `id` · ถอด `htmlFor` แบบ template · เปลี่ยน caption กลับเป็น `<label>` 2 จุด)
         - `npm run verify` 6/6 exit 0 (15.2 นาที)
-  - [ ] C4 onboarding ผู้ใช้ใหม่ + ข้อความ error ที่บอก "แก้ยังไง"
+  - [x] **C4 onboarding ผู้ใช้ใหม่ + ข้อความ error ที่บอก "แก้ยังไง"** — 28/10/69
+        - `lib/actionableError.ts` — แปลง error (Error / Response-like / status number / string / โค้ด Prisma) เป็น `{kind, what, fix, retryable}` ครบ 11 ชนิด (`offline` · `unauthorized` · `forbidden` · `notFound` · `conflict` · `rateLimited` · `server` · `dbNotReady` · `badId` · `badRequest` · `unknown`) ทั้ง th/en — ทุก `fix` มีคำบอกให้ลงมือทำ (`docker ps` · `docker logs` · `migrate` · ล็อกอินใหม่ · รอ · โหลดใหม่)
+        - `components/ui/ErrorNotice.tsx` — กล่อง `role="alert"` แสดง "เกิดอะไร + แก้ยังไง" และปุ่มลองใหม่เฉพาะเมื่อ `retryable` และมี `onRetry` จริง
+        - ต่อสายจริง 3 หน้า: `energy` (ยก `load` เป็น `useCallback` เพื่อให้กดลองใหม่ได้ — เดิมอยู่ใน `useEffect`) · `inventory` · `system-health`
+        - `lib/firstRun.ts` + `pages/start.tsx` — เช็กลิสต์ 6 ขั้น (รหัสผ่าน · เซนเซอร์ · พลังงาน · ของใช้ · แจ้งเตือน · สุขภาพระบบ) ลิงก์ไปหน้าที่มีจริงทุกอัน จำความคืบหน้าใน `localStorage` ผ่านคีย์กลาง และข้ามได้
+        - ล็อกอินครั้งแรก (ปกติ + OTP 2 ทาง) พาไป `/start` ครั้งเดียวผ่าน `loginLandingPath()` — ครั้งต่อไป `/dashboard`; `mustChangePassword` ยังชนะทุกกรณี
+        - `ApiConnectionBanner` เพิ่มคำใบ้ `docker ps` + ชื่อ container เมื่อต่อ API ไม่ได้นานเกิน 1 นาที
+        - เทสต์ใหม่ 2 ไฟล์: `tools/test/actionable-errors.test.mjs` **22 เคส** (เรียกฟังก์ชันจริงผ่าน Node 24 type-stripping ไม่ใช่ grep) · `tools/test/c4-onboarding.test.mjs` **16 เคส**
+        - mutation 8/8 จับได้ (exit 1): ข้อความดิบสั้น ๆ · ถอด `role="alert"` · ปุ่มลองใหม่ไม่เช็ค `retryable` · ไม่พาไป `/start` · ลิงก์ขั้นตอนผิดหน้า · login กลับไป push เอง · ถอดคำใบ้ docker · energy ไม่ใช้ ErrorNotice
+        - บทเรียน: เทสต์ที่อ่านซอร์ส **ต้องตัด comment ก่อนตรวจเสมอ** — รอบแรก M2/M3 ผ่านเพราะคอมเมนต์มีคำว่า `role="alert"`/`retryable` อยู่ (แก้เทสต์ ไม่ใช่แก้ mutation)
+        - `npm run verify` 6/6 exit 0 (17.1 นาที) · sweep label ลอยทั้ง `src/**/*.tsx` = 0
 
 ---
 

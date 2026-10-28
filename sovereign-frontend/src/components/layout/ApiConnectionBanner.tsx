@@ -44,6 +44,9 @@ export default function ApiConnectionBanner() {
           <span>
             <b>{t('app.banner.connecting', 'กำลังเชื่อมต่อใหม่…')}</b>{t('app.banner.connectingDetail', ' (ลองครั้งที่ {n}) — API ยังไม่ตอบสนอง ระบบจะลองเองอัตโนมัติทุกไม่กี่วินาที', { n: attempt })}
           </span>
+          <span className="hidden sm:inline text-[11px] opacity-80">
+            {t('app.banner.dockerHint', 'ถ้านานเกิน 1 นาที: เปิด Docker Desktop แล้วรัน docker ps ดูว่า sovereign-core-api ทำงานอยู่')}
+          </span>
           <button
             onClick={retryNow}
             className="px-3 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-amber-50 text-xs font-semibold"

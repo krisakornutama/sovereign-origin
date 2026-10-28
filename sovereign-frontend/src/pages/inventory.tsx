@@ -8,6 +8,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
+import ErrorNotice from '../components/ui/ErrorNotice';
 import VoiceCommand from '../components/dashboard/VoiceCommand';
 import type { InventoryItem } from '../types';
 import { useLanguageStore } from '../stores/useLanguageStore';
@@ -279,7 +280,7 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          {error && <div className="bg-red-500/10 border border-red-500/40 text-red-300 rounded px-4 py-2 text-sm">{error}</div>}
+          <ErrorNotice error={error} onRetry={load} />
           {message && <div className="bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 rounded px-4 py-2 text-sm">{message}</div>}
 
           {/* Filters */}

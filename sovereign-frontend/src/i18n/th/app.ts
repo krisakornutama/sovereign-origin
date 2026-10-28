@@ -7,6 +7,7 @@ export default {
     connecting: 'กำลังเชื่อมต่อใหม่…',
     connectingDetail: ' (ลองครั้งที่ {n}) — API ยังไม่ตอบสนอง ระบบจะลองเองอัตโนมัติทุกไม่กี่วินาที',
     retryNow: 'ลองทันที',
+    dockerHint: 'ถ้านานเกิน 1 นาที: เปิด Docker Desktop แล้วรัน docker ps ดูว่า sovereign-core-api ทำงานอยู่',
     reconnected: 'เชื่อมต่อ API แล้ว',
     reconnectedDetail: ' — กำลังโหลดข้อมูลให้อัตโนมัติ…',
   },
