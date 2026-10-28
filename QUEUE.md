@@ -589,8 +589,8 @@
 - [ ] **A-obs7 ต่อยอดหลัง A-obs4** — DB latency ผ่าน Prisma middleware · queue depth (offline queue/agent/MQTT) · alert "error budget กำลังหมด" · span ระดับ OTel
 
 ## คิวถัดไปที่เจ้าของเลือกไว้ (ยังไม่เริ่ม)
-- [x] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง — **โค้ด + tests แล้ว 27/10/69** (`docs/IDEMPOTENCY.md`)
-      ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · **ยังไม่ apply migration / ไม่ restart** (รอ Cold Soak)
+- [x] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง — **ใช้งานจริงแล้ว 28/10/69** (`docs/IDEMPOTENCY.md`)
+      ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · migrate + restart + smoke 8/8 ผ่าน
 - [ ] **B2 local read model + กติกา conflict resolution** — ยังไม่เริ่ม (ต้องมี sync จริงก่อน)
 - [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
 
@@ -638,7 +638,13 @@
   - frontend: `newIdempotencyKey()` + `authFetch` แนบให้ทุก POST/PUT/PATCH/DELETE (caller ตั้งเองได้) · คิวออฟไลน์เก็บ header ไว้ replay
   - เทสต์: backend `tests/idempotency.test.ts` **22/22** · `tools/test/idempotency-migration.test.mjs` 14 · `tools/test/idempotency-wiring.test.mjs` 10
   - mutation พิสูจน์แล้ว (exit 1 ทั้งหมด): ถอด `idempotent()` ออกจาก route · สลับก่อน `requireRole` · `authFetch` ทับคีย์ caller · แก้ชื่อคอลัมน์ migration
-  - [ ] apply migration `20261027120000_idempotency_keys` + restart core-api — **รออนุมัติ/จบ Cold Soak** (ตอนนี้ระบบทำงานได้แต่ยังไม่กันซ้ำ)
+  - [x] apply migration `20261027120000_idempotency_keys` + restart core-api — **เสร็จ 28/10/69**
+        backup `backups/postgres/sovereign_20261028_001831.dump` (6.1 MB) → migrate deploy (67/67 up to date) →
+        restart healthy 27 วิ · `/api/health` `migrationHead=20261027120000_idempotency_keys` · restarts=0
+        - ซ้อม SQL ใน scratch schema ก่อน (unique กันแถวซ้ำได้จริง) แล้ว DROP ทิ้ง
+        - smoke 8/8: คีย์ผิดรูปแบบ = 400 `IDEMPOTENCY_INVALID_KEY` · ไม่ส่งคีย์ = 400 เดิม ·
+          replay บนตารางจริง = handler รันครั้งเดียว + `Idempotency-Replayed: true` · payload ต่าง = 409 ·
+          เก็บกวาดแล้วเหลือ 0 แถว · log ไม่มี "table ... is missing"
   - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ
 
 
