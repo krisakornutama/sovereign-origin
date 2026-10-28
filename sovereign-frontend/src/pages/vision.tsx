@@ -340,8 +340,9 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="space-y-2">
-                <label className="text-xs text-gray-400 block">{t('vision.uploadLabel', 'อัปโหลดภาพ (สูงสุด 10MB, jpg/png/webp)')}</label>
+                <label htmlFor="vision-file" className="text-xs text-gray-400 block">{t('vision.uploadLabel', 'อัปโหลดภาพ (สูงสุด 10MB, jpg/png/webp)')}</label>
                 <input
+                  id="vision-file"
                   type="file"
                   accept="image/*"
                   onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
@@ -352,8 +353,9 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-gray-400 block">{t('vision.orUrlLabel', 'หรือ URL snapshot กล้อง (http://กล้อง/snapshot.jpg)')}</label>
+                <label htmlFor="vision-url" className="text-xs text-gray-400 block">{t('vision.orUrlLabel', 'หรือ URL snapshot กล้อง (http://กล้อง/snapshot.jpg)')}</label>
                 <input
+                  id="vision-url"
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -361,8 +363,9 @@ if (d.skipped === 'disabled') setCheckResult(t('vision.checkDisabled', 'กฎ�
                   className="input w-full"
                 />
                 <div className="space-y-1">
-                  <label className="label">{t('vision.cameraLabel', 'กล้อง (ไม่บังคับ — บันทึกเหตุการณ์ได้)')}</label>
+                  <label htmlFor="vision-camera" className="label">{t('vision.cameraLabel', 'กล้อง (ไม่บังคับ — บันทึกเหตุการณ์ได้)')}</label>
                   <select
+                    id="vision-camera"
                     value={cameraId}
                     onChange={(e) => setCameraId(e.target.value)}
                     className="input w-full"
