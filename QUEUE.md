@@ -661,6 +661,13 @@
       3) **doctor ต้องพิมพ์ชัดทุกรอบ**: "รอบนี้ไม่ได้ส่งสัญญาณถึง HUB — รัน `INSTALL-CHECK.cmd --post` เพื่อพิสูจน์การเชื่อมต่อ" (กันเข้าใจผิดว่ารันแล้ว HUB ต้องเห็น)
       4) โครงโฟลเดอร์ชุดติดตั้งเรียบลง — START-HERE เด่นสุด ของ build/dev ย้ายไปโฟลเดอร์ย่อย
       เกณฑ์รับ: เทสต์ red-first + mutation + `npm run verify` ผ่าน + ติดตั้งจริงบนเครื่องลูกแล้ว **heartbeat โผล่ใน DB ทันที**
+      ▸ **คืบหน้า 28/10/69 (slice 1 — กันชุดพังแบบเงียบ ๆ ที่เจอจริงวันนี้)** บน branch `ai/d5-one-button-installer`:
+        · pack ตรวจสายก่อนแพ็กแล้ว — ยิง `GET <hub>/api/health` จริง ไม่ผ่าน = หยุด (exit 1 `hub_unreachable` + ชี้วิธีแก้ `--hub-url`) · 403 นับเป็นยิงไม่ถึง · dry-run ยังไม่แตะเน็ต
+        · HUB_URL เป็น IP ส่วนตัว (LAN/localhost) = แพ็กได้แต่**เตือน DHCP** ทั้งรายงานและ START-HERE (โดเมน = ไม่เตือน)
+        · doctor พิมพ์ท้ายรายงานเสมอเมื่อรอบนั้นไม่ได้ส่งสัญญาณ: "รอบนี้ไม่ได้ส่งสัญญาณถึง HUB … INSTALL-CHECK.cmd --post" (ข้ามเมื่อโปรไฟล์ hub หรือ heartbeat ถึงตัว HUB แล้ว) — เสร็จตามข้อ 3
+        · START-HERE ปิดท้ายด้วยเรื่องเดียว: **INSTALL.cmd ปุ่มเดียว** → ยังไม่ออนไลน์ = รัน `--post` แล้วส่ง `SUPPORT.txt`
+        · เทสต์ red-first `tools/test/d5-installer.test.mjs` (แดง exit 1 → เขียว 9/9) · เทสต์เดิม 11 จุดที่เรียก runPack เติม fetchImpl ปลอมแล้ว
+        · ยังเหลือ: ค่าเริ่มต้น HUB_URL เป็นโดเมน (ข้อ 2 ครึ่งหลัง) + รวมปุ่ม .cmd ให้เหลือตัวเดียวจริง (ข้อ 1/4) — รอ slice ถัดไป
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
