@@ -186,6 +186,21 @@ export function readEnrollmentFile(dir) {
   return { hubUrl: pick('HUB_URL'), code: pick('MACHINE_ENROLL_CODE') };
 }
 
+/**
+ * อ่าน executors ที่แพ็กกำหนดไว้ให้เครื่องนี้ (install-plan.json — เขียนตอนแพ็กด้วย --executors)
+ * @returns {string} เช่น "echo,opencode" · ค่าว่างถ้าชุดไม่ระบุ/อ่านไม่ได้ (ผู้เรียกใช้ echo ต่อ)
+ */
+function readPlanExecutors(bundleRoot) {
+  try {
+    const file = path.join(bundleRoot, 'install-plan.json');
+    if (!fs.existsSync(file)) return '';
+    const plan = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    return String(plan?.executors ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
 export function readJoin(dir) {
   const file = path.join(dir, 'join.json');
   if (!fs.existsSync(file)) {
@@ -277,7 +292,8 @@ export async function runSetup({
   platform = process.platform,
   home = os.homedir(),
   machineName = '',
-  executors = 'echo',
+  // ค่าว่าง = ไม่สั่งเอง ⇒ ใช้ค่าจาก install-plan.json ที่แพ็กมากับชุด (สุดท้าย echo)
+  executors = '',
   force = false,
   skipTask = false,
   log = console.log,
@@ -311,6 +327,9 @@ export async function runSetup({
   const bundleRoot = findBundleRoot(dir);
   const runnerDir = resolveRunnerDir(dir, bundleRoot);
   const join = readJoin(bundleRoot);
+  // executors ที่เครื่องนี้จะเปิด: สิ่งที่สั่งเอง (--executors) > ชุดแพ็ก (install-plan.json) > echo
+  // (ชุด dev 29/10/69: แพ็กด้วย --executors=echo,opencode ⇒ เครื่องลูกเปิด opencode โดยไม่ต้องพิมพ์อะไร)
+  executors = String(executors || readPlanExecutors(bundleRoot) || 'echo');
 
   // โหมดชุดสากร: ไม่มี join.json แต่มี --enroll ⇒ ขอ token เอง
   let resolved = join.ok ? { hubUrl: join.hubUrl, machineToken: join.machineToken, machineName: join.machineName } : null;
@@ -514,6 +533,7 @@ if (isMain) {
       hubUrl: (argv.find((a) => a.startsWith('--hub-url=')) ?? '').slice(10) || '',
       enrollCode: (argv.find((a) => a.startsWith('--code=')) ?? '').slice(7) || process.env.MACHINE_ENROLL_CODE || '',
       machineName: (argv.find((a) => a.startsWith('--name=')) ?? '').slice(7) || '',
+      executors: (argv.find((a) => a.startsWith('--executors=')) ?? '').slice(12) || '',
     });
     process.exitCode = out.exitCode;
   }
