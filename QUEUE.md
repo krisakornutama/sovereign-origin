@@ -604,7 +604,12 @@
           และ **ห้ามตัด block comment ด้วย `/\*...\*/`** — สตริง `accept="image/*"` ทำให้โค้ดถูกกินทั้งบล็อก
   - [x] **C2 ฟอร์มที่คนในบ้านใช้จริง (ชุดแรก)** — 28/10/69: `settings` (Telegram) · `sensors/SensorsHub` · `predictive` · `restaurant` + `restaurant/admin` · `vision`
   - [x] **C3 `img` ไม่มี `alt`** — 28/10/69: `pages/trace.tsx` (QR ในหน้าพิมพ์) ใส่ `alt="QR ${qr.lotCode}"`
-  - [ ] C2b ฟอร์มที่เหลือ — ยังมี `label` ลอย **23 จุด ใน 12 ไฟล์** (`coding/CodingIde` 4 · `pages/relay` 4 · `pages/terrain-demo` 3 · `pages/ai` 2 · `coding/SkillQueuePanel` 2 · `scenarios/ScenarioForecast` 2 · `research/rice` · `skills` · `treasury` = 9 ไฟล์ และอีก 3 ตัวที่เป็น wrapper component (`business/soverien/ui`, `agent-queue`, `selfreliance`) ซึ่งรับ `children` — ต้องใช้ `useId` ไม่ใช่ `htmlFor` ตายตัว)
+  - [x] **C2b ฟอร์มที่เหลือ** — 28/10/69: ผูก `label` ↔ ช่องกรอกครบ **10 ไฟล์** (`coding/CodingIde` · `coding/SkillQueuePanel` · `scenarios/ScenarioForecast` · `pages/ai` · `pages/relay` · `pages/terrain-demo` · `pages/skills` · `pages/selfreliance` · `pages/research/rice` · `pages/treasury`)
+        - 3 จุดที่เป็น "ป้ายหัวกลุ่มปุ่ม" (ไม่ใช่ label ของช่องกรอก) เปลี่ยนเป็น `<div>`: `CodingIde` (ระดับเหตุผล) · `relay` (วันในสัปดาห์) · `treasury` (ทิศทาง) — `<label>` ที่ไม่มี control ข้างในทำให้ screen reader อ่านหลอก
+        - 2 ตัวที่เป็น wrapper component (`business/soverien/ui.tsx` `Field` · `agent-queue.tsx` `Field`) รับ `children` → เป็น implicit association ตาม spec **ไม่แก้โค้ด** แต่ให้เทสต์ข้ามอย่างมีเหตุผล
+        - เทสต์รวมเป็น **45 เคส** · sweep ทั้ง `src/**/*.tsx` เหลือ label ลอย **0 จุด** (ไม่นับ 2 wrapper)
+        - red proof: เอาไฟล์ชุดนี้จาก `HEAD` (ก่อนแก้) มารัน → **exit 1 ทั้ง 10 ไฟล์** · mutation เพิ่ม 6/6 จับได้ (ถอด `htmlFor` · ถอด `id` · ถอด `htmlFor` แบบ template · เปลี่ยน caption กลับเป็น `<label>` 2 จุด)
+        - `npm run verify` 6/6 exit 0 (15.2 นาที)
   - [ ] C4 onboarding ผู้ใช้ใหม่ + ข้อความ error ที่บอก "แก้ยังไง"
 
 ---

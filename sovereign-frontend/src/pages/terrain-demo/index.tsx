@@ -82,10 +82,11 @@ export default function TerrainDemoPage() {
           </h2>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label htmlFor="terrain-width" className="block text-xs text-gray-400 mb-1">
               {t("terrain.width", "Width (m)")}
             </label>
             <input
+              id="terrain-width"
               type="number"
               min={10}
               max={2000}
@@ -96,10 +97,11 @@ export default function TerrainDemoPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label htmlFor="terrain-length" className="block text-xs text-gray-400 mb-1">
               {t("terrain.length", "Length (m)")}
             </label>
             <input
+              id="terrain-length"
               type="number"
               min={10}
               max={2000}
@@ -110,10 +112,11 @@ export default function TerrainDemoPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label htmlFor="terrain-resolution" className="block text-xs text-gray-400 mb-1">
               {t("terrain.resolution", "Resolution (m/px)")}
             </label>
             <input
+              id="terrain-resolution"
               type="number"
               min={1}
               max={50}

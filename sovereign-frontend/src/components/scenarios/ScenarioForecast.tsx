@@ -152,8 +152,8 @@ export default function ScenarioForecast({
       {/* Controls */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
         <div className="space-y-1">
-          <label className="text-xs text-gray-400 block">{t('scenarioForecast.focusLabel', 'หัวข้อที่ให้ความสำคัญ')}</label>
-          <select
+          <label htmlFor="scenario-focus" className="text-xs text-gray-400 block">{t('scenarioForecast.focusLabel', 'หัวข้อที่ให้ความสำคัญ')}</label>
+          <select id="scenario-focus"
             value={focus}
             onChange={(e) => setFocus(e.target.value)}
             className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm"
@@ -162,8 +162,8 @@ export default function ScenarioForecast({
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-gray-400 block">{t('scenarioForecast.horizonLabel', 'กรอบเวลา (วัน)')}</label>
-          <select
+          <label htmlFor="scenario-horizon" className="text-xs text-gray-400 block">{t('scenarioForecast.horizonLabel', 'กรอบเวลา (วัน)')}</label>
+          <select id="scenario-horizon"
             value={horizonDays}
             onChange={(e) => setHorizonDays(Number(e.target.value))}
             className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm"

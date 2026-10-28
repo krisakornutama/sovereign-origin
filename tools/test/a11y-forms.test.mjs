@@ -45,6 +45,17 @@ const FORM_FILES = {
   restaurantAdmin: 'sovereign-frontend/src/pages/restaurant/admin.tsx',
   restaurant: 'sovereign-frontend/src/pages/restaurant/index.tsx',
   vision: 'sovereign-frontend/src/pages/vision.tsx',
+  // C2b — ฟอร์มที่เหลือ (28/10)
+  relay: 'sovereign-frontend/src/pages/relay.tsx',
+  ai: 'sovereign-frontend/src/pages/ai.tsx',
+  terrainDemo: 'sovereign-frontend/src/pages/terrain-demo/index.tsx',
+  skills: 'sovereign-frontend/src/pages/skills.tsx',
+  selfreliance: 'sovereign-frontend/src/pages/selfreliance.tsx',
+  rice: 'sovereign-frontend/src/pages/research/rice.tsx',
+  treasury: 'sovereign-frontend/src/pages/treasury.tsx',
+  codingIde: 'sovereign-frontend/src/components/coding/CodingIde.tsx',
+  skillQueue: 'sovereign-frontend/src/components/coding/SkillQueuePanel.tsx',
+  scenarioForecast: 'sovereign-frontend/src/components/scenarios/ScenarioForecast.tsx',
 };
 
 // ── ตัวอ่านแท็กแบบไม่หลง `=>` หรือ template string ──────────────────────────
@@ -106,6 +117,10 @@ function labelsWithNoAssociation(src) {
     const close = src.indexOf('</label>', label.end);
     const inner = close === -1 ? '' : src.slice(label.end, close);
     if (/<(input|select|textarea)\b/.test(inner)) continue;
+    // wrapper component ที่รับ `children` (เช่น `Field`) — ผู้เรียกเอา control มาใส่ข้างใน
+    // ⇒ เป็น implicit association ตาม spec เช่นกัน แต่ static analysis มองไม่เห็นว่า children คืออะไร
+    // (ตรวจที่ `soverien/ui.tsx` และ `agent-queue.tsx` แล้วว่าใช้แบบนั้นจริง)
+    if (/\{children\}/.test(inner)) continue;
     bad.push(label.text.replace(/\s+/g, ' ').slice(0, 80));
   }
   return bad;

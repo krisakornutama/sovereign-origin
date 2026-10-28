@@ -189,8 +189,9 @@ export default function SelfReliancePage() {
                   ["targetDays", "เป้าวันรอด", "วัน"],
                 ] as const).map(([key, label, unit]) => (
                   <div key={key}>
-                    <label className="text-gray-400 block mb-1">{label}</label>
+                    <label htmlFor={`sr-${key}`} className="text-gray-400 block mb-1">{label}</label>
                     <input
+                      id={`sr-${key}`}
                       type="number" step="any" disabled={!editing}
                       value={String(form[key] ?? "")}
                       onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })}
