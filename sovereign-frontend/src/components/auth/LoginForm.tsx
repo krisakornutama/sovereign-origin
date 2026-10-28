@@ -138,15 +138,21 @@ export default function LoginForm() {
             </div>
           ) : (
             error && (
-              <div className="p-3 rounded-lg bg-red-900/30 border border-red-800/60 text-red-300 text-sm text-center">
+              // role="alert": screen reader ประกาศทันทีที่ล็อกอินไม่ผ่าน (เดิมเงียบ)
+              <div
+                id="login-error"
+                role="alert"
+                className="p-3 rounded-lg bg-red-900/30 border border-red-800/60 text-red-300 text-sm text-center"
+              >
                 {error}
               </div>
             )
           )}
 
           <div className="space-y-1">
-            <label className="label">{t('login.username')}</label>
+            <label htmlFor="login-username" className="label">{t('login.username')}</label>
             <input
+              id="login-username"
               type="text"
               autoComplete="username"
               className="input w-full text-white transition-colors focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
@@ -155,11 +161,14 @@ export default function LoginForm() {
               placeholder="admin"
               required
               autoFocus
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'login-error' : undefined}
             />
           </div>
           <div className="space-y-1">
-            <label className="label">{t('login.password')}</label>
+            <label htmlFor="login-password" className="label">{t('login.password')}</label>
             <input
+              id="login-password"
               type="password"
               autoComplete="current-password"
               className="input w-full text-white transition-colors focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
@@ -167,6 +176,8 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'login-error' : undefined}
             />
           </div>
           <button
