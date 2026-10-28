@@ -593,7 +593,8 @@
       ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · migrate + restart + smoke 8/8 ผ่าน ·
       frontend build ใหม่ขึ้น `:3000` แล้ว ผู้ใช้เบราว์เซอร์ส่ง `x-idempotency-key` จริง
 - [ ] **B2 local read model + กติกา conflict resolution** — ยังไม่เริ่ม (ต้องมี sync จริงก่อน)
-- [ ] **C "คนในบ้านใช้เองได้"** — a11y + onboarding + error ที่บอกทางแก้
+- [x] **C "คนในบ้านใช้เองได้"** — a11y + onboarding + error ที่บอกทางแก้ — **ครบทั้งชุด 28/10/69** (C1/C2/C2b/C3/C4 + deploy ขึ้น `:3000`)
+      ยอดรวม: a11y 45 เคส + `actionable-errors` 22 + `c4-onboarding` 16 · mutation พิสูจน์ 19 แบบ (5+6+8) จับได้ทั้งหมด · label ลอยทั้ง `src/**/*.tsx` = 0 · `npm run verify` 6/6 exit 0
   - [x] **C1 หน้าล็อกอิน / OTP / เปลี่ยนรหัสผ่าน** — 28/10/69
         `tools/test/a11y-forms.test.mjs` **25 เคส** (static อ่าน JSX — ไม่ต้องมีบัญชี/เซิร์ฟเวอร์)
         - `label` ผูกกับช่องกรอกจริง (`htmlFor` ↔ `id`) · ทุกช่องมีชื่อให้ screen reader · ไม่มี `htmlFor` ชี้เป้าผิด
@@ -621,7 +622,12 @@
         - mutation 8/8 จับได้ (exit 1): ข้อความดิบสั้น ๆ · ถอด `role="alert"` · ปุ่มลองใหม่ไม่เช็ค `retryable` · ไม่พาไป `/start` · ลิงก์ขั้นตอนผิดหน้า · login กลับไป push เอง · ถอดคำใบ้ docker · energy ไม่ใช้ ErrorNotice
         - บทเรียน: เทสต์ที่อ่านซอร์ส **ต้องตัด comment ก่อนตรวจเสมอ** — รอบแรก M2/M3 ผ่านเพราะคอมเมนต์มีคำว่า `role="alert"`/`retryable` อยู่ (แก้เทสต์ ไม่ใช่แก้ mutation)
         - `npm run verify` 6/6 exit 0 (17.1 นาที) · sweep label ลอยทั้ง `src/**/*.tsx` = 0
-        - **deploy 28/10/69**: สลับ build ขึ้น `:3000` แล้ว — BUILD_ID `lAvVNVOFYVjQGF3WYRgTR` · `/start/` = 200 · `__NEXT_DATA__ page=/start` ตรง · build เก่า `R5T_mlyuNUkW18UpSCGuM` เก็บที่ `logs/next-backup-20261028_155543` (rollback = สลับโฟลเดอร์กลับ) · `sw-precache.json` regen หลังสลับ = 159 assets · backend `/api/health/` ok · ไม่มี migration/restart backend
+      - **deploy 28/10/69**: สลับ build ขึ้น `:3000` แล้ว — BUILD_ID `lAvVNVOFYVjQGF3WYRgTR` · `/start/` = 200 · `__NEXT_DATA__ page=/start` ตรง · build เก่า `R5T_mlyuNUkW18UpSCGuM` เก็บที่ `logs/next-backup-20261028_155543` (rollback = สลับโฟลเดอร์กลับ) · `sw-precache.json` regen หลังสลับ = 159 assets · backend `/api/health/` ok · ไม่มี migration/restart backend
+      - **acceptance ผ่านเบราว์เซอร์จริง 28/10/69**: เปิด `http://127.0.0.1:3000/start/` บน Chromium — เรนเดอร์ครบ (หัว "เริ่มใช้ระบบใน 6 ขั้น" · 6 ขั้น · skip · footer) ·
+        ลิงก์ 6 ขั้นชี้ `/change-password` `/sensors` `/energy` `/inventory` `/alerts` `/system-health` ครบ · `label htmlFor` ↔ `checkbox id` ผูกถูกทุกขั้น ·
+        ติ๊กขั้นแรก → "ทำแล้ว 1 / 6" + `localStorage['sovereign.firstRunSteps'] = ["password"]` · ยกเลิก → กลับ 0/6 + `[]` ·
+        กด "ข้ามไปก่อน" → client-nav ไป `/dashboard/` + `sovereign.firstRunSeen = "1"` · console error = 0 · ลบคีย์ทดสอบออกคืนสภาพเดิมแล้ว
+        (ทดสอบแบบไม่ล็อกอิน — dashboard ขึ้น "ไม่มีสิทธิ์" ตาม design ไม่ใช่ข้อผิดพลาดของ `/start`)
 
 ---
 
