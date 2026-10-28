@@ -8,6 +8,7 @@ import { getApiUrl } from '../lib/config';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import ErrorNotice from '../components/ui/ErrorNotice';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /system-health — ความจริง runtime ฉบับเดียว เห็นได้ทันที (Phase 1 arch-hardening)
@@ -150,11 +151,7 @@ export default function SystemHealthPage() {
         />
         <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-7xl mx-auto w-full">
           {loading && <div className="text-gray-400">{t('systemHealth.loading', 'กำลังโหลด…')}</div>}
-          {error && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 text-sm">
-              {t('systemHealth.loadError', 'โหลดข้อมูลไม่ได้')}: {error}
-            </div>
-          )}
+          <ErrorNotice error={error} onRetry={load} />
           {data && !loading && (
             <>
               {/* แถว 1: การเทียบหลัก — runtime ↔ disk */}

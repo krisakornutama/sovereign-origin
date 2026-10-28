@@ -5,6 +5,7 @@ import MfaInput from './MfaInput';
 import { useRouter } from 'next/navigation';
 import Icon from '../ui/Icon';
 import LanguageToggle from '../ui/LanguageToggle';
+import { loginLandingPath } from '../../lib/firstRun';
 
 function formatCountdown(totalSec: number): string {
   const m = Math.floor(totalSec / 60);
@@ -67,7 +68,7 @@ export default function LoginForm() {
       } else {
         // token สมบูรณ์ → เข้าระบบ (redirect ไปเปลี่ยนรหัสก่อนถ้ายังไม่ได้เปลี่ยนครั้งแรก)
         login(data.token);
-        router.push(useAuthStore.getState().mustChangePassword ? '/change-password' : '/dashboard');
+        router.push(loginLandingPath(useAuthStore.getState().mustChangePassword));
       }
     } catch (err: any) {
       // fetch ล้มเอง (TypeError: Failed to fetch) = ติดต่อ backend ไม่ได้ — แยกจาก error ที่เรา throw เอง

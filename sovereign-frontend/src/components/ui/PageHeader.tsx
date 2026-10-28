@@ -26,7 +26,7 @@ const ROUTE_THEMES: Array<{ atmo: Atmosphere; re: RegExp }> = [
   { atmo: 'guard', re: /^\/(security|vision|property|alerts|risk-monitor)(\/|$)/ },
   { atmo: 'wealth', re: /^\/(treasury|reports|knowledge|history)(\/|$)/ },
   { atmo: 'kitchen', re: /^\/restaurant(\/|$)/ },
-  { atmo: 'system', re: /^\/(business|system|backup|users|audit|settings|change-password|hover-cards)(\/|$)/ },
+  { atmo: 'system', re: /^\/(business|system|backup|users|audit|settings|change-password|hover-cards|start)(\/|$)/ },
 ];
 
 export function themeClassForPath(pathname: string): string {
