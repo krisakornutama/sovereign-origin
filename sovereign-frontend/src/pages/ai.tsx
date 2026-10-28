@@ -217,18 +217,19 @@ export default function AiPage() {
             <p className="text-xs text-gray-500">{t('ai.whatIfDesc', 'จำลองผลกระทบแบบคำนวณจริงจากข้อมูลปัจจุบัน แล้วให้ AI สรุปว่า "ควรเตรียมตัวอย่างไร"')}</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <div className="space-y-1">
-                <label className="text-xs text-gray-400 block">{t('ai.scenarioLabel', 'สถานการณ์')}</label>
-                <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="input w-full">
+                <label htmlFor="ai-scenario" className="text-xs text-gray-400 block">{t('ai.scenarioLabel', 'สถานการณ์')}</label>
+                <select id="ai-scenario" value={scenario} onChange={(e) => setScenario(e.target.value)} className="input w-full">
                   <option value="no_rain">{t('ai.scenarioNoRain', 'ฝนไม่ตกเลย (น้ำไม่เติม)')}</option>
                   <option value="no_power">{t('ai.scenarioNoPower', 'ไม่มีไฟชาร์จ (แบตถ่านอย่างเดียว)')}</option>
                   <option value="cost_increase">{t('ai.scenarioCostIncrease', 'ค่าใช้จ่ายเพิ่มขึ้น')}</option>
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-gray-400 block">
+                <label htmlFor="ai-days" className="text-xs text-gray-400 block">
                   {scenario === 'cost_increase' ? t('ai.costPercentLabel', 'เปอร์เซ็นต์ค่าใช้จ่ายที่เพิ่ม (%)') : t('ai.durationLabel', 'ระยะเวลา (วัน)')}
                 </label>
                 <input
+                  id="ai-days"
                   type="number"
                   min={1}
                   max={365}
