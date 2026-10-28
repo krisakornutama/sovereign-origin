@@ -96,6 +96,26 @@ describe('runPack: เลือกฟังก์ชั่น + เครื่�
     assert.match(out.report, /krisakorn/);
   });
 
+  // ชุด dev (29/10/69): แพ็กด้วย --executors=echo,opencode ต้องพาค่าไปถึงตัวติดตั้ง
+  // เดิม install-plan ไม่มี executors ⇒ เครื่องลูกเขียน .env เปิดแค่ echo เสมอ ทั้งที่ token ฝั่ง HUB เปิด opencode แล้ว
+  test('แพ็กด้วย --executors → install-plan ต้องพา executors ไปให้ตัวติดตั้งเครื่องลูก', async () => {
+    const dir = sandbox('executors');
+    const issue = fakeIssuer(dir, { id: 'm-10', name: 'เครื่องที่-5', token: 'tok-secret-10', owner: { id: 'u-1', username: 'krisakorn' }, lanConfirmed: true });
+    const out = await pack.runPack(
+      basePack(dir, {
+        dryRun: false,
+        issueCommand: { cmd: process.execPath, args: [issue] },
+        executors: 'echo,opencode',
+        modules: ['core'],
+        owner: 'krisakorn',
+        confirmLan: true,
+      }),
+    );
+    assert.equal(out.exitCode, 0, out.report);
+    const plan = JSON.parse(fs.readFileSync(path.join(dir, 'install-plan.json'), 'utf8'));
+    assert.equal(plan.executors, 'echo,opencode', 'install-plan ต้องมี executors ที่เลือกไว้ — เครื่องลูกจะได้เปิด executor ตรงกับฝั่ง HUB');
+  });
+
   test('ส่ง --owner / --confirm-lan ไปถึงสคริปต์ออก token', async () => {
     const dir = sandbox('args');
     const issue = fakeIssuer(dir, { id: 'm-9', name: 'เครื่องที่-4', token: 'tok-9' });

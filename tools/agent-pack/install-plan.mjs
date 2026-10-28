@@ -54,6 +54,7 @@ export function buildInstallPlan({
   machineName = '',
   hubUrl = '',
   parent = null,
+  executors = '',
   modules = [],
   createdAt = new Date().toISOString(),
 } = {}) {
@@ -66,6 +67,9 @@ export function buildInstallPlan({
     machineName: String(machineName ?? '').trim(),
     hubUrl: String(hubUrl ?? '').trim().replace(/\/$/, ''),
     parent: owner,
+    // executors ที่เครื่องลูกควรเปิด (เช่น "echo,opencode") — setup-machine อ่านค่านี้เขียน .env
+    // ให้เครื่องลูกโดยไม่ต้องพิมพ์อะไร (ค่าว่าง = ไม่ระบุ → เครื่องลูกใช้ค่าเริ่มต้น echo)
+    ...(String(executors ?? '').trim() ? { executors: String(executors).trim() } : {}),
     modules: picked,
     moduleLabels: picked.map((id) => findModule(id, MODULE_CATALOG)?.label ?? id),
     enabledModules: enabledModulesFor(picked, MODULE_CATALOG),

@@ -356,6 +356,38 @@ describe('setup-machine: ติดตั้งที่เครื่องล�
     assert.match(out.report, /ข้ามการสตาร์ท|ตรวจไม่ได้ว่า runner รันอยู่/, 'ต้องแจ้งชัดว่าข้ามการสตาร์ทเพราะตรวจ process ไม่ได้');
     assert.match(out.report, /RUN-RUNNER\.cmd|รีบูต|ล็อกอิน/, 'ต้องบอกวิธีเปิด runner เองต่อ');
   });
+
+  // ── ชุด dev (29/10/69): executors ต้องไหลจากชุดแพ็ก → .env ของเครื่องลูก ─────
+  // เจ้าของดับเบิลคลิกโดยไม่พิมพ์อะไร ⇒ ค่าต้องมาจาก install-plan.json ที่แพ็กมากับชุด
+  test('ชุด dev: ติดตั้งจากชุดที่แพ็กด้วย executors → .env เปิด executor ตามชุด (ไม่ต้องพิมพ์อะไร)', async () => {
+    fs.writeFileSync(path.join(sandbox, 'join.json'), join(), 'utf8');
+    fs.writeFileSync(
+      path.join(sandbox, 'install-plan.json'),
+      JSON.stringify({
+        schema: 1,
+        machineName: 'คอมเครื่องที่ 2',
+        hubUrl: 'http://192.168.1.102:3000',
+        parent: null,
+        executors: 'echo,opencode',
+        modules: ['core'],
+        moduleLabels: ['ระบบหลัก (บังคับ)'],
+        enabledModules: [],
+        pages: [],
+        createdAt: new Date().toISOString(),
+        note: '',
+      }),
+      'utf8',
+    );
+    const out = await setup.runSetup({ dir: sandbox, fetchImpl: fakeFetch(() => okJson()), exec: fakeExec(), platform: 'win32', home: 'C:\\Users\\com', skipTask: true });
+    assert.equal(out.ok, true, out.report);
+    const env = fs.readFileSync(path.join(sandbox, '.env'), 'utf8');
+    assert.match(env, /^ENABLED_EXECUTORS=echo,opencode$/m, '.env ต้องเปิด executor ตามชุดที่แพ็ก — เดิมติดค่าเริ่มต้น echo ทั้งที่ HUB ฝั่ง token เปิด opencode แล้ว');
+  });
+
+  test('ชุดสากร/สั่งมือ: CLI ต้องรับ --executors= (ทับค่าจากชุดได้)', () => {
+    const src = read('tools/agent-pack/setup-machine.mjs');
+    assert.match(src, /startsWith\('--executors='\)/, 'setup-machine ต้องรับ --executors= จากบรรทัดคำสั่ง (ทับค่าจาก install-plan ได้)');
+  });
 });
 
 describe('pack: dry-run ต้องไม่แตะอะไรเลย', () => {

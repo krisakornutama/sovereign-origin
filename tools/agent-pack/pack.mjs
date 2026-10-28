@@ -664,6 +664,7 @@ export async function runPack({
     machineName,
     hubUrl: hub,
     parent: ownerName ? { id: issuedOwner?.id, username: issuedOwner?.username ?? ownerName } : null,
+    executors,
     modules: selectedModules,
   });
   writeInstallPlan(target, installPlan);
