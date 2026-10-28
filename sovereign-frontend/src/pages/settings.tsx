@@ -934,8 +934,8 @@ function TelegramSection() {
 
       <div className="space-y-3">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">{t('settings.telegram.botToken', 'Bot Token')}</label>
-          <input
+          <label htmlFor="settings-telegram-bot-token" className="block text-xs text-gray-400 mb-1">{t('settings.telegram.botToken', 'Bot Token')}</label>
+          <input id="settings-telegram-bot-token"
             type="password"
             value={botToken}
             onChange={(e) => setBotToken(e.target.value)}
@@ -945,8 +945,8 @@ function TelegramSection() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1">{t('settings.telegram.chatId', 'Chat ID')}</label>
-          <input
+          <label htmlFor="settings-telegram-chat-id" className="block text-xs text-gray-400 mb-1">{t('settings.telegram.chatId', 'Chat ID')}</label>
+          <input id="settings-telegram-chat-id"
             type="text"
             value={chatId}
             onChange={(e) => setChatId(e.target.value)}

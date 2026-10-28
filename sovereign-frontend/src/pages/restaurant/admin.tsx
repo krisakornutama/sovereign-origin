@@ -68,16 +68,16 @@ export default function RestaurantAdminPage() {
 
           <div className="card p-4 flex flex-wrap gap-3 items-end">
             <div>
-              <label className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
-              <select value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm">
+              <label htmlFor="restaurant-admin-select" className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
+              <select id="restaurant-admin-select" value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm">
                 <option value="">{t('restaurant.selectPlaceholder', '— เลือกร้าน —')}</option>
                 {restaurants.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
             <div className="flex gap-2 items-end">
               <div>
-                <label className="text-xs text-gray-400">{t('restaurant.admin.cameraLabel', 'ผูกกล้องหน้าร้าน (cameraId)')}</label>
-                <input value={cameraId} onChange={e=>setCameraId(e.target.value)} placeholder={t('restaurant.admin.cameraPlaceholder', 'เช่น Camera.id จาก /sensors')} className="input text-sm" />
+                <label htmlFor="restaurant-admin-camera" className="text-xs text-gray-400">{t('restaurant.admin.cameraLabel', 'ผูกกล้องหน้าร้าน (cameraId)')}</label>
+                <input id="restaurant-admin-camera" value={cameraId} onChange={e=>setCameraId(e.target.value)} placeholder={t('restaurant.admin.cameraPlaceholder', 'เช่น Camera.id จาก /sensors')} className="input text-sm" />
               </div>
               <button onClick={bindCamera} className="px-3 py-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-sm">{t('restaurant.admin.bindCamera', 'ผูกกล้อง')}</button>
             </div>
