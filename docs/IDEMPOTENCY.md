@@ -1,6 +1,6 @@
 # Idempotency (กลาง) — "เน็ตหลุดก็ขายได้"
 
-> สถานะ: **โค้ด + เทสต์เสร็จ (27/10/69)** · **ยังไม่ apply migration ขึ้น production** และยังไม่ restart runtime (Cold Soak)
+> สถานะ: **ใช้งานจริงบน production แล้ว 28/10/69** — migration apply + restart + smoke 8/8 ผ่าน (รายละเอียดท้ายไฟล์)
 > ไฟล์ที่เกี่ยวข้อง: `sovereign-os/core-api/src/services/idempotency.service.ts` · `src/middleware/idempotency.middleware.ts` · `prisma/migrations/20261027120000_idempotency_keys/`
 
 ## ทำไมต้องมี
@@ -62,13 +62,29 @@
 | `IDEMPOTENCY_TTL_SEC` | `86400` | เก็บผลสำเร็จไว้นานแค่ไหน (ขั้นต่ำ 60) |
 | `IDEMPOTENCY_LEASE_SEC` | `60` | จับจองคำขอที่ยังทำงานอยู่ (ขั้นต่ำ 5) |
 
-## ขั้นตอนเปิดใช้บน production (ยังไม่ทำ — รออนุมัติ/จบ Cold Soak)
+## ผลการเปิดใช้จริงบน production (28/10/69)
 
-1. backup DB ตามปกติ (`backups/postgres/...`)
+1. backup `backups/postgres/sovereign_20261028_001831.dump` (6.1 MB · `pg_restore -l` อ่านผ่าน)
+2. ซ้อม SQL ใน schema ชั่วคราว (`idem_rehearsal`) → apply ผ่าน · unique กันแถวซ้ำได้จริง · DROP ทิ้งแล้ว
+3. `prisma migrate deploy` → **apply 1 migration** · 67/67 up to date · record `finished_at` ไม่มี rollback
+4. `docker restart sovereign-core-api` → **healthy ใน 27 วิ** · restarts=0
+   `/api/health` = `status: ok` · `db.migrationHead = 20261027120000_idempotency_keys`
+5. ตรวจตารางจริง: 11 คอลัมน์ · 3 ดัชนี (`pkey` · `expiresAt` · unique `scope_key`)
+6. smoke **8/8 ผ่าน**: API จริงตอบ `400 IDEMPOTENCY_INVALID_KEY` เมื่อคีย์ผิดรูปแบบ · ไม่ส่งคีย์ยังได้ 400 เดิม ·
+   ยิงแอปแยกที่ใช้ `dist` จริงบนตารางจริง = ครั้งแรก 201 → ครั้งที่สอง **`Idempotency-Replayed: true` และ handler รันครั้งเดียว** ·
+   payload ต่างได้ 409 → เก็บกวาดแล้ว `idempotency_keys` เหลือ **0 แถว**
+7. log ไม่มี `table "idempotency_keys" is missing` และไม่มี error ของ idempotency
+
+## ขั้นตอนสำหรับเครื่องถัดไป (ทำซ้ำได้)
+
+1. backup DB ก่อนเสมอ (`backups/postgres/...`)
 2. `docker exec sovereign-core-api npx prisma migrate deploy` → apply `20261027120000_idempotency_keys`
 3. `docker restart sovereign-core-api` (container จะ `prisma generate && npm run build && npm start` เอง)
-4. ตรวจ: `\d idempotency_keys` มี 11 คอลัมน์ + unique `(scope, key)` + index `expiresAt`
-5. smoke: ยิง `POST /api/restaurant/orders` ด้วยคีย์เดิม 2 ครั้ง → ครั้งที่สองต้องได้ `Idempotency-Replayed: true` และมีออเดอร์เดียว
+4. ตรวจ: ตารางมี 11 คอลัมน์ + unique `(scope, key)` + index `expiresAt`
+5. smoke: POST ที่มีคีย์เดิม 2 ครั้ง → ครั้งที่สองต้องได้ `Idempotency-Replayed: true` และข้อมูลเกิดครั้งเดียว
+
+**rollback** (ตารางใหม่ล้วน ไม่กระทบข้อมูลเดิม):
+`DROP TABLE idempotency_keys;` + `DELETE FROM _prisma_migrations WHERE migration_name='20261027120000_idempotency_keys';`
 
 **ลำดับที่ปลอดภัย**: โค้ด deploy ก่อน migrate ได้ (fail-open) แต่ **อย่าให้ window ยาว** —
 ระหว่างที่ยังไม่ migrate ระบบจะไม่กันซ้ำเลย (มี log เตือนบรรทัดเดียว)
