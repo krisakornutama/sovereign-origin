@@ -593,7 +593,17 @@
       ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · migrate + restart + smoke 8/8 ผ่าน ·
       frontend build ใหม่ขึ้น `:3000` แล้ว ผู้ใช้เบราว์เซอร์ส่ง `x-idempotency-key` จริง
 - [ ] **B2 local read model + กติกา conflict resolution** — ยังไม่เริ่ม (ต้องมี sync จริงก่อน)
-- [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
+- [ ] **C "คนในบ้านใช้เองได้"** — a11y + onboarding + error ที่บอกทางแก้
+  - [x] **C1 หน้าล็อกอิน / OTP / เปลี่ยนรหัสผ่าน** — 28/10/69
+        `tools/test/a11y-auth.test.mjs` **13 เคส** (static อ่าน JSX — ไม่ต้องมีบัญชี/เซิร์ฟเวอร์)
+        - `label` ผูกกับช่องกรอกจริง (`htmlFor` ↔ `id`) · ทุกช่องมีชื่อให้ screen reader · ไม่มี `htmlFor` ชี้เป้าผิด
+        - ข้อความ error ของ login/OTP มี `role="alert"` (เดิมเงียบ) · ช่อง login ใช้ `aria-describedby` + `aria-invalid`
+        - ช่องรหัสสำรองของ OTP มี `aria-label` + `aria-describedby` ชี้คำอธิบาย
+        - mutation พิสูจน์แล้ว 4/4 (exit 1 ทั้งหมด): ถอด `htmlFor` · ถอด `role="alert"` · ถอดชื่อช่องรหัสสำรอง · ถอด `id` ของช่องรหัสใหม่
+        - บทเรียน: เทสต์ต้องตัด comment ก่อนตรวจ (คอมเมนต์ที่มี `role="alert"` ทำให้ผ่านทั้งที่ attribute จริงหาย)
+  - [ ] C2 ฟอร์มที่เหลือ — ยังมี `label` ลอย **37 จุด ใน 18 ไฟล์** (`sensors/SensorsHub` 4 · `coding/CodingIde` 4 · `pages/relay` 4 · `vision` 3 · `terrain-demo` 3)
+  - [ ] C3 `img` ไม่มี `alt` 1 จุด (`pages/trace.tsx` — QR code)
+  - [ ] C4 onboarding ผู้ใช้ใหม่ + ข้อความ error ที่บอก "แก้ยังไง"
 
 ---
 

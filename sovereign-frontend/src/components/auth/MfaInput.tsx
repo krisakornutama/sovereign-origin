@@ -185,7 +185,11 @@ export default function MfaInput() {
             </div>
           ) : (
             error && (
-              <div className="mt-6 p-3 rounded-lg bg-red-900/30 border border-red-800/60 text-red-300 text-sm text-center">
+              // role="alert": OTP ผิดต้องถูกประกาศ ไม่ใช่แค่เปลี่ยนสีขอบ (เดิมเงียบ)
+              <div
+                role="alert"
+                className="mt-6 p-3 rounded-lg bg-red-900/30 border border-red-800/60 text-red-300 text-sm text-center"
+              >
                 {error}
               </div>
             )
@@ -193,9 +197,12 @@ export default function MfaInput() {
 
           {useBackup ? (
             <div className="mt-6 space-y-3">
-              <p className="text-xs text-gray-500">{t('login.mfaBackupHint', 'กรอกรหัสสำรอง 10 ตัวที่เก็บไว้ (ใช้ได้ครั้งเดียว)')}</p>
+              <p id="mfa-backup-hint" className="text-xs text-gray-500">{t('login.mfaBackupHint', 'กรอกรหัสสำรอง 10 ตัวที่เก็บไว้ (ใช้ได้ครั้งเดียว)')}</p>
               <input
                 type="text"
+                aria-label={t('login.mfaBackupLabel', 'รหัสสำรอง 10 ตัวอักษร')}
+                aria-describedby="mfa-backup-hint"
+                aria-invalid={error ? true : undefined}
                 value={backupCode}
                 onChange={(e) => setBackupCode(e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 10))}
                 onKeyDown={(e) => { if (e.key === 'Enter') submitBackup(); }}

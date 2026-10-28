@@ -122,8 +122,9 @@ export default function ChangePasswordForm({ forced = false }: Props) {
       <form onSubmit={handleSubmit} className="space-y-4">
         {!forced && (
           <div>
-            <label className="label">{t('changePassword.currentLabel', 'รหัสผ่านปัจจุบัน')}</label>
+            <label htmlFor="cp-current" className="label">{t('changePassword.currentLabel', 'รหัสผ่านปัจจุบัน')}</label>
             <input
+              id="cp-current"
               type="password"
               autoComplete="current-password"
               className={inputCls}
@@ -137,8 +138,9 @@ export default function ChangePasswordForm({ forced = false }: Props) {
         )}
 
         <div>
-          <label className="label">{t('changePassword.newLabel', 'รหัสผ่านใหม่')}</label>
+          <label htmlFor="cp-new" className="label">{t('changePassword.newLabel', 'รหัสผ่านใหม่')}</label>
           <input
+            id="cp-new"
             type="password"
             autoComplete="new-password"
             className={inputCls}
@@ -159,8 +161,9 @@ export default function ChangePasswordForm({ forced = false }: Props) {
         </div>
 
         <div>
-          <label className="label">{t('changePassword.confirmLabel', 'ยืนยันรหัสผ่านใหม่')}</label>
+          <label htmlFor="cp-confirm" className="label">{t('changePassword.confirmLabel', 'ยืนยันรหัสผ่านใหม่')}</label>
           <input
+            id="cp-confirm"
             type="password"
             autoComplete="new-password"
             className={inputCls}
