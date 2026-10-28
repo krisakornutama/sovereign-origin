@@ -1067,7 +1067,7 @@ export default function TreasuryPage() {
       {/* ═══════ Modal: สร้างคำสั่งโอน ═══════ */}
       {modal === 'transfer' && modalFrame(t('treasury.transfers.createTitle', 'สร้างคำสั่งโอน'), doCreateTransfer, (
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-gray-400 col-span-2">{t('treasury.transfers.direction', 'ทิศทาง')}
+          <div className="text-xs text-gray-400 col-span-2">{t('treasury.transfers.direction', 'ทิศทาง')}
             <div className="flex gap-2 mt-1">
               {(['OUT', 'IN'] as const).map((d) => (
                 <button key={d} onClick={() => setTransferForm({ ...transferForm, direction: d })} className={`flex-1 px-3 py-1.5 rounded-lg text-sm border transition-all ${
@@ -1079,7 +1079,7 @@ export default function TreasuryPage() {
                 </button>
               ))}
             </div>
-          </label>
+          </div>
           <label className="text-xs text-gray-400">{t('treasury.transfers.category', 'หมวด')}
             <select className={`${INPUT} w-full mt-1`} value={transferForm.category} onChange={(e) => setTransferForm({ ...transferForm, category: e.target.value })}>
               {TRANSFER_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
