@@ -589,8 +589,9 @@
 - [ ] **A-obs7 ต่อยอดหลัง A-obs4** — DB latency ผ่าน Prisma middleware · queue depth (offline queue/agent/MQTT) · alert "error budget กำลังหมด" · span ระดับ OTel
 
 ## คิวถัดไปที่เจ้าของเลือกไว้ (ยังไม่เริ่ม)
-- [x] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง — **ใช้งานจริงแล้ว 28/10/69** (`docs/IDEMPOTENCY.md`)
-      ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · migrate + restart + smoke 8/8 ผ่าน
+- [x] **B "เน็ตหลุดก็ขายได้"** — idempotency key กลาง — **ใช้งานจริงครบทั้ง backend + frontend 28/10/69** (`docs/IDEMPOTENCY.md`)
+      ต่อแล้ว 4 endpoint (business order/payment · restaurant order/purchase) · migrate + restart + smoke 8/8 ผ่าน ·
+      frontend build ใหม่ขึ้น `:3000` แล้ว ผู้ใช้เบราว์เซอร์ส่ง `x-idempotency-key` จริง
 - [ ] **B2 local read model + กติกา conflict resolution** — ยังไม่เริ่ม (ต้องมี sync จริงก่อน)
 - [ ] **C "คนในบ้านใช้เองได้"** — a11y (ตอนนี้ `aria-*` ทั้ง frontend มี 11 จุด) + onboarding + error ที่บอกทางแก้
 
@@ -645,6 +646,13 @@
         - smoke 8/8: คีย์ผิดรูปแบบ = 400 `IDEMPOTENCY_INVALID_KEY` · ไม่ส่งคีย์ = 400 เดิม ·
           replay บนตารางจริง = handler รันครั้งเดียว + `Idempotency-Replayed: true` · payload ต่าง = 409 ·
           เก็บกวาดแล้วเหลือ 0 แถว · log ไม่มี "table ... is missing"
+  - [x] deploy frontend ให้เบราว์เซอร์ส่งคีย์จริง — **เสร็จ 28/10/69 11:18**
+        build ใหม่ `R5T_mlyuNUkW18UpSCGuM` (`.next-verify` ที่ผ่าน verify) แทน build เก่า `9tdx3EoGEaS8w4byISX5h`
+        - ซ้อมก่อนบนพอร์ต 3099 (`NEXT_DIST_DIR=.next-verify`): `/` 200 ไบต์เท่ากับ prod · chunk ที่มี header 200 (บน :3000 ยัง 404)
+        - สลับแล้ว regen `public/sw-precache.json` (157 asset) · boot ขึ้นใน ~1 วิ · `logs/frontend-restart.log`
+        - smoke: static asset ที่ `/` อ้าง 12/12 = 200 · chunk `3pr0dgpzmk4ac.js` 200 + มี `x-idempotency-key` ·
+          `/mbti/` `/dashboard/` `/business/` `/settings/` `/inventory/` = 200 · `/about` `/partners` ฯลฯ = 404 มาก่อนแล้วทั้ง 2 build
+        - rollback: build เก่าอยู่ที่ `logs/next-backup-20261028_111819` (สลับกลับ + boot ~20 วิ)
   - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ
 
 

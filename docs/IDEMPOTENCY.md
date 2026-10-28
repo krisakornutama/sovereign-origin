@@ -75,6 +75,26 @@
    payload ต่างได้ 409 → เก็บกวาดแล้ว `idempotency_keys` เหลือ **0 แถว**
 7. log ไม่มี `table "idempotency_keys" is missing` และไม่มี error ของ idempotency
 
+### frontend (ฝั่งที่ทำให้ "เบราว์เซอร์" ส่งคีย์จริง) — 28/10/69 11:18
+
+backend กันซ้ำได้เฉพาะคำขอที่ **มี** header · โค้ด frontend แนบ header อยู่แล้ว แต่ `.next` ที่ `:3000` serve
+เป็น build 23/10 (ก่อนมีโค้ดนี้) → ยังไม่มีผลกับผู้ใช้จริง
+
+1. `.next-verify` (build 28/10 11:11 จาก HEAD) มี `x-idempotency-key` — **ซ้อมก่อน** ด้วยการเปิด `next start -p 3099`
+   ชี้ `NEXT_DIST_DIR=.next-verify` → `/` ตอบ 200 ไบต์เท่ากับ prod ทุกไบต์ · chunk ที่มี header ตอบ 200 (บน `:3000` ยัง 404)
+2. สลับ build: `taskkill` ต้นไม้ของ `:3000` → `.next` → `logs/next-backup-20261028_111819` (build เก่า `9tdx3EoGEaS8w4byISX5h`)
+   → `.next-verify` → `.next` (build ใหม่ `R5T_mlyuNUkW18UpSCGuM`)
+3. `node scripts/generate-sw-precache.mjs` — **ต้องรันหลังสลับ build** เพราะสคริปต์อ่าน `.next/static` ตัวที่ serve อยู่
+   (ไฟล์ `public/sw-precache.json` ถูก gitignore · build เก่าและใหม่มี 157/158 asset ต่างกัน)
+4. boot `npm run start -- -p 3000` → **ขึ้นใน ~1 วิ** (`logs/frontend-restart.log`)
+5. smoke: `/` 200 + HTML ชี้ build ใหม่ · static asset ที่ HTML อ้าง 12/12 ตอบ 200 ·
+   `/_next/static/chunks/3pr0dgpzmk4ac.js` 200 + มี `x-idempotency-key` · `/mbti/` `/dashboard/` `/business/` `/settings/` `/inventory/` 200 ·
+   sw-precache 157 รายการ (สุ่ม 8 รายการ ตอบ 200 ครบ)
+6. `/about/` `/partners/` `/community/` `/demo/` `/shop/` = **404 มาก่อนแล้วทั้ง build เก่าและใหม่** (ไม่มีหน้าเหล่านี้ในแอปนี้) ไม่ใช่ regression
+
+**rollback frontend**: `taskkill` ต้นไม้ `:3000` → `.next` → `.next.failed-<ts>` → `logs/next-backup-20261028_111819` → `.next`
+→ regen sw-precache → boot (~20 วิ)
+
 ## ขั้นตอนสำหรับเครื่องถัดไป (ทำซ้ำได้)
 
 1. backup DB ก่อนเสมอ (`backups/postgres/...`)
@@ -82,6 +102,8 @@
 3. `docker restart sovereign-core-api` (container จะ `prisma generate && npm run build && npm start` เอง)
 4. ตรวจ: ตารางมี 11 คอลัมน์ + unique `(scope, key)` + index `expiresAt`
 5. smoke: POST ที่มีคีย์เดิม 2 ครั้ง → ครั้งที่สองต้องได้ `Idempotency-Replayed: true` และข้อมูลเกิดครั้งเดียว
+6. **frontend**: build ด้วย `npm run build` แล้วสลับเข้า `.next` + `node scripts/generate-sw-precache.mjs` + restart `:3000`
+   — ถ้าไม่ทำขั้นนี้ เบราว์เซอร์จะยังไม่ส่ง `x-idempotency-key` (backend จะกันซ้ำให้เฉพาะ client ที่ส่งเอง)
 
 **rollback** (ตารางใหม่ล้วน ไม่กระทบข้อมูลเดิม):
 `DROP TABLE idempotency_keys;` + `DELETE FROM _prisma_migrations WHERE migration_name='20261027120000_idempotency_keys';`
