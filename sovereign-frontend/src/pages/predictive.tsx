@@ -207,16 +207,16 @@ export default function PredictivePage() {
             <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('predictive.explorerTitle', 'ค้นหาความผิดปกติ')}</h2>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1">
-                <label className="label">{t('predictive.metric', 'Metric')}</label>
-                <select value={metric} onChange={(e) => setMetric(e.target.value)} className="input">
+                <label htmlFor="predictive-metric" className="label">{t('predictive.metric', 'Metric')}</label>
+                <select id="predictive-metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="input">
                   {METRICS.map((m) => (
                     <option key={m.value} value={m.value}>{t(`predictive.metrics.${m.value}`, m.label)}</option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="label">{t('predictive.rangeLabel', 'ช่วงเวลา (ชม.)')}</label>
-                <select value={hours} onChange={(e) => setHours(Number(e.target.value))} className="input">
+                <label htmlFor="predictive-hours" className="label">{t('predictive.rangeLabel', 'ช่วงเวลา (ชม.)')}</label>
+                <select id="predictive-hours" value={hours} onChange={(e) => setHours(Number(e.target.value))} className="input">
                   {[6, 12, 24, 48, 72, 168].map((h) => (
                     <option key={h} value={h}>{t('predictive.hoursOption', '{n} ชม.', { n: h })}</option>
                   ))}

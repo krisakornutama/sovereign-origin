@@ -356,11 +356,11 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                   <div className="card p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
                     <h3 className="text-lg font-bold mb-4">{t('sensorsHub.modalTitle', 'Generate Arduino Code for {type}', { type: selectedDevice.type })}</h3>
                     <div className="mb-4">
-                      <label className="label">WiFi SSID</label>
+                      <label htmlFor="wifiSSID" className="label">WiFi SSID</label>
                       <input id="wifiSSID" className="input w-full" defaultValue="SolarKiller" />
                     </div>
                     <div className="mb-4">
-                      <label className="label">WiFi Password</label>
+                      <label htmlFor="wifiPass" className="label">WiFi Password</label>
                       <input id="wifiPass" type="password" className="input w-full" />
                     </div>
                     <button onClick={async () => {
@@ -404,8 +404,8 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
               {/* Controls */}
               <div className="flex gap-4 flex-wrap items-end">
                 <div>
-                    <label className="label">{t('sensorsHub.filterBy', 'กรองตามประเภท')}</label>
-                  <select
+                    <label htmlFor="sensors-filter" className="label">{t('sensorsHub.filterBy', 'กรองตามประเภท')}</label>
+                  <select id="sensors-filter"
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     className="input"
@@ -416,8 +416,8 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                   </select>
                 </div>
                 <div>
-                  <label className="label">{t('sensorsHub.limitBy', 'จำนวนที่แสดง')}</label>
-                  <select
+                  <label htmlFor="sensors-limit" className="label">{t('sensorsHub.limitBy', 'จำนวนที่แสดง')}</label>
+                  <select id="sensors-limit"
                     value={limit}
                     onChange={(e) => setLimit(Number(e.target.value))}
                     className="input"

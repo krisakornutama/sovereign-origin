@@ -190,7 +190,7 @@ export default function TracePage() {
     w.document.write(`<html><head><title>QR ${qr.lotCode}</title></head><body style="font-family:sans-serif;text-align:center;padding:24px">
       <div style="font-size:20px;font-weight:700;margin-bottom:4px">${qr.lotCode}</div>
       <div style="font-size:12px;color:#555;margin-bottom:16px">สแกนเพื่อดูที่มาผลผลิต</div>
-      <img src="${qr.qrDataUrl}" width="280" height="280" />
+      <img src="${qr.qrDataUrl}" alt="QR ${qr.lotCode}" width="280" height="280" />
       <div style="font-size:10px;color:#888;margin-top:16px">Sovereign Origin · Traceability</div>
       <script>window.onload=function(){window.print()}</script></body></html>`);
     w.document.close();
