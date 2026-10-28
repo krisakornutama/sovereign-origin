@@ -211,15 +211,31 @@ describe('lib: scheduled task ที่ไม่ล้มเงียบเม�
     assert.equal(lib.parseSchtasksQuery('ERROR: The system cannot find the file specified.').exists, false);
   });
 
-  test('คำสั่งลงทะเบียนต้องอ้าง launcher ของโฟลเดอร์นั้น ไม่ใช่ node ตรง ๆ (กันพาธดิบ)', () => {
+  // ── สเปกอัปเดต 29/10/69 (D5 "ติดตั้งจบ = runner เดินทันที") ──────────────────
+  // เดิม /TR = "…run-runner.cmd" — พอ task ยิงตอนล็อกอิน (หรือสั่ง /Run) หน้าต่างดำเด้ง
+  // ⇒ เปลี่ยน /TR เป็น wscript.exe "…RUN-START.vbs" (vbs รัน launcher ด้วย window style 0)
+  //    = ซ่อนหน้าต่างทั้งตอนล็อกอินและตอนสั่งรันทันที — เจตนาเดิมคงอยู่: ยังอ้างไฟล์ห่อ
+  //    ในโฟลเดอร์ runner ไม่ใช่ node ดิบ ๆ (กันพาธมีเว้นวรรค)
+  test('คำสั่งลงทะเบียนต้องรันผ่าน wscript + RUN-START.vbs (ซ่อนหน้าต่าง ไม่ใช่ .cmd ตรง ๆ)', () => {
     const args = lib.buildRunnerTaskCreateArgs({
       taskName: 'Sovereign Agent Runner',
-      launcherPath: 'E:\\My work\\x\\run-runner.cmd',
+      hiddenStartPath: 'E:\\My work\\x\\RUN-START.vbs',
     });
     assert.deepEqual(args.slice(0, 4), ['schtasks', '/Create', '/TN', 'Sovereign Agent Runner']);
     const tr = args[args.indexOf('/TR') + 1];
-    assert.match(tr, /^".*run-runner\.cmd"$/, 'ค่า /TR ต้องถูก quote ทั้งก้อน');
+    assert.match(tr, /^wscript\.exe ".*RUN-START\.vbs"$/, 'ค่า /TR ต้องเป็น wscript + vbs โดย quote path ทั้งก้อน (ล็อกอินแล้วไม่เด้งหน้าต่างดำ)');
     assert.ok(args.includes('/F'), 'รันซ้ำต้องทับ task เดิมได้ ไม่พัง');
+  });
+
+  test('RUN-START.vbs ต้องปลอดภัยทุก codepage: ASCII ล้วน + CRLF + ไม่ฝังพาธ + รันแบบซ่อนหน้าต่าง', () => {
+    const dir = 'E:\\My work\\Project Sovereign Origin\\sovereign-os\\agent-runner';
+    const out = lib.buildHiddenStartVbs({ runnerDir: dir });
+    assert.equal(out.path, path.join(dir, 'RUN-START.vbs'));
+    assert.match(out.text, /RUN-RUNNER\.cmd/, 'ต้องเรียก launcher ที่ฟื้นเองหลัง crash');
+    assert.match(out.text, /, 0, False/, 'ต้อง Run ด้วย window style 0 = ไม่มีหน้าต่างเด้ง');
+    assert.ok(!/[^\x00-\x7F]/.test(out.text), 'vbs ต้อง ASCII ล้วน — ไฟล์ที่มีอักษรไทยพังบน codepage อื่น');
+    assert.ok(!out.text.includes('My work'), 'ห้ามฝังพาธลงไฟล์ — ให้หาโฟลเดอร์ตัวเองตอนรัน (GetParentFolderName)');
+    assert.ok(out.text.includes('\r\n'), 'ต้องเป็น CRLF (ไฟล์ที่ Windows รันเอง)');
   });
 });
 
@@ -375,6 +391,7 @@ test('ติดตั้งจริง (คำสั่งปลอม): เข
     'sovereign-os/core-api/.env',
     'sovereign-os/agent-runner/.env',
     'sovereign-os/agent-runner/run-runner.cmd',
+    'sovereign-os/agent-runner/RUN-START.vbs',
   ]) {
     assert.ok(fs.existsSync(path.join(sandbox, rel)), `ต้องสร้าง ${rel}`);
   }
@@ -385,6 +402,7 @@ test('ติดตั้งจริง (คำสั่งปลอม): เข
   assert.ok(exec.ran('compose'), 'ต้องสั่ง compose up');
   assert.ok(exec.ran('schtasks /Create'), 'ต้องลงทะเบียน scheduled task');
   assert.ok(exec.ran('schtasks /Query'), 'ต้องตรวจ task ย้อนหลัง ไม่เชื่อแค่ exit code');
+  assert.ok(exec.ran('schtasks /Run'), 'ต้องสั่งรัน runner เดี๋ยวนี้ — ไม่รอล็อกอินครั้งหน้า');
   assert.ok(fetchImpl.seen.some((s) => s.url.includes('/api/health')), 'ต้องตรวจสุขภาพ API จริง');
   assert.equal(out.exitCode, 0, out.report);
 });
