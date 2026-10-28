@@ -117,9 +117,9 @@ export default function RestaurantPage() {
           {/* ร้าน + กล้อง */}
           <div className="card panel-glow p-4 flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-60">
-              <label className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
+              <label htmlFor="restaurant-select" className="text-xs text-gray-400">{t('restaurant.restaurantLabel', 'ร้าน')}</label>
               <div className="flex gap-2 mt-1">
-                <select value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm flex-1">
+                <select id="restaurant-select" value={selected} onChange={e=>setSelected(e.target.value)} className="input text-sm flex-1">
                   <option value="">{t('restaurant.selectPlaceholder', '— เลือกร้าน —')}</option>
                   {restaurants.map(r=><option key={r.id} value={r.id}>{r.name} {r.cameraId?`[cam:${r.cameraId.slice(0,6)}]`:''}</option>)}
                 </select>

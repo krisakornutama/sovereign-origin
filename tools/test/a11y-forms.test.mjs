@@ -21,10 +21,12 @@ const readRaw = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 // ตัด comment ทิ้งก่อนตรวจ — ไม่งั้นคำอธิบายในคอมเมนต์ (เช่น `// role="alert": ...`)
 // จะทำให้เทสต์ผ่านทั้งที่ attribute จริงถูกลบไปแล้ว
+// ⚠️ ห้ามใช้ `/\*...\*/` แบบกว้าง: ไฟล์จริงมีสตริง `accept="image/*"` → จะกินโค้ดทั้งบล็อกทิ้ง
+// (เจอจริง 28/10: เทสต์หา <input> ไม่เจอเลยเพราะกฎนี้) → ตัดเฉพาะ JSX comment และ // ที่ขึ้นบรรทัดใหม่
 function stripComments(src) {
   return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/^[ \t]*\/\/[^\n]*$/gm, '');
 }
 const read = (p) => stripComments(readRaw(p));
 
@@ -32,6 +34,17 @@ const AUTH_FILES = {
   login: 'sovereign-frontend/src/components/auth/LoginForm.tsx',
   otp: 'sovereign-frontend/src/components/auth/MfaInput.tsx',
   changePassword: 'sovereign-frontend/src/components/auth/ChangePasswordForm.tsx',
+};
+
+// หน้าที่คนในบ้านใช้จริง (C2) — ตรวจเฉพาะ "label ผูกกับช่องกรอก" ก่อน
+// (กฎ "ทุกช่องต้องมีชื่อ" ยังคุมเฉพาะ auth เพราะหน้าอื่นมี input ที่มี aria-label อยู่แล้วบางส่วน)
+const FORM_FILES = {
+  settings: 'sovereign-frontend/src/pages/settings.tsx',
+  sensorsHub: 'sovereign-frontend/src/components/sensors/SensorsHub.tsx',
+  predictive: 'sovereign-frontend/src/pages/predictive.tsx',
+  restaurantAdmin: 'sovereign-frontend/src/pages/restaurant/admin.tsx',
+  restaurant: 'sovereign-frontend/src/pages/restaurant/index.tsx',
+  vision: 'sovereign-frontend/src/pages/vision.tsx',
 };
 
 // ── ตัวอ่านแท็กแบบไม่หลง `=>` หรือ template string ──────────────────────────
@@ -144,6 +157,20 @@ describe('a11y — auth screens: label ผูกกับช่องกรอ�
     test(`${name}: ทุกช่องกรอกมีชื่อให้ screen reader อ่าน`, () => {
       const bad = controlsWithNoName(read(file));
       assert.deepEqual(bad, [], `${file} มีช่องกรอกไม่มีชื่อ: ${bad.join(' | ')}`);
+    });
+  }
+});
+
+describe('a11y — หน้าที่คนในบ้านใช้ (C2): label ผูกกับช่องกรอกจริง', () => {
+  for (const [name, file] of Object.entries(FORM_FILES)) {
+    test(`${name}: ไม่มี <label> ที่ลอยอยู่เดี่ยว ๆ`, () => {
+      const bad = labelsWithNoAssociation(read(file));
+      assert.deepEqual(bad, [], `${file} มี label ที่ไม่ได้ผูกกับช่องกรอก: ${bad.join(' | ')}`);
+    });
+
+    test(`${name}: ไม่มี htmlFor ที่ชี้ไปยัง id ที่ไม่มีอยู่`, () => {
+      const bad = danglingHtmlFor(read(file));
+      assert.deepEqual(bad, [], `${file} มี htmlFor ชี้เป้าผิด: ${bad.join(', ')}`);
     });
   }
 });
