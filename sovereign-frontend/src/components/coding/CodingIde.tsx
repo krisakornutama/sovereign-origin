@@ -340,8 +340,8 @@ export default function CodingIde() {
       {/* ── 1. Toolbar: โมเดล + เหตุผล + อัตโนมัติ + รูปภาพ ── */}
       <section className="card panel-glow px-4 py-2.5 flex-none">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-          <label className="text-gray-400">{t('aiAgent.coding.modelLabel', 'โมเดล')}</label>
-          <select
+          <label htmlFor="coding-model" className="text-gray-400">{t('aiAgent.coding.modelLabel', 'โมเดล')}</label>
+          <select id="coding-model"
             value={codingModel}
             onChange={(e) => setCodingModel(e.target.value)}
             className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"
@@ -351,7 +351,7 @@ export default function CodingIde() {
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
-          <label className="text-gray-400 ml-1">{t('aiAgent.coding.effortLabel', 'เหตุผล')}</label>
+          <div className="text-gray-400 ml-1">{t('aiAgent.coding.effortLabel', 'เหตุผล')}</div>
           <div className="flex gap-1">
             {EFFORT_LEVELS.map((e) => (
               <button
@@ -366,8 +366,8 @@ export default function CodingIde() {
               </button>
             ))}
           </div>
-          <label className="text-gray-400 ml-1">{t('aiAgent.coding.autonomyLabel', 'อัตโนมัติ')}</label>
-          <select
+          <label htmlFor="coding-autonomy" className="text-gray-400 ml-1">{t('aiAgent.coding.autonomyLabel', 'อัตโนมัติ')}</label>
+          <select id="coding-autonomy"
             value={codingAutonomy}
             onChange={(e) => setCodingAutonomy(e.target.value)}
             className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"
@@ -376,7 +376,7 @@ export default function CodingIde() {
               <option key={a.key} value={a.key}>{t(a.key ? `aiAgent.autonomyLevel.${a.key}` : 'aiAgent.autonomyLevel.default', a.label)}</option>
             ))}
           </select>
-          <label className="text-gray-400 ml-1">{t('aiAgent.coding.imageLabel', 'รูปภาพ')}</label>
+          <label htmlFor="coding-ide-image-input" className="text-gray-400 ml-1">{t('aiAgent.coding.imageLabel', 'รูปภาพ')}</label>
           <button
             onClick={() => document.getElementById('coding-ide-image-input')?.click()}
             className={`px-2.5 py-1.5 rounded text-xs font-bold transition ${

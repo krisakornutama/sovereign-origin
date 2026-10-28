@@ -123,8 +123,8 @@ export default function SkillQueuePanel({ models, compact }: { models?: string[]
           className="input w-full"
         />
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="text-gray-400">{t('aiAgent.skillQueue.modelLabel', 'โมเดล')}</label>
-          <select
+          <label htmlFor="skillqueue-model" className="text-gray-400">{t('aiAgent.skillQueue.modelLabel', 'โมเดล')}</label>
+          <select id="skillqueue-model"
             value={form.model}
             onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
             className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"
@@ -134,8 +134,8 @@ export default function SkillQueuePanel({ models, compact }: { models?: string[]
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
-          <label className="text-gray-400 ml-2">{t('aiAgent.skillQueue.effortLabel', 'เหตุผล')}</label>
-          <select
+          <label htmlFor="skillqueue-effort" className="text-gray-400 ml-2">{t('aiAgent.skillQueue.effortLabel', 'เหตุผล')}</label>
+          <select id="skillqueue-effort"
             value={form.reasoningEffort}
             onChange={(e) => setForm((p) => ({ ...p, reasoningEffort: e.target.value }))}
             className="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm"

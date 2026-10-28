@@ -270,8 +270,9 @@ export default function RelayPage() {
           <div className="card panel-glow p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="label">{t('relay.relay', 'Relay')}</label>
+                <label htmlFor="relay-select" className="label">{t('relay.relay', 'Relay')}</label>
                 <select
+                  id="relay-select"
                   value={formRelay}
                   onChange={(e) => setFormRelay(e.target.value)}
                   className="input w-full"
@@ -282,8 +283,9 @@ export default function RelayPage() {
                 </select>
               </div>
               <div>
-                <label className="label">{t('relay.timeLabel', 'เวลา (HH:mm)')}</label>
+                <label htmlFor="relay-time" className="label">{t('relay.timeLabel', 'เวลา (HH:mm)')}</label>
                 <input
+                  id="relay-time"
                   type="time"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
@@ -291,8 +293,9 @@ export default function RelayPage() {
                 />
               </div>
               <div>
-                <label className="label">{t('relay.command', 'คำสั่ง')}</label>
+                <label htmlFor="relay-command" className="label">{t('relay.command', 'คำสั่ง')}</label>
                 <select
+                  id="relay-command"
                   value={formState}
                   onChange={(e) => setFormState(Number(e.target.value))}
                   className="input w-full"
@@ -304,7 +307,7 @@ export default function RelayPage() {
             </div>
 
             <div>
-              <label className="label">{t('relay.daysOfWeek', 'วันในสัปดาห์')}</label>
+              <div className="label">{t('relay.daysOfWeek', 'วันในสัปดาห์')}</div>
               <div className="flex flex-wrap gap-2">
                 {DAY_NAMES.map((name, idx) => {
                   const day = idx + 1;

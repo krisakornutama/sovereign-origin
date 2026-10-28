@@ -147,8 +147,8 @@ export default function SkillsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
               <input value={form.skill} onChange={(e) => setForm({ ...form, skill: e.target.value })} placeholder="ชื่อทักษะ เช่น ปลูกข้าว, ซ่อมปั๊ม *" className="input md:col-span-2" />
               <div>
-                <label className="text-xs text-gray-400 block mb-1">ระดับ: {form.level}/5</label>
-                <input type="range" min={1} max={5} value={form.level} onChange={(e) => setForm({ ...form, level: Number(e.target.value) })} className="w-full accent-emerald-500" />
+                <label htmlFor="skill-level" className="text-xs text-gray-400 block mb-1">ระดับ: {form.level}/5</label>
+                <input id="skill-level" type="range" min={1} max={5} value={form.level} onChange={(e) => setForm({ ...form, level: Number(e.target.value) })} className="w-full accent-emerald-500" />
               </div>
               <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="หมายเหตุ" className="input" />
             </div>
