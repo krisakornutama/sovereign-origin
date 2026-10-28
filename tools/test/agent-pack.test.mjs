@@ -331,6 +331,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
       updateDataDir: path.join(sandbox, 'agent-updates-reuse'),
+      fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — จำลอง HUB ตอบ 2xx
     });
     assert.equal(out.exitCode, 0, out.report);
     const join = JSON.parse(fs.readFileSync(path.join(sandbox, 'bundle-reuse', 'join.json'), 'utf8'));
@@ -362,6 +363,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       force: true,
       exec,
       updateDataDir: path.join(sandbox, 'agent-updates-force'),
+      fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — จำลอง HUB ตอบ 2xx
     });
     assert.equal(out.exitCode, 0, out.report);
     assert.ok(seen[0].includes('--force'), `ต้องส่ง --force ให้สคริปต์ (args: ${seen[0].join(' ')})`);
@@ -383,6 +385,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
       updateDataDir: path.join(sandbox, 'agent-updates-conflict'),
+      fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — จำลอง HUB ตอบ 2xx
     });
     assert.equal(out.exitCode, 1);
     assert.match(out.report, /ชื่ออื่น|--force/);
@@ -404,6 +407,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
       updateDataDir: path.join(sandbox, 'agent-updates-real'),
+      fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — จำลอง HUB ตอบ 2xx
     });
 
     assert.equal(out.exitCode, 0, out.report);
@@ -433,6 +437,7 @@ describe('pack: dry-run ต้องไม่แตะอะไรเลย', ()
       hubUrl: 'http://192.168.1.102:3000',
       issueCommand: { cmd: process.execPath, args: [fakeIssue] },
       updateDataDir: updateDir,
+      fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — จำลอง HUB ตอบ 2xx
     });
     assert.equal(out.exitCode, 0, out.report);
     assert.match(out.report, /เผยแพร่ชุดอัปเดต/, 'ต้องบอกว่าเผยแพร่ชุดอัปเดตแล้ว');

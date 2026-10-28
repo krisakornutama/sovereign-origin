@@ -147,6 +147,12 @@ export function renderReport({ checks, meta }) {
   } else {
     lines.push('  ➜ พร้อมติดตั้ง — ดับเบิลคลิก INSTALL.cmd ได้เลย');
   }
+  // กันเข้าใจผิด (เจอจริง 28/10/69): รอบ "อ่านอย่างเดียว" HUB ไม่รู้อะไรเลย — ต้องบอกผู้ใช้ชัด ๆ
+  if (meta.profile !== 'hub' && meta.heartbeatSent !== true) {
+    lines.push('');
+    lines.push('  ⚠ รอบนี้ "ไม่ได้ส่งสัญญาณถึง HUB" (ตรวจแบบอ่านอย่างเดียว) — HUB จะไม่รู้ว่าคุณรันตรวจ');
+    lines.push('  · พิสูจน์ว่าเครื่องนี้ต่อ HUB ได้จริง: รัน  INSTALL-CHECK.cmd --post');
+  }
   lines.push('');
   return lines.join('\n');
 }
@@ -369,6 +375,9 @@ export async function runDoctor({
   }
 
   // 10) พิสูจน์ token กับ HUB (เขียน heartbeat 1 ครั้ง — ต้องสั่ง --heartbeat หรือ --post)
+  //  heartbeatSent = HUB "ได้ยิน" เครื่องนี้รอบนี้จริง ๆ (ได้ HTTP response กลับมา)
+  //  ใช้โชว์ท้ายรายงานว่า "รอบนี้ HUB ไม่รู้อะไรเลย" เมื่อไม่ได้ส่ง — กันเข้าใจผิด (เจอจริง 28/10/69)
+  let heartbeatSent = false;
   if (allowCommands && (heartbeat || postInstall)) {
     if (!join.ok || !hubUrl) {
       add('token', 'warn', 'ทดสอบ token กับ HUB', 'ข้าม', 'ต้องมี join.json (ชุดสากลจะได้ token ตอนติดตั้ง)');
@@ -379,6 +388,7 @@ export async function runDoctor({
           headers: { 'content-type': 'application/json', 'x-machine-token': join.machineToken },
           body: JSON.stringify({ version: `doctor/${nodeVersion}` }),
         });
+        heartbeatSent = true; // ได้ response = สัญญาณถึง HUB จริง (แม้ HUB จะปฏิเสธ token ก็ถึงตัว HUB แล้ว)
         const status = Number(res?.status ?? 0);
         if (status >= 200 && status < 300) {
           const body = postInstall ? await readJsonSafe(res) : null;
@@ -472,6 +482,7 @@ export async function runDoctor({
     runnerDir,
     profile,
     postInstall,
+    heartbeatSent,
   };
   const report = renderReport({ checks, meta });
   const failed = checks.some((c) => c.status === 'fail');

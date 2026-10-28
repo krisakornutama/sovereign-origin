@@ -55,6 +55,7 @@ const basePack = (dir, over = {}) => ({
   fullKit: false,
   dryRun: true,
   exec: fakeExec(),
+  fetchImpl: async () => ({ status: 200, ok: true }), // hub_url gate ใหม่ (D5) — ครอบทุกเส้นทางแพ็กจริงในไฟล์นี้
   updateDataDir: path.join(dir, 'agent-updates'),
   ...over,
 });

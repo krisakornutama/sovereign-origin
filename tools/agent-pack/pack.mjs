@@ -55,6 +55,17 @@ export function detectHubUrl(ifaces, port = 3000) {
   return `http://${pick}:${port}`;
 }
 
+/** URL นี้ชี้ไปยัง IP ส่วนตัว (LAN บ้าน) หรือ localhost หรือเปล่า — LAN IP เปลี่ยนได้เอง (DHCP) เครื่องลูกจึงอาจหาย */
+export function isPrivateLanUrl(url) {
+  let host = '';
+  try {
+    host = new URL(String(url || '')).hostname;
+  } catch {
+    host = String(url || '').replace(/^\w+:\/\//, '').split(':')[0].split('/')[0];
+  }
+  return !host || host === 'localhost' || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^127\./.test(host);
+}
+
 /**
  * เลือกโฟลเดอร์ปลายทางที่ "เขียนได้จริง" โดยไม่เขียนอะไรลงดิสก์
  * (ตรวจสิทธิ์ของบรรพบุรุษที่มีอยู่จริง — รากไดรฟ์ E: ของเครื่องจริงให้แค่ RX)
@@ -370,6 +381,18 @@ export function renderStartHere({ machineName, hubUrl, plan = null }) {
     '',
     '  ⚠️ ไฟล์นี้มี token ของเครื่องนี้อยู่ใน join.json — อย่าแชร์โฟลเดอร์นี้ให้คนอื่น',
     '     ถ้าติดตั้งเสร็จแล้ว เก็บ join.json ไว้เป็นหลักฐานได้ แต่ถ้าไม่ใช้แล้วให้ลบทิ้ง',
+  );
+  if (isPrivateLanUrl(hubUrl)) {
+    lines.push(
+      '  ⚠️  HUB_URL ข้างบนเป็น IP ภายในบ้าน (LAN) — IP ของเครื่องแม่เปลี่ยนได้เอง (DHCP)',
+      '     ถ้าวันหนึ่งเครื่องนี้หายไปจากหน้าเว็บ HUB ให้แพ็กชุดใหม่ด้วยโดเมนสาธารณะ',
+      '',
+    );
+  }
+  lines.push(
+    '  ถ้าติดตั้งแล้วเครื่องนี้ยังไม่ขึ้นออนไลน์บนหน้าเว็บ HUB:',
+    '   · รัน  INSTALL-CHECK.cmd --post  เพื่อพิสูจน์ว่าต่อ HUB ได้จริง',
+    '   · แล้วเปิด  SUPPORT.txt  ที่ตัวตรวจเขียนไว้ข้าง ๆ ชุดนี้ แล้วส่งข้อความในไฟล์นั้นให้ผู้ดูแลระบบ',
     '',
   );
   return lines.join('\r\n');
@@ -470,6 +493,8 @@ export async function runPack({
   /** ยืนยัน LAN ให้เลยตอนแพ็ก ⇒ คุมได้ทันทีที่เครื่องออนไลน์ */
   confirmLan = false,
   exec = defaultExec,
+  /** ตรวจสายถึง HUB ตอนแพ็ก (ฉีดได้เพื่อเทสต์ — ค่าเริ่มต้น fetch จริง; dry-run ไม่ใช้) */
+  fetchImpl = fetch,
   issueCommand = null,
   platform = process.platform,
   interfaces = os.networkInterfaces(),
@@ -510,6 +535,7 @@ export async function runPack({
       : `ไฟล์ที่จะก็อป: ${fileList.length} ไฟล์ (จาก ${RUNNER_DIR} — ไม่รวม .env/test)`
   );
   plan.push('ออก token: node scripts/issue-machine-token.ts ผ่าน tsx ของ core-api (ต่อ DB ของ HUB)');
+  plan.push(`ตรวจสายถึง HUB ก่อนแพ็ก: GET ${hub}/api/health (ยิงไม่ถึง = หยุดแพ็ก ไม่ปล่อยชุดพังออกไป)`);
 
   if (dryRun) {
     add('plan', 'ok', `${plan.length} ขั้น`);
@@ -532,6 +558,30 @@ export async function runPack({
     add('output', 'fail', `${joinPath} มีอยู่แล้ว`);
     lines.push(`  ✘ ${target} มีชุดติดตั้งอยู่แล้ว — ใช้ --force ถ้าตั้งใจแพ็กทับ (จะออก token ใหม่)`);
     return { exitCode: 1, code: 'out_exists', report: render(), plan, bundleDir: target, steps };
+  }
+
+  // 0) ตรวจสายถึง HUB ก่อนฝัง URL — ชุดที่ฝัง URL ยิงไม่ถึง = ชุดพังแบบเงียบ ๆ
+  //    (เจอจริง 28/10/69: ชุดเดิมฝัง LAN IP เดิมที่ DHCP เปลี่ยนไปแล้ว เครื่องลูกยิงไม่ถึง HUB ทั้งที่กดติดตั้งครบ)
+  let healthStatus = 0;
+  try {
+    const res = await fetchImpl(`${hub}/api/health`, { signal: AbortSignal.timeout(6000) });
+    healthStatus = Number(res?.status ?? 0);
+  } catch {
+    add('hub_url', 'fail', `ยิงไม่ถึง ${hub}/api/health`);
+    lines.push('  ✘ เครื่องนี้ต่อไปยัง HUB นี้ไม่ได้ — ชุดที่แพ็กออกไปจะยิงไม่ถึงเหมือนกัน');
+    lines.push(`     แก้: ระบุ --hub-url="URL ที่ยิงถึงจริง" (ลองเปิด ${hub}/api/health ในเบราว์เซอร์ก่อน)`);
+    return { exitCode: 1, code: 'hub_unreachable', report: render(), plan, bundleDir: target, steps };
+  }
+  if (healthStatus < 200 || healthStatus >= 300) {
+    add('hub_url', 'fail', `HUB ตอบ HTTP ${healthStatus} (ต้องเป็น 2xx)`);
+    lines.push(`  ✘ HUB ที่ ${hub} ตอบ HTTP ${healthStatus} — เช่น 403 = ถูก WAF/firewall บล็อกที่ edge`);
+    lines.push('     แก้: เปิด allowlist ของ /api/* ที่ edge หรือระบุ --hub-url อื่น แล้วแพ็กใหม่');
+    return { exitCode: 1, code: 'hub_unreachable', report: render(), plan, bundleDir: target, steps };
+  }
+  add('hub_url', 'ok', `ต่อ HUB ได้ — ${hub}/api/health ตอบ HTTP ${healthStatus}`);
+  if (isPrivateLanUrl(hub)) {
+    add('hub_url', 'warn', 'HUB_URL เป็น IP ภายในบ้าน (LAN) — IP นี้เปลี่ยนได้เอง (DHCP) เครื่องลูกจะหายไปจาก HUB');
+    lines.push('  ! คำเตือน: ควรแพ็กด้วยโดเมนสาธารณะแทน LAN IP — ถ้า DHCP เปลี่ยน IP เครื่องแม่ เครื่องลูกจะยิงไม่ถึง');
   }
 
   // 1) token
