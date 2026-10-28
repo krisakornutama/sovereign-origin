@@ -6,6 +6,7 @@ import { authFetch } from '../lib/apiFetch';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
+import ErrorNotice from '../components/ui/ErrorNotice';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 
@@ -36,36 +37,39 @@ export default function EnergyPage() {
   const [summary, setSummary] = useState<EnergySummary | null>(null);
   const [points, setPoints] = useState<{ time: number; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!isAuthenticated || !user) return;
-
-    const load = async () => {
-      try {
-        const [sumRes, histRes] = await Promise.all([
-          authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/energy/summary`),
-          authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/history?metric=power_kw&range=7d`),
-        ]);
-        if (!sumRes.ok) throw new Error(`HTTP ${sumRes.status}`);
-        setSummary(await sumRes.json());
-        const hist = await histRes.json();
-        setPoints(
-          hist.map((r: any) => ({
-            time: new Date(r.bucket).getTime(),
-            value: r.avg_value,
-          }))
-        );
-      } catch (err) {
-        console.error(err);
-        setError(t('energy.loadFailed', 'โหลดข้อมูลพลังงานไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลเซ็นเซอร์'));
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    setError(null);
+    setLoading(true);
+    try {
+      const [sumRes, histRes] = await Promise.all([
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/energy/summary`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/history?metric=power_kw&range=7d`),
+      ]);
+      if (!sumRes.ok) throw new Error(`HTTP ${sumRes.status}`);
+      setSummary(await sumRes.json());
+      const hist = await histRes.json();
+      setPoints(
+        hist.map((r: any) => ({
+          time: new Date(r.bucket).getTime(),
+          value: r.avg_value,
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+      // เก็บ error ดิบไว้ — ErrorNotice จะแปลเป็น "เกิดอะไร + ต้องแก้ยังไง" ให้เอง
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
@@ -161,7 +165,7 @@ export default function EnergyPage() {
           title={t('energy.title', 'Energy Management')} theme="power" icon={<Icon name="energy" size={18} />} actions={<Link href="/dashboard" scroll={false} className="text-sm text-sky-400 hover:underline">{t('energy.backDashboard', '← กลับ Dashboard')}</Link>}
         />
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
-        {error && <div className="text-sm text-red-400 inset px-4 py-3">{error}</div>}
+        <ErrorNotice error={error} onRetry={load} />
 
         {loading ? (
           <div className="text-gray-500">{t('common.loading', 'กำลังโหลด...')}</div>

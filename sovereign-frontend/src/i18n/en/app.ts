@@ -7,6 +7,7 @@ export default {
     connecting: 'Reconnecting…',
     connectingDetail: ' (attempt {n}) — the API is not responding; the system will retry automatically every few seconds',
     retryNow: 'Try now',
+    dockerHint: 'If this lasts more than a minute: open Docker Desktop and run docker ps to check sovereign-core-api is running',
     reconnected: 'API connected',
     reconnectedDetail: ' — loading data automatically…',
   },
