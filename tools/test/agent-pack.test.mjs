@@ -294,6 +294,67 @@ describe('setup-machine: ติดตั้งที่เครื่องล�
     assert.ok(exec.ran('schtasks /Create'), 'ต้องลองตั้ง task จริง');
     assert.equal(out.ok, true, 'enroll สำเร็จแล้ว = ยังนับว่าติดตั้งได้ (แค่ autostart ยังไม่ตั้ง)');
     assert.match(out.report, /administrator|ผู้ดูแลระบบ/i, 'ต้องบอกวิธีตั้ง autostart ให้สำเร็จ');
+    assert.ok(exec.ran('wscript '), 'แม้ตั้ง task ไม่ได้ (ไม่มีสิทธิ์ admin) ก็ต้องสตาร์ท runner ให้ทันที — เจอจริง 28/10/69: ติดตั้งจบแต่ runner ไม่เดินจนกว่าจะรีบูต/กดเอง');
+  });
+
+  // ── D5 slice 2: "ติดตั้งจบ = runner เดินทันที" ────────────────────────────────
+  // เจอจริง 28/10/69 (เครื่อง 2): ติดตั้งจบด้วยปุ่มเดียว แต่ runner ไม่ถูกสตาร์ท
+  //   (มีแค่ heartbeat พิสูจน์ token ของตัวติดตั้ง แล้วเงียบ — task /SC ONLOGON ยิงเฉพาะตอนล็อกอิน)
+  // ⇒ หลังตั้ง task ต้องสตาร์ท runner ให้เลย แบบไม่เด้งหน้าต่าง (ผ่าน wscript + RUN-START.vbs ที่สร้างเอง)
+  test('ติดตั้งจบ = runner เดินทันที: สร้าง RUN-START.vbs + สั่ง wscript ซ่อนหน้าต่าง (ไม่รอล็อกอินครั้งหน้า)', async () => {
+    fs.writeFileSync(path.join(sandbox, 'join.json'), join(), 'utf8');
+    const fetchImpl = fakeFetch(() => okJson());
+    const exec = fakeExec(); // ปริยาย: schtasks สำเร็จ · CIM ไม่เจอ process · wscript สำเร็จ
+    const out = await setup.runSetup({ dir: sandbox, fetchImpl, exec, platform: 'win32', home: 'C:\\Users\\com' });
+    assert.equal(out.ok, true, out.report);
+    // (1) vbs ที่สร้างต้อง ASCII + CRLF + ไม่ฝังพาธ + รันแบบซ่อนหน้าต่าง
+    const vbsPath = path.join(sandbox, 'RUN-START.vbs');
+    assert.ok(fs.existsSync(vbsPath), 'ต้องสร้าง RUN-START.vbs ไว้ในโฟลเดอร์ runner (ไฟล์ที่สร้างตอนติดตั้ง ไม่ใช่ไฟล์แถม .cmd)');
+    const vbs = fs.readFileSync(vbsPath, 'utf8');
+    assert.ok(!/[^\x00-\x7F]/.test(vbs), 'vbs ต้อง ASCII ล้วน — ไฟล์ที่มีอักษรไทยพังบน codepage อื่น');
+    assert.ok(vbs.includes('\r\n'), 'vbs ต้องเป็น CRLF');
+    assert.ok(!vbs.includes(sandbox), 'ห้ามฝังพาธลงไฟล์ — ให้หาโฟลเดอร์ตัวเองตอนรัน (GetParentFolderName)');
+    assert.match(vbs, /RUN-RUNNER\.cmd/, 'ต้องเรียก launcher ที่ฟื้นเองหลัง crash');
+    assert.match(vbs, /, 0, False/, 'ต้อง Run ด้วย window style 0 = ไม่เด้งหน้าต่างดำ');
+    // (2) task ต้องชี้ wscript + vbs — ล็อกอินครั้งหน้าก็ต้องไม่เด้งหน้าต่าง
+    // (fakeExec ของไฟล์นี้เก็บ call เป็นสตริงรวมแล้ว)
+    const createCall = exec.calls.find((c) => c.includes('schtasks /Create'));
+    assert.ok(createCall, 'ต้องตั้ง task');
+    assert.match(createCall, /wscript\.exe/, '/TR ต้องรันผ่าน wscript (ซ่อนหน้าต่าง)');
+    assert.match(createCall, /RUN-START\.vbs/, '/TR ต้องชี้ vbs ที่สร้างไว้');
+    // (3) หัวใจของ slice นี้: สตาร์ท runner ทันทีหลังติดตั้ง
+    // (needle 'wscript ' มีวรรคตาม — กันตรงกับ 'wscript.exe' ใน /TR ของ schtasks)
+    assert.ok(exec.ran('wscript '), 'ต้องเริ่ม runner ให้ทันทีด้วย wscript — เครื่องลูกไม่ควรต้องรีบูต/ดับเบิลคลิกเอง');
+    assert.match(out.report, /30 วินาที|สตาร์ท/, 'รายงานต้องบอกว่าเริ่ม runner แล้ว และต้องรอสักครู่ก่อนดู HUB');
+  });
+
+  test('runner รันอยู่แล้ว (CIM เจอ PID) → ห้ามสตาร์ทซ้ำ (กัน runner สองตัวแย่ง heartbeat)', async () => {
+    fs.writeFileSync(path.join(sandbox, 'join.json'), join(), 'utf8');
+    const exec = fakeExec({ 'Get-CimInstance': { code: 0, stdout: '1234\r\n', stderr: '' } });
+    const out = await setup.runSetup({ dir: sandbox, fetchImpl: fakeFetch(() => okJson()), exec, platform: 'win32', home: 'C:\\Users\\com' });
+    assert.equal(out.ok, true);
+    assert.ok(!exec.ran('wscript '), 'มี runner อยู่แล้ว = ห้ามสตาร์ทอีกตัว');
+    assert.match(out.report, /รันอยู่แล้ว/, 'ต้องบอกว่าข้ามการสตาร์ทเพราะรันอยู่แล้ว');
+    assert.match(out.report, /1234/, 'ต้องโชว์ PID ที่เจอ');
+  });
+
+  test('wscript สตาร์ทไม่ผ่าน → ติดตั้งยังนับว่าสำเร็จ + บอกทางเดินต่อ (ดับเบิลคลิก/รีบูต)', async () => {
+    fs.writeFileSync(path.join(sandbox, 'join.json'), join(), 'utf8');
+    const exec = fakeExec({ 'wscript ': { code: 1, stdout: '', stderr: 'wscript failed' } });
+    const out = await setup.runSetup({ dir: sandbox, fetchImpl: fakeFetch(() => okJson()), exec, platform: 'win32', home: 'C:\\Users\\com' });
+    assert.equal(out.ok, true, 'สตาร์ททันทีล้ม = ไม่ใช่ความล้มของการติดตั้ง (heartbeat ผ่านแล้ว)');
+    assert.match(out.report, /สตาร์ท.*ไม่สำเร็จ|สตาร์ทอัตโนมัติ.*ไม่สำเร็จ/, 'ต้องแจ้งชัดว่าขั้นสตาร์ททันทีไม่ผ่าน (ไม่เงียบ)');
+    assert.match(out.report, /RUN-RUNNER\.cmd|รีบูต|ล็อกอิน/, 'ต้องบอกวิธีเปิด runner เองต่อ');
+  });
+
+  test('ตรวจ process ไม่ได้ (CIM พัง) → ไม่สตาร์ทเดา ๆ (กันสตาร์ทซ้ำแบบไม่รู้ตัว) + ยังติดตั้งสำเร็จ', async () => {
+    fs.writeFileSync(path.join(sandbox, 'join.json'), join(), 'utf8');
+    const exec = fakeExec({ 'Get-CimInstance': { code: 1, stdout: '', stderr: 'denied' } });
+    const out = await setup.runSetup({ dir: sandbox, fetchImpl: fakeFetch(() => okJson()), exec, platform: 'win32', home: 'C:\\Users\\com' });
+    assert.equal(out.ok, true);
+    assert.ok(!exec.ran('wscript '), 'ตรวจไม่ได้ว่า runner รันอยู่ไหม = ห้ามสตาร์ทเดา (เสี่ยงสองตัว)');
+    assert.match(out.report, /ข้ามการสตาร์ท|ตรวจไม่ได้ว่า runner รันอยู่/, 'ต้องแจ้งชัดว่าข้ามการสตาร์ทเพราะตรวจ process ไม่ได้');
+    assert.match(out.report, /RUN-RUNNER\.cmd|รีบูต|ล็อกอิน/, 'ต้องบอกวิธีเปิด runner เองต่อ');
   });
 });
 

@@ -253,6 +253,11 @@ export async function runInstall(opts = {}) {
     if (writeIf(path.join(PATHS.runnerDir, 'run-runner.cmd'), launcher.text)) {
       envTouched.push(path.join(PATHS.runnerDir, 'run-runner.cmd'));
     }
+    // ตัวเปิดแบบไม่เด้งหน้าต่าง — scheduled task (/TR) จะชี้มาที่ไฟล์นี้ ไม่ใช่ .cmd ตรง ๆ
+    const hiddenStart = lib.buildHiddenStartVbs({ runnerDir: path.join(root, PATHS.runnerDir) });
+    if (writeIf(path.join(PATHS.runnerDir, 'RUN-START.vbs'), hiddenStart.text)) {
+      envTouched.push(path.join(PATHS.runnerDir, 'RUN-START.vbs'));
+    }
   }
 
   if (!dryRun) {
@@ -427,8 +432,8 @@ export async function runInstall(opts = {}) {
     } else if (platform !== 'win32') {
       add('runner', 'warn', 'ไม่ใช่ Windows — ยังไม่ตั้ง scheduled task', `รันเอง: cd ${PATHS.runnerDir} && node src\\main.mjs`);
     } else {
-      const launcherPath = path.join(root, PATHS.runnerDir, 'run-runner.cmd');
-      const createArgs = lib.buildRunnerTaskCreateArgs({ taskName: TASK_NAME, launcherPath });
+      const hiddenStartPath = path.join(root, PATHS.runnerDir, 'RUN-START.vbs');
+      const createArgs = lib.buildRunnerTaskCreateArgs({ taskName: TASK_NAME, hiddenStartPath });
       const create = await exec(createArgs[0], createArgs.slice(1));
       const query = await exec('schtasks', ['/Query', '/TN', TASK_NAME, '/FO', 'LIST', '/V']);
       const parsed = lib.parseSchtasksQuery(query.stdout || query.stderr || '');
@@ -441,7 +446,7 @@ export async function runInstall(opts = {}) {
             : 'สร้าง scheduled task ไม่สำเร็จ',
           'คลิกขวาตัวติดตั้ง/terminal → Run as administrator แล้วรันใหม่ (ต้องมีสิทธิ์สร้าง task)'
         );
-      } else if (!/run-runner\.cmd/i.test(parsed.taskToRun)) {
+      } else if (!/wscript\.exe/i.test(parsed.taskToRun) || !/RUN-START\.vbs/i.test(parsed.taskToRun)) {
         add('runner', 'fail', `task ชี้ผิดที่: ${parsed.taskToRun}`, 'ลบ task เก่าแล้วรันใหม่: schtasks /Delete /TN "' + TASK_NAME + '" /F');
       } else {
         await exec('schtasks', ['/Run', '/TN', TASK_NAME]);

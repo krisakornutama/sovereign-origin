@@ -139,7 +139,10 @@ describe('setup-machine ในชุด --full (join ที่ราก, ตั�
     }
   });
 
-  test('autostart ชี้ launcher ที่มีอยู่จริง (สร้างให้ถ้ายังไม่มี)', async () => {
+  // สเปกอัปเดต 29/10/69 (D5 "ติดตั้งจบ = runner เดินทันที" + ซ่อนหน้าต่างตอนล็อกอิน):
+  // /TR ไม่ชี้ .cmd ตรง ๆ แล้ว — ชี้ RUN-START.vbs (wscript) ซึ่งเปิด RUN-RUNNER.cmd แบบไม่เด้งหน้าต่าง
+  // เจตนาเดิมคงอยู่: task ต้องชี้ไฟล์ห่อที่มีอยู่จริงในโฟลเดอร์ runner ไม่ใช่ node ดิบ ๆ
+  test('autostart ชี้ไฟล์ห่อที่มีอยู่จริง (task → wscript+vbs → launcher ครบทั้งสาย)', async () => {
     const box = fullKitSandbox();
     try {
       const exec = fakeExec();
@@ -154,8 +157,11 @@ describe('setup-machine ในชุด --full (join ที่ราก, ตั�
       const task = exec.calls.find((c) => c.bin === 'schtasks');
       assert.ok(task, 'ต้องตั้ง scheduled task');
       const tr = task.args[task.args.indexOf('/TR') + 1];
-      const runnerDirFromTask = tr.includes('RUN-RUNNER.cmd') || tr.includes('run-runner.cmd');
-      assert.ok(runnerDirFromTask, `/TR ต้องชี้ launcher ของ runner — ได้: ${tr}`);
+      assert.match(tr, /^wscript\.exe ".*RUN-START\.vbs"$/, `/TR ต้องชี้ vbs ตัวเปิดแบบไม่เด้งหน้าต่าง — ได้: ${tr}`);
+      const vbsPath = path.join(box.runnerDir, 'RUN-START.vbs');
+      assert.ok(fs.existsSync(vbsPath), 'vbs ตัวเปิดต้องถูกสร้างไว้จริง');
+      const vbs = fs.readFileSync(vbsPath, 'utf8');
+      assert.match(vbs, /RUN-RUNNER\.cmd/, 'vbs ต้องเปิด launcher (ตายแล้วฟื้นเอง) — สาย task → vbs → launcher ต้องไม่ขาด');
       assert.ok(fs.existsSync(path.join(box.runnerDir, 'RUN-RUNNER.cmd')), 'launcher ต้องถูกสร้างไว้จริง');
     } finally {
       fs.rmSync(box.root, { recursive: true, force: true });
