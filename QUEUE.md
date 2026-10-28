@@ -669,6 +669,8 @@
         · เทสต์ red-first `tools/test/d5-installer.test.mjs` (แดง exit 1 → เขียว 9/9) · เทสต์เดิม 11 จุดที่เรียก runPack เติม fetchImpl ปลอมแล้ว
         · ยังเหลือ: ค่าเริ่มต้น HUB_URL เป็นโดเมน (ข้อ 2 ครึ่งหลัง) + รวมปุ่ม .cmd ให้เหลือตัวเดียวจริง (ข้อ 1/4) — รอ slice ถัดไป
         · ใช้จริงแล้ว 28/10/69 ปลายคืน: แพ็กชุดรันเนอร์ให้ "คอมเครื่องที่ 2" (LAN + `--force` หมุน token) → เครื่องลูก**ออนไลน์จริง heartbeat ทันที** — ปิด D2 (รายละเอียดที่หัวข้อ D2)
+        · **เจอจริงจากรอบติดตั้ง 28/10/69**: runner**ยังไม่ถูกสตาร์ททันทีในรอบติดตั้ง** — มีแค่ heartbeat พิสูจน์ token ของตัวติดตั้ง (16:59:25) แล้วเงียบ เพราะ task เป็น `/SC ONLOGON` (ยิงเฉพาะตอนล็อกอิน) ⇒ เครื่องลูกต้องรีบูต/ล็อกอินใหม่ หรือดับเบิลคลิก `run-runner.cmd` เอง ถึงจะออนไลน์**ต่อเนื่อง** — งานชิ้นถัดไปของข้อ 1: "ติดตั้งจบ = runner เดินทันที" (สั่ง `schtasks /Run` หรือสตาร์ท hidden ให้เลย)
+        · เจอจริงเพิ่มเติม: label "online" **ค้าง**แม้ heartbeat หยุดแล้ว 19+ นาที (backend ควรตัดเป็น offline ตามอายุ heartbeat — และ doctor `--post` โชว์ age วินาทีอยู่แล้ว ใช้ตรวจความสดได้)
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
