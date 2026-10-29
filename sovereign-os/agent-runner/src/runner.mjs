@@ -111,7 +111,16 @@ export async function runJob(job, config = {}) {
 
     let child;
     try {
-      child = spawn(cmd.bin, cmd.args, { cwd: cmd.cwd, shell: process.platform === 'win32' });
+      const spawnImpl = config.spawnImpl || spawn;
+      child = spawnImpl(cmd.bin, cmd.args, {
+        cwd: cmd.cwd,
+        shell: process.platform === 'win32',
+        // stdin = ignore: opencode `run` อ่าน stdin จน EOF เมื่อ stdin ไม่ใช่ TTY
+        // (pipe ที่เปิดค้าง = รอตลอดไป ⇒ งานค้าง 30 นาที — เจอจริงกับเครื่อง 2, 29/10/69)
+        stdio: ['ignore', 'pipe', 'pipe'],
+        // runner ทำงานเบื้องหลัง (vbs ไม่มีหน้าต่าง) — อย่าให้ cmd/opencode เด้งหน้าต่างดำขึ้นมา
+        windowsHide: true,
+      });
     } catch (err) {
       finish({ status: 'error', exitCode: null, summary: `spawn ไม่ได้: ${err?.message || err}`, logTail: '' });
       return;
@@ -176,41 +185,52 @@ export async function uploadScreenshot({ hubUrl, token, jobId, buffer, fetchImpl
  * หนึ่งรอบของ loop: heartbeat → pull → รัน → รายงาน
  * HUB ล่ม = คืน error ให้ caller รอบหน้า (ไม่ throw ให้ process ตาย)
  */
-export async function pollOnce({ hub, runner, machineName }) {
+export async function pollOnce({ hub, runner, machineName, heartbeatSec = 30 }) {
   try {
     await hub.heartbeat();
     const pulled = await hub.pullJobs();
     // HUB คืน { jobs: [...] } แต่ client บางตัวอาจคืน array ตรงๆ — รับได้ทั้งสองแบบ
     const jobs = Array.isArray(pulled) ? pulled : (pulled?.jobs ?? []);
-    let dispatched = 0;
-    let failed = 0;
-    for (const job of jobs || []) {
-      const result = await runJob(job, { ...runner, machineName: machineName ?? runner?.machineName });
-      dispatched += 1;
-      if (result.status !== 'done') failed += 1;
-      // ภาพหน้าจอตอนจบงาน — จับ/ส่งไม่สำเร็จต้องไม่ทำให้งานที่สำเร็จกลายเป็น error
-      let screenshotUrl = null;
-      if (runner?.captureScreenshot && hub.uploadScreenshot) {
-        try {
-          const shot = await (runner.capture ?? captureScreenshot)();
-          if (shot) {
-            const up = await hub.uploadScreenshot(job.id, shot);
-            screenshotUrl = up?.screenshotUrl ?? null;
+    // งาน AI ยาวได้ถึง 30 นาที — ระหว่างนั้นต้องส่ง heartbeat ต่อเนื่อง
+    // ไม่งั้น HUB ตัดเป็น offline ระหว่างทำงาน (เจอจริง 29/10/69: งาน opencode ค้าง 13 นาที = เครื่องหายจากหน้าเว็บ)
+    const hbMs = Math.max(250, Number(heartbeatSec || 30) * 1000);
+    const hbTimer = setInterval(() => {
+      Promise.resolve(hub.heartbeat()).catch(() => {});
+    }, hbMs);
+    hbTimer.unref?.();
+    try {
+      let dispatched = 0;
+      let failed = 0;
+      for (const job of jobs || []) {
+        const result = await runJob(job, { ...runner, machineName: machineName ?? runner?.machineName });
+        dispatched += 1;
+        if (result.status !== 'done') failed += 1;
+        // ภาพหน้าจอตอนจบงาน — จับ/ส่งไม่สำเร็จต้องไม่ทำให้งานที่สำเร็จกลายเป็น error
+        let screenshotUrl = null;
+        if (runner?.captureScreenshot && hub.uploadScreenshot) {
+          try {
+            const shot = await (runner.capture ?? captureScreenshot)();
+            if (shot) {
+              const up = await hub.uploadScreenshot(job.id, shot);
+              screenshotUrl = up?.screenshotUrl ?? null;
+            }
+          } catch (err) {
+            console.error(`[runner] ส่งภาพหน้าจอไม่สำเร็จ: ${err?.message || err}`);
           }
-        } catch (err) {
-          console.error(`[runner] ส่งภาพหน้าจอไม่สำเร็จ: ${err?.message || err}`);
         }
+        await hub.reportResult(job.id, {
+          status: result.status,
+          result: result.status === 'done' ? result.summary : null,
+          error: result.status === 'done' ? null : result.summary,
+          exitCode: result.exitCode,
+          logTail: result.logTail ?? null,
+          screenshotUrl,
+        });
       }
-      await hub.reportResult(job.id, {
-        status: result.status,
-        result: result.status === 'done' ? result.summary : null,
-        error: result.status === 'done' ? null : result.summary,
-        exitCode: result.exitCode,
-        logTail: result.logTail ?? null,
-        screenshotUrl,
-      });
+      return { dispatched, failed };
+    } finally {
+      clearInterval(hbTimer);
     }
-    return { dispatched, failed };
   } catch (err) {
     return { dispatched: 0, failed: 0, error: err?.message || String(err) };
   }
@@ -220,7 +240,7 @@ export async function pollOnce({ hub, runner, machineName }) {
 export function createRunner({ config = {}, hub, runner = {}, runOnce = null }) {
   let timer = null;
   let running = false;
-  const once = runOnce || (() => pollOnce({ hub, runner, machineName: config.machineName }));
+  const once = runOnce || (() => pollOnce({ hub, runner, machineName: config.machineName, heartbeatSec: config.heartbeatSec }));
   return {
     isRunning: () => running,
     async start() {

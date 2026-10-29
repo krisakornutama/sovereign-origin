@@ -5,6 +5,7 @@
 // รัน: node --test sovereign-os/agent-runner/test/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import {
   buildCommand,
   supportsExecutor,
@@ -264,4 +265,68 @@ test('pollOnce — อัปโหลดภาพล้มต้องยัง�
   assert.equal(out.failed, 0, 'งานทำสำเร็จแล้ว ภาพส่งไม่ได้ต้องไม่ทำให้กลายเป็น error');
   assert.equal(reported.status, 'done');
   assert.equal(reported.screenshotUrl, null);
+});
+
+// ── งานค้างทั้งที่เครื่องยังทำงาน (29/10/69 — เจอจริงกับเครื่อง 2) ─────────────
+// opencode `run` จะอ่าน stdin จนจบ (EOF) เมื่อ stdin ไม่ใช่ TTY
+// runner เดิม spawn แบบ pipe ที่เปิดค้าง ⇒ opencode รอ EOF ตลอดไป ⇒ งานค้าง 30 นาที
+// พิสูจน์ด้วยมือบน HUB: stdin เปิดค้าง = ไม่มี output 30 วิ · stdio ignore = ออกทันที
+test('runJob — spawn ต้องปิด stdin + ซ่อนหน้าต่าง (opencode รอ EOF จาก pipe = งานค้าง)', async () => {
+  const calls = [];
+  const fakeSpawn = (bin, args, opts) => {
+    calls.push({ bin, args, opts });
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => {};
+    setImmediate(() => {
+      child.stdout.emit('data', '{"type":"text","text":"ok"}\n');
+      child.emit('close', 0);
+    });
+    return child;
+  };
+  const res = await runJob({ executor: 'opencode', prompt: 'x' }, { spawnImpl: fakeSpawn, opencodeBin: 'fake-opencode-not-real-xyz' });
+  assert.equal(res.status, 'done', res.summary);
+  assert.equal(calls.length, 1, 'runJob ต้องใช้ spawnImpl ที่ฉีดเข้ามา (เทสต์ต้องไม่ spawn จริง)');
+  assert.deepEqual(
+    calls[0].opts.stdio,
+    ['ignore', 'pipe', 'pipe'],
+    'stdin ต้องเป็น ignore — pipe ที่เปิดค้างทำให้ opencode รอ EOF แล้วงานค้างทั้งที่เครื่องยังทำงาน',
+  );
+  assert.equal(calls[0].opts.windowsHide, true, 'ต้องซ่อนหน้าต่าง cmd ตอน spawn (runner ทำงานเบื้องหลัง)');
+});
+
+test('pollOnce — งานยาวต้องไม่ขาด heartbeat (HUB ต้องไม่เห็นเครื่อง offline ระหว่างงาน)', async () => {
+  let beats = 0;
+  const hub = {
+    heartbeat: async () => {
+      beats += 1;
+      return { status: 'online' };
+    },
+    pullJobs: async () => ({ jobs: [{ id: 'j-long', executor: 'opencode', prompt: 'x' }] }),
+    reportResult: async () => ({}),
+  };
+  // งานจำลองใช้เวลา ~600ms — นานกว่าช่วง heartbeat ที่ตั้งไว้หลายเท่า
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => {};
+    setTimeout(() => {
+      child.stdout.emit('data', '{"type":"text","text":"ok"}\n');
+      child.emit('close', 0);
+    }, 600);
+    return child;
+  };
+  const out = await pollOnce({
+    machineName: 'r',
+    hub,
+    runner: { spawnImpl: fakeSpawn, opencodeBin: 'fake-opencode-not-real-xyz' },
+    heartbeatSec: 0.05,
+  });
+  assert.equal(out.dispatched, 1);
+  assert.ok(
+    beats >= 2,
+    `ต้องมี heartbeat ระหว่างงานด้วย (ได้ ${beats} ครั้ง) — เดิม heartbeat อยู่นอก loop งาน ⇒ งาน 30 นาที = เครื่องดู offline 30 นาที`,
+  );
 });
