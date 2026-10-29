@@ -691,6 +691,7 @@
                 - แก้: `runJob` spawn `stdio:['ignore','pipe','pipe']` + `windowsHide` + seam `spawnImpl` · `pollOnce` มี heartbeat interval ระหว่างงาน (heartbeatSec) · red-first: 2 fails exit 1 → 23/23 เขียว · suite runner 131/134 (3 skipped) exit 0
                 - ช่องว่างเกต: `npm run verify` รันแค่ `tools/test/**` ไม่รวม `sovereign-os/agent-runner/test/*.test.mjs` — บั๊กนี้จะไม่ถูกจับโดยเกตกลาง (บันทึกไว้พิจารณาเพิ่ม step)
                 - เครื่อง 2 ต้องรับโค้ดใหม่: รีบูต (หรือ kill opencode + restart runner) → self-update 30 วิหลังบูตดึงชุดใหม่ → ยิงงานซ้ำ
+                - เผยแพร่ชุด `d26dc25b0276` (25 ไฟล์) แล้ว 29/10/69 · งานค้างเดิม timeout เองที่ 30 นาที (`หมดเวลา 1800000ms`) เครื่องกลับ online — รอเจ้าของรีบูตเครื่อง 2 เพื่อรับโค้ดใหม่ (พิสูจน์ task ซ่อนหน้าต่างตอนล็อกอินด้วย)
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
