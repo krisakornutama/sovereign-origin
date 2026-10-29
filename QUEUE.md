@@ -687,6 +687,10 @@
             - รอเจ้าของ: ก็อปชุดใหม่ → เครื่อง 2 `npm install -g opencode-ai` → SETUP-MACHINE.cmd (admin) → ตรวจ online + ลองงาน echo/opencode
             - **เครื่อง 2 กลับออนไลน์แล้ว 29/10/69 16:52** (เวลาไทย): เจ้าของก็อปชุด + รัน SETUP-MACHINE (admin) ครั้งเดียว → heartbeat ต่อเนื่องทุก ~15 วิ · executors `["echo","opencode"]` · `jobs/pull` + `update/manifest` 200 — เหลือทดสอบงาน echo (ทำได้ทันที) และ opencode (รอ `npm install -g opencode-ai` ที่เครื่อง 2 โหลดเสร็จ)
             - **พิสูจน์งาน echo ครบวงจรแล้ว 29/10/69**: ยิง `POST /api/agent-machines/jobs` (executor echo) → queued→running→**done ใน ~4 วิ** · exit 0 · result `[คอมเครื่องที่ 2] echo: สวัสดีจาก HUB — ทดสอบท่อคำสั่ง 1-2-3 (เดโม)` — ท่อ HUB→คิว→เครื่องลูก→ผลกลับ ใช้ได้จริง · เหลือ: งาน opencode (รอ CLI ที่เครื่อง 2)
+            - **เจอบั๊กงานค้าง 29/10/69 (แก้แล้ว รอ deploy)**: งาน opencode ค้าง 13+ นาที ไม่จบ — พิสูจน์ด้วยมือบน HUB: `opencode run` อ่าน stdin จน EOF เมื่อ stdin ไม่ใช่ TTY ⇒ runner spawn แบบ pipe เปิดค้าง = รอตลอดไปจน timeout 30 นาที · และระหว่างงาน runner ไม่ heartbeat (loop เป็น heartbeat→pull→await งาน) ⇒ HUB เห็นเครื่อง offline ระหว่างทำงาน
+                - แก้: `runJob` spawn `stdio:['ignore','pipe','pipe']` + `windowsHide` + seam `spawnImpl` · `pollOnce` มี heartbeat interval ระหว่างงาน (heartbeatSec) · red-first: 2 fails exit 1 → 23/23 เขียว · suite runner 131/134 (3 skipped) exit 0
+                - ช่องว่างเกต: `npm run verify` รันแค่ `tools/test/**` ไม่รวม `sovereign-os/agent-runner/test/*.test.mjs` — บั๊กนี้จะไม่ถูกจับโดยเกตกลาง (บันทึกไว้พิจารณาเพิ่ม step)
+                - เครื่อง 2 ต้องรับโค้ดใหม่: รีบูต (หรือ kill opencode + restart runner) → self-update 30 วิหลังบูตดึงชุดใหม่ → ยิงงานซ้ำ
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
