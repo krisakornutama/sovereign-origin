@@ -89,6 +89,39 @@ export function parseOpencodeOutput(raw) {
   return { summary, hadError: errors.length > 0 };
 }
 
+/**
+ * ฆ่าทั้ง process tree ของงานที่หมดเวลา
+ *
+ * ทำไมไม่ใช้ child.kill() เฉย ๆ: บน Windows เรา spawn ผ่าน shell (`shell: true`)
+ * ⇒ child ที่ได้คือ **cmd.exe** ไม่ใช่ตัวโปรแกรมจริง — `child.kill()` จึงฆ่าแค่ cmd
+ * ปล่อย `opencode.exe` รันค้างต่อ (เจอจริง 29/10/69: งาน timeout 21:31 แต่ opencode
+ * ยังกิน CPU ต่ออีก 3+ ชั่วโมงบนเครื่อง 2) ⇒ ต้อง `taskkill /T /F` ฆ่าทั้งต้นไม้
+ */
+export function killProcessTree(child, { platform = process.platform, spawnImpl = spawn, log = () => {} } = {}) {
+  const pid = child?.pid;
+  if (!pid) return false;
+  if (platform === 'win32') {
+    try {
+      const killer = spawnImpl('taskkill', ['/pid', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer?.on?.('error', (err) => log(`taskkill ไม่สำเร็จ: ${err?.message || err}`));
+      return true;
+    } catch (err) {
+      log(`taskkill ไม่สำเร็จ: ${err?.message || err}`);
+      return false;
+    }
+  }
+  try {
+    child.kill('SIGKILL');
+    return true;
+  } catch (err) {
+    log(`kill ไม่สำเร็จ: ${err?.message || err}`);
+    return false;
+  }
+}
+
 /** รัน job เดียว → คืนผลลัพธ์ที่พร้อมรายงานกลับ HUB */
 export async function runJob(job, config = {}) {
   const cmd = buildCommand(job, config);
@@ -127,7 +160,11 @@ export async function runJob(job, config = {}) {
     }
 
     const timer = setTimeout(() => {
-      try { child.kill(); } catch { /* ฆ่าไม่ได้ก็ปล่อย */ }
+      // ต้องฆ่าทั้ง tree — child.kill() บน Windows ฆ่าแค่ cmd.exe แล้วปล่อย opencode ค้างกิน CPU
+      const killTree = config.killTreeImpl || killProcessTree;
+      try {
+        killTree(child, { spawnImpl: config.spawnImpl || spawn });
+      } catch { /* ฆ่าไม่ได้ก็ปล่อย — ต้องรายงานผลให้ได้ก่อน */ }
       finish({ status: 'error', exitCode: null, summary: `หมดเวลา ${cmd.timeoutMs}ms — ยกเลิกงาน`, logTail: out.slice(-2000) });
     }, cmd.timeoutMs);
 
