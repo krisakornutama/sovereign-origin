@@ -14,6 +14,7 @@ import {
   pollOnce,
   createRunner,
   resolveCaptureScreenshot,
+  killProcessTree,
 } from '../src/runner.mjs';
 import { captureScreenshot } from '../src/screenshot.mjs';
 
@@ -329,4 +330,68 @@ test('pollOnce — งานยาวต้องไม่ขาด heartbeat (H
     beats >= 2,
     `ต้องมี heartbeat ระหว่างงานด้วย (ได้ ${beats} ครั้ง) — เดิม heartbeat อยู่นอก loop งาน ⇒ งาน 30 นาที = เครื่องดู offline 30 นาที`,
   );
+});
+
+// ── งานหมดเวลาแล้ว "ฆ่าไม่จริง" = opencode ค้างกิน CPU (30/10/69 — เจอจริงเครื่อง 2) ──
+// child.kill() บน Windows ฆ่าแค่ cmd.exe ที่ห่อคำสั่ง — ตัวจริง (opencode.exe) รอดชีวิต
+// เจอจริง: งาน timeout 21:31 แล้ว opencode ยังกิน CPU ต่ออีกกว่า 3 ชั่วโมง
+test('killProcessTree — Windows ต้องฆ่าทั้ง tree ด้วย taskkill /T /F', () => {
+  const calls = [];
+  const fakeSpawn = (bin, args, opts) => {
+    calls.push({ bin, args, opts });
+    return { on: () => {} };
+  };
+  const ok = killProcessTree(
+    { pid: 4242, kill: () => { throw new Error('ห้ามใช้ child.kill บน Windows — มันฆ่าแค่ cmd.exe'); } },
+    { platform: 'win32', spawnImpl: fakeSpawn },
+  );
+  assert.equal(ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].bin, 'taskkill');
+  assert.deepEqual(calls[0].args, ['/pid', '4242', '/T', '/F']);
+  assert.equal(calls[0].opts.windowsHide, true, 'ต้องไม่เด้งหน้าต่างดำขึ้นมาบนเครื่องลูก');
+  assert.equal(calls[0].opts.stdio, 'ignore');
+});
+
+test('killProcessTree — POSIX ใช้ SIGKILL กับ child ตรง ๆ (ไม่ต้อง spawn taskkill)', () => {
+  let sig = null;
+  const ok = killProcessTree(
+    { pid: 7, kill: (s) => { sig = s; } },
+    {
+      platform: 'linux',
+      spawnImpl: () => {
+        throw new Error('ไม่ควร spawn อะไรบน POSIX');
+      },
+    },
+  );
+  assert.equal(ok, true);
+  assert.equal(sig, 'SIGKILL');
+});
+
+test('runJob — หมดเวลาต้องเรียก killProcessTree (ไม่ทิ้ง opencode กิน CPU ค้าง)', async () => {
+  const killCalls = [];
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.pid = 9001;
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => {
+      throw new Error('ต้องฆ่าด้วย killProcessTree ไม่ใช่ child.kill ตรง ๆ');
+    };
+    return child; // ไม่มีวัน close ⇒ ต้องไปทาง timeout
+  };
+  const res = await runJob(
+    { executor: 'opencode', prompt: 'x', timeoutMs: 60 },
+    {
+      spawnImpl: fakeSpawn,
+      opencodeBin: 'fake-opencode-not-real-xyz',
+      killTreeImpl: (child, opts) => {
+        killCalls.push({ pid: child.pid, opts });
+      },
+    },
+  );
+  assert.equal(res.status, 'error');
+  assert.match(res.summary, /หมดเวลา/);
+  assert.equal(killCalls.length, 1, 'หมดเวลาแล้วต้องฆ่า process tree หนึ่งครั้ง');
+  assert.equal(killCalls[0].pid, 9001);
 });
