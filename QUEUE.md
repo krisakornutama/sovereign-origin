@@ -686,6 +686,7 @@
             - หมายเหตุถ้อยคำ: รายงานแพ็กขึ้น "แถวเดิมแต่ยังไม่เคยออนไลน์" แม้เครื่องเคย heartbeat — ข้อความ branch `reused` เขียนกว้างเกินจริง (พฤติกรรมถูก: --force หมุนแถวเดิม) เก็บไว้แก้ถ้อยคำรอบหน้า
             - รอเจ้าของ: ก็อปชุดใหม่ → เครื่อง 2 `npm install -g opencode-ai` → SETUP-MACHINE.cmd (admin) → ตรวจ online + ลองงาน echo/opencode
             - **เครื่อง 2 กลับออนไลน์แล้ว 29/10/69 16:52** (เวลาไทย): เจ้าของก็อปชุด + รัน SETUP-MACHINE (admin) ครั้งเดียว → heartbeat ต่อเนื่องทุก ~15 วิ · executors `["echo","opencode"]` · `jobs/pull` + `update/manifest` 200 — เหลือทดสอบงาน echo (ทำได้ทันที) และ opencode (รอ `npm install -g opencode-ai` ที่เครื่อง 2 โหลดเสร็จ)
+            - **พิสูจน์งาน echo ครบวงจรแล้ว 29/10/69**: ยิง `POST /api/agent-machines/jobs` (executor echo) → queued→running→**done ใน ~4 วิ** · exit 0 · result `[คอมเครื่องที่ 2] echo: สวัสดีจาก HUB — ทดสอบท่อคำสั่ง 1-2-3 (เดโม)` — ท่อ HUB→คิว→เครื่องลูก→ผลกลับ ใช้ได้จริง · เหลือ: งาน opencode (รอ CLI ที่เครื่อง 2)
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
