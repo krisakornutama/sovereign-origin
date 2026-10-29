@@ -30,8 +30,27 @@ export const SNAPSHOT_DIR = '.runner-backup';
 export const HANDOFF_EXIT_CODE = 86;
 /** เวอร์ชันที่เพิ่งทำให้เครื่องล่ม — ไม่ลองซ้ำภายในเวลานี้ */
 export const REJECT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-/** ไฟล์ที่ยอมให้อยู่ในชุดอัปเดต — นามสกุล/ที่อยู่นอกนี้ถูกปฏิเสธ */
-const ALLOWED = /^(src\/[A-Za-z0-9._-]+\.mjs|package\.json|\.env\.example|README\.md|INSTALL-HUB\.md|setup-machine\.mjs|SETUP-MACHINE\.cmd|run-runner\.cmd)$/;
+/** ไฟล์ที่ยอมให้อยู่ในชุดอัปเดต — นามสกุล/ที่อยู่นอกนี้ถูกปฏิเสธ
+ *
+ * ⚠️ ต้องตรงกับ `bundleFiles()` ใน tools/agent-pack/pack.mjs เสมอ
+ * (29/10/69 เคยพลาด: pack เพิ่ม install-plan.mjs · modules.mjs · INSTALL.cmd · doctor.mjs ·
+ *  INSTALL-CHECK.cmd แต่ allowlist ไม่ได้ตาม ⇒ `applyUpdate()` โยน "ชื่อไฟล์ในชุดอัปเดตไม่ถูกต้อง"
+ *  **ก่อนดึงไฟล์แรก** ⇒ เครื่องลูกเห็น manifest 200 แต่ไม่มี update/file เลยสักครั้ง และเงียบสนิท
+ *  เพราะ log อยู่ใน console ที่คนไม่ได้เปิดดู — มีเทสต์กันที่ tools/test/update-bundle-allowlist.test.mjs)
+ */
+export const UPDATE_ALLOWED_PATTERN =
+  /^(src\/[A-Za-z0-9._-]+\.mjs|package\.json|\.env\.example|README\.md|INSTALL-HUB\.md|setup-machine\.mjs|SETUP-MACHINE\.cmd|run-runner\.cmd|install-plan\.mjs|modules\.mjs|INSTALL\.cmd|doctor\.mjs|INSTALL-CHECK\.cmd)$/;
+
+/** true = rel นี้อยู่ในชุดอัปเดตได้ (ใช้ร่วมกับ tools/agent-pack/pack.mjs ตอนเผยแพร่) */
+export function isAllowedUpdatePath(rel) {
+  const norm = String(rel ?? '').replace(/\\/g, '/');
+  return (
+    UPDATE_ALLOWED_PATTERN.test(norm) &&
+    !norm.includes('..') &&
+    !path.isAbsolute(norm) &&
+    !/^[A-Za-z]:/.test(norm)
+  );
+}
 
 export function sha256Hex(buf) {
   return createHash('sha256').update(buf).digest('hex');
@@ -91,8 +110,7 @@ function readRejected(dir, fsImpl = fsSync) {
 /** กันชื่อไฟล์จากภายนอก (HUB): ต้องอยู่ในรายการที่อนุญาตและไม่มีทางลัดออกนอกโฟลเดอร์ */
 function assertSafeRel(rel) {
   const norm = String(rel ?? '').replace(/\\/g, '/');
-  const bad = !ALLOWED.test(norm) || norm.includes('..') || path.isAbsolute(norm) || /^[A-Za-z]:/.test(norm);
-  if (bad) throw new Error(`ชื่อไฟล์ในชุดอัปเดตไม่ถูกต้อง (path): ${rel}`);
+  if (!isAllowedUpdatePath(norm)) throw new Error(`ชื่อไฟล์ในชุดอัปเดตไม่ถูกต้อง (path): ${rel}`);
   return norm;
 }
 
