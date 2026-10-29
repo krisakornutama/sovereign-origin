@@ -16,7 +16,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 // สูตรคำนวณเวอร์ชัน/แฮชต้องเป็นตัวเดียวกับฝั่งเครื่องลูก — import โมดูลของ runner ตรง ๆ
 // (ถ้าเขียนสูตรซ้ำสองที่ วันหนึ่งสองฝั่งจะตกลงกันไม่ได้ แล้วเครื่องลูกจะอัปเดตวนไม่จบ)
-import { computeVersionFromEntries, sha256Hex } from '../../sovereign-os/agent-runner/src/selfUpdate.mjs';
+import { computeVersionFromEntries, sha256Hex, isAllowedUpdatePath } from '../../sovereign-os/agent-runner/src/selfUpdate.mjs';
 import { UPDATE_SIGNING_KEY_ID, canonicalManifestPayload } from '../../sovereign-os/agent-runner/src/updateTrust.mjs';
 import { buildInstallPlan, writeInstallPlan } from './install-plan.mjs';
 import { recommendedIds, summarizeModules } from './modules.mjs';
@@ -309,6 +309,9 @@ export function publishUpdateBundle({
   log = () => {},
   signingKey = '',
   signingKeyPath = '',
+  // ใช้เฉพาะ "ก้าวแรก" ของเครื่องที่ยังรัน runner รุ่นเก่า: allowlist ฝั่งเครื่องปลายทางยังแคบ
+  // ⇒ ตัดไฟล์ที่มันไม่รู้จักออกก่อน แล้วค่อยเผยแพร่ชุดเต็มในรอบถัดไป
+  excludePaths = [],
 } = {}) {
   const dir = path.resolve(dataDir || path.join(root, UPDATE_DATA_DIR));
   const signing = resolveUpdateSigningKey({ root, signingKey, signingKeyPath });
@@ -322,7 +325,23 @@ export function publishUpdateBundle({
     throw new Error(`private key ต้องเป็น Ed25519 (พบ ${privateKey.asymmetricKeyType || 'unknown'})`);
   }
 
-  const files = bundleFiles(root);
+  const all = bundleFiles(root);
+  const excluded = new Set(excludePaths);
+  for (const rel of excluded) {
+    if (!all.includes(rel)) throw new Error(`excludePaths มีไฟล์ที่ไม่อยู่ในชุดอัปเดต: ${rel}`);
+  }
+  const files = all.filter((rel) => !excluded.has(rel));
+  if (excluded.size > 0) {
+    log(`[agent-pack] ตัดออกจากชุดรอบนี้ ${excluded.size} ไฟล์ (เครื่องปลายทางรุ่นเก่ายังไม่รู้จัก): ${[...excluded].join(', ')}`);
+  }
+
+  // กันซ้ำรอย 29/10/69: เผยแพร่ไฟล์ที่ runner ฝั่งเครื่องลูกจะปฏิเสธ = ชุดนั้นติดตั้งไม่ได้เลย
+  // (อาการ: เครื่องลูกได้ manifest 200 แต่ไม่มี update/file สักครั้ง — เงียบสนิท)
+  const rejected = files.filter((rel) => !isAllowedUpdatePath(rel));
+  if (rejected.length > 0) {
+    throw new Error(`เผยแพร่ชุดอัปเดตไม่ได้ — runner จะปฏิเสธทั้งชุดเพราะไฟล์: ${rejected.join(', ')}`);
+  }
+
   const entries = files.map((rel) => {
     const from = bundleSource(root, rel);
     if (!fs.existsSync(from)) throw new Error(`เผยแพร่ชุดอัปเดตไม่ได้ — ไม่พบไฟล์ต้นทาง ${from}`);
