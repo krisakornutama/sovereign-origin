@@ -699,6 +699,8 @@
                 - **ตัวเฝ้าอัตโนมัติชั่วคราว**: `.freebuff/wait-for-update-then-run.mjs` (รอ `update/manifest` = 200 → ยิงงาน opencode เอง) · ลบเมื่อจบงาน
                 - **บั๊ก "timeout แล้วฆ่าไม่จริง" (แก้ 30/10/69)**: `child.kill()` บน Windows ฆ่าแค่ `cmd.exe` ที่ห่อคำสั่ง ⇒ `opencode.exe` รอดชีวิตและกิน CPU ค้างต่อ (เจอจริง: งาน timeout 21:31 แต่ opencode ยังหนักถึง 00:29+) · แก้เป็น `killProcessTree()` = `taskkill /pid <pid> /T /F` บน Windows, `SIGKILL` บน POSIX + seam `killTreeImpl` · red-first: import ไม่มี (SyntaxError) → 26/26 เขียว · suite 134/137 (3 skipped) exit 0
                 - **ข้อเสนอ (ยังไม่ทำ)**: ให้ `jobs/pull` (ทุก 15 วิ) แนบสัญญาณ `updateAvailable` จาก HUB ⇒ runner สั่ง `selfUpdateOnce` ได้ทันที ไม่ต้องรอรอบ 6 ชม. หรือรีสตาร์ทเครื่อง · แก้ทั้ง core-api (แนบ field) + runner (อ่าน field) พร้อมเทสต์
+                - **เผยแพร่ชุด `9c0bb18e17a8` (25 ไฟล์) 30/10/69** — รวม 3 บั๊ก: stdin EOF · heartbeat ระหว่างงาน · kill process tree ตอน timeout · ยืนยันฝั่ง HUB: `GATE allowed:true stable 100%` + `MANIFEST ok version=9c0bb18e17a8`
+                - **หลักฐานว่าด่านผ่านแล้วจริง**: 19:01:18 UTC เครื่อง 2 เรียก `GET /update/manifest` ได้ **200** (ก่อนแก้ได้ 404 rollout_hold ทุกครั้ง) — แต่ยังไม่เห็น `update/file` ตามมา และ heartbeat ขาดตั้งแต่ 19:01:07 ⇒ เครื่องถูกปิด/สลีปหรือ runner ตายก่อนดาวน์โหลด (ต้องดู log ที่เครื่อง 2: `%LOCALAPPDATA%`/โฟลเดอร์คิต `.runner-update-state.json`, `.runner-rejected.json`)
 - [x] **D3 ใช้ doctor เป็น preflight ของ HUB installer** — **เสร็จ 27/10/69**
       `tools/install/install.mjs` เรียก `runDoctor({ profile: 'hub' })` ใน preflight แล้ว
       - ตรวจชุดเดียวกับ INSTALL-CHECK: Node · compose + `sovereign.env.template` · สิทธิ์เขียน · ดิสก์ · Docker · env ของ stack เดิม
