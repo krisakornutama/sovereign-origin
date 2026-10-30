@@ -104,6 +104,11 @@ export default function AgentQueuePage() {
   const [registerToken, setRegisterToken] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
 
+  // ปุ่มควบคุมเครื่อง 2 โดยตรง — ไม่ต้องค้นหาเมนูซ้าย
+  const goToMachineConsole = () => {
+    if (typeof window !== 'undefined') window.location.href = '/machine-console';
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -545,6 +550,12 @@ export default function AgentQueuePage() {
                 disabled={busy}
                 className="rounded-md border border-emerald-700/60 bg-emerald-950/40 px-5 py-2 text-sm text-emerald-300 disabled:opacity-50"
               >
+                <button
+                  onClick={() => goToMachineConsole()}
+                  className="inline-flex items-center gap-2 rounded-md bg-cyan-900/60 hover:bg-cyan-800/80 px-4 py-2 text-sm font-medium text-cyan-200 shadow transition"
+                >
+                  🖥️ ควบคุมเครื่อง 2 (ดูจอ + เมาส์/คีย์บอร์ด)
+                </button>
                 {busy ? "กำลังส่ง…" : "ส่งเข้าคิว"}
               </button>
             </div>
