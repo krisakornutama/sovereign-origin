@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
 import Sidebar from "../components/layout/Sidebar";
 import PageHeader from "../components/ui/PageHeader";
 import StatCard from "../components/ui/StatCard";
@@ -43,6 +44,8 @@ interface MachineRow {
   status?: string;
   executors?: unknown;
   last_heartbeat?: string | null;
+  /** มีค่า = เครื่องนี้ยืนยันตัวตนบน LAN แล้ว (พร้อมรับการควบคุม) */
+  lan_confirmed_at?: string | null;
 }
 
 interface Stats {
@@ -103,10 +106,11 @@ export default function AgentQueuePage() {
   const [registerName, setRegisterName] = useState("");
   const [registerToken, setRegisterToken] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
+  const router = useRouter();
 
-  // ปุ่มควบคุมเครื่อง 2 โดยตรง — ไม่ต้องค้นหาเมนูซ้าย
-  const goToMachineConsole = () => {
-    if (typeof window !== 'undefined') window.location.href = '/machine-console';
+  /** เปิดคอนโซลของเครื่องนั้นตรงตัว — เห็นจอ + คุมเมาส์/คีย์บอร์ดได้ทันที */
+  const openMachineConsole = (machineId: string) => {
+    void router.push({ pathname: "/machine-console", query: { machine: machineId } });
   };
 
   const load = useCallback(async () => {
@@ -354,6 +358,7 @@ export default function AgentQueuePage() {
         <section className="card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-200">เครื่องที่ลงทะเบียน</h2>
+            <span className="text-xs text-gray-500">กดการ์ดเครื่อง = เข้าไปดูจอ/คุมเมาส์-คีย์บอร์ด</span>
             <button onClick={() => void load()} className="text-xs text-gray-500 hover:text-gray-300">รีเฟรช</button>
           </div>
           {machines.length === 0 ? (
@@ -361,16 +366,30 @@ export default function AgentQueuePage() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {machines.map((m) => (
-                <div key={m.id} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-gray-200 truncate">{m.name}</span>
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => openMachineConsole(m.id)}
+                  title={`เปิดคอนโซล ${m.name} — ดูจอ + คุมเมาส์/คีย์บอร์ด`}
+                  className="group rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-left transition hover:border-emerald-700/70 hover:bg-emerald-950/20 focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm text-gray-200">{m.name}</span>
                     <StatusPill
                       variant={m.status === "online" ? "ok" : m.status === "disabled" ? "err" : "off"}
                       label={m.status === "online" ? "ออนไลน์" : m.status === "disabled" ? "ปิดใช้" : "ออฟไลน์"}
                     />
-                  </div>
+                  </span>
                   <code className="mono mt-2 block truncate text-[11px] text-gray-500" title="id สำหรับ @machine:">{m.id}</code>
-                </div>
+                  <span className="mt-2 flex items-center justify-between gap-2 border-t border-gray-800/80 pt-2">
+                    <span className={`text-[11px] ${m.lan_confirmed_at ? "text-emerald-400/90" : "text-amber-400/90"}`}>
+                      {m.lan_confirmed_at ? "พร้อมควบคุม" : "ยังไม่ยืนยัน LAN"}
+                    </span>
+                    <span className="text-[11px] text-cyan-300 opacity-80 transition group-hover:opacity-100">
+                      🖥️ ควบคุม →
+                    </span>
+                  </span>
+                </button>
               ))}
             </div>
           )}
@@ -550,12 +569,6 @@ export default function AgentQueuePage() {
                 disabled={busy}
                 className="rounded-md border border-emerald-700/60 bg-emerald-950/40 px-5 py-2 text-sm text-emerald-300 disabled:opacity-50"
               >
-                <button
-                  onClick={() => goToMachineConsole()}
-                  className="inline-flex items-center gap-2 rounded-md bg-cyan-900/60 hover:bg-cyan-800/80 px-4 py-2 text-sm font-medium text-cyan-200 shadow transition"
-                >
-                  🖥️ ควบคุมเครื่อง 2 (ดูจอ + เมาส์/คีย์บอร์ด)
-                </button>
                 {busy ? "กำลังส่ง…" : "ส่งเข้าคิว"}
               </button>
             </div>

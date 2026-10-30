@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld('sovereign', {
   isAutoStarted: () => ipcRenderer.invoke('sovereign:isAutoStarted'),
   openExternal: (url) => ipcRenderer.invoke('sovereign:openExternal', url),
   retryDashboard: () => ipcRenderer.invoke('sovereign:retryDashboard'),
+  // เปิดจอเครื่องในหน้าต่างแยก — คุมเมาส์/คีย์บอร์ดได้เหมือนในแท็บ แต่ไม่หลุด focus
+  // ตอนสลับไปหน้าอื่น (desktop app เท่านั้น · เบราว์เซอร์ไม่มีสะพานนี้)
+  openRemoteWindow: (opts) => ipcRenderer.invoke('sovereign:openRemoteWindow', opts),
+  // ปักหมุดหน้าต่างรีโมทบนสุด (ใช้ในหน้าต่างแยกเท่านั้น — มีผลกับหน้าต่างที่เรียก)
+  setRemoteAlwaysOnTop: (value) => ipcRenderer.invoke('sovereign:setRemoteAlwaysOnTop', value),
   // setup wizard + อัปเดต
   openWizard: (focus) => ipcRenderer.invoke('sovereign:openWizard', focus),
   pickInstallDir: () => ipcRenderer.invoke('sovereign:pickInstallDir'),

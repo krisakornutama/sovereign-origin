@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { useMachineControl } from "../../hooks/useMachineControl";
+import Icon from "../ui/Icon";
 
 /**
  * ScreenPanel — ดูจอเครื่องปลายทางแบบสด + ควบคุมเมาส์/คีย์บอร์ด
@@ -24,16 +25,107 @@ interface Props {
   machineId: string;
   machineName: string;
   control: ReturnType<typeof useMachineControl>;
+  /** มาจากลิงก์ "ควบคุมเครื่องนี้" → เปิดสตรีมให้เองทันที ไม่ต้องกด "เปิดดูจอ" อีกชั้น */
+  autoJoin?: boolean;
 }
 
-export default function ScreenPanel({ machineId, machineName, control }: Props) {
+export default function ScreenPanel({ machineId, machineName, control, autoJoin = false }: Props) {
   const { joinedMachine, frame, connected, join, leave, sendInput, setFps } = control;
   const [released, setReleased] = useState(false);
+  const [text, setText] = useState("");
+  const [textNote, setTextNote] = useState("");
+  const [clipboardText, setClipboardText] = useState<string | null>(null);
+  const [isFull, setIsFull] = useState(false);
+  /** tick รายวินาที — ใช้วัดว่าเฟรมล่าสุดเก่าแค่ไหน (ภาพค้างต้องเห็นได้ ไม่ใช่เดา) */
+  const [, setTick] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const lastMoveRef = useRef(0);
   const boxRef = useRef<HTMLDivElement | null>(null);
+  const lastFrameAtRef = useRef(0);
+  /** ลองเปิดเองไปแล้วหรือยัง — กันลูป join ซ้ำเมื่อ component วาดใหม่ถี่ (เฟรมไหลทุกวินาที) */
+  const autoTriedRef = useRef(false);
 
   const joined = joinedMachine === machineId;
+
+  // เวลาที่ "เครื่องนี้" รับเฟรมล่าสุด — ใช้เวลาท้องถิ่น ไม่ใช้ timestamp จาก HUB
+  // (นาฬิกาสองเครื่องอาจต่างกันได้ เป็นสิบวินาที → บอก "ภาพเก่า 30 วิ" ทั้งที่สด)
+  useEffect(() => {
+    if (frame) lastFrameAtRef.current = Date.now();
+  }, [frame]);
+
+  // วัดอายุภาพทุกวินาที — ภาพค้างคืออาการที่ผู้ใช้ต้องรู้ก่อนกดอะไร
+  useEffect(() => {
+    if (!joined) return;
+    const timer = setInterval(() => setTick((v) => v + 1), 1000);
+    return () => clearInterval(timer);
+  }, [joined]);
+
+  // ติดตามสถานะเต็มจอ (กด Esc ออกได้ — state ต้องตามให้ตรง)
+  useEffect(() => {
+    const onChange = () => setIsFull(document.fullscreenElement === boxRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  /** สลับเต็มจอ — ใช้กับหน้าต่างรีโมทแยกได้ดีที่สุด */
+  const toggleFullscreen = useCallback(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void el.requestFullscreen().catch(() => {});
+  }, []);
+
+  /** ส่งข้อความทั้งก้อนไปพิมพ์ที่เครื่องปลายทาง — ทางเดียวที่พิมพ์ไทยได้จริง
+   *  (คีย์บอร์ดส่งทีละปุ่ม = layout ของเครื่องปลายทางเป็นตัวตัดสิน ภาษาไทยจะเพี้ยน) */
+  const sendText = useCallback(async () => {
+    const value = text.trim();
+    if (!value || released) return;
+    const ack = await sendInput(machineId, { kind: "text", text: value });
+    if (ack.ok) {
+      setText("");
+      setTextNote("ส่งข้อความไปพิมพ์ที่เครื่องปลายทางแล้ว");
+    } else {
+      setTextNote(ack.error || "ส่งข้อความไม่สำเร็จ");
+    }
+    setTimeout(() => setTextNote(""), 4000);
+  }, [machineId, released, sendInput, text]);
+
+  /** คัดลอกจากคลิปบอร์ดและส่งไปพิมพ์ที่เครื่องปลายทาง */
+  const readClipboardAndSend = useCallback(async () => {
+    try {
+      const clipboard = await navigator.clipboard.readText();
+      setClipboardText(clipboard);
+      const ack = await sendInput(machineId, { kind: "text", text: clipboard });
+      if (ack.ok) {
+        setTextNote("คัดลอกจากคลิปบอร์ดแล้วส่งไปพิมพ์ที่เครื่องปลายทางแล้ว");
+        setTimeout(() => setTextNote(""), 4000);
+      } else {
+        setTextNote(ack.error || "ส่งข้อความไม่สำเร็จ");
+      }
+    } catch (e) {
+      setTextNote("ไม่สามารถอ่านคลิปบอร์ดได้ — อาจปิดการใช้งานหรือเป็นหน้า HTTP");
+      console.error('clipboard read error:', e);
+    }
+  }, [machineId, sendInput, released]);
+
+  // เปลี่ยนเครื่อง = เริ่มนับใหม่ (ไม่ใช้สถานะ "ลองแล้ว" ของเครื่องก่อน)
+  // และคืนสิทธิ์เมาส์/คีย์บอร์ดเสมอ — ห้ามพา "ปล่อยการควบคุม" ของเครื่องก่อนไปใช้กับเครื่องใหม่
+  useEffect(() => {
+    autoTriedRef.current = false;
+    setReleased(false);
+  }, [machineId]);
+
+  // เปิดสตรีมเองเมื่อมาจากลิงก์ตรง — รอให้ socket ต่อ HUB สำเร็จก่อน
+  useEffect(() => {
+    if (!autoJoin || joined || !connected || autoTriedRef.current) return;
+    autoTriedRef.current = true;
+    void join(machineId, 5);
+  }, [autoJoin, connected, join, joined, machineId]);
+
+  // หลุดการเชื่อมต่อ → กลับมาออนไลน์แล้วต้องเปิดสตรีมใหม่เอง (ห้องฝั่ง HUB หายไปกับ socket เก่า)
+  useEffect(() => {
+    if (!connected) autoTriedRef.current = false;
+  }, [connected]);
 
   // ออกจากห้องเมื่อสลับเครื่อง/ปิดหน้า — ไม่งั้นเครื่องปลายทางสตรีมค้างตลอดกาล
   useEffect(() => {
@@ -124,6 +216,9 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
         >
           {connected ? "เปิดดูจอ" : "กำลังเชื่อมต่อ HUB…"}
         </button>
+        {autoJoin && connected ? (
+          <p className="text-xs text-gray-500">กำลังเปิดจอให้อัตโนมัติ…</p>
+        ) : null}
       </div>
     );
   }
@@ -138,6 +233,16 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
         {frame?.width ? (
           <span className="text-gray-500">
             {frame.width}×{frame.height}
+          </span>
+        ) : null}
+        {frame && lastFrameAtRef.current ? (
+          <span
+            className={
+              Date.now() - lastFrameAtRef.current > 5000 ? "text-amber-400" : "text-gray-500"
+            }
+            title="เวลาที่ได้รับเฟรมล่าสุด (นับจากนาฬิกาเครื่องนี้)"
+          >
+            อัปเดต {Math.max(0, Math.round((Date.now() - lastFrameAtRef.current) / 1000))} วิก่อน
           </span>
         ) : null}
 
@@ -168,6 +273,15 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
 
         <button
           type="button"
+          onClick={toggleFullscreen}
+          className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-300"
+          title="เต็มจอ (กด Esc เพื่อออก)"
+        >
+          {isFull ? "ออกจากเต็มจอ" : "⛶ เต็มจอ"}
+        </button>
+
+        <button
+          type="button"
           onClick={() => void leave(machineId)}
           className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-300"
         >
@@ -175,11 +289,21 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
         </button>
       </div>
 
+      {!connected ? (
+        <p className="rounded border border-rose-800/60 bg-rose-900/20 px-3 py-2 text-xs text-rose-300">
+          ขาดการเชื่อมต่อ HUB — กำลังต่อใหม่ให้อัตโนมัติ (ภาพจะหยุดชั่วคราว)
+        </p>
+      ) : null}
+
       {released ? (
         <p className="rounded border border-amber-800/60 bg-amber-900/20 px-3 py-2 text-xs text-amber-300">
           กำลังดูอยู่เฉย ๆ — เมาส์/คีย์บอร์ดของคุณจะไม่ถูกส่งไปที่เครื่องนั้น
         </p>
       ) : null}
+
+      <p className="text-xs text-gray-500">
+        คลิกในภาพหนึ่งครั้งก่อนพิมพ์ — คีย์บอร์ด/เมาส์จะถูกส่งไปที่เครื่องปลายทาง
+      </p>
 
       {/* คลิกตรงนี้ก่อนพิมพ์ — คีย์บอร์ดจะถูกส่งไปที่เครื่องปลายทาง */}
       <div
@@ -187,15 +311,22 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
         tabIndex={0}
         onKeyDown={onKeyDown}
         onKeyUp={onKeyUp}
+        onClick={() => boxRef.current?.focus()}
         onContextMenu={(e) => e.preventDefault()}
-        className="w-full overflow-hidden rounded-lg border border-gray-800 bg-black outline-none focus:border-emerald-700"
+        className={
+          isFull
+            ? "flex h-screen w-screen items-center justify-center overflow-hidden bg-black outline-none"
+            : "w-full overflow-hidden rounded-lg border border-gray-800 bg-black outline-none focus:border-emerald-700"
+        }
       >
         {frame ? (
           <img
             ref={imgRef}
             src={`data:${frame.mime};base64,${frame.data}`}
             alt={`จอของ ${machineName}`}
-            className={`w-full select-none ${released ? "cursor-default" : "cursor-crosshair"}`}
+            className={`${isFull ? "max-h-full max-w-full object-contain" : "w-full"} select-none ${
+              released ? "cursor-default" : "cursor-crosshair"
+            }`}
             draggable={false}
             onMouseMove={onMouseMove}
             onMouseDown={(e) => onMouseButton("down", e)}
@@ -207,6 +338,51 @@ export default function ScreenPanel({ machineId, machineName, control }: Props) 
             กำลังรอภาพหน้าจอ… (ถ้าค้างนาน ตรวจว่าฝั่งเครื่องเปิด ENABLE_REMOTE_CONTROL และ PowerShell ทำงานได้)
           </div>
         )}
+      </div>
+
+      {/* พิมพ์ข้อความทั้งก้อน — ทางเดียวที่ภาษาไทยไปถึงเครื่องปลายทางได้ถูกต้อง */}
+      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-800 bg-gray-900/40 p-2">
+        <label className="min-w-[220px] flex-1 text-xs text-gray-400">
+          ส่งข้อความไปพิมพ์ที่เครื่องปลายทาง (ไทย/ยาว ๆ ใช้ช่องนี้)
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                void sendText();
+              }
+            }}
+            disabled={released}
+            maxLength={2000}
+            rows={2}
+            placeholder="พิมพ์ข้อความแล้วกด Enter (Shift+Enter = ขึ้นบรรทัดใหม่)"
+            className="mt-1 w-full resize-y rounded border border-gray-700 bg-black px-2 py-1.5 text-sm text-gray-200 outline-none focus:border-emerald-700 disabled:opacity-40"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void readClipboardAndSend()}
+          disabled={released}
+          className="rounded bg-teal-700 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+          title="คัดลอกจากคลิปบอร์ดแล้วส่งไปพิมพ์ที่เครื่องปลายทาง"
+        >
+          <Icon name="copy" size={14} /> คลิป
+        </button>
+        {clipboardText && (
+          <div className="mt-1 text-xs text-teal-300">คลิปบอร์ด: {clipboardText.substring(0, 50)}{clipboardText.length > 50 ? '…' : ''}</div>
+        )
+        }
+        <button
+          type="button"
+          onClick={() => void sendText()}
+          disabled={released || !text.trim()}
+          className="rounded bg-emerald-700 px-3 py-1.5 text-xs text-white disabled:opacity-40"
+        >
+          ส่งข้อความ
+        </button>
+        {textNote ? <span className="text-xs text-emerald-300">{textNote}</span> : null}
       </div>
     </div>
   );
