@@ -131,6 +131,7 @@
   "serviceAliases": {
     "business.service": "business",
     "business-shop.service": "business",
+    "business-software.service": "business",
     "business-agent-executor.service": "agent",
     "trace.service": "trace",
     "advisor.service": "farm",
