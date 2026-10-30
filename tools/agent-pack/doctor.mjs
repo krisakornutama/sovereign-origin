@@ -428,19 +428,38 @@ export async function runDoctor({
     } else if (!allowCommands) {
       add('task', 'skip', 'งานอัตโนมัติ (autostart)', 'ข้าม (dry-run — ไม่รันคำสั่ง)');
     } else {
+      // runner ติดตั้ง autostart ให้ตัวเองได้ 2 ทาง: Scheduled Task หรือไฟล์ใน Startup folder
+      // (ทางหลังไม่ต้องสิทธิ์ admin — เป็นทางที่รอดจริงบนเครื่องที่ path มีเว้นวรรค)
+      // ⚠️ ชื่อไฟล์ต้องตรงกับ STARTUP_FILE_NAME ใน sovereign-os/agent-runner/src/autostart.mjs
+      const startupFile = path.join(
+        String(process.env.APPDATA ?? ''),
+        'Microsoft',
+        'Windows',
+        'Start Menu',
+        'Programs',
+        'Startup',
+        'Sovereign Agent Runner.vbs',
+      );
+      const hasStartupEntry = !!process.env.APPDATA && fs.existsSync(startupFile);
       try {
         const r = await exec('schtasks', ['/query', '/tn', taskName]);
         if (r?.code === 0) add('task', 'ok', 'งานอัตโนมัติ (autostart)', `พบ "${taskName}"`);
+        else if (hasStartupEntry)
+          add('task', 'ok', 'งานอัตโนมัติ (autostart)', 'พบจุดเริ่มใน Startup folder (เปิดเองตอนล็อกอิน)');
         else
           add(
             'task',
             'fail',
             'งานอัตโนมัติ (autostart)',
-            `ไม่พบ "${taskName}"`,
-            'เปิด INSTALL.cmd ใหม่ (หรือรัน setup-machine.mjs) เพื่อสร้าง task แล้วตรวจอีกครั้ง',
+            `ไม่พบ "${taskName}" และไม่มีไฟล์ใน Startup folder`,
+            'เปิด INSTALL.cmd (หรือเปิด runner หนึ่งครั้ง — มันจะติดตั้ง autostart ให้เอง) แล้วตรวจอีกครั้ง',
           );
       } catch (err) {
-        add('task', 'warn', 'งานอัตโนมัติ (autostart)', `ตรวจไม่ได้ (${redact(err?.message ?? err)})`, `เปิด Task Scheduler แล้วดูงานชื่อ "${taskName}"`);
+        if (hasStartupEntry) {
+          add('task', 'ok', 'งานอัตโนมัติ (autostart)', 'พบจุดเริ่มใน Startup folder (ตรวจ task ไม่ได้)');
+        } else {
+          add('task', 'warn', 'งานอัตโนมัติ (autostart)', `ตรวจไม่ได้ (${redact(err?.message ?? err)})`, `เปิด Task Scheduler แล้วดูงานชื่อ "${taskName}"`);
+        }
       }
     }
 
