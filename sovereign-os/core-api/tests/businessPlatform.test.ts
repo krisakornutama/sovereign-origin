@@ -44,6 +44,8 @@ const WAREHOUSE_ITEM_ID = '99999999-9999-9999-9999-999999999999';
 let memberSeq = 0;
 let ledgerSeq = 0;
 let paymentSeq = 0;
+// 30/10/69: เก็บ key ของผู้ช่วย AI ที่ถูก seed เพื่อพิสูจน์ว่าเลือกชุดตามประเภทธุรกิจ
+const seededAgentKeys: string[] = [];
 
 function memberToken(position: keyof typeof MEMBER_IDS): string {
   return makeToken('OPERATOR', { userId: MEMBER_IDS[position] });
@@ -120,10 +122,26 @@ before(async () => {
       if (where?.stockQty?.lte !== undefined) list = list.filter((p) => p.stockQty <= where.stockQty.lte);
       return list;
     },
+    count: async ({ where }: any) =>
+      [...products.values()].filter(
+        (p) =>
+          (!where?.businessId || p.businessId === where.businessId) &&
+          (!where?.category || p.category === where.category),
+      ).length,
     create: async ({ data }: any) => {
       const p = { id: PRODUCT_ID + '-new' + products.size, ...data };
       products.set(p.id, p);
       return p;
+    },
+    createMany: async ({ data }: any) => {
+      let count = 0;
+      for (const row of data) {
+        if ([...products.values()].some((p) => p.businessId === row.businessId && p.sku === row.sku)) continue;
+        const p = { id: `${PRODUCT_ID}-seed${products.size}`, isActive: true, ...row };
+        products.set(p.id, p);
+        count += 1;
+      }
+      return { count };
     },
     update: async ({ where, data }: any) => {
       const p = { ...products.get(where.id), ...data };
@@ -233,7 +251,10 @@ before(async () => {
   };
   (prisma as any).businessAgent = {
     count: async () => 0,
-    create: async ({ data }: any) => ({ id: 'ba-' + data.key, ...data }),
+    create: async ({ data }: any) => {
+      seededAgentKeys.push(String(data.key));
+      return { id: 'ba-' + data.key, ...data };
+    },
     findMany: async () => [],
     findUnique: async () => null,
   };
@@ -680,4 +701,35 @@ test('GET /orders/:id/lots — ล็อตต่อ orderLine + traceUrl + เ�
 
   const missing = await get(`/${BIZ_ID}/orders/nope/lots`, memberToken('VIEWER'));
   assert.equal(missing.status, 404);
+});
+
+// ── ประเภทธุรกิจ "ขายซอฟต์แวร์เป็นโปรเจ็ก" (30/10/69) ──
+// สร้างธุรกิจปุ๊บต้องได้แคตตาล็อกดิจิทัล 4 ชุด + ผู้ช่วย AI สายเทคนิค 5 คน
+// และต้องไม่ไปใช้ชุดผู้ช่วย IoT ของธุรกิจขายสินค้า
+test('สร้างธุรกิจ SOFTWARE_PROJECT → แคตตาล็อกดิจิทัล 4 ชุด + ผู้ช่วย AI สายเทคนิค (ไม่ใช่ชุด IoT)', async () => {
+  seededAgentKeys.length = 0;
+  const res = await post(
+    '/',
+    { name: 'Sovereign Dev Shop', bizType: 'SOFTWARE_PROJECT', vatRate: 0.07 },
+    makeToken('OPERATOR', { userId: NON_MEMBER_ID }),
+  );
+  assert.equal(res.status, 201);
+  const biz = await res.json();
+  assert.equal(biz.bizType, 'SOFTWARE_PROJECT');
+
+  const seeded = [...products.values()].filter((p) => p.businessId === BIZ_ID && p.category === 'SOFTWARE');
+  assert.deepEqual(
+    seeded.map((p) => p.sku).sort(),
+    ['SW-ARCH-BOOK', 'SW-BIZ-OS', 'SW-IOT-FW', 'SW-TAX-CORE'],
+    'ต้องได้แคตตาล็อกครบ 4 ชุดตามที่เจ้าของกำหนด',
+  );
+  assert.ok(seeded.every((p) => p.salePrice > 0), 'สินค้าดิจิทัลต้องมีราคาขาย');
+  assert.ok(seeded.every((p) => p.stockQty >= 9999), 'สินค้าดิจิทัลไม่มีสต็อกจริง — ต้องออกออเดอร์ได้ไม่จำกัด');
+  assert.ok(seeded.some((p) => p.sku === 'SW-BIZ-OS' && p.salePrice === 11900), 'ชุด Commercial/Agency ราคาตามช่วงที่กำหนด');
+
+  assert.deepEqual(
+    [...seededAgentKeys].sort(),
+    ['accountant', 'delivery_qa', 'docs_writer', 'license_advisor', 'presales'],
+    'ผู้ช่วย AI ต้องเป็นชุดสายซอฟต์แวร์ ไม่ใช่ชุด IoT',
+  );
 });

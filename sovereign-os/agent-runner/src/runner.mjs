@@ -48,11 +48,17 @@ export function buildCommand(job, config = {}) {
     if (job?.model) args.push('--model', String(job.model));
     if (job?.agent) args.push('--agent', String(job.agent));
     if (job?.workspace) args.push('--dir', String(job.workspace));
-    args.push(String(job?.prompt ?? ''));
+    // prompt ต้องไปทาง stdin เท่านั้น (ไม่ใช่ argv):
+    // - shell:true บน Windows ต่อ args ด้วย space ดิบ ๆ ⇒ newline ใน prompt ตัดคำสั่งเหลือบรรทัดแรก
+    //   (เจอจริง 30/10/69: prompt 5 บรรทัดถึง agent แค่บรรทัดแรก)
+    // - opencode `run` อ่าน stdin จน EOF เมื่อ stdin ไม่ใช่ TTY
+    //   (binary: process.stdin.isTTY ? undefined : await Bun.stdin.text())
+    // ⇒ เขียน prompt ลง stdin แล้ว end ทันที = ครบทุกบรรทัดและไม่ค้าง
     return {
       kind: 'spawn',
       bin: config.opencodeBin || DEFAULT_OPENCODE_BIN,
       args,
+      stdin: String(job?.prompt ?? ''),
       cwd: job?.workspace || undefined,
       timeoutMs: Number(job?.timeoutMs) > 0 ? Number(job.timeoutMs) : DEFAULT_JOB_TIMEOUT_MS,
     };
@@ -68,6 +74,8 @@ export function buildCommand(job, config = {}) {
 /** อ่านผลลัพธ์แบบ JSON events ของ opencode → สรุปเป็นข้อความเดียว */
 export function parseOpencodeOutput(raw) {
   const text = String(raw ?? '');
+  // รูปแบบจริงของ opencode 1.18: {"type":"text","part":{"messageID":"...","text":"..."}}
+  // (ของเดิมอ่าน ev.text ซึ่งไม่มีจริง ⇒ summary กลายเป็น JSON ดิบ ผู้ใช้ไม่เห็นคำตอบ)
   const texts = [];
   const errors = [];
   for (const line of text.split(/\r?\n/)) {
@@ -79,14 +87,21 @@ export function parseOpencodeOutput(raw) {
     } catch {
       continue; // บรรทัดไม่ใช่ JSON (เช่น log ปน) — ข้าม ไม่ทำให้ทั้งงานพัง
     }
-    if (ev?.type === 'text' && typeof ev.text === 'string') texts.push(ev.text);
+    if (ev?.type === 'text') {
+      const body = typeof ev?.part?.text === 'string' ? ev.part.text : typeof ev?.text === 'string' ? ev.text : null;
+      if (body != null) texts.push({ messageID: ev?.part?.messageID ?? null, text: body });
+    }
     if (ev?.type === 'error') {
       const msg = ev?.error?.message || ev?.error?.data?.message || 'unknown error';
       errors.push(String(msg));
     }
   }
-  const summary = errors.length > 0 ? errors.join(' | ') : texts.join('\n').trim() || text.trim().slice(0, 2000);
-  return { summary, hadError: errors.length > 0 };
+  if (errors.length > 0) return { summary: errors.join(' | '), hadError: true };
+  // คำตอบสุดท้าย = ข้อความของ assistant message ล่าสุด (message เดียวอาจมีหลาย text part)
+  const lastId = texts.length > 0 ? texts[texts.length - 1].messageID : null;
+  const finalParts = lastId == null ? texts : texts.filter((t) => t.messageID === lastId);
+  const summary = finalParts.map((t) => t.text).join('\n').trim() || text.trim().slice(0, 2000);
+  return { summary, hadError: false };
 }
 
 /**
@@ -145,15 +160,20 @@ export async function runJob(job, config = {}) {
     let child;
     try {
       const spawnImpl = config.spawnImpl || spawn;
+      const feedStdin = typeof cmd.stdin === 'string';
       child = spawnImpl(cmd.bin, cmd.args, {
         cwd: cmd.cwd,
         shell: process.platform === 'win32',
-        // stdin = ignore: opencode `run` อ่าน stdin จน EOF เมื่อ stdin ไม่ใช่ TTY
-        // (pipe ที่เปิดค้าง = รอตลอดไป ⇒ งานค้าง 30 นาที — เจอจริงกับเครื่อง 2, 29/10/69)
-        stdio: ['ignore', 'pipe', 'pipe'],
+        // prompt ไปทาง stdin (ดู buildCommand) — ต้อง end ทันที ไม่งั้น opencode รอ EOF = งานค้าง 30 นาที
+        stdio: [feedStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         // runner ทำงานเบื้องหลัง (vbs ไม่มีหน้าต่าง) — อย่าให้ cmd/opencode เด้งหน้าต่างดำขึ้นมา
         windowsHide: true,
       });
+      if (feedStdin) {
+        // โปรเซสลูกอาจตายก่อนอ่าน stdin (เช่นหา bin ไม่เจอ) ⇒ EPIPE ต้องไม่ทำให้ runner crash
+        child.stdin?.on?.('error', () => {});
+        child.stdin?.end?.(cmd.stdin);
+      }
     } catch (err) {
       finish({ status: 'error', exitCode: null, summary: `spawn ไม่ได้: ${err?.message || err}`, logTail: '' });
       return;
