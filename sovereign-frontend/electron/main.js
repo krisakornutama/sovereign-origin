@@ -33,6 +33,8 @@ let autoStarted = false;
 // ── tray / wizard / updater สถานะ ──
 let tray = null;
 let setupWin = null;
+// หน้าต่างรีโมทคอนโทรลแยกต่อเครื่อง — เปิดซ้ำเครื่องเดิม = โฟกัสหน้าต่างเดิม ไม่สร้างซ้อน
+const remoteWindows = new Map();
 let quitting = false; // ปิดหน้าต่าง = ย่อลง tray จนกว่าจะสั่งออกจากเมนู tray
 let lastStatus = { frontend: false, launcher: false, api: false };
 let updateInfo = null; // ผลตรวจอัปเดตล่าสุด (แสดงในเมนู tray + wizard)
@@ -285,7 +287,7 @@ function updateTrayMenu() {
       { label: `${statusGlyph(st.launcher)} Launcher :4100 — ${st.launcher ? 'ออนไลน์' : 'ออฟไลน์'}`, enabled: false },
       { type: 'separator' },
       { label: '🚀 เริ่มระบบทั้งหมด', click: () => { startSystem(); } },
-      { label: '🖥️ รีโมทคอนโทรล เครื่องที่ 2', click: () => { showMainWindow('/machine-console'); } },
+      { label: '🖥️ รีโมทคอนโทรลเครื่อง (ดูจอ/คุมเมาส์-คีย์บอร์ด)', click: () => { showMainWindow('/machine-console'); } },
       { label: updLabel, click: () => { if (upd && upd.ok && upd.hasUpdate) openWizard('update'); else checkForUpdates(true); } },
       { label: '⚙️ ตั้งค่าครั้งแรก (Setup Wizard)', click: () => openWizard() },
       { type: 'separator' },
@@ -315,6 +317,62 @@ function showMainWindow(hash = '') {
     dlog('showMainWindow: หน้าต่างถูกเรียกกลับมา' + (hash ? ' → ' + hash : ''));
   } catch (e) { dlog('showMainWindow error:', e.message); }
 }
+
+// ── หน้าต่างรีโมทคอนโทรลแยก (เดสก์ท็อปเท่านั้น) ──
+// เหตุผล: การคุมเครื่องอื่นต้องเห็นจอค้างไว้ตลอด — ถ้าต้องสลับแท็บในหน้าต่างหลัก
+// ภาพจะถูกเบราว์เซอร์หรี่ความถี่ (background tab throttling) และผู้ใช้จะหลุด focus
+// ⇒ แยกเป็น BrowserWindow ของตัวเอง ย้ายไปจอที่สอง/วางข้างงานอื่นได้
+async function openRemoteWindow(opts = {}) {
+  const machineId = String(opts.machineId || '').trim();
+  const machineName = String(opts.machineName || '').trim();
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(machineId)) {
+    return { ok: false, message: 'machineId ไม่ถูกต้อง' };
+  }
+  const existing = remoteWindows.get(machineId);
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+    return { ok: true, reused: true };
+  }
+  if (!(await probe(DASHBOARD_URL))) {
+    return { ok: false, message: 'หน้าเว็บยังไม่ขึ้น (:3000) — กด "เริ่มระบบทั้งหมด" ก่อน' };
+  }
+  const w = new BrowserWindow({
+    width: 1180, height: 780, minWidth: 720, minHeight: 480,
+    backgroundColor: '#020617',
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, '../public/icon.png'),
+    title: machineName ? `ควบคุม — ${machineName}` : 'Sovereign OS — รีโมทคอนโทรล',
+    // backgroundThrottling:false = เฟรมหน้าจอยังไหลต่อแม้หน้าต่างไม่ถูกโฟกัส (จำเป็นสำหรับการเฝ้าดู)
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  const q = new URLSearchParams({ machine: machineId, tab: 'screen', popout: '1' }).toString();
+  w.loadURL(`${DASHBOARD_URL}/machine-console/?${q}`).catch((e) => dlog('remote window load error:', e.message));
+  w.on('closed', () => { remoteWindows.delete(machineId); });
+  remoteWindows.set(machineId, w);
+  dlog('openRemoteWindow:', machineName || machineId);
+  return { ok: true };
+}
+
+ipcMain.handle('sovereign:openRemoteWindow', (_e, opts) => openRemoteWindow(opts || {}));
+
+// ปักหมุดหน้าต่างรีโมทบนสุด — เฝ้าจอเครื่องอื่นพร้อมทำงานอื่นได้โดยไม่ถูกบัง
+ipcMain.handle('sovereign:setRemoteAlwaysOnTop', (e, value) => {
+  try {
+    const target = BrowserWindow.fromWebContents(e.sender);
+    if (!target || target.isDestroyed()) return { ok: false, message: 'ไม่พบหน้าต่างนี้' };
+    target.setAlwaysOnTop(Boolean(value));
+    return { ok: true, alwaysOnTop: target.isAlwaysOnTop() };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+});
 
 // ── Setup Wizard: ตั้งค่าครั้งแรก (โฟลเดอร์/ตรวจสภาพแวดล้อม/เริ่มระบบ/อัปเดต) ──
 function setupFlagPath() { return path.join(app.getPath('userData'), 'setup-done.json'); }

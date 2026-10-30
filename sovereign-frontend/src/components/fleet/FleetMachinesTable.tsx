@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import StatusPill from "../ui/StatusPill";
 import {
   CHANNELS,
@@ -32,6 +33,7 @@ export default function FleetMachinesTable({
   onSaveOverride: (machine: FleetMachine, input: MachineOverrideInput) => Promise<boolean>;
   onRotate: (machine: FleetMachine) => void;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState<"all" | Channel>("all");
   const [complianceFilter, setComplianceFilter] = useState<"all" | Compliance>("all");
@@ -209,6 +211,16 @@ export default function FleetMachinesTable({
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void router.push({ pathname: "/machine-console", query: { machine: machine.id } })
+                          }
+                          title={`เปิดคอนโซล ${machine.name} — ดูจอ/คุมเมาส์-คีย์บอร์ด`}
+                          className="rounded border border-cyan-800/70 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-950/40"
+                        >
+                          🖥️ ควบคุม
+                        </button>
                         <button
                           type="button"
                           onClick={() => (editingId === machine.id ? setEditingId(null) : openEdit(machine))}

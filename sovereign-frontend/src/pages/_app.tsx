@@ -20,7 +20,9 @@ import '../styles/globals.css';
 import '@vepando/liquid-glass-react/style.css';
 
 // หน้าเฉพาะ SUPERADMIN — ซ่อน/ปิดให้สมาชิกเสมอ (กันเดา URL เข้า)
-const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings']);
+// /machine-console: สั่ง/คุมเครื่องอื่นได้ทั้งเครื่อง (เมาส์ คียบอร์ด ไฟล์) ⇒ SUPERADMIN เท่านั้น
+// เดิมไม่อยู่ในรายการ สมาชิกที่เดา URL เข้ามาเห็นรายชื่อเครื่องได้ (ยืนยัน 30/10/69)
+const ADMIN_PAGES = new Set(['/system', '/backup', '/users', '/audit', '/settings', '/machine-console']);
 
 // หน้าสาธารณะ (ไม่ต้อง login) — ลูกค้าไม่ควรเห็นเมนู/แผงควบคุมภายในของระบบ
 // 14/10/69: '/shop' ย้ายไปเว็บสาธารณะ (Sovereign-Web-Standalone) แล้ว — ไม่มีหน้า public ในแอปนี้
