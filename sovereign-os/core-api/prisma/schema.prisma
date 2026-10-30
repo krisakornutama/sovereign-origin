@@ -2168,7 +2168,7 @@ model LearningModelState {
 model Business {
   id            String   @id @default(uuid()) @db.Uuid
   name          String
-  bizType       String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE
+  bizType       String   @default("IOT_RETAIL") // IOT_RETAIL | GENERAL_TRADE | SERVICE | SOFTWARE_PROJECT
   vatRate       Float    @default(0.07) // VAT ต่อธุรกิจ (default 7%)
   isActive      Boolean  @default(true)
   shopName      String? // ชื่อร้านสาธารณะ (แสดงหน้า /shop — ว่าง = ใช้ชื่อธุรกิจ)

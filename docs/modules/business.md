@@ -26,6 +26,12 @@
 - Route ใหญ่สุดของระบบ (455 บรรทัด) + service ใหญ่สุด (`business.service.ts` ~830 บรรทัด) — แก้ทีละจุด
 - `business-shop.service.ts` ดูแลเฉพาะหน้าร้าน/ชุมชน (`openShopOrThrow` ฯลฯ)
 
+## ประเภทธุรกิจ (30/10/69)
+- ค่าที่ใช้จริง: `IOT_RETAIL` · `GENERAL_TRADE` · `SERVICE` · **`SOFTWARE_PROJECT`** (ขายซอฟต์แวร์เป็นโปรเจ็ก)
+- `SOFTWARE_PROJECT` ใช้ `business-software.service.ts` — seed **แคตตาล็อกดิจิทัล 4 ชุด** + **ผู้ช่วย AI สายเทคนิค 5 คน** ตอนสร้างธุรกิจ (idempotent)
+  - ตรรกะแยกไฟล์เพราะ `business.service.ts` เกินเพดาน 800 บรรทัดของ arch-gate — ห้ามย้ายกลับเข้าไฟล์เดิมโดยไม่แบ่งไฟล์ก่อน
+  - สินค้าดิจิทัลใช้ `category = 'SOFTWARE'` และ `stockQty` สูง (ไม่มีสต็อกจริง) — UI แสดง "ดิจิทัล · ไม่จำกัด"
+
 ## ห้ามแตะ / ระวัง
 - เปลี่ยน response ของ `GET /community` ต้องเช็คหน้า `/community` + E2E `trace-community.spec.ts` ด้วยเสมอ
 - ออเดอร์ผูกกับ trace (`business_orders` ↔ lots) — ลบออเดอร์กระทบประวัติตามรอย
