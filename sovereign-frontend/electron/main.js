@@ -285,6 +285,7 @@ function updateTrayMenu() {
       { label: `${statusGlyph(st.launcher)} Launcher :4100 — ${st.launcher ? 'ออนไลน์' : 'ออฟไลน์'}`, enabled: false },
       { type: 'separator' },
       { label: '🚀 เริ่มระบบทั้งหมด', click: () => { startSystem(); } },
+      { label: '🖥️ รีโมทคอนโทรล เครื่องที่ 2', click: () => { showMainWindow('/machine-console'); } },
       { label: updLabel, click: () => { if (upd && upd.ok && upd.hasUpdate) openWizard('update'); else checkForUpdates(true); } },
       { label: '⚙️ ตั้งค่าครั้งแรก (Setup Wizard)', click: () => openWizard() },
       { type: 'separator' },
@@ -302,13 +303,16 @@ function createTray() {
   } catch (e) { dlog('tray create failed:', e.message); }
 }
 
-function showMainWindow() {
+function showMainWindow(hash = '') {
   try {
     if (!win || win.isDestroyed()) { createWindow(); boot(); return; }
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
-    dlog('showMainWindow: หน้าต่างถูกเรียกกลับมา');
+    if (hash) {
+      win.loadURL(`http://localhost:3000${hash}`).catch(() => {});
+    }
+    dlog('showMainWindow: หน้าต่างถูกเรียกกลับมา' + (hash ? ' → ' + hash : ''));
   } catch (e) { dlog('showMainWindow error:', e.message); }
 }
 
