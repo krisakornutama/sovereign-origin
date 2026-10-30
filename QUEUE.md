@@ -761,7 +761,10 @@
     (opencode อ่าน stdin จน EOF — ยืนยันจาก binary: `process.stdin.isTTY ? undefined : await Bun.stdin.text()`)
   - **`result` แสดง JSON ดิบ/ข้อความเริ่มงาน**: `parseOpencodeOutput` อ่าน `ev.text` แต่รูปแบบจริงคือ `ev.part.text` ⇒ อ่านถูกจุด + เลือก **คำตอบสุดท้าย** (messageID ล่าสุด รวมทุก part)
   - เทสต์ red-first: 3 fails exit 1 → **29/29** (`runner.test.mjs`) · suite runner **157 ผ่าน · 3 ข้าม** exit 0
-- [ ] เผยแพร่ชุดอัปเดตเต็ม 25 ไฟล์ + พิสูจน์เครื่อง 2 อัปเดต + งาน multi-line จริง (หลัง `npm run verify` ผ่าน)
+- [x] **เผยแพร่ชุดอัปเดตเต็ม 25 ไฟล์** — version `88b09635891b` (เซ็น `fleet-update-v1` · ตรวจลายเซ็นด้วย trust anchor ของ runner ผ่าน)
+  - คอนเทนเนอร์ `sovereign-core-api` เห็น manifest ใหม่ทันที (mount `data/` · อ่านต่อ request ไม่ต้องรีสตาร์ท)
+- [ ] พิสูจน์เครื่อง 2 อัปเดต + งาน multi-line จริง — **รอเครื่อง 2 เปิด** (heartbeat ล่าสุด 29/10/69 20:24 UTC) · runner เช็คอัปเดตใน ~30 วิหลังบูต
+- [ ] **รอไฟเขียวเจ้าของ**: รีสตาร์ท `sovereign-core-api` (ให้โค้ดประเภทธุรกิจใหม่มีผล) + rebuild frontend (ให้ปุ่มใหม่แสดงบน :3000)
 
 
 
