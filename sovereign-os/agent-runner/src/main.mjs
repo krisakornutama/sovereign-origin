@@ -14,6 +14,7 @@ import { createControlClient } from './control.mjs';
 import { createControlHub } from './hub-control.mjs';
 import { resolveAllowedRoots } from './fsops.mjs';
 import { selfUpdateOnce, planBoot, markHealthy, HANDOFF_EXIT_CODE } from './selfUpdate.mjs';
+import { ensureAutostart, isAutostartEnabled } from './autostart.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const envPath = join(here, '..', '.env');
@@ -57,6 +58,8 @@ const config = {
   selfUpdate: resolveCaptureScreenshot(env.SELF_UPDATE),
   selfUpdateIntervalMs: Number(env.SELF_UPDATE_INTERVAL_SEC || 6 * 60 * 60) * 1000,
   selfUpdateStartDelayMs: Number(env.SELF_UPDATE_START_DELAY_SEC || 30) * 1000,
+  // เปิดตัวเองตอนล็อกอิน (ปิดได้ที่เครื่องนี้ด้วย AUTOSTART=false)
+  autostart: isAutostartEnabled(env),
 };
 
 // ── เครื่องลูกอัปเดตโค้ดเอง: ธงสั่งงานจากบรรทัดคำสั่ง ──────────────────────────
@@ -85,6 +88,30 @@ console.log(
 // ถ้าอัปเดตแล้วโปรเซสใหม่ "ไม่ประกาศตัว" = ผู้ดูแลย้อนกลับให้เอง (ดู restartSupervised)
 const boot = planBoot(runnerRoot, { log: (m) => console.log(m) });
 if (boot.action === 'starting') setTimeout(() => markHealthy(runnerRoot), 10_000).unref?.();
+
+// ── เปิดเองตอนล็อกอิน: ติดตั้งให้ตัวเองทุกครั้งที่บูต (idempotent) ──
+// ทำก่อนเริ่มลูปงาน และไม่ throw — autostart ล้มต้องไม่ทำให้เครื่องหลุดจาก HUB
+if (config.autostart) {
+  try {
+    const auto = await ensureAutostart({
+      runnerDir: runnerRoot,
+      env,
+      log: (m) => console.log(`[runner] ${m}`),
+    });
+    if (auto.status === 'skipped') {
+      console.log(`[runner] เปิดเองตอนล็อกอิน=ข้าม (${auto.reason})`);
+    } else {
+      console.log(
+        `[runner] เปิดเองตอนล็อกอิน=${auto.status}` +
+          ` (startup=${auto.startup} · task=${auto.task}${auto.taskError ? ` — ${auto.taskError}` : ''})`,
+      );
+    }
+  } catch (err) {
+    console.error(`[runner] ติดตั้ง autostart ไม่สำเร็จ (ข้าม): ${err instanceof Error ? err.message : err}`);
+  }
+} else {
+  console.log('[runner] เปิดเองตอนล็อกอิน=ปิด (AUTOSTART=false)');
+}
 
 if (wantVersion || wantCheck || wantSelfUpdate) {
   try {
