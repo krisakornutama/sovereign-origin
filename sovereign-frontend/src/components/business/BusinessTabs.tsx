@@ -71,13 +71,13 @@ export function ProductsTab({ products, canWrite, onAdded, onError, base, post }
   const [form, setForm] = useState({ sku: '', name: '', category: 'SENSOR', costPrice: '', salePrice: '', stockQty: '', reorderPoint: '3', warrantyMonths: '12', specs: '' });
   if (!canWrite) {
     return <div className="space-y-2">{products.map((p: Product) => (
-      <div key={p.id} className="card p-3 flex flex-wrap items-center gap-2 text-sm"><span className="font-mono text-xs text-slate-400">{p.sku}</span><span>{p.name}</span><span className="ml-auto">{baht(p.salePrice)} · สต็อก {p.stockQty}</span></div>
+      <div key={p.id} className="card p-3 flex flex-wrap items-center gap-2 text-sm"><span className="font-mono text-xs text-slate-400">{p.sku}</span><span>{p.name}</span><span className="ml-auto">{baht(p.salePrice)} · {p.category === 'SOFTWARE' ? 'ดิจิทัล · ไม่จำกัด' : `สต็อก ${p.stockQty}`}</span></div>
     ))}</div>;
   }
   return (
     <div className="space-y-4">
       <div className="card p-4 space-y-3">
-        <div className="text-sm font-semibold">📦 เพิ่มสินค้า IoT</div>
+        <div className="text-sm font-semibold">📦 เพิ่มสินค้า</div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <input placeholder="SKU เช่น ESP32-01" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm" aria-label="SKU" />
           <input placeholder="ชื่อสินค้า" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm sm:col-span-2" aria-label="ชื่อสินค้า" />
@@ -108,7 +108,7 @@ export function ProductsTab({ products, canWrite, onAdded, onError, base, post }
             <span className="font-medium">{p.name}</span>
             {p.stockQty <= p.reorderPoint && <span className="text-[10px] px-1.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">ใกล้หมด</span>}
             <span className="ml-auto text-slate-300">ทุน {baht(p.costPrice)} → ขาย {baht(p.salePrice)}</span>
-            <span className="text-slate-400">สต็อก {p.stockQty}</span>
+            <span className="text-slate-400">{p.category === 'SOFTWARE' ? 'ดิจิทัล · ไม่จำกัด' : `สต็อก ${p.stockQty}`}</span>
             <span className="text-slate-500 text-xs">รับประกัน {p.warrantyMonths} เดือน</span>
           </div>
         ))}
