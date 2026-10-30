@@ -51,6 +51,22 @@ test('buildCommand — ถ้าไม่ระบุ model ห้ามใส�
   assert.equal(cmd.args.includes('--model'), false);
 });
 
+// 30/10/69 — เจอจริงจากงานแรกบนเครื่อง 2: prompt 5 บรรทัดไปถึง agent แค่บรรทัดแรก
+// เพราะ shell:true บน Windows ต่อ args ด้วย space ดิบ ๆ ⇒ newline ตัดคำสั่ง
+// opencode `run` อ่าน stdin จน EOF เมื่อ stdin ไม่ใช่ TTY ⇒ ต้องส่ง prompt ทาง stdin แล้ว end
+test('buildCommand — prompt หลายบรรทัดต้องไปทาง stdin ไม่ใช่ argv (Windows shell ตัดที่ newline)', () => {
+  const prompt = 'ทำตามนี้เท่านั้น:\n1) สร้างไฟล์ hello.txt\n2) พิมพ์ path เต็ม';
+  const cmd = buildCommand({ executor: 'opencode', prompt }, { machineName: 'r' });
+  assert.equal(cmd.kind, 'spawn');
+  assert.equal(cmd.stdin, prompt, 'prompt ต้องถูกส่งครบทั้งก้อนทาง stdin');
+  assert.equal(
+    cmd.args.some((a) => String(a).includes('\n')),
+    false,
+    'ห้ามมี newline ใน argv — shell:true บน Windows จะตัดคำสั่งเหลือบรรทัดแรก',
+  );
+  assert.equal(cmd.args.includes(prompt), false, 'ห้ามส่ง prompt ซ้ำทั้ง argv และ stdin');
+});
+
 test('parseOpencodeOutput — ดึงข้อความผลลัพธ์จาก JSON events', () => {
   const lines = [
     JSON.stringify({ type: 'text', text: 'แก้เสร็จแล้ว' }),
@@ -76,6 +92,37 @@ test('parseOpencodeOutput — ข้อความที่ไม่ใช่ J
   const out = parseOpencodeOutput('not json\nalso not json');
   assert.equal(out.hadError, false);
   assert.ok(typeof out.summary === 'string');
+});
+
+// 30/10/69 — เจอจริง: DB `result` เก็บ JSON ดิบของ event แรก เพราะตัวอ่านไปหา `ev.text`
+// แต่รูปแบบจริงของ opencode 1.18 คือ `ev.part.text` ⇒ ผู้ใช้ไม่เห็นคำตอบสุดท้าย
+test('parseOpencodeOutput — รูปแบบจริงของ opencode 1.18: ข้อความอยู่ใน part.text และต้องได้คำตอบสุดท้าย', () => {
+  const lines = [
+    JSON.stringify({ type: 'step_start', part: { messageID: 'm1', type: 'step-start' } }),
+    JSON.stringify({ type: 'text', part: { messageID: 'm1', type: 'text', text: "I'll do exactly those steps." } }),
+    JSON.stringify({ type: 'step_finish', part: { messageID: 'm1', reason: 'tool-calls' } }),
+    JSON.stringify({ type: 'tool_use', part: { messageID: 'm2', tool: 'bash', state: { status: 'completed' } } }),
+    JSON.stringify({
+      type: 'text',
+      part: { messageID: 'm3', type: 'text', text: 'เสร็จแล้ว\nPath: C:\\Users\\USER\\Desktop\\agent-test\\hello.txt' },
+    }),
+  ].join('\n');
+  const out = parseOpencodeOutput(lines);
+  assert.equal(
+    out.summary,
+    'เสร็จแล้ว\nPath: C:\\Users\\USER\\Desktop\\agent-test\\hello.txt',
+    'result ต้องเป็นคำตอบสุดท้าย ไม่ใช่ JSON ดิบหรือข้อความเริ่มงาน',
+  );
+  assert.equal(out.hadError, false);
+});
+
+test('parseOpencodeOutput — คำตอบสุดท้ายที่แบ่งหลาย part ต้องได้ครบทุก part', () => {
+  const lines = [
+    JSON.stringify({ type: 'text', part: { messageID: 'm1', type: 'text', text: 'เริ่มทำ' } }),
+    JSON.stringify({ type: 'text', part: { messageID: 'm2', type: 'text', text: 'ส่วนที่ 1' } }),
+    JSON.stringify({ type: 'text', part: { messageID: 'm2', type: 'text', text: 'ส่วนที่ 2' } }),
+  ].join('\n');
+  assert.equal(parseOpencodeOutput(lines).summary, 'ส่วนที่ 1\nส่วนที่ 2');
 });
 
 test('runJob — echo คืนผลสำเร็จพร้อม exitCode 0', async () => {
@@ -272,28 +319,40 @@ test('pollOnce — อัปโหลดภาพล้มต้องยัง�
 // opencode `run` จะอ่าน stdin จนจบ (EOF) เมื่อ stdin ไม่ใช่ TTY
 // runner เดิม spawn แบบ pipe ที่เปิดค้าง ⇒ opencode รอ EOF ตลอดไป ⇒ งานค้าง 30 นาที
 // พิสูจน์ด้วยมือบน HUB: stdin เปิดค้าง = ไม่มี output 30 วิ · stdio ignore = ออกทันที
-test('runJob — spawn ต้องปิด stdin + ซ่อนหน้าต่าง (opencode รอ EOF จาก pipe = งานค้าง)', async () => {
+test('runJob — เขียน prompt ลง stdin แล้วปิดทันที + ซ่อนหน้าต่าง (pipe ค้าง = opencode รอ EOF = งานค้าง)', async () => {
   const calls = [];
+  const writes = [];
+  let ended = 0;
   const fakeSpawn = (bin, args, opts) => {
     calls.push({ bin, args, opts });
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
+    child.stdin = {
+      on: () => {},
+      end: (chunk) => {
+        writes.push(chunk);
+        ended += 1;
+      },
+    };
     child.kill = () => {};
     setImmediate(() => {
-      child.stdout.emit('data', '{"type":"text","text":"ok"}\n');
+      child.stdout.emit('data', '{"type":"text","part":{"messageID":"m1","text":"ok"}}\n');
       child.emit('close', 0);
     });
     return child;
   };
-  const res = await runJob({ executor: 'opencode', prompt: 'x' }, { spawnImpl: fakeSpawn, opencodeBin: 'fake-opencode-not-real-xyz' });
+  const prompt = 'บรรทัดแรก\nบรรทัดที่สอง';
+  const res = await runJob({ executor: 'opencode', prompt }, { spawnImpl: fakeSpawn, opencodeBin: 'fake-opencode-not-real-xyz' });
   assert.equal(res.status, 'done', res.summary);
   assert.equal(calls.length, 1, 'runJob ต้องใช้ spawnImpl ที่ฉีดเข้ามา (เทสต์ต้องไม่ spawn จริง)');
-  assert.deepEqual(
-    calls[0].opts.stdio,
-    ['ignore', 'pipe', 'pipe'],
-    'stdin ต้องเป็น ignore — pipe ที่เปิดค้างทำให้ opencode รอ EOF แล้วงานค้างทั้งที่เครื่องยังทำงาน',
+  assert.equal(calls[0].opts.stdio[0], 'pipe', 'stdin ต้องเป็น pipe เพื่อส่ง prompt หลายบรรทัด');
+  assert.equal(
+    ended,
+    1,
+    'ต้อง end stdin ครั้งเดียว — ปล่อย pipe ค้าง = opencode รอ EOF แล้วงานค้างทั้งที่เครื่องยังทำงาน',
   );
+  assert.deepEqual(writes, [prompt], 'prompt ต้องไปถึง stdin ครบทุกบรรทัด');
   assert.equal(calls[0].opts.windowsHide, true, 'ต้องซ่อนหน้าต่าง cmd ตอน spawn (runner ทำงานเบื้องหลัง)');
 });
 

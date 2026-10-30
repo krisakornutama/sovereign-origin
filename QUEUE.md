@@ -746,6 +746,24 @@
         - rollback: build เก่าอยู่ที่ `logs/next-backup-20261028_111819` (สลับกลับ + boot ~20 วิ)
   - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ
 
+## ประเภทธุรกิจ "ขายซอฟต์แวร์เป็นโปรเจ็ก" + แก้บั๊กคิวเอเจนต์ (30/10/69) — branch `ai/prompt-stdin-final-answer`
+
+- [x] **ประเภทธุรกิจใหม่ `SOFTWARE_PROJECT`** — เปลี่ยนยุทธศาสตร์ตามเจ้าของ: ขาย Source Code / Blueprint / License ให้นักพัฒนา/เอเจนซี
+  - `Business.bizType` ใหม่ + ตัวเลือกในหน้า `/business` (💻 ขายซอฟต์แวร์เป็นโปรเจ็ก) พร้อมคำอธิบายตอนเลือก
+  - สร้างธุรกิจปุ๊บได้ **แคตตาล็อกดิจิทัล 4 ชุด** อัตโนมัติ: `SW-TAX-CORE` 1,900 · `SW-BIZ-OS` 11,900 · `SW-IOT-FW` 2,500 · `SW-ARCH-BOOK` 1,290
+    (ราคาอยู่ในช่วงที่เจ้าของกำหนด · `stockQty=9999` เพราะสินค้าดิจิทัลไม่มีสต็อกจริง ต้องออกออเดอร์ได้ไม่จำกัด)
+  - ได้ **ผู้ช่วย AI สายเทคนิค 5 คน**: `presales` · `license_advisor` · `docs_writer` · `delivery_qa` · `accountant` (ไม่ใช้ชุด IoT เดิม)
+  - ตรรกะแยกไฟล์ `business-software.service.ts` เพราะ `business.service.ts` มี 877 บรรทัด เกินเพดาน 800 ของ arch-gate (แตะไฟล์เดิม = file-budget fail)
+  - UI สินค้าแสดง "ดิจิทัล · ไม่จำกัด" แทน "สต็อก 9999" สำหรับหมวด `SOFTWARE`
+  - เทสต์: `businessSoftware.test.ts` (presets + seed idempotent) + route test ใน `businessPlatform.test.ts` — **26/26** (exit 0)
+- [x] **บั๊กคิวเอเจนต์จากการใช้งานจริงครั้งแรก (เครื่อง 2)**
+  - **prompt หลายบรรทัดถูกตัดเหลือบรรทัดแรก**: `shell:true` บน Windows ต่อ args ด้วย space ดิบ ⇒ ย้าย prompt ไปทาง **stdin** แล้ว `end()` ทันที
+    (opencode อ่าน stdin จน EOF — ยืนยันจาก binary: `process.stdin.isTTY ? undefined : await Bun.stdin.text()`)
+  - **`result` แสดง JSON ดิบ/ข้อความเริ่มงาน**: `parseOpencodeOutput` อ่าน `ev.text` แต่รูปแบบจริงคือ `ev.part.text` ⇒ อ่านถูกจุด + เลือก **คำตอบสุดท้าย** (messageID ล่าสุด รวมทุก part)
+  - เทสต์ red-first: 3 fails exit 1 → **29/29** (`runner.test.mjs`) · suite runner **157 ผ่าน · 3 ข้าม** exit 0
+- [ ] เผยแพร่ชุดอัปเดตเต็ม 25 ไฟล์ + พิสูจน์เครื่อง 2 อัปเดต + งาน multi-line จริง (หลัง `npm run verify` ผ่าน)
+
+
 
 
 

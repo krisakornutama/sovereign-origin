@@ -10,6 +10,12 @@ import { idempotent } from '../../middleware/idempotency.middleware';
 import { hasBusinessAccess, BUSINESS_POSITIONS } from '../../lib/business';
 import * as svc from '../../services/business.service';
 import * as shopSvc from '../../services/business-shop.service'; // เฟส 4: สถานะจัดส่งแบบเบา
+// ประเภทธุรกิจ "ขายซอฟต์แวร์เป็นโปรเจ็ก" — แยกไฟล์เพราะ business.service.ts เกินเพดาน 800 บรรทัด
+import {
+  isSoftwareBusiness,
+  seedSoftwareAgents,
+  seedSoftwareBusiness,
+} from '../../services/business-software.service';
 import { lotsForOrderLines } from '../../services/trace.service'; // TRACEABILITY — ล็อตผลผลิตของสินค้าในออเดอร์
 import { AuditService } from '../../services/audit.service';
 // P18-hardening — ตรวจ host ภายในจาก lib กลาง (เดิม define ซ้ำในไฟล์นี้)
@@ -52,7 +58,12 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const biz = await svc.createBusiness((req as any).user.id, req.body);
     // seed ผู้ช่วย AI ทันที (ผู้ใช้ไม่ต้องกดเอง)
-    await svc.seedBusinessAgents(biz.id, biz.name);
+    // ธุรกิจขายซอฟต์แวร์ = แคตตาล็อกดิจิทัล 4 ชุด + ผู้ช่วยสายเทคนิค (ไม่ใช่ชุด IoT)
+    if (isSoftwareBusiness(biz.bizType)) {
+      await seedSoftwareBusiness(biz.id, biz.name);
+    } else {
+      await svc.seedBusinessAgents(biz.id, biz.name);
+    }
     res.status(201).json(biz);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -64,7 +75,9 @@ router.post('/:businessId/agents/seed', authenticate, async (req, res) => {
   try {
     if (!(await guard(req, res, 'OWNER'))) return;
     const biz = await prisma.business.findUnique({ where: { id: req.params.businessId } });
-    const created = await svc.seedBusinessAgents(req.params.businessId, biz?.name ?? 'ธุรกิจ');
+    const created = isSoftwareBusiness(biz?.bizType)
+      ? await seedSoftwareAgents(req.params.businessId, biz?.name ?? 'ธุรกิจ')
+      : await svc.seedBusinessAgents(req.params.businessId, biz?.name ?? 'ธุรกิจ');
     res.json({ created });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

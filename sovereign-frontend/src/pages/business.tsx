@@ -25,6 +25,8 @@ const BIZ_TYPES: Array<{ value: string; label: string; emoji: string }> = [
   { value: 'IOT_RETAIL', label: 'ขายสินค้า IoT', emoji: '📡' },
   { value: 'GENERAL_TRADE', label: 'ค้าขายทั่วไป', emoji: '🛒' },
   { value: 'SERVICE', label: 'บริการ/ติดตั้ง', emoji: '🔧' },
+  // 30/10/69: ขายซอฟต์แวร์เป็นโปรเจ็กให้นักพัฒนา/เอเจนซี (Source Code · Blueprint · License)
+  { value: 'SOFTWARE_PROJECT', label: 'ขายซอฟต์แวร์เป็นโปรเจ็ก', emoji: '💻' },
 ];
 
 export default function BusinessPage() {
@@ -120,6 +122,12 @@ export default function BusinessPage() {
                       </button>
                     ))}
                   </div>
+                  {form.bizType === 'SOFTWARE_PROJECT' && (
+                    <p className="text-xs text-cyan-300/80">
+                      💡 ระบบจะสร้างแคตตาล็อกดิจิทัล 4 ชุด (Tax Engine · Business OS · IoT Blueprint · Architecture Book)
+                      + ผู้ช่วย AI สายเทคนิค 5 คนให้อัตโนมัติ
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <button onClick={createBusiness} disabled={busy}
                       className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-medium disabled:opacity-40">สร้างเลย</button>
