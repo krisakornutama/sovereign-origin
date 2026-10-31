@@ -15,6 +15,20 @@ Facebook · LinkedIn · GitHub · Stripe · เว็บไซต์ ฯลฯ) 
 - URL ที่จะเปิดต้องเป็น `http`/`https` เท่านั้น (กัน `javascript:` / `file:` / `data:`)
 - ใช้ `field-crypto.service` (AES-256-GCM, key อยู่ `data/field-crypto.key`) — ห้ามสร้าง crypto ใหม่ซ้อน
 
+## Gmail เป็นบัญชีหลัก (31/10/69)
+
+เจ้าของมีหลาย platform ที่สมัครด้วยอีเมล Gmail เดียวกัน — จึงให้ Gmail ทำหน้าที่เป็น
+"บัญชีหลัก" และให้บัญชีอื่นผูกเข้าไป เพื่อเห็นทั้ง Ecosystem เป็นชุดเดียว
+
+- คอลัมน์ `primary_account_id` (UUID, nullable, FK ชี้ตัวเอง `ON DELETE SET NULL`)
+- บัญชีหลักต้องเป็น `platform = 'gmail'` ของผู้ใช้คนเดียวกัน — ผูกข้าม user = 404
+- ผูกได้ชั้นเดียว: Gmail ที่ถูกผูกเป็นลูกแล้วเป็นหลักให้ใครไม่ได้ และบัญชีที่มีลูกอยู่จะถูกนำไปผูกเป็นลูกไม่ได้ (`HAS_LINKED_ACCOUNTS`)
+- ห้ามผูกกับตัวเอง (`SELF_LINK`)
+- **จับคู่อัตโนมัติ:** ตอนสร้าง/แก้ ถ้า `loginId` ตรงกับ Gmail ที่ยังว่าง (trim + lowercase) จะผูกให้ทันที — แก้ฟิลด์อื่นไม่ทำให้ผูกกลับเองหลังถอด
+- `POST /api/ecosystem/accounts/auto-link` ผูกบัญชีเดิมที่ยังไม่ผูกทั้งหมด (คืน `{linked, checked}`)
+- ลบ Gmail หลัก: บัญชีลูกยังอยู่ แต่ `primary_account_id` ถูกตั้งเป็น NULL (ไม่ลบตาม)
+- list คืน `primaryAccountId` และ `linkedCount` — ยังไม่คืนรหัสผ่านเหมือนเดิม
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)

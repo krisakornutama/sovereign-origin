@@ -2537,12 +2537,19 @@ model UserEcosystemAccount {
   status              String    @default("active") // active | paused | archived
   last_used_at        DateTime? @db.Timestamptz
   password_updated_at DateTime? @db.Timestamptz
+  // ── บัญชีหลัก (31/10/69): บัญชีนี้สมัครด้วยอีเมลของ Gmail ใบไหน ──
+  // ชี้ไปยังแถว platform = 'gmail' ของ "ผู้ใช้คนเดียวกัน" เท่านั้น (ตรวจใน service)
+  // ผูกได้ชั้นเดียว + ON DELETE SET NULL ⇒ ลบ Gmail หลัก = ลูกหลุดการผูก ไม่ถูกลบตาม
+  primary_account_id  String?   @db.Uuid
   created_at          DateTime  @default(now()) @db.Timestamptz
   updated_at          DateTime  @updatedAt @db.Timestamptz
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user    User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  primary UserEcosystemAccount?  @relation("EcosystemIdentity", fields: [primary_account_id], references: [id], onDelete: SetNull)
+  linked  UserEcosystemAccount[] @relation("EcosystemIdentity")
 
   @@index([user_id, platform])
   @@index([user_id, status])
+  @@index([primary_account_id])
   @@map("user_ecosystem_accounts")
 }

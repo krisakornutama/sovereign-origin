@@ -2,19 +2,30 @@
 
 import { useState } from 'react';
 import Icon from '../ui/Icon';
-import type { AccountFormValues, EcosystemPlatform } from './types';
+import type { AccountFormValues, EcosystemAccount, EcosystemPlatform } from './types';
 
 interface Props {
   mode: 'create' | 'edit';
   initial: AccountFormValues;
   platforms: EcosystemPlatform[];
+  /** บัญชี Gmail ที่ใช้เป็น "หลัก" ได้ (ของเจ้าของคนนี้เท่านั้น) */
+  primaries: EcosystemAccount[];
   saving: boolean;
   error: string;
   onSubmit: (values: AccountFormValues, removePassword: boolean) => void;
   onClose: () => void;
 }
 
-export default function AccountForm({ mode, initial, platforms, saving, error, onSubmit, onClose }: Props) {
+export default function AccountForm({
+  mode,
+  initial,
+  platforms,
+  primaries,
+  saving,
+  error,
+  onSubmit,
+  onClose,
+}: Props) {
   const [values, setValues] = useState<AccountFormValues>(initial);
   const [showPassword, setShowPassword] = useState(false);
   const [removePassword, setRemovePassword] = useState(false);
@@ -113,6 +124,30 @@ export default function AccountForm({ mode, initial, platforms, saving, error, o
               autoFocus
             />
           </div>
+
+          {values.platform !== 'gmail' ? (
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="eco-primary">บัญชีหลัก (Gmail ที่ใช้สมัคร)</label>
+              <select
+                id="eco-primary"
+                className="input w-full"
+                value={values.primaryAccountId}
+                onChange={(e) => set('primaryAccountId', e.target.value)}
+              >
+                <option value="">— ไม่ผูก / ให้ระบบจับคู่อัตโนมัติ —</option>
+                {primaries.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}{g.loginId ? ' · ' + g.loginId : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-gray-500">
+                {primaries.length === 0
+                  ? 'ยังไม่มีบัญชี Gmail — เพิ่ม Gmail ก่อนแล้ว platform ที่ใช้อีเมลเดียวกันจะถูกผูกให้เอง'
+                  : 'ถ้าอีเมลที่ใช้สมัครตรงกับ Gmail ด้านบน ระบบจะผูกให้อัตโนมัติเมื่อเว้นว่าง'}
+              </p>
+            </div>
+          ) : null}
 
           <div className="sm:col-span-2">
             <label className="label" htmlFor="eco-url">URL หน้าเข้าใช้งาน</label>

@@ -26,6 +26,10 @@ export interface EcosystemAccount {
   lastUsedAt: string | null;
   passwordUpdatedAt: string | null;
   passwordAgeDays: number | null;
+  /** บัญชี Gmail หลักที่บัญชีนี้ผูกอยู่ (null = ยังไม่ผูก) */
+  primaryAccountId: string | null;
+  /** จำนวนบัญชีที่ใช้ Gmail ใบนี้เป็นหลัก */
+  linkedCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +41,9 @@ export interface EcosystemSummary {
   missingPassword: number;
   platforms: number;
   stalePasswords: number;
+  /** บัญชีที่ผูกกับ Gmail หลักแล้ว / ยังไม่ผูก */
+  linked: number;
+  unlinked: number;
   byPlatform: Record<string, number>;
 }
 
@@ -48,6 +55,8 @@ export interface AccountFormValues {
   password: string;
   notes: string;
   status: string;
+  /** '' = ไม่ผูกกับ Gmail ใบไหน · id ของบัญชี Gmail = ผูกกับใบนั้น */
+  primaryAccountId: string;
 }
 
 export const EMPTY_FORM: AccountFormValues = {
@@ -58,4 +67,5 @@ export const EMPTY_FORM: AccountFormValues = {
   password: '',
   notes: '',
   status: 'active',
+  primaryAccountId: '',
 };
