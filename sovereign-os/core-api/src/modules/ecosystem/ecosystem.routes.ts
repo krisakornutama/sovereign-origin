@@ -4,7 +4,8 @@
 // ทุก endpoint ต้องล็อกอิน และเห็น/แก้ได้เฉพาะบัญชีของตัวเอง (user_id จาก token)
 //   GET    /catalog              แคตตาล็อก platform + หมวด + สถานะ
 //   GET    /accounts             รายการบัญชี + สรุป (ไม่คืนรหัสผ่าน)
-//   POST   /accounts             เพิ่มบัญชี (รหัสผ่านเข้ารหัสก่อนเก็บ)
+//   POST   /accounts             เพิ่มบัญชี (รหัสผ่านเข้ารหัสก่อนเก็บ · Gmail ที่อีเมลตรงกัน = ผูกอัตโนมัติ)
+//   POST   /accounts/auto-link   ผูกบัญชีที่ยังไม่ผูกทั้งหมดเข้ากับ Gmail ที่อีเมลตรงกัน
 //   PATCH  /accounts/:id         แก้บัญชี (ไม่ส่ง password = คงรหัสเดิม)
 //   DELETE /accounts/:id         ลบบัญชี
 //   POST   /accounts/:id/reveal  ขอรหัสผ่านจริง (audit log ทุกครั้ง)
@@ -17,6 +18,7 @@ import {
   EcosystemError,
   createAccount,
   deleteAccount,
+  autoLinkAccounts,
   getEcosystemCatalog,
   listAccounts,
   openAccount,
@@ -63,6 +65,17 @@ router.post('/accounts', authenticate, async (req: Request, res: Response) => {
     res.status(201).json({ account });
   } catch (err) {
     fail(res, err, 'POST /api/ecosystem/accounts');
+  }
+});
+
+// POST /api/ecosystem/accounts/auto-link
+// ต้องอยู่ก่อน route ที่มี :id เพื่อไม่ให้ "auto-link" ถูกตีความเป็น id
+router.post('/accounts/auto-link', authenticate, async (req: Request, res: Response) => {
+  try {
+    const out = await autoLinkAccounts(req.user!.id);
+    res.json(out);
+  } catch (err) {
+    fail(res, err, 'POST /api/ecosystem/accounts/auto-link');
   }
 });
 

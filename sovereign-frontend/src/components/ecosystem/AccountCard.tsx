@@ -6,6 +6,8 @@ import type { EcosystemAccount, EcosystemPlatform } from './types';
 interface Props {
   account: EcosystemAccount;
   platform?: EcosystemPlatform;
+  /** ชื่อ Gmail หลักที่บัญชีนี้ผูกอยู่ (null = ยังไม่ผูก) */
+  primaryLabel?: string | null;
   revealed: string | null;
   busy: boolean;
   onOpen: () => void;
@@ -24,6 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AccountCard({
   account,
   platform,
+  primaryLabel,
   revealed,
   busy,
   onOpen,
@@ -91,6 +94,20 @@ export default function AccountCard({
               </span>
             )}
           </div>
+
+          {account.linkedCount > 0 ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-sky-300">
+              <Icon name="globe" size={12} />
+              Gmail หลักนี้มี {account.linkedCount} platform ใช้บัญชีอยู่
+            </p>
+          ) : null}
+
+          {account.platform !== 'gmail' && primaryLabel ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-300">
+              <Icon name="key" size={12} />
+              ใช้ Gmail: {primaryLabel}
+            </p>
+          ) : null}
 
           {stale ? (
             <p className="mt-1.5 text-[11px] text-amber-400">

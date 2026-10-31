@@ -29,6 +29,8 @@ const EMPTY_SUMMARY: EcosystemSummary = {
   missingPassword: 0,
   platforms: 0,
   stalePasswords: 0,
+  linked: 0,
+  unlinked: 0,
   byPlatform: {},
 };
 
@@ -124,10 +126,21 @@ export default function EcosystemPage() {
   );
 
   const platformById = useMemo(() => new Map(platforms.map((p) => [p.id, p])), [platforms]);
+  // Gmail = บัญชีหลัก: เลือกได้ในฟอร์ม + ใช้แสดงป้ายบนการ์ดลูก
+  const primaries = useMemo(() => accounts.filter((a) => a.platform === 'gmail'), [accounts]);
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+  const primaryLabelOf = useCallback(
+    (account: EcosystemAccount) => {
+      const primary = account.primaryAccountId ? accountById.get(account.primaryAccountId) : null;
+      if (!primary) return null;
+      return primary.loginId ? primary.label + ' · ' + primary.loginId : primary.label;
+    },
+    [accountById],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return accounts.filter((a) => {
+    const list = accounts.filter((a) => {
       if (category !== 'all' && a.category !== category) return false;
       if (status !== 'all' && a.status !== status) return false;
       if (onlyMissing && a.hasPassword) return false;
@@ -136,6 +149,13 @@ export default function EcosystemPage() {
         .join(' ')
         .toLowerCase()
         .includes(q);
+    });
+    // Gmail หลักขึ้นก่อนเสมอ แล้วเรียงบัญชีที่มีลูกมาก → น้อย
+    return list.sort((a, b) => {
+      const ga = a.platform === 'gmail' ? 1 : 0;
+      const gb = b.platform === 'gmail' ? 1 : 0;
+      if (ga !== gb) return gb - ga;
+      return b.linkedCount - a.linkedCount;
     });
   }, [accounts, query, category, status, onlyMissing]);
 
@@ -239,6 +259,8 @@ export default function EcosystemPage() {
           notes: values.notes,
           status: values.status,
         };
+        // Gmail เป็นหลักเสมอ — ไม่ส่ง primaryAccountId ของตัวมันเอง
+        if (values.platform !== 'gmail') body.primaryAccountId = values.primaryAccountId || null;
         if (values.password) body.password = values.password;
         if (modal.mode === 'edit' && removePassword) body.removePassword = true;
 
@@ -269,6 +291,27 @@ export default function EcosystemPage() {
     [modal, load, notify, t, API],
   );
 
+  // ผูกบัญชีที่เพิ่มไว้ก่อนมีฟีเจอร์นี้ ให้เข้ากับ Gmail ที่อีเมลตรงกัน (กดครั้งเดียว)
+  const autoLink = useCallback(async () => {
+    setBusyId('auto-link');
+    try {
+      const res = await authFetch(`${API}/api/ecosystem/accounts/auto-link`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const linked = Number(data.linked) || 0;
+      notify(
+        linked > 0
+          ? t('ecosystem.autoLinked', 'ผูกกับ Gmail ให้แล้ว {n} บัญชี').replace('{n}', String(linked))
+          : t('ecosystem.autoLinkedNone', 'ไม่มีบัญชีใหม่ที่อีเมลตรงกับ Gmail'),
+      );
+      await load();
+    } catch (err: any) {
+      notify(err?.message || t('ecosystem.autoLinkError', 'ผูกอัตโนมัติไม่สำเร็จ'));
+    } finally {
+      setBusyId('');
+    }
+  }, [API, load, notify, t]);
+
   if (!isHydrated) {
     return <div className="p-8 text-white">{t('common.loading', 'กำลังโหลด...')}</div>;
   }
@@ -293,6 +336,7 @@ export default function EcosystemPage() {
         password: '',
         notes: modal.account.notes,
         status: modal.account.status,
+        primaryAccountId: modal.account.primaryAccountId || '',
       }
     : EMPTY_FORM;
 
@@ -310,6 +354,16 @@ export default function EcosystemPage() {
           )}
           actions={
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={autoLink}
+                disabled={loading || busyId === 'auto-link'}
+                title={t('ecosystem.autoLinkHint', 'ผูกบัญชีที่อีเมลตรงกับ Gmail ให้อัตโนมัติ')}
+              >
+                <Icon name="key" size={14} />
+                {t('ecosystem.autoLink', 'ผูกกับ Gmail')}
+              </button>
               <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
                 <Icon name="refresh" size={14} />
                 {t('common.refresh', 'รีเฟรช')}
@@ -336,6 +390,8 @@ export default function EcosystemPage() {
               <p className="mt-1 text-2xl font-semibold text-sky-300">{summary.platforms}</p>
               <p className="mt-0.5 text-[11px] text-gray-500">
                 {t('ecosystem.summary.withPassword', 'มีรหัสแล้ว')} {summary.withPassword}
+                {' · '}
+                {t('ecosystem.summary.linked', 'ผูก Gmail แล้ว')} {summary.linked}
               </p>
             </div>
             <button
@@ -432,6 +488,7 @@ export default function EcosystemPage() {
                   key={account.id}
                   account={account}
                   platform={platformById.get(account.platform)}
+                  primaryLabel={primaryLabelOf(account)}
                   revealed={revealed[account.id] || null}
                   busy={busyId === account.id}
                   onOpen={() => openSite(account)}
@@ -459,6 +516,7 @@ export default function EcosystemPage() {
           mode={modal.mode}
           initial={initialForm}
           platforms={platforms}
+          primaries={primaries}
           saving={saving}
           error={formError}
           onSubmit={save}

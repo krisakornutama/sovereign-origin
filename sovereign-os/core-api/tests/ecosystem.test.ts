@@ -36,6 +36,7 @@ interface Row {
   status: string;
   last_used_at: Date | null;
   password_updated_at: Date | null;
+  primary_account_id?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -66,6 +67,7 @@ function seed(overrides: Partial<Row> = {}): Row {
     status: 'active',
     last_used_at: null,
     password_updated_at: null,
+    primary_account_id: null,
     created_at: now,
     updated_at: now,
     ...overrides,
@@ -309,6 +311,151 @@ describe('ecosystem service — เข้ารหัสและความเ
 });
 
 // ── HTTP routes ──────────────────────────────────────────────────────────────
+
+describe('ecosystem — Gmail เป็นบัญชีหลัก', () => {
+  async function makeGmail(email = 'owner@gmail.com', userId = OWNER) {
+    return svc.createAccount(userId, {
+      platform: 'gmail',
+      label: 'Gmail หลัก',
+      loginId: email,
+      url: 'https://mail.google.com/',
+    });
+  }
+
+  test('จับคู่อัตโนมัติ: อีเมลที่ใช้สมัครตรงกับ Gmail (ไม่สนตัวพิมพ์/ช่องว่าง)', async () => {
+    const gmail = await makeGmail('Owner@Gmail.com');
+    const fiverr = await svc.createAccount(OWNER, {
+      platform: 'fiverr',
+      label: 'Fiverr',
+      loginId: '  owner@gmail.com  ',
+    });
+
+    assert.equal(fiverr.primaryAccountId, gmail.id, 'ต้องผูกกับ Gmail ที่อีเมลตรงกัน');
+    const { accounts } = await svc.listAccounts(OWNER);
+    assert.equal(accounts.find((a) => a.id === gmail.id)!.linkedCount, 1, 'การ์ด Gmail ต้องรู้ว่ามีกี่บัญชีใช้');
+  });
+
+  test('อีเมลไม่ตรง = ไม่ผูก', async () => {
+    await makeGmail('owner@gmail.com');
+    const other = await svc.createAccount(OWNER, {
+      platform: 'fastwork',
+      label: 'Fastwork',
+      loginId: 'other@gmail.com',
+    });
+    assert.equal(other.primaryAccountId, null);
+  });
+
+  test('บัญชีหลักต้องเป็น Gmail — ผูกกับ Fiverr = 400 PRIMARY_MUST_BE_GMAIL', async () => {
+    const fiverr = await svc.createAccount(OWNER, { platform: 'fiverr', label: 'F', loginId: 'x@y.com' });
+    await assert.rejects(
+      () => svc.createAccount(OWNER, { platform: 'fastwork', label: 'W', primaryAccountId: fiverr.id }),
+      (err: any) => err.status === 400 && err.code === 'PRIMARY_MUST_BE_GMAIL',
+    );
+  });
+
+  test('ผูกกับ Gmail ของคนอื่น = 404 (ไม่ยืนยันว่ามีอยู่)', async () => {
+    const otherGmail = await makeGmail('other@gmail.com', OTHER);
+    await assert.rejects(
+      () => svc.createAccount(OWNER, { platform: 'fiverr', label: 'F', primaryAccountId: otherGmail.id }),
+      (err: any) => err.status === 404,
+    );
+  });
+
+  test('ห้ามผูกบัญชีเข้ากับตัวเอง', async () => {
+    const gmail = await makeGmail();
+    await assert.rejects(
+      () => svc.updateAccount(OWNER, gmail.id, { primaryAccountId: gmail.id }),
+      (err: any) => err.code === 'SELF_LINK',
+    );
+  });
+
+  test('ผูกได้ชั้นเดียว: Gmail ที่มีลูกอยู่แล้วถูกนำไปเป็นลูกของอีกใบ = 400', async () => {
+    const g1 = await makeGmail('a@gmail.com');
+    const g2 = await makeGmail('b@gmail.com');
+    await svc.createAccount(OWNER, { platform: 'fiverr', label: 'F', loginId: 'a@gmail.com' });
+    await assert.rejects(
+      () => svc.updateAccount(OWNER, g1.id, { primaryAccountId: g2.id }),
+      (err: any) => err.code === 'HAS_LINKED_ACCOUNTS',
+    );
+  });
+
+  test('ถอดการผูกได้ และการแก้ฟิลด์อื่นไม่ทำให้หลุดเอง', async () => {
+    const gmail = await makeGmail();
+    const fiverr = await svc.createAccount(OWNER, {
+      platform: 'fiverr',
+      label: 'F',
+      loginId: 'owner@gmail.com',
+    });
+    assert.equal(fiverr.primaryAccountId, gmail.id);
+
+    const unlinked = await svc.updateAccount(OWNER, fiverr.id, { primaryAccountId: '' });
+    assert.equal(unlinked.primaryAccountId, null);
+
+    const edited = await svc.updateAccount(OWNER, fiverr.id, { notes: 'แก้หมายเหตุ' });
+    assert.equal(edited.primaryAccountId, null, 'แก้ฟิลด์อื่นแล้วต้องไม่ผูกกลับเอง');
+  });
+
+  test('แก้อีเมลให้ตรงกับ Gmail = ผูกให้อัตโนมัติ', async () => {
+    const gmail = await makeGmail('owner@gmail.com');
+    const fiverr = await svc.createAccount(OWNER, {
+      platform: 'fiverr',
+      label: 'F',
+      loginId: 'old@example.com',
+      primaryAccountId: '',
+    });
+    assert.equal(fiverr.primaryAccountId, null);
+
+    const updated = await svc.updateAccount(OWNER, fiverr.id, { loginId: 'owner@gmail.com' });
+    assert.equal(updated.primaryAccountId, gmail.id);
+  });
+
+  test('autoLinkAccounts: ผูกบัญชีเดิมที่ยังไม่ผูก เฉพาะอีเมลที่ตรง', async () => {
+    const gmail = await makeGmail('owner@gmail.com');
+    const fiverr = await svc.createAccount(OWNER, {
+      platform: 'fiverr',
+      label: 'F',
+      loginId: 'owner@gmail.com',
+      primaryAccountId: '',
+    });
+    const fastwork = await svc.createAccount(OWNER, {
+      platform: 'fastwork',
+      label: 'W',
+      loginId: 'OWNER@gmail.com',
+      primaryAccountId: '',
+    });
+    const linkedin = await svc.createAccount(OWNER, {
+      platform: 'linkedin',
+      label: 'L',
+      loginId: 'someone@else.com',
+      primaryAccountId: '',
+    });
+
+    const out = await svc.autoLinkAccounts(OWNER);
+    assert.deepEqual(out, { linked: 2, checked: 3 });
+
+    const { accounts, summary } = await svc.listAccounts(OWNER);
+    assert.equal(accounts.find((a) => a.id === fiverr.id)!.primaryAccountId, gmail.id);
+    assert.equal(accounts.find((a) => a.id === fastwork.id)!.primaryAccountId, gmail.id);
+    assert.equal(accounts.find((a) => a.id === linkedin.id)!.primaryAccountId, null);
+    assert.equal(summary.linked, 2);
+    assert.equal(summary.unlinked, 2, 'Gmail หลัก + LinkedIn = ยังไม่ผูก');
+  });
+
+  test('POST /accounts/auto-link → 200 และคืนจำนวนที่ผูก', async () => {
+    const token = makeToken('SUPERADMIN');
+    await makeGmail('owner@gmail.com');
+    await svc.createAccount(OWNER, {
+      platform: 'fiverr',
+      label: 'F',
+      loginId: 'owner@gmail.com',
+      primaryAccountId: '',
+    });
+    const res = await api('POST', '/api/ecosystem/accounts/auto-link', token);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.linked, 1);
+    assert.equal(res.body.checked, 1);
+  });
+});
 
 describe('ecosystem routes — สัญญา HTTP', () => {
   test('ไม่มี token = 401 ทุก endpoint ที่มีข้อมูล', async () => {
