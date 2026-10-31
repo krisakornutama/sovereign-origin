@@ -43,6 +43,25 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 
+  // ── 1a. Ecosystem ของฉัน (31/10/69) ──
+  //  เจ้าของสั่ง: platform กระจัดกระจาย (Fiverr · Fastwork · YouTube · Gmail ·
+  //  Facebook · LinkedIn · เว็บไซต์) จนพลาดคอมเมนต์ลูกค้า → รวมไว้ที่เดียว
+  //  หน้านี้เป็น "ส่วนของผู้ใช้" ล้วน ๆ: เปิดเว็บด้วยปุ่ม + เก็บรหัสผ่านเข้ารหัส
+  {
+    title: '🌐 Ecosystem ของฉัน',
+    titleKey: 'common.nav.group.ecosystem',
+    items: [
+      {
+        href: '/ecosystem',
+        label: 'Ecosystem',
+        labelKey: 'common.nav.ecosystem',
+        icon: 'globe',
+        keywords:
+          'ecosystem platform fiverr fastwork youtube gmail facebook linkedin เว็บไซต์ บัญชี รหัสผ่าน password ที่เก็บรหัส ลูกค้า คอมเมนต์',
+      },
+    ],
+  },
+
   // ── 1b. ควบคุมระยะไกล (เครื่องในเครือข่าย) ──
   //  เจ้าของสั่ง 11/10/69: ต้องมีเมนู "ควบคุมระยะไกล" ให้เห็นชัด
   //  รวมของที่เกี่ยวกับการสั่งเครื่องอื่นไว้ที่เดียว: ดูจอ/คุมเครื่อง · สั่งงาน AI · สั่งอัปเดตโค้ด (OTA)
