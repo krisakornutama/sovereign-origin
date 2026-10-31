@@ -766,6 +766,26 @@
 - [ ] พิสูจน์เครื่อง 2 อัปเดต + งาน multi-line จริง — **รอเครื่อง 2 เปิด** (heartbeat ล่าสุด 29/10/69 20:24 UTC) · runner เช็คอัปเดตใน ~30 วิหลังบูต
 - [ ] **รอไฟเขียวเจ้าของ**: รีสตาร์ท `sovereign-core-api` (ให้โค้ดประเภทธุรกิจใหม่มีผล) + rebuild frontend (ให้ปุ่มใหม่แสดงบน :3000)
 
+## Runner เปิดเองตอนบูต + ทางเข้าควบคุมเครื่อง 2 + ชุด prompt ขาย Source Code (31/10/69) — branch `ai/sell-source-code-prompt`
+
+- [x] **Runner ติดตั้ง autostart ให้ตัวเองทุกครั้งที่บูต** (`66e62a3`)
+  - `src/autostart.mjs`: เขียน `autostart-hidden.vbs` เป็น **UTF-16LE + BOM** (path ไทย/ยูนิโค้ดถ้าเป็น UTF-8 จะเปิดไม่ขึ้นเงียบ ๆ) + วาง pointer ใน Startup folder + พยายามสร้าง Scheduled Task ONLOGON (ล้มได้ ไม่ทำให้ runner ล้ม)
+  - เปิด/ปิดด้วย `AUTOSTART=true|false` ใน `.env` · `doctor.mjs` ยอมรับ autostart ทาง Startup folder (ไม่ fail เมื่อไม่มี Scheduled Task)
+  - เทสต์ 11/11 (`test/autostart.test.mjs`) — เริ่มแดง (exit -1 module not found) → เขียว · suite runner 171 tests: **168 pass · 3 skipped · 0 fail**
+  - พิสูจน์จริงด้วย `wscript` บน path ที่มีเว้นวรรค: `WSCRIPT_STATUS=0` · `MARKER_EXISTS=true`
+- [x] **ทางเข้าควบคุมเครื่อง 2** (`61ba503`, `a22e656`, `81dd0de`)
+  - ปุ่ม "ควบคุมเครื่อง 2" บน `/agent-queue` + เมนู tray ของเดสก์ท็อป → `/machine-console`
+  - แยกแท็บ "สิทธิ์ควบคุม" เป็น `components/machine-console/AccessPanel.tsx` เพราะ `machine-console.tsx` เดิม 829 บรรทัด เกินเพดาน 800 → 733
+  - `tsc --noEmit` exit 0 · `npm run verify` ผ่าน exit 0 (tools tests 105/105)
+- [x] **ชุด prompt ส่งงานเอเจนต์สำหรับขาย Source Code** — `docs/SELL-SOURCE-CODE-AGENT-PROMPT.md`
+  - สถานะ platform ที่ตรวจจริง 31/10: GitHub/Stripe/Telegram/Cloudflare/Docker **มีแล้ว** · **Lemon Squeezy ยังไม่มี (ต้องสมัคร)** · SMTP ยังไม่มี
+  - บันทึกของจริง: **ไม่มีหน้าร้าน · ไม่มีระบบ license/activation/download · ไม่มีธุรกิจ `SOFTWARE_PROJECT` ใน DB** (มีแค่ 3 SKU เก่า `SW-DEMO`/`SW-INVENTORY`/`SW-TRACE`)
+  - MASTER PROMPT 5 phase + sub-prompt 4 ตัว + ตารางแบ่งงานเอเจนต์ + Definition of Done
+- [ ] **เครื่อง 2 ต้องเปิด runner ด้วยมือ 1 ครั้ง** — heartbeat หยุดตั้งแต่ 30/10 11:47 UTC → สั่ง `update.apply` ระยะไกลไม่ได้ · หลังเปิด ~1 นาทีจะได้ชุด `90f18cf3dc85` และขึ้น "เปิดเองตอนล็อกอิน=installed"
+- [ ] **rebuild frontend** — build ที่รันอยู่ (30/10 17:26) เก่ากว่า commit `81dd0de` (21:23) ⇒ แท็บ "สิทธิ์ควบคุม" ใหม่ยังไม่ขึ้นบน `:3000` · ต้องขออนุญาตก่อนเพราะทับ `.next` ที่เซิร์ฟเวอร์ใช้อยู่
+- [ ] **Pairing 6 หลัก** — ยังไม่ได้ทำ (ต้องพิมพ์รหัสบนเครื่อง 2 จริง)
+- [ ] push GitHub — **hold**
+
 
 
 
