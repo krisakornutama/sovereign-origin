@@ -611,6 +611,26 @@ ipcMain.handle('sovereign:openExternal', (_e, url) => {
   }
   return { ok: false, message: 'URL ไม่อนุญาต' };
 });
+
+/**
+ * ลิงก์ที่ "ผู้ใช้บันทึกเอง" ในหน้า Ecosystem (Fiverr/Fastwork/เว็บของตัวเอง ฯลฯ)
+ *
+ * ทำไมไม่ใช้ sovereign:openExternal: ตัวนั้นจำกัด host ไว้เฉพาะ YouTube/Facebook/TikTok/Instagram
+ * (allowlist ของ Setup Wizard) ⇒ ลิงก์ Fiverr/LinkedIn/เว็บลูกค้าจะถูกปฏิเสธเงียบ ๆ
+ * กติกาความปลอดภัยของตัวนี้: เปิดได้เฉพาะ http/https — ห้าม file:, javascript:, data:, UNC
+ */
+function isSafeUserLink(url) {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  let u;
+  try { u = new URL(url.trim()); } catch { return false; }
+  return u.protocol === 'http:' || u.protocol === 'https:';
+}
+
+ipcMain.handle('sovereign:openUserLink', (_e, url) => {
+  if (!isSafeUserLink(url)) return { ok: false, message: 'URL ต้องเป็น http/https เท่านั้น' };
+  shell.openExternal(String(url).trim());
+  return { ok: true };
+});
 ipcMain.handle('sovereign:retryDashboard', async () => {
   const st = await probeStatus();
   if (st.frontend) { showingOffline = false; stopProbe(); win.loadURL(DASHBOARD_URL).catch(() => showOffline()); return { ok: true }; }

@@ -70,6 +70,9 @@ model User {
   businesses_owned     Business[]       @relation("BusinessOwner")
   business_memberships BusinessMember[] @relation("BusinessMemberships")
 
+  // Ecosystem ส่วนตัว: บัญชี/platform ที่ผู้ใช้คนนี้ผูกไว้ (รหัสผ่านเข้ารหัสใน DB)
+  ecosystem_accounts UserEcosystemAccount[]
+
   @@map("users")
 }
 
@@ -2514,4 +2517,32 @@ model IdempotencyKey {
   @@unique([scope, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+// ── Ecosystem ส่วนตัวของผู้ใช้ (31/10/69) ─────────────────────────────────────
+// เจ้าของสั่ง: platform ที่มีอยู่ (Fiverr · Fastwork · YouTube · Gmail · Facebook ·
+// LinkedIn · เว็บไซต์) กระจัดกระจายจนตามคอมเมนต์ลูกค้าไม่ทัน → รวมเป็นที่เดียว
+// เก็บ login_id + password_enc เข้ารหัส AES-256-GCM (field-crypto.service)
+// ห้ามคืน password ใน list — ต้องผ่าน POST /api/ecosystem/accounts/:id/reveal เท่านั้น
+model UserEcosystemAccount {
+  id                  String    @id @default(uuid()) @db.Uuid
+  user_id             String    @db.Uuid
+  platform            String    @default("custom") // fiverr | fastwork | youtube | gmail | ... | custom
+  label               String // ชื่อที่ผู้ใช้ตั้งเอง เช่น "Fiverr รับงานเขียน"
+  url                 String? // หน้าเข้าใช้งาน (http/https เท่านั้น)
+  login_id            String? // เข้ารหัส (enc:v1:...)
+  password_enc        String? // เข้ารหัส (enc:v1:...) — ห้ามส่งกลับใน list
+  notes               String?
+  category            String? // freelance | social | video | email | commerce | dev | payments | chat | website | custom
+  status              String    @default("active") // active | paused | archived
+  last_used_at        DateTime? @db.Timestamptz
+  password_updated_at DateTime? @db.Timestamptz
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, platform])
+  @@index([user_id, status])
+  @@map("user_ecosystem_accounts")
 }

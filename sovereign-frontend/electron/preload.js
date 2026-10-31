@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('sovereign', {
   startSystem: () => ipcRenderer.invoke('sovereign:startSystem'),
   isAutoStarted: () => ipcRenderer.invoke('sovereign:isAutoStarted'),
   openExternal: (url) => ipcRenderer.invoke('sovereign:openExternal', url),
+  // ลิงก์ที่ผู้ใช้บันทึกเอง (หน้า Ecosystem) — เปิดได้ทุก http/https ไม่จำกัด host
+  openUserLink: (url) => ipcRenderer.invoke('sovereign:openUserLink', url),
   retryDashboard: () => ipcRenderer.invoke('sovereign:retryDashboard'),
   // เปิดจอเครื่องในหน้าต่างแยก — คุมเมาส์/คีย์บอร์ดได้เหมือนในแท็บ แต่ไม่หลุด focus
   // ตอนสลับไปหน้าอื่น (desktop app เท่านั้น · เบราว์เซอร์ไม่มีสะพานนี้)
