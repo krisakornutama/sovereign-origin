@@ -15,6 +15,7 @@ import { createControlHub } from './hub-control.mjs';
 import { resolveAllowedRoots } from './fsops.mjs';
 import { selfUpdateOnce, planBoot, markHealthy, HANDOFF_EXIT_CODE } from './selfUpdate.mjs';
 import { ensureAutostart, isAutostartEnabled } from './autostart.mjs';
+import { acquireSingleInstance, DEFAULT_LOCK_PORT } from './single-instance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const envPath = join(here, '..', '.env');
@@ -133,6 +134,22 @@ if (wantVersion || wantCheck || wantSelfUpdate) {
     console.error(`[runner] ตรวจ/ติดตั้งอัปเดตไม่สำเร็จ: ${err instanceof Error ? err.message : err}`);
     process.exit(1);
   }
+}
+
+// ── กันเปิดซ้อน: runner สองตัวแย่ง long-poll กันจนเป็นลูป (~22 req/วิ) ──────────
+// ทำหลังโหมด diagnose (--check-update/--self-update) เพราะโหมดนั้นต้องรันได้แม้มีตัวหลักอยู่
+// ออกด้วย exit 0 (ไม่ใช่ error): ตัวห่อ run-runner.cmd หยุดเมื่อ 0/86 ไม่วนรีสตาร์ท
+const lock = await acquireSingleInstance({
+  port: Number(env.SINGLE_INSTANCE_PORT || DEFAULT_LOCK_PORT),
+});
+if (!lock.ok) {
+  console.log(
+    `[runner] มี runner ตัวอื่นทำงานอยู่แล้ว (port ${lock.port}) — ออกเพื่อไม่ให้เปิดซ้อน`,
+  );
+  process.exit(0);
+}
+if (lock.reason) {
+  console.log(`[runner] จองสิทธิ์ตัวเดียวไม่สำเร็จ (${lock.reason}) — ทำงานต่อตามปกติ`);
 }
 
 // รอบอัตโนมัติ: เช็คตอนเริ่ม (หลังปล่อยให้ลูปงานทำงานก่อน) แล้ววนเป็นระยะ

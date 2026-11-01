@@ -79,15 +79,28 @@ describe('machine-control: การส่งคำสั่ง', () => {
     assert.equal(state?.queued ?? 0, 0);
   });
 
-  test('runner เปิดซ้ำ (poll ใหม่) ปลด poll เก่าด้วย null ไม่ปล่อยค้าง', async () => {
-    const stale = awaitCommand(MACHINE, 5000);
-    // poll ตัวใหม่แซงขึ้นมา (เช่น runner รีสตาร์ทแล้วต่อใหม่ก่อน poll เก่าหมดเวลา)
-    const fresh = awaitCommand(MACHINE, 5000);
+  test('poll ซ้อน (runner เปิดซ้ำ) ต้องไม่ปลดกันเอง — คำสั่งไปถึง poll ล่าสุด', async () => {
+    const older = awaitCommand(MACHINE, 200);
+    // poll ตัวใหม่แซงขึ้นมา (เช่น runner เปิดสองโปรเซสจาก Startup + Scheduled Task)
+    const newer = awaitCommand(MACHINE, 200);
 
-    assert.equal(await stale, null, 'poll เก่าต้องได้ null ไม่ค้างจน proxy ตัด');
     const dispatched = dispatchCommand(MACHINE, 'screen.start', { fps: 5 });
-    const received = await fresh;
-    assert.equal(received?.id, dispatched.id);
+    const received = await newer;
+    assert.equal(received?.id, dispatched.id, 'คำสั่งต้องไปถึง poll ที่ยังมีชีวิต');
+
+    const olderResult = await older;
+    assert.equal(olderResult, null, 'poll เก่าต้องได้ null ตอนหมดเวลาเอง');
+  });
+
+  test('poll ใหม่ต้องไม่ทำให้ poll เก่าตอบทันที (ต้นเหตุลูป 20 req/วิ)', async () => {
+    const started = Date.now();
+    const older = awaitCommand(MACHINE, 200);
+    // ตัวที่สองต้องไม่ "ปลด" ตัวแรกด้วย null — ถ้าปลด ปุ่มนี้จะกลายเป็นลูปทันที
+    void awaitCommand(MACHINE, 200);
+
+    const result = await older;
+    assert.equal(result, null);
+    assert.ok(Date.now() - started >= 150, 'poll เก่าต้องรอจนหมดเวลาจริง ไม่ใช่ตอบทันที');
   });
 });
 

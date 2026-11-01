@@ -10,7 +10,9 @@
 //      (ผ่าน run-runner.cmd ⇒ crash แล้วฟื้นเอง และรับช่วง self-update exit 86)
 //   2) วางไฟล์ชี้ใน Startup folder ของผู้ใช้ (`%APPDATA%\...\Startup\`)
 //      ⇒ ทางนี้ **ไม่ต้องสิทธิ์ admin** และเป็นทางสำรองที่เชื่อถือได้ที่สุด
-//   3) พยายามสร้าง Scheduled Task ชื่อเดิม (ถ้ายังไม่มี) — ล้มได้ ไม่ทำให้ runner ล้ม
+//   3) Scheduled Task ชื่อเดิม — ใช้เป็น **ทางสำรอง** เมื่อเขียน Startup folder ไม่ได้เท่านั้น
+//      ⚠️ ห้ามติดตั้งทั้งสองทางพร้อมกัน: Windows จะเปิด runner 2 โปรเซส
+//      ⇒ แย่ง long-poll กันจนเป็นลูป ~22 requests/วินาที (เจอจริง 31/10/69)
 //
 // ⚠️ ไฟล์ .vbs ต้องเป็น UTF-16LE + BOM: path ไทย/ยูนิโค้ดถ้าเขียน UTF-8
 //    wscript จะอ่านเป็นตัวขยะแล้วเปิดไม่ขึ้น (เงียบสนิท ไม่มี error ให้เห็น)
@@ -171,25 +173,49 @@ export async function ensureAutostart({
     out.reason = 'ไม่พบ %APPDATA% — ใช้ Scheduled Task อย่างเดียว';
   }
 
-  // 3) Scheduled Task (ทางเสริม) — มีอยู่แล้วไม่ต้องสร้าง · ล้มได้ไม่ทำให้ runner ล้ม
+  // 3) Scheduled Task — ใช้ "ทางเดียว" กับ Startup เท่านั้น
+  //    เจอจริง 31/10/69: ติดตั้งทั้งสองทาง ⇒ Windows เปิด runner 2 โปรเซส
+  //    ⇒ แย่ง long-poll กันจนเป็นลูป ~22 requests/วินาที
+  //    กติกา: Startup ใช้ได้ = ไม่สร้าง task · ถ้ามี task ค้างจากของเก่า = ลบออก
+  const startupActive = out.startup === 'created' || out.startup === 'unchanged';
   const query = await exec('schtasks', ['/Query', '/TN', TASK_NAME], { windowsHide: true });
-  if (query?.code === 0) {
-    out.task = 'exists';
-  } else {
-    const tr = `wscript.exe "${hiddenPath}"`;
-    const made = await exec(
-      'schtasks',
-      ['/Create', '/TN', TASK_NAME, '/TR', tr, '/SC', 'ONLOGON', '/F'],
-      { windowsHide: true },
-    );
-    if (made?.code === 0) {
-      out.task = 'created';
-      created = true;
-      log(`สร้าง Scheduled Task "${TASK_NAME}" (ตอนล็อกอิน)`);
+  const taskExists = query?.code === 0;
+
+  if (startupActive) {
+    if (!taskExists) {
+      out.task = 'skipped';
     } else {
-      out.task = 'failed';
-      out.taskError = String(made?.stderr || made?.stdout || `exit ${made?.code ?? '?'}`).trim();
-      log(`สร้าง Scheduled Task ไม่สำเร็จ (ใช้ Startup folder แทน): ${out.taskError}`);
+      const removed = await exec('schtasks', ['/Delete', '/TN', TASK_NAME, '/F'], { windowsHide: true });
+      if (removed?.code === 0) {
+        out.task = 'removed';
+        created = true;
+        log(`ลบ Scheduled Task "${TASK_NAME}" — เหลือทางเดียว (Startup) กันเปิดซ้อน`);
+      } else {
+        out.task = 'exists';
+        out.taskError = String(removed?.stderr || removed?.stdout || `exit ${removed?.code ?? '?'}`).trim();
+        log(`ลบ Scheduled Task ไม่สำเร็จ (ยังมีสองทาง): ${out.taskError}`);
+      }
+    }
+  } else {
+    // Startup ใช้ไม่ได้ (ไม่รู้จัก %APPDATA%) = ทางสำรองคือ Scheduled Task
+    if (taskExists) {
+      out.task = 'exists';
+    } else {
+      const tr = `wscript.exe "${hiddenPath}"`;
+      const made = await exec(
+        'schtasks',
+        ['/Create', '/TN', TASK_NAME, '/TR', tr, '/SC', 'ONLOGON', '/F'],
+        { windowsHide: true },
+      );
+      if (made?.code === 0) {
+        out.task = 'created';
+        created = true;
+        log(`สร้าง Scheduled Task "${TASK_NAME}" (ตอนล็อกอิน)`);
+      } else {
+        out.task = 'failed';
+        out.taskError = String(made?.stderr || made?.stdout || `exit ${made?.code ?? '?'}`).trim();
+        log(`สร้าง Scheduled Task ไม่สำเร็จ (ใช้ Startup folder แทน): ${out.taskError}`);
+      }
     }
   }
 
