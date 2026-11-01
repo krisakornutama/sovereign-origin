@@ -16,7 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const POST_DIR = path.join(ROOT, 'sovereign-frontend', 'src', 'components', 'business', 'post');
+const POST_DIR = path.join(ROOT, 'sovereign-frontend', 'src', 'components', 'ecosystem', 'studio');
 const ELECTRON_DIR = path.join(ROOT, 'sovereign-frontend', 'electron');
 
 const bridgeMod = await import(`file:///${path.join(POST_DIR, 'bridge.ts').replace(/\\/g, '/')}`);

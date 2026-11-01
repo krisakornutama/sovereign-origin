@@ -29,6 +29,27 @@ Facebook · LinkedIn · GitHub · Stripe · เว็บไซต์ ฯลฯ) 
 - ลบ Gmail หลัก: บัญชีลูกยังอยู่ แต่ `primary_account_id` ถูกตั้งเป็น NULL (ไม่ลบตาม)
 - list คืน `primaryAccountId` และ `linkedCount` — ยังไม่คืนรหัสผ่านเหมือนเดิม
 
+## Social Studio (02/11/69)
+
+ย้ายงาน "โพสต์คลิป" ออกจากหน้าธุรกิจ (`ธุรกิจของฉัน` ไม่มีแท็บ `📣 โพสต์` แล้ว) เข้ามาอยู่ใน
+Ecosystem → แท็บ **สตูดิโอโพสต์** และแยกเป็น 2 งานชัดเจน:
+
+1. **โพสต์ข้อความ → Facebook** (`TextStudio.tsx`) — พิมพ์/แนบลิงก์/คัดลอก/เปิด Facebook
+   - Facebook ไม่เปิด API ให้แอปบุคคลทั่วไปโพสต์แทน ⇒ แอปเตรียมข้อความให้พร้อมเท่านั้น
+     ห้ามทำให้ผู้ใช้เข้าใจว่าโพสต์ให้แล้ว
+   - เพดาน 63,206 ตัวอักษร · ร่างเก็บที่ `sovereign-social-text-v1`
+2. **ลงคลิปวิดีโอ → YouTube · Instagram · TikTok · Facebook** (`ClipStudio.tsx`)
+   - เตรียมชื่อ/ไฟล์/คำอธิบายครั้งเดียว แล้วกระจายไปทุกแพลตฟอร์ม
+   - YouTube อัปโหลดอัตโนมัติผ่าน OAuth ในแอป (`PostYouTube.tsx`) — ค่าเริ่มต้น `private`
+   - อีกสามแพลตฟอร์มเปิดหน้าอัปโหลด + คัดลอกข้อความ (เบราว์เซอร์ยัดไฟล์ข้ามเว็บไม่ได้)
+   - ร่างเก็บที่ `sovereign-post-draft-v1`
+- **บัญชีที่แสดง = อีเมลที่ผูกไว้ใน Ecosystem** (`loginId`) — ไม่ต้องล็อกอินซ้ำในสตูดิโอ
+  ถ้ายังไม่มีบัญชี การ์ดจะเปิดฟอร์มเพิ่มบัญชีพร้อมเลือก platform ให้
+- ไฟล์ทั้งหมดอยู่ `sovereign-frontend/src/components/ecosystem/studio/` (กลุ่ม `ecosystem`
+  เดียวกัน — ผ่าน import-layers ของ frontend gate)
+- pure logic ที่เทสต์ Node เรียกตรง: `post-model.ts` · `post-validate.ts` ·
+  `post-clipboard.ts` · `bridge.ts` · `studio-model.ts`
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)

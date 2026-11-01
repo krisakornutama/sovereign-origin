@@ -1,5 +1,5 @@
 "use client";
-// components/business/post/PostComposer.tsx
+// components/ecosystem/studio/PostComposer.tsx
 // ส่วนที่ 1 ของแท็บ "📣 โพสต์" — ชื่อคลิป (ช่องเดียวใช้ร่วมกัน) + ไฟล์วิดีโอ
 //
 // ⚠ ข้อเท็จจริงที่หล่อหลอมหน้านี้ (เขียนไว้กันคนแก้ทีหลังเข้าใจผิด):

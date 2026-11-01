@@ -19,7 +19,6 @@ import { BusinessShopTab } from './BusinessShopTab';
 import { AgentsTab } from './BusinessAgentsTab';
 import { LedgerRow, ProductsTab, CustomersTab, InstallationsTab, LedgerForm, AddMemberCard } from './BusinessTabs';
 import SoverienHub from './soverien/SoverienHub';
-import PostHub from './post/PostHub';
 import { useCreateOrderFromCart } from './useOrderActions';
 
 export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Business; onExit: () => void; refreshBiz?: () => void }) {
@@ -174,8 +173,7 @@ export default function BusinessWorkspace({ biz, onExit, refreshBiz }: { biz: Bu
       {/* ── เครื่องมือร้าน Soverien (14/10/69) — ย่อยไว้โมดูลแยก ไม่ให้ไฟล์นี้พังเพดานบรรทัด ── */}
       {tab === 'soverien' && <SoverienHub />}
 
-      {/* ── โพสต์คลิปหลายแพลตฟอร์ม (18/10/69) ── */}
-      {tab === 'post' && <PostHub />}
+      {/* 02/11/69: งานโพสต์/ลงคลิป ย้ายไป Ecosystem → Social Studio แล้ว */}
 
       {/* ── ภาพรวม ── */}
       {tab === 'overview' && (

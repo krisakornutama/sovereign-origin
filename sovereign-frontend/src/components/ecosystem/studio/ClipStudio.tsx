@@ -1,35 +1,40 @@
 "use client";
-// components/business/post/PostHub.tsx
+// components/ecosystem/studio/ClipStudio.tsx
 // ────────────────────────────────────────────────────────────────────────────
-// แท็บ "📣 โพสต์" — คลิปเดียว (ชื่อเดียว + ไฟล์เดียว) → กระจายไป YouTube / Facebook / TikTok / Instagram
+// งานที่ 2 ของ Social Studio: "ลงคลิปวิดีโอ" → YouTube · Instagram · TikTok · Facebook
 //
-// โหมด A (เวอร์ชันนี้): เปิดหน้าเว็บอัปโหลดของแต่ละแพลตฟอร์มด้วยเบราว์เซอร์จริง
-//   ข้อดี: ไม่ต้องขอ API key · ไม่มีค่าใช้จ่าย · ไม่มีโควตารายวัน · ทำได้ทุกบัญชีทันที
-//   ข้อจำกัดที่หนีไม่ได้: ขั้น "เลือกไฟล์ในหน้าเว็บ" ต้องให้เจ้าของลากไฟล์เอง
-//   (เบราว์เซอร์ห้ามเว็บหนึ่งยัดไฟล์ใส่ file input ของอีกเว็บ — เป็นด่านความปลอดภัย ไม่ใช่ข้อบกพร่อง)
-//   ⇒ แอปจึงรับผิดชอบทุกอย่างที่ทำแทนได้: ตรวจไฟล์/ความยาวข้อความ, คัดลอกข้อความให้ทีละแพลตฟอร์ม,
-//     เปิดหน้าที่ถูกต้อง, และชี้โฟลเดอร์ที่มีไฟล์
+// เตรียมครั้งเดียว (ชื่อ + ไฟล์ + คำอธิบาย) แล้วกระจายไปทุกแพลตฟอร์มที่ติ๊ก
+//   · YouTube = อัปโหลดอัตโนมัติผ่าน OAuth ในแอป (PostYouTube)
+//   · อีกสามแพลตฟอร์ม = เปิดหน้าอัปโหลด + คัดลอกข้อความให้ (เบราว์เซอร์ห้ามยัดไฟล์ข้ามเว็บ)
 //
-// ⚠ งานทุกชิ้นถูกบันทึกลง localStorage อัตโนมัติ — ปิดแอปแล้วกลับมาไม่ต้องพิมพ์ใหม่
-//   แต่ "ไฟล์วิดีโอไม่ได้ถูกคัดลอก" เก็บแค่พาธ ⇒ ถ้าย้าย/ลบไฟล์ แอปจะเตือนและให้เลือกใหม่
+// ⚠ บัญชีที่แสดงในแต่ละการ์ดคืออีเมลที่ผูกไว้ใน Ecosystem — ไม่ต้องล็อกอินซ้ำ
+// ⚠ งานทุกชิ้นบันทึกลง localStorage อัตโนมัติ — ปิดแอปแล้วกลับมาพิมพ์ต่อได้
 // ────────────────────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
-import PostComposer from './PostComposer';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import type { EcosystemAccount } from '../types';
 import PostCaptionEditor from './PostCaptionEditor';
+import PostComposer from './PostComposer';
 import PostTargets from './PostTargets';
 import PostYouTube from './PostYouTube';
 import { Alert, BTN_GHOST, Hint } from './ui';
 import { DRAFT_KEY, PLATFORMS, PLATFORM_KEYS, emptyDraft, normalizeDraft } from './post-model';
 import type { PlatformKey, PostDraft } from './post-model';
+import { accountsForPlatform } from './studio-model';
+import type { StudioAccountOption } from './studio-model';
 
 const SAVE_FAILED_MSG =
   'บันทึกร่างลงเครื่องไม่สำเร็จ (พื้นที่เก็บข้อมูลเต็มหรือถูกปิด) — งานที่พิมพ์ไว้จะหายเมื่อปิดหน้านี้ กรุณาส่งออกข้อมูลสำรอง';
 
 // เพดานชื่อคลิป = แพลตฟอร์มที่มี "ช่องชื่อคลิป" จริง และเข้มที่สุด
-// (TikTok ไม่มีช่องชื่อ — ชื่อไปอยู่ในแคปชัน จึงไม่ต้องเอามาคิด)
 const TITLE_CAP = Math.min(...PLATFORMS.filter((p) => p.hasTitleField).map((p) => p.titleMax));
 
-export default function PostHub() {
+export interface ClipStudioProps {
+  accounts: EcosystemAccount[];
+  onAddAccount: (platform: string) => void;
+}
+
+export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) {
   const [draft, setDraft] = useState<PostDraft>(() => emptyDraft(PLATFORM_KEYS));
   const [editKey, setEditKey] = useState<PlatformKey>('youtube');
   const [ready, setReady] = useState(false);
@@ -63,11 +68,17 @@ export default function PostHub() {
     }
   }, [draft, ready]);
 
+  // บัญชีที่ผูกไว้ แยกตามแพลตฟอร์ม — ส่งให้การ์ดปลายทางแสดง "โพสต์ในนาม"
+  const accountsByPlatform = useMemo(() => {
+    const out: Partial<Record<PlatformKey, StudioAccountOption[]>> = {};
+    for (const key of PLATFORM_KEYS) out[key] = accountsForPlatform(accounts, key);
+    return out;
+  }, [accounts]);
+
   const patch = useCallback((p: Partial<PostDraft>) => setDraft((d) => ({ ...d, ...p })), []);
   const onMsg = useCallback((text: string, kind: 'ok' | 'error' | 'warn') => setMsg({ text, kind }), []);
 
   // ⚠ ติ๊ก/ถอดติ๊กแล้วต้องเรียงตาม PLATFORM_KEYS เสมอ (ไม่ใช่ต่อท้าย)
-  //   ไม่งั้นลำดับการ์ดจะสลับไปมาตามลำดับที่ผู้ใช้กด = หาปุ่มไม่เจอ
   const toggleTarget = useCallback((k: PlatformKey) => {
     setDraft((d) => ({
       ...d,
@@ -96,10 +107,10 @@ export default function PostHub() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-gray-100">📣 โพสต์คลิปไปหลายแพลตฟอร์ม</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            เตรียมครั้งเดียว แล้วลง YouTube · Facebook · TikTok · Instagram — เลือกไว้ {draft.targets.length} แพลตฟอร์ม
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold text-gray-100">🎬 ลงคลิปวิดีโอ</h2>
+          <p className="mt-0.5 text-xs text-gray-500">
+            เตรียมครั้งเดียว แล้วลง YouTube · Instagram · TikTok · Facebook — เลือกไว้ {draft.targets.length} แพลตฟอร์ม
           </p>
         </div>
         <button type="button" className={BTN_GHOST} onClick={reset}>ล้างร่าง</button>
@@ -130,7 +141,13 @@ export default function PostHub() {
 
       <PostCaptionEditor draft={draft} editKey={editKey} onEditKey={setEditKey} patch={patch} />
 
-      <PostTargets draft={draft} onToggle={toggleTarget} onMsg={onMsg} />
+      <PostTargets
+        draft={draft}
+        onToggle={toggleTarget}
+        onMsg={onMsg}
+        accountsByPlatform={accountsByPlatform}
+        onAddAccount={onAddAccount}
+      />
 
       <PostYouTube
         title={draft.title}

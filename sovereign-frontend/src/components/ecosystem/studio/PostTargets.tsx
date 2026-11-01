@@ -1,5 +1,5 @@
 "use client";
-// components/business/post/PostTargets.tsx
+// components/ecosystem/studio/PostTargets.tsx
 // ส่วนที่ 3 ของแท็บ "📣 โพสต์" — การ์ดปลายทาง + ขั้นตอนที่ต้องทำบนแต่ละแพลตฟอร์ม
 //
 // ⚠ ความจริงที่ต้องยอมรับ (โหมด A ไม่ใช้ API):
@@ -13,11 +13,16 @@ import type { PlatformKey, PostDraft } from './post-model';
 import { videoCheck } from './post-validate';
 import { copyVia } from './post-clipboard';
 import { postBridge } from './bridge';
+import type { StudioAccountOption } from './studio-model';
 
 export interface PostTargetsProps {
   draft: PostDraft;
   onToggle: (k: PlatformKey) => void;
   onMsg: (text: string, kind: 'ok' | 'error' | 'warn') => void;
+  /** บัญชีที่ผูกไว้ต่อแพลตฟอร์ม — แสดงเป็น "โพสต์ในนาม" */
+  accountsByPlatform?: Partial<Record<PlatformKey, StudioAccountOption[]>>;
+  /** ยังไม่มีบัญชีของแพลตฟอร์มนั้น → ให้หน้าแม่เปิดฟอร์มเพิ่มบัญชี */
+  onAddAccount?: (key: PlatformKey) => void;
 }
 
 /** สิ่งที่ยังขาดสำหรับแพลตฟอร์มนี้ — เรียงตามลำดับที่เจ้าของต้องทำจริง */
@@ -44,7 +49,7 @@ function missing(draft: PostDraft, key: PlatformKey): string[] {
   return out;
 }
 
-export default function PostTargets({ draft, onToggle, onMsg }: PostTargetsProps) {
+export default function PostTargets({ draft, onToggle, onMsg, accountsByPlatform, onAddAccount }: PostTargetsProps) {
   const say = (ok: boolean, good: string, bad: string) => onMsg(ok ? good : bad, ok ? 'ok' : 'warn');
 
   const copy = async (text: string, label: string) => {
@@ -91,6 +96,7 @@ export default function PostTargets({ draft, onToggle, onMsg }: PostTargetsProps
           const lacks = missing(draft, spec.key);
           const ready = lacks.length === 0;
           const caption = buildCaption(draft, spec.key);
+          const linked = accountsByPlatform?.[spec.key] ?? [];
 
           return (
             <div
@@ -108,6 +114,21 @@ export default function PostTargets({ draft, onToggle, onMsg }: PostTargetsProps
                   {ready ? 'พร้อมโพสต์' : `เหลือ ${lacks.length} ขั้นตอน`}
                 </span>
               </label>
+
+              {linked.length > 0 ? (
+                <p className="pl-6 text-[11px] text-gray-400">
+                  <span className="text-gray-500">โพสต์ในนาม:</span>{' '}
+                  <span className="text-gray-300">{linked.map((a) => a.display).join(' · ')}</span>
+                </p>
+              ) : onAddAccount ? (
+                <button
+                  type="button"
+                  className="pl-6 text-left text-[11px] text-amber-300 underline hover:text-amber-200"
+                  onClick={() => onAddAccount(spec.key)}
+                >
+                  ยังไม่ได้ผูกบัญชี {spec.label} — เพิ่มอีเมลที่ใช้ล็อกอิน
+                </button>
+              ) : null}
 
               {lacks.length > 0 && (
                 <ul className="space-y-0.5 pl-6">
