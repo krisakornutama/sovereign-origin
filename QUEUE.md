@@ -782,7 +782,7 @@
   - บันทึกของจริง: **ไม่มีหน้าร้าน · ไม่มีระบบ license/activation/download · ไม่มีธุรกิจ `SOFTWARE_PROJECT` ใน DB** (มีแค่ 3 SKU เก่า `SW-DEMO`/`SW-INVENTORY`/`SW-TRACE`)
   - MASTER PROMPT 5 phase + sub-prompt 4 ตัว + ตารางแบ่งงานเอเจนต์ + Definition of Done
 - [ ] **เครื่อง 2 ต้องเปิด runner ด้วยมือ 1 ครั้ง** — heartbeat หยุดตั้งแต่ 30/10 11:47 UTC → สั่ง `update.apply` ระยะไกลไม่ได้ · หลังเปิด ~1 นาทีจะได้ชุด `90f18cf3dc85` และขึ้น "เปิดเองตอนล็อกอิน=installed"
-- [ ] **rebuild frontend** — build ที่รันอยู่ (30/10 17:26) เก่ากว่า commit `81dd0de` (21:23) ⇒ แท็บ "สิทธิ์ควบคุม" ใหม่ยังไม่ขึ้นบน `:3000` · ต้องขออนุญาตก่อนเพราะทับ `.next` ที่เซิร์ฟเวอร์ใช้อยู่
+- [ ] **rebuild frontend** — build ที่รันอยู่ (30/10 17:26) เก่ากว่า commit `81dd0de` (21:23) และยังไม่มี Social Studio (`16d90b5`) ⇒ ต้องขออนุญาตก่อนเพราะทับ `.next` ที่เซิร์ฟเวอร์ใช้อยู่
 - [ ] **Pairing 6 หลัก** — ยังไม่ได้ทำ (ต้องพิมพ์รหัสบนเครื่อง 2 จริง)
 - [ ] push GitHub — **hold**
 
@@ -801,7 +801,7 @@
   - `setup-node.mjs` ส่งต่อ `dockerWaitMs` (เทสต์ไม่นอน 10 นาที) + `buildRunnerEnv` เขียน `SINGLE_INSTANCE_PORT`
   - `ecosystem.tsx` await `openExternal` + เทสต์ `sovereign:openUserLink`
 - [ ] **rebuild frontend** — ยังไม่ทำ: ต้องขออนุญาตก่อน (ทับ `.next` ที่ `:3000` ใช้อยู่) — Social Studio จะยังไม่ขึ้นจนกว่าจะ rebuild
-- [ ] เผยแพร่ runner update bundle + restart `sovereign-core-api` (หลัง verify ผ่าน)
+- [x] **เผยแพร่ runner update bundle + restart `sovereign-core-api`** — version `1cd408915f8d` (27 ไฟล์ · เซ็น `fleet-update-v1`) · container healthy · `/api/health` = 200
 
 
 
