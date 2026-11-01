@@ -84,7 +84,12 @@ interface Waiter {
 
 interface Channel {
   queue: ControlCommand[];
-  waiter: Waiter | null;
+  /**
+   * long-poll ที่ค้างอยู่ "หลายตัวได้" — runner อาจถูกเปิดซ้อน (Startup + Scheduled Task)
+   * ของเดิมเก็บได้ตัวเดียวแล้วปลดตัวเก่าด้วย null ⇒ สองตัวแย่งกันจนเป็นลูป ~22 req/วิ
+   * (เจอจริง 31/10/69) ⇒ เก็บเป็น Set แล้วให้คำสั่งไปถึง "ตัวล่าสุด" ตัวเก่าหมดเวลาเอง
+   */
+  waiters: Set<Waiter>;
   latestFrame: LatestFrame | null;
   frameSeq: number;
   lastPollAt: number | null;
@@ -105,7 +110,7 @@ function channelOf(machineId: string): Channel {
   if (!ch) {
     ch = {
       queue: [],
-      waiter: null,
+      waiters: new Set<Waiter>(),
       latestFrame: null,
       frameSeq: 0,
       lastPollAt: null,
@@ -141,9 +146,12 @@ export function dispatchCommand(
     timeoutMs,
   };
 
-  if (ch.waiter) {
-    const waiter = ch.waiter;
-    ch.waiter = null;
+  // คำสั่งไปถึง poll "ล่าสุด" ก่อน (ตัวที่เพิ่งมา = น่าจะยังมีชีวิต)
+  // poll เก่าที่ค้างอยู่ไม่ถูกปลด — ปล่อยให้หมดเวลาตาม waitMs เอง
+  const waiters = [...ch.waiters];
+  const waiter = waiters.length > 0 ? waiters[waiters.length - 1] : undefined;
+  if (waiter) {
+    ch.waiters.delete(waiter);
     clearTimeout(waiter.timer);
     waiter.resolve(command);
   } else {
@@ -166,7 +174,7 @@ export function dispatchCommand(
 /**
  * runner เรียกค้างไว้ (long-poll) เพื่อรอคำสั่ง
  * คืน null เมื่อครบเวลา — runner ต้องวนเรียกใหม่ (ไม่ใช่ error)
- * ถ้ามี poll เก่าค้างอยู่ (เช่น runner เปิดซ้ำ) → ปลดอันเก่าด้วย null ก่อน
+ * poll ซ้อนได้ (runner เปิดซ้ำ) — ห้ามปลดตัวเก่าด้วย null เพราะจะกลายเป็นลูปทันที
  */
 export function awaitCommand(
   machineId: string,
@@ -175,24 +183,19 @@ export function awaitCommand(
   const ch = channelOf(machineId);
   ch.lastPollAt = Date.now();
 
-  // runner ตัวใหม่แซงตัวเก่า — อันเก่าต้องได้ null กลับ ไม่ใช่ค้างจน proxy ตัด
-  if (ch.waiter) {
-    const stale = ch.waiter;
-    ch.waiter = null;
-    clearTimeout(stale.timer);
-    stale.resolve(null);
-  }
-
   const queued = ch.queue.shift();
   if (queued) return Promise.resolve(queued);
 
   return new Promise<ControlCommand | null>((resolve) => {
-    const timer = setTimeout(() => {
-      if (ch.waiter && ch.waiter.resolve === resolve) ch.waiter = null;
-      resolve(null);
-    }, waitMs);
-    if (typeof timer.unref === 'function') timer.unref();
-    ch.waiter = { resolve, timer };
+    const waiter: Waiter = {
+      resolve,
+      timer: setTimeout(() => {
+        ch.waiters.delete(waiter);
+        resolve(null);
+      }, waitMs),
+    };
+    if (typeof waiter.timer.unref === 'function') waiter.timer.unref();
+    ch.waiters.add(waiter);
   });
 }
 
@@ -268,7 +271,7 @@ export function controlState() {
   return [...channels.entries()].map(([machineId, ch]) => ({
     machineId,
     queued: ch.queue.length,
-    polling: Boolean(ch.waiter),
+    polling: ch.waiters.size > 0,
     viewers: ch.viewers,
     requestedFps: ch.requestedFps,
     framesReceived: ch.framesReceived,
@@ -281,11 +284,11 @@ export function controlState() {
 /** ล้างทุกอย่าง — เทสต์เรียกใน after() เพื่อไม่ให้ state รั่วข้ามเคส */
 export function resetMachineControl(): void {
   for (const ch of channels.values()) {
-    if (ch.waiter) {
-      clearTimeout(ch.waiter.timer);
-      ch.waiter.resolve(null);
-      ch.waiter = null;
+    for (const waiter of ch.waiters) {
+      clearTimeout(waiter.timer);
+      waiter.resolve(null);
     }
+    ch.waiters.clear();
     ch.queue = [];
     ch.latestFrame = null;
   }

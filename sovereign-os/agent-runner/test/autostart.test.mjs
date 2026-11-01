@@ -101,7 +101,7 @@ test('buildStartupEntry: ชี้ไปที่ hidden launcher ตัวจ�
   assert.match(vbs, /, 0, False\s*$/m);
 });
 
-test('ensureAutostart: Windows + ยังไม่มีอะไร = สร้าง hidden launcher, startup entry และ task', async () => {
+test('ensureAutostart: Windows + Startup ใช้ได้ = สร้าง Startup และไม่สร้าง task (กันเปิดสองโปรเซส)', async () => {
   const fsImpl = memFs();
   const exec = fakeExec((file, args) => {
     if (args[0] === '/Query') return { code: 1, stdout: '', stderr: 'not found' };
@@ -120,7 +120,9 @@ test('ensureAutostart: Windows + ยังไม่มีอะไร = สร�
 
   assert.equal(out.ok, true);
   assert.equal(out.startup, 'created');
-  assert.equal(out.task, 'created');
+  // Startup กับ Scheduled Task พร้อมกัน = Windows เปิด runner สองตัว
+  // ⇒ long-poll แย่งกันจนเป็นลูป ~20 req/วิ (เจอจริงบนเครื่อง 2 31/10/69)
+  assert.equal(out.task, 'skipped', 'Startup ทำงานแล้วห้ามสร้าง task ซ้ำ');
   assert.ok(fsImpl.files.has(HIDDEN_PATH), 'ต้องมี hidden launcher ในโฟลเดอร์ runner');
   assert.ok(fsImpl.files.has(STARTUP_PATH), 'ต้องมีไฟล์ใน Startup folder');
 
@@ -128,6 +130,32 @@ test('ensureAutostart: Windows + ยังไม่มีอะไร = สร�
   assert.ok(fsImpl.files.get(STARTUP_PATH).startsWith('\uFEFF'), 'ต้องมี BOM');
   assert.ok(fsImpl.files.get(HIDDEN_PATH).startsWith('\uFEFF'), 'ต้องมี BOM');
 
+  assert.equal(
+    exec.calls.filter((c) => c.args[0] === '/Create').length,
+    0,
+    'ห้ามสร้าง task เมื่อ Startup ใช้ได้',
+  );
+});
+
+test('ensureAutostart: Startup ใช้ไม่ได้ (ไม่มี %APPDATA%) = fallback ไป Scheduled Task', async () => {
+  const fsImpl = memFs();
+  const exec = fakeExec((file, args) => {
+    if (args[0] === '/Query') return { code: 1, stdout: '', stderr: 'not found' };
+    return { code: 0, stdout: 'SUCCESS', stderr: '' };
+  });
+
+  const out = await ensureAutostart({
+    runnerDir: RUNNER_DIR,
+    appData: '',
+    platform: 'win32',
+    env: {},
+    fsImpl,
+    exec,
+    log: quiet,
+  });
+
+  assert.equal(out.startup, 'skipped');
+  assert.equal(out.task, 'created');
   const create = exec.calls.find((c) => c.args[0] === '/Create');
   assert.ok(create, 'ต้องเรียก schtasks /Create');
   assert.ok(create.args.includes(TASK_NAME), 'ต้องตั้งชื่อ task ตามที่ตกลง');
@@ -137,13 +165,37 @@ test('ensureAutostart: Windows + ยังไม่มีอะไร = สร�
   assert.equal(create.opts?.windowsHide, true, 'ต้องไม่เด้งหน้าต่างดำ');
 });
 
-test('ensureAutostart: เรียกซ้ำแล้วต้องไม่เขียนไฟล์ซ้ำ และไม่สร้าง task ซ้ำ', async () => {
+test('ensureAutostart: มี task ค้างจากของเก่า + Startup ใช้ได้ = ลบ task (เหลือทางเดียว)', async () => {
+  const fsImpl = memFs();
+  const exec = fakeExec((file, args) => {
+    if (args[0] === '/Query') return { code: 0, stdout: 'TaskName: Sovereign Agent Runner', stderr: '' };
+    return { code: 0, stdout: 'SUCCESS', stderr: '' };
+  });
+
+  const out = await ensureAutostart({
+    runnerDir: RUNNER_DIR,
+    appData: APP_DATA,
+    platform: 'win32',
+    env: {},
+    fsImpl,
+    exec,
+    log: quiet,
+  });
+
+  assert.equal(out.startup, 'created');
+  assert.equal(out.task, 'removed', 'ต้องลบ task เก่าเพื่อไม่ให้เปิดสองโปรเซส');
+  const del = exec.calls.find((c) => c.args[0] === '/Delete');
+  assert.ok(del, 'ต้องเรียก schtasks /Delete');
+  assert.ok(del.args.includes(TASK_NAME));
+});
+
+test('ensureAutostart: เรียกซ้ำแล้วต้องไม่เขียนไฟล์ซ้ำ และไม่แตะ task', async () => {
   const fsImpl = memFs();
   let queried = 0;
   const exec = fakeExec((file, args) => {
     if (args[0] === '/Query') {
       queried += 1;
-      return { code: 0, stdout: 'TaskName: Sovereign Agent Runner', stderr: '' };
+      return { code: 1, stdout: '', stderr: 'not found' };
     }
     return { code: 0, stdout: '', stderr: '' };
   });
@@ -172,8 +224,8 @@ test('ensureAutostart: เรียกซ้ำแล้วต้องไม่
 
   assert.equal(fsImpl.writes.length, writesAfterFirst, 'รอบสองต้องไม่เขียนไฟล์เพิ่ม');
   assert.equal(second.startup, 'unchanged');
-  assert.equal(second.task, 'exists');
-  assert.equal(exec.calls.filter((c) => c.args[0] === '/Create').length, 0, 'มี task อยู่แล้วห้ามสร้างซ้ำ');
+  assert.equal(second.task, 'skipped');
+  assert.equal(exec.calls.filter((c) => c.args[0] === '/Create').length, 0, 'ห้ามสร้าง task เมื่อ Startup ใช้ได้');
   assert.ok(queried >= 1);
   assert.equal(first.ok, true);
 });
@@ -196,9 +248,31 @@ test('ensureAutostart: schtasks ล้ม (ไม่ใช่ admin) = ไม่
   });
 
   assert.equal(out.ok, true, 'ติดตั้งไม่ครบก็ต้องไม่ทำให้ runner ล้ม');
+  // Startup ใช้ได้ = ไม่ต้องพึ่ง schtasks เลย (จึงไม่ล้ม)
+  assert.equal(out.task, 'skipped');
+  assert.ok(fsImpl.files.has(STARTUP_PATH), 'Startup entry ต้องถูกสร้างแม้ task ล้ม');
+});
+
+test('ensureAutostart: ไม่มี Startup + schtasks ล้ม = คืน failed พร้อมเหตุผล ไม่ throw', async () => {
+  const fsImpl = memFs();
+  const exec = fakeExec((file, args) => {
+    if (args[0] === '/Query') return { code: 1, stdout: '', stderr: 'not found' };
+    return { code: 1, stdout: '', stderr: 'ERROR: Access is denied.' };
+  });
+
+  const out = await ensureAutostart({
+    runnerDir: RUNNER_DIR,
+    appData: '',
+    platform: 'win32',
+    env: {},
+    fsImpl,
+    exec,
+    log: quiet,
+  });
+
+  assert.equal(out.ok, true, 'ล้มก็ต้องไม่ทำให้ runner ล้ม');
   assert.equal(out.task, 'failed');
   assert.match(String(out.taskError), /Access is denied/i);
-  assert.ok(fsImpl.files.has(STARTUP_PATH), 'Startup entry ต้องถูกสร้างแม้ task ล้ม');
 });
 
 test('ensureAutostart: AUTOSTART=false = ไม่แตะไฟล์และไม่เรียก schtasks', async () => {
