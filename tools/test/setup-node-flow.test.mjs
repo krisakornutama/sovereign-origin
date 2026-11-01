@@ -171,8 +171,20 @@ describe('runSetup — ลำดับขั้นตอน', () => {
     const kit = fakeKit();
     try {
       const { exec, calls } = mockExec({ 'docker|info': { code: 1, stdout: '', stderr: 'no' } });
-      const r = await runSetup({ exec, log: () => {}, kitDir: kit.dir, homedir: kit.dir, freeGb: 40 });
+      // ⚠ ห้ามให้เทสต์นอนรอ Docker จริง 10 นาที (เจอจริง 31/10/69: tools tests ค้าง 400 วิ)
+      //   waitMs=0 = ไม่วนรอเลย · dockerSleep ต้องไม่ถูกเรียกแม้แต่ครั้งเดียว
+      let sleeps = 0;
+      const r = await runSetup({
+        exec,
+        log: () => {},
+        kitDir: kit.dir,
+        homedir: kit.dir,
+        freeGb: 40,
+        dockerWaitMs: 0,
+        dockerSleep: () => { sleeps += 1; },
+      });
       assert.equal(r.ok, false);
+      assert.equal(sleeps, 0, 'unit test ต้องไม่รอ Docker จริง — ต้องส่ง waitMs เข้าไปคุม');
       // ขั้นตรวจเครื่องมือยิง `docker info` เป็นตัวแรก → จับได้ก่อนถึงขั้น 'Docker'
       // (ไม่มีขั้นย่อย 'Docker' แยก — เป็นตัวเดียวกัน ดูจุดที่ 4 ใน setup-node.mjs)
       assert.ok(

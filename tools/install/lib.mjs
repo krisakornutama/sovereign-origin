@@ -244,6 +244,9 @@ export function buildRunnerEnv({
     SELF_UPDATE: 'true',
     SELF_UPDATE_START_DELAY_SEC: '30',
     SELF_UPDATE_INTERVAL_SEC: '21600',
+    // กัน runner เปิดซ้อน: จอง port loopback ตัวเดียวต่อเครื่อง (ตัวที่สอง exit 0)
+    // ค่าเริ่มต้นเดียวกับ DEFAULT_LOCK_PORT ใน src/single-instance.mjs
+    SINGLE_INSTANCE_PORT: '49731',
   };
   const base = [
     '# Agent Runner env — สร้างโดย tools/install/install.mjs',
