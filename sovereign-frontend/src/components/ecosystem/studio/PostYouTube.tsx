@@ -1,5 +1,5 @@
 "use client";
-// components/business/post/PostYouTube.tsx
+// components/ecosystem/studio/PostYouTube.tsx
 // ────────────────────────────────────────────────────────────────────────────
 // การ์ด "อัปโหลดขึ้น YouTube อัตโนมัติ" (โหมด B) — อยู่ในแท็บ 📣 โพสต์
 //

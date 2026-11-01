@@ -15,15 +15,13 @@ export const POSITION_LABELS: Record<string, string> = {
 
 export const POSITION_RANK: Record<string, number> = { OWNER: 0, MANAGER: 1, SALES: 2, TECHNICIAN: 3, STOCK_KEEPER: 3, ACCOUNTANT: 3, VIEWER: 6 };
 
-export type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'tax' | 'agents' | 'team' | 'shop' | 'soverien' | 'post';
+export type Tab = 'overview' | 'products' | 'customers' | 'orders' | 'installations' | 'finance' | 'tax' | 'agents' | 'team' | 'shop' | 'soverien';
 
 export const TABS: Array<{ key: Tab; label: string; minRank: number }> = [
   { key: 'overview', label: 'ภาพรวม', minRank: 6 },
   // 14/10/69: เครื่องมือร้าน Soverien (serial · สติกเกอร์ · ออเดอร์ · ประกัน · CRM)
   { key: 'soverien', label: '🏷️ Soverien', minRank: 6 },
-  // 18/10/69: โพสต์คลิปเดียว → YouTube/Facebook/TikTok (โหมด A เปิดหน้าเว็บอัปโหลดจริง)
-  // 20/10/69: เพิ่ม Instagram เป็นแพลตฟอร์มที่ 4 (เจ้าของขอ)
-  { key: 'post', label: '📣 โพสต์', minRank: 6 },
+  // 02/11/69: ย้าย "โพสต์คลิป" ไป Ecosystem → Social Studio (แท็บธุรกิจไม่ต้องมีงานโพสต์แล้ว)
   { key: 'products', label: 'สินค้า', minRank: 6 },
   { key: 'customers', label: 'ลูกค้า', minRank: 6 },
   { key: 'orders', label: 'ออเดอร์', minRank: 6 },

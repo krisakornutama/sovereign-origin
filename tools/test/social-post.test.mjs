@@ -23,7 +23,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const POST_DIR = path.join(ROOT, 'sovereign-frontend/src/components/business/post');
+const POST_DIR = path.join(ROOT, 'sovereign-frontend/src/components/ecosystem/studio');
 const ELECTRON_DIR = path.join(ROOT, 'sovereign-frontend/electron');
 const MAIN = path.join(ELECTRON_DIR, 'main.js');
 
@@ -577,9 +577,87 @@ describe('วินัยของไฟล์ logic', () => {
     for (const f of fs.readdirSync(POST_DIR)) {
       if (!/\.tsx?$/.test(f)) continue;
       const src = fsReadFile(path.join(POST_DIR, f));
-      const rel = [...src.matchAll(/from\s+'(\.\.\/[^']+)'/g)].map((m) => m[1]);
-      const crossFeature = rel.filter((r) => !r.startsWith('../../../lib') && !r.startsWith('../../ui') && !r.startsWith('../../layout'));
+      // ไฟล์อยู่ใน components/ecosystem/studio ⇒ '../types' = กลุ่มเดียวกัน (ผ่าน)
+      // '../../x' = ข้ามกลุ่ม ⇒ อนุญาตเฉพาะ lib / ui / layout เท่านั้น
+      const rel = [...src.matchAll(/from\s+'(\.\.\/\.\.\/[^']+)'/g)].map((m) => m[1]);
+      const crossFeature = rel.filter((r) => !r.startsWith('../../lib') && !r.startsWith('../../ui') && !r.startsWith('../../layout'));
       assert.deepEqual(crossFeature, [], `${f}: ห้าม import ข้ามโฟลเดอร์ feature — เจอ ${crossFeature.join(', ')}`);
     }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── 10) Social Studio: โพสต์ข้อความ (Facebook) แยกจากลงคลิป ──────────────
+// ══════════════════════════════════════════════════════════════════════════
+const studio = await import(`${dir}/studio-model.ts`);
+
+describe('Social Studio — โพสต์ข้อความ Facebook', () => {
+  test('เพดานข้อความ Facebook ตรงกับที่แพลตฟอร์มใช้จริง', () => {
+    assert.equal(studio.TEXT_LIMITS.facebook, 63206);
+  });
+
+  test('accountsForPlatform ใช้ email ที่ผูกไว้ และตัดบัญชีที่เก็บถาวรออก', () => {
+    const accounts = [
+      { id: '1', platform: 'facebook', label: 'เพจร้าน', loginId: 'me@example.com', status: 'active' },
+      { id: '2', platform: 'facebook', label: 'บัญชีเก่า', loginId: 'old@example.com', status: 'archived' },
+      { id: '3', platform: 'youtube', label: 'ช่องหลัก', loginId: 'yt@example.com', status: 'active' },
+    ];
+    const fb = studio.accountsForPlatform(accounts, 'facebook');
+    assert.equal(fb.length, 1, 'ต้องเหลือเฉพาะบัญชีที่ยังใช้งาน');
+    assert.equal(fb[0].id, '1');
+    assert.equal(fb[0].display, 'me@example.com', 'ต้องแสดงอีเมลที่ผูกไว้');
+    assert.equal(studio.accountsForPlatform(accounts, 'youtube')[0].display, 'yt@example.com');
+  });
+
+  test('display ถอยไปใช้ชื่อบัญชีเมื่อยังไม่มีอีเมล (ไม่โชว์ช่องว่าง)', () => {
+    const [opt] = studio.accountsForPlatform(
+      [{ id: '9', platform: 'facebook', label: 'เพจใหม่', loginId: '   ', status: 'active' }],
+      'facebook',
+    );
+    assert.equal(opt.display, 'เพจใหม่');
+  });
+
+  test('buildTextPost ต่อลิงก์ท้ายข้อความ และไม่เติมบรรทัดเปล่าเมื่อไม่มีลิงก์', () => {
+    assert.equal(studio.buildTextPost('สวัสดีครับ', ''), 'สวัสดีครับ');
+    assert.equal(studio.buildTextPost('  สวัสดีครับ  ', '  '), 'สวัสดีครับ');
+    assert.equal(
+      studio.buildTextPost('สวัสดีครับ', 'https://example.com/x'),
+      'สวัสดีครับ\n\nhttps://example.com/x',
+    );
+    assert.equal(studio.buildTextPost('', 'https://example.com/x'), 'https://example.com/x');
+  });
+
+  test('textPostStatus นับอีโมจิเป็น 1 ตัว และบอกเมื่อยังไม่มีข้อความ', () => {
+    const st = studio.textPostStatus('สวัสดี 👋', '', 10);
+    assert.equal(st.len, 8, 'สวัสดี(6) + เว้นวรรค(1) + 👋(1) ต้องนับแบบ code point');
+    assert.equal(st.ok, true);
+    const empty = studio.textPostStatus('   ', '', 10);
+    assert.equal(empty.ok, false);
+    assert.equal(empty.missing, true);
+    const over = studio.textPostStatus('12345678901', '', 10);
+    assert.equal(over.ok, false);
+    assert.equal(over.over, 1);
+  });
+});
+
+describe('Social Studio — โครงหน้าและที่อยู่ใหม่', () => {
+  test('Ecosystem ใช้ Social Studio และธุรกิจไม่มีแท็บโพสต์แล้ว', () => {
+    const eco = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/pages/ecosystem.tsx'));
+    assert.match(eco, /SocialStudio/, 'Ecosystem ต้องมี Social Studio');
+    assert.match(eco, /components\/ecosystem\/studio\/SocialStudio/);
+
+    const shared = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/components/business/shared.tsx'));
+    assert.ok(!/'post'/.test(shared), 'แท็บ post ต้องถูกถอดออกจาก TABS ของธุรกิจ');
+
+    const ws = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/components/business/BusinessWorkspace.tsx'));
+    assert.ok(!/PostHub/.test(ws), 'BusinessWorkspace ต้องไม่เรนเดอร์ PostHub แล้ว');
+  });
+
+  test('สตูดิโอต้องแยก 2 งานชัดเจน: โพสต์ข้อความ กับ ลงคลิป', () => {
+    const src = fsReadFile(path.join(POST_DIR, 'SocialStudio.tsx'));
+    assert.match(src, /โพสต์ข้อความ/);
+    assert.match(src, /ลงคลิปวิดีโอ/);
+    assert.match(src, /TextStudio/);
+    assert.match(src, /ClipStudio/);
   });
 });

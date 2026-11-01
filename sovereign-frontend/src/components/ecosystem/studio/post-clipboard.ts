@@ -1,4 +1,4 @@
-// components/business/post/post-clipboard.ts
+// components/ecosystem/studio/post-clipboard.ts
 // ────────────────────────────────────────────────────────────────────────────
 // คัดลอกข้อความลงคลิปบอร์ดแบบ "ไม่ล้มหน้าจอ"
 //

@@ -786,6 +786,23 @@
 - [ ] **Pairing 6 หลัก** — ยังไม่ได้ทำ (ต้องพิมพ์รหัสบนเครื่อง 2 จริง)
 - [ ] push GitHub — **hold**
 
+## Social Studio ใน Ecosystem + ปิดบั๊ก runner เปิดซ้อน (02/11/69) — branch `ai/social-studio`
+
+- [x] **ย้ายงานโพสต์ออกจาก "ธุรกิจของฉัน" → Ecosystem → แท็บ "สตูดิโอโพสต์"**
+  - `components/business/post/*` → `components/ecosystem/studio/*` (อยู่กลุ่ม `ecosystem` เดียวกัน — ผ่าน import-layers)
+  - ลบแท็บ `📣 โพสต์` ออกจาก `TABS` ของธุรกิจ + ถอด `PostHub` เดิม
+  - แยก 2 งานชัดเจน: **โพสต์ข้อความ → Facebook** (`TextStudio`) กับ **ลงคลิป → YouTube/IG/TikTok/Facebook** (`ClipStudio`)
+  - บัญชีที่แสดง = `loginId` (อีเมล) จาก `user_ecosystem_accounts` — ไม่ต้องล็อกอินซ้ำ · การ์ดที่ยังไม่มีบัญชีเปิดฟอร์มเพิ่มพร้อมเลือก platform ให้
+  - Facebook ไม่มี API ให้แอปบุคคลทั่วไปโพสต์แทน → แอปเตรียม/คัดลอกข้อความ + เปิดหน้า Facebook และบอกผู้ใช้ตรง ๆ
+  - YouTube ยังอัปโหลดอัตโนมัติผ่าน OAuth เดิม (ค่าเริ่มต้น `private`)
+  - เทสต์: `social-post.test.mjs` **63/63** (เพิ่ม `studio-model` + โครงหน้า) · `youtube-bridge.test.mjs` อัปเดต path หลังย้ายโฟลเดอร์ · `tsc --noEmit` exit 0
+- [x] **ปิดบั๊ก runner เปิดซ้อน + tools test ค้าง** (`8be59bd`, `61f8b40`, `5b52f15`)
+  - single-instance lock ต่อเครื่อง + autostart ทางเดียว + long-poll ซ้อนได้
+  - `setup-node.mjs` ส่งต่อ `dockerWaitMs` (เทสต์ไม่นอน 10 นาที) + `buildRunnerEnv` เขียน `SINGLE_INSTANCE_PORT`
+  - `ecosystem.tsx` await `openExternal` + เทสต์ `sovereign:openUserLink`
+- [ ] **rebuild frontend** — ยังไม่ทำ: ต้องขออนุญาตก่อน (ทับ `.next` ที่ `:3000` ใช้อยู่) — Social Studio จะยังไม่ขึ้นจนกว่าจะ rebuild
+- [ ] เผยแพร่ runner update bundle + restart `sovereign-core-api` (หลัง verify ผ่าน)
+
 
 
 

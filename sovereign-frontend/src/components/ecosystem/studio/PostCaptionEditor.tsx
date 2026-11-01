@@ -1,5 +1,5 @@
 "use client";
-// components/business/post/PostCaptionEditor.tsx
+// components/ecosystem/studio/PostCaptionEditor.tsx
 // ส่วนที่ 2 ของแท็บ "📣 โพสต์" — คำอธิบาย + แฮชแท็ก + หน้าปลายทาง "แยกต่อแพลตฟอร์ม"
 //
 // ⚠ เหตุผลที่แยกต่อแพลตฟอร์ม (เจ้าของสั่งเอง 18/10/69):

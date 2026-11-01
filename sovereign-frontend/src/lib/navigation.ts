@@ -57,7 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: 'common.nav.ecosystem',
         icon: 'globe',
         keywords:
-          'ecosystem platform fiverr fastwork youtube gmail facebook linkedin เว็บไซต์ บัญชี รหัสผ่าน password ที่เก็บรหัส ลูกค้า คอมเมนต์',
+          'ecosystem platform fiverr fastwork youtube gmail facebook linkedin เว็บไซต์ บัญชี รหัสผ่าน password ที่เก็บรหัส ลูกค้า คอมเมนต์ สตูดิโอ studio โพสต์ ลงคลิป คลิป วิดีโอ tiktok instagram reels',
       },
     ],
   },

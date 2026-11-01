@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import AccountCard from '../components/ecosystem/AccountCard';
 import AccountForm from '../components/ecosystem/AccountForm';
+import SocialStudio from '../components/ecosystem/studio/SocialStudio';
 import {
   EMPTY_FORM,
   type AccountFormValues,
@@ -36,8 +37,10 @@ const EMPTY_SUMMARY: EcosystemSummary = {
 
 type ModalState =
   | { open: false }
-  | { open: true; mode: 'create' }
+  | { open: true; mode: 'create'; platform?: string }
   | { open: true; mode: 'edit'; account: EcosystemAccount };
+
+type PageTab = 'accounts' | 'studio';
 
 export default function EcosystemPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
@@ -63,6 +66,7 @@ export default function EcosystemPage() {
   const [onlyMissing, setOnlyMissing] = useState(false);
 
   const [modal, setModal] = useState<ModalState>({ open: false });
+  const [pageTab, setPageTab] = useState<PageTab>('accounts');
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [toast, setToast] = useState('');
 
@@ -338,7 +342,9 @@ export default function EcosystemPage() {
         status: modal.account.status,
         primaryAccountId: modal.account.primaryAccountId || '',
       }
-    : EMPTY_FORM;
+    : modal.open && modal.mode === 'create' && modal.platform
+      ? { ...EMPTY_FORM, platform: modal.platform }
+      : EMPTY_FORM;
 
   return (
     <div className="atmo-system flex min-h-screen bg-gray-950 text-gray-100">
@@ -376,137 +382,181 @@ export default function EcosystemPage() {
           }
         />
 
-        <main className="mx-auto w-full max-w-7xl flex-1 space-y-5 p-4 lg:p-6">
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="card p-4">
-              <p className="text-[11px] text-gray-500">{t('ecosystem.summary.total', 'บัญชีทั้งหมด')}</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-100">{summary.total}</p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                {t('ecosystem.summary.active', 'ใช้งานอยู่')} {summary.active}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-[11px] text-gray-500">{t('ecosystem.summary.platforms', 'platform ที่เชื่อมแล้ว')}</p>
-              <p className="mt-1 text-2xl font-semibold text-sky-300">{summary.platforms}</p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                {t('ecosystem.summary.withPassword', 'มีรหัสแล้ว')} {summary.withPassword}
-                {' · '}
-                {t('ecosystem.summary.linked', 'ผูก Gmail แล้ว')} {summary.linked}
-              </p>
-            </div>
+        <div className="mx-auto w-full max-w-7xl px-4 pt-4 lg:px-6">
+          <div
+            className="flex flex-wrap gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 p-1.5"
+            role="tablist"
+            aria-label="ส่วนของ Ecosystem"
+          >
             <button
               type="button"
-              className={'card p-4 text-left transition-colors ' + (onlyMissing ? 'border-amber-500/70' : '')}
-              onClick={() => setOnlyMissing((v) => !v)}
-              title={t('ecosystem.summary.missingHint', 'กดเพื่อดูเฉพาะบัญชีที่ยังไม่มีรหัส')}
+              role="tab"
+              aria-selected={pageTab === 'accounts'}
+              onClick={() => setPageTab('accounts')}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                pageTab === 'accounts'
+                  ? 'bg-emerald-500/15 font-medium text-emerald-200 ring-1 ring-emerald-500/40'
+                  : 'text-gray-400 hover:bg-slate-800 hover:text-gray-200'
+              }`}
             >
-              <p className="text-[11px] text-gray-500">{t('ecosystem.summary.missing', 'ยังไม่มีรหัสผ่าน')}</p>
-              <p className="mt-1 text-2xl font-semibold text-amber-300">{summary.missingPassword}</p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                {onlyMissing ? t('ecosystem.summary.filterOn', 'กำลังกรองอยู่ — กดอีกครั้งเพื่อดูทั้งหมด') : t('ecosystem.summary.missingHint', 'กดเพื่อดูเฉพาะบัญชีที่ยังไม่มีรหัส')}
-              </p>
+              🔐 บัญชีของฉัน
             </button>
-            <div className="card p-4">
-              <p className="text-[11px] text-gray-500">{t('ecosystem.summary.stale', 'รหัสเก่าเกิน 180 วัน')}</p>
-              <p className={'mt-1 text-2xl font-semibold ' + (summary.stalePasswords > 0 ? 'text-rose-300' : 'text-gray-100')}>
-                {summary.stalePasswords}
-              </p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                {t('ecosystem.summary.staleHint', 'ควรเปลี่ยนเพื่อความปลอดภัย')}
-              </p>
-            </div>
-          </section>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pageTab === 'studio'}
+              onClick={() => setPageTab('studio')}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm transition-colors ${
+                pageTab === 'studio'
+                  ? 'bg-cyan-500/15 font-medium text-cyan-200 ring-1 ring-cyan-500/40'
+                  : 'text-gray-400 hover:bg-slate-800 hover:text-gray-200'
+              }`}
+            >
+              🎬 สตูดิโอโพสต์
+            </button>
+          </div>
+        </div>
 
-          <section className="card flex flex-wrap items-center gap-3 p-3">
-            <div className="flex min-w-[220px] flex-1 items-center gap-2">
-              <Icon name="search" size={15} />
-              <input
-                className="input w-full"
-                value={query}
-                placeholder={t('ecosystem.search', 'ค้นชื่อบัญชี / อีเมล / platform')}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-            <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="all">{t('ecosystem.allCategories', 'ทุกหมวด')}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="all">{t('ecosystem.allStatuses', 'ทุกสถานะ')}</option>
-              <option value="active">{t('ecosystem.status.active', 'ใช้งาน')}</option>
-              <option value="paused">{t('ecosystem.status.paused', 'พักไว้')}</option>
-              <option value="archived">{t('ecosystem.status.archived', 'เก็บถาวร')}</option>
-            </select>
-            <span className="text-xs text-gray-500">
-              {t('ecosystem.showing', 'แสดง')} {filtered.length}/{accounts.length}
-            </span>
-          </section>
-
-          {error ? (
-            <div className="rounded-xl border border-red-800/70 bg-red-950/40 px-4 py-3 text-sm text-red-300">
-              {error}
-              <button type="button" className="ml-3 underline" onClick={load}>
-                {t('common.retry', 'ลองอีกครั้ง')}
-              </button>
-            </div>
-          ) : null}
-
-          {loading ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="card h-44 animate-pulse p-4" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="card flex flex-col items-center gap-3 px-6 py-14 text-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-950/50 text-emerald-300">
-                <Icon name="globe" size={26} />
-              </span>
-              <h2 className="text-base font-semibold text-gray-100">
-                {accounts.length === 0
-                  ? t('ecosystem.empty.title', 'ยังไม่มีบัญชีใน Ecosystem')
-                  : t('ecosystem.emptyFilter.title', 'ไม่พบบัญชีที่ตรงกับตัวกรอง')}
-              </h2>
-              <p className="max-w-md text-sm text-gray-500">
-                {accounts.length === 0
-                  ? t('ecosystem.empty.body', 'เริ่มจากเพิ่ม Fiverr, Fastwork, YouTube, Gmail, Facebook หรือ LinkedIn — แล้วกดปุ่ม “เปิดเว็บ” ได้ทันทีจากที่นี่')
-                  : t('ecosystem.emptyFilter.body', 'ลองล้างคำค้นหรือเปลี่ยนตัวกรอง')}
-              </p>
-              {accounts.length === 0 ? (
-                <button type="button" className="btn-primary mt-1" onClick={() => setModal({ open: true, mode: 'create' })}>
-                  <Icon name="plus" size={14} />
-                  {t('ecosystem.addFirst', 'เพิ่มบัญชีแรก')}
-                </button>
-              ) : null}
-            </div>
+        <main className="mx-auto w-full max-w-7xl flex-1 space-y-5 p-4 lg:p-6">
+          {pageTab === 'studio' ? (
+            <SocialStudio
+              accounts={accounts}
+              onAddAccount={(platform) => setModal({ open: true, mode: 'create', platform })}
+            />
           ) : (
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  platform={platformById.get(account.platform)}
-                  primaryLabel={primaryLabelOf(account)}
-                  revealed={revealed[account.id] || null}
-                  busy={busyId === account.id}
-                  onOpen={() => openSite(account)}
-                  onReveal={() => (account.hasPassword ? reveal(account) : setModal({ open: true, mode: 'edit', account }))}
-                  onCopy={() => copyPassword(account)}
-                  onEdit={() => setModal({ open: true, mode: 'edit', account })}
-                  onDelete={() => remove(account)}
-                />
-              ))}
-            </section>
-          )}
+            <>
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="card p-4">
+                  <p className="text-[11px] text-gray-500">{t('ecosystem.summary.total', 'บัญชีทั้งหมด')}</p>
+                  <p className="mt-1 text-2xl font-semibold text-gray-100">{summary.total}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    {t('ecosystem.summary.active', 'ใช้งานอยู่')} {summary.active}
+                  </p>
+                </div>
+                <div className="card p-4">
+                  <p className="text-[11px] text-gray-500">{t('ecosystem.summary.platforms', 'platform ที่เชื่อมแล้ว')}</p>
+                  <p className="mt-1 text-2xl font-semibold text-sky-300">{summary.platforms}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    {t('ecosystem.summary.withPassword', 'มีรหัสแล้ว')} {summary.withPassword}
+                    {' · '}
+                    {t('ecosystem.summary.linked', 'ผูก Gmail แล้ว')} {summary.linked}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={'card p-4 text-left transition-colors ' + (onlyMissing ? 'border-amber-500/70' : '')}
+                  onClick={() => setOnlyMissing((v) => !v)}
+                  title={t('ecosystem.summary.missingHint', 'กดเพื่อดูเฉพาะบัญชีที่ยังไม่มีรหัส')}
+                >
+                  <p className="text-[11px] text-gray-500">{t('ecosystem.summary.missing', 'ยังไม่มีรหัสผ่าน')}</p>
+                  <p className="mt-1 text-2xl font-semibold text-amber-300">{summary.missingPassword}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    {onlyMissing ? t('ecosystem.summary.filterOn', 'กำลังกรองอยู่ — กดอีกครั้งเพื่อดูทั้งหมด') : t('ecosystem.summary.missingHint', 'กดเพื่อดูเฉพาะบัญชีที่ยังไม่มีรหัส')}
+                  </p>
+                </button>
+                <div className="card p-4">
+                  <p className="text-[11px] text-gray-500">{t('ecosystem.summary.stale', 'รหัสเก่าเกิน 180 วัน')}</p>
+                  <p className={'mt-1 text-2xl font-semibold ' + (summary.stalePasswords > 0 ? 'text-rose-300' : 'text-gray-100')}>
+                    {summary.stalePasswords}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    {t('ecosystem.summary.staleHint', 'ควรเปลี่ยนเพื่อความปลอดภัย')}
+                  </p>
+                </div>
+              </section>
 
-          <p className="text-center text-[11px] text-gray-600">
-            {t(
-              'ecosystem.footer',
-              'รหัสผ่านถูกเข้ารหัส AES-256-GCM · แสดงได้ครั้งละ 30 วินาที · ทุกครั้งที่ขอดูถูกบันทึกใน Audit Log',
-            )}
-          </p>
+              <section className="card flex flex-wrap items-center gap-3 p-3">
+                <div className="flex min-w-[220px] flex-1 items-center gap-2">
+                  <Icon name="search" size={15} />
+                  <input
+                    className="input w-full"
+                    value={query}
+                    placeholder={t('ecosystem.search', 'ค้นชื่อบัญชี / อีเมล / platform')}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="all">{t('ecosystem.allCategories', 'ทุกหมวด')}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="all">{t('ecosystem.allStatuses', 'ทุกสถานะ')}</option>
+                  <option value="active">{t('ecosystem.status.active', 'ใช้งาน')}</option>
+                  <option value="paused">{t('ecosystem.status.paused', 'พักไว้')}</option>
+                  <option value="archived">{t('ecosystem.status.archived', 'เก็บถาวร')}</option>
+                </select>
+                <span className="text-xs text-gray-500">
+                  {t('ecosystem.showing', 'แสดง')} {filtered.length}/{accounts.length}
+                </span>
+              </section>
+
+              {error ? (
+                <div className="rounded-xl border border-red-800/70 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+                  {error}
+                  <button type="button" className="ml-3 underline" onClick={load}>
+                    {t('common.retry', 'ลองอีกครั้ง')}
+                  </button>
+                </div>
+              ) : null}
+
+              {loading ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="card h-44 animate-pulse p-4" />
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="card flex flex-col items-center gap-3 px-6 py-14 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-950/50 text-emerald-300">
+                    <Icon name="globe" size={26} />
+                  </span>
+                  <h2 className="text-base font-semibold text-gray-100">
+                    {accounts.length === 0
+                      ? t('ecosystem.empty.title', 'ยังไม่มีบัญชีใน Ecosystem')
+                      : t('ecosystem.emptyFilter.title', 'ไม่พบบัญชีที่ตรงกับตัวกรอง')}
+                  </h2>
+                  <p className="max-w-md text-sm text-gray-500">
+                    {accounts.length === 0
+                      ? t('ecosystem.empty.body', 'เริ่มจากเพิ่ม Fiverr, Fastwork, YouTube, Gmail, Facebook หรือ LinkedIn — แล้วกดปุ่ม “เปิดเว็บ” ได้ทันทีจากที่นี่')
+                      : t('ecosystem.emptyFilter.body', 'ลองล้างคำค้นหรือเปลี่ยนตัวกรอง')}
+                  </p>
+                  {accounts.length === 0 ? (
+                    <button type="button" className="btn-primary mt-1" onClick={() => setModal({ open: true, mode: 'create' })}>
+                      <Icon name="plus" size={14} />
+                      {t('ecosystem.addFirst', 'เพิ่มบัญชีแรก')}
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((account) => (
+                    <AccountCard
+                      key={account.id}
+                      account={account}
+                      platform={platformById.get(account.platform)}
+                      primaryLabel={primaryLabelOf(account)}
+                      revealed={revealed[account.id] || null}
+                      busy={busyId === account.id}
+                      onOpen={() => openSite(account)}
+                      onReveal={() => (account.hasPassword ? reveal(account) : setModal({ open: true, mode: 'edit', account }))}
+                      onCopy={() => copyPassword(account)}
+                      onEdit={() => setModal({ open: true, mode: 'edit', account })}
+                      onDelete={() => remove(account)}
+                    />
+                  ))}
+                </section>
+              )}
+
+              <p className="text-center text-[11px] text-gray-600">
+                {t(
+                  'ecosystem.footer',
+                  'รหัสผ่านถูกเข้ารหัส AES-256-GCM · แสดงได้ครั้งละ 30 วินาที · ทุกครั้งที่ขอดูถูกบันทึกใน Audit Log',
+                )}
+              </p>
+            </>
+          )}
         </main>
       </div>
 

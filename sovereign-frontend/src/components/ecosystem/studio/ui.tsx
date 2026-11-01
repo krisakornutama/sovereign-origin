@@ -1,5 +1,5 @@
 "use client";
-// components/business/post/ui.tsx
+// components/ecosystem/studio/ui.tsx
 // ชิ้นส่วน UI เล็ก ๆ ของแท็บ "📣 โพสต์"
 //
 // ⚠ ตั้งใจไม่ import จาก ../soverien/ui โดยเด็ดขาด

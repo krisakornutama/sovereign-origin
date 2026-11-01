@@ -1,4 +1,4 @@
-// components/business/post/bridge.ts
+// components/ecosystem/studio/bridge.ts
 // ────────────────────────────────────────────────────────────────────────────
 // สะพานจากหน้าเว็บไป Electron shell (เปิดลิงก์ · เลือกวิดีโอ · เปิดโฟลเดอร์)
 //
