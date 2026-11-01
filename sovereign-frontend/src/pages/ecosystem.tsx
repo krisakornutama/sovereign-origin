@@ -210,7 +210,7 @@ export default function EcosystemPage() {
         const res = await authFetch(`${API}/api/ecosystem/accounts/${account.id}/open`, { method: 'POST' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-        if (!openExternal(String(data.url || ''))) {
+        if (!(await openExternal(String(data.url || '')))) {
           throw new Error(t('ecosystem.badUrl', 'URL ไม่ถูกต้อง — ต้องเป็น http/https'));
         }
       } catch (err: any) {

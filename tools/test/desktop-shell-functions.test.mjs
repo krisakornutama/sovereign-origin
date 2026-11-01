@@ -348,11 +348,11 @@ describe('findStartBat — หา start-sovereign.bat', () => {
 //  6) IPC — ทุก handler ที่ลงทะเบียนไว้ต้องเรียกได้จริงและไม่ throw
 // ═════════════════════════════════════════════════════════════
 describe('IPC — ครบทุก handler ที่หน้าเว็บเรียกใช้', () => {
-  test('ลงทะเบียนครบ 15 ช่อง และชื่อตรงกับ preload.js', () => {
+  test('ลงทะเบียนครบทุกช่อง และชื่อตรงกับ preload.js', () => {
     const { handlers } = loadShell({});
     const expect = [
       'sovereign:pickFile', 'sovereign:readDir', 'sovereign:getStatus', 'sovereign:startSystem',
-      'sovereign:isAutoStarted', 'sovereign:openExternal', 'sovereign:retryDashboard',
+      'sovereign:isAutoStarted', 'sovereign:openExternal', 'sovereign:openUserLink', 'sovereign:retryDashboard',
       'sovereign:openWizard', 'sovereign:pickInstallDir', 'sovereign:checkEnv',
       'sovereign:getSetupDir', 'sovereign:beginSetup', 'sovereign:checkUpdates',
       'sovereign:downloadUpdate',
@@ -395,6 +395,27 @@ describe('IPC — ครบทุก handler ที่หน้าเว็บ�
       assert.equal(r.ok, false, `ห้ามเปิด ${u || '(ว่าง)'}`);
     }
     assert.equal(calls.openExternal.length, 2, 'ไม่มี URL แปลกปลอมหลุดออกไปเปิดจริง');
+  });
+
+  test('openUserLink — เปิดลิงก์ที่ผู้ใช้บันทึกเองได้ทุก host แต่ต้องเป็น http/https', async () => {
+    const { handlers, calls } = loadShell({});
+    const h = handlers.get('sovereign:openUserLink');
+    const allowed = [
+      'https://www.fiverr.com/inbox',
+      'https://www.fastwork.co/profile',
+      'https://example.com/path?q=1#x',
+      'http://localhost:3000/ecosystem',
+    ];
+    for (const u of allowed) {
+      const r = await h(null, u);
+      assert.equal(r.ok, true, `ต้องเปิดได้ ${u}`);
+    }
+    assert.equal(calls.openExternal.length, allowed.length, 'ต้องเปิดจริงทุกลิงก์ที่อนุญาต');
+    for (const u of ['javascript:alert(1)', 'file:///C:/Windows/System32/cmd.exe', 'data:text/html,x', '', '   ', 'not-a-url', 'ftp://example.com/x']) {
+      const r = await h(null, u);
+      assert.equal(r.ok, false, `ห้ามเปิด ${u || '(ว่าง)'}`);
+    }
+    assert.equal(calls.openExternal.length, allowed.length, 'ลิงก์อันตรายต้องไม่ถูกส่งไปเปิด');
   });
 
   test('getStatus / isAutoStarted / retryDashboard ตอบได้ไม่ throw', async () => {
