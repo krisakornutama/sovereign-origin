@@ -518,7 +518,8 @@ export async function runSetup(opts = {}) {
         //   docker info จะล้มทันทีที่ยังไม่ได้ start ⇒ ต้องเปิดและรอให้เสร็จเอง
         //   ไม่งั้นคนต้องเดาว่าไปกดเปิด Docker เอง (เคสจริง 12/10/69)
         if (r.ok && t.id === 'docker') {
-          const boot = await startDockerDesktop({ exec, log });
+          // ส่ง wait/poll/sleep ต่อ — กันเทสต์นอน 10 นาที
+          const boot = await startDockerDesktop({ exec, log, waitMs: opts.dockerWaitMs, pollMs: opts.dockerPollMs, sleep: opts.dockerSleep });
           step('เปิด Docker', boot.ok ? 'ok' : 'fail', boot.reason);
         }
         // ติดตั้งไม่สำเร็จ = หาสาเหตุจริงให้ ไม่ใช่ปล่อยให้คนเดา
