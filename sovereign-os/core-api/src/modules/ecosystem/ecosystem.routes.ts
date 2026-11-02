@@ -14,6 +14,8 @@
 // Express 4: async handler ที่ throw จะค้างไม่ตอบ ⇒ ทุก handler มี try/catch เอง
 import { Router, type Request, type Response } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
+import { rateLimit } from '../../middleware/rateLimit.middleware';
+import { AuditService } from '../../services/audit.service';
 import {
   EcosystemError,
   createAccount,
@@ -27,6 +29,29 @@ import {
 } from '../../services/ecosystem.service';
 
 const router = Router();
+
+// ── เพดานการขอดูรหัสผ่าน ────────────────────────────────────────────────────
+// reveal คือทางเดียวที่รหัสจะออกจาก DB · ถ้า session หลุด ผู้โจมตีไม่ควรไล่เก็บ
+// รหัสทุกบัญชีได้ในไม่กี่วินาที — จำกัดต่อ "ผู้ใช้" (ไม่ใช่ต่อ IP) เพราะหลายคน
+// อาจใช้เครื่องเดียวกัน/ผ่าน tunnel เดียวกัน
+// 10 ครั้ง/นาที = ใช้งานจริงสบาย ๆ แต่ไล่ดูทั้งคลังไม่ได้
+export const revealLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  backoff: true,
+  message: 'ขอดูรหัสผ่านถี่เกินไป — รอสักครู่แล้วลองใหม่',
+  keyBy: (req) => String(req.user?.id ?? ''),
+  onBlock: (_key, req) => {
+    const userId = String(req.user?.id ?? '');
+    if (!userId) return;
+    // fire-and-forget: AuditService กลืน error เอง ไม่ทำให้คำขอค้าง
+    void AuditService.logAction({
+      userId,
+      actionType: 'ECOSYSTEM_REVEAL_RATE_LIMITED',
+      payload: { ip: req.ip, path: req.path },
+    });
+  },
+});
 
 function fail(res: Response, err: unknown, where: string) {
   if (err instanceof EcosystemError) {
@@ -100,7 +125,7 @@ router.delete('/accounts/:id', authenticate, async (req: Request, res: Response)
 });
 
 // POST /api/ecosystem/accounts/:id/reveal
-router.post('/accounts/:id/reveal', authenticate, async (req: Request, res: Response) => {
+router.post('/accounts/:id/reveal', authenticate, revealLimiter, async (req: Request, res: Response) => {
   try {
     const password = await revealPassword(req.user!.id, String(req.params.id || ''));
     res.setHeader('Cache-Control', 'no-store');

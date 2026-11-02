@@ -48,6 +48,7 @@ let seq = 0;
 let svc: typeof import('../src/services/ecosystem.service');
 let server: http.Server;
 let baseUrl = '';
+let revealLimiter: { store: { clear: () => string[] } } | null = null;
 
 const OWNER = 'test-user';
 const OTHER = 'test-user-operator';
@@ -115,7 +116,8 @@ before(async () => {
 
   // import หลังตั้ง key/env เท่านั้น — field-crypto อ่าน path ของ key ตอน module load
   svc = await import('../src/services/ecosystem.service');
-  const { default: ecosystemRoutes } = await import('../src/modules/ecosystem/ecosystem.routes');
+  const { default: ecosystemRoutes, revealLimiter: limiter } = await import('../src/modules/ecosystem/ecosystem.routes');
+  revealLimiter = limiter;
   const express = (await import('express')).default;
 
   const app = express();
@@ -132,6 +134,8 @@ before(async () => {
 beforeEach(() => {
   rows = [];
   audits = [];
+  // limiter เป็น in-memory ต่อ process — เคลียร์ทุกเคสเพื่อไม่ให้ยอดสะสมข้ามเทสต์
+  revealLimiter?.store.clear();
 });
 
 after(async () => {
@@ -500,6 +504,27 @@ describe('ecosystem routes — สัญญา HTTP', () => {
     assert.equal(revealed.body.password, 'route-pw');
     assert.equal(revealed.headers.get('cache-control'), 'no-store');
     assert.ok(audits.some((a) => a.action_type === 'ECOSYSTEM_PASSWORD_REVEALED'));
+  });
+
+  test('reveal ถูกจำกัด 10 ครั้ง/นาที ต่อผู้ใช้ + บันทึก audit ตอนบล็อก', async () => {
+    const token = makeToken('SUPERADMIN');
+    const created = await api('POST', '/api/ecosystem/accounts', token, {
+      platform: 'facebook',
+      label: 'Facebook',
+      password: 'rate-limit-pw',
+    });
+    const id = created.body.account.id;
+
+    for (let i = 0; i < 10; i += 1) {
+      assert.equal((await api('POST', `/api/ecosystem/accounts/${id}/reveal`, token)).status, 200, `ครั้งที่ ${i + 1} ต้องผ่าน`);
+    }
+
+    const blocked = await api('POST', `/api/ecosystem/accounts/${id}/reveal`, token);
+    assert.equal(blocked.status, 429, 'ครั้งที่ 11 ภายในนาทีเดียวต้องถูกบล็อก');
+    assert.ok(Number(blocked.headers.get('retry-after')) >= 1, 'ต้องบอกให้รออีกกี่วินาที');
+    assert.match(String(blocked.body.error), /ถี่เกินไป/);
+    assert.ok(audits.some((a) => a.action_type === 'ECOSYSTEM_REVEAL_RATE_LIMITED'), 'ต้องมี audit ของการถูกบล็อก');
+    assert.equal(JSON.stringify(audits).includes('rate-limit-pw'), false, 'audit ห้ามเก็บรหัสผ่าน');
   });
 
   test('บัญชีของคนอื่นผ่าน HTTP = 404', async () => {
