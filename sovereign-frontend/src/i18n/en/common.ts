@@ -59,6 +59,7 @@ export const common = {
     system: 'System Health',
     systemHealth: 'System Truth',
     alertHistory: 'Alert Delivery Log',
+    consent: 'Consent & privacy',
     backup: 'Backup',
     users: 'Users',
     audit: 'Audit Log',

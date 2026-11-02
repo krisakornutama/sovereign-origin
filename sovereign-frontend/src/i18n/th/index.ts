@@ -45,9 +45,11 @@ import system from './pages/system';
 import start from './pages/start';
 import { treasury } from './pages/treasury';
 import users from './pages/users';
+import consent from './pages/consent';
 import vision from './pages/vision';
 
 export default {
+  consent,
   common,
   app,
   ai,

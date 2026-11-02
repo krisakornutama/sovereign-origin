@@ -61,6 +61,7 @@ export const common = {
     system: 'สุขภาพระบบ',
     systemHealth: 'ความจริงระบบ',
     alertHistory: 'ประวัติแจ้งเตือน',
+    consent: 'ความยินยอม/ข้อมูลส่วนบุคคล',
     backup: 'สำรองข้อมูล',
     users: 'ผู้ใช้',
     audit: 'บันทึกตรวจสอบ',
