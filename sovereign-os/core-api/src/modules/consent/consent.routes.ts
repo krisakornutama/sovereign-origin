@@ -4,8 +4,10 @@
 // ทุกเส้นผูกกับตัวผู้ใช้จาก token เท่านั้น — ห้ามรับ user_id จาก body/query
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
+import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { AuditService } from '../../services/audit.service';
 import { disconnectUserSockets } from '../../realtime/io-registry';
+import { privacyController, privacyPolicySections, PRIVACY_EFFECTIVE_DATE } from '../../content/privacy-policy';
 import {
   CONSENT_POLICY_VERSION,
   listConsents,
@@ -15,6 +17,40 @@ import {
 } from '../../services/consent.service';
 
 const router = Router();
+
+// บัญชีที่ถูกลบต้องไม่กลายเป็นช่องเดารหัสผ่าน: 5 ครั้ง / 15 นาที ต่อบัญชี
+// (bucket ผูกกับ user id หลัง authenticate — ไม่ใช่แค่ IP ซึ่งเปลี่ยนได้)
+const accountDeleteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'พยายามลบบัญชีหลายครั้งเกินไป กรุณาลองใหม่ภายหลัง',
+  keyBy: (req) => (req.user?.id ? `user:${req.user.id}` : ''),
+  onBlock: (_key, req) => {
+    if (!req.user?.id) return;
+    void AuditService.logAction({
+      userId: req.user.id,
+      actionType: 'ACCOUNT_DELETE_RATE_LIMITED',
+      payload: { ip: req.ip },
+    }).catch(() => undefined);
+  },
+});
+
+// GET /api/consent/policy — นโยบายความเป็นส่วนตัว (สาธารณะ: ต้องอ่านได้ก่อนสมัคร)
+// ไม่มีข้อมูลส่วนบุคคลในคำตอบ จึงแคชได้สั้น ๆ เพื่อลดภาระ
+router.get('/policy', async (_req, res) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({
+      version: CONSENT_POLICY_VERSION,
+      effectiveDate: PRIVACY_EFFECTIVE_DATE,
+      controller: privacyController(),
+      sections: privacyPolicySections(),
+    });
+  } catch (err) {
+    console.error('[consent:policy] failed:', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'อ่านนโยบายไม่สำเร็จ' });
+  }
+});
 
 // GET /api/consent — สถานะความยินยอมของฉัน + เวอร์ชันนโยบาย
 router.get('/', authenticate, async (req, res) => {
@@ -73,7 +109,7 @@ router.get('/history', authenticate, async (req, res) => {
 
 // DELETE /api/consent/account — สิทธิ์ถูกลืม: ทำให้บัญชีไม่ระบุตัวตนได้
 // ต้องยืนยันด้วยรหัสผ่าน + พิมพ์ DELETE (กันกดพลาด) และผู้ดูแลคนสุดท้ายลบไม่ได้
-router.delete('/account', authenticate, async (req, res) => {
+router.delete('/account', authenticate, accountDeleteLimiter, async (req, res) => {
   try {
     const result = await anonymizeAccount({
       userId: req.user!.id,

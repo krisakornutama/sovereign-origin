@@ -117,6 +117,11 @@ export default function ConsentPage() {
       <Sidebar />
       <main className="flex-1 p-6">
         <PageHeader title={t('consent.title')} subtitle={t('consent.subtitle')} />
+        <p className="mb-4 text-sm">
+          <a href="/privacy" className="text-sky-300 underline">
+            {t('privacy.title')}
+          </a>
+        </p>
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">

@@ -46,10 +46,12 @@ import start from './pages/start';
 import { treasury } from './pages/treasury';
 import users from './pages/users';
 import consent from './pages/consent';
+import privacy from './pages/privacy';
 import vision from './pages/vision';
 
 export default {
   consent,
+  privacy,
   common,
   app,
   ai,
