@@ -89,7 +89,7 @@
     เติม BOM ⇒ `JSON.parse` ล้ม = เครื่องลูกไม่เปิดโมดูลโดยไม่มีใครรู้สาเหตุ)
   - [x] `npm run verify` ที่ root — **ผ่าน 6/6 ขั้น (12.4 นาที) 25/10/69**
   - [x] merge เข้า `main` — **เสร็จแล้ว 25/10/69** (`242e2dd`)
-  - [ ] push ขึ้น GitHub — **เจ้าของสั่ง hold ไว้ก่อน 25/10/69** (`origin/main` ยังอยู่ที่ `0e00b79`)
+  - [x] push ขึ้น GitHub — **เสร็จแล้ว 03/11/69** (`3529d2e`)
   - [x] restart core-api — **ไม่ต้อง** (ยืนยันแล้ว 25/10/69: การผูกเจ้าของเกิดฝั่ง host
     ผ่าน `tsx` ไม่ได้ผ่าน container · host Prisma client รู้จัก `agent_machine_hubs`/
     `owner_user_id`/`lan_confirmed_at` แล้ว · ไม่มี route ใหม่ ⇒ ไม่มี migration)
@@ -584,7 +584,7 @@
 - [ ] **A-obs4 เปิดใช้จริง** — ต้อง **restart core-api** (รอ Cold Soak / อนุมัติเจ้าของ)
       `METRICS_TOKEN` + `TENANT_ID` + `ACCESS_LOG` อยู่ใน `sovereign-os/infra/.env` (เจ้าของแก้เอง)
       ขั้นตอน: ตั้ง token → `docker restart sovereign-core-api` → `curl -H "x-metrics-token: …" :3001/api/metrics` → ต้องได้ 200 / ไม่ส่ง token ต้องได้ 401
-- [ ] **A-obs5 push ขึ้น GitHub** — ยัง **hold** ตามคำสั่งเจ้าของ (`origin/main` = `0e00b79`, local main นำอยู่ 6 commits)
+- [x] **A-obs5 push ขึ้น GitHub** — **เสร็จแล้ว 03/11/69** (`3529d2e`)
 - [ ] **A-obs6 ตัวเก็บ log/metrics (ยังไม่ตัดสิน)** — Prometheus+Grafana ในเครื่อง หรือสรุป JSON log ด้วย `tools/` — ขึ้นกับสเปก RAM เครื่อง HUB
 - [ ] **A-obs7 ต่อยอดหลัง A-obs4** — DB latency ผ่าน Prisma middleware · queue depth (offline queue/agent/MQTT) · alert "error budget กำลังหมด" · span ระดับ OTel
 
@@ -744,8 +744,7 @@
         - smoke: static asset ที่ `/` อ้าง 12/12 = 200 · chunk `3pr0dgpzmk4ac.js` 200 + มี `x-idempotency-key` ·
           `/mbti/` `/dashboard/` `/business/` `/settings/` `/inventory/` = 200 · `/about` `/partners` ฯลฯ = 404 มาก่อนแล้วทั้ง 2 build
         - rollback: build เก่าอยู่ที่ `logs/next-backup-20261028_111819` (สลับกลับ + boot ~20 วิ)
-  - [ ] push ขึ้น GitHub — **hold** ตามคำสั่งเจ้าของ
-
+  - [x] push ขึ้น GitHub — **เสร็จแล้ว 03/11/69** (`3529d2e`)
 ## ประเภทธุรกิจ "ขายซอฟต์แวร์เป็นโปรเจ็ก" + แก้บั๊กคิวเอเจนต์ (30/10/69) — branch `ai/prompt-stdin-final-answer`
 
 - [x] **ประเภทธุรกิจใหม่ `SOFTWARE_PROJECT`** — เปลี่ยนยุทธศาสตร์ตามเจ้าของ: ขาย Source Code / Blueprint / License ให้นักพัฒนา/เอเจนซี
@@ -833,8 +832,7 @@
 - [x] rebuild frontend ให้แท็บ/ปุ่มใหม่ขึ้น `:3000` — **เสร็จ 03/11/69** (อนุญาตในคำสั่ง "ทำต่อจากเดิม พร้อมปรับปรุงโปรเจ็กให้ดีขึ้น")
       - build ใหม่ `N6KKs3a_3jLSOF-L-8lek` (BUILD_ID 23:52) · `next start` :3000 ตอบ 200 ทั้ง `/` และ `/ecosystem/`
       - chunk Social Studio ใหม่ถูกเสิร์ฟจริง `:3000/_next/static/chunks/1wumzn46bphb6.js` = 200 (ตรวจหาข้อความ badge th ใน chunk)
-- [ ] push GitHub — **hold**
-
+- [x] push GitHub — **เสร็จแล้ว 03/11/69** (`3529d2e`)
 - [x] stale-job reaper ฝั่ง HUB — **เสร็จ 03/11/69** (`496bbf9`)
   - `reapStaleJobs()` ใน `agent-machines.service.ts`: งาน `running` ที่ส่งไปเครื่องแล้ว + ค้างเกิน 45 นาที (runner timeout 30) + เครื่องไม่มี heartbeat เกิน 10 นาที → mark `error` พร้อมเหตุผล `reaper: … heartbeat ล่าสุด: …`
   - ต้องครบทั้งสองเงื่อนไข: งานยาวที่เครื่องยังออนไลน์ไม่ถูกตัด และงานที่รันใน process ของ HUB ไม่อยู่ในขอบเขต (ดูแลด้วย `processAgentQueue`) — มีการตรวจ `status !== "running"` ซ้ำในหน่วยความจำกัน mock/where หลุด
