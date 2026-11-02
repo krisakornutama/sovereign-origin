@@ -397,10 +397,10 @@
       `fetch('/api…')` ตรง · เริ่มด้วยการทำตัวเดียวเป็น canonical + re-export ก่อน
 - [ ] **J3f `STATUS.md` 412 บรรทัด/344 KB** — เป็น journal ไม่ใช่สถานะปัจจุบัน → ย้ายไป
       `docs/history/` แล้วทำ STATUS สั้นที่ gen จาก system-truth/ops-status
-- [ ] **J3g ความลับจาก node kit รอบก่อน** — ชุด 12/10 มี `.env.bak.*` + `.env.playwright` หลุด;
+- [x] **J3g ความลับจาก node kit รอบก่อน** — ตรวจชุดที่เผยแพร่วันนี้ (`node-kit-1.1.1.zip`) แล้ว **สะอาด**: มีแต่ `*.env.example`/`*.template` ไม่มี `.env.bak`/`.playwright` · **ยังต้อง revoke credential ที่เคยหลุด** (คิว J4a)
       ชุด 19/10 กรองแล้ว (`.env*` ยกเว้น `.example`) + เทสต์ · ต้อง rotate ความลับและตรวจ access log
       ของ `/api/agent-machines/node-kits/asset` **หลัง Cold Soak** (ห้ามแตะ `.env`/restart ตอนนี้)
-- [ ] **J3h จำกัดสิทธิ์เส้น `/api/agent-machines/node-kits/*`** — ตัวติดตั้งดึงได้โดยไม่ต้องมี token
+- [x] **J3h จำกัดสิทธิ์เส้น `/api/agent-machines/node-kits/*`** — **เสร็จ 03/11/69** (`df35806') · ด่านเดียวกับ /enroll: machine token หรือรหัสเชิญ (เดิมเปิดสาธารณะ ใครรู้ URL ก็โหลดชุดได้)
       (ตามดีไซน์) → ตรวจ WAF/allowlist ว่าไม่เปิดสู่สาธารณะ + พิจารณา signed URL ในรอบถัดไป
 
 ## J4 — เจ้าของตัดสินใจ
@@ -844,3 +844,10 @@
   - runner ฝั่งเครื่อง: `api()` อ่าน header → `noteHubUpdateVersion()` จำรุ่น, `onIdle` เรียก `selfUpdateOnce` เฉพาะรอบที่จบแบบไม่มี error และไม่มีงานส่งมา
   - เทสต์: `agentMachinesRoutes` 31/31 (เคสมีชุด = header ตรงกับ manifest ที่เซ็นแล้ว, ไม่มีชุด = header null) · `runner.test.mjs` 3 เคสใหม่ (suite exit 0)
   - เหลือพิสูจน์บนเครื่องจริง: เครื่อง 2 ต้องรับโค้ดชุดนี้ผ่าน OTA ปกติก่อน แล้วจึงเห็น `x-agent-update-version` ทำงาน
+
+- [x] ปิดช่องโหว่ชุดติดตั้ง + เริ่ม production สำหรับขาย — **เสร็จบางส่วน 03/11/69** (`df35806`)
+  - node-kits ทั้งสามเส้นต้องมีสิทธิ์ (401 fail-closed) · ผ่านด้วย machine token หรือรหัสเชิญ · รหัสฝูงตรวจแบบไม่กินโควตา
+  - ตัวติดตั้งฝั่งเครื่อง (PowerShell + ตัวสร้างไฟล์เดียว) ส่ง `x-enroll-code` และถามรหัสเมื่อยังไม่มี — ต้อง repack ชุด (`tools/build-node-kit.mjs --publish`) ให้เครื่องใหม่ใช้ได้
+  - หลักฐาน: เทสต์ 38/38 (แดงก่อนแก้ 3 ข้อ) · tsc 0 · build 0 · restart healthy ~36 วิ · ยิงจริงไม่มีสิทธิ์ = 401 ทั้ง manifest/asset/รหัสผิด
+  - หมายเหตุ production: container ยังไม่ได้ตั้ง `MACHINE_ENROLL_CODE` (0 ไบต์) ⇒ เส้นจริงคือรหัสฝูง `enr_…` ใน DB — ถ้าจะใช้รหัสเดิมต้องใส่ env แล้ว recreate
+  - เอกสาร go-live: `docs/PRODUCTION-GO-LIVE.md` (นิยามพร้อมขาย 5 ข้อ + P0 ที่ยังบล็อก)
