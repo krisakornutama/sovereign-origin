@@ -578,9 +578,11 @@ describe('วินัยของไฟล์ logic', () => {
       if (!/\.tsx?$/.test(f)) continue;
       const src = fsReadFile(path.join(POST_DIR, f));
       // ไฟล์อยู่ใน components/ecosystem/studio ⇒ '../types' = กลุ่มเดียวกัน (ผ่าน)
-      // '../../x' = ข้ามกลุ่ม ⇒ อนุญาตเฉพาะ lib / ui / layout เท่านั้น
-      const rel = [...src.matchAll(/from\s+'(\.\.\/\.\.\/[^']+)'/g)].map((m) => m[1]);
-      const crossFeature = rel.filter((r) => !r.startsWith('../../lib') && !r.startsWith('../../ui') && !r.startsWith('../../layout'));
+      // '..' ตั้งแต่ 2 ชั้นขึ้นไป = ข้ามกลุ่ม ⇒ อนุญาตเฉพาะ lib / ui / layout เท่านั้น
+      // (รองรับทั้ง '../../lib' และ '../../../lib' เพราะโฟลเดอร์ studio ลึกกว่า ecosystem หนึ่งชั้น)
+      const rel = [...src.matchAll(/from\s+'((?:\.\.\/){2,}[^']+)'/g)].map((m) => m[1]);
+      const allowed = /^(?:\.\.\/)+(?:lib|ui|layout)\//;
+      const crossFeature = rel.filter((r) => !allowed.test(r));
       assert.deepEqual(crossFeature, [], `${f}: ห้าม import ข้ามโฟลเดอร์ feature — เจอ ${crossFeature.join(', ')}`);
     }
   });

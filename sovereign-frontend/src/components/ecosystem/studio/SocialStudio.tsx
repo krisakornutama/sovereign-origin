@@ -14,10 +14,11 @@ import { useMemo, useState } from 'react';
 import Icon from '../../ui/Icon';
 import type { EcosystemAccount } from '../types';
 import ClipStudio from './ClipStudio';
+import PostHistory from './PostHistory';
 import TextStudio from './TextStudio';
 import { accountsForPlatform } from './studio-model';
 
-type StudioMode = 'text' | 'clip';
+type StudioMode = 'text' | 'clip' | 'history';
 
 const CLIP_PLATFORMS = ['youtube', 'facebook', 'instagram', 'tiktok'] as const;
 
@@ -40,7 +41,7 @@ export default function SocialStudio({ accounts, onAddAccount }: SocialStudioPro
 
   const modes: Array<{
     key: StudioMode;
-    icon: 'note' | 'play';
+    icon: 'note' | 'play' | 'history';
     title: string;
     sub: string;
     badge: string;
@@ -65,11 +66,20 @@ export default function SocialStudio({ accounts, onAddAccount }: SocialStudioPro
       accent: 'text-rose-300',
       ring: 'border-rose-500/60 bg-rose-500/10',
     },
+    {
+      key: 'history',
+      icon: 'history',
+      title: 'ประวัติการโพสต์',
+      sub: 'ติดตามว่าทำแพลตฟอร์มไหนแล้ว — กันโพสต์ซ้ำ',
+      badge: 'บันทึกในฐานข้อมูล',
+      accent: 'text-emerald-300',
+      ring: 'border-emerald-500/60 bg-emerald-500/10',
+    },
   ];
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-3 sm:grid-cols-2" aria-label="เลือกงานที่ต้องการ">
+      <section className="grid gap-3 sm:grid-cols-3" aria-label="เลือกงานที่ต้องการ">
         {modes.map((m) => {
           const active = mode === m.key;
           return (
@@ -114,11 +124,9 @@ export default function SocialStudio({ accounts, onAddAccount }: SocialStudioPro
         })}
       </section>
 
-      {mode === 'text' ? (
-        <TextStudio accounts={accounts} onAddAccount={onAddAccount} />
-      ) : (
-        <ClipStudio accounts={accounts} onAddAccount={onAddAccount} />
-      )}
+      {mode === 'text' && <TextStudio accounts={accounts} onAddAccount={onAddAccount} />}
+      {mode === 'clip' && <ClipStudio accounts={accounts} onAddAccount={onAddAccount} />}
+      {mode === 'history' && <PostHistory />}
     </div>
   );
 }

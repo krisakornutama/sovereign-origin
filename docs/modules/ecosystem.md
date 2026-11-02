@@ -10,6 +10,13 @@ Facebook · LinkedIn · GitHub · Stripe · เว็บไซต์ ฯลฯ) 
 
 - **ห้ามคืนรหัสผ่านใน list/สรุป** — ทางเดียวคือ `POST /api/ecosystem/accounts/:id/reveal`
   (และทุกครั้งต้องเขียน audit log)
+- **`reveal` ถูกจำกัด 10 ครั้ง/นาที ต่อผู้ใช้** (`revealLimiter` ใน `ecosystem.routes.ts`)
+  ครั้งที่ 11 = `429` + `Retry-After` + audit `ECOSYSTEM_REVEAL_RATE_LIMITED`
+  — session ที่หลุดต้องไล่เก็บรหัสทั้งคลังไม่ได้ในไม่กี่วินาที
+- **กุญแจ `field-crypto.key` ห้ามหาย**: ถ้าไฟล์หาย ระบบจะสร้างใหม่เงียบ ๆ และข้อมูล
+  `enc:v1:` เดิมจะอ่านไม่ได้ตลอดกาล → ตรวจด้วย `node tools/verify/crypto-key-check.mjs`
+  และสำรองแบบ explicit ด้วย `--backup` (ไฟล์สำเนาอยู่ `backups/keys/` ซึ่ง gitignore)
+  — ต้องย้ายสำเนาไปเก็บนอกเครื่องเอง
 - ห้ามเก็บ `password` เป็น plaintext หรือถอดรหัสแล้ว cache ไว้ในหน่วยความจำระยะยาว
 - ทุก query ต้องผูก `user_id` จาก token — ห้ามรับ `userId` จาก body/query
 - URL ที่จะเปิดต้องเป็น `http`/`https` เท่านั้น (กัน `javascript:` / `file:` / `data:`)
@@ -50,28 +57,57 @@ Ecosystem → แท็บ **สตูดิโอโพสต์** และแ
 - pure logic ที่เทสต์ Node เรียกตรง: `post-model.ts` · `post-validate.ts` ·
   `post-clipboard.ts` · `bridge.ts` · `studio-model.ts`
 
+### ประวัติการโพสต์ + สถานะต่อแพลตฟอร์ม (02/11/69)
+
+สตูดิโอเดิม "คัดลอกแล้วจบ" — ไม่มีอะไรจำว่าแพลตฟอร์มไหนโพสต์แล้ว ⇒ โพสต์ซ้ำ/ลืมปลายทาง
+จึงเพิ่มแท็บที่ 3 **ประวัติการโพสต์** และเก็บประวัติใน DB (ไม่ใช่ localStorage) เพื่อข้ามเครื่อง
+
+- ตาราง `social_posts` (เจ้าของ: ecosystem) — `kind` (`text` | `clip`), `title`, `body`,
+  `link`, `video_name`, `video_size` (เก็บเป็น string เพราะไฟล์อาจเกิน 2 GB)
+- ตาราง `social_post_targets` — หนึ่งแถวต่อแพลตฟอร์ม: `status` (`pending` | `posted` | `skipped`),
+  `external_url`, `external_id`, `posted_at`
+  - `ON DELETE CASCADE` จากโพสต์ · `account_id → user_ecosystem_accounts` เป็น `SET NULL`
+    (ลบบัญชี = ประวัติยังอยู่ แต่ไม่ผูกบัญชี)
+  - unique `(post_id, platform)` — กันปลายทางซ้ำ
+- API ใต้ `/api/ecosystem/social` (`social-history.routes.ts` + `social-history.service.ts`):
+  - `GET /posts?limit=` (สูงสุด 50) · `POST /posts` · `PATCH /posts/:id/targets/:platform` · `DELETE /posts/:id`
+  - ทุก query ผูก `user_id` — ของคนอื่น/id ผิดรูปแบบ = `404` (ไม่ใช่ `500`)
+  - `accountId` ต้องเป็นบัญชีของผู้ใช้เองและ platform ตรงกัน ไม่งั้น `400`
+  - `externalUrl` ต้องเป็น `http`/`https` เท่านั้น · audit ตอนสร้าง/ทำเครื่องหมายโพสต์แล้ว/ลบ
+  - ห้ามเก็บรหัสผ่านหรือ secret ใด ๆ ในประวัติ
+- UI: `TextStudio`/`ClipStudio` มีปุ่ม **“บันทึกงานนี้ลงประวัติ”** (ไม่บันทึกอัตโนมัติ —
+  ผู้ใช้ต้องกดเมื่อเตรียมงานเสร็จ) · `PostHistory.tsx` แสดงสถานะและปุ่ม “โพสต์แล้ว/ข้าม”
+- คำอธิบายของคลิปที่ต่างกันต่อแพลตฟอร์มจะถูกเก็บรวมพร้อมหัวข้อ `[YouTube]` ฯลฯ
+  เพื่อไม่ให้ประวัติโกหกว่าทุกแพลตฟอร์มใช้ข้อความเดียวกัน
+
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
 
 ### ตารางที่เป็นเจ้าของ
-`user_ecosystem_accounts`
+`social_post_targets` · `social_posts` · `user_ecosystem_accounts`
 
 ### Routes
-- `ecosystem/ecosystem.routes.ts`
+- `ecosystem/ecosystem.routes.ts` (149 บรรทัด)
+- `ecosystem/social-history.routes.ts` (80 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 GET /catalog
 GET /accounts
 POST /accounts
+POST /accounts/auto-link
 PATCH /accounts/:id
 DELETE /accounts/:id
 POST /accounts/:id/reveal
 POST /accounts/:id/open
+GET /posts
+POST /posts
+PATCH /posts/:id/targets/:platform
+DELETE /posts/:id
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้
-`ecosystem.service`
+`ecosystem.service` · `social-history.service`
 
 <!-- auto:end -->

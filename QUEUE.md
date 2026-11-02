@@ -803,6 +803,25 @@
 - [x] **rebuild frontend** — เจ้าของอนุมัติแล้ว · build `hIaUYWqzABWgRry505iMm` (03:37) · `next start` PID 3416 ตอบ 200 · chunk Social Studio ถูกเสิร์ฟจริง (`0vad7s8ns0482`)
 - [x] **เผยแพร่ runner update bundle + restart `sovereign-core-api`** — version `1cd408915f8d` (27 ไฟล์ · เซ็น `fleet-update-v1`) · container healthy · `/api/health` = 200
 
+## Ecosystem hardening + ประวัติการโพสต์ (02/11/69) — branch `ai/ecosystem-hardening`
+
+- [x] **P0: จำกัด `reveal` 10 ครั้ง/นาที ต่อผู้ใช้**
+  - `revealLimiter` ใน `ecosystem.routes.ts` (backoff + keyBy user) · ครั้งที่ 11 = `429` + `Retry-After`
+  - audit `ECOSYSTEM_REVEAL_RATE_LIMITED` (ไม่เก็บรหัสผ่าน) · เทสต์ `ecosystem.test.ts` **27/27**
+- [x] **P0: ด่านตรวจ/สำรองกุญแจ `field-crypto.key`**
+  - `tools/verify/crypto-key-check.mjs` (`--json` / `--backup` / `--to`) + เทสต์ **9/9**
+  - ตรวจจริง: key 32 ไบต์ · fingerprint `4dc0f1f5b948bf2d` · ข้อมูล `enc:v1:` 13 รายการ
+  - สำเนา `backups/keys/field-crypto-20261102-214219.key` (gitignored — ต้องย้ายไปเก็บนอกเครื่องเอง)
+- [x] **ประวัติการโพสต์ + สถานะต่อแพลตฟอร์ม (DB)**
+  - ตาราง `social_posts` / `social_post_targets` (เจ้าของ: ecosystem) + migration `20261102120000_add_social_posts`
+  - `social-history.service.ts` + `social-history.routes.ts` ใต้ `/api/ecosystem/social/posts` (GET/POST/PATCH target/DELETE)
+  - UI: แท็บที่ 3 “ประวัติการโพสต์” (`PostHistory.tsx`) + ปุ่ม “บันทึกงานนี้ลงประวัติ” ใน `TextStudio`/`ClipStudio`
+  - เทสต์ backend `social-history.test.ts` **15/15** · wiring `social-history-wiring.test.mjs` **7/7**
+  - `tools/module-owners.json` ประกาศ `social_posts`/`social_post_targets`/`social-history.service` → ecosystem
+- [ ] apply migration `20261102120000_add_social_posts` บน production (backup DB ก่อน) + restart `sovereign-core-api`
+- [ ] rebuild frontend ให้แท็บ/ปุ่มใหม่ขึ้น `:3000` (ต้องขออนุมัติ — ทับ `.next` ที่กำลังเสิร์ฟ)
+- [ ] push GitHub — **hold**
+
 
 
 
