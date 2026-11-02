@@ -39,6 +39,18 @@ docker restart sovereign-emqx        # MQTT
 
 ทั้งระบบพร้อมกันคำสั่งเดียว: **`start-sovereign.bat`** (ดับเบิลคลิกก็ได้)
 
+### deploy / migrate — ต้องผ่านด่าน backup
+
+```bash
+cd "E:\My work\Project Sovereign Origin"
+node tools/deploy-db.mjs --dry-run     # ดูแผน (ไม่แตะ DB/container)
+node tools/deploy-db.mjs --yes         # ทำจริง: build → migrate deploy → restart → poll /healthz
+```
+
+ด่านแรกคือ `tools/deploy-guard.mjs` — ไม่มีไฟล์ `.dump` / dump เก่ากว่า migration ล่าสุด / dump เก่าเกิน 24 ชม. = **exit 1 ก่อนแตะ DB หรือ container** พร้อมพิมพ์คำสั่งที่ต้องรัน (`tools\backup-db.ps1`)
+
+**ห้าม** รัน `prisma migrate deploy` หรือ `docker restart sovereign-core-api` มือเปล่าเมื่อจะ deploy — ข้ามด่านแล้วจะไม่มีใครรู้ว่า backup ล่าสุดเก่าแค่ไหน (เกิดจริง 03/11/69: migrate ก่อน backup แล้วรอดเพราะมี dump รายวัน)
+
 ### เว็บ :3000 ค้าง
 
 ```bash

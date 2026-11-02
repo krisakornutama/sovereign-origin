@@ -881,8 +881,12 @@
   - ตรวจหลังเติม: `/privacy` ต้องไม่ขึ้นป้ายเตือน และ `GET /api/consent/policy` ตอบ `controller` ครบทั้งสามฟิลด์
 - [ ] **Revoke bot token เก่า 2 ตัว (เจ้าของเท่านั้น)** — ต้องยืนยันก่อนว่าไม่มีบอทที่ยังทำงานอยู่ใช้ token นั้น ไม่งั้นบอทจะดับเงียบ
 - [ ] **WAF allowlist `/mbti/compare*` (เจ้าของเท่านั้น, Cloudflare console)** — ผู้ใช้จริงถูกบล็อกอยู่; ต้องแก้ที่ต้นทางไม่ใช่ปิด WAF
-- [ ] **บังคับ backup ก่อน deploy อัตโนมัติ** — ปัจจุบันเป็นวินัยมือ (ทำครบทุกครั้ง แต่ไม่มีอะไรกันลืม)
-  - เกณฑ์ผ่าน: `deploy`/`migrate` ที่ไม่มี dump ใหม่กว่าฐานข้อมูล = หยุดพร้อมข้อความบอกวิธีแก้ (ไม่ใช่แค่เตือน)
+- [x] **บังคับ backup ก่อน deploy อัตโนมัติ** — **เสร็จ 03/11/69** (`ai/deploy-guard`)
+  - `tools/deploy-guard.mjs`: `assessDeployBackup()` ตรวจ dump ล่าสุดเทียบ migration ล่าสุด + เพดานอายุ 24 ชม. · ไม่มี dump = `no_dump` · dump เก่ากว่า schema = `dump_older_than_migration` · เก่าเกิน = `dump_too_old` → **exit 1 พร้อมคำสั่ง `tools\backup-db.ps1`** (ไม่ใช่แค่เตือน)
+  - `tools/deploy-db.mjs`: ทาง deploy เดียว — ด่าน backup → `npm run build` → `prisma migrate deploy` → `docker restart sovereign-core-api` → poll `/healthz` 200 · ต้องมี `--yes` · `--dry-run` แสดงแผนโดยไม่แตะระบบ
+  - เทสต์ `tools/test/deploy-guard.test.mjs` **11/11** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND` exit 1) — รวมเคส CLI จริงและเคส "dump เก่า → ไม่มีคำว่า migrate สำเร็จใน output"
+  - รันจริงกับของจริง: `node tools/deploy-guard.mjs` → ผ่าน (dump 03/11 03:00 ใหม่กว่า migration `add_user_consents`) · `--dry-run` แสดงแผนครบ 4 ขั้น
+  - เอกสาร: `docs/ops-runbook.md` §deploy/migrate + `docs/ARCHITECTURE.md` (ทาง deploy เดียว) · ยังไม่ deploy จริง (Cold Soak)
 - [ ] **ทดสอบ re-consent เมื่อเวอร์ชันนโยบายเปลี่ยน** — bump `CONSENT_POLICY_VERSION` แล้วผู้ใช้เดิมต้องถูกขอความยินยอมใหม่เฉพาะวัตถุประสงค์ที่กระทบ และหลักฐานต้องอ้างเวอร์ชันใหม่
 
 ### P1 — ควรมีก่อนมีลูกค้ารายที่ 2
