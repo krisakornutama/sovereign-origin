@@ -13,6 +13,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 import type { EcosystemAccount } from '../types';
 import { postBridge } from './bridge';
 import { copyVia } from './post-clipboard';
@@ -43,6 +44,7 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'error' | 'warn' } | null>(null);
+  const t = useLanguageStore((s) => s.t);
 
   // โหลดร่างใน effect เท่านั้น — prerender ฝั่งเซิร์ฟเวอร์ไม่มี localStorage
   useEffect(() => {
@@ -112,7 +114,7 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
         link: link.trim() || undefined,
         targets: [{ platform: 'facebook', accountId: selected?.id || null }],
       });
-      setMsg({ text: 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”', kind: 'ok' });
+      setMsg({ text: t('ecosystem.textStudio.saved', 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”'), kind: 'ok' });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'บันทึกประวัติไม่สำเร็จ', kind: 'error' });
     } finally {
@@ -219,7 +221,7 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
               2) เปิด Facebook
             </button>
             <button type="button" className={BTN_GOOD} onClick={() => void saveHistory()} disabled={!body || saving}>
-              {saving ? 'กำลังบันทึก…' : '3) บันทึกงานนี้ลงประวัติ'}
+              {saving ? t('ecosystem.textStudio.saving', 'กำลังบันทึก…') : t('ecosystem.textStudio.saveHistory', '3) บันทึกงานนี้ลงประวัติ')}
             </button>
             <button type="button" className={BTN_GHOST} onClick={clear} disabled={!text && !link}>
               ล้างข้อความ

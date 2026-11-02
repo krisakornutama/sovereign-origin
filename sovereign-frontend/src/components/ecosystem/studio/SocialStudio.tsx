@@ -11,6 +11,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 import Icon from '../../ui/Icon';
 import type { EcosystemAccount } from '../types';
 import ClipStudio from './ClipStudio';
@@ -29,6 +30,7 @@ export interface SocialStudioProps {
 
 export default function SocialStudio({ accounts, onAddAccount }: SocialStudioProps) {
   const [mode, setMode] = useState<StudioMode>('text');
+  const t = useLanguageStore((s) => s.t);
 
   const fbCount = useMemo(() => accountsForPlatform(accounts, 'facebook').length, [accounts]);
   const clipCount = useMemo(() => {
@@ -51,27 +53,33 @@ export default function SocialStudio({ accounts, onAddAccount }: SocialStudioPro
     {
       key: 'text',
       icon: 'note',
-      title: 'โพสต์ข้อความ',
-      sub: 'เรื่องทั่วไป · โปรโมชัน · อัปเดตงาน → Facebook',
-      badge: fbCount > 0 ? `${fbCount} บัญชี Facebook` : 'ยังไม่มีบัญชี Facebook',
+      title: t('ecosystem.socialStudio.text', 'โพสต์ข้อความ'),
+      sub: t('ecosystem.socialStudio.subText', 'เรื่องทั่วไป · โปรโมชัน · อัปเดตงาน → Facebook'),
+      badge:
+        fbCount > 0
+          ? t('ecosystem.socialStudio.badgeFb', '{n} บัญชี Facebook', { n: fbCount })
+          : t('ecosystem.socialStudio.badgeFbNone', 'ยังไม่มีบัญชี Facebook'),
       accent: 'text-[#7ab5ff]',
       ring: 'border-[#1877f2]/60 bg-[#1877f2]/10',
     },
     {
       key: 'clip',
       icon: 'play',
-      title: 'ลงคลิปวิดีโอ',
-      sub: 'YouTube · Instagram · TikTok · Facebook',
-      badge: clipCount > 0 ? `${clipCount} บัญชีพร้อมใช้` : 'ยังไม่มีบัญชีโซเชียล',
+      title: t('ecosystem.socialStudio.clip', 'ลงคลิปวิดีโอ'),
+      sub: t('ecosystem.socialStudio.subClip', 'YouTube · Instagram · TikTok · Facebook'),
+      badge:
+        clipCount > 0
+          ? t('ecosystem.socialStudio.badgeClip', '{n} บัญชีพร้อมใช้', { n: clipCount })
+          : t('ecosystem.socialStudio.badgeClipNone', 'ยังไม่มีบัญชีโซเชียล'),
       accent: 'text-rose-300',
       ring: 'border-rose-500/60 bg-rose-500/10',
     },
     {
       key: 'history',
       icon: 'history',
-      title: 'ประวัติการโพสต์',
-      sub: 'ติดตามว่าทำแพลตฟอร์มไหนแล้ว — กันโพสต์ซ้ำ',
-      badge: 'บันทึกในฐานข้อมูล',
+      title: t('ecosystem.socialStudio.history', 'ประวัติการโพสต์'),
+      sub: t('ecosystem.socialStudio.historySub', 'ติดตามว่าทำแพลตฟอร์มไหนแล้ว — กันโพสต์ซ้ำ'),
+      badge: t('ecosystem.socialStudio.historyBadge', 'บันทึกในฐานข้อมูล'),
       accent: 'text-emerald-300',
       ring: 'border-emerald-500/60 bg-emerald-500/10',
     },

@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 import type { EcosystemAccount } from '../types';
 import PostCaptionEditor from './PostCaptionEditor';
 import PostComposer from './PostComposer';
@@ -42,6 +43,7 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
   const [saveErr, setSaveErr] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'error' | 'warn' } | null>(null);
+  const t = useLanguageStore((s) => s.t);
 
   // โหลดร่าง — ทำใน effect เท่านั้น เพราะ prerender ฝั่งเซิร์ฟเวอร์ไม่มี localStorage
   useEffect(() => {
@@ -126,7 +128,7 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
           accountId: accountsByPlatform[key]?.[0]?.id || null,
         })),
       });
-      setMsg({ text: 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”', kind: 'ok' });
+      setMsg({ text: t('ecosystem.clipStudio.saved', 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”'), kind: 'ok' });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'บันทึกประวัติไม่สำเร็จ', kind: 'error' });
     } finally {
@@ -154,7 +156,7 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
           </p>
         </div>
         <button type="button" className={BTN_GOOD} onClick={() => void saveHistory()} disabled={!canSave || saving}>
-          {saving ? 'กำลังบันทึก…' : 'บันทึกงานนี้ลงประวัติ'}
+          {saving ? t('ecosystem.clipStudio.saving', 'กำลังบันทึก…') : t('ecosystem.clipStudio.saveHistory', 'บันทึกงานนี้ลงประวัติ')}
         </button>
         <button type="button" className={BTN_GHOST} onClick={reset}>ล้างร่าง</button>
       </div>
