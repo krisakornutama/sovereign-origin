@@ -852,3 +852,9 @@
   - หลักฐาน: เทสต์ 38/38 (แดงก่อนแก้ 3 ข้อ) · tsc 0 · build 0 · restart healthy ~36 วิ · ยิงจริงไม่มีสิทธิ์ = 401 ทั้ง manifest/asset/รหัสผิด
   - หมายเหตุ production: container ยังไม่ได้ตั้ง `MACHINE_ENROLL_CODE` (0 ไบต์) ⇒ เส้นจริงคือรหัสฝูง `enr_…` ใน DB — ถ้าจะใช้รหัสเดิมต้องใส่ env แล้ว recreate
   - เอกสาร go-live: `docs/PRODUCTION-GO-LIVE.md` (นิยามพร้อมขาย 5 ข้อ + P0 ที่ยังบล็อก)
+
+- [x] PDPA consent + สิทธิ์ลบข้อมูล (backend) — **เสร็จ 03/11/69** (`93e6a85`)
+  - ตาราง `user_consents` + `consent_events` (append-only) + `users.deleted_at` · migration `20261103120000_add_user_consents`
+  - `GET/PUT /api/consent` · `GET /api/consent/history` · `DELETE /api/consent/account` (ต้องรหัสผ่าน + พิมพ์ DELETE, ผู้ดูแลคนสุดท้ายลบไม่ได้)
+  - วัตถุประสงค์จำเป็นปิดไม่ได้, ที่เหลือถอนได้; ลบบัญชี = anonymize ไม่ลบแถว (audit ยังตรวจย้อนหลังได้)
+  - เทสต์ `tests/consent.test.ts` 10/10 · tsc 0 · backup `sovereign_20261103_015249.dump` ก่อน migrate · health 200 · `/api/consent` = 401 เมื่อไม่ล็อกอิน
