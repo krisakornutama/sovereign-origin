@@ -60,6 +60,10 @@ export default {
     saved: 'Logged {category}',
     flagCreated: 'Repeated symptoms ≥ 3 times in 14 days — flag created: {flag}',
     saveFailed: 'Save failed',
+    consentRequired:
+      'Health-data consent has not been given — nothing is saved until you consent. Open the privacy centre (/consent) and enable “Health data”.',
+    consentVersionStale:
+      'The privacy policy changed — open the privacy centre (/consent) to confirm the new version before saving.',
     history: 'Recent symptom history',
     noHistory: 'No data yet — log your first symptom on the left',
   },

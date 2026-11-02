@@ -870,9 +870,13 @@
 ## สิ่งที่ควรทำต่อ — เรียงตามความเสี่ยง (บันทึก 03/11/69 หลังปิดรอบนโยบาย/PDPA)
 
 ### P0 — บล็อกการขายจริง (ทำก่อนเปิดให้คนนอกใช้)
-- [ ] **บังคับใช้ความยินยอมเป็นด่านจริงก่อนบันทึกข้อมูลอ่อนไหว** — ตอนนี้มีศูนย์ความยินยอมและหลักฐานแล้ว แต่ยังไม่มีจุดใด *บล็อก* การเขียนข้อมูลเมื่อยังไม่มีความยินยอม
-  - เริ่มที่ข้อมูลสุขภาพ: `health_consents` แยกจาก `user_consents` ⇒ ต้องรวมเป็นด่านเดียวหรือผูกกันให้ชัด
-  - เกณฑ์ผ่าน: เขียนข้อมูลอ่อนไหวโดยไม่มีความยินยอม = 403 พร้อมเหตุผล `consent_required` · ถอนความยินยอมแล้วเขียนใหม่ = 403 · มีเทสต์แดงก่อนแก้
+- [x] **บังคับใช้ความยินยอมเป็นด่านจริงก่อนบันทึกข้อมูลอ่อนไหว** — **เสร็จ 03/11/69** (`ai/consent-gate`)
+  - ด่านกลาง `services/consent-gate.service.ts` (`checkSensitiveConsent` / `requireConsent`) — ค่าเริ่มต้น = **ไม่ยินยอม** (ไม่มีแถว = 403 `consent_required`), นโยบายเวอร์ชันเก่า = 403 `consent_version_stale`, DB ล่ม = 503 fail-closed
+  - ใช้กับข้อมูลสุขภาพทุกเส้นเขียน: `POST /api/health/observations` · `POST /api/health/flags` · `PUT /api/health/profile` (อ่าน/ลบไม่กั้น — สิทธิ์เจ้าของข้อมูล)
+  - ผูก `health_consents` เข้ากับ `user_consents`: `PUT /api/health/consents {conversation}` เขียนทั้งสองตาราง · `GET` แสดงค่าจริงจาก PDPA (เดิมโชว์ ON จากค่า default ทั้งที่ยังไม่เคยยินยอม) · แถวเดิมเป็นรายผู้ใช้ (เดิมแถวส่วนกลางรั่วข้ามผู้ใช้)
+  - UI ไม่โกหกแล้ว: `health.tsx` + `health/self-check.tsx` ตรวจ `res.ok` ก่อนประกาศสำเร็จ และบอกทางไป `/consent` (เดิม 403 จะขึ้น "บันทึกแล้ว" ทั้งที่ไม่มีอะไรถูกเก็บ)
+  - เทสต์: `tests/consentGate.test.ts` **12/12** (แดงก่อนแก้: 201 แทน 403) · `tests/health.routes.test.ts` 15/15 · `tools/test/health-consent-ui.test.mjs` **5/5** (แดง exit 1 เมื่อ stash โค้ดหน้าเว็บ) · arch-gate ผ่าน (ประกาศเจ้าของตาราง `user_consents`/`consent_events` → consent)
+  - เอกสาร `docs/modules/health.md` ระบุกติกาด่านไว้แล้ว
 - [ ] **เติมข้อมูลผู้ควบคุมข้อมูล (เจ้าของเท่านั้น)** — `PRIVACY_CONTROLLER_NAME`, `PRIVACY_CONTACT_EMAIL`, `PRIVACY_CONTACT_ADDRESS`
   - ตรวจหลังเติม: `/privacy` ต้องไม่ขึ้นป้ายเตือน และ `GET /api/consent/policy` ตอบ `controller` ครบทั้งสามฟิลด์
 - [ ] **Revoke bot token เก่า 2 ตัว (เจ้าของเท่านั้น)** — ต้องยืนยันก่อนว่าไม่มีบอทที่ยังทำงานอยู่ใช้ token นั้น ไม่งั้นบอทจะดับเงียบ

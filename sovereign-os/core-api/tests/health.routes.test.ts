@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert';
 import healthRoutes from '../src/modules/health/health.routes';
 import { prisma } from '../src/lib/prisma';
+import { CONSENT_POLICY_VERSION } from '../src/services/consent.service';
 import { createTestServer, makeToken, TestServer } from './helpers';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -76,6 +77,16 @@ before(async () => {
 
   (prisma as any).healthConsent = {
     findMany: async () => [...consents.values()],
+    findFirst: async ({ where }: any = {}) => {
+      if (!where) return null;
+      return (
+        [...consents.values()].find(
+          (c) =>
+            c.category === where.category &&
+            (where.user_id ? c.user_id === where.user_id : c.user_id == null)
+        ) ?? null
+      );
+    },
     create: async ({ data }: any) => {
       const row = { id: nid(), created_at: new Date(), ...data };
       consents.set(row.id, row);
@@ -113,6 +124,44 @@ before(async () => {
       profile = { ...profile, ...data };
       return profile;
     },
+  };
+
+  // ── ความยินยอม PDPA (ด่านจริงของข้อมูลสุขภาพ) ──
+  // ชุดเทสต์นี้เป็นของเดิมที่ต้องเขียนข้อมูลได้ ⇒ seed ให้ยินยอมไว้ก่อน
+  const pdpaConsents = new Map<string, any>();
+  const seedHealthConsent = (granted: boolean) => {
+    pdpaConsents.set('health', {
+      id: 'consent-health',
+      user_id: 'test-user',
+      purpose: 'health',
+      granted,
+      policy_version: CONSENT_POLICY_VERSION,
+      granted_at: granted ? new Date() : null,
+      revoked_at: granted ? null : new Date(),
+    });
+  };
+  seedHealthConsent(true);
+  (globalThis as any).__seedHealthConsent = seedHealthConsent;
+
+  (prisma as any).userConsent = {
+    findMany: async ({ where }: any = {}) =>
+      [...pdpaConsents.values()].filter((row) => (where?.user_id ? row.user_id === where.user_id : true)),
+    findUnique: async ({ where }: any) => {
+      const key = where.user_id_purpose;
+      const row = pdpaConsents.get(key.purpose);
+      return row && row.user_id === key.user_id ? row : null;
+    },
+    upsert: async ({ where, create, update }: any) => {
+      const key = where.user_id_purpose;
+      const existing = pdpaConsents.get(key.purpose);
+      const row = existing ? { ...existing, ...update } : { id: nid(), ...create };
+      pdpaConsents.set(key.purpose, row);
+      return row;
+    },
+  };
+
+  (prisma as any).consentEvent = {
+    create: async ({ data }: any) => ({ id: nid(), created_at: new Date(), ...data }),
   };
 });
 
@@ -283,6 +332,17 @@ test('PUT /consents เปลี่ยน granted จริง + ข้ามค
   const conv = updated.find((c: any) => c.category === 'conversation');
   assert.equal(conv.granted, false, 'conversation ต้องถูกปิด');
   assert.equal(updated.filter((c: any) => c.category === 'telemetry').length, 0, 'granted ไม่ใช่ boolean → ข้าม');
+
+  // ปิด conversation = ถอนความยินยอม PDPA `health` (ด่านจริง) ⇒ คืนสิทธิ์ก่อนเทสต์ที่เหลือ
+  // (พฤติกรรมการกั้นถูกพิสูจน์ละเอียดใน tests/consentGate.test.ts)
+  const restore = await fetch(`${ts.baseUrl}/api/health/consents`, {
+    method: 'PUT',
+    headers: { ...H, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversation: true }),
+  });
+  assert.equal(restore.status, 200);
+  const restored = await restore.json();
+  assert.equal(restored.find((c: any) => c.category === 'conversation').granted, true);
 });
 
 // ─── Profile + contraindication ───

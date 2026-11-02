@@ -215,6 +215,18 @@ export default function HealthPage() {
     return ()=> window.removeEventListener('sovereign:voice-prefill', h as any);
   },[]);
 
+  // ด่านความยินยอม (PDPA): 403 จาก backend = ยังไม่ยินยอม → ต้องบอกทางแก้
+  // ห้ามประกาศ "บันทึกแล้ว" เมื่อเซิร์ฟเวอร์ปฏิเสธ (ผู้ใช้จะเข้าใจว่าข้อมูลถูกเก็บแล้ว)
+  const consentMessage = (data: any): string => {
+    if (data?.code === 'consent_version_stale') {
+      return t('health.observation.consentVersionStale', 'นโยบายความเป็นส่วนตัวเปลี่ยนแล้ว — ไปที่ศูนย์ความยินยอม (/consent) เพื่อยืนยันฉบับใหม่ก่อนบันทึก');
+    }
+    if (data?.code === 'consent_required' || data?.code === 'consent_legacy_revoked') {
+      return t('health.observation.consentRequired', 'ยังไม่ได้ให้ความยินยอมเรื่องข้อมูลสุขภาพ — ไปที่ศูนย์ความยินยอม (/consent) แล้วเปิด “ข้อมูลสุขภาพ”');
+    }
+    return '';
+  };
+
   const addObservation = async () => {
     setAdding(true);
     setFlash('');
@@ -224,7 +236,11 @@ export default function HealthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category, detail: detail.trim() || null, severity }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(consentMessage(data) || (data as any)?.error || t('health.observation.saveFailed', 'บันทึกไม่สำเร็จ'));
+        return;
+      }
       if (data.flag) setFlash(t('health.observation.flagCreated', 'พบอาการซ้ำ ≥ 3 ครั้งใน 14 วัน — สร้าง flag: {flag}', { flag: t('health.flagType.' + data.flag.flag_type, FLAG_TYPE_LABELS[data.flag.flag_type] || data.flag.flag_type) }));
       else setFlash(t('health.observation.saved', 'บันทึก {category} แล้ว', { category: t('health.category.' + category, CATEGORY_LABELS[category]) }));
       setDetail('');
@@ -243,22 +259,32 @@ export default function HealthPage() {
   };
 
   const toggleConsent = async (cat: string, granted: boolean) => {
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/consents`, {
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/consents`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [cat]: !granted }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({} as any));
+      setError(consentMessage(data) || (data as any)?.error || t('health.observation.saveFailed', 'บันทึกไม่สำเร็จ'));
+      return;
+    }
     await load();
   };
 
   const toggleProfileCode = async (kind: 'conditions' | 'medications', code: string) => {
     const list = profile[kind];
     const next = list.includes(code) ? list.filter((c) => c !== code) : [...list, code];
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/profile`, {
+    const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...profile, [kind]: next }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({} as any));
+      setError(consentMessage(data) || (data as any)?.error || t('health.observation.saveFailed', 'บันทึกไม่สำเร็จ'));
+      return;
+    }
     await load();
   };
 
