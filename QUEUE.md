@@ -791,7 +791,7 @@
       - gate `social-post.test.mjs`: อนุญาต import `stores/` (โฟลเดอร์กลางชั้นเดียวกับ lib/ui) + เพิ่มด่านคุมว่าคีย์ t() ต้องมีพรีฟิกซ์ `ecosystem.` — mutation พิสูจน์: ถอดพรีฟิกซ์ 1 จุด = **exit 1** กลับเขียว 64/64
       - ยืนยัน: `tsc --noEmit` exit 0 · `youtube-bridge.test.mjs` exit 0
 
-- [ ] push GitHub — **hold**
+- [x] push GitHub — **เสร็จแล้ว 03/11/69** (อนุญาตในคำสั่ง "push GitHub / stale-job reaper / พัฒนาต่อ")
 
 ## Social Studio ใน Ecosystem + ปิดบั๊ก runner เปิดซ้อน (02/11/69) — branch `ai/social-studio`
 
@@ -835,9 +835,14 @@
       - chunk Social Studio ใหม่ถูกเสิร์ฟจริง `:3000/_next/static/chunks/1wumzn46bphb6.js` = 200 (ตรวจหาข้อความ badge th ใน chunk)
 - [ ] push GitHub — **hold**
 
-
-
-
-
-
-
+- [x] stale-job reaper ฝั่ง HUB — **เสร็จ 03/11/69** (`496bbf9`)
+  - `reapStaleJobs()` ใน `agent-machines.service.ts`: งาน `running` ที่ส่งไปเครื่องแล้ว + ค้างเกิน 45 นาที (runner timeout 30) + เครื่องไม่มี heartbeat เกิน 10 นาที → mark `error` พร้อมเหตุผล `reaper: … heartbeat ล่าสุด: …`
+  - ต้องครบทั้งสองเงื่อนไข: งานยาวที่เครื่องยังออนไลน์ไม่ถูกตัด และงานที่รันใน process ของ HUB ไม่อยู่ในขอบเขต (ดูแลด้วย `processAgentQueue`) — มีการตรวจ `status !== "running"` ซ้ำในหน่วยความจำกัน mock/where หลุด
+  - cron ทุก 5 นาทีใน `workers/start.ts` + แจ้ง Telegram (severity warn, source `reaper`, eventKey กันแจ้งซ้ำ)
+  - เทสต์ `tests/agentMachines.test.ts` 6 เคสใหม่ (ทั้งชุด 27/27) รวมเคสเครื่องยัง heartbeat อยู่ และเคส `dispatched_at` ว่าง
+  - ตรวจ DB จริงตอนรัน: เก็บได้ 0 รายการ (ไม่มีงานค้างจริง ณ 03/11) — งาน `7f95a60b…` เป็น `error` ตั้งแต่ 29/10 ⇒ reaper ทำหน้าที่เป็นแผงกันล่วงหน้า
+- [x] สัญญาณอัปเดตผ่าน `jobs/pull` — **เสร็จ 03/11/69** (`496bbf9`)
+  - HUB แนบ header `x-agent-update-version: <manifest.version>` ทุกครั้งที่ `POST /jobs/pull` และมีชุดผ่าน trust — ถ้าไม่มีชุดผ่าน trust ต้องไม่แนบ (runner ไม่เดาเอง)
+  - runner ฝั่งเครื่อง: `api()` อ่าน header → `noteHubUpdateVersion()` จำรุ่น, `onIdle` เรียก `selfUpdateOnce` เฉพาะรอบที่จบแบบไม่มี error และไม่มีงานส่งมา
+  - เทสต์: `agentMachinesRoutes` 31/31 (เคสมีชุด = header ตรงกับ manifest ที่เซ็นแล้ว, ไม่มีชุด = header null) · `runner.test.mjs` 3 เคสใหม่ (suite exit 0)
+  - เหลือพิสูจน์บนเครื่องจริง: เครื่อง 2 ต้องรับโค้ดชุดนี้ผ่าน OTA ปกติก่อน แล้วจึงเห็น `x-agent-update-version` ทำงาน
