@@ -294,7 +294,7 @@ export async function pollOnce({ hub, runner, machineName, heartbeatSec = 30 }) 
 }
 
 /** สร้าง runner ที่ start/stop ได้ — ต้องเรียก start() ถึงจะวิ่ง */
-export function createRunner({ config = {}, hub, runner = {}, runOnce = null }) {
+export function createRunner({ config = {}, hub, runner = {}, runOnce = null, onIdle = null }) {
   let timer = null;
   let running = false;
   const once = runOnce || (() => pollOnce({ hub, runner, machineName: config.machineName, heartbeatSec: config.heartbeatSec }));
@@ -308,6 +308,16 @@ export function createRunner({ config = {}, hub, runner = {}, runOnce = null }) 
         const out = await once();
         if (out?.error) console.error(`[runner] ติดต่อ HUB ไม่ได้: ${out.error}`);
         if (!running) return;
+        // onIdle: รอบจบโดยไม่ได้รับงานและไม่ล้ม — จุดที่ "หยุดอัปเดตโค้ดตัวเอง" ได้ปลอดภัย
+        // (สัญญาณมาจาก HUB: x-agent-update-version ที่ jobs/pull แนบ — main.mjs อ่านแล้วตั้ง flag)
+        if (onIdle && !out?.error && Number(out?.dispatched ?? 0) === 0) {
+          try {
+            await onIdle();
+          } catch (err) {
+            console.error(`[runner] onIdle ล้มเหลว (ข้ามรอบนี้): ${err?.message || err}`);
+          }
+          if (!running) return;
+        }
         timer = setTimeout(loop, config.intervalMs ?? 15000);
       };
       await loop();

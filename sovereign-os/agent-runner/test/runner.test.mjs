@@ -454,3 +454,44 @@ test('runJob — หมดเวลาต้องเรียก killProcessTre
   assert.equal(killCalls.length, 1, 'หมดเวลาแล้วต้องฆ่า process tree หนึ่งครั้ง');
   assert.equal(killCalls[0].pid, 9001);
 });
+test('runner: จบรอบแบบไม่มีงานการ dispatch = เรียก onIdle (ที่ว่างเหมาะแก่การอัปเดต)', async () => {
+  const calls = [];
+  const r = createRunner({
+    config: { intervalMs: 1000 },
+    hub: { heartbeat: async () => ({}), pullJobs: async () => ({ jobs: [] }) },
+    runner: {},
+    runOnce: async () => ({ dispatched: 0, failed: 0 }),
+    onIdle: async () => calls.push('idle'),
+  });
+  await r.start();
+  r.stop();
+  assert.deepEqual(calls, ['idle'], 'ไม่มีงาน = จุดที่อัปเดตได้ปลอดภัย');
+});
+
+test('runner: รอบที่มีการส่งงานแล้ว (dispatched>0) = ไม่เรียก onIdle กันขีดข้างทำงานสำคัญ', async () => {
+  const calls = [];
+  const r = createRunner({
+    config: { intervalMs: 1000 },
+    hub: { heartbeat: async () => ({}), pullJobs: async () => ({ jobs: [{ id: 'j-1', executor: 'echo', prompt: 'หมายเหตุ' }] }) },
+    runner: {},
+    runOnce: async () => ({ dispatched: 2, failed: 0 }),
+    onIdle: async () => calls.push('idle'),
+  });
+  await r.start();
+  r.stop();
+  assert.deepEqual(calls, [], 'งานกำลังทำใหม่ ต้องไม่ขัดด้วยการอัปเดต');
+});
+
+test('runner: รอบที่ HUB ล้มจนรับงานไม่ได้ (error) = ไม่เรียก onIdle', async () => {
+  const calls = [];
+  const r = createRunner({
+    config: { intervalMs: 1000 },
+    hub: { heartbeat: async () => ({}), pullJobs: async () => { throw new Error('HUB down'); } },
+    runner: {},
+    runOnce: async () => ({ dispatched: 0, failed: 0, error: 'HUB down' }),
+    onIdle: async () => calls.push('idle'),
+  });
+  await r.start();
+  r.stop();
+  assert.deepEqual(calls, [], 'รอบล้มเหลว = อย่าอัปเดตในท่านี้');
+});

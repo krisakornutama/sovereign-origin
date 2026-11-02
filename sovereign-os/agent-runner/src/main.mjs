@@ -191,6 +191,19 @@ function startSelfUpdateLoop() {
   );
 }
 
+// สัญญาณอัปเดตผ่าน pull: HUB แนบเวอร์ชันชุดเผยแพร่ล่าสุดใน header ทุก response
+// (jobs/pull ดึงทุกภวังคา fleet) — runner เทียบว่า "ลงท้ายแล้วหรือยัง" แล้วจึงตัดสินใจอัปเดตตอนว่าง
+let lastSeenUpdateVersion = null; // รุ่นที่ทำงานจนสำเร็จ/up-to-date แล้ว
+let updateDue = false;
+function noteHubUpdateVersion(version) {
+  if (!version) return;
+  if (version !== lastSeenUpdateVersion) {
+    lastSeenUpdateVersion = version;
+    updateDue = true;
+    console.log(`[runner] HUB แจ้งชุดเผยแพร่รุ่น ${version} — จะอัปเดตเมื่อว่างจากงาน`);
+  }
+}
+
 async function api(path, body) {
   const res = await fetch(`${config.hubUrl}${path}`, {
     method: 'POST',
@@ -201,6 +214,7 @@ async function api(path, body) {
     const text = await res.text().catch(() => '');
     throw new Error(`${path} -> HTTP ${res.status} ${text.slice(0, 200)}`);
   }
+  noteHubUpdateVersion(res.headers.get('x-agent-update-version'));
   return await res.json();
 }
 
@@ -224,6 +238,32 @@ const runner = createRunner({
     machineName: config.machineName,
     opencodeBin: config.opencodeBin,
     captureScreenshot: config.captureScreenshot,
+  },
+  onIdle: async () => {
+    if (!updateDue) return;
+    updateDue = false;
+    if (!config.selfUpdate) return; // อัปเดตโค้ดตัวเอง=ปิด — รับรู้แต่ไม่ทำ
+    const target = lastSeenUpdateVersion;
+    try {
+      const out = await selfUpdateOnce({
+        hubUrl: config.hubUrl,
+        token: config.token,
+        dir: runnerRoot,
+        log: (m) => console.log(`[runner] ${m}`),
+      });
+      if (out.status === 'up-to-date') {
+        lastSeenUpdateVersion = target; // รอดูถึงรุ่นนี้แล้ว — ไม่ยอมให้กะพริบซ้ำทุก 15 วิ
+      } else if (out.status !== 'restarted') {
+        console.log(`[runner] อัปเดตตามสัญญาณ pull: ${out.status}`);
+      }
+      if (out.status === 'restarted') {
+        runner.stop();
+        control?.stop();
+        process.exit(HANDOFF_EXIT_CODE);
+      }
+    } catch (err) {
+      console.error(`[runner] อัปเดตตามสัญญาณ pull ล้ม (ไปต่อ รบรอบถัดไปจึงลองใหม่): ${err instanceof Error ? err.message : err}`);
+    }
   },
 });
 

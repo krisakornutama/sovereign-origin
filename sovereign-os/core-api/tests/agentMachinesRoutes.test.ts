@@ -7,6 +7,7 @@ import { mockModel, createTestServer, makeToken } from './helpers';
 import { prisma } from '../src/lib/prisma';
 import { hashToken } from '../src/services/agent-machines.service';
 import { __resetAlertPhoneCache } from '../src/services/orchestrator-alert-phone.service';
+import { readVerifiedUpdateManifest } from '../src/services/update-manifest-trust.service';
 
 const calls: { method: string; url: string; body?: any; token?: string }[] = [];
 
@@ -679,4 +680,28 @@ describe('agent-machines routes — เครื่องที่ปิดอ�
       await srv.close();
     }
   });
+});
+
+test('POST /jobs/pull แนบ header บอกรุ่นชุดเผยแพร่ล่าสุด (สัญญาณอัปเดตผ่าน pull)', async () => {
+  // กติกา: มีชุดผ่าน trust แนบ version ใน header เสมอ (runner เทียบรุ่นตัวเองเอง)
+  // เครื่องที่ยังไม่มีชุดที่ผ่าน trust = ไม่แนบ header (runner ไม่ต้องเดาเอง)
+  const router = loadRouter();
+  const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+  try {
+    const res = await fetch(`${srv.baseUrl}/api/agent-machines/jobs/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-machine-token': 'valid-token' },
+      body: JSON.stringify({ limit: 1 }),
+    });
+    assert.equal(res.status, 200);
+    const verified = readVerifiedUpdateManifest();
+    const headerVersion = res.headers.get('x-agent-update-version');
+    if (verified.ok) {
+      assert.equal(headerVersion, verified.manifest.version, 'header ต้องบอกรุ่นเดียวกับ manifest ที่เซ็นแล้ว');
+    } else {
+      assert.equal(headerVersion, null, 'ไม่มีชุดผ่าน trust = ต้องไม่แนบ header');
+    }
+  } finally {
+    await srv.close();
+  }
 });

@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mockModel } from './helpers';
 import {
+  reapStaleJobs,
   hashToken,
   generateToken,
   registerMachine,
@@ -330,4 +331,86 @@ describe('agent machines — dispatch', () => {
 import { prisma } from '../src/lib/prisma';
 function prismaRef() {
   return prisma;
-}
+}describe('agent machines — stale-job reaper', () => {
+  // ตัวจริงที่ผ่านมา: งานค้าง 29 วัน (7f95a60b) และงานทดสอบ (675af7cb) ค้างสถานะ running ตลอด
+  // เพราะ runner ตายกลางทาง/เครื่องปิด แล้วตัว cancel ปฏิเสธงานที่รันอยู่ (409) — pull คืนแค่ queued
+  // กติกาตามคิว: งาน running เกินเพดานเวลา + heartbeat ขาด = mark error
+  function staleJob(over: Record<string, any> = {}) {
+    const now = Date.now();
+    return {
+      id: 'job-1',
+      status: 'running',
+      machine_id: 'm-1',
+      executor: 'echo',
+      dispatched_at: new Date(now - 50 * 60 * 1000),
+      started_at: null,
+      completed_at: null,
+      machine:
+        over.machine === undefined
+          ? { id: 'm-1', name: 'คอมเครื่องที่ 2', last_heartbeat: new Date(now - 45 * 60 * 1000) }
+          : over.machine,
+      ...over,
+    };
+  }
+  function reaperMocks(rows: any[]) {
+    const updates: any[] = [];
+    mockModel(prismaRef() as any, 'agentJob', {
+      findMany: async () => rows,
+      update: async (args: any) => { updates.push(args); return args.data; },
+    });
+    return { updates: updates as any[] };
+  }
+
+  test('งาน running เกินเพดาน + heartbeat ขาด = mark error พร้อมเหตุผล', async () => {
+    const { updates } = reaperMocks([staleJob()]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 1);
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].where.id, 'job-1');
+    assert.equal(updates[0].data.status, 'error');
+    assert.match(String(updates[0].data.error), /reaper/);
+    assert.match(String(updates[0].data.error), /heartbeat/);
+    assert.ok(updates[0].data.completed_at instanceof Date);
+  });
+
+  test('heartbeat ยังสด = ไม่ตัด แม้งาน running นาน', async () => {
+    const fresh = staleJob({
+      machine: { id: 'm-1', name: 'คอมเครื่องที่ 2', last_heartbeat: new Date(Date.now() - 30 * 1000) },
+    });
+    const { updates } = reaperMocks([fresh]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 0, 'เครื่องยังออนไลน์ — job อาจใช้เวลานานตามจริง ยังไม่ควรตัด');
+    assert.equal(updates.length, 0);
+  });
+
+  test('TIMEOUT ยังใหม่ (ยังไม่ถึงเพดาน) = ไม่ตัด แม้ heartbeat ขาด', async () => {
+    const early = staleJob({ dispatched_at: new Date(Date.now() - 5 * 60 * 1000) });
+    const { updates } = reaperMocks([early]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 0, 'เพดานยังไม่ครบ — ปล่อยให้ timeout ฝั่ง runner เป็นผู้ฆ่าก่อน');
+    assert.equal(updates.length, 0);
+  });
+
+  test('เครื่องถูกลบไปแล้ว (machine = null) = ตัดด้วย', async () => {
+    const orphan = staleJob({ machine: null });
+    const { updates } = reaperMocks([orphan]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 1);
+    assert.equal(updates[0].data.status, 'error');
+  });
+
+  test('dispatched_at เป็น null แต่ started_at เก่า = ใช้ started_at ทำ marker', async () => {
+    const legacy = staleJob({ dispatched_at: null, started_at: new Date(Date.now() - 60 * 60 * 1000) });
+    const { updates } = reaperMocks([legacy]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 1);
+  });
+
+  test('งานที่จบแล้ว (status: done) = ไม่ตัด', async () => {
+    const done = staleJob({ status: 'done' });
+    const { updates } = reaperMocks([done]);
+    const out = await reapStaleJobs();
+    assert.equal(out.reaped, 0);
+    assert.equal(updates.length, 0);
+  });
+});

@@ -771,6 +771,12 @@ router.post('/jobs/pull', async (req: Request, res: Response) => {
     if (!machine) return;
     const limit = Number(req.body?.limit ?? 3) || 3;
     const jobs = await pullJobs(machine, limit);
+    // สัญญาณอัปเดตผ่าน pull (03/11/69 — แทนการรอรอบ self-update 6 ชม./รีบูต):
+    // แนบเวอร์ชันชุดเผยแพร่ล่าสุดถ้ามี — runner เทียบกับรุ่นตัวเองเอง แล้วอัปเดตเมื่อว่างจากงาน
+    const verified = readVerifiedUpdateManifest();
+    if (verified.ok && verified.manifest?.version) {
+      res.set('x-agent-update-version', verified.manifest.version);
+    }
     res.json({ machine: { id: machine.id, name: machine.name }, jobs });
   } catch (err) {
     console.error('POST /api/agent-machines/jobs/pull error:', err instanceof Error ? err.message : err);

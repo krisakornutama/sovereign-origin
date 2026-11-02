@@ -355,3 +355,95 @@ export async function clearScreenshotUrls(urls: string[]): Promise<number> {
   });
   return (res as any)?.count ?? 0;
 }
+// ────────────────────────────────────────────────────────────────────────────
+//  stale-job reaper (เพิ่ม 03/11/69 — ตามงานในคิว "ต้องเติม reaper ฝั่ง HUB")
+//
+//  ปัญหาจากของจริง: งานที่ runner ตายกลางทาง (kill / รีบูต / เครื่องถูกปิด) ค้างสถานะ
+//  "running" ตลอดไป — cancel API ปฏิเสธงานที่รันอยู่ (409) และ jobs/pull คืนแค่ queued
+//  กรณีจริงเก่า: งาน 7f95a60b ค้างนาน 29 วันโดยไม่มีใครปิดมันได้
+//
+//  กติกา (สองเงื่อนไขพร้อมกัน — กันตัดงานยาวที่ยังทำงานจริงอยู่):
+//    1) running เกินเพดานเวลา (ค่าเริ่มต้น 45 นาที > runner timeout 30 นาที)
+//    2) เครื่องไม่ส่ง heartbeat แล้ว (ค่าเริ่มต้น 10 นาที > ที่ runner คุมได้ปกติ < 60 วิ)
+//  งานที่เครื่องยัง heartbeat อยู่ = ไม่แตะ (ให้ timeout ฝั่ง runner เป็นผู้จบเอง)
+//
+//  เรียกจาก workers/start.ts ทุก 5 นาที + ส่ง Telegram แจ้งเมื่อเก็บได้จริง
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface ReapStaleJobsOptions {
+  /** เพดานเวลางาน running ก่อนถือว่าค้าง (ms) — ค่าเริ่มต้น 45 นาที */
+  maxRunningMs?: number;
+  /** ไม่มี heartbeat กี่ ms ถือว่าเครื่องหาย — ค่าเริ่มต้น 10 นาที */
+  staleHeartbeatMs?: number;
+  /** จุดอ่าน "ตอนนี้" — อินเจคได้เพื่อเทสต์ */
+  now?: Date;
+}
+
+export interface ReapedJob {
+  id: string;
+  executor: string | null;
+  machineId: string | null;
+  machineName: string | null;
+  /** งานค้างมากี่นาที */
+  waitMinutes: number;
+  /** heartbeat ล่าสุดของเครื่อง (null = เครื่องถูกลบ หรือไม่เคย heartbeat) */
+  lastHeartbeatAt: Date | null;
+}
+
+export interface ReaperResult {
+  reaped: number;
+  jobs: ReapedJob[];
+}
+
+export async function reapStaleJobs(opts: ReapStaleJobsOptions = {}): Promise<ReaperResult> {
+  const now = opts.now ?? new Date();
+  const maxRunningMs = opts.maxRunningMs ?? 45 * 60_000;
+  const staleHeartbeatMs = opts.staleHeartbeatMs ?? 10 * 60_000;
+  const runningCutoff = new Date(now.getTime() - maxRunningMs);
+  const heartbeatCutoff = new Date(now.getTime() - staleHeartbeatMs);
+
+  // เลือกงาน running ที่ถูกส่งไปเครื่องระยะไกล (machine_id ไม่เป็น null)
+  // งานที่รันใน process ของ HUB อยู่ในความดูแลของ processAgentQueue แล้ว
+  const rows = (await prisma.agentJob.findMany({
+    where: { status: 'running', machine_id: { not: null } },
+    include: { machine: { select: { id: true, name: true, last_heartbeat: true } } },
+  })) as any[];
+
+  const reaped: ReapedJob[] = [];
+  for (const job of rows) {
+    // ตรวจสถานะอีกชั้นในหน่วยความจำ — ทนกรณีที่ส่วนเชื่อมฐานข้อมูลไม่กรอง where ให้
+    if (job.status !== 'running') continue;
+    // งานรุ่นเก่าอาจไม่มี dispatched_at — ใช้ started_at แทน
+    const since: Date | null = job.dispatched_at ?? job.started_at ?? null;
+    if (!since || since >= runningCutoff) continue; // เพดานยังไม่ครบ
+
+    const machine = job.machine ?? null;
+    const hb: Date | null = machine?.last_heartbeat ?? null;
+    const hbStale = !hb || hb < heartbeatCutoff;
+    if (!hbStale) continue; // เครื่องยังออนไลน์ — งานอาจใช้เวลานานตามจริง อย่าตัด
+
+    const waitMinutes = Math.max(1, Math.round((now.getTime() - since.getTime()) / 60_000));
+    const machineName = machine?.name ?? job.machine_id ?? '(ไม่พบเครื่อง)';
+    const hbText = hb ? hb.toISOString() : 'ไม่มีข้อมูล';
+    await prisma.agentJob.update({
+      where: { id: job.id },
+      data: {
+        status: 'error',
+        error:
+          'reaper: งานค้าง ' + waitMinutes + ' นาที โดยไม่มี heartbeat จากเครื่อง "' +
+          machineName + '" (heartbeat ล่าสุด: ' + hbText + ')',
+        completed_at: now,
+      },
+    });
+    reaped.push({
+      id: job.id,
+      executor: job.executor ?? null,
+      machineId: machine?.id ?? job.machine_id ?? null,
+      machineName: machine?.name ?? null,
+      waitMinutes,
+      lastHeartbeatAt: hb,
+    });
+  }
+
+  return { reaped: reaped.length, jobs: reaped };
+}
