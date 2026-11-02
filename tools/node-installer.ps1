@@ -167,12 +167,18 @@ if (-not $HubUrl) {
 $HubUrl = $HubUrl.TrimEnd('/')
 if ($HubUrl -notmatch '^https?://') { Die "ที่อยู่ HUB ไม่ถูกต้อง: $HubUrl" }
 
+if (-not $Code) {
+  $Code = Read-Host 'รหัสเชิญสำหรับติดตั้งเครื่องใหม่ (ขอจากหน้าเครื่องที่ HUB)'
+}
+$headers = @{}
+if ($Code) { $headers['x-enroll-code'] = $Code }
+
 Say "  HUB : $HubUrl"
 Say "  จะติดตั้งไว้ที่: $Dest"
 $api = "$HubUrl/api/agent-machines/node-kits"
 
 try {
-  $manifest = Invoke-RestMethod -Uri "$api/manifest/" -TimeoutSec 20
+  $manifest = Invoke-RestMethod -Uri "$api/manifest/" -TimeoutSec 20 -Headers $headers
 } catch {
   Die "ติดต่อ HUB ไม่ได้ ($api/manifest/) - ตรวจว่าเครื่อง HUB เปิดอยู่และอยู่เครือข่ายเดียวกัน"
 }
@@ -191,7 +197,7 @@ if ($DryRun) {
 $zip = Join-Path $env:TEMP ("node-kit-{0}.zip" -f $manifest.asset.sha256.Substring(0, 12))
 Say ("  ... กำลังดาวน์โหลด ({0} MB) ..." -f $sizeMb)
 try {
-  Invoke-WebRequest -Uri "$HubUrl$($manifest.assetUrl)/" -OutFile $zip -TimeoutSec 900 -UseBasicParsing
+  Invoke-WebRequest -Uri "$HubUrl$($manifest.assetUrl)/" -Headers $headers -OutFile $zip -TimeoutSec 900 -UseBasicParsing
 } catch {
   Die "ดาวน์โหลดไม่สำเร็จ: $($_.Exception.Message)"
 }

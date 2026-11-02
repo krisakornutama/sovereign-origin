@@ -505,6 +505,41 @@ export async function releaseEnrollTokenUse(tokenId: string, root?: string): Pro
  * ใช้รหัสเชิญหนึ่งครั้ง — atomic ภายในโปรเซส
  * คืน reason แบบไม่เปิดเผยข้อมูลอื่น (ผู้เรียกที่มีรหัสผิดเห็นแค่ invalid)
  */
+/**
+ * ตรวจว่ารหัสเชิญ "ยังใช้ได้" โดยไม่กินโควตา
+ *
+ * ใช้กับทางที่ไม่ได้ลงทะเบียนเครื่อง (เช่น ดาวน์โหลดชุดติดตั้งเครื่องใหม่)
+ * ถ้าใช้ consumeEnrollToken รหัสจะถูกเผาไปหนึ่งครั้งทุกครั้งที่กดดาวน์โหลด
+ */
+export async function verifyEnrollToken(
+  rawToken: string,
+  root?: string,
+): Promise<
+  | { ok: true; tokenId: string; label: string }
+  | { ok: false; reason: EnrollTokenConsumeReason }
+> {
+  if (!isEnrollTokenFormat(rawToken)) return { ok: false, reason: 'invalid' };
+  const hash = hashToken(rawToken);
+  const now = Date.now();
+
+  if (root) {
+    const store = readEnrollTokenStore(root);
+    const record = store.tokens.find((row) => safeHashEqual(row.tokenHash, hash));
+    if (!record) return { ok: false, reason: 'invalid' };
+    if (record.revokedAt) return { ok: false, reason: 'revoked' };
+    if (isExpired(record, now)) return { ok: false, reason: 'expired' };
+    if (record.usedCount >= record.maxUses) return { ok: false, reason: 'exhausted' };
+    return { ok: true, tokenId: record.id, label: record.label };
+  }
+
+  const row = await prisma.fleetEnrollmentToken.findUnique({ where: { token_hash: hash } });
+  if (!row) return { ok: false, reason: 'invalid' };
+  if (row.revoked_at) return { ok: false, reason: 'revoked' };
+  if (row.expires_at && row.expires_at.getTime() <= now) return { ok: false, reason: 'expired' };
+  if (row.used_count >= row.max_uses) return { ok: false, reason: 'exhausted' };
+  return { ok: true, tokenId: row.id, label: row.label };
+}
+
 export async function consumeEnrollToken(
   rawToken: string,
   machine: { id?: string | null; name?: string | null },
