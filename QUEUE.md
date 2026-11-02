@@ -848,7 +848,7 @@
 - [x] ปิดช่องโหว่ชุดติดตั้ง + เริ่ม production สำหรับขาย — **เสร็จบางส่วน 03/11/69** (`df35806`)
   - พบบั๊กตอน repack: กติกาตัด Ollama ดูแค่โฟลเดอร์ `Ollama` ⇒ `sovereign-os/edge-ai/{models,runtime}` หลุดเข้าชุด (แชร์ 1.3 GB จาก 36 MB) — แก้ที่ `tools/build-node-kit.mjs` (`f69e721`) · dry-run เหลือ 2,181 ไฟล์ / 61.4 MB
   - node-kits ทั้งสามเส้นต้องมีสิทธิ์ (401 fail-closed) · ผ่านด้วย machine token หรือรหัสเชิญ · รหัสฝูงตรวจแบบไม่กินโควตา
-  - ตัวติดตั้งฝั่งเครื่อง (PowerShell + ตัวสร้างไฟล์เดียว) ส่ง `x-enroll-code` และถามรหัสเมื่อยังไม่มี — ต้อง repack ชุด (`tools/build-node-kit.mjs --publish`) ให้เครื่องใหม่ใช้ได้
+    - ตัวติดตั้งฝั่งเครื่อง (PowerShell + ตัวสร้างไฟล์เดียว) ส่ง `x-enroll-code` และถามรหัสเมื่อยังไม่มี · **repack + publish แล้ว 03/11/69**: `node-kit-1.1.1.zip` 35.8 MB (sha `3b7dabf9…`) bootstrap 17,520 B (sha `63e8c04c…`) — ไฟล์ที่เสิร์ฟมี header จริง
   - หลักฐาน: เทสต์ 38/38 (แดงก่อนแก้ 3 ข้อ) · tsc 0 · build 0 · restart healthy ~36 วิ · ยิงจริงไม่มีสิทธิ์ = 401 ทั้ง manifest/asset/รหัสผิด
   - หมายเหตุ production: container ยังไม่ได้ตั้ง `MACHINE_ENROLL_CODE` (0 ไบต์) ⇒ เส้นจริงคือรหัสฝูง `enr_…` ใน DB — ถ้าจะใช้รหัสเดิมต้องใส่ env แล้ว recreate
   - เอกสาร go-live: `docs/PRODUCTION-GO-LIVE.md` (นิยามพร้อมขาย 5 ข้อ + P0 ที่ยังบล็อก)
