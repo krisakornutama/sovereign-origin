@@ -858,3 +858,11 @@
   - `GET/PUT /api/consent` · `GET /api/consent/history` · `DELETE /api/consent/account` (ต้องรหัสผ่าน + พิมพ์ DELETE, ผู้ดูแลคนสุดท้ายลบไม่ได้)
   - วัตถุประสงค์จำเป็นปิดไม่ได้, ที่เหลือถอนได้; ลบบัญชี = anonymize ไม่ลบแถว (audit ยังตรวจย้อนหลังได้)
   - เทสต์ `tests/consent.test.ts` 10/10 · tsc 0 · backup `sovereign_20261103_015249.dump` ก่อน migrate · health 200 · `/api/consent` = 401 เมื่อไม่ล็อกอิน
+
+- [x] ปิดช่องโหว่ภายนอกเพิ่ม (03/11/69) — `bc22338`
+  - `/api/health/truth` บังคับล็อกอิน (เดิมเปิดสาธารณะ: fingerprint dist + สถานะเกต + ประวัติ nightly) · `/api/health` ยังเปิดให้ watchdog
+  - `DELETE /api/consent/account` จำกัด 5 ครั้ง/15 นาที ต่อบัญชี + audit `ACCOUNT_DELETE_RATE_LIMITED` (กันใช้เป็นช่องเดารหัสผ่าน)
+  - ตรวจแล้วไม่พบการเสิร์ฟไฟล์ระบบ: `/.env` = 404 · `/backups/` = 404 · CORS ไม่ได้ตั้ง `*` (ค่าเริ่มต้นผูก localhost:3000)
+  - นโยบายความเป็นส่วนตัว: `GET /api/consent/policy` + หน้า `/privacy` (th/en) เวอร์ชันเดียวกับหลักฐานยินยอม
+  - **เจ้าของต้องเติมก่อนเผยแพร่**: `PRIVACY_CONTROLLER_NAME`, `PRIVACY_CONTACT_EMAIL`, `PRIVACY_CONTACT_ADDRESS` (หน้าเว็บเตือนถ้ายังว่าง)
+  - ทดสอบกับบัญชีจริง: `cd sovereign-os/core-api && node tools/consent-smoke.mjs --confirm` → 15/15 ผ่าน (สร้างบัญชี → API → DB → ลบทิ้ง)
