@@ -88,6 +88,7 @@ import crisisRoutes from './modules/crisis/crisis.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import learningRoutes from './modules/learning/learning.routes';
 import usersRoutes from './modules/users/users.routes';
+import consentRoutes from './modules/consent/consent.routes'; // PDPA: ความยินยอม + สิทธิ์ลบข้อมูล
 import auditRoutes from './modules/audit/audit.routes';
 import systemRoutes, { livenessRouter } from './modules/system/system.routes';
 import clientMonitorRoutes from './modules/system/client-monitor.routes';
@@ -290,6 +291,7 @@ export function mountRoutes(app: Express): void {
   app.use('/api/sensors', sensorDataRoutes); // /data /metrics /all DELETE /:metric — หลัง sensor.routes เสมอ
   app.use('/api/ai', aiChatRoutes); // POST /chat — หลัง ai.routes เสมอ
   app.use('/api/users', usersRoutes); // จัดการ user (SUPERADMIN)
+  app.use('/api/consent', consentRoutes); // PDPA: ความยินยอมของผู้ใช้เอง + สิทธิ์ถูกลืม
   app.use('/api/audit', auditRoutes); // ดู audit log (SUPERADMIN)
   app.use('/api/knowledge', knowledgeFilesRoutes); // ไฟล์ .txt/.md — หลัง search/knowledge/teach เสมอ
   app.use(livenessRouter); // GET /healthz (Docker healthcheck + watchdog — ไม่มี auth)
