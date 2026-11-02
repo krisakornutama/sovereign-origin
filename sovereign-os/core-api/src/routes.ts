@@ -1,3 +1,4 @@
+import { authenticate } from './middleware/auth.middleware';
 import type { Express } from 'express';
 import { join } from 'node:path';
 import { readFile as readFileCb } from 'node:fs';
@@ -213,8 +214,9 @@ export function mountRoutes(app: Express): void {
   // ── GET /api/health/truth — ความจริง runtime ฉบับเดียวสำหรับหน้า /system-health ──
   // รวม 3 แหล่ง: (1) fingerprint ของ dist ที่โปรเซสนี้โหลดจริง (2) migration head จริงจาก DB
   // (3) data/system-truth.json = ผลเกต (arch-gate 4 กฎ + prod-truth) ล่าสุดที่ verify เขียนไว้
-  // Public เหมือน /api/health (ไม่มี token ก็ดูสุขภาพความจริงได้) — ไม่เปิดเผยความลับใด ๆ
-  app.get('/api/health/truth', async (_req, res) => {
+  // ปิด 03/11/69: เดิมเปิดสาธารณะ ⇒ คนนอกอ่าน fingerprint ของ dist, สถานะเกต และประวัติ nightly ได้
+  // (ข้อมูล recon ที่ใช้เลือกช่องโหว่) — ตอนนี้ต้องล็อกอิน ส่วน /api/health ที่มีแค่ status ยังเปิดไว้ให้ watchdog
+  app.get('/api/health/truth', authenticate, async (_req, res) => {
     try {
       const [fp, migrationHead, gateRaw, nightlyHist] = await Promise.all([
         getSelfFingerprint(),
