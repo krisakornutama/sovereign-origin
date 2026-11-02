@@ -95,6 +95,15 @@ function isSkipped(rel, opts = {}) {
   // Ollama ตัดที่นี่จุดเดียว — ถ้าไปใส่ใน SKIP_DIRS/SKIP_PATH_PREFIX ตัวเลือก --with-ollama
   // จะกลายเป็นโค้ดตาย (เคสจริง 12/10/69: เทสต์จับได้ตอนรันครั้งแรก)
   if (!withOllama && (rel === 'Ollama' || rel.startsWith('Ollama/'))) return true;
+  // โมเดล/รันไทม์ของ edge-AI อยู่ใต้ sovereign-os/edge-ai — ต้องตัดด้วย ไม่ใช่แค่โฟลเดอร์ชื่อ Ollama
+  // เคสจริง 03/11/69: repack พองเป็น 1.3 GB เพราะลาก models + cuda dll เข้าชุด (เดิมชุด 36 MB)
+  if (
+    !withOllama &&
+    (rel === 'sovereign-os/edge-ai/models' ||
+      rel.startsWith('sovereign-os/edge-ai/models/') ||
+      rel === 'sovereign-os/edge-ai/runtime' ||
+      rel.startsWith('sovereign-os/edge-ai/runtime/'))
+  ) return true;
   if (SKIP_PATH_PREFIX.some((p) => rel === p || rel.startsWith(`${p}/`))) return true;
   // .next / .next-verify / .next.broken-* = build artifact ทุกชนิด
   if (rel.split('/').some((seg) => isBuildArtifactDir(seg))) return true;
