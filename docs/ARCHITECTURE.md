@@ -75,10 +75,12 @@ sovereign-os/core-api/src/
 | `check-parity.mjs` | พิสูจน์อัลกอริทึม fingerprint สองฝั่งตรงกัน (CI รันทุก PR) |
 | `verify.mjs` | Quality gate เดียว — เขียนผลล่าสุดลง `data/system-truth.json` |
 | `gen-module-docs.mjs` | gen เอกสารโมดูลจากโค้ดจริง (ไม่ทับส่วนเขียนมือ) |
+| `deploy-guard.mjs` | ด่าน backup ก่อน deploy/migrate (ไม่มี dump / dump เก่ากว่า migration / เก่าเกิน 24 ชม. = หยุด) |
+| `deploy-db.mjs` | ทาง deploy เดียวของ core-api: ด่าน backup → build → migrate deploy → restart → poll `/healthz` |
 
 ## Deployment จริง (สิ่งที่ต้องรู้ก่อนแตะ prod)
 
-- Backend: `docker restart sovereign-core-api` → container rebuild `dist` จาก source ที่ mount เอง (generate + tsc) แล้ว start
+- Backend: **`node tools/deploy-db.mjs --yes`** (ด่าน backup → `npm run build` → `prisma migrate deploy` → `docker restart sovereign-core-api` → poll `/healthz`) — container rebuild `dist` จาก source ที่ mount เอง (generate + tsc) แล้ว start · ด่าน backup คือ `tools/deploy-guard.mjs`: ไม่มี dump / dump เก่ากว่า migration ล่าสุด / เก่าเกิน 24 ชม. = **exit 1 ก่อนแตะ DB หรือ container** · `--dry-run` ดูแผนได้โดยไม่แตะระบบ
 - Frontend: `npm run build` ที่ `sovereign-frontend/` แล้ว restart `next start` (:3000)
 - Migration: **ห้าม**รัน raw SQL ข้าม `_prisma_migrations` — ถ้าจำเป็นต้องทำมือ ให้ `prisma migrate resolve` ทันทีเพื่อให้ ledger ตรงความจริง (เคสจริง 23-09: ledger หลุด 3 รายการ + energy ไม่เคยลง prod)
 - พอร์ต: :3000 frontend prod (bind 0.0.0.0 — **เครื่องใน LAN เข้าถึงได้ทางนี้เท่านั้น**) · :3001 backend (ผูก 127.0.0.1:3001 เท่านั้น เครื่องอื่นใน LAN ต่อตรงไม่ได้ ต้องผ่าน rewrite `/api/*` ของ :3000) · 5432 postgres (Docker)

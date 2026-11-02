@@ -167,6 +167,9 @@ tools/*
 # lib ของเทสต์ env-secret-ownership — ไม่มีไฟล์นี้ใน repo = clone สด/CI พังเงียบ (เจอจริงบน MAIN)
 !tools/env-secret-ownership.mjs
 !tools/check-parity.mjs
+# deploy guard — ทาง deploy เดียว: ไม่มีสองไฟล์นี้ใน clone สด = ด่าน backup หายเงียบ ๆ
+!tools/deploy-guard.mjs
+!tools/deploy-db.mjs
 !tools/
 !tools/install/
 tools/install/*
