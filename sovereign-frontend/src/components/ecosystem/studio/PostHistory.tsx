@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useLanguageStore } from '../../../stores/useLanguageStore';
 import { openExternal } from '../../../lib/openExternal';
 import {
   deleteSocialPost,
@@ -25,21 +26,19 @@ import type {
 } from './social-history-client';
 import { Alert, BTN_GHOST, BTN_GOOD, Card, Hint, INPUT_CLS } from './ui';
 
-const PLATFORM_META: Record<SocialPlatformKey, { label: string; emoji: string }> = {
-  youtube: { label: 'YouTube', emoji: '▶️' },
-  facebook: { label: 'Facebook', emoji: '📘' },
-  instagram: { label: 'Instagram', emoji: '📸' },
-  tiktok: { label: 'TikTok', emoji: '🎵' },
+const PLATFORM_META: Record<SocialPlatformKey, { emoji: string }> = {
+  youtube: { emoji: '▶️' },
+  facebook: { emoji: '📘' },
+  instagram: { emoji: '📸' },
+  tiktok: { emoji: '🎵' },
 };
 
-const STATUS_META: Record<SocialTargetStatus, { label: string; cls: string }> = {
-  pending: { label: 'รอโพสต์', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-200' },
-  posted: { label: 'โพสต์แล้ว', cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' },
-  skipped: { label: 'ข้าม', cls: 'border-slate-500/40 bg-slate-500/10 text-gray-300' },
-};
+function platformLabel(t: ReturnType<typeof useLanguageStore.getState>['t'], platform: string) {
+  return t(`postHistory.platform.${platform}`, platform);
+}
 
-function platformMeta(platform: string) {
-  return PLATFORM_META[platform as SocialPlatformKey] ?? { label: platform, emoji: '🌐' };
+function statusLabel(t: ReturnType<typeof useLanguageStore.getState>['t'], status: SocialTargetStatus) {
+  return t(`postHistory.status.${status}`, status);
 }
 
 function dateLabel(iso: string | null): string {
@@ -50,6 +49,8 @@ function dateLabel(iso: string | null): string {
 }
 
 export default function PostHistory() {
+  const t = useLanguageStore((s) => s.t);
+
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -64,11 +65,11 @@ export default function PostHistory() {
     try {
       setPosts(await listSocialPosts(20));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'โหลดประวัติไม่สำเร็จ');
+      setErr(e instanceof Error ? e.message : t('ecosystem.postHistory.loadError', 'โหลดประวัติไม่สำเร็จ'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -81,7 +82,7 @@ export default function PostHistory() {
       const key = targetKey(post.id, platform);
       const rawLink = String(links[key] || '').trim();
       if (status === 'posted' && rawLink && !/^https?:\/\//i.test(rawLink)) {
-        setErr('ลิงก์โพสต์ต้องขึ้นต้นด้วย http:// หรือ https://');
+        setErr(t('ecosystem.postHistory.badUrl', 'ลิงก์โพสต์ต้องขึ้นต้นด้วย http:// หรือ https://'));
         return;
       }
       setBusy(key);
@@ -93,47 +94,48 @@ export default function PostHistory() {
           ...(rawLink ? { externalUrl: rawLink } : {}),
         });
         setPosts((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+        const label = platformLabel(t, platform);
         setMsg(
           status === 'posted'
-            ? `บันทึกว่าโพสต์ ${platformMeta(platform).label} แล้ว`
+            ? t('ecosystem.postHistory.msgPosted', `บันทึกว่าโพสต์ ${label} แล้ว`, { label })
             : status === 'skipped'
-              ? `ทำเครื่องหมายข้าม ${platformMeta(platform).label} แล้ว`
-              : `ตั้ง ${platformMeta(platform).label} กลับเป็นรอโพสต์`,
+              ? t('ecosystem.postHistory.msgSkipped', `ทำเครื่องหมายข้าม ${label} แล้ว`, { label })
+              : t('ecosystem.postHistory.msgPending', `ตั้ง ${label} กลับเป็นรอโพสต์`, { label }),
         );
       } catch (e) {
-        setErr(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
+        setErr(e instanceof Error ? e.message : t('ecosystem.postHistory.updateError', 'อัปเดตสถานะไม่สำเร็จ'));
       } finally {
         setBusy('');
       }
     },
-    [links],
+    [links, t],
   );
 
   const remove = useCallback(async (post: SocialPost) => {
-    if (!window.confirm('ลบประวัตินี้ permanently? การลบไม่กระทบโพสต์จริงบนแพลตฟอร์ม')) return;
+    if (!window.confirm(t('ecosystem.postHistory.confirmDelete', 'ลบประวัตินี้ถาวรใช่หรือไม่? การลบไม่กระทบโพสต์จริงบนแพลตฟอร์ม'))) return;
     setBusy(`delete:${post.id}`);
     setErr('');
     setMsg('');
     try {
       await deleteSocialPost(post.id);
       setPosts((list) => list.filter((p) => p.id !== post.id));
-      setMsg('ลบประวัตินี้แล้ว');
+      setMsg(t('ecosystem.postHistory.deleted', 'ลบประวัตินี้แล้ว'));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'ลบประวัติไม่สำเร็จ');
+      setErr(e instanceof Error ? e.message : t('ecosystem.postHistory.deleteError', 'ลบประวัติไม่สำเร็จ'));
     } finally {
       setBusy('');
     }
-  }, []);
+  }, [t]);
 
   const total = useMemo(() => posts.length, [posts]);
 
   return (
     <Card
-      title="ประวัติการโพสต์"
-      sub="บันทึกไว้ในฐานข้อมูล — ข้ามเครื่องได้ ไม่หายเมื่อล้างเบราว์เซอร์"
+      title={t('ecosystem.postHistory.title', 'ประวัติการโพสต์')}
+      sub={t('ecosystem.postHistory.subtitle', 'บันทึกไว้ในฐานข้อมูล — ข้ามเครื่องได้ ไม่หายเมื่อล้างเบราว์เซอร์')}
       right={
         <button type="button" className={BTN_GHOST} onClick={() => void load()} disabled={loading}>
-          {loading ? 'กำลังโหลด…' : 'รีเฟรช'}
+          {loading ? t('ecosystem.postHistory.loading', 'กำลังโหลด…') : t('ecosystem.postHistory.refresh', 'รีเฟรช')}
         </button>
       }
     >
@@ -141,13 +143,14 @@ export default function PostHistory() {
       {msg && <Alert kind="ok">{msg}</Alert>}
 
       {loading && posts.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-500">กำลังโหลดประวัติ…</p>
+        <p className="py-6 text-center text-sm text-gray-500">
+          {t('ecosystem.postHistory.loadingHistory', 'กำลังโหลดประวัติ…')}
+        </p>
       ) : total === 0 ? (
         <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-6 text-center">
-          <p className="text-sm text-gray-300">ยังไม่มีประวัติการโพสต์</p>
+          <p className="text-sm text-gray-300">{t('ecosystem.postHistory.noHistory', 'ยังไม่มีประวัติการโพสต์')}</p>
           <p className="mt-1 text-xs text-gray-500">
-            ไปที่แท็บ “โพสต์ข้อความ” หรือ “ลงคลิปวิดีโอ” แล้วกด “บันทึกงานนี้ลงประวัติ”
-            เพื่อเก็บไว้ติดตามว่าทำแพลตฟอร์มไหนแล้ว
+            {t('ecosystem.postHistory.noHistorySub', 'ไปที่แท็บ “โพสต์ข้อความ” หรือ “ลงคลิปวิดีโอ” แล้วกด “บันทึกงานนี้ลงประวัติ” เพื่อเก็บไว้ติดตามว่าทำแพลตฟอร์มไหนแล้ว')}
           </p>
         </div>
       ) : (
@@ -160,7 +163,7 @@ export default function PostHistory() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-semibold text-gray-100">
-                    {post.title || (post.kind === 'clip' ? 'งานลงคลิป' : 'โพสต์ข้อความ')}
+                    {post.title || (post.kind === 'clip' ? t('ecosystem.postHistory.clipPost', 'งานลงคลิป') : t('ecosystem.postHistory.textPost', 'โพสต์ข้อความ'))}
                   </h4>
                   <p className="text-[11px] text-gray-500">
                     {dateLabel(post.createdAt)}
@@ -173,7 +176,7 @@ export default function PostHistory() {
                   onClick={() => void remove(post)}
                   disabled={busy === `delete:${post.id}`}
                 >
-                  ลบ
+                  {t('ecosystem.postHistory.actions.delete', 'ลบ')}
                 </button>
               </header>
 
@@ -194,8 +197,8 @@ export default function PostHistory() {
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {post.targets.map((target) => {
-                  const meta = platformMeta(target.platform);
-                  const status = STATUS_META[target.status] ?? STATUS_META.pending;
+                  const meta = PLATFORM_META[target.platform as SocialPlatformKey] ?? { emoji: '🌐' };
+                  const status = target.status as SocialTargetStatus;
                   const key = targetKey(post.id, target.platform);
                   const working = busy === key;
                   return (
@@ -203,15 +206,17 @@ export default function PostHistory() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm">{meta.emoji}</span>
                         <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-200">
-                          {meta.label}
+                          {platformLabel(t, target.platform)}
                         </span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] ${status.cls}`}>
-                          {status.label}
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px]`}>
+                          {statusLabel(t, status)}
                         </span>
                       </div>
 
                       {target.postedAt && (
-                        <p className="mt-1 text-[10px] text-gray-500">เมื่อ {dateLabel(target.postedAt)}</p>
+                        <p className="mt-1 text-[10px] text-gray-500">
+                          {t('ecosystem.postHistory.postedAt', 'เมื่อ')} {dateLabel(target.postedAt)}
+                        </p>
                       )}
                       {target.externalUrl && (
                         <button
@@ -219,17 +224,17 @@ export default function PostHistory() {
                           className="mt-1 block break-all text-left text-[10px] text-cyan-300 hover:underline"
                           onClick={() => void openExternal(target.externalUrl as string)}
                         >
-                          เปิดลิงก์โพสต์
+                          {t('ecosystem.postHistory.openLink', 'เปิดลิงก์โพสต์')}
                         </button>
                       )}
 
-                      {target.status !== 'posted' && (
+                      {status !== 'posted' && (
                         <div className="mt-2 space-y-1.5">
                           <input
                             className={`${INPUT_CLS} !py-1 !text-[11px]`}
                             value={links[key] || ''}
                             onChange={(e) => setLinks((m) => ({ ...m, [key]: e.target.value }))}
-                            placeholder="ลิงก์โพสต์ (ไม่บังคับ)"
+                            placeholder={t('ecosystem.postHistory.linkPlaceholder', 'ลิงก์โพสต์ (ไม่บังคับ)')}
                             inputMode="url"
                           />
                           <div className="flex flex-wrap gap-1.5">
@@ -239,7 +244,7 @@ export default function PostHistory() {
                               onClick={() => void setTarget(post, target.platform, 'posted')}
                               disabled={working}
                             >
-                              {working ? 'กำลังบันทึก…' : 'โพสต์แล้ว'}
+                              {working ? t('ecosystem.postHistory.saving', 'กำลังบันทึก…') : t('ecosystem.postHistory.markPosted', 'โพสต์แล้ว')}
                             </button>
                             <button
                               type="button"
@@ -247,30 +252,30 @@ export default function PostHistory() {
                               onClick={() => void setTarget(post, target.platform, 'skipped')}
                               disabled={working}
                             >
-                              ข้าม
+                              {t('ecosystem.postHistory.markSkipped', 'ข้าม')}
                             </button>
                           </div>
                         </div>
                       )}
 
-                      {target.status === 'posted' && (
+                      {status === 'posted' && (
                         <button
                           type="button"
                           className={`${BTN_GHOST} mt-2 !px-2 !py-1 !text-[10px]`}
                           onClick={() => void setTarget(post, target.platform, 'pending')}
                           disabled={working}
                         >
-                          ตั้งกลับเป็นรอโพสต์
+                          {t('ecosystem.postHistory.markPending', 'ตั้งกลับเป็นรอโพสต์')}
                         </button>
                       )}
-                      {target.status === 'skipped' && (
+                      {status === 'skipped' && (
                         <button
                           type="button"
                           className={`${BTN_GHOST} mt-2 !px-2 !py-1 !text-[10px]`}
                           onClick={() => void setTarget(post, target.platform, 'pending')}
                           disabled={working}
                         >
-                          ตั้งกลับเป็นรอโพสต์
+                          {t('ecosystem.postHistory.markPending', 'ตั้งกลับเป็นรอโพสต์')}
                         </button>
                       )}
                     </div>
@@ -283,8 +288,7 @@ export default function PostHistory() {
       )}
 
       <Hint>
-        “โพสต์แล้ว” ในที่นี้คือบันทึกของแอป ไม่ได้ยืนยันแทนแพลตฟอร์ม — กดเมื่อคุณโพสต์จริงแล้วเท่านั้น
-        ถ้าลบประวัตินี้ โพสต์บนแพลตฟอร์มยังอยู่ครบ
+        {t('ecosystem.postHistory.hint', '“โพสต์แล้ว” ในที่นี้คือบันทึกของแอป ไม่ได้ยืนยันแทนแพลตฟอร์ม — กดเมื่อคุณโพสต์จริงแล้วเท่านั้น ถ้าลบประวัตินี้ โพสต์บนแพลตฟอร์มยังอยู่ครบ')}
       </Hint>
     </Card>
   );

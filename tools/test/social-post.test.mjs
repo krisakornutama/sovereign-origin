@@ -581,9 +581,25 @@ describe('วินัยของไฟล์ logic', () => {
       // '..' ตั้งแต่ 2 ชั้นขึ้นไป = ข้ามกลุ่ม ⇒ อนุญาตเฉพาะ lib / ui / layout เท่านั้น
       // (รองรับทั้ง '../../lib' และ '../../../lib' เพราะโฟลเดอร์ studio ลึกกว่า ecosystem หนึ่งชั้น)
       const rel = [...src.matchAll(/from\s+'((?:\.\.\/){2,}[^']+)'/g)].map((m) => m[1]);
-      const allowed = /^(?:\.\.\/)+(?:lib|ui|layout)\//;
+      // stores/ = โฟลเดอร์กลางชั้นเดียวกับ lib/ui (useLanguageStore) ไม่ใช่ feature อื่น
+      const allowed = /^(?:\.\.\/)+(?:(?:lib|ui|layout|stores))\//;
       const crossFeature = rel.filter((r) => !allowed.test(r));
       assert.deepEqual(crossFeature, [], `${f}: ห้าม import ข้ามโฟลเดอร์ feature — เจอ ${crossFeature.join(', ')}`);
+    }
+  });
+
+  test('คีย t() ในสตูดิโอต้องมีพรีฟิกซ์หน้า ecosystem. — dict รูทแยกตามชื่อหน้า', () => {
+    for (const f of fs.readdirSync(POST_DIR)) {
+      if (!/.tsx?$/.test(f)) continue;
+      const src = fsReadFile(path.join(POST_DIR, f));
+      const bad = [...src.matchAll(/\bt\('([^'.][a-zA-Z][^']*)'/g)]
+        .map((x) => x[1])
+        .filter((k) => !k.startsWith('ecosystem.'));
+      assert.deepEqual(
+        bad,
+        [],
+        `${f}: คียที่ไม่มีพรีฟิกซ์ ecosystem. = en resolve ไม่ได้ตลอด — ใช้ t('ecosystem.…') — เจอ ${bad.join(', ')}`,
+      );
     }
   });
 });
