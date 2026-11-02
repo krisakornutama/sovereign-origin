@@ -2,6 +2,24 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { HealthCategory, HealthFlagStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { requireConsent, type ConsentGateReason } from '../../services/consent-gate.service';
+import { setConsent, listConsents } from '../../services/consent.service';
+
+// หมวดใน `health_consents` ที่ผูกกับวัตถุประสงค์ PDPA `health` (ตารางนี้เป็นของโมดูลสุขภาพ)
+const HEALTH_LEGACY_CATEGORY = 'conversation';
+
+/**
+ * ด่านความยินยอมของข้อมูลสุขภาพ = ด่านกลาง + สวิตช์เดิมของโมดูลนี้
+ * ถ้าผู้ใช้ปิด `health_consents.conversation` ไว้ = ถือว่าถอน (ไม่ให้สองที่ขัดกัน)
+ */
+const healthConsentGate = requireConsent('health', {
+  extraReason: async (userId): Promise<ConsentGateReason | null> => {
+    const legacy = await prisma.healthConsent.findFirst({
+      where: { user_id: userId, category: HEALTH_LEGACY_CATEGORY },
+    });
+    return legacy && legacy.granted === false ? 'consent_legacy_revoked' : null;
+  },
+});
 
 const router = Router();
 
@@ -190,7 +208,8 @@ router.get('/overview', authenticate, async (req, res) => {
 // ── Module 2/4: Observations (Encrypted Health Log) ──
 
 // POST /api/health/observations — บันทึกอาการ (จากบทสนทนา/เซ็นเซอร์/ผู้ใช้)
-router.post('/observations', authenticate, async (req, res) => {
+// ⚠ ข้อมูลสุขภาพ = อ่อนไหวที่สุด ⇒ ต้องมีความยินยอม PDPA ก่อนเขียน (ด่านจริง ไม่ใช่แค่ป้าย)
+router.post('/observations', authenticate, healthConsentGate, async (req, res) => {
   try {
     const { category, detail, severity, source, observed_at } = req.body || {};
     if (!VALID_CATEGORIES.includes(category)) {
@@ -269,7 +288,8 @@ router.get('/flags', authenticate, async (req, res) => {
 });
 
 // POST /api/health/flags — สร้าง flag ด้วยมือ (เช่น จาก AI Agent หลัง Stage 1)
-router.post('/flags', authenticate, async (req, res) => {
+// ข้อมูลสุขภาพเช่นกัน ⇒ ผ่านด่านเดียวกับ observations
+router.post('/flags', authenticate, healthConsentGate, async (req, res) => {
   try {
     const { flag_type, category, note } = req.body || {};
     if (!VALID_CATEGORIES.includes(category)) {
@@ -319,17 +339,33 @@ router.post('/flags/:id/address', authenticate, async (req, res) => {
 // GET /api/health/consents
 router.get('/consents', authenticate, async (req, res) => {
   try {
-    let consents = await prisma.healthConsent.findMany();
-    // default: ทุกหมวดอนุญาต — ถ้ายังไม่เคยตั้งค่าให้สร้างเริ่มต้น
+    const userId = (req as any).user?.id as string | undefined;
+    // อ่านเฉพาะของตัวเอง (+ แถวส่วนกลางที่ไม่มีเจ้าของ) — ห้ามคืนสวิตช์ของผู้ใช้คนอื่น
+    const where = userId ? { OR: [{ user_id: userId }, { user_id: null }] } : {};
+    let consents = await prisma.healthConsent.findMany({ where } as any);
+    // default: ทุกหมวดอนุญาต — ถ้ายังไม่เคยตั้งค่าให้สร้างเริ่มต้น (ผูกกับผู้ใช้คนนี้)
     const DEFAULT_CATEGORIES = ['telemetry', 'conversation', 'export'];
     const existing = new Set(consents.map((c) => c.category));
     for (const category of DEFAULT_CATEGORIES) {
       if (!existing.has(category)) {
         consents.push(
-          await prisma.healthConsent.create({ data: { category, granted: true } })
+          await prisma.healthConsent.create({
+            data: userId ? { user_id: userId, category, granted: true } : { category, granted: true },
+          } as any)
         );
       }
     }
+
+    // "conversation" ต้องสะท้อนความยินยอม PDPA จริง ไม่ใช่ค่าตั้งต้นในตารางเก่า
+    // (ถ้าโชว์ ON แต่ด่านเขียนตอบ 403 = ผู้ใช้หาสาเหตุไม่ได้)
+    if (userId) {
+      const pdpa = await listConsents(userId);
+      const health = pdpa.purposes.find((p) => p.key === 'health');
+      consents = consents.map((row: any) =>
+        row.category === HEALTH_LEGACY_CATEGORY ? { ...row, granted: health?.granted === true } : row
+      );
+    }
+
     res.json(consents);
   } catch (err) {
     res.status(500).json({ error: 'Failed to load consents' });
@@ -337,6 +373,8 @@ router.get('/consents', authenticate, async (req, res) => {
 });
 
 // PUT /api/health/consents — { "telemetry": true, "conversation": false }
+// "conversation" = การบันทึกข้อมูลสุขภาพ ⇒ เขียนลงตาราง PDPA (`user_consents.health`)
+// ด้วยเสมอ เพื่อให้ด่านเดียว (`healthConsentGate`) เห็นสถานะจริง ไม่มีสองที่ขัดกัน
 router.put('/consents', authenticate, async (req, res) => {
   try {
     const userId = (req as any).user?.id as string | undefined;
@@ -361,6 +399,15 @@ router.put('/consents', authenticate, async (req, res) => {
           })
         );
       }
+      if (category === HEALTH_LEGACY_CATEGORY && userId) {
+        await setConsent({
+          userId,
+          purpose: 'health',
+          granted,
+          source: 'health-module',
+          ip: req.ip,
+        });
+      }
     }
     res.json(results);
   } catch (err) {
@@ -383,7 +430,8 @@ router.get('/profile', authenticate, async (req, res) => {
 });
 
 // PUT /api/health/profile — { conditions: ["kidney_disease"], medications: ["anticoagulant"] }
-router.put('/profile', authenticate, async (req, res) => {
+// โรคประจำตัว/ยาที่ใช้ = ข้อมูลสุขภาพ ⇒ ต้องผ่านด่านความยินยอมก่อนบันทึก
+router.put('/profile', authenticate, healthConsentGate, async (req, res) => {
   try {
     const userId = (req as any).user?.id as string | undefined;
     const { conditions, medications } = req.body || {};

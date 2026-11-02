@@ -28,6 +28,7 @@
     "business → auth(users)": 2,
     "compost → inventory(inventory_items)": 1,
     "compost → restaurant(restaurant_waste_logs)": 1,
+    "consent → auth(users)": 3,
     "dashboard → sensors(sensor_telemetry)": 1,
     "dime → auth(users)": 1,
     "dime → treasury(asset_positions)": 3,

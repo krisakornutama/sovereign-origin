@@ -109,10 +109,15 @@ Write-Host ('  HUB : ' + $hub)
 Write-Host ('  This machine : ' + $env:COMPUTERNAME)
 Write-Host ''
 
+# --- the HUB will not serve kits without an enrollment code ---
+if (-not $code) { $code = Read-Host 'Enrollment code for this HUB' }
+$headers = @{}
+if ($code) { $headers['x-enroll-code'] = $code }
+
 # --- ask the HUB what to download ---
 $manifestUrl = $hub + '/api/agent-machines/node-kits/manifest/'
 try {
-  $m = Invoke-RestMethod -Uri $manifestUrl -TimeoutSec 25
+  $m = Invoke-RestMethod -Uri $manifestUrl -TimeoutSec 25 -Headers $headers
 } catch {
   if ($env:SOV_DRYRUN -eq '1') {
     Write-Host '  [dry-run] HUB unreachable - skipping the download (nothing changed).' -ForegroundColor Yellow
@@ -141,7 +146,7 @@ $tmp = Join-Path $env:TEMP 'sovereign-install.ps1'
 Write-Host '  Downloading the installer script ...'
 $ProgressPreference = 'SilentlyContinue'
 try {
-  Invoke-WebRequest -Uri ($hub + '/api/agent-machines/node-kits/bootstrap/') -OutFile $tmp -TimeoutSec 120 -UseBasicParsing
+  Invoke-WebRequest -Uri ($hub + '/api/agent-machines/node-kits/bootstrap/') -Headers $headers -OutFile $tmp -TimeoutSec 120 -UseBasicParsing
 } catch {
   Die ("Download failed: " + $_.Exception.Message) 4
 }

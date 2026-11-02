@@ -181,7 +181,7 @@ export default function SelfCheckPage() {
       for (const qq of QUESTIONS) {
         const severity = answers[qq.id] ?? 0;
         if (severity === 0) continue; // ข้ามข้อที่ไม่มีอาการ
-        await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/observations`, {
+        const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/observations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -191,6 +191,17 @@ export default function SelfCheckPage() {
             source: transcript ? "conversation" : "manual",
           }),
         });
+        // ด่านความยินยอม (PDPA): 403 = ไม่มีอะไรถูกบันทึก — ห้ามไปหน้าสรุปว่า "เสร็จแล้ว"
+        if (!r.ok) {
+          const body: any = await r.json().catch(() => ({}));
+          if (body?.code === "consent_version_stale") {
+            throw new Error(t("health.observation.consentVersionStale", "นโยบายความเป็นส่วนตัวเปลี่ยนแล้ว — ไปที่ศูนย์ความยินยอม (/consent) เพื่อยืนยันฉบับใหม่ก่อนบันทึก"));
+          }
+          if (body?.code === "consent_required" || body?.code === "consent_legacy_revoked") {
+            throw new Error(t("health.observation.consentRequired", "ยังไม่ได้ให้ความยินยอมเรื่องข้อมูลสุขภาพ — ไปที่ศูนย์ความยินยอม (/consent) แล้วเปิด “ข้อมูลสุขภาพ”"));
+          }
+          throw new Error(body?.error || t("health.observation.saveFailed", "บันทึกไม่สำเร็จ"));
+        }
       }
       // ดึงสรุปใหม่
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/health/overview`);
