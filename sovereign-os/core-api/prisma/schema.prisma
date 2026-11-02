@@ -72,6 +72,8 @@ model User {
 
   // Ecosystem ส่วนตัว: บัญชี/platform ที่ผู้ใช้คนนี้ผูกไว้ (รหัสผ่านเข้ารหัสใน DB)
   ecosystem_accounts UserEcosystemAccount[]
+  // Social Studio: ประวัติการโพสต์/ลงคลิป + สถานะต่อแพลตฟอร์ม
+  social_posts       SocialPost[]
 
   @@map("users")
 }
@@ -2547,9 +2549,54 @@ model UserEcosystemAccount {
   user    User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
   primary UserEcosystemAccount?  @relation("EcosystemIdentity", fields: [primary_account_id], references: [id], onDelete: SetNull)
   linked  UserEcosystemAccount[] @relation("EcosystemIdentity")
+  social_targets SocialPostTarget[]
 
   @@index([user_id, platform])
   @@index([user_id, status])
   @@index([primary_account_id])
   @@map("user_ecosystem_accounts")
+}
+
+// ── Social Studio: ประวัติการโพสต์ + สถานะต่อแพลตฟอร์ม (2/11/69) ─────────────
+// ทำไมเก็บใน DB ไม่ใช่ localStorage: เจ้าของใช้หลายเครื่อง/หลายโปรไฟล์ และ
+// ประวัติต้องไม่หายเมื่อล้างเบราว์เซอร์ — เป็น "บันทึกงาน" ไม่ใช่ draft
+// ห้ามเก็บรหัสผ่าน/secret ในตารางนี้ (บัญชีถูกอ้างด้วย id เท่านั้น)
+model SocialPost {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  kind       String   @default("text") // text | clip
+  title      String   @default("")
+  body       String   @default("")
+  link       String?
+  video_name String?
+  // เก็บเป็น string เพราะไฟล์วิดีโออาจเกิน 2 GB (Int ไม่พอ)
+  video_size String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  user    User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  targets SocialPostTarget[]
+
+  @@index([user_id, created_at])
+  @@map("social_posts")
+}
+
+model SocialPostTarget {
+  id           String    @id @default(uuid()) @db.Uuid
+  post_id      String    @db.Uuid
+  platform     String // youtube | facebook | instagram | tiktok
+  account_id   String?   @db.Uuid // บัญชี Ecosystem ที่ใช้โพสต์ (ลบบัญชี = ปลายทางยังอยู่)
+  status       String    @default("pending") // pending | posted | skipped
+  external_url String?
+  external_id  String?
+  posted_at    DateTime? @db.Timestamptz
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+
+  post    SocialPost            @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  account UserEcosystemAccount? @relation(fields: [account_id], references: [id], onDelete: SetNull)
+
+  @@unique([post_id, platform])
+  @@index([account_id])
+  @@map("social_post_targets")
 }

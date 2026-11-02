@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { EcosystemAccount } from '../types';
 import { postBridge } from './bridge';
 import { copyVia } from './post-clipboard';
+import { createSocialPost } from './social-history-client';
 import {
   TEXT_DRAFT_KEY,
   TEXT_LIMITS,
@@ -24,7 +25,7 @@ import {
   normalizeTextDraft,
   textPostStatus,
 } from './studio-model';
-import { Alert, BTN_GHOST, BTN_PRIMARY, Card, Counter, Hint, INPUT_CLS } from './ui';
+import { Alert, BTN_GHOST, BTN_GOOD, BTN_PRIMARY, Card, Counter, Hint, INPUT_CLS } from './ui';
 
 const FB_HOME = 'https://www.facebook.com/';
 
@@ -40,6 +41,7 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
   const [link, setLink] = useState('');
   const [accountId, setAccountId] = useState('');
   const [ready, setReady] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'error' | 'warn' } | null>(null);
 
   // โหลดร่างใน effect เท่านั้น — prerender ฝั่งเซิร์ฟเวอร์ไม่มี localStorage
@@ -97,6 +99,26 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
     const w = typeof window === 'undefined' ? null : window.open(url, '_blank', 'noopener,noreferrer');
     if (!w) setMsg({ text: 'เบราว์เซอร์บล็อกป๊อปอัป — กรุณาอนุญาตแล้วกดอีกครั้ง', kind: 'warn' });
   }, [accounts, selected]);
+
+  const saveHistory = useCallback(async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await createSocialPost({
+        kind: 'text',
+        title: text.trim().split('\n')[0].slice(0, 120) || 'โพสต์ข้อความ',
+        body: text.trim(),
+        link: link.trim() || undefined,
+        targets: [{ platform: 'facebook', accountId: selected?.id || null }],
+      });
+      setMsg({ text: 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”', kind: 'ok' });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'บันทึกประวัติไม่สำเร็จ', kind: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  }, [link, selected, text]);
 
   const clear = useCallback(() => {
     if (!window.confirm('ล้างข้อความที่พิมพ์ไว้ทั้งหมด?')) return;
@@ -195,6 +217,9 @@ export default function TextStudio({ accounts, onAddAccount }: TextStudioProps) 
             </button>
             <button type="button" className={BTN_GHOST} onClick={openFacebook} disabled={!selected}>
               2) เปิด Facebook
+            </button>
+            <button type="button" className={BTN_GOOD} onClick={() => void saveHistory()} disabled={!body || saving}>
+              {saving ? 'กำลังบันทึก…' : '3) บันทึกงานนี้ลงประวัติ'}
             </button>
             <button type="button" className={BTN_GHOST} onClick={clear} disabled={!text && !link}>
               ล้างข้อความ

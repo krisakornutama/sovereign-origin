@@ -17,9 +17,10 @@ import PostCaptionEditor from './PostCaptionEditor';
 import PostComposer from './PostComposer';
 import PostTargets from './PostTargets';
 import PostYouTube from './PostYouTube';
-import { Alert, BTN_GHOST, Hint } from './ui';
-import { DRAFT_KEY, PLATFORMS, PLATFORM_KEYS, emptyDraft, normalizeDraft } from './post-model';
+import { Alert, BTN_GHOST, BTN_GOOD, Hint } from './ui';
+import { DRAFT_KEY, PLATFORMS, PLATFORM_KEYS, buildCaption, emptyDraft, normalizeDraft, platformByKey } from './post-model';
 import type { PlatformKey, PostDraft } from './post-model';
+import { createSocialPost } from './social-history-client';
 import { accountsForPlatform } from './studio-model';
 import type { StudioAccountOption } from './studio-model';
 
@@ -39,6 +40,7 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
   const [editKey, setEditKey] = useState<PlatformKey>('youtube');
   const [ready, setReady] = useState(false);
   const [saveErr, setSaveErr] = useState('');
+  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'error' | 'warn' } | null>(null);
 
   // โหลดร่าง — ทำใน effect เท่านั้น เพราะ prerender ฝั่งเซิร์ฟเวอร์ไม่มี localStorage
@@ -98,11 +100,49 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
     setMsg(null);
   }, []);
 
+  const saveHistory = useCallback(async () => {
+    const captions = draft.targets
+      .map((key) => ({ key, text: buildCaption(draft, key).trim() }))
+      .filter((c) => c.text);
+    const unique = new Set(captions.map((c) => c.text));
+    // คำอธิบายต่างกันต่อแพลตฟอร์ม (TikTok ใส่แฮชแท็กมากกว่า) — เก็บให้ครบพร้อมชื่อแพลตฟอร์ม
+    // ดีกว่าตัดเหลืออันเดียวแล้วจำผิดว่าโพสต์อะไรไปบ้าง
+    const body =
+      unique.size <= 1
+        ? captions[0]?.text || ''
+        : captions.map((c) => `[${platformByKey(c.key)?.label || c.key}]\n${c.text}`).join('\n\n');
+
+    setSaving(true);
+    setMsg(null);
+    try {
+      await createSocialPost({
+        kind: 'clip',
+        title: draft.title.trim().slice(0, 120) || 'งานลงคลิป',
+        body,
+        videoName: draft.videoName || undefined,
+        videoSize: draft.videoSize > 0 ? draft.videoSize : undefined,
+        targets: draft.targets.map((key) => ({
+          platform: key,
+          accountId: accountsByPlatform[key]?.[0]?.id || null,
+        })),
+      });
+      setMsg({ text: 'บันทึกงานนี้ลงประวัติแล้ว — ดูได้ในแท็บ “ประวัติการโพสต์”', kind: 'ok' });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : 'บันทึกประวัติไม่สำเร็จ', kind: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  }, [accountsByPlatform, draft]);
+
   const reset = () => {
     if (!window.confirm('ล้างร่างทั้งหมด (ชื่อคลิป คำอธิบาย แฮชแท็ก และไฟล์ที่เลือก) แล้วเริ่มใหม่?')) return;
     setDraft({ ...emptyDraft(PLATFORM_KEYS), targets: [...PLATFORM_KEYS] });
     setMsg({ text: 'ล้างร่างแล้ว', kind: 'ok' });
   };
+
+  const canSave =
+    draft.targets.length > 0 &&
+    Boolean(draft.title.trim() || draft.videoName || draft.targets.some((k) => buildCaption(draft, k).trim()));
 
   return (
     <div className="space-y-4">
@@ -113,6 +153,9 @@ export default function ClipStudio({ accounts, onAddAccount }: ClipStudioProps) 
             เตรียมครั้งเดียว แล้วลง YouTube · Instagram · TikTok · Facebook — เลือกไว้ {draft.targets.length} แพลตฟอร์ม
           </p>
         </div>
+        <button type="button" className={BTN_GOOD} onClick={() => void saveHistory()} disabled={!canSave || saving}>
+          {saving ? 'กำลังบันทึก…' : 'บันทึกงานนี้ลงประวัติ'}
+        </button>
         <button type="button" className={BTN_GHOST} onClick={reset}>ล้างร่าง</button>
       </div>
 
