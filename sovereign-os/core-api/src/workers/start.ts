@@ -15,6 +15,7 @@ import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
 import { startTruthWatchdog } from '../services/truth-watchdog.service'; // Phase 2: แจ้งเตือน prod รันโค้ดเก่า/เกตพัง
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
+import { reapStaleJobs } from '../services/agent-machines.service';
 import { notifyLowStock, notifyTaxDeadlines, buildMorningDigest } from '../services/business.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { processCodingQueue } from '../services/coding-agent.service';
@@ -196,6 +197,30 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   setInterval(() => {
     processAgentQueue().catch((err) => console.error('Agent queue error:', err));
   }, 30 * 1000);
+
+  // ── Stale-job reaper: งาน running ที่เครื่องหาย (heartbeat ขาด) เกินเพดาน = mark error + แจ้ง Telegram ──
+  // เคสจริงที่มา: งาน opencode ค้าง 29 วันสถานะ running เพราะ runner ตายกลางทางและ cancel ตัดไม่ได้ (409)
+  const runStaleJobReaper = async () => {
+    try {
+      const out = await reapStaleJobs();
+      if (out.reaped > 0) {
+        const detail = out.jobs
+          .slice(0, 5)
+          .map((j) => `• ${j.machineName || j.machineId || '?'} — ค้าง ${j.waitMinutes} นาที (${j.executor || '-'})`)
+          .join('\n');
+        await sendTelegramAlert({
+          text: `🔮 Stale-job reaper เก็บงานค้าง ${out.reaped} รายการ\n${detail}`,
+          severity: 'warn',
+          eventKey: `stale-job-reaper-${out.jobs.map((j) => j.id).join(',')}`,
+          source: 'reaper',
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error('Stale-job reaper error:', err instanceof Error ? err.message : err);
+    }
+  };
+  runStaleJobReaper();
+  setInterval(runStaleJobReaper, 5 * 60 * 1000);
 
   // ── Coding Agent: เก็บงาน queued ค้างหลัง restart + รันงานเขียนโค้ดเบื้องหลัง ──
   processCodingQueue().catch((err) => console.error('Coding queue boot error:', err));
