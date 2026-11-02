@@ -290,6 +290,7 @@ export const SECTIONS: NavSection[] = [
       { href: '/system', label: 'สุขภาพระบบ', labelKey: 'common.nav.system', icon: 'system', keywords: 'ระบบ สุขภาพ เซิร์ฟเวอร์ router' },
       { href: '/system-health', label: 'ความจริงระบบ', labelKey: 'common.nav.systemHealth', icon: 'system', keywords: 'ความจริง fingerprint build migration เกต verify prod truth รันโค้ดเก่า' },
       { href: '/alert-history', label: 'ประวัติแจ้งเตือน', labelKey: 'common.nav.alertHistory', icon: 'alerts', keywords: 'alert แจ้งเตือน telegram watchdog ประวัติ ยับ dedup ส่งสำเร็จ' },
+      { href: '/consent', label: 'ความยินยอม/ข้อมูลส่วนบุคคล', labelKey: 'common.nav.consent', icon: 'shield', keywords: 'pdpa consent ความยินยอม ลบข้อมูล สิทธิ์ ข้อมูลส่วนบุคคล privacy' },
     ],
   },
   {
