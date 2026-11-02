@@ -61,12 +61,14 @@ import {
 import {
   decideEnrollAttempt,
   normalizeExecutors,
+  safeEqual,
 } from '../../services/machine-enroll.service';
 import {
   consumeEnrollToken,
   isEnrollTokenFormat,
   markEnrollTokenMachine,
   releaseEnrollTokenUse,
+  verifyEnrollToken,
 } from '../../services/fleet-enrollment.service';
 import {
   currentFleetPolicy,
@@ -87,6 +89,41 @@ const router = Router();
  * เก็บในหน่วยความจำเท่านั้น (พอกันการเดา) ไม่ต้องเขียนลง DB
  */
 const enrollFailures = new Map<string, number>();
+
+/**
+ * ด่านชุดติดตั้งเครื่องใหม่: เดิมสามเส้นนี้เปิดให้ใครก็โหลดได้ (รู้ URL = ได้ชุดระบบทั้งชุด)
+ * ผ่านได้สองทางเท่านั้น:
+ *   • machine token ของเครื่องที่ลงทะเบียนแล้ว (เครื่องเดิมดึงชุดใหม่)
+ *   • รหัสเชิญ MACHINE_ENROLL_CODE หรือรหัสฝูง enr_... ที่ยังใช้ได้ — ตรวจแบบไม่กินโควตา
+ * ไม่มีทั้งสอง = 401 เสมอ (fail-closed แม้ HUB ไม่ได้ตั้งรหัสเชิญ)
+ */
+async function authorizeNodeKitAccess(req: Request, res: Response): Promise<boolean> {
+  const machineToken = String(req.get('x-machine-token') ?? '').trim();
+  if (machineToken) {
+    const machine = await authenticateToken(machineToken);
+    if (machine) return true;
+  }
+
+  const headerCode = String(req.get('x-enroll-code') ?? '').trim();
+  const queryCode = typeof req.query?.code === 'string' ? String(req.query.code).trim() : '';
+  const code = headerCode || queryCode;
+  if (code) {
+    const expected = String(process.env.MACHINE_ENROLL_CODE ?? '').trim();
+    if (expected && safeEqual(code, expected)) return true;
+    if (isEnrollTokenFormat(code)) {
+      const verdict = await verifyEnrollToken(code);
+      if (verdict.ok) return true;
+    }
+  }
+
+  res.status(401).json({
+    error: 'ต้องมีสิทธิ์ก่อนดาวน์โหลดชุดติดตั้ง',
+    hint: 'แนบ header x-enroll-code (หรือ query ?code=) ด้วยรหัสเชิญที่ยังใช้ได้ หรือใช้ x-machine-token ของเครื่องที่ลงทะเบียนแล้ว',
+    decision: 'access_denied',
+  });
+  return false;
+}
+
 
 /** hash ของไฟล์ที่ให้บริการ — เทียบกับ manifest ก่อนส่งออกทุกครั้ง (ไฟล์บนดิสก์อาจถูกแก้/หาย) */
 function sha256Hex(buf: Buffer): string {
@@ -559,8 +596,9 @@ router.get('/desktop-update/asset', async (req: Request, res: Response) => {
 //
 // เปิดให้อ่านได้โดยไม่ต้องมี machine token: เครื่องใหม่ยังไม่มี token มาจะส่ง
 //   แต่ต้องมีรหัสเชิญในการ "ลงทะเบียน" เสมอ (ดู /enroll) — ชุดติดตั้งไม่ใช่คีย์ลับ
-router.get('/node-kits/manifest', async (_req: Request, res: Response) => {
+router.get('/node-kits/manifest', async (req: Request, res: Response) => {
   try {
+    if (!(await authorizeNodeKitAccess(req, res))) return;
     const manifest = readNodeKitManifest();
     if (!manifest) {
       res.status(404).json({
@@ -586,8 +624,9 @@ router.get('/node-kits/manifest', async (_req: Request, res: Response) => {
 // ไฟล์ .cmd ที่คนก๊อปไปเครื่องใหม่ต้องเป็น ASCII ล้วน (ข้อความไทวงใน .cmd ทำให้
 //   cmd.exe พัง — เจอจริง 10/10/69 ทั้งโปรเจกต์) แต่ข้อความที่คนอ่านต้องเป็นไทย
 //   ⇒ ตัว .cmd จึงโหลดสคริปต์ชิ้นนี้มารันแทน (UTF-8) แล้วค่อยดึงชุดติดตั้งตาม
-router.get('/node-kits/bootstrap', async (_req: Request, res: Response) => {
+router.get('/node-kits/bootstrap', async (req: Request, res: Response) => {
   try {
+    if (!(await authorizeNodeKitAccess(req, res))) return;
     const found = await resolveVerifiedBootstrap();
     if (!found) {
       res.status(404).json({ error: 'installer script missing or does not match manifest' });
@@ -614,8 +653,9 @@ router.get('/node-kits/bootstrap', async (_req: Request, res: Response) => {
 });
 
 // GET /api/agent-machines/node-kits/asset — ส่ง archive ชุดติดตั้ง (ตรวจแฮชกับ manifest ก่อนทุกครั้ง)
-router.get('/node-kits/asset', async (_req: Request, res: Response) => {
+router.get('/node-kits/asset', async (req: Request, res: Response) => {
   try {
+    if (!(await authorizeNodeKitAccess(req, res))) return;
     const found = await resolveVerifiedNodeKitAsset();
     if (!found) return res.status(404).json({ error: 'node kit missing or does not match manifest' });
     res.set({

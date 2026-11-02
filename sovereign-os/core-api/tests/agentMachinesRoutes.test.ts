@@ -8,6 +8,7 @@ import { prisma } from '../src/lib/prisma';
 import { hashToken } from '../src/services/agent-machines.service';
 import { __resetAlertPhoneCache } from '../src/services/orchestrator-alert-phone.service';
 import { readVerifiedUpdateManifest } from '../src/services/update-manifest-trust.service';
+import { generateEnrollToken } from '../src/services/fleet-enrollment.service';
 
 const calls: { method: string; url: string; body?: any; token?: string }[] = [];
 
@@ -704,4 +705,103 @@ test('POST /jobs/pull แนบ header บอกรุ่นชุดเผย�
   } finally {
     await srv.close();
   }
+});
+
+describe('node-kits — ชุดติดตั้งต้องมีสิทธิ์ก่อนดาวน์โหลด', () => {
+  const KEY = 'MACHINE_ENROLL_CODE';
+  const saved = process.env[KEY];
+
+  async function withServer(fn) {
+    process.env[KEY] = 'enroll-code-for-test';
+    const router = loadRouter();
+    const srv = await createTestServer((app) => app.use('/api/agent-machines', router));
+    try {
+      await fn(srv.baseUrl);
+    } finally {
+      if (saved === undefined) delete process.env[KEY];
+      else process.env[KEY] = saved;
+      await srv.close();
+    }
+  }
+
+  test('ไม่มีรหัสและไม่มี token = 401 (ของเดิมเปิดให้โหลดฟรี)', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(base + '/api/agent-machines/node-kits/manifest');
+      assert.equal(res.status, 401, 'ต้องไม่ปล่อย manifest ให้คนที่ไม่มีสิทธิ์');
+      const body = await res.json();
+      assert.equal(body.decision, 'access_denied');
+      assert.match(String(body.hint), /x-enroll-code/);
+    });
+  });
+
+  test('รหัสเชิญผิด = 401', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(base + '/api/agent-machines/node-kits/asset', {
+        headers: { 'x-enroll-code': 'wrong-code' },
+      });
+      assert.equal(res.status, 401);
+    });
+  });
+
+  test('รหัสเชิญถูก (header) = ผ่านด่าน', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(base + '/api/agent-machines/node-kits/manifest', {
+        headers: { 'x-enroll-code': 'enroll-code-for-test' },
+      });
+      assert.notEqual(res.status, 401);
+      assert.ok([200, 404].includes(res.status), 'ผ่านด่านแล้วเหลือแค่เรื่องไฟล์บนดิสก์');
+    });
+  });
+
+  test('รหัสเชิญถูก (query ?code=) = ผ่านด่าน', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(base + '/api/agent-machines/node-kits/bootstrap?code=enroll-code-for-test');
+      assert.notEqual(res.status, 401);
+    });
+  });
+
+  test('machine token ของเครื่องที่ลงทะเบียนแล้ว = ผ่านด่าน', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(base + '/api/agent-machines/node-kits/manifest', {
+        headers: { 'x-machine-token': 'valid-token' },
+      });
+      assert.notEqual(res.status, 401);
+    });
+  });
+
+  test('รหัสเชิญฝูงที่ยังใช้ได้ = ผ่าน และต้องไม่กินโควตา', async () => {
+    let consumed = 0;
+    mockModel(prisma, 'fleetEnrollmentToken', {
+      findUnique: async () => ({
+        id: 'tok-1', label: 'ฝูงทดสอบ', token_hash: 'hash', revoked_at: null,
+        expires_at: null, used_count: 0, max_uses: 5,
+      }),
+      update: async () => { consumed += 1; return {}; },
+      updateMany: async () => { consumed += 1; return { count: 1 }; },
+    });
+    await withServer(async (base) => {
+      const { token } = generateEnrollToken();
+      const res = await fetch(base + '/api/agent-machines/node-kits/manifest', {
+        headers: { 'x-enroll-code': token },
+      });
+      assert.notEqual(res.status, 401, 'รหัสฝูงที่ยังใช้ได้ต้องผ่าน');
+      assert.equal(consumed, 0, 'ดาวน์โหลดชุดติดตั้งต้องไม่กินโควตารหัสเชิญ');
+    });
+  });
+
+  test('รหัสเชิญฝูงที่ถูกเพิกถอน = 401', async () => {
+    mockModel(prisma, 'fleetEnrollmentToken', {
+      findUnique: async () => ({
+        id: 'tok-2', label: 'เพิกถอนแล้ว', token_hash: 'hash', revoked_at: new Date(),
+        expires_at: null, used_count: 0, max_uses: 5,
+      }),
+    });
+    await withServer(async (base) => {
+      const { token } = generateEnrollToken();
+      const res = await fetch(base + '/api/agent-machines/node-kits/manifest', {
+        headers: { 'x-enroll-code': token },
+      });
+      assert.equal(res.status, 401);
+    });
+  });
 });
