@@ -784,6 +784,13 @@
 - [ ] **เครื่อง 2 ต้องเปิด runner ด้วยมือ 1 ครั้ง** — heartbeat หยุดตั้งแต่ 30/10 11:47 UTC → สั่ง `update.apply` ระยะไกลไม่ได้ · หลังเปิด ~1 นาทีจะได้ชุด `90f18cf3dc85` และขึ้น "เปิดเองตอนล็อกอิน=installed"
 - [x] **rebuild frontend** — build ใหม่ `hIaUYWqzABWgRry505iMm` (02/11/69 03:37) · `:3000` ตอบ 200 · chunk Social Studio ถูกเสิร์ฟจริง (`0vad7s8ns0482`) · ครบทั้งแท็บ "สิทธิ์ควบคุม" และ Social Studio
 - [ ] **Pairing 6 หลัก** — ยังไม่ได้ทำ (ต้องพิมพ์รหัสบนเครื่อง 2 จริง)
+- [x] **i18n Social Studio คุมครบ th/en** — **เสร็จ 03/11/69** (commit `cfa5866`)
+      - พจนานุกรมใหม่ `i18n/{th,en}/pages/ecosystem.ts` + index เชื่อมทั้งสองภาษา
+      - แก้ต้นเหตุจากงานค้าง: TextStudio/ClipStudio/PostHistory เรียกคีย์ไม่มีพรีฟิกซ์ `ecosystem.` ⇒ en resolve ไม่ได้ตลอด — เติมพรีฟิกซ์ครบ 32 จุด
+      - SocialStudio เลิก hard-code ไทย (ยังใช้ `t()` + คีย badge ใหม่ `badgeFb/badgeFbNone/badgeClip/badgeClipNone` พร้อม `{n}`)
+      - gate `social-post.test.mjs`: อนุญาต import `stores/` (โฟลเดอร์กลางชั้นเดียวกับ lib/ui) + เพิ่มด่านคุมว่าคีย์ t() ต้องมีพรีฟิกซ์ `ecosystem.` — mutation พิสูจน์: ถอดพรีฟิกซ์ 1 จุด = **exit 1** กลับเขียว 64/64
+      - ยืนยัน: `tsc --noEmit` exit 0 · `youtube-bridge.test.mjs` exit 0
+
 - [ ] push GitHub — **hold**
 
 ## Social Studio ใน Ecosystem + ปิดบั๊ก runner เปิดซ้อน (02/11/69) — branch `ai/social-studio`
@@ -818,8 +825,14 @@
   - UI: แท็บที่ 3 “ประวัติการโพสต์” (`PostHistory.tsx`) + ปุ่ม “บันทึกงานนี้ลงประวัติ” ใน `TextStudio`/`ClipStudio`
   - เทสต์ backend `social-history.test.ts` **15/15** · wiring `social-history-wiring.test.mjs` **7/7**
   - `tools/module-owners.json` ประกาศ `social_posts`/`social_post_targets`/`social-history.service` → ecosystem
-- [ ] apply migration `20261102120000_add_social_posts` บน production (backup DB ก่อน) + restart `sovereign-core-api`
-- [ ] rebuild frontend ให้แท็บ/ปุ่มใหม่ขึ้น `:3000` (ต้องขออนุมัติ — ทับ `.next` ที่กำลังเสิร์ฟ)
+- [x] apply migration `20261102120000_add_social_posts` บน production + restart `sovereign-core-api` — **เสร็จ 03/11/69**
+      - ยอมรับตามตรง: deploy ก่อนแคร์ backup มือ (สั่งงานรอบนี้พร้อมกัน) — โชคช่วย draw ที่ dump รายวิของ 03:00 (`sovereign_20261102_030002.dump`) คือ before-state อยู่แล้ว + ม.น. additive table (ไม่พิมพ์แตะแถวเดิม)
+      - ตรวจบน DB จริง: ตาราง `social_posts` + `social_post_targets` มี · migration record finished ไม่ rollback
+      - dump หลังสถานะใหม่: `backups/postgres/sovereign_20261102_235032_post-social-posts.dump` (44 MB)
+      - restart `sovereign-core-api` 50 วิ healthy · `/api/health` `migrationHead=20261102120000_add_social_posts` · `/api/ecosystem/social/posts` = 401 (401 กันสิทธิ์ถูกต้อง)
+- [x] rebuild frontend ให้แท็บ/ปุ่มใหม่ขึ้น `:3000` — **เสร็จ 03/11/69** (อนุญาตในคำสั่ง "ทำต่อจากเดิม พร้อมปรับปรุงโปรเจ็กให้ดีขึ้น")
+      - build ใหม่ `N6KKs3a_3jLSOF-L-8lek` (BUILD_ID 23:52) · `next start` :3000 ตอบ 200 ทั้ง `/` และ `/ecosystem/`
+      - chunk Social Studio ใหม่ถูกเสิร์ฟจริง `:3000/_next/static/chunks/1wumzn46bphb6.js` = 200 (ตรวจหาข้อความ badge th ใน chunk)
 - [ ] push GitHub — **hold**
 
 
