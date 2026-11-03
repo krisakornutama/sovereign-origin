@@ -386,8 +386,11 @@
       container** → ห้ามทำระหว่าง Cold Soak; ต้องให้เจ้าของอนุมัติ + ทำในหน้าต่างปิดระบบ
       → **19/10/69: แก้ compose เป็น 900s + เทสต์ `wal-config.test.mjs` แล้ว** · runtime ยัง `SHOW = 5min`
       เพราะ `-c` ของ container เดิม override — ค่าใหม่มีผลเมื่อ recreate เท่านั้น (ยังไม่ทำ)
-- [ ] **J3b nightly-history หาย 5 วัน** (7/9/13/14/17 ต.ค. ไม่มี entry) — เขียน atomic แล้ว
-      แต่ยังไม่มี "ตรวจช่องว่าง" ใน nightly-report → ควรเตือนเมื่อเมื่อวานไม่มีแถว
+- [x] **J3b nightly-history หาย 5 วัน** (7/9/13/14/17 ต.ค. ไม่มี entry) — **เสร็จ 03/11/69** (`ai/nightly-history-gaps`)
+      · แยก logic เป็น `tools/nightly-history.mjs` (เดิม inline ใน nightly-verify = เทสต์ไม่ได้): `mergeHistoryEntry()` กันข้อมูลเสียทั้งก้อนหาย + เรียงเก่า→ใหม่ + เก็บ 30 วัน · `findHistoryGaps()` ตรวจย้อนหลัง 7 วัน (ไม่นับวันนี้)
+      · `status.json` มี `historyGaps` และ Telegram เตือน `🗓 ประวัติ nightly ขาด N วัน: …` (ไม่ทำให้ nightly แดง — เครื่องอาจปิดอยู่)
+      · หลักฐานกับไฟล์จริง: `gaps@2026-11-04 = ['2026-11-03']` (รอบ 02:00 ของวันนี้ไม่เขียน entry จริง) · `gaps@2026-11-03 = []`
+      · เทสต์ `tools/test/nightly-history.test.mjs` **9/9** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND` exit 1)
 - [ ] **J3c แยกไฟล์ใหญ่** — pages: settings 1,254 · dashboard 1,219 · treasury 1,187 ·
       ai-agent 1,064 · livestock 860 · knowledge 806 (baseline รับไว้ = หนี้ที่มองไม่เห็น)
 - [ ] **J3d รวมโมดูลจิ๋ว ≤70 บรรทัด** — war-room 10 · reports 27 · mesh 28 · notes 33 · audit 36 ·

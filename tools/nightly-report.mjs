@@ -62,6 +62,10 @@ const text =
   (s.restore ? `\n💾 Backup กู้คืน: ${s.restore.skipped ? '⏭' : s.restore.ok ? '✓' : '🚨'} ${s.restore.last ?? ''}` : '') +
   // ความยินยอม/PDPA: อ่านเท่านั้น (ไม่สร้างบัญชี) — ล้ม = เส้นข้อมูลส่วนบุคคลมีปัญหา ต้องเห็นทุกคืน
   (s.consentSmoke ? `\n🧾 Consent smoke: ${s.consentSmoke.skipped ? '⏭' : s.consentSmoke.ok ? '✓' : '🚨'} ${s.consentSmoke.last ?? ''}` : '') +
+  // J3b: ประวัติ nightly ขาดวันไหน = กราฟแนวโน้มมีรู ต้องรู้ก่อนเชื่อ "ผ่านติดกัน N วัน"
+  (Array.isArray(s.historyGaps) && s.historyGaps.length
+    ? `\n🗓 ประวัติ nightly ขาด ${s.historyGaps.length} วัน: ${s.historyGaps.slice(0, 7).join(', ')}${s.historyGaps.length > 7 ? ' …' : ''}`
+    : '') +
   // Phase 4: สุขภาพเครื่อง — ปัญหาที่ตรวจก่อนรัน (รู้ก่อนว่า verify อาจพังเพราะสภาพแวดล้อม)
   (Array.isArray(s.machine?.problems) && s.machine.problems.length
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')

@@ -109,6 +109,7 @@ Task Scheduler ชื่อ **Sovereign Nightly Verify** → `tools/nightly-veri
 | ⚠️ ผ่าน (มีขั้นข้าม) | มีบางอย่าง**ไม่ได้ตรวจ** — ดูบรรทัด "ข้าม N รายการ" พร้อมเหตุผล (ห้ามนับเป็นผ่าน) |
 | 🚨 ไม่ผ่าน | มีขั้นตอนพัง ดู `logs/nightly/last-run.log` |
 | "เกตล่าสุด: ไม่ทราบ" | gate ล้มก่อนเขียนผล = ไม่รู้ว่าขั้นไหนพัง (รายงานจะไม่อ้างผลของรอบเก่าแล้ว) |
+| "🗓 ประวัติ nightly ขาด N วัน" | `nightly-history.json` ไม่มี entry ของวันเหล่านั้น (รอบนั้นไม่ได้รัน/เขียนไม่สำเร็จ) — กราฟแนวโน้มมีรู อย่านับว่า "ผ่านติดกัน N วัน" · 3/11/69 เพิ่มตัวตรวจใน `tools/nightly-history.mjs` |
 
 สวิตช์ทดลอง: `NIGHTLY_SKIP_RESTORE=1` (ข้าดการกู้ dump) · `NIGHTLY_REPORT_DRY=1` (พิมพ์ข้อความลง `logs/nightly/report.log` ไม่ส่ง Telegram จริง) · log ทั้งหมด: `logs/nightly/`
 
