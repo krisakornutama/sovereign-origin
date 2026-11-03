@@ -402,8 +402,11 @@
       + boundary-baseline + docs/modules พร้อมกัน = branch แยก
 - [ ] **J3e รวม HTTP helper 3 ตัว** (`apiClient` / `apiFetch` / `fetchJson`) — ~50 หน้ายังเรียก
       `fetch('/api…')` ตรง · เริ่มด้วยการทำตัวเดียวเป็น canonical + re-export ก่อน
-- [ ] **J3f `STATUS.md` 412 บรรทัด/344 KB** — เป็น journal ไม่ใช่สถานะปัจจุบัน → ย้ายไป
-      `docs/history/` แล้วทำ STATUS สั้นที่ gen จาก system-truth/ops-status
+- [x] **J3f `STATUS.md` 412 บรรทัด/344 KB** — **เสร็จ 03/11/69** (`ai/status-doc`)
+      · ย้าย journal เดิม (บันทึกถึง 22/10/69) → `docs/history/status-journal-2026-10.md` (ไม่ตัดทิ้ง) · `STATUS.md` ใหม่ 85 บรรทัด gen จาก `system-truth.json` + `logs/nightly/status.json` + `ops-status.json` + `nightly-history.json`
+      · `tools/status-doc.mjs`: `--check` (ค่าดีฟอลต์ · อ่านเท่านั้น) / `--write` / `--print` · `--check` ใช้ "สร้างเมื่อ" ในไฟล์เดิมเป็นฐาน ⇒ เวลาผ่านไปไม่ทำให้เก่า เก่าเมื่อข้อมูลจริงเปลี่ยน · `--out=` / `--root=` สำหรับ worktree
+      · เทสต์ `tools/test/status-doc.test.mjs` **15/15** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND` exit 1) ครอบข้อมูลครบ/ว่าง/JSON เสีย/failedExtras/history gaps/CLI exit code/ไฟล์จริงต้องสั้น
+      · ไม่ผูกเข้า nightly (กัน diff ทุกคืน) — รันมือก่อน commit · เอกสาร `docs/ops-runbook.md` §STATUS.md
 - [x] **J3g ความลับจาก node kit รอบก่อน** — ตรวจชุดที่เผยแพร่วันนี้ (`node-kit-1.1.1.zip`) แล้ว **สะอาด**: มีแต่ `*.env.example`/`*.template` ไม่มี `.env.bak`/`.playwright` · **ยังต้อง revoke credential ที่เคยหลุด** (คิว J4a)
       ชุด 19/10 กรองแล้ว (`.env*` ยกเว้น `.example`) + เทสต์ · ต้อง rotate ความลับและตรวจ access log
       ของ `/api/agent-machines/node-kits/asset` **หลัง Cold Soak** (ห้ามแตะ `.env`/restart ตอนนี้)
