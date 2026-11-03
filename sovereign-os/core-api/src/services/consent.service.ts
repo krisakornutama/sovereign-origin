@@ -17,6 +17,50 @@ export const CONSENT_POLICY_VERSION = '2026-11-03';
 
 export type ConsentPurposeKey = 'essential' | 'telemetry' | 'analytics' | 'marketing' | 'health';
 
+/**
+ * เวอร์ชันที่นโยบาย "ของวัตถุประสงค์นี้" เปลี่ยนครั้งล่าสุด
+ *
+ * bump `CONSENT_POLICY_VERSION` พร้อมแก้เฉพาะบางวัตถุประสงค์ → ขยับเฉพาะคีย์นั้น
+ * ผู้ใช้ที่ยอมรับเวอร์ชัน >= ค่านี้แล้วไม่ต้องถูกถามซ้ำ — ถ้าไม่ทำแบบนี้ การแก้ข้อความ
+ * จุดเดียวจะกลายเป็นการขอความยินยอมใหม่ทั้งระบบ ผู้ใช้จะกดยอมโดยไม่อ่าน (พิธีกรรม)
+ *
+ * ⚠️ ห้ามใส่เวอร์ชันล้ำหน้า `CONSENT_POLICY_VERSION` — มีเทสต์คุมที่
+ * `tests/consentPolicyVersion.test.ts`
+ */
+export const CONSENT_PURPOSE_REVISED_IN: Record<ConsentPurposeKey, string> = {
+  essential: '2026-11-03',
+  telemetry: '2026-11-03',
+  analytics: '2026-11-03',
+  marketing: '2026-11-03',
+  health: '2026-11-03',
+};
+
+const versionAt = (value: unknown): number => {
+  const t = Date.parse(String(value ?? ''));
+  return Number.isFinite(t) ? t : NaN;
+};
+
+/**
+ * แถวความยินยอมที่เก็บไว้ยังใช้ได้กับวัตถุประสงค์นี้ไหม
+ *
+ * เทียบกับ "เวอร์ชันที่ถ้อยคำของวัตถุประสงค์นี้เปลี่ยนล่าสุด" ไม่ใช่เวอร์ชันรวม:
+ * ถ้าวันหนึ่ง bump นโยบายเพราะแก้เฉพาะสุขภาพ ผู้ใช้ที่ยอมรับการตลาดไว้แล้ว
+ * ไม่ต้องถูกถามซ้ำ — แต่สุขภาพต้องยืนยันใหม่
+ *
+ * @param revisedIn ใช้ในเทสต์/การย้ายข้อมูลเท่านั้น — ปกติอ่านจาก `CONSENT_PURPOSE_REVISED_IN`
+ */
+export function isConsentCurrent(
+  purpose: ConsentPurposeKey,
+  row: { granted?: boolean | null; policy_version?: string | null } | null | undefined,
+  revisedIn: string = CONSENT_PURPOSE_REVISED_IN[purpose] ?? CONSENT_POLICY_VERSION
+): boolean {
+  if (!row || row.granted !== true) return false;
+  const stored = versionAt(row.policy_version);
+  const required = versionAt(revisedIn);
+  if (!Number.isFinite(stored) || !Number.isFinite(required)) return false; // อ่านไม่ได้ = fail closed
+  return stored >= required;
+}
+
 export interface ConsentPurposeSpec {
   key: ConsentPurposeKey;
   /** true = ปิดไม่ได้ (จำเป็นต่อการให้บริการ) */
@@ -78,6 +122,10 @@ export interface ConsentState {
   key: ConsentPurposeKey;
   required: boolean;
   granted: boolean;
+  /** true = เคยยอมรับไว้ แต่ถ้อยคำของวัตถุประสงค์นี้เปลี่ยนแล้ว → ต้องยืนยันฉบับใหม่ */
+  needsReconsent: boolean;
+  /** เวอร์ชันที่นโยบายของวัตถุประสงค์นี้เปลี่ยนล่าสุด */
+  revisedIn: string;
   updatedAt: Date | null;
   labelTh: string;
   labelEn: string;
@@ -85,24 +133,32 @@ export interface ConsentState {
 }
 
 /** สถานะความยินยอมของผู้ใช้ + เวอร์ชันนโยบายที่ใช้อยู่ */
-export async function listConsents(userId: string): Promise<{ policyVersion: string; purposes: ConsentState[] }> {
+export async function listConsents(
+  userId: string
+): Promise<{ policyVersion: string; reconsentRequired: boolean; purposes: ConsentState[] }> {
   const rows = await prisma.userConsent.findMany({ where: { user_id: userId } });
   const byPurpose = new Map(rows.map((row) => [String(row.purpose), row]));
+  const purposes: ConsentState[] = CONSENT_PURPOSES.map((spec) => {
+    const row = byPurpose.get(spec.key);
+    const revisedIn = CONSENT_PURPOSE_REVISED_IN[spec.key] ?? CONSENT_POLICY_VERSION;
+    return {
+      key: spec.key,
+      required: spec.required,
+      // วัตถุประสงค์จำเป็น = เปิดเสมอ ไม่ว่าแถวใน DB จะเป็นอะไร
+      granted: spec.required ? true : Boolean(row?.granted),
+      // "ขอใหม่" ใช้เฉพาะคนที่เคยยอมรับไว้แล้ว (คนที่ไม่เคยยอม = ครั้งแรก ไม่ใช่ขอใหม่)
+      needsReconsent: !spec.required && Boolean(row?.granted) && !isConsentCurrent(spec.key, row),
+      revisedIn,
+      updatedAt: row?.updated_at ?? null,
+      labelTh: spec.labelTh,
+      labelEn: spec.labelEn,
+      detailTh: spec.detailTh,
+    };
+  });
   return {
     policyVersion: CONSENT_POLICY_VERSION,
-    purposes: CONSENT_PURPOSES.map((spec) => {
-      const row = byPurpose.get(spec.key);
-      return {
-        key: spec.key,
-        required: spec.required,
-        // วัตถุประสงค์จำเป็น = เปิดเสมอ ไม่ว่าแถวใน DB จะเป็นอะไร
-        granted: spec.required ? true : Boolean(row?.granted),
-        updatedAt: row?.updated_at ?? null,
-        labelTh: spec.labelTh,
-        labelEn: spec.labelEn,
-        detailTh: spec.detailTh,
-      };
-    }),
+    reconsentRequired: purposes.some((p) => p.needsReconsent),
+    purposes,
   };
 }
 

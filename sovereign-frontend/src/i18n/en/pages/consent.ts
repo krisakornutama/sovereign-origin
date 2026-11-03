@@ -8,6 +8,9 @@ const consent = {
   granted: 'Granted',
   revoked: 'Not granted',
   loading: 'Loading consent status…',
+  reconsentBanner:
+    'A new privacy policy is in effect — please confirm the purposes marked “Needs confirmation” below (your other choices remain valid).',
+  reconfirm: 'Needs confirmation',
   historyTitle: 'Consent history',
   historyEmpty: 'No history yet — every change you make is recorded here.',
   deleteTitle: 'Delete my account and data',

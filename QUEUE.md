@@ -887,7 +887,14 @@
   - เทสต์ `tools/test/deploy-guard.test.mjs` **11/11** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND` exit 1) — รวมเคส CLI จริงและเคส "dump เก่า → ไม่มีคำว่า migrate สำเร็จใน output"
   - รันจริงกับของจริง: `node tools/deploy-guard.mjs` → ผ่าน (dump 03/11 03:00 ใหม่กว่า migration `add_user_consents`) · `--dry-run` แสดงแผนครบ 4 ขั้น
   - เอกสาร: `docs/ops-runbook.md` §deploy/migrate + `docs/ARCHITECTURE.md` (ทาง deploy เดียว) · ยังไม่ deploy จริง (Cold Soak)
-- [ ] **ทดสอบ re-consent เมื่อเวอร์ชันนโยบายเปลี่ยน** — bump `CONSENT_POLICY_VERSION` แล้วผู้ใช้เดิมต้องถูกขอความยินยอมใหม่เฉพาะวัตถุประสงค์ที่กระทบ และหลักฐานต้องอ้างเวอร์ชันใหม่
+- [x] **ทดสอบ re-consent เมื่อเวอร์ชันนโยบายเปลี่ยน** — **เสร็จ 03/11/69** (`ai/reconsent-policy`)
+  - `CONSENT_PURPOSE_REVISED_IN` = เวอร์ชันที่ถ้อยคำของ **แต่ละ** วัตถุประสงค์เปลี่ยนล่าสุด ⇒ bump นโยบายที่แตะเฉพาะสุขภาพ = ขอใหม่เฉพาะสุขภาพ (การตลาด/วิเคราะห์ไม่ถูกถามซ้ำ) · `isConsentCurrent()` เทียบรายวัตถุประสงค์ + fail-closed ถ้าเวอร์ชันอ่านไม่ได้
+  - `GET /api/consent` ตอบ `needsReconsent` ต่อวัตถุประสงค์ + `reconsentRequired` ระดับบน (UI ไม่ต้องเดา) · คนที่ไม่เคยยอม = ครั้งแรก ไม่ใช่ "ขอใหม่"
+  - ด่านข้อมูลสุขภาพใช้กติกาเดียวกัน ⇒ `consent_version_stale` เฉพาะเมื่อวัตถุประสงค์นั้นถูกแก้จริง
+  - UI `/consent`: แบนเนอร์ amber + ปุ่มเปลี่ยนเป็น "ต้องยืนยันใหม่" และ **ส่ง `granted:true`** (เดิมกดปุ่มเดียวจะกลายเป็นการถอน — ยืนยันฉบับใหม่ไม่ได้เลย) + i18n th/en
+  - หลักฐาน append-only: ยืนยันใหม่ = เขียน `policy_version` ใหม่ลง `user_consents` + event ใหม่ โดย event เดิมยังคงเวอร์ชันเดิม
+  - เทสต์: `tests/consentPolicyVersion.test.ts` **11/11** (แดงก่อนแก้: import ไม่มี/`needsReconsent` undefined) · `tools/test/consent-reconsent-ui.test.mjs` **5/5** (แดงก่อนแก้ 5 ข้อ) · `tests/consentGate.test.ts` 12/12 + `tests/consent.test.ts` 10/10 ไม่พัง
+  - ยังไม่ bump `CONSENT_POLICY_VERSION` จริง (ต้องแก้ข้อความนโยบายก่อน) — เมื่อจะ bump: อัปเดต `CONSENT_PURPOSE_REVISED_IN` เฉพาะวัตถุประสงค์ที่กระทบ
 
 ### P1 — ควรมีก่อนมีลูกค้ารายที่ 2
 - [ ] เชื่อม `/privacy` เข้าหน้าสมัคร/หน้าล็อกอิน (ตอนนี้เข้าถึงจากหน้า `/consent` เท่านั้น — ผู้ใช้ใหม่ควรเห็นก่อนกดยอมรับ)

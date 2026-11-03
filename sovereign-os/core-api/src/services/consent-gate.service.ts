@@ -18,6 +18,7 @@
 import { prisma } from '../lib/prisma';
 import {
   CONSENT_POLICY_VERSION,
+  isConsentCurrent,
   purposeSpec,
   type ConsentPurposeKey,
 } from './consent.service';
@@ -52,7 +53,9 @@ export async function checkSensitiveConsent(
   if (!row || row.granted !== true) {
     return { ok: false, purpose, reason: 'consent_required', policyVersion: CONSENT_POLICY_VERSION };
   }
-  if (String(row.policy_version ?? '') !== CONSENT_POLICY_VERSION) {
+  // เทียบกับเวอร์ชันที่ "วัตถุประสงค์นี้" เปลี่ยนล่าสุด — bump นโยบายที่แตะเฉพาะเรื่องอื่น
+  // ต้องไม่ทำให้ผู้ใช้ต้องยอมรับซ้ำทั้งระบบ (แต่ถ้าวัตถุประสงค์นี้ถูกแก้ = ต้องขอใหม่)
+  if (!isConsentCurrent(purpose, row)) {
     return { ok: false, purpose, reason: 'consent_version_stale', policyVersion: CONSENT_POLICY_VERSION };
   }
 
