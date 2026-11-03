@@ -112,6 +112,26 @@ Task Scheduler ชื่อ **Sovereign Nightly Verify** → `tools/nightly-veri
 
 สวิตช์ทดลอง: `NIGHTLY_SKIP_RESTORE=1` (ข้าดการกู้ dump) · `NIGHTLY_REPORT_DRY=1` (พิมพ์ข้อความลง `logs/nightly/report.log` ไม่ส่ง Telegram จริง) · log ทั้งหมด: `logs/nightly/`
 
+### consent smoke — พิสูจน์เส้นความยินยอม/PDPA ทุกคืน (เพิ่ม 3/11/69)
+
+`tools/consent-smoke-runner.mjs` เป็นทางเดียวที่ควรใช้ (Nightly เรียกเองหลัง restore-check):
+
+```bash
+# nightly ใช้ตัวนี้: อ่านเท่านั้น (GET 3 เส้น) — ปลอดภัยกับ production
+node tools/consent-smoke-runner.mjs --check
+
+# เขียนจริง (สร้าง/ลบบัญชีชั่วคราว) — ต้องเป็นสภาพแวดล้อมทดสอบเท่านั้น
+node tools/consent-smoke-runner.mjs --full --env=test \
+  --hub=http://127.0.0.1:3101 \
+  --scratch-db='postgresql://sovereign:...@127.0.0.1:5432/sovereign_smoke?schema=smoke_<สุ่ม>'
+```
+
+- `--check` (ค่าดีฟอลต์) **ไม่แตะ DB**: `/api/consent/policy` ต้อง 200 + เวอร์ชัน ISO + หัวข้อ PDPA ครบ (`who`/`data`/`purpose`/`rights`/`changes`/`contact`) · `/api/consent` และ `/api/consent/history` ต้อง **401** เมื่อไม่ส่ง token (ถ้า 200 = ข้อมูลรั่ว) · เตือน (ไม่ทำให้แดง) เมื่อเวอร์ชัน runtime ต่างจากโค้ด หรือผู้ควบคุมข้อมูลยังว่าง
+- `--full` **ปฏิเสธ (exit 2)** ถ้าไม่มี `--env=test` · hub เป็น `:3001` (production) · ไม่มี `--scratch-db` · schema เป็น `public` หรือชี้ตัวเดียวกับ `DATABASE_URL` ของโปรเจกต์ ⇒ ต้องสตาร์ท core-api อีกตัว (เช่น `:3101`) ที่ชี้ scratch schema (`prisma db push` ด้วย URL นั้น) แล้วลบ schema ทิ้งเมื่อเสร็จ
+- `sovereign-os/core-api/tools/consent-smoke.mjs` เองก็ปฏิเสธถ้าไม่ได้ `CONSENT_SMOKE_ENV=test` (ทางออกฉุกเฉิน: `--allow-non-test` — พิมพ์เตือนทุกครั้ง)
+- ผลใน `status.json`: `consentSmoke` + `failedExtras` (ขั้นเสริมล้ม = nightly ไม่ผ่าน) · log: `logs/nightly/consent-smoke.log` · ปิดชั่วคราว: `NIGHTLY_SKIP_CONSENT=1`
+
+
 ### `verify:full` แตะ :3000 อย่างไร (เพิ่ม 2/10/69 — ทำให้รอบ gate ผ่านได้จริง)
 
 `npm run verify:full` = build ทับ `.next` ของ prod → ต้อง kill แล้วบูตใหม่ก่อน e2e ไม่งั้น chunk เก่า/ใหม่ผสมกัน 404

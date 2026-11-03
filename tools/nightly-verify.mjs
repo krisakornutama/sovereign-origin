@@ -139,6 +139,34 @@ if (process.env.NIGHTLY_SKIP_RESTORE === '1') {
   console.log(`💾 Backup restore-check: ${restore.last}`);
 }
 
+// ── ความยินยอม/PDPA: พิสูจน์ว่าเส้นสาธารณะ + ด่านยืนยันตัวตนยังทำงานจริงทุกคืน ──
+// ทำไมต้องมี: `consent-smoke.mjs` เดิมต้องสั่งมือ และค่าเริ่มต้นยิงใส่ production :3001
+// → runner แยก --check (อ่านเท่านั้น: GET 3 เส้น ไม่แตะ DB) กับ --full (เขียนจริง ต้อง
+//   --env=test + hub ที่ไม่ใช่ :3001 + scratch DB) · nightly ใช้ --check เท่านั้น
+// ปิดได้ด้วย NIGHTLY_SKIP_CONSENT=1 (เช่น ตอนแก้ consent ค้างกลางทาง)
+let consentSmoke = null;
+if (process.env.NIGHTLY_SKIP_CONSENT === '1') {
+  console.log('⏭ ข้าม consent smoke (NIGHTLY_SKIP_CONSENT=1)');
+  consentSmoke = { ok: null, skipped: true, last: 'ข้าม (NIGHTLY_SKIP_CONSENT=1)' };
+} else if (!backend.up) {
+  consentSmoke = { ok: null, skipped: true, last: 'backend :3001 ไม่ตอบ' };
+} else {
+  const r = spawnSync('node', [join(REPO, 'tools', 'consent-smoke-runner.mjs'), '--check', '--json'], {
+    windowsHide: true, cwd: REPO, encoding: 'utf8', timeout: 180_000,
+  });
+  const raw = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  writeFileSync(join(LOGDIR, 'consent-smoke.log'), raw);
+  let parsed = null;
+  try { parsed = JSON.parse((r.stdout ?? '').trim().split('\n').filter(Boolean).pop() ?? ''); } catch { /* ไม่ใช่ JSON = ใช้ exit code */ }
+  consentSmoke = {
+    ok: r.status === 0,
+    last: parsed?.last ?? `runner exit ${r.status}`,
+    checks: Array.isArray(parsed?.checks) ? parsed.checks.length : null,
+    warnings: Array.isArray(parsed?.warnings) ? parsed.warnings : [],
+  };
+  console.log(`🧾 Consent smoke: ${consentSmoke.last}`);
+}
+
 // ── สถานะรวม (ให้ report + watchdog + หน้าเว็บอ่านต่อ) ──
 // โครง system-truth.json: { ok, steps, prodTruth:{diskFingerprint,...} } — codeMatch/migrationHead
 // ต้องคำนวณเองจาก /api/health (runtime fingerprint) เทียบกับดิสก์
@@ -172,12 +200,24 @@ if (!backend.up) {
   skipped.push({ name: 'backend :3001', why: `บูตไม่ขึ้น${backend.error ? ` · ${backend.error.slice(0, 140)}` : ''}` });
 }
 if (restore?.skipped) skipped.push({ name: 'backup restore-check', why: 'NIGHTLY_SKIP_RESTORE=1' });
+if (consentSmoke?.skipped) skipped.push({ name: 'consent smoke', why: consentSmoke.last });
 if (!indexnow) skipped.push({ name: 'IndexNow', why: 'สคริปต์ไม่คืนผลลัพธ์' });
 if (!seo) skipped.push({ name: 'SEO pre-flight', why: 'สคริปต์ไม่คืนผลลัพธ์' });
 if (!gsc) skipped.push({ name: 'GSC coverage', why: 'สคริปต์ไม่คืนผลลัพธ์' });
 
+// ขั้นเสริม (นอก npm run verify) ที่พิสูจน์ว่า "ของจริงยังใช้ได้" — ล้มแล้วต้องไม่รายงานว่าผ่าน
+const failedExtras = [];
+if (restore && restore.ok === false) failedExtras.push('backup restore-check');
+if (consentSmoke && consentSmoke.ok === false) failedExtras.push('consent smoke');
+const allOk = ok && failedExtras.length === 0;
+if (ok && failedExtras.length) {
+  console.log(`🚨 ขั้นเสริมไม่ผ่าน: ${failedExtras.join(', ')} — nightly ถือว่าไม่ผ่าน`);
+}
+
 const status = {
-  ok,
+  ok: allOk,
+  gateOk: ok,
+  failedExtras,
   durationMin: Math.round((Date.now() - t0) / 60_000),
   finishedAt: new Date().toISOString(),
   lastGateOk: truthFresh ? (truth.ok ?? null) : null,
@@ -192,6 +232,7 @@ const status = {
   seo,
   gsc,
   restore,
+  consentSmoke,
   machine: { ok: machine.ok, problems: machine.problems ?? [], ramFreeGB: machine.info?.ramFreeGB ?? null, diskFreeGB: machine.info?.diskFreeGB ?? null, containers: machine.info?.containers ?? null },
 };
 writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
@@ -227,4 +268,4 @@ const rep = spawnSync('node', [join(REPO, 'tools', 'nightly-report.mjs'), STATUS
 writeFileSync(join(LOGDIR, 'report.log'), `${rep.stdout ?? ''}\n${rep.stderr ?? ''}`);
 // process.exitCode ไม่ใช่ process.exit: บน Node 24/Windows การ exit ทันทีหลัง fetch
 // (health check ข้างบน) ทำให้ libuv assert → Task Scheduler ได้ 127 แม้งานผ่านจริง
-process.exitCode = ok ? 0 : 1;
+process.exitCode = allOk ? 0 : 1;

@@ -2,8 +2,10 @@
 //
 // ทำอะไร: สร้างบัญชีชั่วคราว → ออก token ของบัญชีนั้น → ยิง API จริงทุกเส้น →
 //         ตรวจผลใน DB → ลบบัญชีชั่วคราวทิ้ง
-// ข้อบังคับ: ต้องสั่งด้วย --confirm (กันเผลอรันบนระบบที่ใช้งานจริงโดยไม่ตั้งใจ)
-// ใช้:  cd sovereign-os/core-api && node tools/consent-smoke.mjs --confirm [--hub=http://localhost:3001]
+// ข้อบังคับ: ต้องสั่งด้วย --confirm + ประกาศ CONSENT_SMOKE_ENV=test
+//            (กันเผลอรันบนระบบที่ใช้งานจริงโดยไม่ตั้งใจ — ค่าเริ่มต้นของ --hub คือ :3001)
+// ใช้:  cd sovereign-os/core-api && CONSENT_SMOKE_ENV=test node tools/consent-smoke.mjs --confirm [--hub=http://localhost:3101]
+// ทางที่แนะนำ (ตรวจ hub + scratch DB ให้ก่อน): node tools/consent-smoke-runner.mjs --full --env=test --hub=... --scratch-db=...
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -17,6 +19,25 @@ const HUB = ((args.find((a) => a.startsWith('--hub=')) || '').slice(6) || 'http:
 if (!args.includes('--confirm')) {
   console.error('ปฏิเสธการทำงาน: สคริปต์นี้สร้าง/ลบบัญชีจริง ต้องสั่งด้วย --confirm');
   process.exit(2);
+}
+
+// ── ด่านสภาพแวดล้อม (03/11/69) ─────────────────────────────────────────────
+// ค่าเริ่มต้นของ --hub คือ localhost:3001 = production ที่มีคนใช้จริง
+// สคริปต์นี้สร้าง/ลบบัญชี ⇒ ต้องประกาศว่าเป็นสภาพแวดล้อมทดสอบเท่านั้น
+// ทางที่ปลอดภัยกว่า: `node tools/consent-smoke-runner.mjs --full --env=test ...`
+// (ตรวจว่า hub ไม่ใช่ :3001 + scratch DB schema ไม่ใช่ public แล้วตั้งธงนี้ให้เอง)
+const SMOKE_ENV = String(process.env.CONSENT_SMOKE_ENV ?? '').trim();
+if (SMOKE_ENV !== 'test' && !args.includes('--allow-non-test')) {
+  console.error(
+    'ปฏิเสธการทำงาน: ต้องประกาศ CONSENT_SMOKE_ENV=test ก่อน (สคริปต์สร้าง/ลบบัญชีจริง)',
+  );
+  console.error(
+    '   ถ้าจำเป็นต้องตรวจกับระบบจริงครั้งเดียวโดยมีคนเฝ้า: เพิ่ม --allow-non-test (จะพิมพ์เตือนชัดเจน)',
+  );
+  process.exit(2);
+}
+if (SMOKE_ENV !== 'test' && args.includes('--allow-non-test')) {
+  console.error(`⚠️  --allow-non-test: กำลังสร้าง/ลบบัญชีจริงบน ${HUB} — ตรวจครั้งเดียวเท่านั้น`);
 }
 
 function readEnvFile(key) {
