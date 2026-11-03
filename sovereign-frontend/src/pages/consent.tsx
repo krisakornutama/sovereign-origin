@@ -17,6 +17,10 @@ interface ConsentPurpose {
   key: string;
   required: boolean;
   granted: boolean;
+  /** เคยยอมรับไว้ แต่ถ้อยคำของวัตถุประสงค์นี้เปลี่ยน → ต้องยืนยันฉบับใหม่ */
+  needsReconsent?: boolean;
+  /** เวอร์ชันที่นโยบายของวัตถุประสงค์นี้เปลี่ยนล่าสุด */
+  revisedIn?: string;
   updatedAt: string | null;
   labelTh: string;
   labelEn: string;
@@ -25,6 +29,8 @@ interface ConsentPurpose {
 
 interface ConsentPayload {
   policyVersion: string;
+  /** true = มีวัตถุประสงค์ที่ต้องยืนยันฉบับใหม่ (นโยบายถูกแก้) */
+  reconsentRequired?: boolean;
   purposes: ConsentPurpose[];
 }
 
@@ -74,10 +80,13 @@ export default function ConsentPage() {
       setBusy(purpose.key);
       setError(null);
       try {
+        // เคยยอมรับไว้ใต้เวอร์ชันเก่า = "ยืนยันใหม่" ต้องส่ง granted:true เสมอ
+        // ถ้าใช้ !purpose.granted ตรง ๆ ผู้ใช้จะกดแล้วกลายเป็นการถอน — ยืนยันฉบับใหม่ไม่ได้เลย
+        const nextGranted = purpose.needsReconsent ? true : !purpose.granted;
         const res = await authFetch(`${getApiUrl()}/api/consent`, {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ purpose: purpose.key, granted: !purpose.granted }),
+          body: JSON.stringify({ purpose: purpose.key, granted: nextGranted }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -129,6 +138,12 @@ export default function ConsentPage() {
           </div>
         )}
 
+        {data?.reconsentRequired && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {t('consent.reconsentBanner')}
+          </div>
+        )}
+
         <section className="mb-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold">{t('consent.purposesTitle')}</h2>
@@ -162,12 +177,14 @@ export default function ConsentPage() {
                   disabled={purpose.required || busy === purpose.key}
                   onClick={() => void toggle(purpose)}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    purpose.granted
-                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                    purpose.needsReconsent
+                      ? 'bg-amber-500/15 text-amber-200 border border-amber-500/40'
+                      : purpose.granted
+                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-slate-800 text-slate-300 border border-slate-700'
                   } ${purpose.required ? 'cursor-not-allowed opacity-60' : 'hover:opacity-90'}`}
                 >
-                  {purpose.granted ? t('consent.granted') : t('consent.revoked')}
+                  {purpose.needsReconsent ? t('consent.reconfirm') : purpose.granted ? t('consent.granted') : t('consent.revoked')}
                 </button>
               </li>
             ))}
