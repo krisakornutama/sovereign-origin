@@ -133,6 +133,22 @@ node tools/consent-smoke-runner.mjs --full --env=test \
 - ผลใน `status.json`: `consentSmoke` + `failedExtras` (ขั้นเสริมล้ม = nightly ไม่ผ่าน) · log: `logs/nightly/consent-smoke.log` · ปิดชั่วคราว: `NIGHTLY_SKIP_CONSENT=1`
 
 
+### STATUS.md — อ่านสถานะปัจจุบันที่ไหน (เพิ่ม 3/11/69 · J3f)
+
+`STATUS.md` ไม่ใช่ journal แล้ว — ประวัติเดิม (ถึง 22/10/69) ย้ายไป `docs/history/status-journal-2026-10.md`
+ไฟล์ปัจจุบัน **gen จากข้อมูลจริง 4 ไฟล์**: `sovereign-os/core-api/data/system-truth.json` (ผล verify) · `logs/nightly/status.json` · `sovereign-os/core-api/data/ops-status.json` (task/เครื่อง) · `sovereign-os/core-api/data/nightly-history.json`
+
+```bash
+node tools/status-doc.mjs --check   # ค่าดีฟอลต์: อ่านเท่านั้น · ไฟล์หาย/ข้อมูลเปลี่ยน = exit 1
+node tools/status-doc.mjs --write   # เขียน STATUS.md ใหม่หลัง verify/nightly มีผลใหม่
+node tools/status-doc.mjs --print   # ดูเฉย ๆ ไม่แตะไฟล์
+```
+
+- `--check` ใช้ "สร้างเมื่อ" ที่อยู่ในไฟล์เดิมเป็นฐาน → เวลาผ่านไปเฉย ๆ ไม่ทำให้ถูกหาว่าเก่า · เก่าเมื่อ **ข้อมูลจริงเปลี่ยน** เท่านั้น
+- เขียนที่อื่นได้ด้วย `--out=<path>` · ใช้ root อื่น (worktree) ด้วย `--root=<dir>`
+- **ไม่ผูกเข้า nightly อัตโนมัติ** — จะทำให้ working tree มี diff ทุกคืนโดยไม่มีใคร commit · รันมือหลังงานเสร็จ (ก่อน commit/ส่งงาน)
+
+
 ### `verify:full` แตะ :3000 อย่างไร (เพิ่ม 2/10/69 — ทำให้รอบ gate ผ่านได้จริง)
 
 `npm run verify:full` = build ทับ `.next` ของ prod → ต้อง kill แล้วบูตใหม่ก่อน e2e ไม่งั้น chunk เก่า/ใหม่ผสมกัน 404
