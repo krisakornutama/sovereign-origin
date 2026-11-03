@@ -24,4 +24,6 @@ export default {
   rateLimitedNoHeader: 'ลองพยายามบ่อยเกินไป — พักสักครู่แล้วลองใหม่',
   otpInvalid: 'รหัส OTP ไม่ถูกต้อง',
   genericError: 'เกิดข้อผิดพลาด',
+  privacyLink: 'นโยบายความเป็นส่วนตัว',
+  privacyHint: 'จะขอความยินยอมเรื่องข้อมูลส่วนบุคคลหลังเข้าสู่ระบบ',
 } as const;

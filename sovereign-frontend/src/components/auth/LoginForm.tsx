@@ -205,6 +205,18 @@ export default function LoginForm() {
               LOCAL-FIRST
             </span>
           </div>
+
+          {/* นโยบายต้องอ่านได้ก่อนตัดสินใจ (PDPA) — ลิงก์นี้อยู่ก่อนล็อกอินโดยตั้งใจ */}
+          <div className="pt-1 text-center text-[11px] leading-relaxed text-gray-500">
+            <a
+              href="/privacy"
+              className="text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-emerald-300"
+            >
+              {t('login.privacyLink', 'นโยบายความเป็นส่วนตัว')}
+            </a>
+            <span className="mx-2 text-gray-700">·</span>
+            <span>{t('login.privacyHint', 'จะขอความยินยอมเรื่องข้อมูลส่วนบุคคลหลังเข้าสู่ระบบ')}</span>
+          </div>
         </form>
       </div>
     </div>

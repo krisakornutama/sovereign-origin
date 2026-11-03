@@ -132,6 +132,18 @@ describe('consent — GET /api/consent', () => {
   });
 });
 
+describe('consent — GET /api/consent/policy (สาธารณะ)', () => {
+  test('อ่านได้โดยไม่ต้องล็อกอิน — ผู้ใช้ต้องเห็นนโยบายก่อนกดยอมรับ', async () => {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/api/consent/policy`);
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as any;
+      assert.ok(body.version, 'ต้องบอกเวอร์ชันนโยบาย');
+      assert.ok(Array.isArray(body.sections) && body.sections.length > 0, 'ต้องมีเนื้อหานโยบายให้อ่าน');
+    });
+  });
+});
+
 describe('consent — PUT /api/consent', () => {
   test('วัตถุประสงค์ที่ไม่รู้จัก = 400', async () => {
     await withServer(async (base) => {

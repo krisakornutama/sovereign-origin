@@ -24,4 +24,6 @@ export default {
   rateLimitedNoHeader: 'Too many attempts — wait a moment and try again',
   otpInvalid: 'Invalid OTP code',
   genericError: 'Something went wrong',
+  privacyLink: 'Privacy policy',
+  privacyHint: 'Consent for personal data is requested after you sign in',
 } as const;
