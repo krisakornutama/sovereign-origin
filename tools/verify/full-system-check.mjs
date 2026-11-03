@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireJwtSecret } from './creds.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const API = process.env.API_URL || 'http://127.0.0.1:3001';
@@ -17,8 +18,14 @@ const WEB = process.env.WEB_URL || 'http://127.0.0.1:3000';
 const require = createRequire(import.meta.url);
 const jwt = require(path.join(ROOT, 'sovereign-os/core-api/node_modules/jsonwebtoken'));
 const psql = (sql) => execSync(`docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "${sql}"`, { encoding: 'utf8' }).trim();
-const secret = fs.readFileSync(path.join(ROOT, 'sovereign-os/infra/.env'), 'utf8')
-  .split(/\r?\n/).find(l => l.startsWith('JWT_SECRET=')).slice('JWT_SECRET='.length).replace(/^["']|["']$/g, '');
+// H3: อ่าน JWT_SECRET จากจุดเดียว (tools/verify/creds.mjs) — คีย์หาย = บอกไฟล์ตรง ๆ ไม่ใช่ TypeError
+let secret = '';
+try {
+  secret = requireJwtSecret();
+} catch (err) {
+  console.error(`FATAL ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(2);
+}
 
 const [adminId, tvStr] = psql("SELECT id||'|'||token_version FROM users WHERE username='mock-admin'").split('|');
 if (!adminId) { console.error('FATAL ไม่พบ mock-admin (จำเป็นสำหรับ mint session)'); process.exit(2); }

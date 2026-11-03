@@ -211,7 +211,11 @@
 ## H — คุณภาพระยะยาว (ไม่ด่วน)
 - [ ] H1 retention ตาราง non-hypertable ที่โตเงียบ — วัดจริก่อน: `audit_logs` (เขียนทุก action)/`security_events` → ตั้งตามข้อมูลจริง (sensor_telemetry จัดครบแล้ว ห้ามซ้ำ)
 - [ ] H2 กัน e2e fail ลูกโซ่ — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
-- [ ] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` (แนว telegram-creds.mjs) — JWT_SECRET ถูกอ่านกระจายหลาย tools วันนี้
+- [x] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` — **เสร็จ 03/11/69** (`ai/verify-creds`)
+      · `parseEnvText()` / `readEnvFile()` / `readSecret()` / `requireSecret()` / `requireJwtSecret()` / `maskSecret()` — คีย์หาย = `MissingSecretError` ที่บอกชื่อคีย์ + ไฟล์ + ทางแก้ (เดิม `.find()` คืน undefined แล้ว `.slice` โยน TypeError ที่อ่านไม่ออก)
+      · เลิกอ่านซ้ำ 3 ที่: `full-system-check.mjs` · `security-audit.mjs` · `ui-sweep.mjs` (ทั้งสามใช้ `requireJwtSecret()` และ exit 2 พร้อมเหตุผลเมื่อไม่มีค่า)
+      · เทสต์ `tools/test/verify-creds.test.mjs` **9/9** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND`) — quote/CRLF/`export`/ค่าเว้นวรรค/`=` ในค่า/คีย์ซ้ำ/ไฟล์หาย/คีย์หาย/preferEnv/mask
+      · ของจริง: อ่าน `JWT_SECRET` จาก `sovereign-os/infra/.env` ได้ (64 ตัวอักษร · log แสดงแค่ `73••••33`)
 - [ ] H4 Windows-coupling ชั้น ops (Task Scheduler/.bat/.ps1) — จดไว้ ทำเมื่อโมเดลขาย turnkey จริง (launcher Go เริ่มถูกทางแล้ว)
 - [ ] H5 (P2 ใช้งานง่าย ต่อจาก 27/9) เชื่อม Telegram รายวัน: สรุป ops-status ตี 8:30 หลัง digest — เจ้าของเห็นสถานะครบทุกสายในแชทเดิม ไม่ต้องเปิดเว็บ/เครื่อง · ใช้คอมโพเนนต์ที่มีทั้งหมด (ops-status --quiet + nightly-report)
 - [x] H6 e2e ทนเน็ตกระตุก — **เสร็จ 27/9/69**: เพิ่ม ERR_CONNECTION_TIMED_OUT + ERR_NETWORK_CHANGED ใน IGNORE ของ all-pages (เน็ต LTE กระตุก ≠ บั๊กระบบ) — พิสูจน์: all-pages 46/46 ผ่าน
