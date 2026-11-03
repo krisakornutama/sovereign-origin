@@ -2,6 +2,8 @@ import { authFetch } from './apiFetch';
 import { fetchJsonArray, fetchJsonObject, asArray, asObject } from './fetchJson';
 import { getApiUrl } from './config';
 
+export { authFetch } from './apiFetch'; // canonical — อ้างอิงตัวเดียวกับ apiFetch
+
 // ── Centralized typed API client — deprecates raw `${process.env.NEXT_PUBLIC_API_URL}/api/...` ──
 // Usage: `api.getArray<MenuItem>('/restaurant/menus?restaurantId=xxx')` guarantees array, never throws into render
 

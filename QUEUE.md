@@ -400,8 +400,11 @@
 - [ ] **J3d รวมโมดูลจิ๋ว ≤70 บรรทัด** — war-room 10 · reports 27 · mesh 28 · notes 33 · audit 36 ·
       search 36 · selfreliance 40 · clone 40 · dms 41 (62 → ~56) — ต้องแก้ `module-owners.json`
       + boundary-baseline + docs/modules พร้อมกัน = branch แยก
-- [ ] **J3e รวม HTTP helper 3 ตัว** (`apiClient` / `apiFetch` / `fetchJson`) — ~50 หน้ายังเรียก
-      `fetch('/api…')` ตรง · เริ่มด้วยการทำตัวเดียวเป็น canonical + re-export ก่อน
+- [ ] **J3e รวม HTTP helper 3 ตัว** (`apiClient` / `apiFetch` / `fetchJson`) — เริ่มแล้ว 03/11/69 (`ai/http-helper-canonical`)
+      · ขั้น 1 (เสร็จ): ทำ `authFetch` เป็น canonical ใน `apiFetch.ts` แล้ว re-export จาก `fetchJson.ts` + `apiClient.ts` — importจากไหนก็ได้ฟังก์ชันตัวเดียวกัน
+      · เทสต์ `tools/test/http-helper-canonical.test.mjs` **4/4** (แดงก่อนแก้)
+      · ขั้นต่อไป (งานต่อ): ย้าย raw `fetch('/api…') ในหน้าต่าง ๆ (privacy, trace, settings, auth, ฯลฯ) มาใช้ `authFetch` — ต้องไม่แตะ `useAuthStore.ts` (store ตามกฎ #4)
+      ~50 หน้ายังเรียก fetch ตรง · เริ่มจากหน้าที่ไม่ใช่ auth-flow ก่อน
 - [x] **J3f `STATUS.md` 412 บรรทัด/344 KB** — **เสร็จ 03/11/69** (`ai/status-doc`)
       · ย้าย journal เดิม (บันทึกถึง 22/10/69) → `docs/history/status-journal-2026-10.md` (ไม่ตัดทิ้ง) · `STATUS.md` ใหม่ 85 บรรทัด gen จาก `system-truth.json` + `logs/nightly/status.json` + `ops-status.json` + `nightly-history.json`
       · `tools/status-doc.mjs`: `--check` (ค่าดีฟอลต์ · อ่านเท่านั้น) / `--write` / `--print` · `--check` ใช้ "สร้างเมื่อ" ในไฟล์เดิมเป็นฐาน ⇒ เวลาผ่านไปไม่ทำให้เก่า เก่าเมื่อข้อมูลจริงเปลี่ยน · `--out=` / `--root=` สำหรับ worktree

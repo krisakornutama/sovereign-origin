@@ -1,5 +1,7 @@
 import { authFetch } from './apiFetch';
 
+export { authFetch } from './apiFetch'; // canonical — อ้างอิงตัวเดียวกับ apiFetch
+
 // ────────────────────────────────────────────────────────────────────────────
 // fetchJson — ดึงข้อมูลจาก API พร้อมการันตีรูปร่างก่อนเข้า state
 //
