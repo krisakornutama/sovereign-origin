@@ -89,7 +89,10 @@ function nightlyLine() {
   const p = join(MAIN_ROOT, 'logs', 'nightly', 'status.json');
   try {
     const s = JSON.parse(readFileSync(p, 'utf8'));
-    const failed = (s.steps ?? []).filter((x) => x.ok === false).map((x) => x.name);
+    const failed = [
+      ...(s.steps ?? []).filter((x) => x.ok === false).map((x) => x.name),
+      ...(Array.isArray(s.failedExtras) ? s.failedExtras : []),
+    ];
     return {
       ok: s.ok,
       finishedAt: parsePsDate(s.finishedAt)?.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false }) ?? '—',

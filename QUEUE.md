@@ -865,7 +865,7 @@
   - ตรวจแล้วไม่พบการเสิร์ฟไฟล์ระบบ: `/.env` = 404 · `/backups/` = 404 · CORS ไม่ได้ตั้ง `*` (ค่าเริ่มต้นผูก localhost:3000)
   - นโยบายความเป็นส่วนตัว: `GET /api/consent/policy` + หน้า `/privacy` (th/en) เวอร์ชันเดียวกับหลักฐานยินยอม
   - **เจ้าของต้องเติมก่อนเผยแพร่**: `PRIVACY_CONTROLLER_NAME`, `PRIVACY_CONTACT_EMAIL`, `PRIVACY_CONTACT_ADDRESS` (หน้าเว็บเตือนถ้ายังว่าง)
-  - ทดสอบกับบัญชีจริง: `cd sovereign-os/core-api && node tools/consent-smoke.mjs --confirm` → 15/15 ผ่าน (สร้างบัญชี → API → DB → ลบทิ้ง)
+  - ทดสอบกับบัญชีจริง: `cd sovereign-os/core-api && node tools/consent-smoke.mjs --confirm` → 15/15 ผ่าน (สร้างบัญชี → API → DB → ลบทิ้ง) · **ตั้งแต่ 03/11/69 ต้องมี `CONSENT_SMOKE_ENV=test` หรือใช้ `tools/consent-smoke-runner.mjs --full --env=test` (ดู P1)**
 
 ## สิ่งที่ควรทำต่อ — เรียงตามความเสี่ยง (บันทึก 03/11/69 หลังปิดรอบนโยบาย/PDPA)
 
@@ -901,7 +901,14 @@
   - ไม่มีหน้าสมัครเองในระบบ (ผู้ดูแลสร้างบัญชี) ⇒ หน้าจอแรกของผู้ใช้ใหม่คือ login: เพิ่มลิงก์ “นโยบายความเป็นส่วนตัว” + บรรทัดบอกว่าจะขอความยินยอมหลังเข้าสู่ระบบ (th/en)
   - ล็อกคุณสมบัติ “อ่านได้ก่อนล็อกอิน”: `tools/test/login-privacy-links.test.mjs` **5/5** (แดงก่อนแก้ exit 1) ตรวจลิงก์อยู่ในฟอร์ม login, `/privacy` ใช้ `fetch` ตรง (ไม่ใช่ `authFetch`), `/api/consent/policy` ไม่มี `authenticate` กั้น
   - เทสต์พฤติกรรมจริงเพิ่มใน `tests/consent.test.ts`: `GET /api/consent/policy` = 200 โดยไม่ส่ง token (11/11)
-- [ ] เพิ่ม `consent-smoke.mjs` เข้า nightly/CI — ปัจจุบันต้องสั่งมือ; ควรมี runner ที่ปฏิเสธการรันนอกสภาพแวดล้อมทดสอบ
+- [x] เพิ่ม `consent-smoke.mjs` เข้า nightly/CI + runner ที่ปฏิเสธการรันนอกสภาพแวดล้อมทดสอบ — **เสร็จ 03/11/69** (`ai/consent-smoke-nightly`)
+  - `tools/consent-smoke-runner.mjs` แยก 2 โหมด: `--check` (ค่าดีฟอลต์ · nightly) = อ่านเท่านั้น GET 3 เส้น ไม่แตะ DB · `--full` = เขียนจริง (สร้าง/ลบบัญชี) ต้องผ่านทุกข้อ: `--env=test`, hub ไม่ใช่ `:3001`, `--scratch-db` ที่ schema ไม่ใช่ `public` และไม่ใช่ `DATABASE_URL` ของโปรเจกต์ → ไม่ผ่าน = **exit 2 ก่อนแตะอะไร**
+  - `--check` ตรวจจริง: policy 200 + เวอร์ชัน ISO + หัวข้อ PDPA ครบ (`who`/`data`/`purpose`/`rights`/`changes`/`contact`) · `/api/consent` + `/history` ต้อง 401 เมื่อไม่ส่ง token (200 = ข้อมูลรั่ว) · เตือน (ไม่ทำให้แดง) เมื่อ runtime ต่างจากโค้ด หรือผู้ควบคุมข้อมูลยังว่าง
+  - `consent-smoke.mjs` ปฏิเสธเองถ้าไม่ได้ `CONSENT_SMOKE_ENV=test` (เดิมค่าเริ่มต้นยิงใส่ production `:3001`) — ทางออกฉุกเฉิน `--allow-non-test` พิมพ์เตือนทุกครั้ง
+  - nightly-verify: รัน `--check --json` หลัง restore-check · เก็บ `consentSmoke` + `failedExtras` ใน `status.json` · **ขั้นเสริมล้ม = nightly ไม่ผ่าน** (เดิม restore ล้มแต่รายงานยังขึ้น ✅) · Telegram มีบรรทัด 🧾 · log `logs/nightly/consent-smoke.log` · ปิดได้ด้วย `NIGHTLY_SKIP_CONSENT=1`
+  - เทสต์ `tools/test/consent-smoke-runner.test.mjs` **19/19** (แดงก่อนแก้: `ERR_MODULE_NOT_FOUND` exit 1) — รวม CLI จริง: `--full` ไม่มี `--env=test` = exit 2 · `--check` ชน hub ตาย = exit 1
+  - รันจริงกับ production แบบอ่านเท่านั้น: `OK · 6/7 · ⚠️ 1 คำเตือน (ผู้ควบคุมข้อมูลยังว่าง)` · `--full` ชี้ `:3001` = exit 2 · `consent-smoke.mjs --confirm` ไม่มี env = exit 2
+  - เอกสาร: `docs/ops-runbook.md` §consent smoke
 - [ ] ทดสอบ fleet กับเครื่องจริง 1 เครื่อง (สร้างรหัสเชิญ + ตั้ง site/group ผ่าน UI) — งานค้างเดิมจาก Phase 2
 - [ ] ตัดสินใจเรื่อง `MACHINE_ENROLL_CODE` บน production: ใช้รหัสเดิม (ต้องใส่ env + recreate) หรือใช้รหัสฝูง `enr_…` อย่างเดียวแล้วลบเอกสารที่ยังพูดถึงรหัสเดิม
 - [ ] ตรวจ `/api/metrics` ว่า `METRICS_TOKEN` ถูกตั้งบน production จริง (ว่าง = 401 ซึ่งปลอดภัย แต่ต้องยืนยันว่าไม่ได้ตั้งเป็นค่าอ่อน)
