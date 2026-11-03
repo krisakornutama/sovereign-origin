@@ -14,6 +14,7 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from '
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeJsonWithChecksum } from './json-checksum.mjs';
+import { findHistoryGaps, mergeHistoryEntry } from './nightly-history.mjs';
 
 // REPO = root ของ repo (ไฟล์อยู่ tools/ → ต้องขึ้น 2 ชั้น: ไฟล์ → tools → root)
 // (บั๊กจริงรอบแรก: ขึ้นชั้นเดียว → REPO=tools → log หลุดไป tools/logs และไม่เรียก report)
@@ -235,9 +236,11 @@ const status = {
   consentSmoke,
   machine: { ok: machine.ok, problems: machine.problems ?? [], ramFreeGB: machine.info?.ramFreeGB ?? null, diskFreeGB: machine.info?.diskFreeGB ?? null, containers: machine.info?.containers ?? null },
 };
-writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
 
 // ── Phase 4: history 30 วัน — ให้ /system-health วาดกราฟแนวโน้ม (ตามวันที่ รันซ้อน = แทนที่) ──
+// 03/11/69 (J3b): เพิ่ม "ตรวจช่องว่าง" — entry ของ 7/9/13/14/17 ต.ค. หายไปโดยไม่มีใครรู้
+// ⇒ เก็บผลลง status.historyGaps ให้รายงาน Telegram เตือน (ไม่ทำให้ nightly แดง: เครื่องอาจปิด)
+let historyGaps = [];
 try {
   const histPath = join(REPO, 'sovereign-os', 'core-api', 'data', 'nightly-history.json');
   let hist = [];
@@ -252,13 +255,18 @@ try {
     machineOk: status.machine?.ok ?? null,
     skippedCount: status.skippedCount,
   };
-  hist = Array.isArray(hist) ? hist.filter((e) => e.day !== day) : [];
-  hist.push(entry);
-  while (hist.length > 30) hist.shift(); // เก็บ 30 วันล่าสุด
+  const next = mergeHistoryEntry(hist, entry);
+  historyGaps = findHistoryGaps(next, { today: day });
   // ต้องอัปเดต sidecar .sha256 ด้วย ไม่งั้น data-integrity (สแกนทุก boot/สัปดาห์)
   // จะตีว่า checksum ไม่ตรง = BIT_ROT แล้ว quarantine สำเนาทุกครั้ง (เจอจริง 276 ไฟล์)
-  writeJsonWithChecksum(histPath, hist);
+  writeJsonWithChecksum(histPath, next);
+  if (historyGaps.length) {
+    console.log(`🗓 nightly-history ขาด ${historyGaps.length} วัน: ${historyGaps.join(', ')}`);
+  }
 } catch { /* soft-fail — history พังไม่กระทบ nightly */ }
+status.historyGaps = historyGaps;
+
+writeFileSync(STATUS, JSON.stringify(status, null, 2) + '\n');
 try { unlinkSync(LOCK); } catch { /* ข้าม */ }
 
 // ── สรุป Telegram (สคริปต์แยก — soft-fail) — เก็บ output ไว้พิสูจน์เสมอ (ส่ง/skip/พลาด) ──
