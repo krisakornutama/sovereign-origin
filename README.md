@@ -3,6 +3,10 @@
 ระบบบ้านอัจฉริยะ Sovereign ที่ดูแลตัวเองได้ (Self-Sovereign Home OS) — Security, Resilience, AI และ Telemetry ในชุดเดียว
 ทดสอบ 994/994 tests ผ่าน 100% · core-api รันบน RAM ~220MiB, CPU <0.5%
 
+> **Community Edition (Docker อย่างเดียว — ไม่ต้องมี Node.js บนเครื่อง):**
+> `cp deploy/community/.env.example deploy/community/.env` แล้ว `docker compose -f deploy/community/docker-compose.yml up -d --build`
+> ดูรายละเอียดที่ [`deploy/community/README.md`](deploy/community/README.md)
+
 ## 🚀 ติดตั้งครั้งเดียวใช้งานได้เลย (One-Shot Install)
 
 **ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2) **+ Node.js 20+**
