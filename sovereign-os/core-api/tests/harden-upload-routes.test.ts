@@ -196,7 +196,9 @@ describe('wiring: ทุกโมดูล multer ผ่าน hardenUpload', ()
       assert.ok(!usesMulter || usesHarden, `${rel}: มี multer แต่ไม่ผ่าน hardenUpload`);
       if (usesHarden) hardenFiles++;
     }
-    assert.ok(hardenFiles >= 7, `ต้องมีอย่างน้อย 7 โมดูลผ่าน hardenUpload (เจอ ${hardenFiles})`);
+    // CE baseline หลังแยกโมดูล Pro ออก (04/11/69): 4 โมดูล — โมดูล Pro ที่เคยใช้ hardenUpload
+    // (business/payments/treasury/restaurant) ย้ายไป repo Pro แล้ว จึงนับเฉพาะที่เหลือใน CE
+    assert.ok(hardenFiles >= 4, `ต้องมีอย่างน้อย 4 โมดูลผ่าน hardenUpload (เจอ ${hardenFiles})`);
   });
 
   test('hardenUpload: memory mode กัน misconfig + ต้องมี memoryStorage และ randomDiskName ใน lib', () => {

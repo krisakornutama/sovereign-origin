@@ -14,7 +14,6 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { agentActions } from './agent-actions.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
-import { confirmReportedPaymentByToken, rejectReportedPaymentByToken } from './business-shop.service';
 import { parseJobCallback, approveJob, rejectJob } from './orchestrator-approval.service';
 import {
   parseQueueCommand,
@@ -115,8 +114,9 @@ export class TelegramAgentBot {
     this.resolveActor = deps.resolveActor || this.lookupSuperadmin;
     this.allowedChatId = deps.allowedChatId ?? process.env.TELEGRAM_CHAT_ID;
     this.token = deps.token ?? (process.env.TELEGRAM_BOT_TOKEN || '');
-    this.confirmPay = deps.confirmPay || ((token, actor) => confirmReportedPaymentByToken(token, actor));
-    this.rejectPay = deps.rejectPay || ((token, actor) => rejectReportedPaymentByToken(token, actor));
+    const proOnly = async (): Promise<PaymentConfirmResult> => ({ status: 'error', message: 'การยืนยันรับเงินเป็นฟีเจอร์ของ Pro' });
+    this.confirmPay = deps.confirmPay || proOnly;
+    this.rejectPay = deps.rejectPay || proOnly;
   }
 
   get enabled(): boolean {

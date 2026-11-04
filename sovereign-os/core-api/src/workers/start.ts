@@ -8,15 +8,12 @@ import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import { MqttIngestionWorker, systemEvents, flushTelemetryNow } from './mqttIngest';
 import { relayScheduler } from '../services/relay-scheduler.service';
-import { startDimeScheduler } from '../services/dime.service';
 import { dmsService } from '../services/dms.service';
 import { payWeeklyAllowances, archiveOldItems, resetDailyChores, buildDailySummary, formatDailySummary, snapshotAllPortfolios } from '../services/teach-kids.service';
-import { runSignalCheck } from '../services/portfolio-signal.service';
 import { startWanMonitor } from '../services/wan-monitor.service';
 import { startTruthWatchdog } from '../services/truth-watchdog.service'; // Phase 2: แจ้งเตือน prod รันโค้ดเก่า/เกตพัง
 import { seedDefaultRoles, processAgentQueue, runMorningReports } from '../services/agent-team.service';
 import { reapStaleJobs } from '../services/agent-machines.service';
-import { notifyLowStock, notifyTaxDeadlines, buildMorningDigest } from '../services/business.service';
 import { sendTelegramMessage } from '../modules/telegram/telegram.routes';
 import { processCodingQueue } from '../services/coding-agent.service';
 import { initGovernor, runGovernorCycle } from '../services/governor.service';
@@ -40,7 +37,6 @@ import { aiAnalyst } from '../services/ai-analyst.service';
 import { timeConsensus } from '../services/time-consensus.service';
 import { runBitRotScan } from '../services/data-integrity.service';
 import { systemMonitor } from '../services/system-monitor.service';
-import { createWealthWorker, wealthEmitter } from '../services/wealth.service';
 import { createRiskWorker, riskEmitter } from '../services/risk-monitor.service';
 import { runAndReportStripeReconcile } from '../services/stripe-reconcile.runtime';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from '../services/defcon-engine.service';
@@ -115,7 +111,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   // Start services
   new MqttIngestionWorker();
   relayScheduler.start();
-  startDimeScheduler(); // Dime! Statement — cron ตาม DIME_ENABLED/DIME_FETCH_CRON (default ปิด)
   startTruthWatchdog(); // Phase 2: ตรวจ codeMatch/เกตพัง/stale truth — แจ้ง Telegram (soft-fail)
 
   // ── Series 🔴: Dead-Man Switch (DMS) — ตรวจบันไดวิกฤต 90s/180s + WoL (ถ้าตั้ง) ──
@@ -258,21 +253,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   runPortfolioSnapshot();
   setInterval(runPortfolioSnapshot, 6 * 60 * 60 * 1000);
 
-  // ── AI Portfolio Manager: ตรวจสัญญาณ Small-Cap ทุก 15 นาที (Rule 3 Daily gate กัน spam ใน service) ──
-  // กฎเก็บใน SystemSetting 'portfolio.triggers' — แก้ได้ผ่าน /api/treasury/signals
-  async function runPortfolioSignals() {
-    try {
-      const report = await runSignalCheck();
-      if (report.alerts.length > 0) {
-        console.log(`📈 Portfolio signals: ${report.alerts.map((a) => `${a.symbol}:${a.action}`).join(', ')}`);
-      }
-    } catch (err) {
-      console.error('Portfolio signal error:', err instanceof Error ? err.message : err);
-    }
-  }
-  runPortfolioSignals();
-  setInterval(runPortfolioSignals, 15 * 60 * 1000);
-
   // ── WAN Monitor: เฝ้าเน็ตซิม Archer MR505 ทุก 60 วิ (alert UP/DOWN + telemetry wan_state) ──
   startWanMonitor(60_000);
 
@@ -322,50 +302,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
   setTimeout(runStripeReconcileCheck, 45_000); // หลังบูต 45 วิ (ให้ DB พร้อมก่อน)
   setInterval(runStripeReconcileCheck, 30 * 60 * 1000);
-
-  // ── BUSINESS PLATFORM: เตือนสต็อกต่ำของทุกธุรกิจผ่าน Telegram (ทุก 6 ชม.) ──
-  async function runBusinessLowStockCheck() {
-    try {
-      const n = await notifyLowStock();
-      if (n > 0) console.log(`📦 Business low-stock: พบ ${n} รายการ เตือนแล้ว`);
-    } catch (err) {
-      console.error('Business low-stock error:', err instanceof Error ? err.message : err);
-    }
-  }
-  runBusinessLowStockCheck();
-  setInterval(runBusinessLowStockCheck, 6 * 60 * 60 * 1000);
-
-  // ── BUSINESS PLATFORM: เตือนกำหนดยื่นภาษี ภ.พ.30/ภ.ง.ด.3/50/51/90 (ทุก 6 ชม. — ตัว dispatcher กันส่งซ้ำเอง) ──
-  async function runBusinessTaxDeadlineCheck() {
-    try {
-      const n = await notifyTaxDeadlines();
-      if (n > 0) console.log(`⏰ Business tax deadlines: เตือน ${n} ธุรกิจ`);
-    } catch (err) {
-      console.error('Business tax-deadline error:', err instanceof Error ? err.message : err);
-    }
-  }
-  runBusinessTaxDeadlineCheck();
-  setInterval(runBusinessTaxDeadlineCheck, 6 * 60 * 60 * 1000);
-
-  // ── Morning digest ทุกเช้า 08:00 เวลาไทย — ยอดขายเมื่อวาน/ค้างชำระ/แจ้งชำระรอยืนยัน/บิลคู่ค้า (P19 ต่อ) ──
-  // กันส่งซ้ำด้วยวันที่ (นับในหน่วยความจำ) · เช็คทุก 10 นาที — ยิงแค่ช่วงชั่วโมง 8 (บูตใหม่ช่วงอื่นของวัน = ข้าม)
-  let morningDigestDay = '';
-  async function runMorningDigest() {
-    try {
-      const now = new Date();
-      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(now);
-      const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false }).format(now));
-      if (day === morningDigestDay || hour !== 8) return;
-      morningDigestDay = day;
-      const text = await buildMorningDigest(now);
-      const ok = await sendTelegramMessage(text);
-      if (ok) console.log('🌅 Morning digest ส่งแล้ว');
-    } catch (err) {
-      console.error('Morning digest error:', err instanceof Error ? err.message : err);
-    }
-  }
-  runMorningDigest();
-  setInterval(runMorningDigest, 10 * 60 * 1000);
 
   // ── Vision AI คนแปลกหน้า: ตรวจตามกฎ (ทุก 60 วิ — ตัวกฎกันการตรวจซ้ำด้วย interval_min) ──
   async function runVisionCheckWorker() {
@@ -419,11 +355,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   if (analystStarted) console.log('🤖 AI Security Analyst เริ่มทำงาน (Ollama + Telegram)');
 
   // ── Phase 4: Risk & Wealth Infrastructure ──
-
-  // Module 13: Wealth & Asset Tracker — cron job ดึงราคา (ทุก 1-4 ชม.) + คำนวณพอร์ต/เสบียง/runway
-  const wealthWorker = createWealthWorker(config.portfolio);
-  app.locals.wealthWorker = wealthWorker;
-  wealthWorker.start();
 
   // Module 14 + 15: Risk Monitor (RSS + Ollama) → DEFCON Engine (physical actions)
   // DEFCON actions: ต่อกับระบบเดิมที่มีอยู่ — MQTT relay control + backup + exec (เหมือน POWER_SHUTDOWN_CMD)
@@ -698,7 +629,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
   }
 
   // Forward internal events to websocket clients
-  wealthEmitter.on('wealth_update', (data) => io.emit('wealth_update', data));
   riskEmitter.on('risk_error', (err) => io.emit('risk_error', err));
   riskEmitter.on('threat_update', (threat) => {
     io.emit('threat_update', threat);

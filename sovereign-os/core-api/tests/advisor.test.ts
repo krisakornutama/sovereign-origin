@@ -160,10 +160,12 @@ test('buildSituationContext gathers real data into compact context', async () =>
   assert.strictEqual(ctx.inventory.foodQty, 34);
   assert.strictEqual(ctx.inventory.lowStock, 1);
   assert.strictEqual(ctx.inventory.expired, 1);
-  assert.strictEqual(ctx.wealth.portfolioUsd, 1000); // 0.01 BTC × 100000
-  assert.strictEqual(ctx.wealth.inventoryUsd, 20 + 60 + 12 + 5);
-  assert.strictEqual(ctx.wealth.runwayMonths, 6);
-  assert.strictEqual(ctx.wealth.monthlyBurnUsd, 1000);
+  // CE ไม่มี wealth service — ตัวเลขพอร์ต/ความมั่งคั่งเป็นของ Pro จึงต้องเป็น null
+  assert.strictEqual(ctx.wealth.portfolioUsd, null);
+  assert.strictEqual(ctx.wealth.totalUsd, null);
+  assert.strictEqual(ctx.wealth.inventoryUsd, null);
+  assert.strictEqual(ctx.wealth.runwayMonths, null);
+  assert.strictEqual(ctx.wealth.monthlyBurnUsd, null);
   assert.strictEqual(ctx.risk.threatOverall, 55);
   assert.strictEqual(ctx.risk.defcon, 3);
   assert.strictEqual(ctx.truncated, false);

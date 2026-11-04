@@ -1,7 +1,7 @@
 # Open-Core: เส้นแบ่ง Community Edition กับ Pro
 
-> สถานะ 04/11/69: **ยังไม่ได้แยกโค้ด** — เอกสารนี้กำหนดเส้นแบ่งที่ตกลงไว้ เพื่อให้การแยก
-> (branch `ai/open-core-split`) มีเกณฑ์ชัด และ README อ้างอิงได้ก่อนเปิดตัว
+> สถานะ 04/11/69: **แยกโค้ดแล้ว (Clean Hard Cut)** — CE ใน repo นี้ไม่มีโมดูล Pro แล้ว
+> (Pro อยู่ที่ private repo `project-sovereign-pro`) ด่านกันถอยหลัง: `node tools/verify/open-core-boundary.mjs --check`
 
 ## หลักคิด
 

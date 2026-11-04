@@ -10,7 +10,6 @@
 
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
-import { computePortfolioValue, computeInventoryValue } from './wealth.service';
 import { classifyDefcon } from './defcon-engine.service';
 import { getModelForTask } from './ai-router.service';
 
@@ -108,7 +107,6 @@ export interface AdvisorDataSources {
   inventory(): Promise<Array<{ name: string; category: string; quantity: number; unit_price_usd: number | null; minimum_stock: number | null; expiry_date: Date | null }>>;
   assets(): Promise<Array<{ symbol: string; type: string; quantity: number }>>;
   latestPrices(): Promise<Array<{ symbol: string; price_usd: number }>>;
-  wealthHistory(): Promise<{ total_usd_value: number; payload: unknown } | null>;
   threatIndex(): Promise<{ overall: number; summary: string | null } | null>;
 }
 
@@ -161,9 +159,6 @@ export const defaultDataSources: AdvisorDataSources = {
       `SELECT DISTINCT ON (symbol) symbol, price_usd
        FROM asset_prices ORDER BY symbol, time DESC`
     );
-  },
-  async wealthHistory() {
-    return prisma.wealthHistory.findFirst({ orderBy: { timestamp: 'desc' }, take: 1 });
   },
   async threatIndex() {
     return prisma.threatIndex.findFirst({ orderBy: { timestamp: 'desc' }, select: { overall: true, summary: true } });
@@ -223,7 +218,7 @@ export async function buildSituationContext(
 ): Promise<SituationContext> {
   let truncated = false;
 
-  const [telemetry, powerAvg, waterHistory, plots, items, assets, prices, wealthRow, threat] =
+  const [telemetry, powerAvg, waterHistory, plots, items, assets, prices, threat] =
     await Promise.all([
       safe(ds.latestTelemetry()),
       safe(ds.powerAvg24h()),
@@ -232,7 +227,6 @@ export async function buildSituationContext(
       safe(ds.inventory()),
       safe(ds.assets()),
       safe(ds.latestPrices()),
-      safe(ds.wealthHistory()),
       safe(ds.threatIndex()),
     ]);
 
@@ -309,41 +303,13 @@ export async function buildSituationContext(
     truncated = true;
   }
 
-  // เงิน
-  let portfolioUsd: number | null = null;
-  let missingPrices: string[] = [];
-  try {
-    const assetList = (assets || []) as any;
-    const priceList = (prices || []).map((p) => ({ symbol: p.symbol, priceUsd: Number(p.price_usd) }));
-    if (assetList.length) {
-      const pv = computePortfolioValue(assetList, priceList as any);
-      portfolioUsd = pv.totalUsd;
-      missingPrices = pv.missingPrices || [];
-    }
-  } catch {
-    portfolioUsd = null;
-  }
-  const inventoryUsd = itemsList.length
-    ? computeInventoryValue(
-        itemsList.map((i) => ({ ...i, unitPriceUsd: i.unit_price_usd ?? 0 }) as any)
-      )
-    : null;
-  const totalUsd = wealthRow?.total_usd_value != null ? Number(wealthRow.total_usd_value) : portfolioUsd;
-  let runwayMonths: number | null = null;
-  let monthlyBurnUsd: number | null = null;
-  try {
-    const payload = (wealthRow?.payload as any) ?? {};
-    const r = payload?.runway?.months;
-    const b = payload?.runway?.monthly_burn_usd ?? payload?.monthlyBurnUsd;
-    runwayMonths = r != null && Number.isFinite(Number(r)) ? Number(r) : null;
-    monthlyBurnUsd = b != null && Number.isFinite(Number(b)) ? Number(b) : null;
-  } catch {
-    runwayMonths = null;
-  }
-  if (missingPrices.length > 5) {
-    missingPrices = missingPrices.slice(0, 5);
-    truncated = true;
-  }
+  // เงิน — พอร์ต/ความมั่งคั่งเป็นของ Pro (CE ไม่มี wealth service)
+  const portfolioUsd: number | null = null;
+  const inventoryUsd: number | null = null;
+  const totalUsd: number | null = null;
+  const runwayMonths: number | null = null;
+  const monthlyBurnUsd: number | null = null;
+  const missingPrices: string[] = [];
 
   // เสี่ยง
   const threatOverall = threat?.overall != null ? Number(threat.overall) : null;

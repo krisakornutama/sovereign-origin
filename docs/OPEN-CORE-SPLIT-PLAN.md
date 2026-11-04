@@ -73,28 +73,28 @@
 - ตรวจความถูกต้องแล้ว: ทุกไฟล์ใน private repo มี blob ตรงกับ public repo 100% (`git diff --name-only <pro-main> main -- <paths>` ว่าง)
 - วิธีใช้อยู่ใน `README.md` ของ repo Pro
 
-## 7) ขั้นถัดไป: ลบ Pro ออกจาก public — ติดอยู่ที่ CE ยังพึ่ง service Pro
+## 7) ขั้น C-2 — Clean Hard Cut ทำแล้ว (04/11/69)
 
-ลองลบบน branch แล้ว `tsc` ฟ้อง **26 จุดใน 9 ไฟล์ CE** ⇒ ยังลบไม่ได้ทันที ต้องปลดก่อน:
+ลบโค้ด Pro ออกจาก public repo แล้ว **90 ไฟล์** และปลด CE ที่เคยพึ่ง service ของ Pro:
 
-| ไฟล์ CE | พึ่งอะไรของ Pro |
+- `components/pro/**` (43 ไฟล์), routes 8 โมดูล, service ของ Pro 11 + `business-agent-executor` + `portfolio-signal`, `lib/business.ts`
+- หน้า `/business` `/ecosystem` `/soverien` `/warranty` `/treasury` `/portfolio` `/fleet` `/restaurant` ออกจาก CE (API เดิมตอบ 404 ผ่าน registry พร้อมบอกชื่อโมดูล)
+- ตัดงานเบื้องหลังของ Pro ใน `workers/start.ts` (Dime scheduler, portfolio signals, low-stock/tax alerts, morning digest, wealth worker)
+- `advisor.service`: ถอด wealth ออก ค่าพอร์ต/runway เป็น `null` (CE ไม่มีข้อมูลการเงิน)
+- Telegram bot: ถอด dependency `business-shop.service` — ปุ่มยืนยันรับเงินตอบว่าเป็นฟีเจอร์ Pro (hook ยัง inject ได้สำหรับ Pro)
+- เทสต์ Pro 20 ไฟล์ + `e2e-fixture.ts` ย้ายไป repo Pro แล้ว
+
+**ผลตรวจ (รันจริงบน branch นี้):**
+
+| ด่าน | ผล |
 |---|---|
-| `src/modules/users/users.routes.ts` | `fleet-persistence.service` |
-| `src/services/advisor.service.ts` | `wealth.service` |
-| `src/services/business-agent-executor.service.ts` | `business.service` |
-| `src/services/fleet-policy.service.ts` | `fleet-persistence.service` |
-| `src/services/fleet-scope.service.ts` | `fleet-overview.service` (+ type ของมัน 13 จุด) |
-| `src/services/portfolio-signal.service.ts` | `price-feed.service` |
-| `src/services/telegram-agent-bot.service.ts` | `business-shop.service` |
-| `src/workers/start.ts` | `dime` / `business` / `wealth` service (3 งาน) |
-| `src/scripts/e2e-fixture.ts` | `business-shop.service` |
+| `tsc --noEmit` core-api | 0 error |
+| เทสต์ core-api ทั้งชุด | **867 ผ่าน / 0 ล้ม** (994 เดิม − เทสต์ Pro ที่ย้ายออก) |
+| `next build` + `tsc --noEmit` ฝั่งเว็บ | ผ่าน |
+| `open-core-boundary --check` | Pro ใน CE 0 ไฟล์ · CE อ้างถึง Pro 0 จุด |
 
-แนวทางที่ต้องเลือกก่อนลงมือ (กระทบพฤติกรรม CE):
+**หมายเหตุที่ต้องรู้:**
 
-1. **guarded require** — ห่อ import ด้วย `try/catch` + ตอบ 404/ข้ามงานเมื่อไม่มีโมดูล (CE ยังมีหน้า users/fleet บางส่วน)
-2. **ตัดฟีเจอร์ออกจาก CE** — หน้า/งานที่อิง Pro หายไปเลย (ชัดที่สุด แต่ผู้ใช้ CE เสียฟีเจอร์)
-3. **ย้าย service ที่ใช้ร่วมขึ้น CE** — เฉพาะ service ที่เป็นของกลางจริง (ต้องแยกทีละตัว ไม่ใช่ยกทั้งก้อน)
-
-พร้อมกันนั้นต้องย้ายเทสต์ Pro 12 ไฟล์ (`businessPlatform`, `thaiTax`, `transfersApi`, `treasuryApi`, `portfolioOwner`, `restaurant.routes`, `paymentsCheckout`, `paymentsFreshClone`, `paymentsWebhook`, `paymentSlips-db`, `dime-db`, `uploads-db`) ไป repo Pro ด้วย ไม่งั้น CI public แดงหลังลบ
-
-ด่านที่เพิ่มแล้ว: `.github/workflows/open-core-boundary.yml` (boundary `--check` + `tsc` + proRegistry/invite tests)
+- `fleet-policy` / `fleet-persistence` **ยังอยู่ CE** เพราะหน้าเครื่อง (agent machines) ใช้จัด site/group — ไม่ใช่ route ที่ขาย
+- Prisma model ของธุรกิจ/การเงินยังอยู่ใน schema (ตารางว่าง ไม่มี route ใช้) เพื่อไม่ให้ migration history ของ CE พัง
+- ประวัติ git ของ public ยังมีโค้ด Pro อยู่ — ถ้าต้องลบจริงต้อง `git filter-repo` + force-push (ยังไม่ทำ เพราะทำลายประวัติที่คนอื่น clone ไปแล้ว)

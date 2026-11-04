@@ -86,7 +86,7 @@ node tools/install/install.mjs
 | **Telegram Alert** (แจ้งเตือน severity เกรด production) | ใส่ `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` ใน `infra/.env` → `docker compose up -d` |
 | **UPS Shutdown** (แบตเตอรี่ถึงขีด → CHECKPOINT → ปิดเครื่อง) | `UPS_ENABLED=true` + มี NUT server (`upsd`) → ระวัง `UPS_DRY_RUN` |
 | **AI / Ollama** (Dhamma, Agent, Analyst) | ติดตั้ง Ollama แล้วเปิด `AI_ANALYST_ENABLED=true` + ตั้ง `OLLAMA_MODEL` |
-| **การลงทุน** (Portfolio) | `PORTFOLIO_ENABLED=true` + ตั้งพอร์ต/ราคา |
+| **การลงทุน** (Portfolio) *(Pro — ไม่อยู่ใน CE)* | `PORTFOLIO_ENABLED=true` + ตั้งพอร์ต/ราคา |
 | **เซนเซอร์ IoT** (MQTT) | ต่อ ESP32 ส่ง MQTT ไป EMQX (`sovereign/…`) |
 
 ## 🏠 ทรัพยากรขั้นต่ำ
@@ -122,7 +122,7 @@ npm run build  # tsc ตรวจ type + build dist/
 ## 📄 License และขอบเขต Open-Core
 
 - **Community Edition (โค้ดใน repo นี้):** [AGPL-3.0](LICENSE) — ใช้/แก้/ต่อยอดได้ ถ้าให้บริการแบบเครือข่ายต้องเปิดโค้ดที่แก้ด้วย
-- **Pro modules (ยังไม่แยกออกจาก repo นี้):** business / shop / treasury / POS / fleet — จะย้ายไป private repo ก่อนเปิดขาย
+- **Pro modules (แยกออกแล้ว 04/11/69):** business / shop / treasury / POS / fleet อยู่ใน private repo `project-sovereign-pro` — repo นี้เหลือ CE ล้วน API ของโมดูล Pro ตอบ 404 พร้อมบอกชื่อโมดูล (ไม่ทำให้ทั้ง API ล่ม)
 - เส้นแบ่งฉบับเต็ม + สิ่งที่ห้ามตัดออกจาก CE (consent, privacy, audit): [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md)
 
 > ⚠️ ตอนนี้ repo ยังมีทั้งสองส่วนรวมกัน — ห้ามโพสต์ประชาสัมพันธ์ว่า "CE พร้อมใช้" จนกว่าจะแยกเสร็จ (คิว `ai/open-core-split`)
