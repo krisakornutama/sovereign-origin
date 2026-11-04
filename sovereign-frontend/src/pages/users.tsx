@@ -7,6 +7,7 @@ import { authFetch } from '../lib/apiFetch';
 import { asObject } from '../lib/fetchJson';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
+import InviteCodesPanel from '../components/users/InviteCodesPanel';
 import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
 
@@ -388,6 +389,8 @@ export default function UsersPage() {
             <span className="text-amber-400">{t('users.addUserHintStrong', ' เปลี่ยนรหัสผ่านเองก่อนเข้าใช้งาน')}</span>{t('users.addUserHintTail', ' (กดบังคับเปลี่ยนได้ทุกเมื่อ)')}
           </div>
         </div>
+
+        <InviteCodesPanel />
 
         {/* User list */}
         <div className="card panel-cyan overflow-hidden">
