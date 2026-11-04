@@ -7,6 +7,15 @@
 > `cp deploy/community/.env.example deploy/community/.env` แล้ว `docker compose -f deploy/community/docker-compose.yml up -d --build`
 > ดูรายละเอียดที่ [`deploy/community/README.md`](deploy/community/README.md)
 
+## 🎬 เดโม 15 วินาที
+
+ลำดับ: `docker compose up -d` → ค่าอุณหภูมิเปลี่ยน → หน้าแจ้งเตือนเด้ง → มือถือได้รับ Telegram/Discord/LINE
+
+<!-- วางไฟล์คลิปที่ docs/media/demo.gif แล้วเปิดบรรทัดล่างนี้ (GitHub ฝัง GIF ได้ แต่ MP4 จะเป็นลิงก์ดาวน์โหลด) -->
+<!-- ![เดโม 15 วินาที](docs/media/demo.gif) -->
+
+สคริปต์ถ่าย + คำสั่งจำลองอุณหภูมิ + วิธีแปลงเป็น GIF: [](docs/PRELAUNCH-DEMO.md)
+
 ## 🖥️ รับช่วงต่อบนเครื่องใหม่ (clone แล้วรันได้เลย)
 
 ```bash
