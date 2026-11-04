@@ -11,3 +11,9 @@ test-results
 .env
 .env.*
 !.env.example
+# พบตอนทดสอบจริง 04/11/69: context 524 MB ทั้งที่ node_modules/.next ถูกตัดแล้ว
+# ต้นเหตุ = dist-electron 1.5 GB (แอปเดสก์ท็อป) ไม่เกี่ยวกับ image เว็บเลย
+dist-electron
+dist-portable*
+tsconfig.tsbuildinfo
+.DS_Store
