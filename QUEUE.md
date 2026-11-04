@@ -1008,3 +1008,18 @@
 - [ ] **แยก Pro modules ไป private repo** (`ai/open-core-split`) — ทำหลังทดสอบ CE ผ่าน
 - [ ] **Discord + LINE จริง** — โค้ดพร้อม (`alertFanout` 14/14) แต่ยังไม่มี credential ในเครื่อง ⇒ ยังพิสูจน์ได้แค่ Telegram
 - [ ] **คลิป 15 วิ + โพสต์ Reddit** — ยังไม่มีสื่อใน repo
+
+## CE1 — พิสูจน์คำสั่งเดียวสำเร็จ (04/11/69) ✅
+- [x] **`docker compose up -d --build` บนฐานข้อมูลว่าง = ผ่าน** (พอร์ตหลบ 3100/3101/1884/18084)
+      · db healthy · migrate exit 0 + seed สร้าง `admin` · api `/healthz` 200 · web 200 · `POST /api/auth/login` 200
+      · production ไม่ถูกแตะ (:3001 = 200, :3000 = 200 ระหว่างทดสอบ)
+- [x] **เจอบั๊ก fresh-install 4 จุดที่ซ่อนมานาน — production รอดเพราะถูกลงมือแก้:**
+      1. `farm_soil_readings.plot_id` TEXT vs `farm_plots.id` UUID ⇒ FK สร้างไม่ได้
+      2. migration `20260912000000` ขึ้นต้นด้วยข้อความขยะ `statements kept: 9`
+      3. `20260923210000` drop `dose_logs` ไม่มี IF EXISTS + ตารางไม่เคยถูกสร้างใน migration
+      4. schema drift: `users.pending_mfa_secret` ไม่มีใน migration ใด ⇒ seed ล้ม P2022
+- [x] **ทางแก้ที่เลือก:** CE ใช้ `prisma db push` (schema → DB ตรง ๆ) แทน `migrate deploy` + seed
+      · production ยังใช้ `migrate deploy` ตามปกติ (ไม่แตะ)
+- [x] Node 18 → **node:22-alpine** ทั้ง API และ migrate + `npm ci` (Prisma บน musl มี openssl แล้ว)
+- [x] **build context 524 MB → เหลือไม่กี่ MB** (ตัด `dist-electron` 1.5 GB) · คง `knowledge/` ไว้ (Dockerfile COPY)
+- [ ] เหลือ: Discord + LINE credential จริง (ต้องเจ้าของ) · คลิป 15 วิ · แยก Pro modules
