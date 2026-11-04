@@ -11,7 +11,7 @@ const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const FE = join(ROOT, 'sovereign-frontend');
 const GUARD = join(FE, 'e2e', 'helpers', 'authGuard.ts');
 
-// รายชื่อ spec ที่อยู่ใน project "authenticated" ของ playwright.config.ts
+// spec ที่อยู่ใน project "authenticated" ของ playwright.config.ts
 const AUTH_SPECS = ['pages.spec.ts', 'pos-flow.spec.ts', 'spa-nav.spec.ts'];
 
 test('มี helper กลางสำหรับ skip เมื่อ auth ล่ม', () => {
@@ -31,8 +31,9 @@ for (const spec of AUTH_SPECS) {
   });
 }
 
-test('playwright.config ยังประกาศ project authenticated (กันลิสต์เทสต์นี้กลายเป็นของตาย)', () => {
-  const cfg = readFileSync(join(FE, 'playwright.config.ts'), 'utf8').replace(/\/g, '');
+test('playwright.config ยังประกาศ project authenticated และอ้าง spec ในลิสต์', () => {
+  // config เขียน testMatch เป็น regex (มี backslash หนีจุด) → ตัด backslash ก่อนเทียบ
+  const cfg = readFileSync(join(FE, 'playwright.config.ts'), 'utf8').replaceAll('\', '');
   assert.match(cfg, /name: 'authenticated'/, 'ไม่พบ project authenticated');
   for (const spec of AUTH_SPECS) {
     assert.ok(cfg.includes(spec), `config ไม่ได้อ้าง ${spec} แล้ว — อัปเดตลิสต์ในเทสต์นี้`);
