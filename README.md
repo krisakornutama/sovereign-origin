@@ -9,10 +9,11 @@
 
 ## 🎬 เดโม 15 วินาที
 
-ลำดับ: `docker compose up -d` → ค่าอุณหภูมิเปลี่ยน → หน้าแจ้งเตือนเด้ง → มือถือได้รับ Telegram/Discord/LINE
+3 ฉากจากระบบจริง: **1** ล็อกอิน + 2FA → **2** Dashboard ที่มีข้อมูลจริง → **3** รหัสเชิญ (ไม่ต้องมี SMTP)
 
-<!-- วางไฟล์คลิปที่ docs/media/demo.gif แล้วเปิดบรรทัดล่างนี้ (GitHub ฝัง GIF ได้ แต่ MP4 จะเป็นลิงก์ดาวน์โหลด) -->
-<!-- ![เดโม 15 วินาที](docs/media/demo.gif) -->
+![เดโม: login + 2FA → dashboard จริง → รหัสเชิญ](docs/media/demo.gif)
+
+> คลิปชุดนี้เป็นภาพนิ่ง 3 ฉาก (12 วิ) จากระบบที่รันจริง — ไฟล์วิดีโอเต็ม: [`docs/media/demo.mp4`](docs/media/demo.mp4)
 
 สตอรีบอร์ด + คำสั่งจำลองอุณหภูมิ + สคริปต์ยิง alert จริง: [`docs/PRELAUNCH-DEMO.md`](docs/PRELAUNCH-DEMO.md)
 
