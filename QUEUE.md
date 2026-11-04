@@ -244,6 +244,14 @@
       · env: `DISCORD_WEBHOOK_URL` · `LINE_CHANNEL_ACCESS_TOKEN` · `LINE_TO` (LINE Messaging API — ไม่ใช่ LINE Notify ที่ปิดแล้ว)
       · เทสต์ `tests/alertFanout.test.ts` 14/14 + `tests/telegramChannels.test.ts` 4/4 · `telegramAlert.test.ts` เดิมยังผ่าน 16/16
 
+## K — UI polish (ปรับหน้าให้ลื่น/สวย) — งานถัดไปหลัง CE3/H1
+
+- [ ] **K1 เปิด Dashboard ดูของจริงแล้วปรับเฉพาะจุด** — เปิด http://localhost:3000/dashboard/ ดูหน้าจริง แล้วปรับเฉพาะจุดที่สะดุดตา (ไม่แตะไฟล์ critical ตาม AGENTS.md ข้อ 4: `_app.tsx`, `_document.tsx`, `globals.css`, `navigation.ts`, stores, root `package.json`)
+  - จุดที่น่าปรับเบื้องต้นจากการอ่านโค้ด: spacing/font size ของวิดเจ็ตบนมือถือ, contrast ของข้อความเล็ก, skeleton loading ให้ครบทุกวิดเจ็ตที่โหลดช้า
+  - ข้อห้าม: ห้ามแก้โครงสร้าง layout ทั้งหน้า ห้ามเปลี่ยนสี/fonts ใน `globals.css` ห้ามแก้ `_app.tsx`/`_document.tsx`
+  - หลังปรับต้องรัน `npm run verify` 6/6 ก่อน commit
+  - เอกสารอ้างอิง: โค้ดหน้า `dashboard.tsx` (1,227 บรรทัด) มี design dense/neon อยู่ก่อนแล้ว รวม skeleton, sparkline, edit mode drag-and-drop
+
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
 - **Staging แยกเต็มรูป** — มี preview-stack mock :3100 สำหรับทดลองแล้ว · ทำเมื่อมีเครื่องที่สอง/ขายจริงเท่านั้น
