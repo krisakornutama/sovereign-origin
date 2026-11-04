@@ -1,0 +1,40 @@
+name: Open-core boundary
+
+# ด่านกัน Pro หลุดเข้า CE: CE ต้องไม่ import ของ Pro (และไม่ import ไฟล์ที่ไม่มีอยู่)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Boundary check (CE must not import Pro)
+        run: node tools/verify/open-core-boundary.mjs --check
+
+      - name: Install core-api dependencies
+        working-directory: sovereign-os/core-api
+        run: npm install --no-fund --no-audit
+
+      - name: Generate Prisma client
+        working-directory: sovereign-os/core-api
+        run: npx prisma generate
+
+      - name: Typecheck core-api
+        working-directory: sovereign-os/core-api
+        run: npx tsc --noEmit
+
+      - name: Pro registry + invite registration tests
+        working-directory: sovereign-os/core-api
+        run: npx tsx --test --test-concurrency=1 tests/proRegistry.test.ts tests/inviteRegister.test.ts
