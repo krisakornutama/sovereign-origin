@@ -1,3 +1,7 @@
+import { skipIfAuthStateMissing } from './helpers/authGuard';
+
+skipIfAuthStateMissing();
+
 import { test, expect } from '@playwright/test';
 
 // ── หน้าหลักหลังล็อกอิน: render ครบ ไม่มีหน้าไหนพัง (คลาสบั๊ก .map is not a function) ──
