@@ -221,7 +221,7 @@ export class AuthService {
     }
   }
 
-  private static generateToken(user: any, mfaVerified: boolean) {
+  static generateToken(user: any, mfaVerified: boolean) {
     const payload = {
       userId: user.id,
       role: user.role,

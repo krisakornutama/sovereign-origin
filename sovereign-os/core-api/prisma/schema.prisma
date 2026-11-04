@@ -16,6 +16,25 @@ enum Role {
   KID // ลูก/สมาชิกในครอบครัว (มีอยู่ใน DB จริงแล้ว — สอดคล้องกับ teach-kids)
 }
 
+// ── รหัสเชิญสมัครสมาชิก (self-hosted: ไม่ต้องใช้ SMTP) ──
+// เก็บเฉพาะ sha256 ของรหัส — plaintext แสดงครั้งเดียวตอนสร้าง
+model InviteCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  code_hash  String    @unique
+  label      String?
+  role       Role      @default(OPERATOR)
+  max_uses   Int       @default(1)
+  use_count  Int       @default(0)
+  expires_at DateTime? @db.Timestamptz
+  revoked_at DateTime? @db.Timestamptz
+  created_by String?   @db.Uuid
+  used_by    String?   @db.Uuid
+  used_at    DateTime? @db.Timestamptz
+  created_at DateTime  @default(now()) @db.Timestamptz
+
+  @@map("invite_codes")
+}
+
 model User {
   id                   String  @id @default(uuid()) @db.Uuid
   username             String  @unique

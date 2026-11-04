@@ -6,6 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { AuditService } from '../../services/audit.service';
 import { getFleetSiteById } from '../../services/fleet-persistence.service';
 import { disconnectUserSockets } from '../../realtime/io-registry';
+import { createInvite } from '../../services/invite.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // User Management (SUPERADMIN) — ย้ายมาจาก inline routes ใน server.ts
@@ -110,6 +111,55 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Update failed' });
+  }
+});
+
+// ── รหัสเชิญสมัครสมาชิก (self-hosted) ──────────────────────────────────────
+// SUPERADMIN เท่านั้น: สร้าง/ดู/เพิกถอน — plaintext ของรหัสเห็นครั้งเดียวตอนสร้าง
+router.get('/invites', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  try {
+    const invites = await prisma.inviteCode.findMany({
+      orderBy: { created_at: 'desc' },
+      take: 100,
+      select: {
+        id: true, label: true, role: true, max_uses: true, use_count: true,
+        expires_at: true, revoked_at: true, used_at: true, created_at: true, used_by: true,
+      },
+    });
+    res.json(invites);
+  } catch (err: any) {
+    console.error('[invites:list] failed:', err?.message || err);
+    res.status(500).json({ error: 'อ่านรายการรหัสเชิญไม่สำเร็จ' });
+  }
+});
+
+router.post('/invites', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    const { role, label, maxUses, expiresInHours } = req.body ?? {};
+    const invite = await createInvite({ role, label, maxUses, expiresInHours, createdBy: req.user!.id });
+    await AuditService.logAction({
+      userId: req.user!.id,
+      actionType: 'INVITE_CREATED',
+      payload: { invite_id: invite.id, role: invite.role, max_uses: invite.maxUses, expires_at: invite.expiresAt, ip: req.ip },
+    });
+    res.status(201).json(invite);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'สร้างรหัสเชิญไม่สำเร็จ' });
+  }
+});
+
+router.delete('/invites/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  try {
+    await prisma.inviteCode.update({ where: { id: req.params.id }, data: { revoked_at: new Date() } });
+    await AuditService.logAction({
+      userId: req.user!.id,
+      actionType: 'INVITE_REVOKED',
+      payload: { invite_id: req.params.id, ip: req.ip },
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[invites:revoke] failed:', err?.message || err);
+    res.status(500).json({ error: 'เพิกถอนรหัสเชิญไม่สำเร็จ' });
   }
 });
 
