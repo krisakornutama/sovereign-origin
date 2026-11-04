@@ -1025,11 +1025,11 @@
 - [ ] เหลือ: Discord + LINE credential จริง (ต้องเจ้าของ) · คลิป 15 วิ · แยก Pro modules
 
 ### Open-Core ขั้น A + B — เสร็จ 4 พ.ย. 69
-- [x] **ขั้น A: Pro registry เดียว** —  รวม 8 mount (business/fleet/portfolio/treasury/dime/payments-slips/payments/restaurant)
-      ·  เหลือจุดเชื่อมเดียว · โมดูลหาย = mount 404 +  ไม่ล้มตอนบูต (lazy require)
-      · เทสต์  4/4 (ลำดับ slips ก่อน payments, key ไม่ซ้ำ, 404 body)
-      · ตรวจของจริง: build ผ่าน · restart  ·  ครบ 8 ·  200 · business/treasury/restaurant/fleet = 401 (ต้องล็อกอิน)
-- [x] **ขั้น B: แยก frontend** —  →  (35 ไฟล์) · แก้ import ลึก +1 ชั้น 11 ไฟล์ · build ผ่าน
-      ·  +  ถูกจัดเป็นหน้า Pro (ตรวจ S/N จากออเดอร์ที่ขายแล้ว = รับประกันเชิงพาณิชย์ ตามคำตัดสินเจ้าของ)
+- [x] **ขั้น A: Pro registry เดียว** — `sovereign-os/core-api/src/modules/pro/registry.ts` รวม 8 mount (business / fleet / portfolio / treasury / dime / payments-slips / payments / restaurant)
+      · `routes.ts` เหลือจุดเชื่อมเดียว · โมดูลหาย = mount 404 + `console.warn` ไม่ล้มตอนบูต (lazy `require`)
+      · เทสต์ `tests/proRegistry.test.ts` 4/4 (ลำดับ slips ก่อน payments, key ไม่ซ้ำ, body ของ 404)
+      · ตรวจของจริง: build ผ่าน · restart `sovereign-core-api` · log `[pro] mounted:` ครบ 8 · `/api/health` 200 · business/treasury/restaurant/fleet = 401 (ต้องล็อกอิน)
+- [x] **ขั้น B: แยก frontend** — `components/business/**` → `components/pro/business/**` (35 ไฟล์) · แก้ import ลึก +1 ชั้น 11 ไฟล์ · `npm run build` ผ่าน
+      · `/warranty` + `/soverien` จัดเป็นหน้า Pro (ตรวจ S/N จากออเดอร์ที่ขายแล้ว = รับประกันเชิงพาณิชย์ ตามคำตัดสินเจ้าของ)
 - [x] **Boundary tool = 0 จุด** (จาก 12) · เทสต์ tool 4/4
-- [ ] **ของที่ยังไม่มี: หน้าประกันอุปกรณ์/Asset ของ CE** (BYOH) — ต้องสร้างใหม่ ไม่ใช่ย้ายโค้ด · ยังไม่มีระบบสมัครสมาชิกใน CE (seed มีแค่ admin)
+- [ ] **ของที่ยังไม่มี: หน้าประกันอุปกรณ์/Asset ของ CE** (BYOH) — ต้องสร้างใหม่ ไม่ใช่ย้ายโค้ด · CE ยังไม่มีระบบสมัครสมาชิก (seed มีแค่ admin)
