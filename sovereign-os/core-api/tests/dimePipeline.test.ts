@@ -1,3 +1,4 @@
+import './setup-env';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDimeProcessor, sha1Section, type DimeDeps } from '../src/services/dime.service';

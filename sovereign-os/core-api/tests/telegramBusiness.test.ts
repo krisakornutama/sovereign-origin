@@ -1,6 +1,7 @@
 // tests/telegramBusiness.test.ts
 // แจ้งเตือนธุรกิจ → ห้องเฉพาะธุรกิจ (16/10/69)
 // เจ้าของ: "ตัวเดียวกับส่งข้อมูลเรื่องบ้าง แต่อันนี้แยกเฉพาะห้อง เพราะเกี่ยวกับธุรกิจโดยตรง"
+import './setup-env';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

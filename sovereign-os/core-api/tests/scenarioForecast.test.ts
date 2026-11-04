@@ -1,8 +1,8 @@
 // tests/scenarioForecast.test.ts — ครอบ scenario-forecast.service.ts (เดิม 0%)
 // 1) parseForecastResponse — pure parser ต้องกลั่นผล AI ให้สะอาดเสมอ (กัน output เพี้ยน)
 // 2) generateScenarios — เมื่อ Ollama ออฟไลน์ ต้อง fallback จาก Threat Index แบบ deterministic และ persist ลง DB
-import 'dotenv/config';
 import './setup-env';
+import 'dotenv/config';
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestServer, mockModel, type TestServer } from './helpers';

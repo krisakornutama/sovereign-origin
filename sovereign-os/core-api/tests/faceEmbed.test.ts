@@ -1,4 +1,5 @@
 // TDD: ระบบจดจำใบหน้าด้วย embedding — เปรียบเทียบความคล้ายเชิงตัวเลข (ไม่พึ่ง LLM ในการตัดสิน)
+import './setup-env';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,4 +1,5 @@
 // tests/wan-monitor.test.ts — pure functions (ไม่ ping จริง)
+import './setup-env';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parsePingLatency, pingResultFromExit, ipFromSubnet, classifyWanIssue, parseSpeedtestMbps } from '../src/services/wan-monitor.service.ts';

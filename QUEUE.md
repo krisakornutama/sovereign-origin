@@ -209,7 +209,14 @@
 - [ ] G2 เช็คลิสต์ก่อนเปิด /shop สู่อินเทอร์เน็ต: ~~tunnel~~ (มีแล้ว 30/9 — I4a) + consent/PDPA (F2) ยังไม่เสร็จ → ยังปิดไม่ได้
 
 ## H — คุณภาพระยะยาว (ไม่ด่วน)
-- [ ] H1 retention ตาราง non-hypertable ที่โตเงียบ — วัดจริก่อน: `audit_logs` (เขียนทุก action)/`security_events` → ตั้งตามข้อมูลจริง (sensor_telemetry จัดครบแล้ว ห้ามซ้ำ)
+- [x] **H1 retention — วัดขนาดจริงเสร็จ 04/11/69** (`ai/test-db-isolation`) · **ยังไม่ลบข้อมูลใด ๆ** (รอเจ้าของอนุมัติตัวเลข)
+      · `audit_logs` **26,901 แถว** — partitioned รายเดือน: `2026_08` 6.8 MB · `_09` 5.3 MB · `_10` 232 kB · `_11` 80 kB (pre-create `_12`, `2027_01` 24 kB) ⇒ อัตราใหม่ ~10 แถว/วัน (ทั้งตารางดูเหมือน 0 bytes ถ้าดู `pg_total_relation_size` ของ parent — ต้องรวม child)
+      · `security_events` **12,738 แถว / 6.3 MB** — ส.ค. 362 · ก.ย. 1,893 · ต.ค. **10,329** (พุ่ง 5 เท่า) · พ.ย. 154 ⇒ ~154/วัน
+      · `alert_events` **27,593 แถว / 12 MB** — ก.ย. 4,715 · ต.ค. **20,749** · พ.ย. (1–4) 2,129 ⇒ ~532/วัน (โตเร็วสุด)
+      · **พบต้นเหตุขยะจากเทสต์:** key `x`, `k`, `warn once`, `same text`, `synthetic-streak-critical` มีแถวใน DB จริงรวม **4,378 แถว** เพราะ test file ไม่ import `./setup-env` ⇒ Prisma ใช้ `DATABASE_URL` จริง
+      · **แก้แล้ว:** เติม `import './setup-env'` ให้ 19 ไฟล์ที่แตะ Prisma (รวม `telegramAlert` / `syntheticStreak`) · พิสูจน์แล้ว: รันสองไฟล์นั้นซ้ำ count ยัง **4,378** (ไม่มีแถวใหม่) · เทสต์กันถอยหลัง `tools/test/test-env-isolation.test.mjs` **2/2** (แดงก่อนแก้: 19 ไฟล์) — ไฟล์ที่ใช้ `db-harness` (real-DB) ยกเว้นเพราะตั้งใจรันกับ `TEST_DATABASE_URL`
+      · noise หลักที่ไม่ใช่เทสต์: `truth:code-mismatch` 5,628/ต.ค. · `send_returned_false` รวม ~7.7k (ช่วง Telegram ยังไม่ตั้ง)
+      · **ข้อเสนอ retention (รออนุมัติ):** audit 12 เดือน (drop partition รายเดือน = O(1)) · security 90 วัน · alert 30–90 วัน (UI ใช้แค่สถิติ 24 ชม.) — ยังไม่สร้าง job ลบ
 - [ ] H2 กัน e2e fail ลูกโซ่ — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
 - [x] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` — **เสร็จ 03/11/69** (`ai/verify-creds`)
       · `parseEnvText()` / `readEnvFile()` / `readSecret()` / `requireSecret()` / `requireJwtSecret()` / `maskSecret()` — คีย์หาย = `MissingSecretError` ที่บอกชื่อคีย์ + ไฟล์ + ทางแก้ (เดิม `.find()` คืน undefined แล้ว `.slice` โยน TypeError ที่อ่านไม่ออก)

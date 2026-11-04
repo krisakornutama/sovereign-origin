@@ -1,5 +1,6 @@
 // tests/syntheticStreak.test.ts — pure tracker + ท่อผ่าน dispatcher จริง (mock sender)
 // พฤติกรรม: FAIL ติดกันครบ threshold → critical ยิง 1 ครั้งแล้วค้างหยุด · PASS reset ทุกอย่าง
+import './setup-env';
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { syntheticStreak, resetSyntheticStreakForTest } from '../src/services/client-monitor.service';

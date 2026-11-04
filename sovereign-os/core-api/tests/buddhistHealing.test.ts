@@ -1,4 +1,5 @@
 // TDD: Sovereign Buddhist Healing Module — ธรรมะบำบัดใจ + สมุนไพรคู่ยา + ติดตามผล
+import './setup-env';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,5 +1,6 @@
 // tests/portfolio-signal.test.ts
 // AI Portfolio Manager — pure signal engine tests (ไม่แตะ DB/เน็ต)
+import './setup-env';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
