@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sovereign OS — Community Edition (self-hosted, คำสั่งเดียว)
+#
+#   cp .env.example .env      # แล้วแก้รหัสผ่านตามที่คอมเมนต์บอก
+#   docker compose up -d --build
+#
+# เปิด Dashboard:  http://localhost:3000
+# เปิด API ตรง:    http://localhost:3001/healthz   (ใช้ตรวจสุขภาพเท่านั้น)
+#
+# หมายเหตุ: ไฟล์นี้ออกแบบให้ "ไม่ผูกกับเครื่องผู้พัฒนา" — ไม่มี bind mount ของ
+# ซอร์สโค้ด, ข้อมูลทั้งหมดอยู่ใน named volume, ใช้ได้ทั้ง x86_64 และ arm64 (Raspberry Pi)
+# ─────────────────────────────────────────────────────────────────────────────
+name: sovereign
+
+services:
+  # ── ฐานข้อมูลอนุกรมเวลา ──────────────────────────────────────────────────
+  db:
+    image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sovereign}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD ใน .env (openssl rand -hex 24)}
+      POSTGRES_DB: ${POSTGRES_DB:-sovereign}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-sovereign} -d $${POSTGRES_DB:-sovereign}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [sovereign]
+
+  # ── MQTT broker สำหรับเซนเซอร์ IoT (ESP32 ฯลฯ) ──────────────────────────
+  mqtt:
+    image: emqx/emqx:5.8
+    restart: unless-stopped
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_USERNAME:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?ต้องตั้ง EMQX_PASSWORD ใน .env}
+    ports:
+      # broker ต้องเปิดให้อุปกรณ์ในวง LAN ต่อเข้ามาได้ (ค่าเริ่มต้น 0.0.0.0)
+      - "${MQTT_BIND:-0.0.0.0}:${MQTT_PORT:-1883}:1883"
+      # dashboard ของ EMQX เปิดเฉพาะเครื่องนี้
+      - "127.0.0.1:${EMQX_DASHBOARD_PORT:-18083}:18083"
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    networks: [sovereign]
+
+  # ── งานครั้งเดียว: สร้างตาราง (migrate) + บัญชี admin คนแรก (seed) ───────
+  #    รันซ้ำได้ปลอดภัย: migrate deploy ไม่ทำอะไรถ้า schema ล่าสุดแล้ว
+  #    seed จะไม่แตะรหัสผ่านเดิมถ้าไม่ได้ตั้ง SEED_ADMIN_PASSWORD
+  migrate:
+    build:
+      context: ../../sovereign-os/core-api
+      dockerfile: Dockerfile.prod
+    image: sovereign-core-api:local
+    restart: "no"
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/seed.js"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sovereign}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      TZ: ${TZ:-Asia/Bangkok}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [sovereign]
+
+  # ── Backend (Express + Prisma) ───────────────────────────────────────────
+  api:
+    build:
+      context: ../../sovereign-os/core-api
+      dockerfile: Dockerfile.prod
+    image: sovereign-core-api:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sovereign}
+      JWT_SECRET: ${JWT_SECRET:?ต้องตั้ง JWT_SECRET ใน .env (>= 16 ตัวอักษรสุ่ม)}
+      MQTT_HOST: mqtt
+      MQTT_PORT: 1883
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:${WEB_PORT:-3000}}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      ENABLED_MODULES: ${ENABLED_MODULES:-}
+      # การแจ้งเตือน (ไม่บังคับ — ว่างไว้ = ไม่ส่ง)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_MIN_SEVERITY: ${TELEGRAM_MIN_SEVERITY:-warn}
+      TZ: ${TZ:-Asia/Bangkok}
+    ports:
+      # dashboard เรียก API ผ่าน Next rewrite (/api/*) เป็นหลัก
+      # เปิดพอร์ตนี้ให้เบราว์เซอร์เครื่องอื่นใน LAN ต่อตรงได้ (WebSocket ใช้พอร์ตนี้)
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-3001}:3001"
+    volumes:
+      - api_data:/app/data
+      - api_backups:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    networks: [sovereign]
+
+  # ── Dashboard (Next.js) ──────────────────────────────────────────────────
+  web:
+    build:
+      context: ../../sovereign-frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # ค่าที่เบราว์เซอร์ใช้ยิง API — ตั้งเป็น http://<ip-ของเครื่องนี้>:3001
+        # ถ้าจะเปิดใช้จากเครื่องอื่นใน LAN (ต้องตั้ง API_BIND=0.0.0.0 ด้วย)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    image: sovereign-web:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # ให้ Next rewrite /api/* → core-api ภายในเครือข่าย docker
+      PRIVATE_API_ORIGIN: http://api:3001
+      # ใช้สร้าง CSP ให้ตรงกับ NEXT_PUBLIC_API_URL ตอน runtime
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_TELEMETRY_DISABLED: "1"
+      TZ: ${TZ:-Asia/Bangkok}
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [sovereign]
+
+volumes:
+  pgdata:
+  emqx_data:
+  emqx_log:
+  api_data:
+  api_backups:
+
+networks:
+  sovereign:
+    driver: bridge

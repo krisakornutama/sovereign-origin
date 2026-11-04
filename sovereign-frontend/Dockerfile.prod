@@ -1,14 +1,17 @@
 # ── Production build (multi-stage): next build → next start ──
-FROM node:18-alpine AS build
+# Next 16 บังคับ Node >= 20.9 — node:18 จะพังตั้งแต่ `next build`
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-ENV NEXT_PUBLIC_API_URL=http://localhost:3001
+# ใช้ค่าเริ่มต้นเดิมได้ แต่ deploy ที่เปิดจากเครื่องอื่น (เช่น Raspberry Pi) ต้อง override ตอน build
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # build script รัน next build + generate-sw-precache (PWA) เอง
 RUN npm run build
 
-FROM node:18-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package*.json ./

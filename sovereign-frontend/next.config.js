@@ -1,3 +1,12 @@
+// Self-hosted (Community/Raspberry Pi): API อาจอยู่คนละ host จากหน้าเว็บ
+// เติม origin ที่ตั้งผ่าน NEXT_PUBLIC_API_URL (คั่นด้วย comma ได้) เข้า connect-src
+// ทั้ง http และ ws — ไม่งั้นเบราว์เซอร์จะบล็อกคำขอแม้ตั้งค่าถูก
+const extraApiOrigins = (process.env.NEXT_PUBLIC_API_URL || '')
+  .split(',')
+  .map((s) => s.trim().replace(/\/+$/, ''))
+  .filter((s) => /^https?:\/\//.test(s))
+  .flatMap((u) => [u, u.replace(/^http/, 'ws')]);
+
 // Security headers ทุกเส้นทาง (ปิดรอยรั่วจากการทดสอบระบบ 19 ก.ย. 2569: หน้าเว็บไม่มี headers เลย
 // ขณะที่ backend มีครบผ่าน helmet) · HSTS ไร้ผลบน http แต่คุ้มไว้สำหรับตอนขึ้น https/ reverse proxy
 const securityHeaders = [
@@ -20,7 +29,8 @@ const securityHeaders = [
     // I0c (1/10/69): Leaflet ใช้ bare host `tile.openstreetmap.org` (ไม่มีซับโดเมน) — wildcard `*.` ไม่ครอบ = CSP บล็อกแผนที่ /partners (จับได้จาก nightly 30/9) → เติม bare host ตรง ๆ
     "img-src 'self' data: blob: https://api.qrserver.com http://192.168.1.50 https://*.tile.openstreetmap.org https://tile.openstreetmap.org",
     "media-src 'self' blob:",
-    "connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 http://192.168.1.102:3001 ws://localhost:3001 ws://127.0.0.1:3001 ws://192.168.1.102:3001 http://localhost:3101 http://127.0.0.1:3101 ws://localhost:3101 ws://127.0.0.1:3101",
+    "connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 http://192.168.1.102:3001 ws://localhost:3001 ws://127.0.0.1:3001 ws://192.168.1.102:3001 http://localhost:3101 http://127.0.0.1:3101 ws://localhost:3101 ws://127.0.0.1:3101"
+      + (extraApiOrigins.length ? ` ${extraApiOrigins.join(' ')}` : ''),
     "frame-src 'self' https://www.youtube.com https://player.vimeo.com",
     "frame-ancestors 'self'",
     "base-uri 'self'",

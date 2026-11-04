@@ -221,6 +221,17 @@
 - [x] H6 e2e ทนเน็ตกระตุก — **เสร็จ 27/9/69**: เพิ่ม ERR_CONNECTION_TIMED_OUT + ERR_NETWORK_CHANGED ใน IGNORE ของ all-pages (เน็ต LTE กระตุก ≠ บั๊กระบบ) — พิสูจน์: all-pages 46/46 ผ่าน
 - [x] H7 กัน seed e2e ซ้ำ — **เสร็จ 27/9/69**: และ **จับบั๊กจริงใหญ่** — pos-flow cleanup ชี้ DB `sovereign_v2` ที่ไม่มีอยู่แล้ว (DB จริง = sovereign) → cleanup เงียบมาตลาด → ร้าน 'E2E-ทดสอบอัตโนมัติ' ค้าง 2 รายการใน DB จริง · แก้: ชื่อ DB + cleanup ตรวจสอบได้ (คืน boolean + retry 3 รอบแล้ว throw) + เคลียร์ของค้าง — พิสูจน์: pos-flow 2/2 ผ่าน
 
+## CE — Community Edition packaging (Phase 1: ขาย/แจกแบบ pure software)
+- [x] **CE1 docker compose คำสั่งเดียว (รวม Dashboard)** — **เสร็จ 04/11/69** (`ai/community-stack`)
+      · `deploy/community/`: `docker-compose.yml` (db · mqtt · migrate · api · web) + `.env.example` + `README.md`
+      · named volume ล้วน (ไม่ bind mount ซอร์ส) · `migrate` รัน `prisma migrate deploy` + seed แล้ว `api` ถึงเริ่ม (`service_completed_successfully`)
+      · **แก้บั๊กที่เจอ:** `sovereign-frontend/Dockerfile.prod` ใช้ `node:18` แต่ Next 16 บังคับ ≥ 20.9 → build ล้มทุกครั้ง (image นี้ไม่เคยถูกใช้ที่ไหน) · เปลี่ยนเป็น `node:22-alpine` + รับ `ARG NEXT_PUBLIC_API_URL`
+      · **CSP ตาม env:** `next.config.js` เติม origin จาก `NEXT_PUBLIC_API_URL` เข้า `connect-src` (http + ws) — เดิม deploy บน Pi แล้วเปิดจากเครื่องอื่นจะถูก CSP บล็อก
+      · เทสต์ `tools/test/community-stack.test.mjs` **11/11** (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
+      · ยังไม่ทดสอบ `up` เต็มชุด: พอร์ต 5432/3001/1883 ชนกับ production ที่รันอยู่ (Cold Soak) — รอเจ้าของเปิดหน้าต่างทดสอบ
+- [ ] **CE2 README/คลิป/GitHub Community** — ต้องรอเจ้าของอนุญาต push (ยัง hold) · README หลักชี้ไป `deploy/community/` แล้ว
+- [ ] **CE3 ช่องแจ้งเตือน Discord/LINE** — ยังไม่มีใน backend (มีแต่ Telegram) = งานใหม่ ไม่ใช่แค่ทดสอบ
+
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
 - **Staging แยกเต็มรูป** — มี preview-stack mock :3100 สำหรับทดลองแล้ว · ทำเมื่อมีเครื่องที่สอง/ขายจริงเท่านั้น
@@ -403,8 +414,8 @@
 - [ ] **J3e รวม HTTP helper 3 ตัว** (`apiClient` / `apiFetch` / `fetchJson`) — เริ่มแล้ว 03/11/69 (`ai/http-helper-canonical`)
       · ขั้น 1 (เสร็จ): ทำ `authFetch` เป็น canonical ใน `apiFetch.ts` แล้ว re-export จาก `fetchJson.ts` + `apiClient.ts` — importจากไหนก็ได้ฟังก์ชันตัวเดียวกัน
       · เทสต์ `tools/test/http-helper-canonical.test.mjs` **4/4** (แดงก่อนแก้)
-      · ขั้นต่อไป (งานต่อ): ย้าย raw `fetch('/api…') ในหน้าต่าง ๆ (privacy, trace, settings, auth, ฯลฯ) มาใช้ `authFetch` — ต้องไม่แตะ `useAuthStore.ts` (store ตามกฎ #4)
-      ~50 หน้ายังเรียก fetch ตรง · เริ่มจากหน้าที่ไม่ใช่ auth-flow ก่อน
+      · ขั้น 2 (**ยกเลิก 04/11/69**): จะย้าย `privacy.tsx`/`trace.tsx` → `authFetch` แต่เทสต์เดิม `tools/test/login-privacy-links.test.mjs` ห้ามไว้ชัดเจน — สองหน้านี้เป็น **สาธารณะก่อนล็อกอิน** ต้องใช้ `fetch` ตรง ไม่งั้นติด 401 อ่านนโยบาย/ตามรอยล็อตไม่ได้
+      · งานที่เหลือของ J3e: เฉพาะหน้า **หลังล็อกอิน** (settings/business ฯลฯ) ที่ยิง API ตัวเอง — ต้องเช็กทีละหน้าว่า endpoint ต้องมี token จริงก่อนย้าย
 - [x] **J3f `STATUS.md` 412 บรรทัด/344 KB** — **เสร็จ 03/11/69** (`ai/status-doc`)
       · ย้าย journal เดิม (บันทึกถึง 22/10/69) → `docs/history/status-journal-2026-10.md` (ไม่ตัดทิ้ง) · `STATUS.md` ใหม่ 85 บรรทัด gen จาก `system-truth.json` + `logs/nightly/status.json` + `ops-status.json` + `nightly-history.json`
       · `tools/status-doc.mjs`: `--check` (ค่าดีฟอลต์ · อ่านเท่านั้น) / `--write` / `--print` · `--check` ใช้ "สร้างเมื่อ" ในไฟล์เดิมเป็นฐาน ⇒ เวลาผ่านไปไม่ทำให้เก่า เก่าเมื่อข้อมูลจริงเปลี่ยน · `--out=` / `--root=` สำหรับ worktree
