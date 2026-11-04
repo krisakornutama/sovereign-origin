@@ -217,7 +217,9 @@
       · **แก้แล้ว:** เติม `import './setup-env'` ให้ 19 ไฟล์ที่แตะ Prisma (รวม `telegramAlert` / `syntheticStreak`) · พิสูจน์แล้ว: รันสองไฟล์นั้นซ้ำ count ยัง **4,378** (ไม่มีแถวใหม่) · เทสต์กันถอยหลัง `tools/test/test-env-isolation.test.mjs` **2/2** (แดงก่อนแก้: 19 ไฟล์) — ไฟล์ที่ใช้ `db-harness` (real-DB) ยกเว้นเพราะตั้งใจรันกับ `TEST_DATABASE_URL`
       · noise หลักที่ไม่ใช่เทสต์: `truth:code-mismatch` 5,628/ต.ค. · `send_returned_false` รวม ~7.7k (ช่วง Telegram ยังไม่ตั้ง)
       · **ข้อเสนอ retention (รออนุมัติ):** audit 12 เดือน (drop partition รายเดือน = O(1)) · security 90 วัน · alert 30–90 วัน (UI ใช้แค่สถิติ 24 ชม.) — ยังไม่สร้าง job ลบ
-- [ ] H2 กัน e2e fail ลูกโซ่ — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
+- [x] **H2 กัน e2e fail ลูกโซ่ — เสร็จ 04/11/69** (`90e1ab9`) — จุดเดียวพัง → 63 spec did not run (เคสจริง 26/9) — spec ที่ depend login ให้ skip เฉพาะตัวแทนพังทั้งกอง (auth.setup retry แก้แล้วใน 09b0f88)
+      · `e2e/helpers/authGuard.ts` = skip พร้อมเหตุผลเมื่อไม่มี `state.json`/token ใช้ไม่ได้ · pages/pos-flow/spa-nav ติดด่านระดับไฟล์ ⇒ จุดพังเดียวกลายเป็น skipped เฉพาะ spec ที่ต้องล็อกอิน
+      · เทสต์ `tools/test/e2e-auth-guard.test.mjs` 4/4 (แดงก่อนแก้: ไม่มี helper) + ตรวจ config ว่ายังมี project authenticated
 - [x] H3 รวมการอ่าน secret เป็นจุดเดียว `tools/verify/creds.mjs` — **เสร็จ 03/11/69** (`ai/verify-creds`)
       · `parseEnvText()` / `readEnvFile()` / `readSecret()` / `requireSecret()` / `requireJwtSecret()` / `maskSecret()` — คีย์หาย = `MissingSecretError` ที่บอกชื่อคีย์ + ไฟล์ + ทางแก้ (เดิม `.find()` คืน undefined แล้ว `.slice` โยน TypeError ที่อ่านไม่ออก)
       · เลิกอ่านซ้ำ 3 ที่: `full-system-check.mjs` · `security-audit.mjs` · `ui-sweep.mjs` (ทั้งสามใช้ `requireJwtSecret()` และ exit 2 พร้อมเหตุผลเมื่อไม่มีค่า)
@@ -286,7 +288,9 @@
 - [x] I3b ✅ migration declarative monthly (ส.ค.26–ม.ค.27 + default) — ย้ายครบ · PK (id,timestamp) · index timestamp DESC · probe เขียนจริงตก partition ถูก
 - [x] I3c ✅ auto-purge/export: เดือนจบเกิน 90 วัน = export NDJSON.gz → ตรวจจำนวน → drop → mirror · ensure 3 เดือนล่วงหน้าทุกรอบ nightly · probe ผ่าน · ด่าน default-partition ใน machine-health
 > **19/10/69:** 3 บรรทัด `I3a–I3c` ที่เคยค้างด้านล่างเป็น "สำเนาค้าง" ของงานที่ทำเสร็จแล้ว (157–159) — ลบออกแล้ว; เหลือ I3d ที่ยังไม่ทำจริง
-- [ ] I3d machine-health เพิ่มด่านขนาด audit_logs — กันโตเงียบอีกสาย (ยังไม่ได้ทำ)
+- [x] **I3d ด่านขนาด audit_logs — เสร็จ 04/11/69** (`90e1ab9`)
+      · machine-health วัดขนาดรวม parent+partitions และจำนวนแถวทุกครั้ง (เกณฑ์ 1 GB / 5M แถว · ปรับผ่าน `MH_AUDIT_WARN_MB`/`MH_AUDIT_WARN_ROWS`)
+      · ตรรกะแยกที่ `tools/lib/audit-size-gate.mjs` + `tools/test/audit-size-gate.test.mjs` 5/5 · ของจริง 12.1 MB / 26,901 แถว = ไม่เตือน (ค่าปกติ)
 
 ## I4 — Cloudflare Tunnel เปิด /shop สู่อินเทอร์เน็ต (ตาม G2 — ต้องรอเจ้าของ: domain บน Cloudflare + token)
 - [x] I4a container cloudflared ทะลุ CGNAT/LTE (MR505) — **เสร็จ 30/9/69** (container `sovereign-cloudflared` รันจริงด้วย token ใน infra/.env · route `*`→:3000, `^/api`→:3001)

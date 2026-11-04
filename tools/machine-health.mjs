@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { statfsSync, statSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { auditSizeVerdict } from './lib/audit-size-gate.mjs';
+import { auditSizeVerdict } from './verify/audit-size-gate.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 
