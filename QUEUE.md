@@ -1045,3 +1045,10 @@
 - [x] **E2E บน CE จริง (:3100):** CLI ออกรหัส → check valid → สมัคร 201 + token → `/api/consent` เห็น essential+telemetry → ใช้รหัสซ้ำ = 400 → login ผู้ใช้ใหม่ = 200 → `/api/users/invites` ไม่มี token = 401
 - [x] **Production:** backup `backups/prod-before-invite-20261104-223458.dump` (6.7 MB) แล้ว `prisma migrate deploy` → มีตาราง `invite_codes` · health 200
 - [x] Frontend build ผ่าน (169 assets) · API `tsc --noEmit` ผ่าน
+
+### UI จัดการรหัสเชิญ (Admin) — เสร็จ 4 พ.ย. 69
+- [x] `components/users/InviteCodesPanel.tsx` — การ์ดในหน้า `/users` (SUPERADMIN): สร้างรหัส (role/label/จำนวนครั้ง/วันหมดอายุ), แสดงรหัส+ลิงก์ครั้งเดียวพร้อมปุ่มคัดลอก, ตารางสถานะ (ใช้ได้/ใช้ครบ/หมดอายุ/เพิกถอนแล้ว) + ปุ่มเพิกถอน
+- [x] เรียบง่ายแบบไม่เพิ่ม dependency — ใช้ `authFetch` + `asObject` เดิมของโปรเจกต์
+- [x] ตรวจกับ CE จริง (:3100) ด้วย SUPERADMIN + TOTP: `GET /api/users/invites` 200 · `POST` 201 ได้รหัส `SG-...` · `DELETE` 200 · รายการแสดง `revoked=true`
+- [x] frontend build ผ่าน และ bundle มี component จริง (`grep` เจอข้อความใน chunk) · CE web rebuild + up = 200
+- [ ] ยังไม่ได้คลิกทดสอบผ่านเบราว์เซอร์จริง (ต้องล็อกอิน admin + TOTP) — ตรวจได้ถึงระดับ build + API
