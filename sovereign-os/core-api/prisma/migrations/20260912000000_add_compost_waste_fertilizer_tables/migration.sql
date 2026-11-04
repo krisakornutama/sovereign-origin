@@ -1,4 +1,3 @@
-statements kept: 9
 -- CreateTable
 CREATE TABLE "restaurant_waste_logs" (
     "id" UUID NOT NULL,
