@@ -1,0 +1,13 @@
+# บริบท build ของ Docker ต้องเล็ก — ไม่งั้น `docker compose up --build` ส่ง node_modules/.next
+# หลาย GB เข้า daemon แล้วช้า/ล้ม (CE ต้อง build ได้บน Raspberry Pi)
+node_modules
+.next
+out
+coverage
+e2e
+playwright-report
+test-results
+*.log
+.env
+.env.*
+!.env.example

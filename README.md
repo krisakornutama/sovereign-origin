@@ -87,3 +87,11 @@ npm run build  # tsc ตรวจ type + build dist/
 
 - External Dead-Man Switch (ESP32-S3 + 4G) — ดู `docs/SERIES_RED_DMS_BLUEPRINT.md`
 - Cold Standby Machine (Postgres replication + Wake-on-LAN)
+
+## 📄 License และขอบเขต Open-Core
+
+- **Community Edition (โค้ดใน repo นี้):** [AGPL-3.0](LICENSE) — ใช้/แก้/ต่อยอดได้ ถ้าให้บริการแบบเครือข่ายต้องเปิดโค้ดที่แก้ด้วย
+- **Pro modules (ยังไม่แยกออกจาก repo นี้):** business / shop / treasury / POS / fleet — จะย้ายไป private repo ก่อนเปิดขาย
+- เส้นแบ่งฉบับเต็ม + สิ่งที่ห้ามตัดออกจาก CE (consent, privacy, audit): [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md)
+
+> ⚠️ ตอนนี้ repo ยังมีทั้งสองส่วนรวมกัน — ห้ามโพสต์ประชาสัมพันธ์ว่า "CE พร้อมใช้" จนกว่าจะแยกเสร็จ (คิว `ai/open-core-split`)
