@@ -28,6 +28,32 @@ docker compose up -d --build
 
 > เปลี่ยนรหัส admin ครั้งแรกหลังล็อกอิน (หน้า Settings → Security)
 
+
+## เพิ่มสมาชิกด้วยรหัสเชิญ
+
+CE ไม่มี SMTP และไม่เปิดรับสมัครเสรี — สมาชิกใหม่ต้องมีรหัสเชิญที่ admin สร้าง
+
+**วิธีที่ 1 — CLI (เร็วที่สุด)**
+
+```bash
+docker compose exec api node dist/scripts/make-invite.js --role OPERATOR --uses 1 --days 7
+```
+
+ได้รหัสรูปแบบ `SG-XXXX-XXXX-XXXX` พร้อมลิงก์ `/register?code=...` ส่งให้ผู้ใช้
+
+**วิธีที่ 2 — API (ต้องเป็น SUPERADMIN)**
+
+```bash
+curl -X POST http://localhost:3001/api/users/invites \n  -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \n  -d '{"role":"OPERATOR","label":"ทีมขาย","maxUses":5,"expiresInHours":72}'
+# ดูรายการ:   GET /api/users/invites
+# เพิกถอน:    DELETE /api/users/invites/<id>
+```
+
+จากนั้นผู้ใช้เปิด `/register?code=SG-...` กรอกรหัส + ชื่อผู้ใช้ + รหัสผ่าน
+
+> รหัสถูกเก็บเป็น sha256 (ดูใน DB ไม่ได้) · ใช้ได้ตาม `maxUses` · มีวันหมดอายุ · เพิกถอนได้
+> การสมัครจะบันทึกความยินยอม "จำเป็นต่อบริการ" อัตโนมัติ และให้เลือก telemetry/analytics
+
 ## ตรวจว่าทุกอย่างขึ้นครบ
 
 ```bash

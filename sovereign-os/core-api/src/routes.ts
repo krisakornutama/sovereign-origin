@@ -17,6 +17,7 @@ const readJsonIfExists = async (p: string): Promise<unknown | null> =>
     });
   });
 import authRoutes from './modules/auth/auth.routes';
+import registerRoutes from './modules/auth/register.routes'; // สมัครสมาชิกด้วยรหัสเชิญ (CE)
 import nodeRoutes from './modules/nodes/node.routes';
 import deviceRoutes from './modules/devices/device.routes';
 import telemetryRoutes from './modules/telemetry/telemetry.routes';
@@ -102,6 +103,7 @@ export function mountRoutes(app: Express): void {
   // ── สิทธิ์ฟังก์ชั่นต่อคน: แต่ละหน้า mount พร้อม featureGuard(featureKey) —
   // SUPERADMIN ผ่านเสมอ, สมาชิกต้องได้รับ grant ในตาราง user_feature_grants
   // (หน้า auth/devices/telemetry/sensors เป็นโครงสร้างพื้นฐาน — ใคร login แล้วใช้ได้)
+  app.use('/api/auth', registerRoutes); // /api/auth/register + /register/check (public + rate limit)
   app.use('/api/auth', authRoutes);
   app.use('/api/trace', traceRoutes); // TRACEABILITY — ตามรอยล็อตผลผลิต (หน้าใน sidebar ของแอป)
   // 13/10/69: ถอดเส้นทางของเว็บสาธารณะออกจากโปรเจกต์นี้ทั้งหมด (คำสั่งเจ้าของ:

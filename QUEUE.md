@@ -1033,3 +1033,15 @@
       · `/warranty` + `/soverien` จัดเป็นหน้า Pro (ตรวจ S/N จากออเดอร์ที่ขายแล้ว = รับประกันเชิงพาณิชย์ ตามคำตัดสินเจ้าของ)
 - [x] **Boundary tool = 0 จุด** (จาก 12) · เทสต์ tool 4/4
 - [ ] **ของที่ยังไม่มี: หน้าประกันอุปกรณ์/Asset ของ CE** (BYOH) — ต้องสร้างใหม่ ไม่ใช่ย้ายโค้ด · CE ยังไม่มีระบบสมัครสมาชิก (seed มีแค่ admin)
+
+### สมัครสมาชิกด้วยรหัสเชิญ (CE) — เสร็จ 4 พ.ย. 69
+- [x] **ทำไมเลือกรหัสเชิญ:** CE ไม่มี SMTP (ไม่สร้าง friction ให้ homelab) และมักเปิดพอร์ตออกเน็ต → เปิดรับสมัครเสรี = bot ถม DB
+- [x] **DB:** ตาราง `invite_codes` (เก็บแค่ sha256 ของรหัส) + migration `20261104120000_invite_codes`
+- [x] **Backend:** `services/invite.service.ts` (สร้าง/ตรวจ/ใช้สิทธิ์แบบ atomic) · `POST /api/auth/register` + `/register/check` (rate limit 8/15 นาที/IP) · `GET/POST/DELETE /api/users/invites` (SUPERADMIN + audit log)
+- [x] **CLI:** `node dist/scripts/make-invite.js --role OPERATOR --uses 1 --days 7` — ทางลัดของ self-hosted
+- [x] **Frontend:** หน้า `/register?code=...` (ตรวจรหัสก่อน, เลือก telemetry/analytics, ลิงก์ `/privacy`) + ลิงก์จากหน้า login
+- [x] **PDPA:** สมัครสำเร็จ = บันทึก consent "จำเป็นต่อบริการ" อัตโนมัติ + ที่เลือกเพิ่ม
+- [x] **เทสต์:** `tests/inviteRegister.test.ts` 11/11 (รหัสซ้ำ/หมดอายุ/เพิกถอน/รหัสผ่านอ่อน/ชื่อซ้ำ 409/ชื่อผิดรูปแบบ/consent)
+- [x] **E2E บน CE จริง (:3100):** CLI ออกรหัส → check valid → สมัคร 201 + token → `/api/consent` เห็น essential+telemetry → ใช้รหัสซ้ำ = 400 → login ผู้ใช้ใหม่ = 200 → `/api/users/invites` ไม่มี token = 401
+- [x] **Production:** backup `backups/prod-before-invite-20261104-223458.dump` (6.7 MB) แล้ว `prisma migrate deploy` → มีตาราง `invite_codes` · health 200
+- [x] Frontend build ผ่าน (169 assets) · API `tsc --noEmit` ผ่าน

@@ -207,6 +207,12 @@ export default function LoginForm() {
           </div>
 
           {/* นโยบายต้องอ่านได้ก่อนตัดสินใจ (PDPA) — ลิงก์นี้อยู่ก่อนล็อกอินโดยตั้งใจ */}
+          <div className="pt-1 text-center text-xs">
+            <a href="/register" className="text-emerald-400 underline underline-offset-2 hover:text-emerald-300">
+              มีรหัสเชิญ? สมัครสมาชิก
+            </a>
+          </div>
+
           <div className="pt-1 text-center text-[11px] leading-relaxed text-gray-500">
             <a
               href="/privacy"
