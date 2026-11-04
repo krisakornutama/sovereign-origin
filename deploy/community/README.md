@@ -57,6 +57,25 @@ docker compose down -v            # หยุด + ลบข้อมูลท�
 docker compose up -d --build      # อัปเดตหลัง git pull
 ```
 
+## การแจ้งเตือน 3 ช่องทาง
+
+ตั้งใน `.env` แล้ว `docker compose up -d api` — ตั้งช่องไหนก็ได้ ไม่ตั้ง = ข้ามช่องนั้น
+
+| ช่อง | ต้องตั้ง |
+|---|---|
+| Telegram | `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (หรือตั้งผ่านหน้า Settings) |
+| Discord | `DISCORD_WEBHOOK_URL` — Server Settings → Integrations → Webhooks |
+| LINE | `LINE_CHANNEL_ACCESS_TOKEN` + `LINE_TO` (Messaging API, ผู้รับขึ้นต้น U/C/R) |
+
+ตรวจว่าส่งได้จริงทุกช่องก่อนพึ่งระบบ:
+
+```bash
+# ล็อกอินในหน้าเว็บ → F12 → Application → localStorage → sovereign-token
+curl -X POST http://localhost:3001/api/telegram/channels/test \
+  -H "Authorization: Bearer <token>"
+# → {"success":true,"channels":[{"channel":"discord","ok":true,...},{"channel":"line","ok":true,...}]}
+```
+
 ## ข้อมูลอยู่ที่ไหน
 
 | Volume | เก็บอะไร |

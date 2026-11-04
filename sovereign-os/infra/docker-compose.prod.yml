@@ -66,6 +66,10 @@ services:
       TELEMETRY_FLUSH_MS: ${TELEMETRY_FLUSH_MS:-60000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # CE3: ช่องทางเพิ่มเติม (ตั้งใน infra/.env) — ไม่ประกาศตรงนี้ = container ไม่เห็นค่า
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+      LINE_TO: ${LINE_TO:-}
       SYNTHETIC_ROUND_TOKEN: ${SYNTHETIC_ROUND_TOKEN:-}
       OTA_BASE_URL: ${OTA_BASE_URL:-http://localhost:3001}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
