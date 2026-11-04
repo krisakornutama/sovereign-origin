@@ -7,6 +7,7 @@ import axios from 'axios';
 import { config } from '../config';
 import { getTelegramCredentials, getBusinessChatId } from './telegram-credentials.service';
 import { recordAlertEvent } from './alert-store.service'; // Phase 3: ทุก alert ถูกจดลง alert_events (soft-fail)
+import { fanoutAlert, resolveExternalAlertTargets } from './alert-fanout.service'; // CE3: Discord + LINE
 
 export type AlertSeverity = 'critical' | 'warn' | 'info';
 
@@ -168,21 +169,20 @@ export class TelegramAlertDispatcher {
 
 async function defaultSender(html: string): Promise<boolean> {
   const creds = await getTelegramCredentials();
-  if (!creds.botToken || !creds.chatId) {
-    console.warn('Telegram credentials not set — alert suppressed silently');
+  const targets = resolveExternalAlertTargets(); // Discord / LINE จาก env
+  if (creds.botToken && creds.chatId) {
+    targets.telegram = { botToken: creds.botToken, chatId: creds.chatId };
+  }
+  if (!targets.telegram && !targets.discord && !targets.line) {
+    console.warn('No alert channel configured (Telegram/Discord/LINE) — alert suppressed silently');
     return Promise.resolve(false);
   }
-  return axios
-    .post(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
-      chat_id: creds.chatId,
-      text: html,
-      parse_mode: 'HTML',
-    })
-    .then(() => true)
-    .catch((err) => {
-      console.error('Telegram send failed:', err instanceof Error ? err.message : err);
-      return false;
-    });
+  // ยิงขนานทุกช่อง: ช่องหนึ่งล้มต้องไม่ทำให้ช่องอื่นเงียบ
+  const { ok, outcomes } = await fanoutAlert(html, targets);
+  for (const o of outcomes) {
+    if (!o.ok) console.error(`Alert channel ${o.channel} failed: ${o.reason}`);
+  }
+  return ok;
 }
 
 export function createTelegramAlertDispatcher(

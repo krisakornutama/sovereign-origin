@@ -16,6 +16,7 @@ import {
   maskChatId,
 } from '../../services/telegram-credentials.service';
 import { sendBusinessAlert, sendBusinessAlertTo } from '../../services/telegram-alert.service';
+import { fanoutAlert, resolveExternalAlertTargets } from '../../services/alert-fanout.service'; // CE3: Discord + LINE
 import { listAlertEvents, alertStats24h } from '../../services/alert-store.service'; // Phase 3: ประวัติ alert ในระบบ
 import { synthesizeWav } from '../../services/tts.service'; // ระดับที่ 2: ส่งเสียงพูดไทย
 
@@ -258,6 +259,25 @@ router.post('/test', authenticate, requireRole('SUPERADMIN'), async (req, res) =
   }
   const ok = await sendTelegram('✅ Sovereign Alert — test message');
   res.json({ success: ok });
+});
+
+// CE3 (04/11/69): ทดสอบทุกช่องทางที่ตั้งไว้ (Telegram + Discord + LINE) — คืนผลแยกช่อง
+// ใช้ก่อนพึ่งระบบจริง: รู้ทันทีว่าช่องไหนตั้งผิด โดยไม่ต้องรอ alert จริง
+router.post('/channels/test', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+  try {
+    const creds = await getTelegramCredentials();
+    const targets = resolveExternalAlertTargets();
+    if (creds.botToken && creds.chatId) {
+      targets.telegram = { botToken: creds.botToken, chatId: creds.chatId };
+    }
+    if (!targets.telegram && !targets.discord && !targets.line) {
+      return res.status(400).json({ success: false, error: 'No alert channel configured' });
+    }
+    const result = await fanoutAlert('✅ Sovereign Alert — channel test', targets);
+    return res.json({ success: result.ok, channels: result.outcomes });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err instanceof Error ? err.message : 'test failed' });
+  }
 });
 
 // Manual send (for testing)

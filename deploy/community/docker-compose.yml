@@ -88,6 +88,10 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       TELEGRAM_MIN_SEVERITY: ${TELEGRAM_MIN_SEVERITY:-warn}
+      # ช่องทางเพิ่มเติม — ตั้งช่องไหนก็ได้ (ไม่ตั้ง = ข้าม)
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+      LINE_TO: ${LINE_TO:-}
       TZ: ${TZ:-Asia/Bangkok}
     ports:
       # dashboard เรียก API ผ่าน Next rewrite (/api/*) เป็นหลัก

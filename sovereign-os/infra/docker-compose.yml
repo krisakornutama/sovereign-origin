@@ -81,6 +81,10 @@ services:
       OTA_TOKEN: ${OTA_TOKEN:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # CE3: ช่องทางเพิ่มเติม (ตั้งใน infra/.env) — ไม่ประกาศตรงนี้ = container ไม่เห็นค่า
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+      LINE_TO: ${LINE_TO:-}
       # ── Agent Orchestration: ระดับการแจ้งเตือนงานที่รันบนเครื่องคอม ──
       # ก่อนเพิ่มบรรทัดนี้ container ไม่เห็นค่าเหล่านี้เลย ⇒ ผู้ใช้ตั้งในไฟล์นี้แล้ว
       # ระบบก็ยังไม่เห็น (ชั้น call เปิดสวิตช์ได้แต่โทรไม่ออก) — ตัวแปรที่ไม่ประกาศที่นี่

@@ -230,7 +230,12 @@
       · เทสต์ `tools/test/community-stack.test.mjs` **11/11** (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
       · ยังไม่ทดสอบ `up` เต็มชุด: พอร์ต 5432/3001/1883 ชนกับ production ที่รันอยู่ (Cold Soak) — รอเจ้าของเปิดหน้าต่างทดสอบ
 - [ ] **CE2 README/คลิป/GitHub Community** — ต้องรอเจ้าของอนุญาต push (ยัง hold) · README หลักชี้ไป `deploy/community/` แล้ว
-- [ ] **CE3 ช่องแจ้งเตือน Discord/LINE** — ยังไม่มีใน backend (มีแต่ Telegram) = งานใหม่ ไม่ใช่แค่ทดสอบ
+- [x] **CE3 ช่องแจ้งเตือน Discord/LINE** — **เสร็จ 04/11/69** (`ai/alert-fanout`)
+      · `services/alert-fanout.service.ts`: แปลง HTML→ข้อความล้วน (คงลิงก์), Discord (จำกัด 2000 + `allowed_mentions.parse=[]`), LINE Messaging API (จำกัด 5000), ตรวจ URL/รหัสผู้รับก่อนตั้งช่อง
+      · ต่อเข้ากับ dispatcher เดิม ⇒ severity/dedup/rate-limit ยังทำงานเหมือนเดิม · ยิงขนานแบบ soft-fail (ช่องหนึ่งล้มไม่ทำให้ช่องอื่นเงียบ)
+      · `POST /api/telegram/channels/test` (SUPERADMIN) — ทดสอบทุกช่องพร้อมกัน คืนผลแยกช่อง
+      · env: `DISCORD_WEBHOOK_URL` · `LINE_CHANNEL_ACCESS_TOKEN` · `LINE_TO` (LINE Messaging API — ไม่ใช่ LINE Notify ที่ปิดแล้ว)
+      · เทสต์ `tests/alertFanout.test.ts` 14/14 + `tests/telegramChannels.test.ts` 4/4 · `telegramAlert.test.ts` เดิมยังผ่าน 16/16
 
 ## ตัดสินใจแล้ว: ไม่ทำ (กันระบบบวม)
 - **Sensor auto-calibration** — maintenance-radar เตือน drift cross-node + task 90 วันอยู่แล้ว เหลือแค่ทำตามเตือน ไม่สร้างระบบใหม่
