@@ -7,9 +7,9 @@
 // ข้อมูลอยู่ใน localStorage ของเครื่องนี้ (เก็บแบบ local-first ตามที่เจ้าของสั่ง)
 // → เปิดจากเครื่องอื่น/มือถือจะไม่เจอข้อมูล แต่ยังแสดงหน้า UI ปกติ
 import { useEffect, useState } from 'react';
-import type { Db } from '../components/business/soverien/types';
-import { load } from '../components/business/soverien/store';
-import WarrantyCheck from '../components/business/soverien/WarrantyCheck';
+import type { Db } from '../components/pro/business/soverien/types';
+import { load } from '../components/pro/business/soverien/store';
+import WarrantyCheck from '../components/pro/business/soverien/WarrantyCheck';
 import Sidebar from '../components/layout/Sidebar';
 import Icon from '../components/ui/Icon';
 

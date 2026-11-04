@@ -27,9 +27,15 @@
 2. `routes.ts` เรียก registry ตัวเดียว → จุดเชื่อม 8 จุดเหลือ 1
 3. เกณฑ์ผ่าน: ปิดโมดูล Pro ทั้งหมดแล้ว API ยังบูตได้ (health 200) และ `/api/business` ตอบ 404 ไม่ใช่ 500
 
+> ✅ **ทำแล้ว (4 พ.ย. 69):** จุดเชื่อม routes 8 → 1 (`src/modules/pro/registry.ts`) · lazy `require` ต่อโมดูล ⇒ ไฟล์ถูกย้ายออกแล้ว mount เป็น 404 + log ไม่ throw · เทสต์ `tests/proRegistry.test.ts` 4/4 · boot จริงขึ้น `[pro] mounted: business, fleet, portfolio, treasury, dime, payments-slips, payments, restaurant` และ health 200
+
 **ขั้น B — แยกหน้า frontend**
 4. ย้าย `components/business/**` ไป `components/pro/**` และเปลี่ยน import 2 หน้า (`soverien`, `warranty`)
 5. เกณฑ์ผ่าน: `npm run build` ผ่าน + `/warranty` ยังใช้งานได้ (หน้านี้เป็น CE? ถ้าใช่ ต้องย้าย logic ที่ใช้ร่วมออกมาก่อน)
+
+> ✅ **ทำแล้ว (4 พ.ย. 69):** `components/business/**` → `components/pro/business/**` (35 ไฟล์, `git mv`) · build ผ่าน
+> ⚠ **คำตัดสินที่ทำจริงต่างจากแผนเล็กน้อย — และเหตุผล:** หน้า `/warranty` + `/soverien` **ไม่ย้ายไป CE** เพราะทั้งคู่ตรวจ S/N จาก `orders`/`serials` ที่ขายให้ลูกค้า = รับประกันเชิงพาณิชย์ (Pro ตามคำตัดสินของเจ้าของ) การย้ายไป `components/assets/` จะได้หน้าที่ตรวจอะไรไม่ได้ (ไม่มีข้อมูลออเดอร์)
+> ❗ **ที่ยังไม่มี:** CE ยังไม่มีหน้าประกันอุปกรณ์ของตัวเอง (BYOH: บอร์ด ESP32/เซนเซอร์ + วันหมดประกัน) — ต้องสร้างใหม่เป็นฟีเจอร์แยก ไม่ใช่การย้ายโค้ด
 
 **ขั้น C — ย้ายโค้ดจริงไป private repo**
 6. สร้าง repo `sovereign-pro` (private) — **ต้องให้เจ้าของสร้าง/อนุญาตก่อน** (เครื่องนี้ `gh` ยังไม่ล็อกอิน: 401)

@@ -34,7 +34,6 @@ import aiChatRoutes from './modules/ai/ai-chat.routes';
 import relayRoutes from './modules/relay/relay.routes';
 import telegramRoutes from './modules/telegram/telegram.routes';
 import agentMachinesRoutes from './modules/agent-machines/agent-machines.routes'; // Agent Orchestration Hub — ส่งงานไปเครื่องคอมใน LAN
-import fleetRoutes from './modules/fleet/fleet.routes'; // Fleet Control Plane — ภาพรวม/ช่องทาง/รหัสเชิญ/หมุน token (ไฟล์ state ไม่ใช้ DB)
 import machineControlRoutes from './modules/machine-control/machine-control.routes'; // ช่องควบคุมเครื่องระยะไกล — จอ/เมาส์/คีย์บอร์ด/ไฟล์
 import timescaleRoutes from './modules/timescale/timescale.routes';
 import reportRoutes from './modules/reports/reports.routes';
@@ -48,10 +47,7 @@ import teachRoutes from './modules/knowledge/teach.routes';
 import knowledgeFilesRoutes from './modules/knowledge/knowledge-files.routes';
 import agentTeamRoutes from './modules/agent/agent.routes';
 import visionRuleRoutes from './modules/vision/vision-rule.routes';
-import portfolioRoutes from './modules/portfolio/portfolio.routes';
-import treasuryRoutes from './modules/treasury/treasury.routes';
 import selfrelianceRoutes from './modules/selfreliance/selfreliance.routes';
-import dimeRoutes from './modules/dime/dime.routes';
 import healingRoutes from './modules/healing/healing.routes';
 import codingRoutes from './modules/coding/coding.routes';
 import workspaceRoutes from './modules/coding/workspace.routes';
@@ -59,8 +55,6 @@ import skillsRoutes from './modules/coding/skills.routes';
 import notesRoutes from './modules/notes/notes.routes';
 import ecosystemRoutes from './modules/ecosystem/ecosystem.routes';
 import socialHistoryRoutes from './modules/ecosystem/social-history.routes';
-import paymentsRoutes from './modules/payments/payments.routes';
-import paymentSlipsRoutes from './modules/payments/payment-slips.routes';
 import cloneRoutes from './modules/clone/clone.routes';
 import riskRoutes from './modules/risk/risk.routes';
 import predictiveRoutes from './modules/predictive/predictive.routes';
@@ -76,7 +70,6 @@ import livestockRoutes from './modules/livestock/livestock.routes';
 import compostRoutes from './modules/compost/compost.routes';
 import wasteRoutes from './modules/waste/waste.routes';
 import propertyRoutes from './modules/property/property.routes';
-import restaurantRoutes from './modules/restaurant/restaurant.routes';
 import govsimRoutes from './modules/govsim/govsim.routes';
 import governorRoutes from './modules/governor/governor.routes';
 import warRoomRoutes from './modules/war-room/war-room.routes';
@@ -95,9 +88,9 @@ import systemRoutes, { livenessRouter } from './modules/system/system.routes';
 import clientMonitorRoutes from './modules/system/client-monitor.routes';
 import qrRoutes from './modules/system/qr.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
-import businessRoutes from './modules/business/business.routes';
 import traceRoutes from './modules/trace/trace.routes';
 import { featureGuard } from './services/feature-grant.service';
+import { registerProRoutes } from './modules/pro/registry';
 
 // ────────────────────────────────────────────────────────────────────────────
 // mountRoutes — จุดรวมเสียบ route ทั้งหมด (ย้ายมาจาก server.ts)
@@ -120,7 +113,7 @@ export function mountRoutes(app: Express): void {
   //   - /api/partners  เครือข่ายคู่ค้าสาธารณะ
   //   - /api/software  แคตตาล็อกซอฟต์แวร์สาธารณะ
   //   โค้ดทั้งหมดถูกย้ายออกไปครบ พร้อม README วิธีนำกลับเข้า
-  app.use('/api/business', businessRoutes); // BUSINESS PLATFORM — ธุรกิจขายสินค้า IoT (สิทธิ์ต่อธุรกิจใน router)
+  registerProRoutes(app); // Pro modules: business/fleet/treasury/dime/payments/restaurant
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);
   app.use('/api/telemetry', telemetryRoutes);
@@ -139,7 +132,6 @@ export function mountRoutes(app: Express): void {
   app.use('/api/relay', featureGuard('/relay'), relayRoutes);
   app.use('/api/telegram', telegramRoutes);
   app.use('/api/agent-machines', agentMachinesRoutes); // HUB: ลงทะเบียนเครื่อง + สั่งงานข้ามเครื่อง (ผู้ใช้ JWT / runner machine-token)
-  app.use('/api/fleet', fleetRoutes); // Fleet Control Plane — SUPERADMIN เท่านั้น; ไม่มี route สาธารณะ
   app.use('/api/machine-control', machineControlRoutes); // ช่องควบคุมเครื่อง: long-poll ของ runner + state/frame/command ของ SUPERADMIN
   app.use('/api/timescale', timescaleRoutes);
   app.use('/api/reports', featureGuard('/reports'), reportRoutes);
@@ -152,13 +144,10 @@ export function mountRoutes(app: Express): void {
   app.use('/api/knowledge', featureGuard('/knowledge'), teachRoutes); // AI สอนลูก — POST /teach/generate, POST /teach/save
   app.use('/api/agent', featureGuard('/ai-agent'), agentTeamRoutes); // Agentic AI team — บทบาท + งานเบื้องหลัง
   app.use('/api/vision', featureGuard('/vision'), visionRuleRoutes); // Vision AI คนแปลกหน้า
-  app.use('/api/portfolio', featureGuard('/portfolio'), portfolioRoutes); // Phase 4: Wealth & Asset Tracker
-  app.use('/api/treasury', featureGuard(['/treasury', '/portfolio']), treasuryRoutes); // LIFE & FINANCE: Treasury & Wealth Engine (Net Worth / Runway / 5 Families)
   app.use('/api/selfreliance', selfrelianceRoutes); // วันรอด (Days of Autonomy) — น้ำ/อาหาร/ไฟ/เงิน + จุดอ่อนบ้าน
   app.use('/api/skill-matrix', skillMatrixRoutes); // S5: Skills Matrix — คน×ทักษะ 1-5 + summary
   app.use('/api/crisis', crisisRoutes); // S6: Crisis Playbooks — flood / blackout / security (one active at a time)
   app.use('/api/learning', learningRoutes); // Self-Learning Data Lake + Engine — A/B/C/D ทั้งหมดเรียนรู้ต่อจากอดีต
-    app.use('/api/dime', featureGuard(['/treasury', '/portfolio']), dimeRoutes); // Dime! Statement — IMAP + PDF → อัปเดตพอร์ตอัตโนมัติ
   app.use('/api/healing', featureGuard('/healing'), healingRoutes); // Sovereign Buddhist Healing Module
   app.use('/api/coding', featureGuard('/ai-agent'), codingRoutes); // Coding Agent
   app.use('/api/coding', featureGuard('/ai-agent'), workspaceRoutes); // Coding Agent — workspace (ตำแหน่งโปรเจ็ก/ไฟล์/เทอร์มินัล)
@@ -166,8 +155,6 @@ export function mountRoutes(app: Express): void {
   app.use('/api/notes', featureGuard('/ai-agent'), notesRoutes); // Note — ปุ่มโน้ต
   app.use('/api/ecosystem', ecosystemRoutes); // Ecosystem ส่วนตัว: platform + ที่เก็บรหัสผ่าน (เข้ารหัส AES-256-GCM)
   app.use('/api/ecosystem/social', socialHistoryRoutes); // Social Studio: ประวัติการโพสต์ + สถานะต่อแพลตฟอร์ม
-  app.use('/api/payments/slips', paymentSlipsRoutes); // FREE-FIRST: payment slips + manual review (no paid provider)
-  app.use('/api/payments', paymentsRoutes); // PAYMENTS — Checkout Session (THB) · transport เป็นของปลอมจนกว่าจะเปิด STRIPE_LIVE_ENABLED
   app.use('/api/clone', featureGuard('/settings'), cloneRoutes); // Export & Clone
   app.use('/api/risk-monitor', featureGuard('/risk-monitor'), riskRoutes);
   app.use('/api/predictive', featureGuard('/predictive'), predictiveRoutes); // Phase 4: Risk Monitor + DEFCON  // Health check — Public (ไม่ต้อง auth) — frontend hook ใช้ poll endpoint นี้
@@ -276,7 +263,6 @@ export function mountRoutes(app: Express): void {
   }
   app.use('/api/property', featureGuard('/property'), propertyRoutes); // แผนที่ที่ดิน 3 มิติ + จุดยุทธศาสตร์
   if (config.modules.isEnabled('restaurant')) {
-    app.use('/api/restaurant', featureGuard('/restaurant'), restaurantRoutes); // จักรวรรดิร้านอาหาร — Farm→Inventory→Menu→Order
   }
   app.use('/api/govsim', govsimRoutes); // Governance & Socio-Political Simulation (War Room)
   app.use('/api/governor', governorRoutes); // Governor AI — คุมเมืองอัตโนมัติ + มนุษย์ approve เรื่องใหญ่

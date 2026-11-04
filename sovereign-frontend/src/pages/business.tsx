@@ -7,7 +7,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { authFetch } from '../lib/apiFetch';
 import { getApiUrl } from '../lib/config';
 import { useAuthStore } from '../stores/useAuthStore';
-import BusinessWorkspace from '../components/business/BusinessWorkspace';
+import BusinessWorkspace from '../components/pro/business/BusinessWorkspace';
 
 // ────────────────────────────────────────────────────────────────────────────
 // /business — หน้ารวมธุรกิจ (Hub) + ปุ่มสร้างธุรกิจ + workspace

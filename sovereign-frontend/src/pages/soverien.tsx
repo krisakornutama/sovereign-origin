@@ -10,7 +10,7 @@
 // ⚠ ไม่แตะ src/lib/navigation.ts (ไฟล์ protected ตามกฎโปรเจกต์)
 //   → หน้านี้เข้าผ่านปุ่มใน /business และผ่านลิงก์ตรง /soverien
 import Head from 'next/head';
-import SoverienHub from '../components/business/soverien/SoverienHub';
+import SoverienHub from '../components/pro/business/soverien/SoverienHub';
 import Sidebar from '../components/layout/Sidebar';
 import Icon from '../components/ui/Icon';
 import Link from 'next/link';
