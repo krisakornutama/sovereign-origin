@@ -106,3 +106,19 @@ docker compose exec db pg_dump -U sovereign sovereign | gzip > sovereign-$(date 
 | `api` restart loop | `docker compose logs api` — มักเป็น `DATABASE_URL`/`JWT_SECRET` ไม่ถูก |
 | `migrate` exited ≠ 0 | `docker compose logs migrate` — ฐานข้อมูลยังไม่พร้อม หรือรหัสผ่านผิด |
 | หน้าเว็บโหลดได้แต่ API 401/network error | ตรวจ `NEXT_PUBLIC_API_URL` ว่าตรงกับ URL ที่เปิดจริง |
+
+## ✅ พิสูจน์แล้ว (04/11/69)
+
+ติดตั้งบนฐานข้อมูลว่างจริงด้วย `docker compose up -d --build` สำเร็จในรอบเดียว:
+
+| ขั้น | ผล |
+|---|---|
+| db (TimescaleDB) | healthy |
+| migrate (schema + seed) | exited 0 · สร้างผู้ใช้ `admin` ตาม `SEED_ADMIN_PASSWORD` |
+| api :3001 (ในเครื่องนี้ทดสอบ :3100) | `/healthz` = 200 |
+| web :3000 (ทดสอบ :3101) | 200 · เปิด Dashboard ได้ |
+| login | `POST /api/auth/login` = 200 |
+
+> หมายเหตุ: service `migrate` ใช้ `prisma db push` (sync จาก schema) ไม่ใช่ `migrate deploy`
+> เพราะ migration history มี drift — ฐานข้อมูลใหม่จะสร้างไม่ครบและ seed ล้ม (`P2022`)
+> production เดิมยังใช้ `migrate deploy` ตามปกติ ไม่กระทบ

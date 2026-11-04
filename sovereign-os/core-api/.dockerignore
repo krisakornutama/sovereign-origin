@@ -11,7 +11,7 @@ dist/
 # Runtime data / backups — mount จาก host ตอนรัน ไม่ใช่ของ image
 data/
 backups/
-knowledge/
+# knowledge/ — ต้องคงไว้: Dockerfile COPY /app/knowledge เข้า image (ถ้าตัด build จะล้ม)
 ota_firmwares/
 
 # Prisma client ที่ generate ไว้บน host (สถาปัตยกรรมเครื่องอื่น)

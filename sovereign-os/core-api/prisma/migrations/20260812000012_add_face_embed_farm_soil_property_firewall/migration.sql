@@ -15,7 +15,7 @@ ALTER TABLE "farm_plots" ADD COLUMN "boundary" JSONB;
 -- 3) ค่า NPK/ความชื้นของแปลง
 CREATE TABLE "farm_soil_readings" (
   "id" TEXT NOT NULL,
-  "plot_id" TEXT NOT NULL,
+  "plot_id" UUID NOT NULL,
   "n" DOUBLE PRECISION,
   "p" DOUBLE PRECISION,
   "k" DOUBLE PRECISION,

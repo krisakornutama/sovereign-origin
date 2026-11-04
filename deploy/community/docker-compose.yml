@@ -57,7 +57,10 @@ services:
       dockerfile: Dockerfile.prod
     image: sovereign-core-api:local
     restart: "no"
-    command: ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/seed.js"]
+    # 04/11/69: migrate deploy → db push
+    # เหตุผล: migration history มี drift (schema มีคอลัมน์/ตารางที่ migration ไม่มี) ⇒ ฐานข้อมูลใหม่
+    # สร้าง schema ไม่ครบ seed ล้ม P2022 · db push sync จาก schema ตรง ๆ เหมาะกับ self-hosted ติดตั้งใหม่
+    command: ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node dist/scripts/seed.js"]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sovereign}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
