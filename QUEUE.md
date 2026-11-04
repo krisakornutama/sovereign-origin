@@ -1023,3 +1023,13 @@
 - [x] Node 18 → **node:22-alpine** ทั้ง API และ migrate + `npm ci` (Prisma บน musl มี openssl แล้ว)
 - [x] **build context 524 MB → เหลือไม่กี่ MB** (ตัด `dist-electron` 1.5 GB) · คง `knowledge/` ไว้ (Dockerfile COPY)
 - [ ] เหลือ: Discord + LINE credential จริง (ต้องเจ้าของ) · คลิป 15 วิ · แยก Pro modules
+
+### Open-Core ขั้น A + B — เสร็จ 4 พ.ย. 69
+- [x] **ขั้น A: Pro registry เดียว** —  รวม 8 mount (business/fleet/portfolio/treasury/dime/payments-slips/payments/restaurant)
+      ·  เหลือจุดเชื่อมเดียว · โมดูลหาย = mount 404 +  ไม่ล้มตอนบูต (lazy require)
+      · เทสต์  4/4 (ลำดับ slips ก่อน payments, key ไม่ซ้ำ, 404 body)
+      · ตรวจของจริง: build ผ่าน · restart  ·  ครบ 8 ·  200 · business/treasury/restaurant/fleet = 401 (ต้องล็อกอิน)
+- [x] **ขั้น B: แยก frontend** —  →  (35 ไฟล์) · แก้ import ลึก +1 ชั้น 11 ไฟล์ · build ผ่าน
+      ·  +  ถูกจัดเป็นหน้า Pro (ตรวจ S/N จากออเดอร์ที่ขายแล้ว = รับประกันเชิงพาณิชย์ ตามคำตัดสินเจ้าของ)
+- [x] **Boundary tool = 0 จุด** (จาก 12) · เทสต์ tool 4/4
+- [ ] **ของที่ยังไม่มี: หน้าประกันอุปกรณ์/Asset ของ CE** (BYOH) — ต้องสร้างใหม่ ไม่ใช่ย้ายโค้ด · ยังไม่มีระบบสมัครสมาชิกใน CE (seed มีแค่ admin)

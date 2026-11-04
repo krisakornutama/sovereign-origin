@@ -15,7 +15,7 @@ export const PRO_AREAS = {
   business: {
     label: 'ร้านค้า/ออเดอร์/ใบกำกับ',
     modules: ['business'],
-    pages: ['business', 'ecosystem'],
+    pages: ['business', 'ecosystem', 'soverien', 'warranty'],
     routes: ['/api/business', '/api/ecosystem'],
   },
   restaurant: {
