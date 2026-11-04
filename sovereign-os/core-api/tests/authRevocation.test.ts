@@ -1,3 +1,4 @@
+import './setup-env';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert';
 import { createTestServer, makeToken, mockModel, type TestServer } from './helpers';

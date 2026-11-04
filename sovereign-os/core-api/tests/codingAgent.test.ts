@@ -1,4 +1,5 @@
 // TDD: Coding Agent — ผู้ใช้พิมพ์ภาพรวมครั้งเดียว → วางแผน → เขียนโค้ด → ตรวจงาน → เสนอทางต่อ
+import './setup-env';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

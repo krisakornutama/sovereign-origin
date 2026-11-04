@@ -1,4 +1,5 @@
 // TDD: Export & Clone — เลือกฟังก์ชั่นที่อยากถอดแบบ → ส่งออกแพ็กเกจ → นำเข้าเครื่องอื่น
+import './setup-env';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

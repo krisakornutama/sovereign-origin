@@ -1,3 +1,4 @@
+import './setup-env';
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';

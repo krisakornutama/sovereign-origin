@@ -1,4 +1,5 @@
 // tests/selfreliance.test.ts — pure compute (ไม่แตะ DB)
+import './setup-env';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
