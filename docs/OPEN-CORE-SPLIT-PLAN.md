@@ -64,3 +64,37 @@
 1. สร้าง private repo (หรือให้ผมสร้างผ่าน `gh auth login` ของคุณ)
 2. ยืนยันว่า `warranty`/`soverien` เป็น CE หรือ Pro (ผมเดาไม่ได้ — กระทบลูกค้าจริง)
 3. ยืนยันชื่อโมดูลที่ขาย: business / restaurant / treasury / fleet ครบหรือมีเพิ่ม (เช่น e-Tax, multi-tenant)
+
+## 6) ผลขั้น C — private repo มีโค้ด Pro ครบแล้ว (04/11/69)
+
+- repo: `krisakornutama/project-sovereign-pro` (private) · branch `main`
+- เนื้อหา **65 ไฟล์**: `modules/pro/registry.ts` + routes 8 โมดูล (business / fleet / portfolio / treasury / dime / payments ×2 / restaurant), service ที่ผูกอยู่ 11 ไฟล์, `lib/business.ts`, `components/pro/**` 43 ไฟล์
+- โครงพาธคงเดิมทุกไฟล์ → คัดลอกกลับเข้า CE ได้ตรง ไม่ต้องแก้ import
+- ตรวจความถูกต้องแล้ว: ทุกไฟล์ใน private repo มี blob ตรงกับ public repo 100% (`git diff --name-only <pro-main> main -- <paths>` ว่าง)
+- วิธีใช้อยู่ใน `README.md` ของ repo Pro
+
+## 7) ขั้นถัดไป: ลบ Pro ออกจาก public — ติดอยู่ที่ CE ยังพึ่ง service Pro
+
+ลองลบบน branch แล้ว `tsc` ฟ้อง **26 จุดใน 9 ไฟล์ CE** ⇒ ยังลบไม่ได้ทันที ต้องปลดก่อน:
+
+| ไฟล์ CE | พึ่งอะไรของ Pro |
+|---|---|
+| `src/modules/users/users.routes.ts` | `fleet-persistence.service` |
+| `src/services/advisor.service.ts` | `wealth.service` |
+| `src/services/business-agent-executor.service.ts` | `business.service` |
+| `src/services/fleet-policy.service.ts` | `fleet-persistence.service` |
+| `src/services/fleet-scope.service.ts` | `fleet-overview.service` (+ type ของมัน 13 จุด) |
+| `src/services/portfolio-signal.service.ts` | `price-feed.service` |
+| `src/services/telegram-agent-bot.service.ts` | `business-shop.service` |
+| `src/workers/start.ts` | `dime` / `business` / `wealth` service (3 งาน) |
+| `src/scripts/e2e-fixture.ts` | `business-shop.service` |
+
+แนวทางที่ต้องเลือกก่อนลงมือ (กระทบพฤติกรรม CE):
+
+1. **guarded require** — ห่อ import ด้วย `try/catch` + ตอบ 404/ข้ามงานเมื่อไม่มีโมดูล (CE ยังมีหน้า users/fleet บางส่วน)
+2. **ตัดฟีเจอร์ออกจาก CE** — หน้า/งานที่อิง Pro หายไปเลย (ชัดที่สุด แต่ผู้ใช้ CE เสียฟีเจอร์)
+3. **ย้าย service ที่ใช้ร่วมขึ้น CE** — เฉพาะ service ที่เป็นของกลางจริง (ต้องแยกทีละตัว ไม่ใช่ยกทั้งก้อน)
+
+พร้อมกันนั้นต้องย้ายเทสต์ Pro 12 ไฟล์ (`businessPlatform`, `thaiTax`, `transfersApi`, `treasuryApi`, `portfolioOwner`, `restaurant.routes`, `paymentsCheckout`, `paymentsFreshClone`, `paymentsWebhook`, `paymentSlips-db`, `dime-db`, `uploads-db`) ไป repo Pro ด้วย ไม่งั้น CI public แดงหลังลบ
+
+ด่านที่เพิ่มแล้ว: `.github/workflows/open-core-boundary.yml` (boundary `--check` + `tsc` + proRegistry/invite tests)
