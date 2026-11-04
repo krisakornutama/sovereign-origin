@@ -1,0 +1,25 @@
+name: ขอฟีเจอร์ / Feature request
+description: เสนอสิ่งที่อยากให้มี
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: ปัญหาที่อยากแก้
+      description: เล่าสถานการณ์จริงที่ทำให้ต้องการฟีเจอร์นี้
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: แนวทางที่คิดไว้ (ไม่บังคับ)
+  - type: dropdown
+    id: scope
+    attributes:
+      label: เกี่ยวกับส่วนไหน
+      options:
+        - Monitoring / sensors
+        - Alerts (Telegram / Discord / LINE)
+        - Dashboard / UI
+        - Docker / ติดตั้ง
+        - อื่น ๆ

@@ -1,0 +1,55 @@
+name: แจ้งบั๊ก / Bug report
+description: รายงานสิ่งที่ทำงานผิดจากที่ควรเป็น
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ขอบคุณที่ช่วยทดสอบ — ยิ่งบอกขั้นตอนซ้ำได้ ยิ่งแก้ได้เร็ว
+        **ห้ามใส่ token, รหัสผ่าน, URL ที่มี key หรือข้อมูลส่วนตัวของลูกค้า**
+  - type: input
+    id: version
+    attributes:
+      label: เวอร์ชัน / commit
+      placeholder: เช่น CE 0.1.0 หรือ commit a493569
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: ติดตั้งแบบไหน
+      options:
+        - docker compose (Community Edition)
+        - Windows one-shot installer
+        - รันจากซอร์ส (npm)
+        - อื่น ๆ
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: ขั้นตอนทำให้เกิดปัญหา
+      placeholder: |
+        1. ...
+        2. ...
+        3. เห็นอาการ ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: สิ่งที่คาดว่าจะเกิดขึ้น
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: log ที่เกี่ยวข้อง (ปิดข้อมูลลับก่อน)
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: การตรวจสอบก่อนส่ง
+      options:
+        - label: ฉันเอา token/รหัสผ่าน/ข้อมูลลูกค้าออกจาก log แล้ว
+          required: true

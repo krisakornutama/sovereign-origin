@@ -997,3 +997,14 @@
 - [ ] **Fleet ทดสอบเครื่องจริง 1 เครื่อง** — รอเจ้าของมีเครื่องที่ 2 พร้อม (ผมเตรียมรหัสเชิญ/คำสั่งให้ได้ทันที)
 - [ ] **G1/G2 ทิศทาง e-Tax + เปิด /shop สู่อินเทอร์เน็ต** — เจ้าของตัดสินใจ (PDPA gate ยังไม่บังคับใช้จริง = เหตุผลที่ G2 ยังปิด)
 - [x] **Push GitHub** — ทำรอบนี้แล้ว (`90e1ab9` + docs) · `origin/main` = local
+
+## CE/Open-Core — เปิดทาง Phase 2 (04/11/69)
+- [x] **LICENSE = AGPL-3.0** — ไฟล์เต็ม 34,020 B จาก SPDX (gnu.org ถูก reset ระหว่างดึง) · เดิมไม่มี LICENSE = ตามกฎหมายทุกคนใช้/ fork ไม่ได้
+- [x] **`docs/OPEN-CORE.md` = เส้นแบ่ง CE/Pro** — ระบุสิ่งที่ห้ามตัดออกจาก CE (consent/privacy/audit) และ 5 ขั้นตอนแยก repo จริง
+- [x] **README มีหัวข้อ License + คำเตือน** ห้ามโพสต์ว่า "CE พร้อมใช้" ก่อนแยก Pro เสร็จ
+- [x] **Issue templates** (`bug_report.yml` · `feature_request.yml` · `config.yml`) — bug form บังคับยืนยันว่าปลอดข้อมูลลับ (ชุมชนจะแปะ log มาเสมอ)
+- [x] **`sovereign-frontend/.dockerignore`** — เดิมไม่มี ⇒ `docker compose up --build` ส่ง `node_modules/.next` หลาย GB เข้า daemon (CE ต้อง build ได้บน Pi 4)
+- [ ] **ทดสอบ `compose up` บนพอร์ตหลบ** (3100/3101/1884/18084) — กำลังรัน `logs/ce-up.log`; ต้องผ่านก่อนอัปเดต README ว่า "คำสั่งเดียว"
+- [ ] **แยก Pro modules ไป private repo** (`ai/open-core-split`) — ทำหลังทดสอบ CE ผ่าน
+- [ ] **Discord + LINE จริง** — โค้ดพร้อม (`alertFanout` 14/14) แต่ยังไม่มี credential ในเครื่อง ⇒ ยังพิสูจน์ได้แค่ Telegram
+- [ ] **คลิป 15 วิ + โพสต์ Reddit** — ยังไม่มีสื่อใน repo

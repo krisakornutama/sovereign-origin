@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: วิธีติดตั้ง (Community Edition)
+    url: https://github.com/krisakornutama/sovereign-origin/blob/main/deploy/community/README.md
+    about: อ่านก่อนเปิด issue เรื่องติดตั้ง — มีคำสั่งและข้อกำหนดครบ
