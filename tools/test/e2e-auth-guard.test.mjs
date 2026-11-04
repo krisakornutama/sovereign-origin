@@ -33,7 +33,7 @@ for (const spec of AUTH_SPECS) {
 
 test('playwright.config ยังประกาศ project authenticated และอ้าง spec ในลิสต์', () => {
   // config เขียน testMatch เป็น regex (มี backslash หนีจุด) → ตัด backslash ก่อนเทียบ
-  const cfg = readFileSync(join(FE, 'playwright.config.ts'), 'utf8').replaceAll('\', '');
+  const cfg = readFileSync(join(FE, 'playwright.config.ts'), 'utf8').split(String.fromCharCode(92)).join('');
   assert.match(cfg, /name: 'authenticated'/, 'ไม่พบ project authenticated');
   for (const spec of AUTH_SPECS) {
     assert.ok(cfg.includes(spec), `config ไม่ได้อ้าง ${spec} แล้ว — อัปเดตลิสต์ในเทสต์นี้`);
