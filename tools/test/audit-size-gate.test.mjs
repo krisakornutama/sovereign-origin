@@ -1,7 +1,7 @@
 // I3d — ด่านขนาด audit_logs (กันโตเงียบอีกสาย)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditSizeVerdict, DEFAULT_AUDIT_WARN_MB, DEFAULT_AUDIT_WARN_ROWS } from '../lib/audit-size-gate.mjs';
+import { auditSizeVerdict, DEFAULT_AUDIT_WARN_MB, DEFAULT_AUDIT_WARN_ROWS } from '../verify/audit-size-gate.mjs';
 
 test('ขนาดปกติ = ไม่เตือน', () => {
   assert.equal(auditSizeVerdict({ totalMb: 12.4, rows: 26901 }), null);
