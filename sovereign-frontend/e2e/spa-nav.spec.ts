@@ -1,3 +1,7 @@
+import { skipIfAuthStateMissing } from './helpers/authGuard';
+
+skipIfAuthStateMissing();
+
 import { test, expect } from '@playwright/test';
 import { NAV_GROUPS } from '../src/lib/navigation';
 

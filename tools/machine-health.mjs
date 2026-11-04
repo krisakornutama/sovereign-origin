@@ -12,6 +12,7 @@ import { execSync } from 'node:child_process';
 import { statfsSync, statSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { auditSizeVerdict } from './lib/audit-size-gate.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -174,6 +175,15 @@ try {
   const defCount = execSync('docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT count(*) FROM audit_logs_default"', { windowsHide: true, encoding: 'utf8', timeout: 20_000 }).trim();
   info.auditDefaultRows = Number(defCount);
   if (info.auditDefaultRows > 0) problems.push({ level: 'warn', area: 'audit', message: `audit_logs มี ${info.auditDefaultRows} แถวตกใน default partition — partition เดือนนั้นหาย (รัน tools/verify/audit-retention.mjs เพื่อสร้างใหม่)` });
+  // 4b++) I3d: ขนาดรวมทั้งหมด (parent + ทุก partition) — กันโตเงียบจนดิสก์เต็ม
+  const sizeCmd = `docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT COALESCE(SUM(pg_total_relation_size(i.inhrelid)),0) FROM pg_inherits i JOIN pg_class p ON p.oid = i.inhparent WHERE p.relname = 'audit_logs'"`;
+  const rowsCmd = `docker exec sovereign-db psql -U sovereign -d sovereign -tAc "SELECT count(*) FROM audit_logs"`;
+  const auditBytes = Number(execSync(sizeCmd, { windowsHide: true, encoding: 'utf8', timeout: 20_000 }).trim());
+  const auditRows = Number(execSync(rowsCmd, { windowsHide: true, encoding: 'utf8', timeout: 20_000 }).trim());
+  info.auditTotalMB = Math.round((auditBytes / 1024 ** 2) * 10) / 10;
+  info.auditRows = auditRows;
+  const auditVerdict = auditSizeVerdict({ totalMb: info.auditTotalMB, rows: auditRows });
+  if (auditVerdict) problems.push({ level: auditVerdict.level, area: 'audit', message: auditVerdict.message });
 } catch { /* Docker/DB ดับ = จับโดยด่านอื่นอยู่แล้ว */ }
 
 // 4c) I1c — WAL archive ติดขัด: failed>0 = warn ทันที · ไม่มีไฟล์ใหม่ >30 นาที = warn (archive_timeout 300s ต้องไหลสม่ำเสมอ)

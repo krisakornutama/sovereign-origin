@@ -1,3 +1,7 @@
+import { skipIfAuthStateMissing } from './helpers/authGuard';
+
+skipIfAuthStateMissing();
+
 import { test, expect, request } from '@playwright/test';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
