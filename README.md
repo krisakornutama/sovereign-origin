@@ -7,6 +7,37 @@
 > `cp deploy/community/.env.example deploy/community/.env` แล้ว `docker compose -f deploy/community/docker-compose.yml up -d --build`
 > ดูรายละเอียดที่ [`deploy/community/README.md`](deploy/community/README.md)
 
+## 🖥️ รับช่วงต่อบนเครื่องใหม่ (clone แล้วรันได้เลย)
+
+```bash
+git clone https://github.com/krisakornutama/sovereign-origin.git
+cd sovereign-origin
+```
+
+**ทางเร็วสุด — Community Edition ด้วย Docker (ไม่ต้องมี Node.js บนเครื่อง)**
+
+```bash
+cp deploy/community/.env.example deploy/community/.env
+# แก้ SEED_ADMIN_PASSWORD ใน .env ก่อน (ถ้าเว้นว่าง ระบบจะสุ่มให้และพิมพ์ใน log)
+docker compose -f deploy/community/docker-compose.yml up -d --build
+```
+
+- เว็บ `http://localhost:3000` · API `http://localhost:3001/healthz` · MQTT `1883`
+- ผู้ใช้เริ่มต้น `admin` (รหัสอยู่ใน `deploy/community/.env`)
+- เพิ่มสมาชิกด้วยรหัสเชิญ: หน้า **Users → การ์ดรหัสเชิญ** หรือ
+  `docker compose -f deploy/community/docker-compose.yml exec api node dist/scripts/make-invite.js --role OPERATOR --days 7`
+- หยุด: `docker compose -f deploy/community/docker-compose.yml down` (ข้อมูลยังอยู่)
+
+**โหมดพัฒนา (แก้โค้ดแล้วเห็นผลทันที)**
+
+```bash
+cd sovereign-os/core-api && npm ci && npx prisma generate && npm run dev   # :3001
+cd sovereign-frontend && npm ci && npm run dev                              # :3000
+```
+
+**รันเทสต์ก่อนแก้โค้ด** — API: `cd sovereign-os/core-api && npm test` · เว็บ: `cd sovereign-frontend && npm run typecheck && npm run build`
+ด่านกัน Pro หลุดเข้า CE: `node tools/verify/open-core-boundary.mjs` (ต้องได้ 0 จุด)
+
 ## 🚀 ติดตั้งครั้งเดียวใช้งานได้เลย (One-Shot Install)
 
 **ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2) **+ Node.js 20+**
