@@ -9,11 +9,11 @@
 
 ## 🎬 เดโม 15 วินาที
 
-3 ฉากจากระบบจริง: **1** ล็อกอิน + 2FA → **2** Dashboard ที่มีข้อมูลจริง → **3** รหัสเชิญ (ไม่ต้องมี SMTP)
+11 ฉากจากระบบจริง: Dashboard → แจ้งเตือน → ประวัติ alert → อุปกรณ์ IoT → กราฟ 24 ชม. → ผู้ใช้/รหัสเชิญ → ตั้งค่า Telegram → Audit log → PDPA consent → สมัครด้วยรหัสเชิญ → Security
 
-![เดโม: login + 2FA → dashboard จริง → รหัสเชิญ](docs/media/demo.gif)
+![เดโม 15 วินาที: Dashboard, แจ้งเตือน, อุปกรณ์ IoT และหน้าจอหลักของ Sovereign OS](docs/media/demo.gif)
 
-> คลิปชุดนี้เป็นภาพนิ่ง 3 ฉาก (12 วิ) จากระบบที่รันจริง — ไฟล์วิดีโอเต็ม: [`docs/media/demo.mp4`](docs/media/demo.mp4)
+> ภาพนิ่ง 11 ฉาก (15 วิ) จากระบบที่รันจริง — ต้นฉบับแยกไฟล์: [`docs/media/screens/`](docs/media/screens) · วิดีโอ 3 ฉากเดิม: [`docs/media/demo.mp4`](docs/media/demo.mp4)
 
 สตอรีบอร์ด + คำสั่งจำลองอุณหภูมิ + สคริปต์ยิง alert จริง: [`docs/PRELAUNCH-DEMO.md`](docs/PRELAUNCH-DEMO.md)
 
