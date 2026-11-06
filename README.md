@@ -1,7 +1,9 @@
 # Sovereign OS
 
+**English** · [ไทย](README.md)
+
 ระบบบ้านอัจฉริยะ Sovereign ที่ดูแลตัวเองได้ (Self-Sovereign Home OS) — Security, Resilience, AI และ Telemetry ในชุดเดียว
-ทดสอบ 994/994 tests ผ่าน 100% · core-api รันบน RAM ~220MiB, CPU <0.5%
+ทดสอบ backend 1,823 tests (ข้าม 1) + tooling 1,287 tests ผ่านทั้งหมด (6 พ.ย. 2026) · core-api รันบน RAM ~220MiB, CPU <0.5%
 
 > **Community Edition (Docker อย่างเดียว — ไม่ต้องมี Node.js บนเครื่อง):**
 > `cp deploy/community/.env.example deploy/community/.env` แล้ว `docker compose -f deploy/community/docker-compose.yml up -d --build`
@@ -28,7 +30,8 @@ cd sovereign-origin
 
 ```bash
 cp deploy/community/.env.example deploy/community/.env
-# แก้ SEED_ADMIN_PASSWORD ใน .env ก่อน (ถ้าเว้นว่าง ระบบจะสุ่มให้และพิมพ์ใน log)
+# ต้องตั้ง 3 ค่า: POSTGRES_PASSWORD, EMQX_PASSWORD, JWT_SECRET (สุ่ม 24 ตัวอักษรขึ้นไป)
+# SEED_ADMIN_PASSWORD ไม่บังคับ — ถ้าเว้นว่าง ระบบจะสุ่มให้และพิมพ์ใน log ของ service migrate
 docker compose -f deploy/community/docker-compose.yml up -d --build
 ```
 
@@ -50,7 +53,7 @@ cd sovereign-frontend && npm ci && npm run dev                              # :3
 
 ## 🚀 ติดตั้งครั้งเดียวใช้งานได้เลย (One-Shot Install)
 
-**ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2) **+ Node.js 20+**
+**ต้องมี Docker ก่อน** (Windows: Docker Desktop / Linux: docker engine + compose v2) **+ Node.js 20+** สำหรับตัวติดตั้งเท่านั้น (ทาง Docker ด้านบนไม่ต้องใช้ Node.js)
 
 **Windows — ดับเบิลคลิก:**
 ```bat
@@ -109,7 +112,7 @@ node tools/install/install.mjs
 
 ```
 sovereign-os/
-  core-api/     ← Backend (Express + Prisma, ทุกโมดูล 38 modules)
+  core-api/     ← Backend (Express + Prisma, 58 modules)
   infra/        ← docker-compose (dev/prod) + .env (ไม่เข้า git)
 sovereign-frontend/  ← Dashboard (Next.js)
 docs/           ← Blueprint เอกสารออกแบบ (SERIES_RED_DMS_BLUEPRINT.md) + คู่มือ Google Search Console สำหรับเว็บ portfolio (google-search-console-guide.md)
@@ -120,7 +123,7 @@ tools/install/  ← ตัวติดตั้งคลิกเดียว
 
 ```bash
 cd sovereign-os/core-api
-npm test   # 994 tests (tsx --test, serial)
+npm test   # 1,823 tests (tsx --test, serial)
 npm run build  # tsc ตรวจ type + build dist/
 ```
 
@@ -135,4 +138,4 @@ npm run build  # tsc ตรวจ type + build dist/
 - **Pro modules (แยกออกแล้ว 04/11/69):** business / shop / treasury / POS / fleet อยู่ใน private repo `project-sovereign-pro` — repo นี้เหลือ CE ล้วน API ของโมดูล Pro ตอบ 404 พร้อมบอกชื่อโมดูล (ไม่ทำให้ทั้ง API ล่ม)
 - เส้นแบ่งฉบับเต็ม + สิ่งที่ห้ามตัดออกจาก CE (consent, privacy, audit): [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md)
 
-> ⚠️ ตอนนี้ repo ยังมีทั้งสองส่วนรวมกัน — ห้ามโพสต์ประชาสัมพันธ์ว่า "CE พร้อมใช้" จนกว่าจะแยกเสร็จ (คิว `ai/open-core-split`)
+> ⚠️ Community Edition พร้อมใช้แล้ว (แยก Pro ออกเสร็จ 04/11/69) — โมดูล Pro ตอบ 404 พร้อมชื่อโมดูล ไม่ทำให้ API ล่ม
