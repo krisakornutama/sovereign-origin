@@ -1,6 +1,6 @@
 # Sovereign OS
 
-**English** · [ไทย](README.md)
+[English](README.en.md) · ไทย
 
 ระบบบ้านอัจฉริยะ Sovereign ที่ดูแลตัวเองได้ (Self-Sovereign Home OS) — Security, Resilience, AI และ Telemetry ในชุดเดียว
 ทดสอบ backend 1,823 tests (ข้าม 1) + tooling 1,287 tests ผ่านทั้งหมด (6 พ.ย. 2026) · core-api รันบน RAM ~220MiB, CPU <0.5%
