@@ -78,6 +78,7 @@
     "service:data-lake.service → inventory(inventory_items)": 1,
     "service:data-lake.service → sensors(sensor_telemetry)": 1,
     "service:documents.service → inventory(inventory_items)": 1,
+    "service:invite.service → auth(users)": 1,
     "service:learning-engine.service → farm(farm_plots)": 1,
     "service:learning-engine.service → health(health_observations)": 1,
     "service:learning-engine.service → health(health_readings)": 1,

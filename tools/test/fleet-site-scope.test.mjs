@@ -23,8 +23,6 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const BACKEND = 'sovereign-os/core-api';
 const SCHEMA = `${BACKEND}/prisma/schema.prisma`;
 const MIGRATION = `${BACKEND}/prisma/migrations/20261024130000_site_admin_role/migration.sql`;
-const SCOPE = `${BACKEND}/src/services/fleet-scope.service.ts`;
-const ROUTES = `${BACKEND}/src/modules/fleet/fleet.routes.ts`;
 const AUDIT = `${BACKEND}/src/services/audit.service.ts`;
 const AUTH_MW = `${BACKEND}/src/middleware/auth.middleware.ts`;
 const USERS = `${BACKEND}/src/modules/users/users.routes.ts`;
@@ -97,25 +95,6 @@ describe('schema + migration — SITE_ADMIN มีของจริงรอง
   });
 });
 
-describe('fleet-scope.service — fail closed', () => {
-  const src = read(SCOPE);
-
-  test('บทบาทที่ผ่านประตูมีแค่ SUPERADMIN + SITE_ADMIN', () => {
-    assert.match(src, /FLEET_READ_ROLES\s*=\s*\['SUPERADMIN',\s*'SITE_ADMIN'\]/);
-  });
-
-  test('มีรหัสข้อผิดพลาดแยกกรณี ไม่มีสาขา / สาขาหาย', () => {
-    assert.match(src, /'SITE_SCOPE_MISSING'/);
-    assert.match(src, /'SITE_SCOPE_UNKNOWN'/);
-  });
-
-  test('กรอง overview แล้วคิด summary/channels ใหม่ (ไม่ปล่อยตัวเลขทั้งระบบ)', () => {
-    assert.match(src, /export function filterFleetOverviewForScope/);
-    assert.match(src, /const summary = \{/);
-    assert.match(src, /const channels = overview\.channels\.map/);
-  });
-});
-
 describe('auth middleware — อ่านสาขาจาก DB ทุก request', () => {
   const mw = read(AUTH_MW);
 
@@ -131,70 +110,6 @@ describe('auth middleware — อ่านสาขาจาก DB ทุก req
   test('ส่งค่าลง req.user ทั้งสองฟังก์ชัน', () => {
     const assigns = mw.match(/assigned_site_id: dbUser\.assigned_site_id \?\? null/g) ?? [];
     assert.equal(assigns.length, 2);
-  });
-});
-
-describe('fleet.routes — guard รายเส้น', () => {
-  const src = read(ROUTES);
-
-  test('ไม่ใช้ router.use(authenticate, requireRole(...)) ทั้งโมดูลอีก', () => {
-    assert.ok(!/router\.use\(\s*authenticate\s*,\s*requireRole/.test(src), 'ต้องแยกสิทธิ์รายเส้น');
-    assert.match(src, /router\.use\(authenticate\);/);
-  });
-
-  test('ทุก route มี guard readOnly หรือ superOnly', () => {
-    const lines = src.split(/\r?\n/).filter((line) => /^router\.(get|post|put|patch|delete)\(/.test(line));
-    assert.ok(lines.length >= 10, `คาดว่ามีอย่างน้อย 10 เส้น (พบ ${lines.length})`);
-    for (const line of lines) {
-      assert.match(line, /\b(readOnly|superOnly)\b/, `route ไม่มี guard: ${line.trim()}`);
-    }
-  });
-
-  test('เส้นอ่านอนุญาต SITE_ADMIN', () => {
-    for (const needle of [
-      "router.get('/overview', readOnly",
-      "router.get('/policy', readOnly",
-      "router.get('/sites', readOnly",
-      "router.get('/groups', readOnly",
-      "router.get('/audit', readOnly",
-    ]) {
-      assert.ok(src.includes(needle), `ขาด guard: ${needle}`);
-    }
-  });
-
-  test('เส้นเขียน/จัดการกุญแจเป็น SUPERADMIN เท่านั้น', () => {
-    for (const needle of [
-      "router.put('/policy', superOnly",
-      "router.get('/enroll-tokens', superOnly",
-      "router.post('/enroll-tokens', superOnly",
-      "router.post('/enroll-tokens/:id/revoke', superOnly",
-      "router.put('/machines/:id', superOnly",
-      "router.post('/machines/:id/rotate-token', superOnly",
-    ]) {
-      assert.ok(src.includes(needle), `ขาด guard: ${needle}`);
-    }
-  });
-
-  test('/overview ถูกกรองด้วย scope ก่อนตอบ', () => {
-    const section = routeSection(src, "router.get('/overview'");
-    assert.match(section, /scopeOf\(req, res\)/);
-    assert.match(section, /filterFleetOverviewForScope\(/);
-  });
-
-  test('/sites และ /groups ใช้รายการที่จำกัดสาขา', () => {
-    assert.match(routeSection(src, "router.get('/sites'"), /listFleetSitesScoped\(siteIdOfScope\(scope\)\)/);
-    assert.match(routeSection(src, "router.get('/groups'"), /listFleetGroupsScoped\(siteIdOfScope\(scope\)\)/);
-  });
-
-  test('/audit ส่ง machineIds ลง service', () => {
-    const section = routeSection(src, "router.get('/audit'");
-    assert.match(section, /machineIdsForScope\(/);
-    assert.match(section, /machineIds,\s*\n\s*\}\);/);
-  });
-
-  test('scopeOf ปฏิเสธเมื่อ resolve ไม่ผ่าน และไม่เรียก DB เมื่อเป็น SUPERADMIN', () => {
-    assert.match(src, /async function scopeOf[\s\S]*?if \(!resolved\.ok\)[\s\S]*?return null;/);
-    assert.match(src, /req\.user\?\.role === 'SITE_ADMIN' && assigned \? await getFleetSiteById\(assigned\) : null/);
   });
 });
 

@@ -29,7 +29,7 @@ export const MODULE_CATALOG = Object.freeze([
     desc: 'หน้าแรก · เครื่องลูก/คิวงาน · สถานะระบบ · ตั้งค่า',
     required: true,
     recommended: true,
-    pages: ['/dashboard', '/fleet', '/machine-console', '/agent-queue', '/system', '/settings'],
+    pages: ['/dashboard', '/machine-console', '/agent-queue', '/system', '/settings'],
     services: ['timescaledb', 'core-api'],
   },
   {
@@ -37,7 +37,7 @@ export const MODULE_CATALOG = Object.freeze([
     label: 'IoT / เซนเซอร์ / รีเลย์',
     desc: 'อ่านเซนเซอร์ ESP32 · สั่งรีเลย์ · บ้าน 3D · อุปกรณ์ในโรงงาน/ร้าน',
     recommended: true,
-    pages: ['/sensors', '/automation', '/relay', '/infrastructure', '/business', '/property'],
+    pages: ['/sensors', '/automation', '/relay', '/infrastructure', '/property'],
     services: ['emqx'],
   },
   {
@@ -56,13 +56,6 @@ export const MODULE_CATALOG = Object.freeze([
     enabledModules: ['farm'],
   },
   {
-    id: 'restaurant',
-    label: 'ร้านอาหาร / คาเฟ่',
-    desc: 'เมนู/โต๊ะ · จอครัว (KDS) · รายงานขาย · เครื่องชั่งในครัว',
-    pages: ['/restaurant', '/restaurant/admin', '/restaurant/kds', '/restaurant/reports', '/restaurant/kitchen'],
-    enabledModules: ['restaurant'],
-  },
-  {
     id: 'inventory',
     label: 'คลังสินค้า / วัตถุดิบ',
     desc: 'สต็อก · รับเข้า/เบิกออก · แจ้งเตือนของใกล้หมด',
@@ -74,12 +67,6 @@ export const MODULE_CATALOG = Object.freeze([
     label: 'พลังงาน / ไฟฟ้า',
     desc: 'มิเตอร์ · ต้นทุนไฟ · วางแผนลดการใช้',
     pages: ['/energy'],
-  },
-  {
-    id: 'treasury',
-    label: 'การเงิน / ทรัพย์สิน',
-    desc: 'กระแสเงินสด · ทรัพย์สินสุทธิ · เงินสำรองยังชีพ',
-    pages: ['/treasury', '/portfolio'],
   },
   {
     id: 'health',

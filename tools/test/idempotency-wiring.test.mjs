@@ -15,63 +15,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-const BUSINESS = 'sovereign-os/core-api/src/modules/business/business.routes.ts';
-const RESTAURANT = 'sovereign-os/core-api/src/modules/restaurant/restaurant.routes.ts';
 const SERVICE = 'sovereign-os/core-api/src/services/idempotency.service.ts';
 const REQUEST_ID = 'sovereign-frontend/src/lib/requestId.ts';
 const API_FETCH = 'sovereign-frontend/src/lib/apiFetch.ts';
 const OFFLINE_QUEUE = 'sovereign-frontend/src/lib/offlineQueue.ts';
-
-describe('idempotency — backend routes', () => {
-  test('business: เปิดออเดอร์ติด idempotent พร้อม scope ของตัวเอง', () => {
-    const src = read(BUSINESS);
-    assert.match(
-      src,
-      /router\.post\('\/:businessId\/orders',\s*authenticate,\s*idempotent\('business\.order'\)/,
-      'POST /:businessId/orders ต้องมี idempotent("business.order") หลัง authenticate',
-    );
-  });
-
-  test('business: บันทึกรับเงินติด idempotent (เงินซ้ำ = เสียเงินจริง)', () => {
-    const src = read(BUSINESS);
-    assert.match(
-      src,
-      /router\.post\('\/:businessId\/orders\/:id\/payments',\s*authenticate,\s*idempotent\('business\.payment'\)/,
-      'POST /:businessId/orders/:id/payments ต้องมี idempotent("business.payment")',
-    );
-  });
-
-  test('restaurant: เปิดออเดอร์ติด idempotent', () => {
-    const src = read(RESTAURANT);
-    assert.match(
-      src,
-      /router\.post\('\/orders',\s*authenticate,\s*idempotent\('restaurant\.order'\)/,
-      'POST /orders ต้องมี idempotent("restaurant.order")',
-    );
-  });
-
-  test('restaurant: รับซื้อวัตถุดิบติด idempotent หลังด่านสิทธิ์', () => {
-    const src = read(RESTAURANT);
-    assert.match(
-      src,
-      /router\.post\('\/purchases',\s*authenticate,\s*requireRole\(\.\.\.WRITE_ROLES\),\s*idempotent\('restaurant\.purchase'\)/,
-      'POST /purchases ต้องมี idempotent("restaurant.purchase") หลัง requireRole (ไม่ให้คีย์ถูกจองก่อนรู้สิทธิ์)',
-    );
-  });
-
-  test('ทุกจุดใช้ scope คนละชื่อ (คีย์ชนกันข้าม endpoint ไม่ได้)', () => {
-    const scopes = [
-      ...read(BUSINESS).matchAll(/idempotent\('([^']+)'\)/g),
-      ...read(RESTAURANT).matchAll(/idempotent\('([^']+)'\)/g),
-    ].map((m) => m[1]);
-    assert.deepEqual(scopes.sort(), [
-      'business.order',
-      'business.payment',
-      'restaurant.order',
-      'restaurant.purchase',
-    ]);
-  });
-});
 
 describe('idempotency — backend service ↔ frontend contract', () => {
   test('รูปแบบคีย์ที่ frontend สร้าง ต้องผ่านกติกาของ backend', () => {

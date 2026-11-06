@@ -91,7 +91,6 @@ import qrRoutes from './modules/system/qr.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import traceRoutes from './modules/trace/trace.routes';
 import { featureGuard } from './services/feature-grant.service';
-import { registerProRoutes } from './modules/pro/registry';
 
 // ────────────────────────────────────────────────────────────────────────────
 // mountRoutes — จุดรวมเสียบ route ทั้งหมด (ย้ายมาจาก server.ts)
@@ -115,7 +114,7 @@ export function mountRoutes(app: Express): void {
   //   - /api/partners  เครือข่ายคู่ค้าสาธารณะ
   //   - /api/software  แคตตาล็อกซอฟต์แวร์สาธารณะ
   //   โค้ดทั้งหมดถูกย้ายออกไปครบ พร้อม README วิธีนำกลับเข้า
-  registerProRoutes(app); // Pro modules: business/fleet/treasury/dime/payments/restaurant
+  // 5/11/69: โมดูล Pro (business/fleet/treasury/dime/payments/restaurant) แยกไป private repo แล้ว
   app.use('/api/nodes', nodeRoutes);
   app.use('/api/devices', deviceRoutes);
   app.use('/api/telemetry', telemetryRoutes);

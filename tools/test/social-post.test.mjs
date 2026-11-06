@@ -659,18 +659,6 @@ describe('Social Studio — โพสต์ข้อความ Facebook', () =
 });
 
 describe('Social Studio — โครงหน้าและที่อยู่ใหม่', () => {
-  test('Ecosystem ใช้ Social Studio และธุรกิจไม่มีแท็บโพสต์แล้ว', () => {
-    const eco = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/pages/ecosystem.tsx'));
-    assert.match(eco, /SocialStudio/, 'Ecosystem ต้องมี Social Studio');
-    assert.match(eco, /components\/ecosystem\/studio\/SocialStudio/);
-
-    const shared = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/components/business/shared.tsx'));
-    assert.ok(!/'post'/.test(shared), 'แท็บ post ต้องถูกถอดออกจาก TABS ของธุรกิจ');
-
-    const ws = fsReadFile(path.join(ROOT, 'sovereign-frontend/src/components/business/BusinessWorkspace.tsx'));
-    assert.ok(!/PostHub/.test(ws), 'BusinessWorkspace ต้องไม่เรนเดอร์ PostHub แล้ว');
-  });
-
   test('สตูดิโอต้องแยก 2 งานชัดเจน: โพสต์ข้อความ กับ ลงคลิป', () => {
     const src = fsReadFile(path.join(POST_DIR, 'SocialStudio.tsx'));
     assert.match(src, /โพสต์ข้อความ/);

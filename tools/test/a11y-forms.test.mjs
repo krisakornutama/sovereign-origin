@@ -42,8 +42,6 @@ const FORM_FILES = {
   settings: 'sovereign-frontend/src/pages/settings.tsx',
   sensorsHub: 'sovereign-frontend/src/components/sensors/SensorsHub.tsx',
   predictive: 'sovereign-frontend/src/pages/predictive.tsx',
-  restaurantAdmin: 'sovereign-frontend/src/pages/restaurant/admin.tsx',
-  restaurant: 'sovereign-frontend/src/pages/restaurant/index.tsx',
   vision: 'sovereign-frontend/src/pages/vision.tsx',
   // C2b — ฟอร์มที่เหลือ (28/10)
   relay: 'sovereign-frontend/src/pages/relay.tsx',
@@ -52,7 +50,6 @@ const FORM_FILES = {
   skills: 'sovereign-frontend/src/pages/skills.tsx',
   selfreliance: 'sovereign-frontend/src/pages/selfreliance.tsx',
   rice: 'sovereign-frontend/src/pages/research/rice.tsx',
-  treasury: 'sovereign-frontend/src/pages/treasury.tsx',
   codingIde: 'sovereign-frontend/src/components/coding/CodingIde.tsx',
   skillQueue: 'sovereign-frontend/src/components/coding/SkillQueuePanel.tsx',
   scenarioForecast: 'sovereign-frontend/src/components/scenarios/ScenarioForecast.tsx',

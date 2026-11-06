@@ -12,7 +12,6 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 const MIGRATION = 'sovereign-os/core-api/prisma/migrations/20261023150000_fleet_persisted_model/migration.sql';
 const SCHEMA = 'sovereign-os/core-api/prisma/schema.prisma';
-const ROUTES = 'sovereign-os/core-api/src/modules/fleet/fleet.routes.ts';
 const POLICY = 'sovereign-os/core-api/src/services/fleet-policy.service.ts';
 const ENROLL = 'sovereign-os/core-api/src/services/fleet-enrollment.service.ts';
 const BACKFILL = 'sovereign-os/core-api/scripts/fleet-backfill.mjs';
@@ -79,15 +78,7 @@ describe('Fleet Phase 2 — persisted model', () => {
     }
   });
 
-  test('production routes ใช้ DB-backed loaders และมี audit', () => {
-    const routes = read(ROUTES);
-    assert.ok(routes.includes('loadFleetPolicy'), 'routes ต้องใช้ loadFleetPolicy');
-    assert.ok(routes.includes('listEnrollTokensDb'), 'routes ต้องใช้ listEnrollTokensDb');
-    assert.ok(routes.includes("router.get('/audit'"), 'routes ต้องมี /audit');
-    assert.ok(routes.includes("router.get('/sites'"), 'routes ต้องมี /sites');
-    assert.ok(routes.includes("router.get('/groups'"), 'routes ต้องมี /groups');
-    assert.ok(routes.includes("requireRole('SUPERADMIN')"), 'ทุก route ต้อง SUPERADMIN');
-
+  test('CE services อ่าน/เขียน policy จาก DB และบันทึกการใช้ token', () => {
     const policy = read(POLICY);
     const enroll = read(ENROLL);
     assert.ok(policy.includes('loadFleetPolicyFromDb'), 'policy ต้องอ่านจาก DB');

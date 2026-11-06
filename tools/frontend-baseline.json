@@ -5,7 +5,8 @@
     "     line-budget (pages≤800, components≤400)",
     "     sidebar-rule (ทุกหน้า import Sidebar; exception = public/login/redirect/ไฟล์พิเศษ)",
     "รายการในนี้ = หนี้ที่รับไว้ชั่วคราว — ของใหม่ที่ละเมิด = verify FAIL",
-    "about.tsx + partners.tsx (sidebar-rule) ตั้งใจรับ: หน้าสาธารณะ P16 เหมือน /shop — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)"
+    "about.tsx + partners.tsx (sidebar-rule) ตั้งใจรับ: หน้าสาธารณะ P16 เหมือน /shop — หน้าสาธารณะไม่มี sidebar ภายใน (30/9/69)",
+    "register.tsx (sidebar-rule) ตั้งใจรับ: หน้าสมัครสมาชิกด้วยรหัสเชิญเป็นหน้าสาธารณะเต็มจอ (เหมือน /login) — ต้องไม่มี Sidebar (5/11/69)"
   ],
   "violations": [
     "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",
@@ -28,6 +29,7 @@
     "sidebar-rule|sovereign-frontend/src/pages/index.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/partners.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/portfolio.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
+    "sidebar-rule|sovereign-frontend/src/pages/register.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/sensors.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/shop.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)"
   ]

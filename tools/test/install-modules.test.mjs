@@ -163,11 +163,11 @@ describe('parseModuleSelection: อ่านคำตอบของผู้ใ
 
 describe('enabledModulesFor: ชื่อที่ต้องเขียนลง ENABLED_MODULES', () => {
   test('รวมเฉพาะชื่อที่ backend รู้จัก และไม่ซ้ำ', () => {
-    const ids = ['core', 'farm', 'restaurant', 'iot'];
+    const ids = ['core', 'farm', 'inventory', 'iot'];
     const names = enabledModulesFor(ids, MODULE_CATALOG);
     assert.deepEqual(names, [...names].filter((n, i) => names.indexOf(n) === i));
     for (const n of names) assert.ok(BACKEND_MODULES.includes(n));
-    assert.ok(names.includes('farm') && names.includes('restaurant'));
+    assert.ok(names.includes('farm') && names.includes('inventory'));
   });
 
   test('ไม่เลือกฟังก์ชั่นที่มีประตู backend = ไม่มีชื่อนั้น (ปิดจริง ไม่ใช่แค่ซ่อนเมนู)', () => {
