@@ -2,8 +2,10 @@ name: Publish images (GHCR)
 
 # เผยแพร่ image ของ Community Edition ขึ้น GitHub Container Registry
 # - trigger: push tag v* (เช่น v1.2.0) หรือกด Run workflow เอง
-# - build ทั้ง linux/amd64 และ linux/arm64 (Raspberry Pi 4/5)
-# - ใช้ Dockerfile.prod ตัวเดียวกับที่ deploy/community ใช้ build จากซอร์ส
+# - build แยก job ต่อ platform: linux/amd64 (native, เร็ว) และ linux/arm64 (QEMU, ช้า)
+#   ทั้งสองวิ่งพร้อมกัน แล้ว merge เป็น multi-arch manifest ใน job `merge`
+#   → amd64 พร้อมใช้ในไม่กี่นาที ไม่ต้องรอ arm64 ที่กินเวลาเกือบชั่วโมง
+# - cache แยก scope ต่อ image+arch เพื่อไม่ให้ cache ของ arm64 ไปทับของ amd64
 #
 # หลัง publish ครั้งแรก: package จะเป็น private แม้ repo จะ public
 #   → Packages → เลือก package → Package settings → Change visibility → Public
@@ -27,17 +29,33 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  publish:
-    name: ${{ matrix.name }}
+  build:
+    name: build ${{ matrix.name }} (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    # arm64 ผ่าน QEMU ใช้เวลาได้ถึง ~45 นาที — ตั้งเพดานไว้ไม่ให้ค้างข้ามชั่วโมง
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: api
+            arch: amd64
+            platform: linux/amd64
+            context: ./sovereign-os/core-api
+            file: ./sovereign-os/core-api/Dockerfile.prod
+          - name: api
+            arch: arm64
+            platform: linux/arm64
             context: ./sovereign-os/core-api
             file: ./sovereign-os/core-api/Dockerfile.prod
           - name: web
+            arch: amd64
+            platform: linux/amd64
+            context: ./sovereign-frontend
+            file: ./sovereign-frontend/Dockerfile.prod
+          - name: web
+            arch: arm64
+            platform: linux/arm64
             context: ./sovereign-frontend
             file: ./sovereign-frontend/Dockerfile.prod
 
@@ -45,8 +63,77 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # QEMU จำเป็นเฉพาะ arm64 — amd64 ไม่ต้องติดตั้ง ทำให้ job เร็วขึ้นอีก
       - name: Set up QEMU (arm64 emulation)
+        if: matrix.arch == 'arm64'
         uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platform }}
+          # ยังไม่ติด tag ในขั้นนี้ — merge job จะติด tag บน manifest รวมให้
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true
+          labels: ${{ steps.meta.outputs.labels }}
+          # web ฝัง NEXT_PUBLIC_API_URL ตอน build — ตั้ง repo variable เพื่อเปลี่ยนค่าเริ่มต้น
+          build-args: ${{ matrix.name == 'web' && format('NEXT_PUBLIC_API_URL={0}', vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001') || '' }}
+          cache-from: type=gha,scope=${{ matrix.name }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ matrix.arch }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "::error::ไม่มี digest จากขั้น build"
+            exit 1
+          fi
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.name }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge ${{ matrix.name }} (multi-arch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [api, web]
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.name }}-*
+          merge-multiple: true
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -70,16 +157,18 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # web ฝัง NEXT_PUBLIC_API_URL ตอน build — ตั้ง repo variable เพื่อเปลี่ยนค่าเริ่มต้น
-          build-args: ${{ matrix.name == 'web' && format('NEXT_PUBLIC_API_URL={0}', vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001') || '' }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Create multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          set -euo pipefail
+          echo "digests ที่ได้รับ:"
+          ls -1
+          image="${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}"
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${image}@sha256:%s " *)
+
+      - name: Inspect manifest
+        run: |
+          image="${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}"
+          docker buildx imagetools inspect "$image:${GITHUB_REF_NAME#v}" || docker buildx imagetools inspect "$image:latest"
