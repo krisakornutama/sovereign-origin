@@ -110,17 +110,24 @@ test('CSP เติม API host จาก NEXT_PUBLIC_API_URL (http + ws) อั
 });
 
 // ── 5. compose syntax ผ่าน docker จริง (ถ้ามี docker ในเครื่อง) ──────────────
-test('docker compose config ผ่าน (ถ้ามี docker)', (t) => {
+function composeEnv(extra = {}) {
   const env = {
     ...process.env,
     POSTGRES_PASSWORD: 'test-password',
     EMQX_PASSWORD: 'test-password',
     JWT_SECRET: '0123456789abcdef0123456789abcdef',
     SEED_ADMIN_PASSWORD: 'adminpass1234',
+    ...extra,
   };
+  if (!('API_IMAGE' in extra)) delete env.API_IMAGE;
+  if (!('WEB_IMAGE' in extra)) delete env.WEB_IMAGE;
+  return env;
+}
+
+test('docker compose config ผ่าน (ถ้ามี docker)', (t) => {
   const r = spawnSync('docker', ['compose', '-f', COMPOSE, 'config', '--quiet'], {
     cwd: ROOT,
-    env,
+    env: composeEnv(),
     encoding: 'utf8',
     timeout: 120000,
   });
@@ -129,4 +136,35 @@ test('docker compose config ผ่าน (ถ้ามี docker)', (t) => {
     return;
   }
   assert.equal(r.status, 0, `compose config ล้ม: ${(r.stderr || r.stdout || '').slice(0, 500)}`);
+});
+
+// ── 6. Prebuilt image: GHCR แทนการ build ในเครื่องได้ ──────────────────────
+test('API_IMAGE/WEB_IMAGE เปลี่ยน image ที่รันจริง (migrate ใช้ image เดียวกับ api)', (t) => {
+  const API = 'ghcr.io/krisakornutama/sovereign-origin/api:v1.2.0';
+  const WEB = 'ghcr.io/krisakornutama/sovereign-origin/web:v1.2.0';
+  const r = spawnSync('docker', ['compose', '-f', COMPOSE, 'config', '--format', 'json'], {
+    cwd: ROOT,
+    env: composeEnv({ API_IMAGE: API, WEB_IMAGE: WEB }),
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  if (r.error && r.error.code === 'ENOENT') {
+    t.skip('ไม่มี docker ในเครื่องนี้');
+    return;
+  }
+  assert.equal(r.status, 0, `compose config ล้ม: ${(r.stderr || r.stdout || '').slice(0, 500)}`);
+  const cfg = JSON.parse(r.stdout);
+  assert.equal(cfg.services.api.image, API, 'api ต้องใช้ image จาก API_IMAGE');
+  assert.equal(cfg.services.migrate.image, API, 'migrate ต้องใช้ image เดียวกัน ไม่ใช่ build ซ้ำ');
+  assert.equal(cfg.services.web.image, WEB, 'web ต้องใช้ image จาก WEB_IMAGE');
+});
+
+test('workflow เผยแพร่ GHCR: tag v*, api+web, linux/amd64+arm64', () => {
+  const wf = read('.github/workflows/publish-images.yml');
+  assert.match(wf, /tags:\s*\n\s*-\s*'v\*'/, 'ต้อง trigger จาก tag v*');
+  assert.match(wf, /ghcr\.io/, 'ต้อง push ขึ้น GHCR');
+  assert.match(wf, /packages:\s*write/, 'ต้องมีสิทธิ์ push package');
+  assert.match(wf, /linux\/amd64,linux\/arm64/, 'ต้อง build ทั้ง amd64 และ arm64');
+  assert.match(wf, /sovereign-os\/core-api\/Dockerfile\.prod/, 'ต้อง build API จาก Dockerfile.prod');
+  assert.match(wf, /sovereign-frontend\/Dockerfile\.prod/, 'ต้อง build web จาก Dockerfile.prod');
 });

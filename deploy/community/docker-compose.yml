@@ -9,6 +9,11 @@
 #
 # หมายเหตุ: ไฟล์นี้ออกแบบให้ "ไม่ผูกกับเครื่องผู้พัฒนา" — ไม่มี bind mount ของ
 # ซอร์สโค้ด, ข้อมูลทั้งหมดอยู่ใน named volume, ใช้ได้ทั้ง x86_64 และ arm64 (Raspberry Pi)
+#
+# ใช้ image ที่ build เอง (ค่าเริ่มต้น) หรือ image ที่ CI เผยแพร่บน GHCR:
+#   API_IMAGE=ghcr.io/krisakornutama/sovereign-origin/api:v1.2.0
+#   WEB_IMAGE=ghcr.io/krisakornutama/sovereign-origin/web:v1.2.0
+#   docker compose up -d --pull always     # ไม่ต้องใส่ --build
 # ─────────────────────────────────────────────────────────────────────────────
 name: sovereign
 
@@ -55,7 +60,7 @@ services:
     build:
       context: ../../sovereign-os/core-api
       dockerfile: Dockerfile.prod
-    image: sovereign-core-api:local
+    image: ${API_IMAGE:-sovereign-core-api:local}
     restart: "no"
     # 04/11/69: migrate deploy → db push
     # เหตุผล: migration history มี drift (schema มีคอลัมน์/ตารางที่ migration ไม่มี) ⇒ ฐานข้อมูลใหม่
@@ -75,7 +80,7 @@ services:
     build:
       context: ../../sovereign-os/core-api
       dockerfile: Dockerfile.prod
-    image: sovereign-core-api:local
+    image: ${API_IMAGE:-sovereign-core-api:local}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -127,7 +132,7 @@ services:
         # ค่าที่เบราว์เซอร์ใช้ยิง API — ตั้งเป็น http://<ip-ของเครื่องนี้>:3001
         # ถ้าจะเปิดใช้จากเครื่องอื่นใน LAN (ต้องตั้ง API_BIND=0.0.0.0 ด้วย)
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-    image: sovereign-web:local
+    image: ${WEB_IMAGE:-sovereign-web:local}
     restart: unless-stopped
     environment:
       NODE_ENV: production

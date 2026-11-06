@@ -1,0 +1,85 @@
+name: Publish images (GHCR)
+
+# เผยแพร่ image ของ Community Edition ขึ้น GitHub Container Registry
+# - trigger: push tag v* (เช่น v1.2.0) หรือกด Run workflow เอง
+# - build ทั้ง linux/amd64 และ linux/arm64 (Raspberry Pi 4/5)
+# - ใช้ Dockerfile.prod ตัวเดียวกับที่ deploy/community ใช้ build จากซอร์ส
+#
+# หลัง publish ครั้งแรก: package จะเป็น private แม้ repo จะ public
+#   → Packages → เลือก package → Package settings → Change visibility → Public
+#   (ทำครั้งเดียวต่อ package: api และ web)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: ./sovereign-os/core-api
+            file: ./sovereign-os/core-api/Dockerfile.prod
+          - name: web
+            context: ./sovereign-frontend
+            file: ./sovereign-frontend/Dockerfile.prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # web ฝัง NEXT_PUBLIC_API_URL ตอน build — ตั้ง repo variable เพื่อเปลี่ยนค่าเริ่มต้น
+          build-args: ${{ matrix.name == 'web' && format('NEXT_PUBLIC_API_URL={0}', vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001') || '' }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
