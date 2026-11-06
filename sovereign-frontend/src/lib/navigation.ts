@@ -43,25 +43,6 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 
-  // ── 1a. Ecosystem ของฉัน (31/10/69) ──
-  //  เจ้าของสั่ง: platform กระจัดกระจาย (Fiverr · Fastwork · YouTube · Gmail ·
-  //  Facebook · LinkedIn · เว็บไซต์) จนพลาดคอมเมนต์ลูกค้า → รวมไว้ที่เดียว
-  //  หน้านี้เป็น "ส่วนของผู้ใช้" ล้วน ๆ: เปิดเว็บด้วยปุ่ม + เก็บรหัสผ่านเข้ารหัส
-  {
-    title: '🌐 Ecosystem ของฉัน',
-    titleKey: 'common.nav.group.ecosystem',
-    items: [
-      {
-        href: '/ecosystem',
-        label: 'Ecosystem',
-        labelKey: 'common.nav.ecosystem',
-        icon: 'globe',
-        keywords:
-          'ecosystem platform fiverr fastwork youtube gmail facebook linkedin เว็บไซต์ บัญชี รหัสผ่าน password ที่เก็บรหัส ลูกค้า คอมเมนต์ สตูดิโอ studio โพสต์ ลงคลิป คลิป วิดีโอ tiktok instagram reels',
-      },
-    ],
-  },
-
   // ── 1b. ควบคุมระยะไกล (เครื่องในเครือข่าย) ──
   //  เจ้าของสั่ง 11/10/69: ต้องมีเมนู "ควบคุมระยะไกล" ให้เห็นชัด
   //  รวมของที่เกี่ยวกับการสั่งเครื่องอื่นไว้ที่เดียว: ดูจอ/คุมเครื่อง · สั่งงาน AI · สั่งอัปเดตโค้ด (OTA)
@@ -69,14 +50,6 @@ export const NAV_GROUPS: NavGroup[] = [
     title: '🖥️ ควบคุมระยะไกล',
     titleKey: 'common.nav.group.remote',
     items: [
-      {
-        href: '/fleet',
-        label: 'ศูนย์ควบคุมฝูงเครื่อง',
-        labelKey: 'common.nav.fleet',
-        icon: 'system',
-        keywords:
-          'fleet ฝูงเครื่อง ศูนย์ควบคุม เครื่องทั้งหมด สาขา site group channel rollout stable beta canary enrollment token compliance update',
-      },
       {
         href: '/machine-console',
         label: 'คอนโซลเครื่อง',
@@ -99,41 +72,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: 'ota',
         keywords: 'อัปเดต เฟิร์มแวร์ ota เครื่องลูก hub สั่งอัปเดต ชุดติดตั้ง',
       },
-    ],
-  },
-
-  // ── 2. ร้านอาหาร (ธุรกิจ) ──
-  //  เจ้าของ 19/10/69: ให้พับเก็บได้ (ปกติมีหัวข้อย่อย 4 อัน)
-  {
-    title: '🏪 ร้านอาหาร',
-    titleKey: 'common.nav.group.restaurant',
-    items: [
-      {
-        href: '/restaurant',
-        label: 'ขายของ (POS)',
-        labelKey: 'common.nav.restaurant',
-        icon: 'inventory',
-        keywords: 'ร้านอาหาร จักรวรรดิ เมนู สูตร ออเดอร์ POS แต้ม ใบหน้า ครัว ขาย นั่งกิน กลับบ้าน',
-        collapsible: true,
-        children: [
-          { href: '/restaurant/admin', label: 'จัดการเมนู & สูตร', labelKey: 'common.nav.restaurantAdmin', icon: 'edit', keywords: 'เมนู สูตร วัตถุดิบ ราคา ผลิตเอง' },
-          { href: '/restaurant/kds', label: 'จอครัว (KDS)', labelKey: 'common.nav.restaurantKds', icon: 'automation', keywords: 'ครัว คิว ออเดอร์ ทำอาหาร เสิร์ฟ' },
-          { href: '/restaurant/reports', label: 'รายงานร้าน', labelKey: 'common.nav.restaurantReports', icon: 'reports', keywords: 'รายงาน รายรับ รายจ่าย กำไร ขาย' },
-          { href: '/restaurant/kitchen', label: 'ครัว IOT', labelKey: 'common.nav.restaurantKitchen', icon: 'sensors', keywords: 'ครัว น้ำหนัก ตู้เย็น HX711 อุณหภูมิ' },
-        ],
-      },
-    ],
-  },
-
-  // ── 2b. ธุรกิจของฉัน ──
-  {
-    title: '🏢 ธุรกิจของฉัน',
-    titleKey: 'common.nav.group.business',
-    items: [
-      { href: '/business', label: 'ธุรกิจของฉัน', labelKey: 'common.nav.business', icon: 'package', keywords: 'ธุรกิจ ขายของ IoT สินค้า ลูกค้า ออเดอร์ ใบเสนอราคา ชำระเงิน ติดตั้ง ช่าง การเงิน กำไร สต็อก ทีม ตำแหน่ง ผู้ช่วย AI agent' },
-      // 13/10/69: ถอด "Catalog กลางชุมชน" (/community) ออกจากเมนู — เป็นหน้าไดเรกทอรีของเว็บ
-      //   ที่ลิงก์ไปหน้าร้าน/เครือข่ายคู่ค้าสาธารณะ ซึ่งถูกย้ายไป E:\My work\Sovereign-Web-Standalone
-      //   เหลือแต่ "ธุรกิจของฉัน" ที่เป็นของแอป desktop จริง
     ],
   },
 
@@ -162,28 +100,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/healing', label: 'ธรรมะบำบัด', labelKey: 'common.nav.healing', icon: 'healing', keywords: 'ธรรมะ สมาธิ สมุนไพร เยียวยา วัด ใจ' },
       { href: '/lifestyle', label: 'วิถีชีวิต', labelKey: 'common.nav.lifestyle', icon: 'lifestyle', keywords: 'วิถี ชีวิต ธรรมชาติ จังหวะ หน้าต่าง อากาศ แสง circadian manual day' },
       { href: '/crisis', label: 'โหมดวิกฤต', labelKey: 'common.nav.crisis', icon: 'shield', keywords: 'วิกฤต ฉุกเฉิน น้ำท่วม ดับไฟ ปลอดภัย' },
-    ],
-  },
-
-  // ── 5. การเงิน & ลงทุน ──
-  //  เจ้าของ 19/10/69: ให้พับเก็บได้ (หัวข้อย่อย 4 หัวข้อ)
-  {
-    title: '💰 การเงิน & ลงทุน',
-    titleKey: 'common.nav.group.finance',
-    items: [
-      {
-        href: '/treasury',
-        label: 'คลัง & ลงทุน',
-        labelKey: 'common.nav.treasury',
-        icon: 'portfolio',
-        keywords: 'เงิน การเงิน หุ้น พอร์ต ทรัพย์สิน ลงทุน คลัง กระแสเงินสด runway survival net worth portfolio signals',
-        collapsible: true,
-        children: [
-          { href: '/treasury#net-worth', label: 'ทรัพย์สิน & เงินสด', labelKey: 'common.nav.treasuryNetWorth', icon: 'portfolio', keywords: 'ทรัพย์สิน เงินสด net worth หนี้สิน' },
-          { href: '/treasury#runway', label: 'Survival Runway', labelKey: 'common.nav.treasuryRunway', icon: 'gauge', keywords: 'runway อยู่รอด เดือน ค่าใช้จ่าย' },
-          { href: '/treasury#strategies', label: 'กลยุทธ์ลงทุน', labelKey: 'common.nav.treasuryStrategies', icon: 'target', keywords: 'กลยุทธ์ ลงทุน 5 ตระกูล ปันผล' },
-        ],
-      },
     ],
   },
 

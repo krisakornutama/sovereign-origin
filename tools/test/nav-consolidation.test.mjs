@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* ── เมนูรวมศูนย์ (19/10/69) ───────────────────────────────────────────────
    เจ้าของสั่ง: "ลดปุ่มที่ไม่จำเป็น ควบรวมปุ่มให้น้อยลงและกระชับขึ้น"
-   − ร้านอาหาร + การลงทุน: พับเก็บได้
+   − ร้านอาหาร/การลงทุน/ธุรกิจ/ฟลีท/Ecosystem: ถอดออกจาก CE ตอนแยก Pro (5/11/69)
    − วิจัยพันธุ์ข้าว → ตามรอยผลผลิต
    − Self-Check 32 + MBTI → ตรวจสุขภาพ
    − พยากรณ์/จำลองการปกครอง/เรียนรู้เอง/เฝ้าระวังความเสี่ยง/แผนที่ทรัพย์สิน/
@@ -74,14 +74,11 @@ describe('เมนูรวม — หน้าเดิมต้องเห�
 });
 
 describe('เมนูพับได้ + ค้นหาได้', () => {
-  test('ร้านอาหารและการลงทุนเปิดโหมดพับเก็บ', () => {
-    const at = NAV_ONLY.indexOf("href: '/restaurant'");
-    assert.notEqual(at, -1, 'ไม่พบเมนูร้านอาหาร');
-    assert.match(NAV_ONLY.slice(at, at + 1200), /collapsible: true/, 'ร้านอาหารต้องพับได้');
-
-    const t = NAV_ONLY.indexOf("href: '/treasury'");
-    assert.notEqual(t, -1, 'ไม่พบเมนูคลัง & ลงทุน');
-    assert.match(NAV_ONLY.slice(t, t + 1200), /collapsible: true/, 'การลงทุนต้องพับได้');
+  test('เมนู Pro ถูกถอดออกจาก CE (ไม่มีลิงก์ไปหน้าที่ไม่มีอยู่)', () => {
+    for (const href of ['/restaurant', '/business', '/fleet', '/treasury', '/ecosystem', '/portfolio']) {
+      assert.equal(hrefCount(href), 0, `${href} ยังอยู่ในเมนูหลัก — CE ไม่มีหน้านี้แล้ว`);
+      assert.ok(!inSections(href), `${href} ยังอยู่ใน SECTIONS — ต้องถอดออกพร้อมเมนู`);
+    }
   });
 
   test('ไม่มี href ซ้ำในเมนูหลัก', () => {
