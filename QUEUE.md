@@ -71,11 +71,15 @@ done; done
 - แยกตรรกะเทียบเป็น `tools/verify/restore-compare.mjs` — แถวต่างสองทางถือปกติ (dump เป็น snapshot), ยังจับของจริง (ตารางหาย, migration head ไม่ตรง, restore error) เหมือนเดิม
 - เทสต์ `tools/test/backup-restore-compare.test.mjs` 5/5 · รัน restore จริงซ้ำผ่าน ("กู้คืนได้จริง")
 
-### ยังค้าง — เจ้าของตัดสินใจ
-- Task **`ShipShop3000`** (23:59 ทุกวัน) ยัง fail `0x1` — เป็น task เก่าที่รัน `start-sovereign.bat`; รอบ 6 พ.ย. ล้มเพราะ health `:3001` ไม่ตอบภายใน 240 วิ (ตอนนั้น API เพิ่ง restart) และปลายทางมี `start http://localhost:3000` เปิด browser เองด้วย ถ้าไม่ต้องการพฤติกรรมนี้แนะนำ disable:
-  `schtasks /Change /TN "ShipShop3000" /DISABLE`
-- Task **`Sovereign Nightly Verify`** (02:00) result `0x1` มาจาก tools test ข้างบน → รอบถัดไปควรเขียวเอง ยังไม่ต้องแก้โค้ด
-- Task **`Sovereign Synthetic Browser Check`** ล่าสุดผ่าน (7 พ.ย. 14:11) — ที่ล้มก่อนหน้าเป็นการล้มชั่วคราว ไม่ต้องแก้
+### แก้แล้ว — P0 Task Scheduler + Dead-man Alert (2026-11-07 รอบดึก)
+- **`ShipShop3000`** — disable แล้ว (`schtasks /Change /TN "ShipShop3000" /DISABLE`) เพราะเป็น task เก่าที่รัน `start-sovereign.bat` แล้วค้าง/เปิด browser เอง · `tools/ops-status.mjs` อ่าน `State` แล้วแสดง "ปิดอยู่ (ตั้งใจ)" ไม่นับเป็นงานล้ม
+- **`Sovereign Nightly Verify`** — รันผ่าน Task Scheduler จริงเมื่อ 21:12 → **Last Result 0** · nightly status `ok=true` (gate 6/6 · backup restore ผ่าน · consent smoke ผ่าน)
+- **`Sovereign Nightly Deadman`** — task ใหม่ 03:30 ทุกวัน (ผ่าน `run-hidden.vbs` ไม่มีหน้าต่างเด้ง) · ตรวจ `nightly-history.json`: ไม่ผ่าน/ไม่มีผลติดกัน **2 คืน** = Telegram · dedup วันละครั้ง · creds ใช้ `tools/verify/telegram-creds.mjs` (DB → `sovereign-os/infra/.env`)
+- **`tools/nightly-report.mjs`** — เลิกอ่าน DB เอง เปลี่ยนมาใช้ creds กลาง → รายงาน nightly ส่ง Telegram ได้จริง (ยืนยันรอบ 21:15, creds: env)
+- **`STATUS.md`** — gen ใหม่: gate ✅ 6/6 · nightly ✅ · task scheduler ✅ (10 งาน, ShipShop ปิดตั้งใจ)
+
+### ค้างเฉพาะข้อมูล (ไม่บล็อก P0)
+- `codeMatch=false` ใน nightly ล่าสุด: prod `:3001` ยังรัน fingerprint เก่า (dist 254 ไฟล์ vs ดิสก์ 256) — เป็นเรื่อง deploy ไม่ใช่ nightly พัง; `docker restart sovereign-core-api` จะเคลียร์ (ต้องยืนยันก่อนแตะ production)
 
 ---
 

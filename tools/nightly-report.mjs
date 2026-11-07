@@ -1,23 +1,22 @@
 #!/usr/bin/env node
 // ────────────────────────────────────────────────────────────────────────────
-// nightly-report.mjs — สรุปผล nightly verify:full ส่งเข้า Telegram (Phase 3)
-// ใช้: node tools/nightly-report.mjs <statusJsonPath>
-// อ่าน credentials จาก Postgres system_settings (telegram.botToken/chatId) เหมือน backend
+// nightly-report.mjs — สรุปผล nightly verify ส่งเข้า Telegram (Phase 3)
+// ใช้: node tools/nightly-report.mjs <statusJsonPath> [--dry]
+// creds: tools/verify/telegram-creds.mjs (เจ้าของเดียว — DB → infra/.env)
+//   เดิมอ่าน DB อย่างเดียว ⇒ DB มีแค่ telegram.bizChatId ทำให้ทุกคืน "ข้ามการส่ง" เงียบ ๆ
 // soft-fail ทั้งหมด: ไม่มี creds / Telegram ล่ม = exit 0 (ไม่ทำให้ nightly fail)
 // ────────────────────────────────────────────────────────────────────────────
 import { readFileSync, existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import { notify, readTelegramCreds } from './verify/telegram-creds.mjs';
 
 const REPO = join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PREFIX = 'enc:v1:';
 
 const statusPath = process.argv[2];
-if (!statusPath || !existsSync(statusPath)) {
-  console.error('usage: node tools/nightly-report.mjs <status.json>');
+if (!statusPath || statusPath.startsWith('--') || !existsSync(statusPath)) {
+  console.error('usage: node tools/nightly-report.mjs <status.json> [--dry]');
   process.exit(0);
 }
 
@@ -71,39 +70,30 @@ const text =
     ? '\n' + s.machine.problems.map((p) => `${p.level === 'critical' ? '🚨' : '⚠️'} ${p.message}`).join('\n')
     : '');
 
-// ── 3) Telegram creds — อ่านจาก DB + ถอดรหัส ──
-function dbCreds() {
-  try {
-    const out = execSync(
-      `docker exec sovereign-db psql -U sovereign -d sovereign -t -A -c "SELECT value FROM system_settings WHERE key='telegram.botToken'; SELECT value FROM system_settings WHERE key='telegram.chatId';"`,
-      { windowsHide: true, encoding: 'utf8', timeout: 20_000 }
-    ).split('\n').map((l) => l.trim()).filter(Boolean);
-    return { token: decryptField(out[0] ?? ''), chatId: decryptField(out[1] ?? '') };
-  } catch {
-    return { token: '', chatId: '' };
+async function main() {
+  const dry = process.argv.includes('--dry');
+  const creds = readTelegramCreds();
+  const hasCreds = Boolean(creds.token && creds.chatId);
+
+  // dry = ต้องเห็นข้อความเสมอ แม้ creds จะหาย — ใช้ทดสอบระบบโดยไม่กวนเจ้าของตอนตี 2
+  if (dry) {
+    console.log(`[dry] creds: ${hasCreds ? creds.source : 'ไม่พบ (DB/infra/.env)'} — จะส่งข้อความ:\n${text}`);
+    process.exitCode = 0;
+    return;
   }
+  if (!hasCreds) {
+    console.log('ไม่มี Telegram credentials (DB หรือ sovereign-os/infra/.env) — ข้ามการส่ง (soft-fail)');
+    process.exitCode = 0;
+    return;
+  }
+  const r = await notify(text, creds, { parseMode: 'HTML' });
+  if (r.ok) console.log(`ส่งสรุป nightly เข้า Telegram แล้ว (creds: ${creds.source})`);
+  else console.log(`ส่งไม่สำเร็จ (soft-fail): ${r.error}`);
+  process.exitCode = 0;
 }
 
-async function main() {
-  const { token, chatId } = dbCreds();
-  if (!token || !chatId) {
-    console.log('ไม่มี Telegram credentials ใน DB — ข้ามการส่ง (soft-fail)');
-    process.exit(0);
-  }
-  if (process.argv.includes('--dry')) {
-    console.log('[dry] จะส่งข้อความ:\n' + text);
-    process.exit(0);
-  }
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-    });
-    console.log(res.ok ? 'ส่งสรุป nightly เข้า Telegram แล้ว' : `Telegram ตอบ ${res.status} — ข้าม (soft-fail)`);
-  } catch (err) {
-    console.log('ส่งไม่สำเร็จ (soft-fail):', err instanceof Error ? err.message : err);
-  }
-  process.exit(0);
-}
-main();
+main().catch((err) => {
+  // รายงานล้มต้องไม่ทำให้ nightly ล้ม — แค่จบเงียบพร้อม log
+  console.log('nightly-report error (soft-fail):', err instanceof Error ? err.message : err);
+  process.exitCode = 0;
+});
