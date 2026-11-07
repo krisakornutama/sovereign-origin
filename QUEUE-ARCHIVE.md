@@ -492,9 +492,11 @@
 - [ ] **J6e สแตก edge-AI / agent-runner ยังใช้ detached+windowsHide แบบลูกโดยตรง (node/ollama)** — อยู่ใน
       รายการยกเว้นพร้อมเหตุผล "ยังไม่ได้พิสูจน์กับหน้าต่างจริง" (สแตกปิดอยู่ตอนตรวจ) ⇒ รอบหน้าที่เปิด edge-AI
       ให้รัน `tools/window-flash-probe.ps1` ระหว่าง `start.mjs` ถ้าเห็นหน้าต่างให้ย้ายมาใช้ hidden-launch.cjs
-- [ ] **J6f แพ็ก desktop ที่ไม่มีโฟลเดอร์ tools/** — ตอนนี้ถอยไปใช้ `cmd /d /c call` แบบ windowsHide
-      (ไม่มีหน้าต่าง แต่ .bat อาจตายถ้าปิดแอปกลางทาง) ⇒ ถ้าต้องการครบ ให้ก๊อป `tools/hidden-launch.cjs`
-      + `tools/run-hidden.vbs` เข้าแพ็กด้วย (แก้ `tools/build-desktop.mjs` — ยังไม่แตะรอบนี้)
+- [x] **J6f แพ็ก desktop ที่ไม่มีโฟลเดอร์ tools/** — **เสร็จ 07/11/69** (`tools/build-desktop.mjs`): คัด
+      `tools/hidden-launch.cjs` + `tools/run-hidden.vbs` → `resources/tools/` ทุกครั้ง พร้อมตรวจ byte-equal
+      กับซอร์ส · `hidden-launch.cjs` หา `run-hidden.vbs` ที่อยู่ข้างตัวเองได้ ⇒ แพ็กใช้ตัวจริง ไม่ต้องสร้าง
+      VBS ชั่วคราว · เทสต์: `tools/test/desktop-kit.test.mjs` (แพ็ก `--out` ต้องมีครบ/ตรงซอร์ส) และ
+      `tools/test/hidden-launch.test.mjs` (vbs ข้างโมดูล · ไม่มี vbs → VBS สำรอง)
 
 ## J7 — Docker flap: watchdog ปลุก daemon แล้ว daemon ตายทันทีที่รอบจบ (เคสจริง 19/10/69) — ปิดแล้ว
 

@@ -10,9 +10,11 @@
 //   2) generate overlay จากซอร์ส → dist-portable/resources/app/
 //      (electron/ copy ตรง + package.json ปรับ: เติม "main": "electron/main.js" และตัด scripts —
 //       ตัวเดียวที่ต่างจากซอร์สโดยดีไซน์)
+//   2.6) copy tools/hidden-launch.cjs + tools/run-hidden.vbs → dist-portable/resources/tools/
+//      (ตัวเปิด .bat แบบไม่มีหน้าต่าง — electron/main.js require จาก resources/tools/)
 //   3) copy sidecar backend → dist-portable/resources/core-api/ (--skip-sidecar ข้าม)
 //      (ถ้าไม่มี core-api/dist ให้ build ก่อน — sidecar ไม่มี dist = จอดำแบบเดิม)
-//   4) ตรวจ sync ซอร์ส ↔ overlay ทุกไฟล์ ไม่ตรง = exit 1
+//   4) ตรวจ sync ซอร์ส ↔ overlay + resources/tools ทุกไฟล์ ไม่ตรง = exit 1
 //
 // ใช้: node tools/build-desktop.mjs [--skip-runtime] [--skip-sidecar] [--out=<พาธ>]
 //   --out=<พาธ> = เขียนผลลัพธ์ลงโฟลเดอร์นั้นแทน dist-portable (กันชนกับแอปที่กำลังรัน)
@@ -118,6 +120,21 @@ for (const name of ['app.asar', 'app.asar.unpacked']) {
   }
 }
 
+// ── 2.6) ตัวเปิดแบบไม่มีหน้าต่าง → resources/tools/ (J6f) ──
+// electron/main.js require จาก resources/app/electron/../../tools/hidden-launch.cjs
+// = resources/tools/hidden-launch.cjs · planHiddenLaunch ใช้ run-hidden.vbs ที่อยู่ข้างกัน
+// เดิมแพ็กมีแต่ overlay ⇒ require ไม่เจอ แล้วถอยไป cmd /c call (ไม่มีหน้าต่าง แต่ .bat อาจตาย
+// เมื่อปิดแอปกลางทาง) — คัดจากซอร์สทุกครั้ง กัน drift แบบเดียวกับ overlay
+const launcherFiles = ['hidden-launch.cjs', 'run-hidden.vbs'];
+const toolsDest = path.join(PORTABLE, 'resources', 'tools');
+mkdirSync(toolsDest, { recursive: true });
+for (const name of launcherFiles) {
+  const src = path.join(ROOT, 'tools', name);
+  if (!existsSync(src)) die(`ไม่พบ tools/${name} — ตัวเปิด .bat แบบไม่มีหน้าต่างจะหายไปจากแพ็ก`);
+  cpSync(src, path.join(toolsDest, name), { force: true });
+}
+log('hidden launcher:', launcherFiles.join(' + '), '→', path.relative(ROOT, toolsDest));
+
 // ── 3) sidecar backend → resources/core-api ──
 if (!skipSidecar) {
   if (!existsSync(path.join(CORE_API, 'dist', 'server.js'))) {
@@ -161,4 +178,12 @@ for (const f of overlayTree.keys()) {
   if (!srcTree.has(f)) die(`overlay มีไฟล์แปลกปลอม: ${f}`);
 }
 log('✅ overlay sync ตรงซอร์ส 100%');
+
+// ตัวช่วยที่คัดเข้า resources/tools ต้องตรงซอร์ส (พาธที่ electron/main.js require ชี้มาที่นี่)
+for (const name of launcherFiles) {
+  const srcBuf = readFileSync(path.join(ROOT, 'tools', name));
+  const destBuf = readFileSync(path.join(toolsDest, name));
+  if (Buffer.compare(srcBuf, destBuf) !== 0) die(`resources/tools/${name} ต่างจากซอร์ส`);
+}
+log('✅ hidden launcher sync ตรงซอร์ส 100%');
 log('เสร็จ: dist-portable/ พร้อมใช้ (runtime' + (skipRuntime ? ' [คงเดิม]' : ' ใหม่') + ' + overlay' + (skipSidecar ? ' [sidecar คงเดิม]' : ' + sidecar') + ')');
