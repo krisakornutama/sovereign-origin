@@ -72,9 +72,10 @@ done; done
 - เทสต์ `tools/test/backup-restore-compare.test.mjs` 5/5 · รัน restore จริงซ้ำผ่าน ("กู้คืนได้จริง")
 
 ### ยังค้าง — เจ้าของตัดสินใจ
-- Task **`ShipShop3000`** (23:59 ทุกวัน) ยัง fail `0x1` — เป็น task เก่าที่รัน `start-sovereign.bat` (เปิด browser เอง และอาจ build ทับ `.next` ที่ prod ใช้อยู่) แนะนำ disable:
+- Task **`ShipShop3000`** (23:59 ทุกวัน) ยัง fail `0x1` — เป็น task เก่าที่รัน `start-sovereign.bat`; รอบ 6 พ.ย. ล้มเพราะ health `:3001` ไม่ตอบภายใน 240 วิ (ตอนนั้น API เพิ่ง restart) และปลายทางมี `start http://localhost:3000` เปิด browser เองด้วย ถ้าไม่ต้องการพฤติกรรมนี้แนะนำ disable:
   `schtasks /Change /TN "ShipShop3000" /DISABLE`
 - Task **`Sovereign Nightly Verify`** (02:00) result `0x1` มาจาก tools test ข้างบน → รอบถัดไปควรเขียวเอง ยังไม่ต้องแก้โค้ด
+- Task **`Sovereign Synthetic Browser Check`** ล่าสุดผ่าน (7 พ.ย. 14:11) — ที่ล้มก่อนหน้าเป็นการล้มชั่วคราว ไม่ต้องแก้
 
 ---
 
