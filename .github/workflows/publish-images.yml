@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # ไม่มีขั้น QEMU: runner arm64 เป็น ARM จริง build จึงเร็วเท่า amd64
       - name: Set up Buildx

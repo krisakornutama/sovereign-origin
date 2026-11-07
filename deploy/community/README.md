@@ -151,6 +151,6 @@ docker compose exec db pg_dump -U sovereign sovereign | gzip > sovereign-$(date 
 | web :3000 (ทดสอบ :3101) | 200 · เปิด Dashboard ได้ |
 | login | `POST /api/auth/login` = 200 |
 
-> หมายเหตุ: service `migrate` ใช้ `prisma db push` (sync จาก schema) ไม่ใช่ `migrate deploy`
+> หมายเหตุ: service `migrate` ใช้ `prisma migrate deploy` (baseline 20261107190000) ไม่ใช่ `db push`
 > เพราะ migration history มี drift — ฐานข้อมูลใหม่จะสร้างไม่ครบและ seed ล้ม (`P2022`)
 > production เดิมยังใช้ `migrate deploy` ตามปกติ ไม่กระทบ

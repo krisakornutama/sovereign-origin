@@ -56,10 +56,10 @@ for (let i = 0; i < 30; i++) {
 if (!ready) { fail('Postgres ทดสอบไม่พร้อมใน 30 วิ'); process.exit(1); }
 ok('Postgres ทดสอบพร้อม', `port ${PG_PORT}`);
 
-console.log('▶ [2/6] push schema (prisma db push)');
-execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'],
+console.log('▶ [2/6] apply migrations (prisma migrate deploy)');
+execFileSync('npx', ['prisma', 'migrate', 'deploy'],
   { cwd: CORE, stdio: 'pipe', env: { ...process.env, DATABASE_URL: DB_URL }, shell: process.platform === 'win32' });
-ok('schema push สำเร็จ');
+ok('migrate deploy สำเร็จ');
 
 console.log('▶ [3/6] รัน harness (โหลด dist จริงของโค้ดใหม่)');
 const harness = spawn('node', ['tools/verify/client-monitor-harness.mjs'], {

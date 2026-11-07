@@ -119,15 +119,15 @@ if (await fwdHealthy()) {
   }
   if (!ok) fail('forwarder ไม่ตอบ startup packet ภายใน 20 วิ');
   log('forwarder healthy (ตอบ auth request จริง)');
-/* 3) ฐานทดสอบ + schema (prisma db push รวมสร้างฐานให้ถ้ายังไม่มี) */
-log(`push schema → ${TEST_DB} (สร้างอัตโนมัติถ้ายังไม่มี)`);
+/* 3) ฐานทดสอบ + schema (migrate deploy จาก baseline — ห้าม db push, มี gate กัน) */
+log(`migrate deploy → ${TEST_DB} (สร้างอัตโนมัติถ้ายังไม่มี)`);
 const pushUrl = fwdUrl;
 {
-  const push = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], { windowsHide: true,
+  const push = spawnSync('npx', ['prisma', 'migrate', 'deploy'], { windowsHide: true,
     cwd: API, stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32',
     env: { ...process.env, DATABASE_URL: pushUrl },
   });
-  if (push.status !== 0) fail(`prisma db push ล้มเหลว (exit ${push.status}) — ดู log ข้างบน`);
+  if (push.status !== 0) fail(`prisma migrate deploy ล้มเหลว (exit ${push.status}) — ดู log ข้างบน`);
 }
 
 
