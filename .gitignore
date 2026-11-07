@@ -147,6 +147,8 @@ tools/*
 !tools/nightly-verify.mjs
 !tools/nightly-report.mjs
 !tools/nightly-history.mjs
+!tools/nightly-deadman.mjs
+!tools/ops-task-state.mjs
 !tools/status-doc.mjs
 !tools/stage-release.mjs
 !tools/register-nightly-task.ps1

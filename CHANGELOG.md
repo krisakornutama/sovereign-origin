@@ -16,6 +16,7 @@
 - **ความปลอดภัย / คุณภาพ** — ปิด Dependabot advisories ที่เหลือ, mount farm executive API ให้ตรงกับหน้าที่เรียก, เพิ่มเทสต์ route/E2E
 - **Module boundary** — ปิด 6 เส้นข้ามโมดูลผ่าน service ของเจ้าของตาราง (`consent → health`, `consent → ai`, `farm → livestock`)
 - **Nightly** — แก้ restore-check false positive (แยก pure compare + เทสต์ 5/5) และรัน restore จริงผ่าน 149/149 ตาราง
+- **Ops / Nightly (P0)** — ปิด `ShipShop3000` ที่ค้าง, ยืนยัน `Sovereign Nightly Verify` ผ่านจริงผ่าน Task Scheduler (Last Result 0), เพิ่ม **dead-man alert 03:30** เตือน Telegram เมื่อ nightly ไม่ผ่าน/ไม่ส่งผลติดกัน 2 คืน และแก้ `nightly-report` ให้ใช้ creds กลาง (DB → `infra/.env`) แทนการอ่าน DB อย่างเดียว
 - **Desktop** — แพ็ก `hidden-launch.cjs` + `run-hidden.vbs` ไปกับแอป (J6f) ให้เปิด `.bat` แบบไม่มีหน้าต่างได้ครบ
 - **เอกสาร** — อัปเดต `CHANGELOG` / `README` / `STATUS` / `QUEUE` ให้ตรงกับสถานะจริง
 

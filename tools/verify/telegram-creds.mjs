@@ -63,20 +63,25 @@ export function readTelegramCreds() {
   return { token: infra.TELEGRAM_BOT_TOKEN || '', chatId: infra.TELEGRAM_CHAT_ID || '', source: 'env' };
 }
 
-async function sendTelegram(text, creds) {
+async function sendTelegram(text, creds, opts = {}) {
   try {
+    const body = { chat_id: creds.chatId, text, disable_web_page_preview: true };
+    // nightly-report ใช้ HTML (<b>/<code>) · ผู้เรียกอื่นปล่อยว่าง = plain text
+    if (opts.parseMode) body.parse_mode = opts.parseMode;
     const r = await fetch(`https://api.telegram.org/bot${creds.token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: creds.chatId, text, disable_web_page_preview: true }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
-    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${(await r.text()).slice(0, 160)}` };
+    // อ่าน body ให้หมดทุกกรณี — ปล่อย connection ค้างจะทำให้ process ไม่ยอมจบ
+    const reply = await r.text();
+    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${reply.slice(0, 160)}` };
   } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
 }
 
 /** แจ้งเตือน — ไม่มี creds = คืน { ok:false, error } อธิบาย (ผู้เรียก report ต่อได้) */
-export async function notify(text, creds = readTelegramCreds()) {
+export async function notify(text, creds = readTelegramCreds(), opts = {}) {
   if (!creds.token || !creds.chatId) return { ok: false, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env)' };
-  return sendTelegram(text, creds);
+  return sendTelegram(text, creds, opts);
 }
