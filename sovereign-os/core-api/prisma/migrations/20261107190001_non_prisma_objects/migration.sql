@@ -14,10 +14,12 @@ FROM audit_logs
 WHERE action_type LIKE 'FLEET\_%';
 
 -- ใน DB ที่มี TimescaleDB อยู่แล้ว view นี้เป็น continuous aggregate (relkind อื่น) → ห้าม replace
--- สร้างเฉพาะเมื่อยังไม่มีตาราง sensor_telemetry จริง (CI ที่ไม่มี TimescaleDB จะข้ามไปเงียบ ๆ)
+-- ต้องเช็ก "extension timescaledb" ด้วย: baseline สร้างตาราง sensor_telemetry ไว้แล้ว (Prisma ไม่ตัด @@ignore
+-- ออกจาก migrate diff) แต่ CI job test-db ใช้ postgres:15 เปล่า ๆ ซึ่งไม่มี time_bucket → ต้องข้าม
 DO $$
 BEGIN
     IF to_regclass('public.sensor_telemetry') IS NOT NULL
+       AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')
        AND to_regclass('public.sensor_telemetry_hourly') IS NULL THEN
         EXECUTE $view$
             CREATE VIEW "sensor_telemetry_hourly" AS
