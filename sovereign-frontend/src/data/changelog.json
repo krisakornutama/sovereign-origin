@@ -27,6 +27,7 @@
                 "Module boundary — ปิด 6 เส้นข้ามโมดูลผ่าน service ของเจ้าของตาราง (consent → health, consent → ai, farm → livestock)",
                 "Nightly — แก้ restore-check false positive (แยก pure compare + เทสต์ 5/5) และรัน restore จริงผ่าน 149/149 ตาราง",
                 "Ops / Nightly (P0) — ปิด ShipShop3000 ที่ค้าง, ยืนยัน Sovereign Nightly Verify ผ่านจริงผ่าน Task Scheduler (Last Result 0), เพิ่ม dead-man alert 03:30 เตือน Telegram เมื่อ nightly ไม่ผ่าน/ไม่ส่งผลติดกัน 2 คืน และแก้ nightly-report ให้ใช้ creds กลาง (DB → infra/.env) แทนการอ่าน DB อย่างเดียว",
+                "Release Automation (Sprint 1) — .github/workflows/release.yml ปล่อยชุดติดตั้ง Windows อัตโนมัติเมื่อ push tag v*: ตรวจ tag ↔ version ก่อน build, build core-api + static export, แพ็ก portable exe/zip ด้วย electron-builder บน windows-latest, เขียน/ตรวจ SHA256SUMS.txt ด้วย tools/release-build.mjs แล้วแนบ GitHub Release · เทสต์ red-first 11 ตัว (tools/test/release-build.test.mjs) ครอบการคัด artifact, รูปแบบ checksum, tag gate และสัญญาของ workflow",
                 "Desktop — แพ็ก hidden-launch.cjs + run-hidden.vbs ไปกับแอป (J6f) ให้เปิด .bat แบบไม่มีหน้าต่างได้ครบ",
                 "เอกสาร — อัปเดต CHANGELOG / README / STATUS / QUEUE ให้ตรงกับสถานะจริง"
               ]

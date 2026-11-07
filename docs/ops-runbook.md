@@ -334,6 +334,11 @@ npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่�
 ## ๑๐. วงจรปล่อย release แอป desktop (ทำตามนี้ทุกครั้ง)
 
 > หลักการ: **ตัวติดตั้งทุกตัวต้องมีลายเซ็นอ้างอิง** — updater ของเครื่องผู้ใช้จะตรวจ SHA-256 ก่อนเปิดรัน และ**ไม่มีลายเซ็น = ลบทิ้ง** (fail-closed) ดังนั้นลืมขั้นที่ 3 = release นั้นใช้ auto-update ไม่ได้เลย
+>
+> **ทางหลัก (อัตโนมัติ):** bump version → commit → `git tag v<ver> && git push origin v<ver>`
+> workflow `.github/workflows/release.yml` จะตรวจว่า tag ตรงกับ `sovereign-frontend/package.json`, build บน `windows-latest`,
+> แพ็ก portable exe + zip, เขียน/ตรวจ `SHA256SUMS.txt` แล้วแนบ GitHub Release ให้เอง (ใช้ `tools/release-build.mjs`)
+> · ขั้น 2–4 ด้านล่างเก็บไว้เป็น **fallback** เมื่อ CI ใช้ไม่ได้
 
 1. **bump เวอร์ชัน:** `sovereign-frontend/package.json` → เปลี่ยนค่า `"version": "1.x.y"`
 2. **build:** `cd sovereign-frontend && npm run electron:build` (ได้ `dist-electron/Sovereign-OS-<ver>-portable.exe` + zip · ใช้เวลานาน จัดสิทธิ์เครื่องว่าง)
