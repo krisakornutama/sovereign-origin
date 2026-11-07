@@ -123,7 +123,7 @@ export default function FarmExecutivePage() {
 
           {k && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div data-testid="farm-kpi-grid" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                 <KpiCard label="แปลงที่ยังผลิต" value={k.growing} hint={`ทั้งหมด ${k.plots} แปลง`} />
                 <KpiCard label="ใกล้เก็บเกี่ยว (7 วัน)" value={k.upcomingHarvests7d} hint={`เลยกำหนด ${k.overdueHarvests}`} tone={k.overdueHarvests > 0 ? 'alert' : 'default'} />
                 <KpiCard label="สัตว์คงเหลือ" value={k.animals} hint={`${k.groups} กลุ่ม`} />
@@ -137,7 +137,7 @@ export default function FarmExecutivePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div data-testid="farm-kpi-grid-secondary" className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 <KpiCard label="ไซโลต่ำกว่าเกณฑ์" value={k.silosLow} tone={k.silosLow > 0 ? 'alert' : 'ok'} hint="ต่ำกว่า 15% = วิกฤต" />
                 <KpiCard label="ตายใน 7 วัน" value={k.mortality7d} hint="รวมทุกกลุ่มที่ยังผลิต" tone={k.mortality7d > 0 ? 'alert' : 'ok'} />
                 <KpiCard label="ความเสี่ยงวิกฤต" value={k.criticalRisks} tone={k.criticalRisks > 0 ? 'alert' : 'ok'} hint={`จากทั้งหมด ${data.risks.length} รายการ`} />
@@ -159,7 +159,12 @@ export default function FarmExecutivePage() {
                   {[...critical, ...rest].map((risk) => {
                     const style = SEVERITY_STYLE[risk.severity];
                     return (
-                      <div key={risk.id} className={`rounded-xl border ${style.box} px-4 py-3`}>
+                      <div
+                        key={risk.id}
+                        data-testid="risk-card"
+                        data-severity={risk.severity}
+                        className={`rounded-xl border ${style.box} px-4 py-3`}
+                      >
                         <div className="flex items-start gap-3">
                           <span className={`mt-1.5 w-2 h-2 rounded-full ${style.dot} shrink-0`} />
                           <div className="min-w-0 flex-1">
@@ -173,7 +178,7 @@ export default function FarmExecutivePage() {
                               {risk.action}
                             </p>
                           </div>
-                          <Link href={risk.link} className="text-[12px] text-gray-300 hover:text-emerald-300 whitespace-nowrap">
+                          <Link data-testid="risk-link" href={risk.link} className="text-[12px] text-gray-300 hover:text-emerald-300 whitespace-nowrap">
                             เปิดหน้า →
                           </Link>
                         </div>
