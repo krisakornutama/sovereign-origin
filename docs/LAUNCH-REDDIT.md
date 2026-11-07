@@ -61,10 +61,47 @@ I would rather hear "your install broke on my NAS" now than after I start chargi
 Repo: https://github.com/krisakornutama/sovereign-origin
 Docs: `deploy/community/README.md` (install + invite codes), `docs/PRELAUNCH-DEMO.md` (demo)
 
+**Verify the published images before posting (delete this section)**
+
+The README and FAQ tell people to pull `:1.2.0`. Prove that exact tag exists, is pullable without a GitHub login (so anonymous readers can use it), and that every release tag points at the same build:
+
+```bash
+# 1) the tags the docs reference must exist and be public
+for img in api web; do
+  for t in 1.2.0 1.2 latest; do
+    docker manifest inspect "ghcr.io/krisakornutama/sovereign-origin/$img:$t" >/dev/null \
+      && echo "ok   $img:$t" || echo "FAIL $img:$t"
+  done
+done
+
+# 2) all tags of one image must be the same manifest digest
+for t in 1.2.0 1.2 latest; do
+  printf '%s  ' "$t"
+  docker buildx imagetools inspect --raw "ghcr.io/krisakornutama/sovereign-origin/api:$t" | sha256sum
+done
+
+# 3) it must be multi-arch, not only the machine you are testing on
+docker buildx imagetools inspect "ghcr.io/krisakornutama/sovereign-origin/api:1.2.0" \
+  | grep -E 'Platform|linux/'
+```
+
+No Docker on the review machine? The same check over plain HTTP:
+
+```bash
+tok=$(curl -s "https://ghcr.io/token?scope=repository%3Akrisakornutama%2Fsovereign-origin%2Fapi%3Apull&service=ghcr.io" \
+  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $tok" \
+  -H 'Accept: application/vnd.oci.image.index.v1+json' \
+  https://ghcr.io/v2/krisakornutama/sovereign-origin/api/manifests/1.2.0   # 200 = ok, 404 = tag missing
+```
+
+If `:v1.2.0` returns 404 that is expected and not a publishing failure: image tags drop the leading `v` from the git tag (`v1.2.0` → `1.2.0`). If any check fails, fix the tag or the doc before posting — a 404 `docker pull` in the first comment is the worst possible first impression.
+
 **Reviewer checklist before posting (delete this section)**
 
 - [ ] Replace the RAM table if you re-measure on the machine you post from
 - [ ] Add the demo GIF under `docs/media/demo.gif` and uncomment the image line in `README.md`
 - [ ] Re-check the claim list: 867 API tests passing, `tsc` clean, `next build` clean, open-core boundary 0 violations
+- [ ] Run the image checks above: the exact tag in the docs pulls anonymously, all release tags share one digest, and the manifest lists both `linux/amd64` and `linux/arm64`
 - [ ] Confirm branch protection on `main` is back on
 - [ ] Post in r/selfhosted with the `Project` flair, no marketing links, answer every comment for the first 3 hours
