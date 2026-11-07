@@ -2,9 +2,11 @@ name: Publish images (GHCR)
 
 # เผยแพร่ image ของ Community Edition ขึ้น GitHub Container Registry
 # - trigger: push tag v* (เช่น v1.2.0) หรือกด Run workflow เอง
-# - build แยก job ต่อ platform: linux/amd64 (native, เร็ว) และ linux/arm64 (QEMU, ช้า)
+# - build แยก job ต่อ platform และรันบน runner สถาปัตยกรรมตรงกัน (ไม่ใช้ QEMU เลย)
+#   amd64 → ubuntu-latest, arm64 → ubuntu-24.04-arm (ฟรีสำหรับ public repo)
 #   ทั้งสองวิ่งพร้อมกัน แล้ว merge เป็น multi-arch manifest ใน job `merge`
-#   → amd64 พร้อมใช้ในไม่กี่นาที ไม่ต้องรอ arm64 ที่กินเวลาเกือบชั่วโมง
+#   → amd64 พร้อมใช้ในไม่กี่นาที และ arm64 ไม่ค้าง QEMU อีก
+#   (เดิมใช้ QEMU emulate arm64: job `api` ค้างถึง 6 ชม. แล้วถูก GitHub ตัดทิ้ง)
 # - cache แยก scope ต่อ image+arch เพื่อไม่ให้ cache ของ arm64 ไปทับของ amd64
 #
 # หลัง publish ครั้งแรก: package จะเป็น private แม้ repo จะ public
@@ -31,9 +33,9 @@ env:
 jobs:
   build:
     name: build ${{ matrix.name }} (${{ matrix.arch }})
-    runs-on: ubuntu-latest
-    # arm64 ผ่าน QEMU ใช้เวลาได้ถึง ~45 นาที — ตั้งเพดานไว้ไม่ให้ค้างข้ามชั่วโมง
-    timeout-minutes: 75
+    runs-on: ${{ matrix.runner }}
+    # เผื่อไว้พอสมควร: build ปกติจบใน ~10 นาที ถ้าค้างเกินนี้คือมีปัญหา ไม่ต้องรอ 6 ชม.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -41,21 +43,25 @@ jobs:
           - name: api
             arch: amd64
             platform: linux/amd64
+            runner: ubuntu-latest
             context: ./sovereign-os/core-api
             file: ./sovereign-os/core-api/Dockerfile.prod
           - name: api
             arch: arm64
             platform: linux/arm64
+            runner: ubuntu-24.04-arm
             context: ./sovereign-os/core-api
             file: ./sovereign-os/core-api/Dockerfile.prod
           - name: web
             arch: amd64
             platform: linux/amd64
+            runner: ubuntu-latest
             context: ./sovereign-frontend
             file: ./sovereign-frontend/Dockerfile.prod
           - name: web
             arch: arm64
             platform: linux/arm64
+            runner: ubuntu-24.04-arm
             context: ./sovereign-frontend
             file: ./sovereign-frontend/Dockerfile.prod
 
@@ -63,11 +69,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # QEMU จำเป็นเฉพาะ arm64 — amd64 ไม่ต้องติดตั้ง ทำให้ job เร็วขึ้นอีก
-      - name: Set up QEMU (arm64 emulation)
-        if: matrix.arch == 'arm64'
-        uses: docker/setup-qemu-action@v3
-
+      # ไม่มีขั้น QEMU: runner arm64 เป็น ARM จริง build จึงเร็วเท่า amd64
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 

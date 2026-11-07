@@ -21,4 +21,7 @@ prisma/prisma/
 # เอกสาร/ทดสอบ — image ใช้รัน ไม่ใช่พัฒนา
 docs/
 tests/
+coverage/
+models/
+tts/
 *.log
