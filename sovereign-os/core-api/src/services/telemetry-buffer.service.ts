@@ -55,3 +55,22 @@ export class TelemetryBuffer {
 
 export const telemetryBuffer = new TelemetryBuffer();
 export { TELEMETRY_FLUSH_MS };
+
+/**
+ * เขียน telemetry 1 แถวลง sensor_telemetry ทันที (ไม่ผ่าน buffer)
+ * ใช้กับ offline replay ที่ต้องรักษาเวลาวัดเดิมของ client
+ * — parameterized query เท่านั้น ห้ามต่อ string จาก input
+ */
+export async function appendTelemetryRow(
+  prisma: { $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<number> },
+  row: TelemetryRow
+): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    'INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES ($1, $2::uuid, $3, $4, $5)',
+    row.time,
+    row.nodeId,
+    row.deviceId,
+    row.metric,
+    row.value
+  );
+}

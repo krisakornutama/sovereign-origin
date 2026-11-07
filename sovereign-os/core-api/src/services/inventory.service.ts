@@ -118,6 +118,70 @@ export async function deductStock(
   return { ok: shortfall === 0, name: item.name, remaining, shortfall, reason: shortfall > 0 ? `หักได้ ${remaining}/${Number(item.quantity)} — ขาด ${shortfall}` : undefined };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Atomic stock delta — ใช้กับ offline replay (conflict resolver)
+//
+// ต่างจาก deductStock ด้านบน: การหักต้องเป็น atomic guard ที่ DB
+// (UPDATE ... WHERE quantity >= amount) ไม่ใช่ read-then-write
+// เพื่อกัน 2 เครื่องตัดสต็อกพร้อมกันแล้วยอดติดลบ/หาย
+// ─────────────────────────────────────────────────────────────
+
+export interface StockDeltaResult {
+  applied: boolean;
+  /** ยอดคงเหลือหลังทำรายการ (หรือยอดปัจจุบันถ้าไม่ผ่าน guard) */
+  quantity: number;
+  reason?: string;
+}
+
+export async function applyStockDelta(
+  prisma: {
+    inventoryItem: {
+      findFirst: (args: any) => Promise<any>;
+      updateMany: (args: any) => Promise<{ count: number }>;
+    };
+  },
+  input: { userId: string; itemId: string; delta: number }
+): Promise<StockDeltaResult> {
+  const amount = Number(input.delta);
+  if (!Number.isFinite(amount) || amount === 0) {
+    return { applied: false, quantity: 0, reason: 'INVALID_DELTA' };
+  }
+
+  const ownerWhere = { id: input.itemId, user_id: input.userId };
+  const existing = await prisma.inventoryItem.findFirst({
+    where: ownerWhere,
+    select: { quantity: true },
+  });
+  if (!existing) return { applied: false, quantity: 0, reason: 'RESOURCE_NOT_FOUND' };
+
+  if (amount < 0) {
+    const deduct = Math.abs(amount);
+    const guarded = await prisma.inventoryItem.updateMany({
+      where: { ...ownerWhere, quantity: { gte: deduct } },
+      data: { quantity: { decrement: deduct } },
+    });
+    const current = await prisma.inventoryItem.findFirst({
+      where: ownerWhere,
+      select: { quantity: true },
+    });
+    const quantity = Number(current?.quantity ?? existing.quantity);
+    return guarded.count > 0 ? { applied: true, quantity } : { applied: false, quantity };
+  }
+
+  await prisma.inventoryItem.updateMany({
+    where: ownerWhere,
+    data: { quantity: { increment: amount } },
+  });
+  const current = await prisma.inventoryItem.findFirst({
+    where: ownerWhere,
+    select: { quantity: true },
+  });
+  return {
+    applied: true,
+    quantity: Number(current?.quantity ?? Number(existing.quantity) + amount),
+  };
+}
+
 /** เติมยอดคงเหลือ (กลับเข้าคลัง — เช่น เติมถังอาหาร) */
 export async function addStock(
   prisma: { inventoryItem: { findUnique: (a: any) => Promise<any>; update: (a: any) => Promise<any> } },
