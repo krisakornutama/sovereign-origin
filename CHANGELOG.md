@@ -6,6 +6,21 @@
 
 ---
 
+## [Unreleased] — 2026-11-07
+
+> งานหลัง tag `v1.2.0` — จะรวมใน release ถัดไป (image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้)
+
+### 🔧 งานหลังปล่อย v1.2.0
+
+- **CI / images** — แยก build amd64/arm64, ตัด QEMU, ใช้ runner ARM จริง + จำกัดเวลา 45 นาที; ทุก tag ของ `api`/`web` ชี้ manifest เดียวกัน
+- **ความปลอดภัย / คุณภาพ** — ปิด Dependabot advisories ที่เหลือ, mount farm executive API ให้ตรงกับหน้าที่เรียก, เพิ่มเทสต์ route/E2E
+- **Module boundary** — ปิด 6 เส้นข้ามโมดูลผ่าน service ของเจ้าของตาราง (`consent → health`, `consent → ai`, `farm → livestock`)
+- **Nightly** — แก้ restore-check false positive (แยก pure compare + เทสต์ 5/5) และรัน restore จริงผ่าน 149/149 ตาราง
+- **Desktop** — แพ็ก `hidden-launch.cjs` + `run-hidden.vbs` ไปกับแอป (J6f) ให้เปิด `.bat` แบบไม่มีหน้าต่างได้ครบ
+- **เอกสาร** — อัปเดต `CHANGELOG` / `README` / `STATUS` / `QUEUE` ให้ตรงกับสถานะจริง
+
+---
+
 ## [v1.2.0] — 2026-11-06 (released)
 
 **Community Edition (CE) เปิดตัวเป็น repo สาธารณะ** — repo นี้เหลือ CE เพียว ไม่มีโมดูล Pro

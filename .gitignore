@@ -165,6 +165,7 @@ tools/*
 !tools/boundary-baseline.json
 !tools/map-owners.mjs
 !tools/gen-module-docs.mjs
+!tools/gen-changelog-data.mjs
 !tools/auto-doc-block.mjs
 # lib ของเทสต์ env-secret-ownership — ไม่มีไฟล์นี้ใน repo = clone สด/CI พังเงียบ (เจอจริงบน MAIN)
 !tools/env-secret-ownership.mjs

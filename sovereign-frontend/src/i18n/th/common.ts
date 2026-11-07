@@ -55,6 +55,7 @@ export const common = {
     healing: 'ธรรมะบำบัด',
     lifestyle: 'วิถีชีวิต',
     history: 'ประวัติข้อมูล',
+    changelog: 'ประวัติการพัฒนา',
     reports: 'รายงาน AI',
     mbti: 'แบบทดสอบ MBTI',
     changePassword: 'เปลี่ยนรหัสผ่าน',
