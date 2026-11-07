@@ -1,7 +1,7 @@
 # STATUS — สถานะปัจจุบัน
 
 > ไฟล์นี้สร้างโดย `node tools/status-doc.mjs --write` — **ห้ามแก้มือ** (แก้ที่ข้อมูลต้นทางแล้ว gen ใหม่)
-> สร้างเมื่อ: 2026-11-07T14:21:23.613Z
+> สร้างเมื่อ: 2026-11-07T14:22:54.444Z
 > ประวัติงานย้อนหลัง: [docs/history/status-journal-2026-10.md](docs/history/status-journal-2026-10.md)
 > คิวงาน / สิ่งที่ต้องทำต่อ: [QUEUE.md](QUEUE.md)
 
@@ -50,7 +50,7 @@
 
 - สถานะ: ✅ ปกติ
 - แรมว่าง: 4.5 GB · ดิสก์ว่าง: 83 GB
-- วัดเมื่อ: 2026-11-07 21:21
+- วัดเมื่อ: 2026-11-07 21:22
 - ปัญหา: —
 
 ## Task scheduler
@@ -59,14 +59,14 @@
 | --- | --- | --- |
 | ShipShop 23:59 | 6/11/2569 23:59:59 | — ปิดอยู่ (ตั้งใจ) |
 | DB Backup 03:00 | 7/11/2569 03:00:00 | ✅ OK |
-| Docker Watch | 7/11/2569 21:21:21 | ✅ OK |
+| Docker Watch | 7/11/2569 21:22:22 | ✅ OK |
 | Machine Watch | 7/11/2569 21:13:13 | ✅ OK |
-| Deadman 03:30 | — | ✅ ยังไม่เคยรัน (0x41303) |
+| Deadman 03:30 | 7/11/2569 21:22:22 | ✅ OK |
 | Gate 03:20 | 7/11/2569 03:20:20 | ✅ OK |
 | Verify 02:00 | 7/11/2569 21:12:12 | ✅ OK |
 | Offsite 03:30 | 7/11/2569 03:30:30 | ✅ OK |
 | Digest 08:00 | 7/11/2569 08:00:00 | ✅ OK |
-| Synthetic Check | 7/11/2569 21:16:16 | ✅ OK |
+| Synthetic Check | 7/11/2569 21:21:21 | ✅ OK |
 
 ## ที่มา
 
@@ -74,7 +74,7 @@
 | --- | --- | --- |
 | Quality gate | 2026-11-07 21:21 | `sovereign-os/core-api/data/system-truth.json` |
 | Nightly | 2026-11-07 21:15 | `logs/nightly/status.json` |
-| เครื่อง / task | 2026-11-07 21:21 | `sovereign-os/core-api/data/ops-status.json` |
+| เครื่อง / task | 2026-11-07 21:22 | `sovereign-os/core-api/data/ops-status.json` |
 | ประวัติ nightly | 2026-11-07 | `sovereign-os/core-api/data/nightly-history.json` |
 
 ---
