@@ -53,6 +53,7 @@ export const common = {
     healing: 'Buddhist Healing',
     lifestyle: 'Lifestyle',
     history: 'History',
+    changelog: 'Development history',
     reports: 'AI Reports',
     mbti: 'MBTI Test',
     changePassword: 'Change Password',

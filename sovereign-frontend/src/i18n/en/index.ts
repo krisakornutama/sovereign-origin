@@ -11,6 +11,7 @@ import audit from './pages/audit';
 import automation from './pages/automation';
 import backup from './pages/backup';
 import changePassword from './pages/changePassword';
+import changelog from './pages/changelog';
 import community from './pages/community';
 import ecosystem from './pages/ecosystem';
 import dashboard from './pages/dashboard';
@@ -61,6 +62,7 @@ export default {
   automation,
   backup,
   changePassword,
+  changelog,
   community,
   ecosystem,
   dashboard,
