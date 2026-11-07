@@ -31,6 +31,17 @@ test('threat intel: add + matchDomains + hits เพิ่ม + remove', { skip:
 
 test('threat intel: seedIfEmpty ไม่ทำอะไรถ้าฐานมีข้อมูลแล้ว', { skip: SKIP ? 'set RUN_INTEGRATION=1 to enable' : false }, async () => {
   const { threatIntel } = await import('../../src/services/threat-intel.service');
-  const n = await threatIntel.seedIfEmpty();
-  assert.equal(n, 0, 'มีข้อมูลอยู่แล้ว seed ควรคืน 0');
+  // ต้องสร้างข้อมูลเองก่อน 1 แถว — เดิมเทสต์นี้พึ่ง seed ที่มี만ใน DB dev จึงแดงบน DB เปล่า (CI)
+  const seed = await threatIntel.add({
+    type: 'DOMAIN',
+    value: `seedcheck-${Date.now()}.example.com`,
+    category: 'malware',
+    note: 'test',
+  });
+  try {
+    const n = await threatIntel.seedIfEmpty();
+    assert.equal(n, 0, 'มีข้อมูลอยู่แล้ว seed ควรคืน 0');
+  } finally {
+    await threatIntel.remove(seed.id);
+  }
 });

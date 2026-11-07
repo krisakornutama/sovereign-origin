@@ -93,3 +93,55 @@ jobs:
           RUN_DB_TESTS: '1'
           TEST_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
           TEST_TMPDIR: ${{ github.workspace }}/.dbtest-tmp
+
+  # real-Postgres integration suite (opt-in ด้วย RUN_INTEGRATION=1)
+  # ใช้ TimescaleDB เพราะ sensor_telemetry เป็น hypertable + ต้องมี extension จริง
+  # สร้าง schema ด้วย db push (ไม่ใช่ migrate deploy) เพราะ migration chain ในรีโปตาม schema ไม่ทัน
+  # เช่น users.token_version ถูกเพิ่มด้วย db push และไม่เคยถูกบันทึกเป็น migration
+  test-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sovereign-os/core-api
+    services:
+      timescaledb:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+      JWT_SECRET: ci-secret-0123456789abcdef
+      RUN_INTEGRATION: '1'
+      # เทสต์ฝั่ง server ใช้วันที่/เวลาเขตกรุงเทพ — ให้ตรงกับ prod
+      TZ: Asia/Bangkok
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Push schema to CI Postgres
+        run: npx prisma db push --skip-generate --accept-data-loss
+
+      # sensor_telemetry ถูกประกาศ @@ignore → db push ไม่สร้างให้ แต่ integration test เขียนลงตารางจริง
+      - name: Create TimescaleDB table that Prisma ignores
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f scripts/ci-timescale-ignored.sql
+
+      - name: Run integration suite (real Postgres)
+        run: npm run test:integration

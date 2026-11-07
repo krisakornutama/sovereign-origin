@@ -7,6 +7,7 @@
 //      แม้สองคิว replay พร้อมกัน (race) ซึ่งเป็นเคสที่ read-then-write ฝั่ง resolver พลาด
 //   2) claim TTL — claim ที่ค้างเกิน STALE_CLAIM_MS ต้องถูกยึดคืนได้ แต่ claim สดต้องกันงานซ้ำ
 //   3) SyncConflictLog จริง — PENDING_REVIEW ต้องมีแถวใน DB (unique mutation_id) และ retry ไม่เพิ่มแถว
+//   4) Telemetry path — append ลง sensor_telemetry จริงโดยมี node fixture (FK node_id) และ replay ไม่ซ้ำ
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PrismaClient } from '@prisma/client';
@@ -26,6 +27,7 @@ const keyPrefix = `itest-sync-${stamp}`;
 let userId = '';
 let resolver: ConflictResolver;
 let store: PrismaConflictResolverStore;
+const nodeIds: string[] = [];
 
 function inventoryMutation(overrides: Partial<OfflineMutation> = {}): OfflineMutation {
   return {
@@ -62,8 +64,8 @@ async function quantityOf(itemId: string): Promise<number> {
   return Number(row.quantity);
 }
 
-async function idempotencyRow(key: string) {
-  return prisma.idempotencyKey.findUnique({ where: { scope_key: { scope: SCOPE, key } } });
+async function idempotencyRow(key: string, scope: string = SCOPE) {
+  return prisma.idempotencyKey.findUnique({ where: { scope_key: { scope, key } } });
 }
 
 before(async () => {
@@ -79,9 +81,18 @@ before(async () => {
 after(async () => {
   if (SKIP) return;
   try {
+    // ถ้า before hook ล้ม (สร้าง user ไม่ได้) ห้ามให้ cleanup กลบ error ต้นทาง
     await prisma.syncConflictLog.deleteMany({ where: { userId } });
     await prisma.idempotencyKey.deleteMany({ where: { key: { startsWith: keyPrefix } } });
-    await prisma.inventoryItem.deleteMany({ where: { user_id: userId } });
+    if (userId) await prisma.inventoryItem.deleteMany({ where: { user_id: userId } });
+    if (nodeIds.length > 0) {
+      // hypertable ไม่มี cascade — ลบแถว telemetry ก่อนแล้วจึงลบ node ที่เป็น FK เจ้าของ
+      await prisma.$executeRawUnsafe(
+        'DELETE FROM sensor_telemetry WHERE node_id = ANY($1::uuid[])',
+        nodeIds
+      );
+      await prisma.node.deleteMany({ where: { id: { in: nodeIds } } });
+    }
     if (userId) await prisma.user.delete({ where: { id: userId } });
   } finally {
     await prisma.$disconnect();
@@ -169,4 +180,51 @@ test('claim TTL: claim สดกันงานซ้ำ (SKIPPED) แต่ cla
   assert.equal(stale.status, 'APPLIED', 'claim ที่ค้างเกิน TTL ต้องถูกยึดคืน');
   assert.equal(await quantityOf(itemId), 7);
   assert.equal((await idempotencyRow(staleKey))?.status, 'done');
+});
+
+test('telemetry: node fixture จริง → APPLIED ลง sensor_telemetry และ replay ด้วยคีย์เดิมไม่เพิ่มแถว', { skip: SKIP ? 'set RUN_INTEGRATION=1 to enable' : false }, async () => {
+  // sensor_telemetry มี FK → ต้องมี node จริงก่อน (fixture ที่ลบใน after hook)
+  const node = await prisma.node.create({ data: { name: `${keyPrefix}-node` } });
+  nodeIds.push(node.id);
+  const metric = `${keyPrefix}-soc`;
+
+  const mutation: OfflineMutation = {
+    id: `${keyPrefix}-tel-1`,
+    domain: 'telemetry',
+    action: 'ingest',
+    idempotencyKey: `${keyPrefix}-tel-key`,
+    occurredAt: '2026-11-07T10:00:00.000Z',
+    userId,
+    payload: { nodeId: node.id, deviceId: 'itest-device', metric, value: 82.5 },
+  };
+
+  const countRows = async (): Promise<number> => {
+    const rows = await prisma.$queryRawUnsafe<Array<{ count: number }>>(
+      'SELECT count(*)::int AS count FROM sensor_telemetry WHERE node_id = $1::uuid AND metric = $2',
+      node.id,
+      metric
+    );
+    return Number(rows[0].count);
+  };
+
+  const applied = await resolver.resolve(mutation);
+  assert.equal(applied.status, 'APPLIED');
+  assert.equal(await countRows(), 1, 'ต้องมีแถว telemetry จริง 1 แถว');
+
+  // ยืนยันค่าที่เขียนลง hypertable ตรงกับ payload (ไม่ใช่แค่จำนวนแถว)
+  const stored = await prisma.$queryRawUnsafe<Array<{ value: number; device_id: string }>>(
+    'SELECT value, device_id FROM sensor_telemetry WHERE node_id = $1::uuid AND metric = $2',
+    node.id,
+    metric
+  );
+  assert.equal(Number(stored[0].value), 82.5);
+  assert.equal(stored[0].device_id, 'itest-device');
+
+  // replay ของงานเดิม (คนละ mutation id, คีย์เดิม) → SKIPPED และไม่เขียนซ้ำ
+  const replay = await resolver.resolve({ ...mutation, id: `${keyPrefix}-tel-2` });
+  assert.equal(replay.status, 'SKIPPED');
+  assert.equal(replay.duplicateOf, 'APPLIED');
+  assert.equal(await countRows(), 1, 'replay ต้องไม่เพิ่มแถว telemetry');
+  // telemetry ใช้ scope ของตัวเอง (sync.telemetry) ไม่ใช่ sync.inventory
+  assert.equal((await idempotencyRow(mutation.idempotencyKey, 'sync.telemetry'))?.status, 'done');
 });
