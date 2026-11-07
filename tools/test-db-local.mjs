@@ -120,7 +120,23 @@ if (await fwdHealthy()) {
   if (!ok) fail('forwarder ไม่ตอบ startup packet ภายใน 20 วิ');
   log('forwarder healthy (ตอบ auth request จริง)');
 /* 3) ฐานทดสอบ + schema (migrate deploy จาก baseline — ห้าม db push, มี gate กัน) */
-log(`migrate deploy → ${TEST_DB} (สร้างอัตโนมัติถ้ายังไม่มี)`);
+// migrate deploy ไม่สร้างฐานให้เอง (ต่างจาก db push) และจะล้ม P3005 ถ้าเจอ schema เดิมค้างจากรอบก่อน
+// ฐานนี้เป็น DB ทิ้งชื่อ sovereign_test → ล้างแล้วสร้างใหม่ทุกครั้งก่อน deploy
+log(`เตรียมฐานทดสอบ ${TEST_DB} (ล้างของเดิม — เป็น DB ทิ้ง)`);
+{
+  const reset = spawnSync(
+    'docker',
+    [
+      'exec', DB_CONTAINER, 'psql', '-U', DB_USER, '-d', 'postgres', '-v', 'ON_ERROR_STOP=1',
+      '-c', `DROP DATABASE IF EXISTS "${TEST_DB}" WITH (FORCE)`,
+      '-c', `CREATE DATABASE "${TEST_DB}"`,
+    ],
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] }
+  );
+  if (reset.status !== 0) fail(`เตรียมฐานทดสอบล้มเหลว (exit ${reset.status}) — ดู log ข้างบน`);
+}
+
+log(`migrate deploy → ${TEST_DB}`);
 const pushUrl = fwdUrl;
 {
   const push = spawnSync('npx', ['prisma', 'migrate', 'deploy'], { windowsHide: true,
