@@ -1,0 +1,112 @@
+name: Release Desktop
+
+# ปล่อยชุดติดตั้ง Sovereign OS สำหรับ Windows อัตโนมัติ
+# - trigger: push tag v* (เช่น v1.2.1) — tag ต้องตรงกับ version ใน sovereign-frontend/package.json
+# - build บน windows-latest เพราะ electron-builder target "portable" ต้องใช้ NSIS/wine ฝั่ง Windows
+# - ลำดับ: ตรวจ tag → build core-api (sidecar) → build static export → electron-builder (portable exe + zip)
+#          → stage + SHA256SUMS.txt → ตรวจซ้ำ → แนบ GitHub Release
+# - ไม่มี signing certificate: ปิด auto-discovery (แอป updater ตรวจ SHA-256 ของไฟล์แทน)
+#
+# หมายเหตุ: workflow นี้ไม่รัน `npm run verify` (E2E ต้องมี backend+DB)
+#   ด่านคุณภาพยังอยู่ที่ PR/CI ปกติ — ที่นี่เน้น "แพ็กของที่ build ได้จริงแล้วปล่อย"
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag ที่ต้องการปล่อย (ต้องมีอยู่แล้ว เช่น v1.2.1)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: build + publish Windows desktop
+    runs-on: windows-latest
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            sovereign-frontend/package-lock.json
+            sovereign-os/core-api/package-lock.json
+
+      # ดักตั้งแต่ต้น: tag v1.2.1 แต่ package.json ยังเป็น 1.2.0 = หยุดก่อนเสียเวลา build
+      - name: ตรวจ tag ↔ version
+        shell: bash
+        run: node tools/release-build.mjs --check-tag="${{ inputs.tag || github.ref_name }}"
+
+      - name: ติดตั้ง dependencies + build core-api (sidecar)
+        working-directory: sovereign-os/core-api
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
+      - name: ติดตั้ง dependencies ของ frontend
+        working-directory: sovereign-frontend
+        run: npm ci
+
+      - name: Build static export
+        working-directory: sovereign-frontend
+        run: npm run build:static
+
+      - name: Build portable exe + zip
+        working-directory: sovereign-frontend
+        run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # คัดเฉพาะ artifact ของ version นี้ + เขียน SHA256SUMS.txt ลง staging dir
+      - name: Stage artifacts + SHA256SUMS
+        run: node tools/release-build.mjs --stage --dir=sovereign-frontend/dist-electron --out=release-assets
+
+      # ตรวจซ้ำก่อนปล่อย: ไฟล์ที่อัปโหลดต้องตรงกับ manifest ทุกไบต์
+      - name: Verify checksums
+        run: node tools/release-build.mjs --verify --dir=release-assets
+
+      # ยืนยันชัด ๆ ว่า SHA256SUMS.txt อยู่ในชุดที่จะแนบ (ไม่พึ่ง glob เงียบ ๆ)
+      - name: ยืนยัน SHA256SUMS.txt
+        shell: bash
+        run: |
+          test -f release-assets/SHA256SUMS.txt
+          cat release-assets/SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sovereign-os-${{ inputs.tag || github.ref_name }}-win-x64
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: Sovereign OS ${{ inputs.tag || github.ref_name }}
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
