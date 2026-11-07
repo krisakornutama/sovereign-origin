@@ -24,6 +24,8 @@ interface FakeState {
   userUpdates: any[];
   audit: any[];
   superadminCount: number;
+  purges: string[];
+  chatActorUpdates: any[];
 }
 
 let state: FakeState;
@@ -67,6 +69,26 @@ function mockConsentModels() {
       return { id: 'a-1' };
     },
   } as any);
+
+  // purge ข้อมูลส่วนบุคคลตอนลบบัญชี — ต้องถูกเรียกจริง ไม่ใช่แค่เปลี่ยนชื่อ
+  mockModel(prisma as any, 'healthProfile', {
+    deleteMany: async (args: any) => {
+      state.purges.push(`healthProfile:${args?.where?.user_id}`);
+      return { count: 1 };
+    },
+  } as any);
+  mockModel(prisma as any, 'healthReading', {
+    deleteMany: async (args: any) => {
+      state.purges.push(`healthReading:${args?.where?.user_id}`);
+      return { count: 1 };
+    },
+  } as any);
+  mockModel(prisma as any, 'chatMessage', {
+    updateMany: async (args: any) => {
+      state.chatActorUpdates.push(args);
+      return { count: 1 };
+    },
+  } as any);
 }
 
 function loadRouter() {
@@ -91,6 +113,8 @@ beforeEach(async () => {
     userUpdates: [],
     audit: [],
     superadminCount: 2,
+    purges: [],
+    chatActorUpdates: [],
   };
   mockConsentModels();
 });
@@ -251,6 +275,12 @@ describe('consent — DELETE /api/consent/account (สิทธิ์ลบข�
       assert.ok(patch.deleted_at instanceof Date, 'ต้องบันทึกเวลาลบไว้ตรวจสอบ');
       assert.equal(state.audit.length, 1, 'ต้องลง audit หนึ่งรายการ');
       assert.equal(state.audit[0].actionType ?? state.audit[0].action_type, 'ACCOUNT_SELF_DELETED');
+      // PDPA: ข้อมูลสุขภาพต้องถูกลบจริง ไม่ใช่แค่เปลี่ยนชื่อบัญชี
+      assert.ok(state.purges.includes(`healthProfile:${USER_ID}`), 'ต้องลบโปรไฟล์สุขภาพ');
+      assert.ok(state.purges.includes(`healthReading:${USER_ID}`), 'ต้องลบผลวัดสุขภาพ');
+      assert.equal(state.chatActorUpdates.length, 1, 'ต้องย้ายประวัติแชทไปชื่อนิรนัย');
+      assert.equal(state.chatActorUpdates[0].where.actor, 'owner');
+      assert.equal(state.chatActorUpdates[0].data.actor, patch.username);
     });
   });
 });

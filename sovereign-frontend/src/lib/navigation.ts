@@ -82,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'common.nav.group.farm',
     items: [
       { href: '/farm', label: 'แปลงเกษตร', labelKey: 'common.nav.farm', icon: 'farm', keywords: 'ฟาร์ม แปลง ดิน พืช เกษตร ปลูก เก็บเกี่ยว' },
+      { href: '/farm-executive', label: 'ภาพรวมฟาร์ม (ผู้บริหาร)', labelKey: 'common.nav.farmExecutive', icon: 'dashboard', keywords: 'ภาพรวม ฟาร์ม ผู้บริหาร kpi ความเสี่ยง แจ้งเตือน วัคซีน หยุดยา ไซโล thi' },
       { href: '/trace', label: 'ตามรอยผลผลิต', labelKey: 'common.nav.trace', icon: 'search', keywords: 'ตามรอย trace lot ล็อต ผลผลิต qr สแกน ที่มา ต้นทาง traceability วิจัย ข้าว พันธุ์' },
       { href: '/livestock', label: 'ปศุสัตว์', labelKey: 'common.nav.livestock', icon: 'farm', keywords: 'ปศุสัตว์ เล้า คอก ไก่ สุกร โค เป็ด ฟาร์มปศุสัตว์' },
       { href: '/inventory', label: 'เสบียง & ทรัพยากร', labelKey: 'common.nav.inventory', icon: 'inventory', keywords: 'เสบียง คลัง สต็อก ของใช้ น้ำ อาหาร เมล็ด ยา เครื่องมือ' },

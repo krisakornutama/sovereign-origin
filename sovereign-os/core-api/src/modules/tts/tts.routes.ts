@@ -92,7 +92,8 @@ export function spawnPythonWithFallback(
 
 // ── Piper TTS (คุณภาพเสียงสูงกว่า pyttsx3) — กะ config ผ่าน env ──
 // ต้องมี: tools/piper/piper.exe (แตกจาก piper.zip) + ไฟล์เสียงภาษาไทย .onnx
-// (โหลดจาก HuggingFace เช่น th_TH-pipat-medium.onnx → วางใน tools/piper/voices/)
+// (โหลดจาก HuggingFace: th_TH-tsync2-medium.onnx → วางใน tools/piper/voices/
+//  หรือรัน `node tools/fetch-external-assets.mjs --only=piper` ให้ครบทั้งชุด)
 export interface TtsConfig {
   engine: 'piper' | 'pyttsx3';
   piperExe: string;
@@ -106,7 +107,7 @@ export function resolveTtsConfig(env: Record<string, string | undefined> = proce
   const piperExe =
     env.PIPER_EXE || 'E:\\My work\\Project Sovereign Origin\\tools\\piper\\piper.exe';
   const piperVoice =
-    env.PIPER_VOICE || 'E:\\My work\\Project Sovereign Origin\\tools\\piper\\voices\\th_TH-pipat-medium.onnx';
+    env.PIPER_VOICE || 'E:\\My work\\Project Sovereign Origin\\tools\\piper\\voices\\th_TH-tsync2-medium.onnx';
   return {
     engine,
     piperExe,

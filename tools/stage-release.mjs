@@ -35,6 +35,18 @@ const INSTALL = path.resolve(value('install', path.join(ROOT, '..', 'Project Sov
 const version = JSON.parse(fs.readFileSync(path.join(FE, 'package.json'), 'utf8')).version || '0.0.0';
 const OUT = path.resolve(value('out', path.join(ROOT, 'release', `Sovereign-OS-${version}-win-x64`)));
 
+/**
+ * คัดเฉพาะ artifact ของเวอร์ชันที่กำลังจัด — dist-electron มีของรุ่นเก่าค้างอยู่เสมอ
+ * (เคสจริง: จัด release 1.2.0 แล้วมี 1.1.1 ติดไปด้วย ทำให้คนก๊อปหยิบผิดไฟล์)
+ */
+export function selectArtifacts(names, version) {
+  const isVersioned = (name) => name.includes(`-${version}-`);
+  return {
+    portable: names.filter((n) => /^Sovereign-OS-.*-portable\.exe$/i.test(n) && isVersioned(n)),
+    zips: names.filter((n) => /^Sovereign[ -]OS-.*\.zip$/i.test(n) && isVersioned(n)),
+  };
+}
+
 const say = (m = '') => console.log(m);
 const die = (m) => { console.error(`[stage-release] ERROR: ${m}`); process.exit(1); };
 const mb = (n) => `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -56,8 +68,7 @@ if (!fs.existsSync(DIST)) die(`ไม่พบ ${DIST} — รัน "npm run el
 
 // ── 1) เก็บ artifact จาก electron-builder ──────────────────────────────────────
 const all = fs.readdirSync(DIST);
-const portable = all.filter((n) => /^Sovereign-OS-.*-portable\.exe$/i.test(n));
-const zips = all.filter((n) => /^Sovereign[ -]OS-.*\.zip$/i.test(n));
+const { portable, zips } = selectArtifacts(all, version);
 if (!portable.length) {
   die('ไม่พบไฟล์ portable exe ใน dist-electron — ตรวจ target "portable" ใน electron-builder แล้ว build ใหม่');
 }

@@ -292,5 +292,15 @@ export async function anonymizeAccount(input: AnonymizeInput): Promise<Anonymize
     },
   });
 
+  // ── ลบข้อมูลส่วนบุคคลที่ผูกกับบัญชี (PDPA: สิทธิ์ถูกลืม) ──────────────────
+  // anonymize แถว user อย่างเดียวไม่พอ: ข้อมูลสุขภาพและประวัติแชทคือข้อมูล
+  // อ่อนไหวที่สุด และไม่มีใครต้องใช้ต่อหลังเจ้าของขอลบ
+  // สิ่งที่ *ไม่* ลบโดยตั้งใจ: audit log + consent_events (หลักฐานทางกฎหมาย)
+  // — แต่ผูกกับ user id ที่ไม่ระบุตัวตนแล้ว
+  await prisma.healthProfile.deleteMany({ where: { user_id: user.id } });
+  await prisma.healthReading.deleteMany({ where: { user_id: user.id } });
+  // ChatMessage ผูกด้วยชื่อผู้ใช้ (actor) ไม่ใช่ id → ย้ายบทสนทนาไปยังชื่อนิรนาม
+  await prisma.chatMessage.updateMany({ where: { actor: user.username }, data: { actor: username } });
+
   return { ok: true, username, anonymizedAt: now };
 }
