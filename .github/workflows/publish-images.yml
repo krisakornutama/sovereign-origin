@@ -23,6 +23,10 @@ on:
         description: 'ติด tag เพิ่มให้ image (เช่น 1.2.0) — ใช้เติม tag ที่ขาดโดยไม่ต้องสร้าง git tag ใหม่'
         required: false
         default: ''
+      extra_tags:
+        description: 'tag เสริมที่ชี้ไปยัง manifest เดียวกัน คั่นด้วย comma (เช่น 1.2,latest) — ต้องกรอกช่อง tag ด้วย'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -180,3 +184,17 @@ jobs:
         run: |
           image="${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}"
           docker buildx imagetools inspect "$image:${GITHUB_REF_NAME#v}" || docker buildx imagetools inspect "$image:latest"
+
+      # เติม tag เสริม (เช่น 1.2, latest) ให้ชี้ manifest เดียวกับ tag ที่ระบุ — ไม่ต้อง rebuild
+      - name: Alias extra tags
+        if: inputs.extra_tags != '' && inputs.tag != ''
+        env:
+          EXTRA_TAGS: ${{ inputs.extra_tags }}
+          BASE_TAG: ${{ inputs.tag }}
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          for t in $(echo "$EXTRA_TAGS" | tr ',' ' '); do
+            echo "ติด tag $t -> $BASE_TAG"
+            docker buildx imagetools create -t "$IMAGE:$t" "$IMAGE:$BASE_TAG"
+          done
