@@ -50,8 +50,8 @@ beforeEach(() => {
 });
 
 async function withServer(fn: (base: string) => Promise<void>) {
-  const router = require('../src/modules/farm/farm.routes').default;
-  const srv = await createTestServer((app) => app.use('/api/farm', router));
+  const router = require('../src/modules/farm/farm-executive.routes').default;
+  const srv = await createTestServer((app) => app.use('/api/farm/executive', router));
   try {
     await fn(srv.baseUrl);
   } finally {
