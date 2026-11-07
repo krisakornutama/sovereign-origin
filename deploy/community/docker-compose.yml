@@ -11,9 +11,10 @@
 # ซอร์สโค้ด, ข้อมูลทั้งหมดอยู่ใน named volume, ใช้ได้ทั้ง x86_64 และ arm64 (Raspberry Pi)
 #
 # ใช้ image ที่ build เอง (ค่าเริ่มต้น) หรือ image ที่ CI เผยแพร่บน GHCR:
-#   API_IMAGE=ghcr.io/krisakornutama/sovereign-origin/api:v1.2.0
-#   WEB_IMAGE=ghcr.io/krisakornutama/sovereign-origin/web:v1.2.0
+#   API_IMAGE=ghcr.io/krisakornutama/sovereign-origin/api:1.2.0
+#   WEB_IMAGE=ghcr.io/krisakornutama/sovereign-origin/web:1.2.0
 #   docker compose up -d --pull always     # ไม่ต้องใส่ --build
+# หมายเหตุ: tag บน GHCR ไม่มีคำนำหน้า v (git tag v1.2.0 → image tag 1.2.0)
 # ─────────────────────────────────────────────────────────────────────────────
 name: sovereign
 
