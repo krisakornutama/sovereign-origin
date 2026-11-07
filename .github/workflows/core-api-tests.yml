@@ -96,8 +96,8 @@ jobs:
 
   # real-Postgres integration suite (opt-in ด้วย RUN_INTEGRATION=1)
   # ใช้ TimescaleDB เพราะ sensor_telemetry เป็น hypertable + ต้องมี extension จริง
-  # สร้าง schema ด้วย db push (ไม่ใช่ migrate deploy) เพราะ migration chain ในรีโปตาม schema ไม่ทัน
-  # เช่น users.token_version ถูกเพิ่มด้วย db push และไม่เคยถูกบันทึกเป็น migration
+  # สร้าง schema ด้วย migrate deploy จาก baseline ที่ generate จาก schema.prisma โดยตรง
+  # → deterministic ทั้ง dev/CI/prod (เดิมใช้ db push เพราะ migration chain ไม่ตรงกับ schema)
   test-integration:
     runs-on: ubuntu-latest
     defaults:
@@ -105,7 +105,8 @@ jobs:
         working-directory: sovereign-os/core-api
     services:
       timescaledb:
-        image: timescale/timescaledb:latest-pg15
+        # pin เวอร์ชัน: image upstream อัปเดตแล้วอาจเปลี่ยน default config/hypertable behavior
+        image: timescale/timescaledb:2.17.2-pg15
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
@@ -136,10 +137,10 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Push schema to CI Postgres
-        run: npx prisma db push --skip-generate --accept-data-loss
+      - name: Apply migrations to CI Postgres (baseline)
+        run: npx prisma migrate deploy
 
-      # sensor_telemetry ถูกประกาศ @@ignore → db push ไม่สร้างให้ แต่ integration test เขียนลงตารางจริง
+      # sensor_telemetry ถูกประกาศ @@ignore → migration ไม่มีตารางนี้ แต่ integration test เขียนลงตารางจริง
       - name: Create TimescaleDB table that Prisma ignores
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f scripts/ci-timescale-ignored.sql
 

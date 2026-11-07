@@ -18,7 +18,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const MIGRATIONS_DIR = 'sovereign-os/core-api/prisma/migrations';
-const MIGRATION = `${MIGRATIONS_DIR}/20261027120000_idempotency_keys/migration.sql`;
+// migration chain เดิมถูก squash เป็น baseline (20261107190000) — ไฟล์ต้นทางเก็บไว้ที่ migrations_archive
+const ARCHIVE_DIR = 'sovereign-os/core-api/prisma/migrations_archive';
+const MIGRATION = `${ARCHIVE_DIR}/20261027120000_idempotency_keys/migration.sql`;
 const SCHEMA = 'sovereign-os/core-api/prisma/schema.prisma';
 const OWNERS = 'tools/module-owners.json';
 
@@ -137,7 +139,12 @@ describe('idempotency — migration', () => {
       if (!fs.existsSync(file)) return false;
       return /CREATE TABLE "idempotency_keys"/.test(fs.readFileSync(file, 'utf8'));
     });
-    assert.deepEqual(creators, ['20261027120000_idempotency_keys']);
+    // migration ที่ถูก apply จริงต้องมีตัวเดียวที่สร้างตารางนี้ (ของเดิมอยู่ใน archive แล้ว ไม่นับ)
+    assert.equal(
+      creators.length,
+      1,
+      `ต้องมี migration ที่ apply อยู่เพียงตัวเดียวที่สร้าง idempotency_keys (พบ ${creators.join(', ') || 'ไม่มี'})`
+    );
   });
 });
 
