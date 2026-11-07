@@ -132,6 +132,13 @@ npm run build  # tsc ตรวจ type + build dist/
 - External Dead-Man Switch (ESP32-S3 + 4G) — ดู `docs/SERIES_RED_DMS_BLUEPRINT.md`
 - Cold Standby Machine (Postgres replication + Wake-on-LAN)
 
+## 📚 เอกสารและประวัติการพัฒนา
+
+- [`CHANGELOG.md`](CHANGELOG.md) — สรุปสิ่งที่พัฒนา/แก้ในแต่ละเวอร์ชัน (ล่าสุด v1.2.0)
+- [`QUEUE.md`](QUEUE.md) — งานค้างและสถานะ launch ล่าสุด
+- [`docs/FAQ-REDDIT.md`](docs/FAQ-REDDIT.md) — คำตอบสำหรับคอมเมนต์เปิดตัว
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — สถาปัตยกรรมและเส้นแบ่งโมดูล
+
 ## 📄 License และขอบเขต Open-Core
 
 - **Community Edition (โค้ดใน repo นี้):** [AGPL-3.0](LICENSE) — ใช้/แก้/ต่อยอดได้ ถ้าให้บริการแบบเครือข่ายต้องเปิดโค้ดที่แก้ด้วย

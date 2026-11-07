@@ -3,6 +3,10 @@
 ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
 งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
+> อัปเดตล่าสุด 2026-11-07: ตรวจ image manifest ครบ 6 tag ผ่านทั้งหมด (ดึงได้โดยไม่ล็อกอิน, amd64+arm64)
+> · branch protection เปิดจริง 6 required checks · topics ครบรวม `agpl` · `npm run verify` ผ่าน 6/6
+> · เหลือแค่เจ้าของ rotate token กับโพสต์ Reddit
+
 ---
 
 ## สถานะภาพรวม (ตรวจแล้ว)
@@ -21,6 +25,7 @@
 | ด่านตรวจ image ก่อนโพสต์ | มีแล้วใน `docs/LAUNCH-REDDIT.md` (หัวข้อ "Verify the published images before posting") |
 | Demo GIF | ฝังใน `README.md` และ `README.en.md` แล้ว (`docs/media/demo.gif`) |
 | Telegram token | ใช้งานได้ (sendMessage → 200) แต่ **ควร rotate** ถ้าเคยหลุดใน log |
+| Quality gate | **ผ่าน 6/6** (2026-11-07, 2.5 นาที) — แก้ module-boundary 6 เส้นที่ค้างหลังแยก Pro + อัปเดตเทสต์ E2E/GHCR ที่อ้าง spec/workflow รุ่นเก่า |
 
 ---
 
@@ -33,8 +38,10 @@
 docker compose -f sovereign-os/infra/docker-compose.yml up -d core-api
 ```
 
-### 2. agent ทำได้ — ตรวจความพร้อมก่อนโพสต์ (รันซ้ำได้ทุกครั้ง)
-รายละเอียดคำสั่งอยู่ใน `docs/LAUNCH-REDDIT.md` หัวข้อ "Verify the published images before posting" สรุปสั้น:
+### 2. ✅ ตรวจ image แล้ว (2026-11-07) — ผ่าน
+ตรวจ manifest แบบไม่ล็อกอินครบ 6 tag: `api`/`web` × `1.2.0`/`1.2`/`latest`
+→ ทุกตัวมี `linux/amd64` + `linux/arm64` และดึงได้โดยไม่ต้องล็อกอิน
+คำสั่งนี้รันซ้ำได้ก่อนโพสต์ทุกครั้ง (รายละเอียดใน `docs/LAUNCH-REDDIT.md`):
 
 ```bash
 # ทุก tag ที่เอกสารอ้างต้องดึงได้แบบไม่ล็อกอิน

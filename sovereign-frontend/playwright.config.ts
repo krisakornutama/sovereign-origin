@@ -26,13 +26,13 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/, timeout: 180_000 },
     {
       name: 'authenticated',
-      testMatch: /pages\.spec\.ts|spa-nav\.spec\.ts|trace-community\.spec\.ts|shop-checkout\.spec\.ts|farm-executive\.spec\.ts/,
+      testMatch: /pages\.spec\.ts|spa-nav\.spec\.ts|farm-executive\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/state.json' },
       dependencies: ['setup'],
     },
     {
       name: 'anonymous',
-      testMatch: /login\.spec\.ts|shop-checkout-anon\.spec\.ts/,
+      testMatch: /login\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],

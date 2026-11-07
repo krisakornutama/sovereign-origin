@@ -11,6 +11,8 @@
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+import { deleteUserHealthData } from './health-readings.service';
+import { anonymizeChatActor } from './ai-chat.service';
 
 /** เวอร์ชันนโยบายความเป็นส่วนตัว — เปลี่ยนเมื่อแก้ข้อความ/วัตถุประสงค์ ต้อง bump */
 export const CONSENT_POLICY_VERSION = '2026-11-03';
@@ -297,10 +299,9 @@ export async function anonymizeAccount(input: AnonymizeInput): Promise<Anonymize
   // อ่อนไหวที่สุด และไม่มีใครต้องใช้ต่อหลังเจ้าของขอลบ
   // สิ่งที่ *ไม่* ลบโดยตั้งใจ: audit log + consent_events (หลักฐานทางกฎหมาย)
   // — แต่ผูกกับ user id ที่ไม่ระบุตัวตนแล้ว
-  await prisma.healthProfile.deleteMany({ where: { user_id: user.id } });
-  await prisma.healthReading.deleteMany({ where: { user_id: user.id } });
+  await deleteUserHealthData(user.id);
   // ChatMessage ผูกด้วยชื่อผู้ใช้ (actor) ไม่ใช่ id → ย้ายบทสนทนาไปยังชื่อนิรนาม
-  await prisma.chatMessage.updateMany({ where: { actor: user.username }, data: { actor: username } });
+  await anonymizeChatActor(user.username, username);
 
   return { ok: true, username, anonymizedAt: now };
 }

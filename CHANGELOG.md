@@ -6,17 +6,40 @@
 
 ---
 
-## [v1.2.0] — กำลังพัฒนา (unreleased)
+## [v1.2.0] — 2026-11-06 (released)
 
-รวมทุกสิ่งที่ commit หลังจาก `v1.1.1` จนถึงปัจจุบัน (HEAD = `5f4277d`) — ครอบทั้ง frontend, backend, deploy, ops, test และเอกสาร
+**Community Edition (CE) เปิดตัวเป็น repo สาธารณะ** — repo นี้เหลือ CE เพียว ไม่มีโมดูล Pro
+(Pro ย้ายไป private repo แล้ว ดู [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md))
+ตัวเลข ณ วันปล่อย: backend 1,823 tests (ข้าม 1) · tooling/CI 1,287 tests (ข้าม 6) · `tsc` + `next build` สะอาด
+
+### 🚀 งานเปิดตัว Community Edition (4–7 พ.ย. 2026)
+
+- **แยก Pro ออกจาก CE (Clean Hard Cut)** — ลบโมดูล/หน้า/เทสต์ Pro 90+ ไฟล์, ทำ Pro registry + 404 ที่บอกชื่อโมดูล, ขยาย open-core boundary gate ให้ตรวจ frontend ด้วย
+- **ชุดติดตั้ง CE คำสั่งเดียว** — `deploy/community/docker-compose.yml` (db · mqtt · migrate · api · web), named volume ล้วน, `.env.example` บังคับ 3 secrets, พิสูจน์ติดตั้งใหม่บนฐานข้อมูลว่างแล้ว
+- **สมัครด้วยรหัสเชิญ (ไม่มี SMTP)** — CLI/API/UI, เก็บ SHA-256, ใช้ครั้งเดียว/มีวันหมดอายุ/เพิกถอนได้ + การ์ดจัดการในหน้าผู้ใช้
+- **Alert fanout 3 ช่อง** — Telegram ยืนยัน end-to-end; Discord + LINE ผ่าน stub (รูปแบบ/headers/plain-text/mention hardening)
+- **เดโม 15 วินาที 11 ฉาก** — `docs/media/demo.gif` + ภาพนิ่ง `docs/media/screens/` ฝังใน README ไทย/อังกฤษ
+- **README ภาษาอังกฤษ** — `README.en.md` + สลับภาษาที่หัว README, แก้ตัวเลขเทสต์/โมดูลให้ตรงจริง, เติมขั้นตั้ง 3 secrets
+- **GHCR multi-arch images** — workflow `publish-images.yml` แยก build amd64 (ubuntu) + arm64 (ubuntu-24.04-arm) แล้ว merge manifest; image `api`/`web` เป็น public, tags `1.2.0`, `1.2`, `latest` (+ `main`, `sha-*`)
+- **คู่มือ/FAQ ภาษาอังกฤษ** — `deploy/community/README.en.md`, `docs/FAQ-REDDIT.md`, ด่านตรวจ image ก่อนโพสต์ใน `docs/LAUNCH-REDDIT.md`
+- **ความปลอดภัย/คุณภาพรอบปล่อย** — ปิด Dependabot advisories (high 5 + moderate ที่เหลือ), mount farm executive API ให้ตรงกับหน้าที่เรียก, เทสต์ route/E2E ของ farm executive
+- **UI CE** — ตัดเมนู Pro ออกจาก `navigation.ts` (Ecosystem/ร้านอาหาร/ธุรกิจ/ฟลีท/การเงิน) และ QuickDeck ชี้หน้า CE จริง
+
+> หมายเหตุ: หลัง tag `v1.2.0` (6 พ.ย.) มี commit วันที่ 7 พ.ย. ปรับ CI + ปิด advisories + farm executive
+> — image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้ จะรวมใน release ถัดไป
+
+### 📚 ประวัติการพัฒนาก่อนแยก Pro (ถึง 2026-11-05)
+
+รายการด้านล่างคือสิ่งที่พัฒนาตั้งแต่ `v1.1.1` จนถึงวันที่แยก Pro ออก —
+บางรายการเป็นงาน Pro ที่ **ย้ายออกจาก repo นี้แล้ว** เก็บไว้เพื่อเป็นประวัติ ไม่ใช่สิ่งที่ CE ใช้งานได้ในตอนนี้
 
 ### 🚀 ฟีเจอร์ใหญ่ที่เพิ่มเข้ามา
 
 **ระบบติดตั้งและการเผยแพร่ (Deploy / Packaging)**
-- **CE1 — ชุดติดตั้ง Community Edition แบบ Docker Compose คำสั่งเดียว** (`deploy/community/`): db · mqtt · migrate · api · web ใช้ named volume ล้วน ไม่ bind mount ซอร์ส รันบนเครื่องใดก็ได้ (x86_64/arm64) `migrate` รัน `prisma migrate deploy + seed` แล้ว `api` จึงเริ่ม
+- **CE1 — ชุดติดตั้ง Community Edition แบบ Docker Compose คำสั่งเดียว** (`deploy/community/`): db · mqtt · migrate · api · web ใช้ named volume ล้วน ไม่ bind mount ซอร์ส รันบนเครื่องใดก็ได้ (x86_64/arm64) `migrate` รัน `prisma db push + seed` แล้ว `api` จึงเริ่ม
 - แก้บัคจริง: `Dockerfile.prod` ของ frontend ใช้ `node:18` แต่ Next 16 บังคับ ≥ 20.9 → เปลี่ยนเป็น `node:22-alpine`
 - `next.config.js`: เติม origin จาก `NEXT_PUBLIC_API_URL` เข้า CSP `connect-src` (http + ws) กัน CSP บล็อกเมื่อเปิดจากเครื่องอื่น
-- เทสต์ `tools/test/community-stack.test.mjs` 11/11 (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
+- เทสต์ `tools/test/community-stack.test.mjs` 13/13 (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
 - `INSTALL-CHECK` doctor พร้อม `SUPPORT.txt` (ซ่อนข้อมูล敏感) สำหรับตรวจก่อน/หลังติดตั้ง
 - ตัวติดตั้งเครื่องใหม่แบบไฟล์เดียว 4.7 KB + ชุดติดตั้งเครื่องลูก (agent-pack) 36 MB
 
@@ -139,5 +162,6 @@
 ---
 
 ### หมายเหตุ
-- ยังไม่ได้ push ไป GitHub (main นำ `origin/main` อยู่ 12 commit) รอเจ้าของอนุญาตก่อน push
-- งานใดที่ระบุ "รอเจ้าของอนุมัติ" (เช่น การลบข้อมูลจริงตาม retention, push GitHub, เปิด /shop สู่อินเทอร์เน็ต) ยังไม่ได้ดำเนินการ
+- v1.2.0 ถูก push ขึ้น `origin/main` และปล่อย Release แล้ว (2026-11-06) · image `api`/`web` ขึ้น GHCR เป็น public แล้ว
+- สถานะงานค้างล่าสุดดูที่ [`QUEUE.md`](QUEUE.md) · snapshot สภาพระบบดูที่ [`STATUS.md`](STATUS.md)
+- CHANGELOG นี้เก็บประวัติก่อนแยก Pro ไว้ด้วย; งาน Pro ใหม่ไม่ได้อยู่ใน repo นี้
