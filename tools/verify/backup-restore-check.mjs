@@ -5,7 +5,8 @@
 
    ทำอะไร: กู้ dump ล่าสุดเข้า "ฐานข้อมูลชั่วคราว" แล้วเทียบกับฐานข้อมูลจริงทีละตาราง
      · ตารางครบไหม (restore ต้องได้ทุกตาราง)
-     · แถวหายไหม (restore มีแถวมากกว่าจริง = ข้อมูลเพี้ยน)
+     · จำนวนแถวต่างกันเท่าไร — ต่างสองทางเป็นปกติ เพราะ dump เป็น snapshot
+       (dump เก่ากว่า = จริงมีมากกว่า · ลบแถวหลังถ่าย backup = dump มีมากกว่า)
      · migration head ตรงกันไหม
    แล้วลบฐานข้อมูลชั่วคราวทิ้งเสมอ — ไม่แตะฐานข้อมูลจริงเด็ดขาด (อ่านอย่างเดียว)
 
@@ -19,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { notify } from './telegram-creds.mjs';
+import { compareTableCounts } from './restore-compare.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // worktree (Freebuff) ไม่มีโฟลเดอร์ backups — ให้หาโฟลเดอร์หลักของ MAIN แทน (เหมือน frontend-watchdog)
@@ -123,12 +125,11 @@ try {
     rec.liveTables = live.size;
     rec.restoredTables = restored.size;
     if (restored.size === 0) problems.push('กู้แล้วไม่มีตารางเลย');
-    const missing = [...live.keys()].filter((t) => !restored.has(t));
-    if (missing.length) problems.push(`ตารางที่หายไป ${missing.length} ตัว: ${missing.slice(0, 5).join(', ')}`);
-    const more = [...restored.entries()].filter(([t, n]) => live.has(t) && n > live.get(t)).map(([t, n]) => `${t}(${n}>${live.get(t)})`);
-    if (more.length) problems.push(`ตารางที่ข้อมูลมากกว่าฐานจริง = เพี้ยน: ${more.slice(0, 5).join(', ')}`);
-    const fewer = [...restored.entries()].filter(([t, n]) => live.has(t) && n < live.get(t));
-    rec.tablesWithNewerLiveRows = fewer.length; // ปกติ — dump เก่ากว่าเวลาถ่าย
+    const diff = compareTableCounts(live, restored);
+    if (diff.missing.length) problems.push(`ตารางที่หายไป ${diff.missing.length} ตัว: ${diff.missing.slice(0, 5).join(', ')}`);
+    // จำนวนแถวต่างกันสองทางเป็นปกติของ dump ที่เป็น snapshot — เก็บไว้ดูtrend ไม่ใช่ปัญหา
+    rec.tablesWithNewerLiveRows = diff.moreInLive.length;   // dump เก่ากว่าเวลาถ่าย
+    rec.tablesWithFewerLiveRows = diff.moreInRestore.length; // มีการลบแถวหลังถ่าย backup
     rec.rowSamples = ['users', 'products', 'business_orders', 'partners', 'feedback_notes']
       .filter((t) => restored.has(t))
       .map((t) => ({ t, live: live.get(t), restored: restored.get(t) }));
@@ -137,7 +138,7 @@ try {
     rec.migrationRestored = migrationHead(TMP_DB);
     if (rec.migrationLive !== rec.migrationRestored) problems.push(`migration head ไม่ตรง: จริง ${rec.migrationLive} · กู้ ${rec.migrationRestored}`);
 
-    log(`backup-restore-check: ตาราง จริง ${rec.liveTables} · กู้ ${rec.restoredTables} · ที่มีข้อมูลใหม่กว่าใน dump ${rec.tablesWithNewerLiveRows} ตาราง (ปกติ)`);
+    log(`backup-restore-check: ตาราง จริง ${rec.liveTables} · กู้ ${rec.restoredTables} · ข้อมูลใหม่กว่าใน dump ${rec.tablesWithNewerLiveRows} ตาราง (ปกติ) · dump มีมากกว่าจริง ${rec.tablesWithFewerLiveRows} ตาราง (ปกติ — ลบแถวหลังถ่าย backup)`);
     for (const s of rec.rowSamples) log(`  · ${s.t}: จริง ${s.live} / กู้ ${s.restored}`);
   }
 } catch (e) {

@@ -58,6 +58,26 @@ done; done
 
 ---
 
+## Nightly / Task Scheduler — ตรวจแล้ว 2026-11-07
+
+### แก้แล้ว — tools unit tests (ต้นเหตุที่ Quality Gate แดง)
+- `tools/test/e2e-auth-guard.test.mjs` ยังอ้าง `pos-flow.spec.ts` ที่ถูกลบตอนแยก Pro → อัปเดตเป็น `pages` / `spa-nav` / `farm-executive`
+- `tools/test/community-stack.test.mjs` อ้าง workflow รุ่นเก่า (`linux/amd64,linux/arm64` บรรทัดเดียว) แต่ workflow แยก build ต่อ arch → เปลี่ยนไปตรวจ `platform:` ใน matrix + `imagetools create`
+- `tools/test/batch-codepage.test.mjs` ฟ้อง `tools/install/uninstall.cmd` เป็น LF (ไฟล์นี้ไม่ถูก track — มีผลเฉพาะเครื่องนี้) → แปลงเป็น CRLF แล้ว
+- ผล: `npm run verify` ผ่าน 6/6 (2026-11-07)
+
+### แก้แล้ว — backup restore-check (false positive)
+- nightly 2026-11-07 ฟ้อง `system_settings(12>10)` = "ข้อมูลเพี้ยน" แต่สาเหตุจริงคือ **ลบ DB override ของ Telegram หลังถ่าย backup** (`telegram.botToken` / `telegram.chatId`) ซึ่งเป็นการทำงานปกติ
+- แยกตรรกะเทียบเป็น `tools/verify/restore-compare.mjs` — แถวต่างสองทางถือปกติ (dump เป็น snapshot), ยังจับของจริง (ตารางหาย, migration head ไม่ตรง, restore error) เหมือนเดิม
+- เทสต์ `tools/test/backup-restore-compare.test.mjs` 5/5 · รัน restore จริงซ้ำผ่าน ("กู้คืนได้จริง")
+
+### ยังค้าง — เจ้าของตัดสินใจ
+- Task **`ShipShop3000`** (23:59 ทุกวัน) ยัง fail `0x1` — เป็น task เก่าที่รัน `start-sovereign.bat` (เปิด browser เอง และอาจ build ทับ `.next` ที่ prod ใช้อยู่) แนะนำ disable:
+  `schtasks /Change /TN "ShipShop3000" /DISABLE`
+- Task **`Sovereign Nightly Verify`** (02:00) result `0x1` มาจาก tools test ข้างบน → รอบถัดไปควรเขียวเอง ยังไม่ต้องแก้โค้ด
+
+---
+
 ## หมายเหตุการทำงาน (สำคัญสำหรับ agent รอบถัดไป)
 
 - **`gh` CLI ใช้ไม่ได้ (token หมดอายุ) แต่ GitHub API ใช้ได้** — ขอ token จาก Git Credential Manager ได้เสมอ:
