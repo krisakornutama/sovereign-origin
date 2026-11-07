@@ -12,6 +12,8 @@ CONTEXTS=(
   "Core API tests / test (ubuntu-latest)"
   "Core API tests / test (windows-latest)"
   "Core API tests / test-db"
+  # เพิ่ม 7 พ.ย. 69: arch-gate เป็นที่รันของ gate ชุดใหม่ (no-db-push + ci-ddl-sync)
+  "Architecture Gate / arch-gate"
 )
 
 # 1) สิทธิ์: repo ส่วนตัวฟรีจะ 403 ที่นี่ — สคริปต์บอกทางออกตรง ๆ ไม่เดา

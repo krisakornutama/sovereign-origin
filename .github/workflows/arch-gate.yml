@@ -7,17 +7,17 @@ name: Architecture Gate
 # หมายเหตุ: env-truth ข้ามบน CI โดยธรรมชาติ (ไม่มี .env) — arch-gate จัดการ "ไม่มี .env = ข้าม" ให้แล้ว
 
 on:
+  # ไม่ใส่ paths filter ตอน PR โดยเจตนา: context นี้เป็น required check — ถ้ากรอง paths
+  # เช็คจะ "หาย" บน PR ที่ไม่แตะไฟล์ที่กรอง แล้ว merge ไม่ได้เลย
   pull_request:
+  push:
+    branches: [main]
     paths:
       - 'sovereign-os/core-api/**'
       - 'sovereign-frontend/**'
       - 'tools/**'
       - '.github/workflows/arch-gate.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'tools/**'
-      - '.github/workflows/arch-gate.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -56,3 +56,8 @@ jobs:
 
       - name: ตรวจ fingerprint parity (tools ↔ runtime)
         run: node tools/check-parity.mjs
+
+      # gate ชุดใหม่ (7 พ.ย. 69): no-db-push (ห้ามสแกน DB จริง) + ci-ddl-sync (DDL ใน CI ต้องตรง schema)
+      # เดิมรันได้แค่ผ่าน tools/verify.mjs บนเครื่อง → CI ไม่เคยบังคับ ตอนนี้เป็น required check แล้ว
+      - name: ตรวจ gate ชุดใหม่ (node --test tools/test/**)
+        run: npm run test:tools

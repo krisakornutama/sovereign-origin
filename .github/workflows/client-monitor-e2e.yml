@@ -27,6 +27,8 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    # เคสจริง 7 พ.ย. 69: run ค้างเงียบ 28 นาที (step e2e ไม่จบ) — ใส่เพดานไว้ให้ job ล้มแทนการค้าง
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
 

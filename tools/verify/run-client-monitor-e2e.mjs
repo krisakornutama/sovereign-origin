@@ -19,6 +19,14 @@ const LINE_IOS_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Appl
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const WEIRD_UA = 'Gibberish/1.0 (###|||) weird-agent';
 
+// watchdog แข็ง: ถ้ามีจุดใดค้าง ต้องล้มพร้อม exit 1 ไม่ใช่ปล่อย job ค้างจนครบ 6 ชม.
+const WATCHDOG_MS = 180_000;
+const watchdog = setTimeout(() => {
+  console.error(`  ❌ [watchdog] E2E ค้างเกิน ${WATCHDOG_MS / 1000} วิ — ยอมล้มเพื่อให้ CI บอกเราได้`);
+  process.exit(1);
+}, WATCHDOG_MS);
+watchdog.unref();
+
 let step = 0;
 function ok(name, detail = '') { console.log(`  ✅ [${++step}] ${name}${detail ? ` — ${detail}` : ''}`); }
 function fail(name, detail = '') { console.error(`  ❌ [${++step}] FAIL: ${name}${detail ? ` — ${detail}` : ''}`); }
@@ -29,8 +37,9 @@ function assert(cond, name, detail = '') {
   throw new Error(`ASSERT-FAIL: ${name}`);
 }
 
+// ทุก request ต้องมีเพดานเวลา — เคสจริง 7 พ.ย. 69: CI ค้างเงียบ 28 นาทีเพราะ fetch ไม่มี timeout
 async function fetchJson(url, opts = {}) {
-  const res = await fetch(url, opts);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000), ...opts });
   const text = await res.text().catch(() => '');
   let body = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
@@ -198,9 +207,13 @@ try {
   console.error('harness log (tail):', harnessLog.slice(-1200));
   process.exitCode = 1;
 } finally {
-  harness.kill();
+  // SIGKILL: SIGTERM อาจถูก handler ของ harness กลืน → child ค้างถือ pipe ต่อ → node ออกไม่ได้
+  harness.kill('SIGKILL');
   try { execFileSync('docker', ['rm', '-f', PG_NAME], { stdio: 'ignore' }); } catch {}
+  clearTimeout(watchdog);
 }
 
 if (process.exitCode === 1) process.exit(1);
 console.log('\n✅ E2E client-monitor ผ่านครบ — ท่อจริงเดินสมบูรณ์');
+// เคสจริง 7 พ.ย. 69: งานผ่านครบแต่ step บน CI ค้างค้าง — ปิด process เองให้ชัดเจน
+process.exit(0);
