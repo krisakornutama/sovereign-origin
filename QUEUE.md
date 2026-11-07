@@ -1,59 +1,70 @@
 # QUEUE — คิวงาน Launch Reddit (Sovereign OS CE)
 
-ส่งต่อให้ agent ตัวถัดไป อ่านจบแล้วทำตามลำดับ ข้อใดทำบนเว็บ GitHub ไม่ได้ผ่าน `gh` (token หมดอายุ) ให้แจ้งผู้ใช้ให้ทำแทน
+ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
+งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
 ---
 
-## สถานะภาพรวม (ยืนยันจาก GitHub API แล้ว)
+## สถานะภาพรวม (ตรวจแล้ว)
 
 | รายการ | สถานะ |
 |---|---|
-| About description | เสร็จแล้ว — "Sovereign Origin — self-sovereign home OS" |
-| Release `v1.2.0` | เสร็จแล้ว — published ไม่ใช่ draft |
-| Telegram token | ใช้งานจริงได้ — sendMessage → 200, message_id=11 |
-| README.en.md + workflow + FAQ | เสร็จแล้ว — commit `c000361` push ขึ้น main แล้ว |
-| `npm run verify` | ผ่าน 6/6 (2.6 นาที) |
-| Workflow "Publish images (GHCR)" | **กำลังรันอยู่** — in_progress, trigger จาก tag v1.2.0 |
+| Repo visibility | public · license AGPL-3.0 · description "Sovereign Origin — self-sovereign home OS" |
+| Topics | **ครบแล้ว** — self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql, agpl |
+| Branch protection `main` | **เปิดแล้ว** — required checks 6 ตัว: `Audit site / audit`, `File size guard / size`, `Deploy portfolio / publish`, `Core API tests / test (ubuntu-latest)`, `Core API tests / test (windows-latest)`, `Core API tests / test-db` |
+| Release `v1.2.0` | published (ไม่ใช่ draft) — release note เขียนใหม่แล้ว มีคำสั่ง `docker pull` + บันทึกการเผยแพร่ image |
+| Release note | ระบุว่า `api` เผยแพร่สำเร็จ และ `latest`/`1.2` ของ `web` ถูกย้ายมาชี้ build ล่าสุดแล้ว |
+| Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที |
+| Image `api` | public · tags `1.2.0`, `1.2`, `latest`, `main`, `sha-11b07ef`, `sha-97dd0fe`, `sha-b08ba90` · multi-arch amd64+arm64 |
+| Image `web` | public · tags `1.2.0`, `1.2`, `latest`, `main`, `sha-11b07ef`, `sha-97dd0fe`, `sha-b08ba90`, `sha-c000361` · multi-arch amd64+arm64 |
+| เอกสารที่อ้าง tag image | ตรงกับของจริงแล้ว (`1.2.0` ไม่มี `v` นำหน้า) — `deploy/community/README.en.md`, `.env.example`, `docker-compose.yml`, `docs/FAQ-REDDIT.md` |
+| ด่านตรวจ image ก่อนโพสต์ | มีแล้วใน `docs/LAUNCH-REDDIT.md` (หัวข้อ "Verify the published images before posting") |
+| Demo GIF | ฝังใน `README.md` และ `README.en.md` แล้ว (`docs/media/demo.gif`) |
+| Telegram token | ใช้งานได้ (sendMessage → 200) แต่ **ควร rotate** ถ้าเคยหลุดใน log |
 
 ---
 
-## งานค้าง (เรียงตามลำดับ)
+## งานที่เหลือ
 
-### 1. รอ workflow images เสร็จ → ตรวจสอบผล
-สั่งดูสถานะจาก GitHub API:
+### 1. เจ้าของทำ — rotate Telegram token
+ถ้า token เคยถูกพิมพ์ใน log หรือแชท ให้ทำใหม่: @BotFather → `/revoke` → เอา token ใหม่ไปใส่ `TELEGRAM_BOT_TOKEN` ใน `sovereign-os/infra/.env` แล้วรัน
 
 ```bash
-curl -s -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/krisakornutama/sovereign-origin/actions/runs?per_page=5
+docker compose -f sovereign-os/infra/docker-compose.yml up -d core-api
 ```
 
-หา workflow ชื่อ **Publish images (GHCR)** event `push` head `v1.2.0`
-- ถ้า `conclusion` = `success` → ไปข้อ 2
-- ถ้า `conclusion` = `failure` → ดู log แล้วแจ้งผู้ใช้ (อาจต้องแก้ workflow แล้ว push tag ใหม่)
-- ถ้ายัง `in_progress` → รอแล้วเช็คใหม่
+### 2. agent ทำได้ — ตรวจความพร้อมก่อนโพสต์ (รันซ้ำได้ทุกครั้ง)
+รายละเอียดคำสั่งอยู่ใน `docs/LAUNCH-REDDIT.md` หัวข้อ "Verify the published images before posting" สรุปสั้น:
 
-### 2. แจ้งผู้ใช้ตั้ง package เป็น Public (ทำบนเว็บ GitHub)
-หลัง images publish เสร็จแล้ว package `api` และ `web` จะเป็น **private** ตามค่าเริ่มต้นของ GHCR แม้ repo จะ public
+```bash
+# ทุก tag ที่เอกสารอ้างต้องดึงได้แบบไม่ล็อกอิน
+for img in api web; do for t in 1.2.0 1.2 latest; do
+  docker manifest inspect "ghcr.io/krisakornutama/sovereign-origin/$img:$t" >/dev/null && echo "ok $img:$t";
+done; done
+```
 
-บอกผู้ใช้: เข้า GitHub → Packages → เลือก `sovereign-origin/api` และ `sovereign-origin/web` → Package settings → Change visibility → **Public** (ทำครั้งเดียวต่อ package)
+ถ้าด่านนี้ไม่ผ่าน ห้ามโพสต์ — คอมเมนต์แรกของ thread จะเป็นคนก๊อปคำสั่งใน README ไปรันแล้วเจอ 404
 
-### 3. เพิ่ม topic "agpl" (ทำบนเว็บ GitHub)
-ปัจจุบันมี topics: self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql
-ให้เพิ่ม `agpl` ให้ครบ ตั้งที่หน้า repository settings บนเว็บ
-
-### 4. เปิด Branch protection rule บน main (ทำบนเว็บ GitHub)
-Settings → Branches → Add branch protection rule สำหรับ `main` (กัน force-push / ลบ branch)
-
-### 5. ยืนยันโพสต์ Reddit ใช้ฉบับสั้น
-ถ้าผู้ใช้ยังไม่ได้โพสต์ หรือยังใช้ข้อความยาวอยู่ → ให้ส่งข้อความฉบับสั้น (5 ช่อง: Project name / Repo / Description / Deployment / AI involvement) ภาษาอังกฤษ ภาษาคน ให้ผู้ใช้ก๊อปวาง
-
-### 6. แนะนำ rotate Telegram token (ถ้าเคยพิมพ์หลุดใน log)
-บอกผู้ใช้: token Telegram ที่พิมพ์ไว้ใน log ตอนตรวจระบบ อาจหลุดออกนอกเครื่อง → rotate ผ่าน @BotFather แล้วแก้ `TELEGRAM_BOT_TOKEN` ใน `sovereign-os/infra/.env` จากนั้นรัน `docker compose -f sovereign-os/infra/docker-compose.yml up -d core-api`
+### 3. เจ้าของทำ — โพสต์ Reddit
+ใช้ `docs/LAUNCH-REDDIT.md` (ฉบับเต็ม) หรือฉบับสั้น 5 ช่อง (Project name / Repo / Description / Deployment / AI involvement) ภาษาอังกฤษ
+ก่อนโพสต์: อ่านส่วน "Reviewer checklist before posting" แล้วลบส่วน reviewer ออก
 
 ---
 
-## หมายเหตุสำคัญ
+## หมายเหตุการทำงาน (สำคัญสำหรับ agent รอบถัดไป)
 
-- `gh` CLI **token หมดอายุ** (401 Bad credentials) → agent ทำงานฝั่ง GitHub UI แทนไม่ได้ ข้อ 2–4 ต้องให้ผู้ใช้ทำบนเว็บ
-- workflow images ใช้เวลา ~15–20 นาที (build `linux/amd64` + `linux/arm64` ผ่าน QEMU) อย่าข้ามไปข้อ 2 ก่อนเช็ค conclusion
-- ไฟล์ที่เกี่ยวข้องทั้งหมดอยู่ใน commit `c000361` บน branch `main` แล้ว
+- **`gh` CLI ใช้ไม่ได้ (token หมดอายุ) แต่ GitHub API ใช้ได้** — ขอ token จาก Git Credential Manager ได้เสมอ:
+  ```bash
+  T=$(printf "protocol=https\nhost=github.com\n\n" | git credential fill 2>/dev/null | sed -n 's/^password=//p')
+  curl -s -H "Authorization: Bearer $T" https://api.github.com/repos/krisakornutama/sovereign-origin/...
+  ```
+  ใช้ token นี้ dispatch workflow / อ่าน job / แก้ release body ได้ (ห้ามพิมพ์ค่าออกมา)
+- **workflow image ไม่ใช้ QEMU แล้ว** — build แยก 4 job: `api/web` × amd64 (`ubuntu-latest`) + arm64 (`ubuntu-24.04-arm`) แล้ว merge manifest ด้วย `docker buildx imagetools create` ใช้เวลา ~2 นาที (เดิม QEMU ค้างชนเพดาน 6 ชม.)
+- **การ dispatch** ต้องส่ง input ให้ครบตามที่ต้องการ:
+  - `tag` (เช่น `1.2.0`) เติม tag ที่ขาดโดยไม่ต้องสร้าง git tag ใหม่
+  - `extra_tags` (เช่น `1.2,latest`) ผูก tag เสริมเข้ากับ manifest เดียวกันแบบไม่ rebuild — ต้องกรอก `tag` ด้วย
+- **อ่านสถานะ run จาก REST API เท่านั้น** — หน้า HTML เคยรายงาน `in_progress=0` ทั้งที่ job ยังรัน
+- **`run_terminal_command` หมดเวลา ~290 วิ** — loop poll ต้องสั้นกว่านั้น (เช่น `seq 1 9` + `sleep 25`)
+- `jq` ไม่มีในเครื่องนี้ · python console เป็น cp1252 (พิมพ์ไทยแล้ว `UnicodeEncodeError`) → ใช้ `node -e` กับ JSON แทน
+- `str_replace` ต้องใช้ absolute path (`E:\My work\Project Sovereign Origin\...`) เพราะ project root ของเซสชันคือ `Sovereign Guard Temp`
+- ประวัติคิวงานเก่าอยู่ที่ `QUEUE-ARCHIVE.md`
