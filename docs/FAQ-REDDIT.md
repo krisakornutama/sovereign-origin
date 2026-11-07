@@ -22,7 +22,16 @@ The images are built for `linux/amd64` and `linux/arm64` on every `v*` tag, and 
 
 ### Are there prebuilt images?
 
-Yes — the `Publish images (GHCR)` workflow builds both api and web for amd64 + arm64 on every `v*` tag. Set `API_IMAGE` / `WEB_IMAGE` in `.env` to the published tag and run `docker compose up -d --pull always`. Building from source still works and remains the default.
+Yes — the `Publish images (GHCR)` workflow builds both api and web for amd64 + arm64 on every `v*` tag. For release `v1.2.0` the published tags are `1.2.0` (pin this one), `1.2` and `latest`, so set in `.env`:
+
+```env
+API_IMAGE=ghcr.io/krisakornutama/sovereign-origin/api:1.2.0
+WEB_IMAGE=ghcr.io/krisakornutama/sovereign-origin/web:1.2.0
+```
+
+Then run `docker compose up -d --pull always`. Building from source still works and remains the default.
+
+> Image tags drop the leading `v` from the git tag: `v1.2.0` publishes `1.2.0`, not `v1.2.0` (the latter returns 404). `main` and `sha-<commit>` tags also exist; `latest` follows the newest build.
 
 > Note: GHCR packages are private by default. After the first publish, open the package settings and switch visibility to public.
 
