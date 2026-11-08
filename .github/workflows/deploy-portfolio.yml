@@ -27,6 +27,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       # token เดินทางผ่าน env → script ใช้ http.extraheader (Basic auth แบบ actions/checkout)
       # ไม่ฝังใน URL จึงไม่มีทางโผล่ใน log/error ของ git หรือ remote.origin.url (redact กันพลาดอีกชั้นใน script)
