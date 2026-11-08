@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readConfig as readTelegramAlertConfig } from '../machine-alert.config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const INFRA_ENV = path.join(ROOT, 'sovereign-os', 'infra', '.env');
@@ -80,8 +81,11 @@ async function sendTelegram(text, creds, opts = {}) {
   } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
 }
 
-/** แจ้งเตือน — ไม่มี creds = คืน { ok:false, error } อธิบาย (ผู้เรียก report ต่อได้) */
+/** แจ้งเตือน — ไม่มี creds = คืน { ok:false, error } อธิบาย (ผู้เรียก report ต่อได้)
+ *  · respect กติกาเจ้าของ 12/10/69: alert-settings.json ตั้ง enabled:false = "ยังตรวจอยู่ แต่ไม่ส่ง"
+ *    → คืน { ok:true, status:'skipped_by_config' } ให้ผู้เรียกตัดสินเป็น "ข้ามเพราะตั้งใจ" ไม่ใช่ความล้ม (1/11/2569) */
 export async function notify(text, creds = readTelegramCreds(), opts = {}) {
+  if (readTelegramAlertConfig().enabled === false) return { ok: true, status: 'skipped_by_config' };
   if (!creds.token || !creds.chatId) return { ok: false, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env)' };
   return sendTelegram(text, creds, opts);
 }

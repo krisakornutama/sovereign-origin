@@ -18,9 +18,13 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { notify } from './telegram-creds.mjs';
 import { compareTableCounts } from './restore-compare.mjs';
+
+// main-guard: เทสต์ import ไฟล์นี้เพื่อจับ headVerdict เปเปอร์เท่านั้น — ไม่ควรรัน docker จริง
+// (เจอจริง 8/11/2569: import หนึ่งครั้ง = กู้ dump 29 วิ และกิน docker exec 8 ต่อเครื่อง)
+const INVOKED_DIRECTLY = pathToFileURL(process.argv[1] ?? '').href === import.meta.url;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // worktree (Freebuff) ไม่มีโฟลเดอร์ backups — ให้หาโฟลเดอร์หลักของ MAIN แทน (เหมือน frontend-watchdog)
@@ -79,8 +83,27 @@ function migrationHead(db) {
   }
 }
 
-const problems = [];
-const rec = { at: new Date().toISOString(), container: CONT, ok: false, problems };
+/** ตัดสิน migration head จริง vs กู้ (ตอนแก้: 1/11/2569)
+ *  · จริงสูงกว่ากู้ = ปกติของ snapshot: dump ถูกถ่ายก่อน migration ใหม่ถูก apply (จริงเดินหน้าต่อ) — ไม่ใช่ความผิดของ backup
+ *  · ตรงกัน = สมบูรณ์
+ *  · กู้สูงกว่าจริง = ผิดปกติจริง: กู้กลับแล้วมี migration ที่ live ไม่มี (มีการลบ migration ออกจาก live) — ต้องตรวจ
+ *  คืน null = ไม่มีปัญหา / ข้อความปัญหา = ปัญหาที่ต้องตัดสินผ่าน --strict */
+export { headVerdict };
+function headVerdict(live, restored) {
+  if (!live || !restored) return null; // อ่านไม่ได้ = ไม่เอามาทริคทริป — ให้การตรวจอื่นจับแทน
+  if (live === restored) return null;
+  // เทียบด้วย sort ตามชื่อ (ชื่อ migration มีเวลานำหน้าเสมอ — YYYYMMDDHHMMSS_x) = ให้เห็นว่าอันไหน "ลำดับตามจริง"
+  if (live > restored && restored.startsWith(live.slice(0, 8))) {
+    // จริงใหม่กว่าในวันเดียวกัน — dump ถ่ายก่อน apply รอบหลัง = ปกติของ snapshot
+    return null;
+  }
+  if (live > restored) return null; // dump ถ่ายย้อนรอบก่อน (คืนก่อน) — เดินหน้าหลังถ่าย = ปกติ
+  return `migration head กู้สูงกว่าจริง: กู้ ${restored} > จริง ${live} — จริงเดินถอยหลัง (มีการลบ migration) — ตรวจที่ prisma/migrations`;
+}
+
+if (INVOKED_DIRECTLY) {
+  const problems = [];
+  const rec = { at: new Date().toISOString(), container: CONT, ok: false, problems };
 
 function cleanup() {
   try { docker(['exec', CONT, 'psql', '-U', PG_USER, '-d', 'postgres', '-q', '-c', `DROP DATABASE IF EXISTS ${TMP_DB};`]); } catch { /* soft */ }
@@ -136,7 +159,8 @@ try {
 
     rec.migrationLive = migrationHead(LIVE_DB);
     rec.migrationRestored = migrationHead(TMP_DB);
-    if (rec.migrationLive !== rec.migrationRestored) problems.push(`migration head ไม่ตรง: จริง ${rec.migrationLive} · กู้ ${rec.migrationRestored}`);
+    const headProblem = headVerdict(rec.migrationLive, rec.migrationRestored);
+    if (headProblem) problems.push(headProblem);
 
     log(`backup-restore-check: ตาราง จริง ${rec.liveTables} · กู้ ${rec.restoredTables} · ข้อมูลใหม่กว่าใน dump ${rec.tablesWithNewerLiveRows} ตาราง (ปกติ) · dump มีมากกว่าจริง ${rec.tablesWithFewerLiveRows} ตาราง (ปกติ — ลบแถวหลังถ่าย backup)`);
     for (const s of rec.rowSamples) log(`  · ${s.t}: จริง ${s.live} / กู้ ${s.restored}`);
@@ -154,13 +178,14 @@ try {
   fs.writeFileSync(OUT_FILE, JSON.stringify(rec, null, 2) + '\n');
 } catch { /* soft */ }
 log(`backup-restore-check: ${rec.ok ? 'ผ่าน — backup กู้คืนได้จริง' : `มีปัญหา ${problems.length} จุด`}`);
-if (!rec.ok) {
+  if (!rec.ok) {
   const text = [
     '🚨 <b>Backup กู้คืนไม่ได้</b> — ต้องแก้ก่อนเชื่อถือระบบสำรอง',
     ...problems.slice(0, 10).map((p) => `• ${p}`),
     `<code>${new Date().toLocaleString('th-TH')}</code>`,
   ].join('\n');
   if (TEST) log(`[dry] ${text.replace(/<[^>]+>/g, '')}`);
-  else notify(text).then((r) => log(r.ok ? 'แจ้ง Telegram แล้ว' : `ส่ง TG ไม่สำเร็จ: ${r.error}`)).catch(() => {});
+  else notify(text).then((r) => log(r.ok ? (r.status === 'skipped_by_config' ? 'แจ้ง Telegram ถูกข้าม (config ปิด)' : 'แจ้ง Telegram แล้ว') : `ส่ง TG ไม่สำเร็จ: ${r.error}`)).catch(() => {});
 }
-process.exitCode = STRICT && !rec.ok ? 1 : 0;
+  process.exitCode = STRICT && !rec.ok ? 1 : 0;
+}
