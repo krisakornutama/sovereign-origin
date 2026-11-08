@@ -152,7 +152,14 @@ async function withServer(handler, fn) {
   const srv = http.createServer(handler);
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${srv.address().port}`;
-  try { return await fn(base); } finally { await new Promise((r) => srv.close(r)); }
+  try {
+    return await fn(base);
+  } finally {
+    // Node ≥19 เปิด keep-alive ใน global agent เป็นค่าเริ่มต้น → socket ค้างอยู่ → close() รอตลอดกาล
+    // (บั๊กจริงบน CI Linux: ไฟล์นี้ค้าง 60 วิ/ไม่จบทั้งที่เทสต์รันครบ — ในเครื่อง Windows ปิดเองเพราะ RST)
+    srv.closeAllConnections?.();
+    await new Promise((r) => srv.close(r));
+  }
 }
 
 // ═════════════════════════════════════════════════════════════
