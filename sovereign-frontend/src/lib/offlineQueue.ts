@@ -8,9 +8,21 @@
 
 import { useAuthStore } from '../stores/useAuthStore';
 import { ownQueuedActions, stampUserId, type QueueUserId } from './offline/queue-namespace';
+import {
+  QUEUE_MAX_AGE_MS,
+  buildAuditRecord,
+  recordAuditThenRemove,
+  splitByAge,
+  trimIds,
+  type AuditStore,
+  type RetentionAuditRecord,
+} from './offline/queue-retention';
 
 const DB_NAME = 'sovereign-offline';
 const STORE = 'actions';
+// v2: เพิ่ม store 'audit' — การเพิ่ม store ใหม่ตอน upgrade ไม่แตะข้อมูล store เดิม
+const AUDIT_STORE = 'audit';
+const DB_VERSION = 2;
 
 export interface QueuedAction {
   id?: number;
@@ -32,11 +44,14 @@ export function currentQueueUserId(): QueueUserId {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(AUDIT_STORE)) {
+        db.createObjectStore(AUDIT_STORE, { keyPath: 'id', autoIncrement: true });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -79,6 +94,85 @@ async function removeAction(id: number): Promise<void> {
     };
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ── audit store (บันทึกการเก็บกวาดคิว) ──
+/** adapter ของ audit store — put ต้องสำเร็จก่อน sweep จึงจะลบได้ (write-ahead) */
+const auditStore: AuditStore = {
+  async put(record: RetentionAuditRecord): Promise<void> {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(AUDIT_STORE, 'readwrite');
+      tx.objectStore(AUDIT_STORE).add(record);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+    await trimAuditStore();
+  },
+  async list(): Promise<RetentionAuditRecord[]> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(AUDIT_STORE, 'readonly');
+      const req = tx.objectStore(AUDIT_STORE).getAll();
+      req.onsuccess = () => resolve(req.result as RetentionAuditRecord[]);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+  },
+};
+
+/** ตัดบันทึกที่เกินเพดาน (cap ของบันทึกเอง ไม่แตะคิว) */
+async function trimAuditStore(): Promise<void> {
+  const records = await auditStore.list();
+  const stale = trimIds(records);
+  if (stale.length === 0) return;
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(AUDIT_STORE, 'readwrite');
+    for (const id of stale) tx.objectStore(AUDIT_STORE).delete(id);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** บันทึกการเก็บกวาดทั้งหมด (ใหม่ → เก่า) — ใช้แสดงผลในหน้า settings */
+export async function listAudit(): Promise<RetentionAuditRecord[]> {
+  try {
+    return await auditStore.list();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * เก็บกวาดคิวที่เกินอายุ 30 วัน — เขียน audit ก่อนลบเสมอ
+ * ไม่แตะคิวที่ยังไม่เกินอายุ · ไม่ล็อกอินก็เก็บกวาดได้ (ตัดสินจากอายุเท่านั้น ตาม R2)
+ */
+export async function sweepExpiredQueue(now: number = Date.now()): Promise<{ removed: number }> {
+  try {
+    const all = await getAllActions();
+    const { removables } = splitByAge(all, now, QUEUE_MAX_AGE_MS);
+    if (removables.length === 0) return { removed: 0 };
+
+    const removed = await recordAuditThenRemove(
+      removables.map((a) => a.id as number),
+      buildAuditRecord(removables, now),
+      auditStore,
+      removeAction
+    );
+    if (removed > 0) await notify();
+    return { removed };
+  } catch (err) {
+    // เขียนบันทึกล้ม = ไม่ลบ (write-ahead) — การเก็บกวาดล้มต้องไม่ทำให้แอปพัง
+    console.error('[offline] retention sweep failed (nothing removed):', err);
+    return { removed: 0 };
+  }
 }
 
 /** จำนวน action ที่ค้าง — ไม่ส่ง userId = นับทั้งหมด (compat กับ caller เดิม) · ส่ง = เฉพาะเจ้าของนั้น */
@@ -249,6 +343,9 @@ export function initOfflineQueue(): void {
   window.addEventListener('online', () => {
     flushQueue().catch(console.error);
   });
+
+  // บูต: เก็บกวาดคิวที่เกินอายุ (เขียน audit ก่อนลบ · ล้มแล้วไม่ลบอะไร)
+  void sweepExpiredQueue();
 }
 
 /** ส่งคิวทั้งหมดอีกครั้ง — ลบรายการที่สำเร็จ (2xx) */

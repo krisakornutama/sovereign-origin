@@ -2,8 +2,9 @@
 id: queue-retention-sweep
 title: Offline queue retention sweep (ตัดคิวเกิน 30 วัน + audit ก่อนลบ)
 priority: 1
-status: todo
-owner: null
+status: doing
+owner: buffy
+claimed: 2026-11-09T16:26:46.274Z
 created: 2026-11-09
 depends_on: []
 gate: npm run verify

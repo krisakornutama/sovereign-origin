@@ -71,3 +71,4 @@ jobs:
           tools/test/ci-ddl-sync.test.mjs
           tools/test/queue.test.mjs
           tools/test/license-issue.test.mjs
+          tools/test/frontend-queue-retention.test.mjs

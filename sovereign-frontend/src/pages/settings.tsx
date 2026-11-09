@@ -25,6 +25,7 @@ import {
   flushSelected,
   type QueuedAction,
 } from '../lib/offlineQueue';
+import QueueRetentionNote from '../components/system/QueueRetentionNote';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
@@ -189,6 +190,7 @@ export default function SettingsPage() {
     // reload ทุกครั้งที่ badge เปลี่ยน (คิวถูกเพิ่ม/ลบจากที่อื่น)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queuedCount]);
+
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -578,7 +580,6 @@ export default function SettingsPage() {
               {t('settings.pwa.installHint', 'ปุ่มติดตั้งจะโผล่ที่นี่เมื่อเบราว์เซอร์พร้อม — ต้องเปิดผ่าน HTTPS หรือ localhost และเยี่ยมชมอย่างน้อย 1 ครั้ง')}
             </div>
           )}
-
           <div className="flex gap-3 flex-wrap">
             <button onClick={measureCache} className="btn-secondary">
               <Icon name="package" size={14} />
@@ -593,14 +594,13 @@ export default function SettingsPage() {
             </button>
           </div>
         </section>
-
         {/* คิว Offline */}
         <section className="panel panel-cyan p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('settings.queue.title', 'คิว Offline ({n})', { n: queuedItems.length })}</h2>
           <p className="text-xs text-gray-500">
             {t('settings.queue.desc', 'action ที่ค้างไว้ตอนออฟไลน์ (POST/PUT/PATCH/DELETE) — จะ sync อัตโนมัติเมื่อกลับ online หรือเลือกจัดการด้านล่าง')}
           </p>
-
+          <QueueRetentionNote />
           {queuedItems.length === 0 ? (
             <div className="text-gray-500 text-sm text-center py-4">{t('settings.queue.empty', 'ไม่มี action ค้าง — คิวว่าง')}</div>
           ) : (
