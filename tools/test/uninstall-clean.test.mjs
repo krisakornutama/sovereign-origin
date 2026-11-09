@@ -4,6 +4,7 @@
 // จึงรันได้ทั้ง Windows และ Linux โดยไม่ต้องมี Docker/schtasks จริง
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {
   buildComposeDownArgs,
   buildUninstallPlan,
@@ -150,6 +151,40 @@ test('U10: แยก "ไม่มีอะไรให้ถอน" ออก�
   assert.equal(down.tolerateFailure, undefined);
   assert.equal(typeof down.classifyFailure, 'function');
   assert.ok(down.args.includes('--env-file'));
+});
+
+test('U11: รองรับชุดติดตั้งแยก (--compose/--project) ไม่ผูกกับ path ใน repo', () => {
+  const plan = buildUninstallPlan({
+    platform: 'linux',
+    composeFile: '/tmp/probe/docker-compose.yml',
+    hasCompose: true, // ในเทสต์ไม่สร้างไฟล์จริง — ฉีดผลการตรวจเข้าไป
+    projectName: 'sovereign-verify-probe',
+    composeEnvFile: '/tmp/probe/.env',
+    purgeData: true,
+  });
+  const down = composeStep(plan);
+  assert.deepEqual(
+    down.args.slice(0, 7),
+    ['compose', '-p', 'sovereign-verify-probe', '--env-file', '/tmp/probe/.env', '-f', '/tmp/probe/docker-compose.yml'],
+    'ต้องส่ง -p และ --env-file ตามชุดติดตั้งที่ระบุ'
+  );
+  assert.ok(down.args.includes('-v'), 'purge-data ต้องลบ volume ของ project นั้น');
+});
+
+test('U12: purge-backups อิง install root ของ compose ที่ระบุ — ห้ามลบ backups/ ของ repo', () => {
+  const repoPlan = buildUninstallPlan({ platform: 'linux', hasCompose: true, purgeData: true });
+  assert.match(repoPlan.backupsDir, /[\\/]backups$/, 'ชุดมาตรฐาน = <repo>/backups');
+
+  const custom = buildUninstallPlan({
+    platform: 'linux',
+    composeFile: '/tmp/verify-stack/docker-compose.yml',
+    hasCompose: true,
+    purgeData: true,
+  });
+  assert.equal(custom.backupsDir, path.join('/tmp/verify-stack', 'backups'), 'ชุดแยก = backups ใต้โฟลเดอร์ชุดนั้น');
+  assert.notEqual(custom.backupsDir, repoPlan.backupsDir, 'ห้ามชี้ไป backups ของ repo');
+  const step = custom.steps.find((s) => s.id === 'purge-backups');
+  assert.ok(step.args.includes(custom.backupsDir), 'คำสั่งลบต้องชี้ backups ใต้ชุดนั้น');
 });
 
 test('U8: บอกรายการที่ "ไม่ถอน" ครบและตรงกับตัวเลือก', () => {

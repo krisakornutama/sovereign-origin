@@ -48,9 +48,11 @@ export function classifyComposeFailure(output) {
 }
 
 /** อาร์กิวเมนต์ compose down — แยกออกมาเพื่อเทสลำดับ/การส่ง --env-file */
-export function buildComposeDownArgs({ composeFile = COMPOSE_FILE, envFile = null, purgeData = false } = {}) {
+export function buildComposeDownArgs({ composeFile = COMPOSE_FILE, envFile = null, purgeData = false, projectName = null } = {}) {
   return [
     'compose',
+    // -p จำเป็นเมื่อสแตกที่ติดตั้งไม่ได้อยู่ในโฟลเดอร์ของ compose ไฟล์ (custom install / ชุดทดสอบแยก)
+    ...(projectName ? ['-p', projectName] : []),
     ...(envFile ? ['--env-file', envFile] : []),
     '-f',
     composeFile,
@@ -66,7 +68,13 @@ export function buildComposeDownArgs({ composeFile = COMPOSE_FILE, envFile = nul
 export function buildUninstallPlan(options = {}) {
   const {
     platform = process.platform,
-    hasCompose = existsSync(COMPOSE_FILE),
+    composeFile = COMPOSE_FILE,
+    hasCompose = existsSync(composeFile),
+    projectName = null,
+    // รากของ "ชุดติดตั้ง" — backups/ ของชุดนั้นอยู่ใต้รากนี้
+    // ชุดมาตรฐาน = repo root · custom compose (เช่น สแตกทดสอบ) = โฟลเดอร์ของ compose ไฟล์
+    // ห้ามใช้ ROOT คงที่: purge-data ของชุดทดสอบเคยลบ backups/ ของ repo จริง
+    installRoot = composeFile === COMPOSE_FILE ? ROOT : dirname(composeFile),
     purgeData = false,
     purgeImages = false,
     removeFiles = false,
@@ -95,7 +103,7 @@ export function buildUninstallPlan(options = {}) {
       id: 'compose-down',
       label: purgeData ? 'หยุด container + ลบ volume/ข้อมูล' : 'หยุด container (เก็บ volume ข้อมูลไว้)',
       command: 'docker',
-      args: buildComposeDownArgs({ envFile: composeEnvFile, purgeData }),
+      args: buildComposeDownArgs({ composeFile, envFile: composeEnvFile, purgeData, projectName }),
       // ไม่ใช้ tolerateFailure: ต้องแยก "ไม่มีอะไรให้ถอน" ออกจาก "หยุดไม่ได้จริง"
       classifyFailure: classifyComposeFailure,
       nextAction: 'ตรวจว่า deploy/community/.env มี POSTGRES_PASSWORD/JWT_SECRET/EMQX_PASSWORD ครบ',
@@ -123,13 +131,14 @@ export function buildUninstallPlan(options = {}) {
     }
   }
 
-  // 4) ลบโฟลเดอร์ backup (เฉพาะเมื่อ purge-data — เป็นข้อมูลส่วนบุคคล)
+  // 4) ลบโฟลเดอร์ backup ของชุดติดตั้งนี้ (เฉพาะเมื่อ purge-data — เป็นข้อมูลส่วนบุคคล)
+  const backupsDir = join(installRoot, 'backups');
   if (purgeData) {
     add({
       id: 'purge-backups',
-      label: 'ลบโฟลเดอร์ backup ของฐานข้อมูล',
+      label: `ลบโฟลเดอร์ backup ของฐานข้อมูล (${backupsDir})`,
       command: platform === 'win32' ? 'cmd' : 'rm',
-      args: platform === 'win32' ? ['/c', 'rmdir', '/s', '/q', join(ROOT, 'backups')] : ['-rf', join(ROOT, 'backups')],
+      args: platform === 'win32' ? ['/c', 'rmdir', '/s', '/q', backupsDir] : ['-rf', backupsDir],
       tolerateFailure: true,
     });
   }
@@ -159,6 +168,8 @@ export function buildUninstallPlan(options = {}) {
 
   return {
     root: ROOT,
+    installRoot,
+    backupsDir,
     purgeData: Boolean(purgeData),
     purgeImages: Boolean(purgeImages),
     removeFiles: Boolean(removeFiles),
@@ -213,10 +224,19 @@ function runStep(step) {
 const isMain = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('tools/install/uninstall.mjs');
 if (isMain) {
   const yes = process.argv.includes('--yes') || process.argv.includes('-y');
+  // ออปชันสำหรับชุดติดตั้งที่ไม่ใช่ค่าเริ่มต้น (ชุดทดสอบแยก/ติดตั้งที่อื่น)
+  const argValue = (flag) => {
+    const withEq = process.argv.find((a) => a.startsWith(`${flag}=`));
+    if (withEq) return withEq.slice(flag.length + 1);
+    const i = process.argv.indexOf(flag);
+    return i >= 0 ? process.argv[i + 1] : undefined;
+  };
   const plan = buildUninstallPlan({
     purgeData: process.argv.includes('--purge-data'),
     purgeImages: process.argv.includes('--purge-images'),
     removeFiles: process.argv.includes('--remove-files'),
+    ...(argValue('--compose') ? { composeFile: resolve(argValue('--compose')) } : {}),
+    ...(argValue('--project') ? { projectName: argValue('--project') } : {}),
   });
 
   console.log('══════════════════════════════════════════════════');

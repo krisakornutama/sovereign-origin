@@ -33,10 +33,47 @@ docker compose --env-file deploy/community/.env.test -f deploy/community/docker-
 docker compose --env-file deploy/community/.env.test -f deploy/community/docker-compose.yml up -d --no-deps api web
 ```
 
-- เหตุที่ต้อง `--no-deps`: service `migrate` ล้มด้วย **P3005** ("database schema is not empty")
-  ตั้งแต่ก่อนถอนแล้ว (compose ls แสดง `exited(1)`) — สแตกนี้ถูกสร้างด้วย `db push`/restore
-  จึงไม่มี `_prisma_migrations` · ไม่ใช่ผลจากการถอน และไม่ได้แตะข้อมูล
 - หลังคืนระบบ: `api :3100` = 200 · `web :3101` = 200 · container กลับมาเท่าสภาพก่อนถอน
+
+### P3005 — แก้แล้ว (2026-11-10)
+
+`migrate` เคยมั่ลด้วย P3005 เพราะฐานข้อมูลมี schema อยู่แล้วแต่ไม่มี `_prisma_migrations`
+(สร้างจากรุ่นก่อน squash baseline) ทำให้ `docker compose up -d` ล้มทั้งสแตก
+
+ขั้นตอนที่ทำ:
+1. ตรวจ drift: `prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --script`
+   → ของขาดเป็นแบบ additive อย่างเดียว: ตาราง `sync_conflict_logs` + 3 index
+2. apply SQL ส่วนที่ขาด (ไม่มีคำสั่งลบ/แก้ของเดิม)
+3. รัน `node dist/scripts/migrate-deploy.js` → ตรวจ drift ว่าง → baseline 2 migration แล้ว deploy ซ้ำ → exit 0
+4. `docker compose up -d` แบบไม่ใส่ `--no-deps` → **`migrate` Exited (0)** · api/web healthy · mqtt up
+
+=> ถอน/คืนระบบซ้ำได้โดยไม่มี service ล้ม (`UNINSTALL3_EXIT=0`, `RESTORE3_EXIT=0`)
+
+ผลิตภัณฑ์: `deploy/community/docker-compose.yml` เปลี่ยน `command` เป็น `node dist/scripts/migrate-deploy.js`
+ซึ่ง baseline อัตโนมัติ **เฉพาะเมื่อ drift ว่าง** — ถ้า schema ไม่ตรงจะ exit 1 พร้อมบอกให้คนตรวจ
+(ไม่เดาแทนลูกค้า) · unit tests: `core-api/tests/migrate-baseline.test.ts` 6/6
+
+## purge-data — พิสูจน์บนสแตกแยก (`tools/install/verify-purge.mjs`)
+
+การลบ volume ถาวรทำบนข้อมูลจริงไม่ได้ สคริปต์นี้จึงสร้าง Docker project ชั่วคราว (ชื่อสุ่ม +
+volume ของตัวเอง, image timescale ที่มีในเครื่อง) แล้วตรวจ:
+
+```
+node tools/install/verify-purge.mjs      # ✅ ผ่านครบ 11/11
+```
+
+- โหมดปกติ: `uninstall --yes` → container หาย · **volume ยังอยู่** · เปิดกลับมาเห็นข้อมูลเดิมครบ 3 แถว
+- `--purge-data`: container หาย · **volume หายจริง**
+- `--compose` / `--project`: ใช้ชุดติดตั้งที่ไม่ใช่ค่าเริ่มต้นได้ (จำเป็นสำหรับการทดสอบแยกและ custom install)
+- cleanup อัตโนมัติ (`down -v`) ทั้งสองกรณี ไม่มีอะไรค้างบนเครื่อง
+
+### บั๊กที่เจอระหว่างทำ harness (แก้แล้ว)
+
+`purge-backups` เคยใช้ `<repo>/backups` คงที่ ไม่สนใจ `--compose` — การรัน `--purge-data`
+ของสแตกทดสอบจึงลบ `backups/` ของ repo จริง (เจอตอน verify แดงจาก `windows-hide-guard`)
+แก้: purge อิง **install root ของ compose ที่ระบุ** (`<installRoot>/backups`) — ชุดมาตรฐานยังเป็น
+`<repo>/backups` · regression: U12 + harness ตรวจว่า `backups/postgres/*.dump` ของ repo ยังอยู่
+และสร้าง backup ใหม่ด้วย `tools/backup-db.ps1` แล้ว (ตรวจสอบได้: `backups/postgres/sovereign_*.dump`)
 
 ## ความสมบูรณ์ของข้อมูลหลังคืนระบบ
 
@@ -69,4 +106,6 @@ docker compose --env-file deploy/community/.env.test -f deploy/community/docker-
 
 - รันบน Windows เครื่องเดียว — เส้นทาง Linux/macOS ยังพิสูจน์ด้วย pure test (U2)
 - ยังไม่ได้ทดสอบ `--purge-data` กับข้อมูลจริง (จะลบ volume ถาวร) — ครอบด้วย U3/U8 แทน
-- `migrate` ยังล้ม P3005 ตามสภาพเดิมของสแตก — ควร baseline ให้เรียบร้อยแยกเป็นงานถัดไป
+- purge-data พิสูจน์บน postgres ตัวเดียว (ไม่รวม volume ของ mqtt/web) — กลไก `-v` เดียวกันจึงใช้ร่วมกัน
+- `sync_conflict_logs` ถูกสร้างด้วย SQL จาก `migrate diff` (ไม่ใช่ migration ใหม่) เพราะ baseline ถูก squash ไปแล้ว;
+  ฐานข้อมูลใหม่ยังได้ตารางนี้จาก baseline ตามปกติ

@@ -188,6 +188,7 @@ tools/install/*
 !tools/install/install.cmd
 # ถอนต้องมาพร้อมติดตั้ง — เคยหลุด allowlist แล้วลูกค้าไม่ได้ตัวถอนไปเลย
 !tools/install/uninstall.mjs
+!tools/install/verify-purge.mjs
 !tools/install/uninstall.sh
 !tools/install/uninstall.cmd
 !tools/agent-pack/
