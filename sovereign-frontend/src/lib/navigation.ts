@@ -140,6 +140,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/users', label: 'ผู้ใช้', labelKey: 'common.nav.users', icon: 'users', keywords: 'ผู้ใช้ บัญชี สมาชิก' },
       { href: '/audit', label: 'บันทึกตรวจสอบ', labelKey: 'common.nav.audit', icon: 'audit', keywords: 'log ตรวจสอบ audit' },
       { href: '/history', label: 'ประวัติข้อมูล', labelKey: 'common.nav.history', icon: 'history', keywords: 'ประวัติ ข้อมูล ย้อนหลัง graph' },
+      { href: '/changelog', label: 'ประวัติการพัฒนา', labelKey: 'common.nav.changelog', icon: 'book', keywords: 'ประวัติ การพัฒนา เวอร์ชัน changelog release notes อัปเดต อะไรใหม่ version' },
       { href: '/settings', label: 'ตั้งค่า', labelKey: 'common.nav.settings', icon: 'settings', keywords: 'ตั้งค่า ปรับแต่ง clone export สำรองข้อมูล backup เปลี่ยนรหัสผ่าน password' },
     ],
   },

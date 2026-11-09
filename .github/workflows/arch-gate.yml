@@ -7,17 +7,17 @@ name: Architecture Gate
 # หมายเหตุ: env-truth ข้ามบน CI โดยธรรมชาติ (ไม่มี .env) — arch-gate จัดการ "ไม่มี .env = ข้าม" ให้แล้ว
 
 on:
+  # ไม่ใส่ paths filter ตอน PR โดยเจตนา: context นี้เป็น required check — ถ้ากรอง paths
+  # เช็คจะ "หาย" บน PR ที่ไม่แตะไฟล์ที่กรอง แล้ว merge ไม่ได้เลย
   pull_request:
+  push:
+    branches: [main]
     paths:
       - 'sovereign-os/core-api/**'
       - 'sovereign-frontend/**'
       - 'tools/**'
       - '.github/workflows/arch-gate.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'tools/**'
-      - '.github/workflows/arch-gate.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,12 +25,13 @@ permissions:
 jobs:
   arch-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # file-budget ต้อง diff กับ base branch ได้
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -56,3 +57,10 @@ jobs:
 
       - name: ตรวจ fingerprint parity (tools ↔ runtime)
         run: node tools/check-parity.mjs
+
+      # gate ชุดใหม่ (7 พ.ย. 69): no-db-push (ห้ามสแกน DB จริง) + ci-ddl-sync (DDL ใน CI ต้องตรง schema)
+      # เดิมรันได้แค่ผ่าน tools/verify.mjs บนเครื่อง → CI ไม่เคยบังคับ ตอนนี้เป็น required check แล้ว
+      # ระบุไฟล์ตรง ๆ ไม่รันทั้งชุด: suite เต็ม (1349 เทสต์) ค้างบน runner ทั้งที่ในเครื่องใช้ 37 วิ
+      # (job นี้เป็น required check — ต้องเร็วและจบแน่นอน) · ชุดเต็มยังรันในเครื่องผ่าน tools/verify.mjs
+      - name: ตรวจ gate ชุดใหม่ (no-db-push + ci-ddl-sync)
+        run: node --test tools/test/no-db-push-gate.test.mjs tools/test/ci-ddl-sync.test.mjs

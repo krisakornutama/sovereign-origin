@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readConfig as readTelegramAlertConfig } from '../machine-alert.config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const INFRA_ENV = path.join(ROOT, 'sovereign-os', 'infra', '.env');
@@ -63,20 +64,28 @@ export function readTelegramCreds() {
   return { token: infra.TELEGRAM_BOT_TOKEN || '', chatId: infra.TELEGRAM_CHAT_ID || '', source: 'env' };
 }
 
-async function sendTelegram(text, creds) {
+async function sendTelegram(text, creds, opts = {}) {
   try {
+    const body = { chat_id: creds.chatId, text, disable_web_page_preview: true };
+    // nightly-report ใช้ HTML (<b>/<code>) · ผู้เรียกอื่นปล่อยว่าง = plain text
+    if (opts.parseMode) body.parse_mode = opts.parseMode;
     const r = await fetch(`https://api.telegram.org/bot${creds.token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: creds.chatId, text, disable_web_page_preview: true }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });
-    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${(await r.text()).slice(0, 160)}` };
+    // อ่าน body ให้หมดทุกกรณี — ปล่อย connection ค้างจะทำให้ process ไม่ยอมจบ
+    const reply = await r.text();
+    return r.ok ? { ok: true } : { ok: false, error: `${r.status} ${reply.slice(0, 160)}` };
   } catch (e) { return { ok: false, error: e?.message || 'network error' }; }
 }
 
-/** แจ้งเตือน — ไม่มี creds = คืน { ok:false, error } อธิบาย (ผู้เรียก report ต่อได้) */
-export async function notify(text, creds = readTelegramCreds()) {
+/** แจ้งเตือน — ไม่มี creds = คืน { ok:false, error } อธิบาย (ผู้เรียก report ต่อได้)
+ *  · respect กติกาเจ้าของ 12/10/69: alert-settings.json ตั้ง enabled:false = "ยังตรวจอยู่ แต่ไม่ส่ง"
+ *    → คืน { ok:true, status:'skipped_by_config' } ให้ผู้เรียกตัดสินเป็น "ข้ามเพราะตั้งใจ" ไม่ใช่ความล้ม (1/11/2569) */
+export async function notify(text, creds = readTelegramCreds(), opts = {}) {
+  if (readTelegramAlertConfig().enabled === false) return { ok: true, status: 'skipped_by_config' };
   if (!creds.token || !creds.chatId) return { ok: false, error: 'ไม่มี credentials (ตั้งได้ที่หน้า Settings หรือ TELEGRAM_* ใน infra/.env)' };
-  return sendTelegram(text, creds);
+  return sendTelegram(text, creds, opts);
 }

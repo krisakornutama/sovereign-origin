@@ -2660,3 +2660,30 @@ model SocialPostTarget {
   @@index([account_id])
   @@map("social_post_targets")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYNC CONFLICT LOG — รายการ offline replay ที่ business guard ไม่ให้ผ่าน
+// 1 แถว = 1 mutation ที่ต้องให้มนุษย์ตรวจ (PENDING_REVIEW) · ห้ามลบอัตโนมัติ
+// resolver เขียนแบบ upsert by mutationId ⇒ client retry ไม่ทำให้ log ซ้ำ
+// ─────────────────────────────────────────────────────────────────────────────
+model SyncConflictLog {
+  id             String    @id @default(uuid()) @db.Uuid
+  mutationId     String    @unique @map("mutation_id")
+  idempotencyKey String    @map("idempotency_key")
+  domain         String
+  action         String
+  userId         String    @map("user_id") // TEXT ไม่ใช่ UUID — รองรับ id จาก test/ระบบเดิม
+  resource       String
+  conflictReason String    @map("conflict_reason") // เช่น INSUFFICIENT_STOCK: ...
+  payload        Json
+  occurredAt     DateTime  @map("occurred_at") @db.Timestamptz(6)
+  status         String    @default("PENDING_REVIEW") // PENDING_REVIEW | RESOLVED | REJECTED
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy     String?   @map("resolved_by")
+  note           String?
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@map("sync_conflict_logs")
+}

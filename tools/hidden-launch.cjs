@@ -68,9 +68,26 @@ function buildTempVbsBody(cli) {
 let seq = 0;
 
 /**
+ * หา run-hidden.vbs ที่ "ไปกับตัวช่วย" — ลำดับ:
+ *   1) <rootDir>/tools/run-hidden.vbs            (รันจาก repo: rootDir = repo root)
+ *   2) <โฟลเดอร์ของ hidden-launch.cjs>/run-hidden.vbs (แพ็ก desktop: resources/tools/)
+ * คืน '' = ไม่มีเลย → planHiddenLaunch สร้าง VBS ชั่วคราวแทน
+ */
+function findShippedVbs(rootDir) {
+  const candidates = [];
+  if (rootDir) candidates.push(path.join(rootDir, 'tools', 'run-hidden.vbs'));
+  candidates.push(path.join(__dirname, 'run-hidden.vbs'));
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch { /* ignore */ }
+  }
+  return '';
+}
+
+/**
  * เตรียมวิธีเปิดคำสั่งแบบไม่มีหน้าต่าง
  * @param {{ rootDir?: string, cli: string, tmpDir?: string, tag?: string }} opts
- *   rootDir = โฟลเดอร์ที่มี tools/run-hidden.vbs (ถ้าไม่มี จะสร้าง VBS ชั่วคราวเอง)
+ *   rootDir = โฟลเดอร์ที่มี tools/run-hidden.vbs (ถ้าไม่มี จะใช้ vbs ที่อยู่ข้าง hidden-launch.cjs
+ *   ก่อน แล้วจึงสร้าง VBS ชั่วคราวเอง)
  * @returns {{ file: string, args: string[], cmdFile: string, vbs: string, hidden: true } | null}
  *   ส่งค่า null = ทำไม่ได้ (คำสั่งมีอักขระที่ .cmd รับไม่ได้ / เขียนไฟล์ไม่ได้) → ผู้เรียกต้องมีทางถอย
  */
@@ -83,8 +100,8 @@ function planHiddenLaunch({ rootDir, cli, tmpDir = os.tmpdir(), tag = 'sovereign
     const cmdFile = path.join(tmpDir, `${uniq}.cmd`);
     fs.writeFileSync(cmdFile, `${cmd}\r\n`, { encoding: 'ascii' }); // CRLF · ไม่มี BOM
 
-    let vbs = rootDir ? path.join(rootDir, 'tools', 'run-hidden.vbs') : '';
-    if (!vbs || !fs.existsSync(vbs)) {
+    let vbs = findShippedVbs(rootDir);
+    if (!vbs) {
       vbs = path.join(tmpDir, `${uniq}.vbs`);
       fs.writeFileSync(vbs, buildTempVbsBody(cmd), { encoding: 'ascii' });
     }

@@ -1,0 +1,404 @@
+{
+  "generatedFrom": "CHANGELOG.md",
+  "generatedBy": "tools/gen-changelog-data.mjs",
+  "currentVersion": "1.2.0",
+  "versions": [
+    {
+      "version": "Unreleased",
+      "dateISO": "2026-11-07",
+      "dateLabel": "7 พ.ย. 2026",
+      "released": false,
+      "ref": "",
+      "summary": [
+        {
+          "type": "note",
+          "text": "งานหลัง tag v1.2.0 — จะรวมใน release ถัดไป (image 1.2.0 build จาก 11b07ef จึงยังไม่มีส่วนนี้)"
+        }
+      ],
+      "sections": [
+        {
+          "title": "🔧 งานหลังปล่อย v1.2.0",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "CI / images — แยก build amd64/arm64, ตัด QEMU, ใช้ runner ARM จริง + จำกัดเวลา 45 นาที; ทุก tag ของ api/web ชี้ manifest เดียวกัน",
+                "ความปลอดภัย / คุณภาพ — ปิด Dependabot advisories ที่เหลือ, mount farm executive API ให้ตรงกับหน้าที่เรียก, เพิ่มเทสต์ route/E2E",
+                "Module boundary — ปิด 6 เส้นข้ามโมดูลผ่าน service ของเจ้าของตาราง (consent → health, consent → ai, farm → livestock)",
+                "Nightly — แก้ restore-check false positive (แยก pure compare + เทสต์ 5/5) และรัน restore จริงผ่าน 149/149 ตาราง",
+                "Nightly (8 พ.ย.) — migration head แยกสายสถานะให้ถูกเจตนา: dump ที่ถ่าย *ก่อน* migration ใหม่ถูก apply (จริงสูงกว่ากู้) = ปกติของ snapshot ไม่ตีเป็นแดง — เฉพาะ \"กู้สูงกว่าจริง\" (live ถอยหลัง/มีการลบ migration) จึงฟ้อง, notify() เคารพสวิตช์ alert-settings.json (enabled:false → {ok:true, status:'skipped_by_config'} — แยก \"ข้ามเพราะตั้งใจปิด\" ออกจาก \"ส่งไม่ผ่านเพราะพัง\") และ main-guard ให้ import เพื่อเทสต์ไม่ยิง docker จริง (29.4s → 0.1s) · PR #52 (d1687d) — เทสต์ red-first 8/8 + รันจริง --strict ผ่าน (กู้ครบ 150/150 ตาราง)",
+                "Ops / Nightly (P0) — ปิด ShipShop3000 ที่ค้าง, ยืนยัน Sovereign Nightly Verify ผ่านจริงผ่าน Task Scheduler (Last Result 0), เพิ่ม dead-man alert 03:30 เตือน Telegram เมื่อ nightly ไม่ผ่าน/ไม่ส่งผลติดกัน 2 คืน และแก้ nightly-report ให้ใช้ creds กลาง (DB → infra/.env) แทนการอ่าน DB อย่างเดียว",
+                "Release Automation (Sprint 1) — .github/workflows/release.yml ปล่อยชุดติดตั้ง Windows อัตโนมัติเมื่อ push tag v*: ตรวจ tag ↔ version ก่อน build, build core-api + static export, แพ็ก portable exe/zip ด้วย electron-builder บน windows-latest, เขียน/ตรวจ SHA256SUMS.txt ด้วย tools/release-build.mjs แล้วแนบ GitHub Release · เทสต์ red-first 11 ตัว (tools/test/release-build.test.mjs) ครอบการคัด artifact, รูปแบบ checksum, tag gate และสัญญาของ workflow",
+                "Offline-First Read Cache (Sprint 2 · ระยะ 1) — src/lib/offline/read-cache.ts เก็บข้อมูลอ่านลง IndexedDB แยกโดเมน (system/menu/farm/inventory/telemetry) พร้อม TTL ต่อคำขอ, stale-while-revalidate, ถอยไปใช้แคชเก่าเมื่อ network ล่ม และไม่ทำให้การอ่านพังเมื่อ IndexedDB ใช้ไม่ได้/เขียนไม่ได้ · เพิ่ม hook useOfflineRead สำหรับหน้าเว็บ · เทสต์ red-first 13 เคส (read-cache.test.ts) ผูกเข้า npm run verify ผ่าน tools/test/frontend-offline-read-cache.test.mjs",
+                "Offline-First Conflict Resolver (Sprint 2 · ระยะ 2) — sovereign-os/core-api/src/modules/sync/conflict-resolver.ts คุมการ replay คิวออฟไลน์ตอนกลับมาออนไลน์: telemetry replay ได้เสมอ (ไม่ reject), ยอด stock/money ที่ทับกันจะยึดค่าที่เครื่องอื่นเขียนล่าสุด (ไม่ใช่ Last-Write-Wins ย้อนกลับไม่ได้) และเขียน SyncConflictLog แบบ upsert by mutationId — retry ไม่สร้าง log ซ้ำ · เทสต์ red-first จบเขียว 6/6 (conflict-resolver.test.ts, ผูกเข้า verify ผ่าน tools/test/backend-conflict-resolver.test.mjs) · migration แบบ additive 20261107120000_add_sync_conflict_logs · ตารางใหม่ผูกเจ้าของใน tools/module-owners.json (sync_conflict_logs → sync) ให้ arch-gate เขียว",
+                "CI hardening — ปิดการค้างใน CI — แก้ npm run test:tools ค้างบน runner: ไฟล์ตัวค้างจริงคือ tools/test/desktop-shell-functions.test.mjs (HANG 60s บน runner, run 42410357754) — ปิด keep-alive socket ของ test server และยก script เป็น node --test --test-force-exit --test-timeout=120000 · ใส่ timeout-minutes ครบทุก job ในทุก workflow (14 jobs หลังลบ probe ชั่วคราว) · พิสูจน์ผ่าน PR #51: required checks ทั้ง 7 รันจริง (10/10 pass), policy บล็อก merge ขณะ checks pending (mergeable_state=blocked, gh pr merge ปฏิเสธ \"base branch policy prohibits the merge\") และ merge เมื่อเขียวครบ (d652698)",
+                "Desktop — แพ็ก hidden-launch.cjs + run-hidden.vbs ไปกับแอป (J6f) ให้เปิด .bat แบบไม่มีหน้าต่างได้ครบ",
+                "เอกสาร — อัปเดต CHANGELOG / README / STATUS / QUEUE ให้ตรงกับสถานะจริง"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "v1.2.0",
+      "dateISO": "2026-11-06",
+      "dateLabel": "6 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [
+        {
+          "type": "paragraph",
+          "text": "Community Edition (CE) เปิดตัวเป็น repo สาธารณะ — repo นี้เหลือ CE เพียว ไม่มีโมดูล Pro (Pro ย้ายไป private repo แล้ว ดู docs/OPEN-CORE.md) ตัวเลข ณ วันปล่อย: backend 1,823 tests (ข้าม 1) · tooling/CI 1,287 tests (ข้าม 6) · tsc + next build สะอาด"
+        }
+      ],
+      "sections": [
+        {
+          "title": "🚀 งานเปิดตัว Community Edition (4–7 พ.ย. 2026)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "แยก Pro ออกจาก CE (Clean Hard Cut) — ลบโมดูล/หน้า/เทสต์ Pro 90+ ไฟล์, ทำ Pro registry + 404 ที่บอกชื่อโมดูล, ขยาย open-core boundary gate ให้ตรวจ frontend ด้วย",
+                "ชุดติดตั้ง CE คำสั่งเดียว — deploy/community/docker-compose.yml (db · mqtt · migrate · api · web), named volume ล้วน, .env.example บังคับ 3 secrets, พิสูจน์ติดตั้งใหม่บนฐานข้อมูลว่างแล้ว",
+                "สมัครด้วยรหัสเชิญ (ไม่มี SMTP) — CLI/API/UI, เก็บ SHA-256, ใช้ครั้งเดียว/มีวันหมดอายุ/เพิกถอนได้ + การ์ดจัดการในหน้าผู้ใช้",
+                "Alert fanout 3 ช่อง — Telegram ยืนยัน end-to-end; Discord + LINE ผ่าน stub (รูปแบบ/headers/plain-text/mention hardening)",
+                "เดโม 15 วินาที 11 ฉาก — docs/media/demo.gif + ภาพนิ่ง docs/media/screens/ ฝังใน README ไทย/อังกฤษ",
+                "README ภาษาอังกฤษ — README.en.md + สลับภาษาที่หัว README, แก้ตัวเลขเทสต์/โมดูลให้ตรงจริง, เติมขั้นตั้ง 3 secrets",
+                "GHCR multi-arch images — workflow publish-images.yml แยก build amd64 (ubuntu) + arm64 (ubuntu-24.04-arm) แล้ว merge manifest; image api/web เป็น public, tags 1.2.0, 1.2, latest (+ main, sha-*)",
+                "คู่มือ/FAQ ภาษาอังกฤษ — deploy/community/README.en.md, docs/FAQ-REDDIT.md, ด่านตรวจ image ก่อนโพสต์ใน docs/LAUNCH-REDDIT.md",
+                "ความปลอดภัย/คุณภาพรอบปล่อย — ปิด Dependabot advisories (high 5 + moderate ที่เหลือ), mount farm executive API ให้ตรงกับหน้าที่เรียก, เทสต์ route/E2E ของ farm executive",
+                "UI CE — ตัดเมนู Pro ออกจาก navigation.ts (Ecosystem/ร้านอาหาร/ธุรกิจ/ฟลีท/การเงิน) และ QuickDeck ชี้หน้า CE จริง"
+              ]
+            },
+            {
+              "type": "note",
+              "text": "หมายเหตุ: หลัง tag v1.2.0 (6 พ.ย.) มี commit วันที่ 7 พ.ย. ปรับ CI + ปิด advisories + farm executive — image 1.2.0 build จาก 11b07ef จึงยังไม่มีส่วนนี้ จะรวมใน release ถัดไป"
+            }
+          ]
+        },
+        {
+          "title": "📚 ประวัติการพัฒนาก่อนแยก Pro (ถึง 2026-11-05)",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "รายการด้านล่างคือสิ่งที่พัฒนาตั้งแต่ v1.1.1 จนถึงวันที่แยก Pro ออก — บางรายการเป็นงาน Pro ที่ ย้ายออกจาก repo นี้แล้ว เก็บไว้เพื่อเป็นประวัติ ไม่ใช่สิ่งที่ CE ใช้งานได้ในตอนนี้"
+            }
+          ]
+        },
+        {
+          "title": "🚀 ฟีเจอร์ใหญ่ที่เพิ่มเข้ามา",
+          "blocks": [
+            {
+              "type": "subheading",
+              "text": "ระบบติดตั้งและการเผยแพร่ (Deploy / Packaging)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "CE1 — ชุดติดตั้ง Community Edition แบบ Docker Compose คำสั่งเดียว (deploy/community/): db · mqtt · migrate · api · web ใช้ named volume ล้วน ไม่ bind mount ซอร์ส รันบนเครื่องใดก็ได้ (x86_64/arm64) migrate รัน prisma db push + seed แล้ว api จึงเริ่ม",
+                "แก้บัคจริง: Dockerfile.prod ของ frontend ใช้ node:18 แต่ Next 16 บังคับ ≥ 20.9 → เปลี่ยนเป็น node:22-alpine",
+                "next.config.js: เติม origin จาก NEXT_PUBLIC_API_URL เข้า CSP connect-src (http + ws) กัน CSP บล็อกเมื่อเปิดจากเครื่องอื่น",
+                "เทสต์ tools/test/community-stack.test.mjs 13/13 (แดงก่อนแก้ 4 ข้อ) · docker compose config ผ่านจริง",
+                "INSTALL-CHECK doctor พร้อม SUPPORT.txt (ซ่อนข้อมูล敏感) สำหรับตรวจก่อน/หลังติดตั้ง",
+                "ตัวติดตั้งเครื่องใหม่แบบไฟล์เดียว 4.7 KB + ชุดติดตั้งเครื่องลูก (agent-pack) 36 MB"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "ช่องแจ้งเตือน (Alerts / Notifications)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "CE3 — Discord + LINE ต่อจาก dispatcher เดิม (Telegram) ที่มี severity/dedup/rate-limit อยู่แล้ว",
+                "services/alert-fanout.service.ts: แปลง HTML → ข้อความล้วน (คงลิงก์), Discord จำกัด 2,000 ตัวอักษร + ปิด mention (allowed_mentions.parse=[]), LINE Messaging API จำกัด 5,000 ตัวอักษร, ตรวจ URL/รหัสผู้รับก่อนตั้งช่อง",
+                "ยิงขนานทุกช่องแบบ soft-fail: ช่องหนึ่งล้มไม่ทำให้ช่องอื่นเงียบ",
+                "POST /api/telegram/channels/test (SUPERADMIN) — ทดสอบทุกช่องพร้อมกัน คืนผลแยกช่อง",
+                "env: DISCORD_WEBHOOK_URL · LINE_CHANNEL_ACCESS_TOKEN · LINE_TO (LINE Messaging API — ไม่ใช่ LINE Notify ที่ปิดแล้ว)",
+                "เทสต์ alertFanout.test.ts 14/14 + telegramChannels.test.ts 4/4 · telegramAlert.test.ts เดิมยังผ่าน 16/16"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "ระบบควบคุมเครื่องระยะไกล (Machine Control / Orchestrator)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "Machine Console: ดูจอสด / ควบคุมเมาส์คีย์บอร์ด / จัดการไฟล์ของเครื่องในเครือข่าย",
+                "Agent Queue: หน้าเว็บคิวงาน + คำสั่ง Telegram + ปุ่ม \"ควบคุมเครื่อง 2\" → /machine-console",
+                "Orchestrator: HUB สั่งงานผ่าน LAN + ด่านอนุมัติงานเสี่ยง + แจ้งเตือน text/voice/call + TTS ใน container (espeak-ng + pyttsx3)",
+                "agent-pack: ตัวช่วยติดตั้งเครื่องลูก — ก๊อปโฟลเดอร์เดียว ดับเบิลคลิก แล้วออนไลน์เอง · อัปเดตโค้ดตัวเองจาก HUB แทนก๊อปผ่าน USB",
+                "Fleet control plane v1: persist สถานะใน PostgreSQL · SITE_ADMIN สิทธิ์อ่านเฉพาะไซต์ · sign runner manifests"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "ระบบชำระเงิน (Payments / Stripe)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "หน่วยคิดเงิน THB (minor unit) + จุดเสียบ Stripe Checkout (ยังใช้ของปลอมก่อนเปิดจริง)",
+                "Webhook ยืนยันการจ่ายเงินจริง (THB) · บังคับ success_url + เพดาน client_reference_id + unit_amount"
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "-atomicity ของการเขียนเงิน: ให้ Prisma ปลอมย้อนกลับ transaction ได้ · idempotency-key guard สำหรับเขียนเงิน/สต็อก"
+            },
+            {
+              "type": "list",
+              "items": [
+                "แผงชำระผ่านบัตรบนหน้าร้าน + webhook รับออเดอร์หน้าร้าน · บันทึกแถวเงินจริงตอน Stripe ยืนยัน"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "ความเป็นส่วนตัว (PDPA / Consent)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "บังคับความยินยอมเป็นด่านจริงก่อนบันทึกข้อมูลสุขภาพ (consent gate)",
+                "ขอความยินยอมใหม่เฉพาะวัตถุประสงค์ที่ถูกแก้ + UI ยืนยันฉบับใหม่ได้จริง",
+                "ลิงก์นโยบายความเป็นส่วนตัวบนหน้าเข้าสู่ระบบ · consent smoke เข้า nightly",
+                "สิทธิ์ลบข้อมูล (DELETE) ยังทำได้เสมอ — สิทธิ์ของเจ้าของข้อมูล"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "ระบบสำรองข้อมูลและกู้คืน (Backup / PITR)"
+            },
+            {
+              "type": "list",
+              "items": [
+                "Offsite backup รายวัน: dump → เข้ารหัส AES-256-GCM → ส่ง Telegram",
+                "สาย offsite รอบสอง: age (X25519) เข้ารหัสคู่ขนาน → ตัดสาย AES เก่า (เก็บช่องถอด .enc เก่าไว้จนกว่าจะหมดความหมาย)",
+                "PITR สมบูรณ์: เปิด WAL archiving จริง (archive_mode=on, archive_timeout=300s) + drill อัตโนมัติซ้อมผ่านจริง + runbook §๙ กู้จริงเมื่อไฟดับ",
+                "frontend-watchdog ตัวจริง: :3000 ตาย=บูตเอง · ค้าง=kill PID เฉพาะ · สิ่งแปลกปลอม=fail-safe"
+              ]
+            },
+            {
+              "type": "subheading",
+              "text": "อื่น ๆ"
+            },
+            {
+              "type": "list",
+              "items": [
+                "MBTI ระบบครบวงจร: แบบทดสอบ 93/32 ข้อ + เทียบสองคน + AI ปรับโทนตามบุคลิกภาพ + ตราแปดส่วน + โปรไฟล์คนในบ้าน",
+                "ธีมบรรยากาศรายโดเมน (atmo-*) + Dashboard โทน circadian + เมนูเปลี่ยนสีตามหน้า",
+                "ระบบพาร์ทเนอร์ (แผนที่คู่ค้า + สมัครปักหมุด + แผงอนุมัติ) + SMS gateway จริง (OTP)",
+                "ระบบติดตาม Traceability เฟส 1–2: ล็อตผลผลิต Farm→Inventory→Shop + หน้า /trace",
+                "โซเชียลสตูดิโอ: โพสต์/ลงคลิป YouTube (OAuth loopback + resumable upload) + Instagram 第四ช่องทาง",
+                "ระบบธุรกิจ: เมนู 9 ส่วน + พิมพ์หลายใบต่อ A4 + สลิป PromptPay + แจ้งเตือน Telegram ห้องธุรกิจ"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🐛 แก้บัคที่สำคัญ",
+          "blocks": [
+            {
+              "type": "table",
+              "headers": [
+                "บัค",
+                "ผลกระทบ",
+                "วิธีแก้"
+              ],
+              "rows": [
+                [
+                  "Test file ไม่ import ./setup-env",
+                  "เขียนแถวขยะลง alert_events ใน DB จริง (key x, k, warn once, same text, synthetic-streak-critical รวม 4,378 แถว)",
+                  "เติม import './setup-env' ให้ 19 ไฟล์เทสต์ + เพิ่มเทสต์กันถอยหลัง tools/test/test-env-isolation.test.mjs"
+                ],
+                [
+                  "Webhook TransferOrder ค้างไม่ตอบ",
+                  "verified_by เป็นคอลัมน์ @db.Uuid แต่อ่านเป็นสตริงธรรมดา → Prisma P2023",
+                  "ปรับให้อ่าน/เขียนเป็น UUID ตรงกัน"
+                ],
+                [
+                  "/shop/ ไม่ยิงร้าน default",
+                  "หน้าร้านแสดงว่าง",
+                  "แก้ให้ยิงร้าน default + gate จับหน้าว่าง"
+                ],
+                [
+                  "DELETE /api/users/:id ค้าง",
+                  "audit_logs.user_id FK ไม่ใช่ nullable + SetNull",
+                  "ทำให้ nullable + onDelete SetNull"
+                ],
+                [
+                  "Service worker ค้างของเก่า",
+                  "\"แก้แล้วแต่ยังเห็นของเก่า\"",
+                  "cache-bust อัตโนมัติทุก build"
+                ],
+                [
+                  "Nightly verify ล้มทุกคืน",
+                  "Build ทับ server ที่ serve prod อยู่",
+                  "แยก build ออกเป็นโหมด prod-build + rollback copy"
+                ],
+                [
+                  "คำสั่งไทยใน .cmd/.bat พัง",
+                  "cmd.exe อ่านไบต์ไทยเป็นคำสั่ง → <ไทย>' is not recognized",
+                  "วาง chcp 65001 บนสุด + พิมพ์ ASCII ล้วนเท่านั้น"
+                ],
+                [
+                  "%VAR% กับ set บรรทัดเดียวกัน",
+                  "%VAR% ถูกแทนค่าก่อน set รัน → เรียกสตริงว่าง",
+                  "เรียกพาธตรง ๆ หรือใช้ if exist (...) else (...)"
+                ],
+                [
+                  "Docker build ค้างเมื่อ port drift",
+                  "Port ชนกับ production ที่รันอยู่",
+                  "next-env.d.ts + verify cleans dist ก่อน build"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🎨 ปรับ UI / UX",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "QuickDeck: glass shortcuts ปุ่มทางลัดงานประจำ (ขาย/หน้าร้าน · สินค้าสต็อก · จอครัว KDS · เงินภาษี · ฟาร์ม) กดครั้งเดียวเข้างาน",
+                "PageHeader ใหม่ ครบ 42 หน้า + badge แสดงสถานะ",
+                "รวม EmptyState / StatCard / SectionCard ใช้ทั่ว inventory/farm/status/stats",
+                "Dashboard: skeleton loading แทนข้อความเฉย ๆ · sparkline เทรนด์เซ็นเซอร์ · edit mode ลากจัดเรียงวิดเจ็ตได้ · mobile เรียงลำดับใหม่เหมาะจอเล็ก",
+                "หน้าล็อกอินปรับให้สวยขึ้น + แก้ ss log spam ใน container",
+                "ควบคุมอัตราเฟรมของการเลื่อนหน้า (กันเลื่อนกลับบนสุดเมื่อเปลี่ยนหน้า)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🔒 ความปลอดภัย",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "ตรวจช่องโหว่ระบบตัวเอง: headers / SQLi / brute-force / IDOR + ผนวกเป็น check ที่ 5 ของ quality gate",
+                "Rate-limit bucket แยกต่อ section ด้วย X-Forwarded-For (trust proxy=1) กันกิน quota IP จริงร่วมกับ gate",
+                "เก็บ telegram token + รหัสเราเตอร์ เข้ารหัส AES-256-GCM เสมอ (enc:v1:...) · ค่าเก่า plaintext อ่านได้จนกว่าจะตั้งใหม่",
+                "เข้ารหัส field PII (phone / taxId / PromptPay) + phone_hash สำหรับ lookup · migrate ข้อมูลจริงครบ",
+                "npm audit fix ปิดช่องโหว่ทั้งหมด → 0 vulnerabilities ทั้ง FE + API",
+                "เก็บกวาดราก repo: ย้าย credentials เข้าที่ปลอดภัย + เอกสาร CORS + ปิด X-Powered-By",
+                "Socket.IO ด่าน JWT+MFA+allowlist payload + ล็อก ai-models ทุกเส้นทาง",
+                "Bind db/mqtt ports loopback-only + เพิ่ม CSP/Permissions-Policy ทั้ง web และ API",
+                "/api/health/truth ต้องล็อกอิน (เดิมเปิดสาธารณะ)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "📦 ปรับระบบปฏิบัติการ (Ops)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "Quality gate เดียว: npm run verify ครบ 6/6 (Architecture Gate + Frontend Gate + backend build+test + frontend typecheck+build)",
+                "Nightly gate 03:20: verify + db-doctor แจ้ง Telegram เมื่อพัง + credential อ่านจาก system_settings → env",
+                "db-doctor: ตรวจ app env ↔ compose ↔ ฐานจริง + ฐานแปลกปลอม + schema drift + backup ผิดตัว",
+                "Security-anomaly digest: 6 กลุ่มจาก audit_logs (brute-force / MFA / นอกเวลา / บัญชี / first-seen / spike) ส่ง Telegram 08:00 ทุกวัน",
+                "Machine-alert watcher: เฝ้าเครื่องทุก 10 นาที แจ้ง Telegram ทันทีเมื่อดิสก์/แรมวิกฤต/docker ล่ม",
+                "เคลียร์พื้นที่ดิสก์ E: (Docker prune + compact vhdx 106→19 GB) + ตั้ง task compact ทุกอาทิตย์ 04:00"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🧪 ทดสอบและคุณภาพโค้ด",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "เทสต์ a11y auth screens + ฟอร์มทั้งระบบ (รวม mutation proof 6 จุด)",
+                "เทสต์ E2E กวาดทุกหน้าจากเมนูจริง 34 หน้า + all-pages จับ console/JS error",
+                "เทสต์ desktop app 45 เคส (โหลด main.js จริงใน VM + stub electron)",
+                "เทสต์ orchestrator กับ HUB จริง + ไม่ทิ้ง state ค้างเมื่อติดตั้งโดยไม่รีสตาร์ท",
+                "เทสต์ atomicity ของการเขียนเงิน + เทสต์ idempotency-key",
+                "เทสต์กันเทสต์เขียน DB จริง (setup-env isolation) 2/2"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "📄 เอกสาร",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "AGENTS.md: กฎเหล็กสำหรับ AI (GIT SAFETY, BUILD BEFORE COMMIT, BRANCH WORKFLOW, ฯลฯ)",
+                "docs/ARCHITECTURE.md + docs/modules/<โมดูล>.md: สถาปัตยกรรมรวม + กติกาที่เกตตรวจอัตโนมัติ",
+                "docs/history/: journal เดิมที่ย้ายมาจาก STATUS.md",
+                "STATUS.md: snapshot ที่ gen จากข้อมูลจริงด้วย tools/status-doc.mjs",
+                "QUEUE.md: คิวงานทั้งหมด พร้อมสถานะทำ/ค้าง/บล็อก"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "v1.1.1",
+      "dateISO": "2026-09-18",
+      "dateLabel": "18 ก.ย. 2026",
+      "released": true,
+      "ref": "dbe43d0",
+      "summary": [
+        {
+          "type": "list",
+          "items": [
+            "Desktop: แยก downloadFile เป็นโมดูล + เทส regression 7 เคส",
+            "Bump 1.1.1 สำหรับ release ที่มีด่านในตัว"
+          ]
+        }
+      ],
+      "sections": []
+    },
+    {
+      "version": "v1.1.0",
+      "dateISO": "2026-09-18",
+      "dateLabel": "18 ก.ย. 2026",
+      "released": true,
+      "ref": "016dffa",
+      "summary": [
+        {
+          "type": "list",
+          "items": [
+            "Publish: รวม evidence/ directory เข้า whitelist (guardmini field evidence ไม่เคยถึง Pages)"
+          ]
+        }
+      ],
+      "sections": []
+    },
+    {
+      "version": "v1.0",
+      "dateISO": "2026-09-17",
+      "dateLabel": "17 ก.ย. 2026",
+      "released": true,
+      "ref": "15f2e68",
+      "summary": [
+        {
+          "type": "list",
+          "items": [
+            "Publish: กันไฟล์ทดลอง (tmp-*, *.bak) ออกจาก production sync"
+          ]
+        }
+      ],
+      "sections": []
+    }
+  ],
+  "notes": [
+    {
+      "type": "list",
+      "items": [
+        "v1.2.0 ถูก push ขึ้น origin/main และปล่อย Release แล้ว (2026-11-06) · image api/web ขึ้น GHCR เป็น public แล้ว",
+        "สถานะงานค้างล่าสุดดูที่ QUEUE.md · snapshot สภาพระบบดูที่ STATUS.md",
+        "CHANGELOG นี้เก็บประวัติก่อนแยก Pro ไว้ด้วย; งาน Pro ใหม่ไม่ได้อยู่ใน repo นี้"
+      ]
+    }
+  ]
+}

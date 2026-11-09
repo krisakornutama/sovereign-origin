@@ -3,6 +3,10 @@
 ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
 งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
+> อัปเดตล่าสุด 2026-11-07: ตรวจ image manifest ครบ 6 tag ผ่านทั้งหมด (ดึงได้โดยไม่ล็อกอิน, amd64+arm64)
+> · branch protection เปิดจริง 6 required checks · topics ครบรวม `agpl` · `npm run verify` ผ่าน 6/6
+> · เหลือแค่เจ้าของ rotate token กับโพสต์ Reddit
+
 ---
 
 ## สถานะภาพรวม (ตรวจแล้ว)
@@ -11,7 +15,7 @@
 |---|---|
 | Repo visibility | public · license AGPL-3.0 · description "Sovereign Origin — self-sovereign home OS" |
 | Topics | **ครบแล้ว** — self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql, agpl |
-| Branch protection `main` | **เปิดแล้ว** — required checks 6 ตัว: `Audit site / audit`, `File size guard / size`, `Deploy portfolio / publish`, `Core API tests / test (ubuntu-latest)`, `Core API tests / test (windows-latest)`, `Core API tests / test-db` |
+| Branch protection `main` | **เปิดแล้ว** — required checks 7 ตัว (ชื่อ job ล้วน): `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate` |
 | Release `v1.2.0` | published (ไม่ใช่ draft) — release note เขียนใหม่แล้ว มีคำสั่ง `docker pull` + บันทึกการเผยแพร่ image |
 | Release note | ระบุว่า `api` เผยแพร่สำเร็จ และ `latest`/`1.2` ของ `web` ถูกย้ายมาชี้ build ล่าสุดแล้ว |
 | Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที |
@@ -21,6 +25,7 @@
 | ด่านตรวจ image ก่อนโพสต์ | มีแล้วใน `docs/LAUNCH-REDDIT.md` (หัวข้อ "Verify the published images before posting") |
 | Demo GIF | ฝังใน `README.md` และ `README.en.md` แล้ว (`docs/media/demo.gif`) |
 | Telegram token | ใช้งานได้ (sendMessage → 200) แต่ **ควร rotate** ถ้าเคยหลุดใน log |
+| Quality gate | **ผ่าน 6/6** (2026-11-07, 2.5 นาที) — แก้ module-boundary 6 เส้นที่ค้างหลังแยก Pro + อัปเดตเทสต์ E2E/GHCR ที่อ้าง spec/workflow รุ่นเก่า |
 
 ---
 
@@ -33,8 +38,10 @@
 docker compose -f sovereign-os/infra/docker-compose.yml up -d core-api
 ```
 
-### 2. agent ทำได้ — ตรวจความพร้อมก่อนโพสต์ (รันซ้ำได้ทุกครั้ง)
-รายละเอียดคำสั่งอยู่ใน `docs/LAUNCH-REDDIT.md` หัวข้อ "Verify the published images before posting" สรุปสั้น:
+### 2. ✅ ตรวจ image แล้ว (2026-11-07) — ผ่าน
+ตรวจ manifest แบบไม่ล็อกอินครบ 6 tag: `api`/`web` × `1.2.0`/`1.2`/`latest`
+→ ทุกตัวมี `linux/amd64` + `linux/arm64` และดึงได้โดยไม่ต้องล็อกอิน
+คำสั่งนี้รันซ้ำได้ก่อนโพสต์ทุกครั้ง (รายละเอียดใน `docs/LAUNCH-REDDIT.md`):
 
 ```bash
 # ทุก tag ที่เอกสารอ้างต้องดึงได้แบบไม่ล็อกอิน
@@ -48,6 +55,31 @@ done; done
 ### 3. เจ้าของทำ — โพสต์ Reddit
 ใช้ `docs/LAUNCH-REDDIT.md` (ฉบับเต็ม) หรือฉบับสั้น 5 ช่อง (Project name / Repo / Description / Deployment / AI involvement) ภาษาอังกฤษ
 ก่อนโพสต์: อ่านส่วน "Reviewer checklist before posting" แล้วลบส่วน reviewer ออก
+
+---
+
+## Nightly / Task Scheduler — ตรวจแล้ว 2026-11-07
+
+### แก้แล้ว — tools unit tests (ต้นเหตุที่ Quality Gate แดง)
+- `tools/test/e2e-auth-guard.test.mjs` ยังอ้าง `pos-flow.spec.ts` ที่ถูกลบตอนแยก Pro → อัปเดตเป็น `pages` / `spa-nav` / `farm-executive`
+- `tools/test/community-stack.test.mjs` อ้าง workflow รุ่นเก่า (`linux/amd64,linux/arm64` บรรทัดเดียว) แต่ workflow แยก build ต่อ arch → เปลี่ยนไปตรวจ `platform:` ใน matrix + `imagetools create`
+- `tools/test/batch-codepage.test.mjs` ฟ้อง `tools/install/uninstall.cmd` เป็น LF (ไฟล์นี้ไม่ถูก track — มีผลเฉพาะเครื่องนี้) → แปลงเป็น CRLF แล้ว
+- ผล: `npm run verify` ผ่าน 6/6 (2026-11-07)
+
+### แก้แล้ว — backup restore-check (false positive)
+- nightly 2026-11-07 ฟ้อง `system_settings(12>10)` = "ข้อมูลเพี้ยน" แต่สาเหตุจริงคือ **ลบ DB override ของ Telegram หลังถ่าย backup** (`telegram.botToken` / `telegram.chatId`) ซึ่งเป็นการทำงานปกติ
+- แยกตรรกะเทียบเป็น `tools/verify/restore-compare.mjs` — แถวต่างสองทางถือปกติ (dump เป็น snapshot), ยังจับของจริง (ตารางหาย, migration head ไม่ตรง, restore error) เหมือนเดิม
+- เทสต์ `tools/test/backup-restore-compare.test.mjs` 5/5 · รัน restore จริงซ้ำผ่าน ("กู้คืนได้จริง")
+
+### แก้แล้ว — P0 Task Scheduler + Dead-man Alert (2026-11-07 รอบดึก)
+- **`ShipShop3000`** — disable แล้ว (`schtasks /Change /TN "ShipShop3000" /DISABLE`) เพราะเป็น task เก่าที่รัน `start-sovereign.bat` แล้วค้าง/เปิด browser เอง · `tools/ops-status.mjs` อ่าน `State` แล้วแสดง "ปิดอยู่ (ตั้งใจ)" ไม่นับเป็นงานล้ม
+- **`Sovereign Nightly Verify`** — รันผ่าน Task Scheduler จริงเมื่อ 21:12 → **Last Result 0** · nightly status `ok=true` (gate 6/6 · backup restore ผ่าน · consent smoke ผ่าน)
+- **`Sovereign Nightly Deadman`** — task ใหม่ 03:30 ทุกวัน (ผ่าน `run-hidden.vbs` ไม่มีหน้าต่างเด้ง) · ตรวจ `nightly-history.json`: ไม่ผ่าน/ไม่มีผลติดกัน **2 คืน** = Telegram · dedup วันละครั้ง · creds ใช้ `tools/verify/telegram-creds.mjs` (DB → `sovereign-os/infra/.env`)
+- **`tools/nightly-report.mjs`** — เลิกอ่าน DB เอง เปลี่ยนมาใช้ creds กลาง → รายงาน nightly ส่ง Telegram ได้จริง (ยืนยันรอบ 21:15, creds: env)
+- **`STATUS.md`** — gen ใหม่: gate ✅ 6/6 · nightly ✅ · task scheduler ✅ (10 งาน, ShipShop ปิดตั้งใจ)
+
+### ค้างเฉพาะข้อมูล (ไม่บล็อก P0)
+- `codeMatch=false` ใน nightly ล่าสุด: prod `:3001` ยังรัน fingerprint เก่า (dist 254 ไฟล์ vs ดิสก์ 256) — เป็นเรื่อง deploy ไม่ใช่ nightly พัง; `docker restart sovereign-core-api` จะเคลียร์ (ต้องยืนยันก่อนแตะ production)
 
 ---
 

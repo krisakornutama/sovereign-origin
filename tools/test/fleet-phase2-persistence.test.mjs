@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-const MIGRATION = 'sovereign-os/core-api/prisma/migrations/20261023150000_fleet_persisted_model/migration.sql';
+// migration chain เดิมถูก squash เป็น baseline (20261107190000) — DDL ต้นทางเก็บไว้ที่ migrations_archive
+// เพื่อให้ guard ยังตรวจ "ของจริงที่เคย apply" ได้เหมือนเดิม
+const MIGRATION = 'sovereign-os/core-api/prisma/migrations_archive/20261023150000_fleet_persisted_model/migration.sql';
 const SCHEMA = 'sovereign-os/core-api/prisma/schema.prisma';
 const POLICY = 'sovereign-os/core-api/src/services/fleet-policy.service.ts';
 const ENROLL = 'sovereign-os/core-api/src/services/fleet-enrollment.service.ts';

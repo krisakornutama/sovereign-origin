@@ -7,8 +7,13 @@
  *         หรือ "circadian" = ตามเวลาของวัน (เช้า/สาย/เย็น/กลางคืนโทนฐาน)
  *         — ถ้าไม่ส่งมา ระบบเดาจากเส้นทางปัจจุบัน (auto) หรือส่ง "none" เพื่อบังคับค่าเดิม
  */
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { circadianClass } from '../../lib/useCircadian';
+import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { subscribeOfflineSync } from '../../lib/offlineQueue';
+import { networkState, NetworkIndicatorBadge } from '../../components/nav/NetworkIndicator';
+import { useLanguageStore } from '../../stores/useLanguageStore';
 import SectionTabs from './SectionTabs';
 
 export type PageTheme =
@@ -58,6 +63,22 @@ export default function PageHeader({
     : theme === 'circadian' ? circadianClass()
     : `atmo-${theme}`;
 
+  // Offline UX (Sprint 2 ระยะ 3): network indicator + pending queue counter บน Header ทุกหน้า
+  const { queuedCount, isOnline, syncNow } = useOfflineSync();
+  // syncing = flushQueue กำลังรันจริง (subscribe จาก offlineQueue — setFlushActive ช่วง try/finally)
+  const [syncing, setSyncing] = useState(false);
+  useEffect(() => subscribeOfflineSync(setSyncing), []);
+
+  const netState = networkState(isOnline, queuedCount, syncing);
+
+  // label ตามภาษาที่เลือก (fallback ไทย — เหมือนกติกา t('key', 'fallback') ของโค้ดเดิม)
+  const t = useLanguageStore((s) => s.t);
+  const statusLabel =
+    netState === 'syncing' ? t('common.syncing', 'กำลังซิงก์')
+    : netState === 'offline' ? t('common.offline', 'ออฟไลน์')
+    : t('common.online', 'ออนไลน์');
+  const pendingLabel = t('common.pendingQueue', '{n} รายการรอส่ง');
+
   return (
     <header className={`flex flex-wrap items-end justify-between gap-4 mb-7 ${resolved}`}>
       <div className="min-w-0 flex-1">
@@ -78,7 +99,16 @@ export default function PageHeader({
         {subtitle && <p className="text-[13px] text-gray-400 mt-1.5 leading-relaxed max-w-2xl">{subtitle}</p>}
         <SectionTabs />
       </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <NetworkIndicatorBadge
+          state={netState}
+          queuedCount={queuedCount}
+          label={statusLabel}
+          pendingLabel={pendingLabel}
+          onSync={syncNow}
+        />
+        {actions}
+      </div>
     </header>
   );
 }

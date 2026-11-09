@@ -147,8 +147,11 @@ tools/*
 !tools/nightly-verify.mjs
 !tools/nightly-report.mjs
 !tools/nightly-history.mjs
+!tools/nightly-deadman.mjs
+!tools/ops-task-state.mjs
 !tools/status-doc.mjs
 !tools/stage-release.mjs
+!tools/release-build.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md
 !tools/test/
@@ -165,6 +168,7 @@ tools/*
 !tools/boundary-baseline.json
 !tools/map-owners.mjs
 !tools/gen-module-docs.mjs
+!tools/gen-changelog-data.mjs
 !tools/auto-doc-block.mjs
 # lib ของเทสต์ env-secret-ownership — ไม่มีไฟล์นี้ใน repo = clone สด/CI พังเงียบ (เจอจริงบน MAIN)
 !tools/env-secret-ownership.mjs

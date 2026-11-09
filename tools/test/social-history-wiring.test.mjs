@@ -76,12 +76,14 @@ describe('Social Studio — สายไฟของประวัติกา�
     assert.match(schema, /post\s+SocialPost\s+@relation\([^)]*onDelete: Cascade/);
     assert.match(schema, /account UserEcosystemAccount\?\s+@relation\([^)]*onDelete: SetNull/);
 
+    // 7 พ.ย. 69: migration เดิม 74 ตัวถูกย้ายไป prisma/migrations_archive (ไม่ถูก apply แล้ว)
+    // → ตรวจ baseline ซึ่งเป็นไฟล์เดียวที่รันจริงบน DB ใหม่
     const migration = read(
       'sovereign-os',
       'core-api',
       'prisma',
       'migrations',
-      '20261102120000_add_social_posts',
+      '20261107190000_baseline',
       'migration.sql',
     );
     assert.match(migration, /CREATE TABLE "social_posts"/);

@@ -1,3 +1,4 @@
+import { prisma } from '../lib/prisma';
 import { linearFit, detectAnomalies, type AnomalyPoint } from './predictive.service';
 
 export type ReadingType = 'WEIGHT' | 'BP' | 'SUGAR' | 'TEMP';
@@ -145,4 +146,16 @@ export function analyzeReadings(
     anomalies,
     reference: latest ? checkReference(type, latest.value, latest.systolic, latest.diastolic) : null,
   };
+}
+
+/**
+ * ลบข้อมูลสุขภาพทั้งหมดของผู้ใช้ (PDPA: สิทธิ์ถูกลืม)
+ *
+ * health_profiles / health_readings เป็นของโมดูล health — โมดูล consent
+ * เรียกผ่านฟังก์ชันนี้แทนการยิง prisma เอง (arch-gate module-boundary)
+ * ไม่ลบเป็น transaction เดียวโดยตั้งใจ: เก็บพฤติกรรมเดิมตอนลบบัญชี
+ */
+export async function deleteUserHealthData(userId: string): Promise<void> {
+  await prisma.healthProfile.deleteMany({ where: { user_id: userId } });
+  await prisma.healthReading.deleteMany({ where: { user_id: userId } });
 }

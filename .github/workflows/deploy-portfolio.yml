@@ -27,15 +27,16 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       # token เดินทางผ่าน env → script ใช้ http.extraheader (Basic auth แบบ actions/checkout)
       # ไม่ฝังใน URL จึงไม่มีทางโผล่ใน log/error ของ git หรือ remote.origin.url (redact กันพลาดอีกชั้นใน script)
       PUBLISH_REPO_URL: https://github.com/krisakornutama/project-sovereign.git
       PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 

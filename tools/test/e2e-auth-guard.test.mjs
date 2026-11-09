@@ -12,7 +12,8 @@ const FE = join(ROOT, 'sovereign-frontend');
 const GUARD = join(FE, 'e2e', 'helpers', 'authGuard.ts');
 
 // spec ที่อยู่ใน project "authenticated" ของ playwright.config.ts
-const AUTH_SPECS = ['pages.spec.ts', 'pos-flow.spec.ts', 'spa-nav.spec.ts'];
+// (pos-flow.spec.ts / trace-community.spec.ts / shop-checkout.spec.ts ถูกลบตอนแยก Pro ออกแล้ว)
+const AUTH_SPECS = ['pages.spec.ts', 'spa-nav.spec.ts', 'farm-executive.spec.ts'];
 
 test('มี helper กลางสำหรับ skip เมื่อ auth ล่ม', () => {
   assert.ok(existsSync(GUARD), 'ไม่พบ e2e/helpers/authGuard.ts');

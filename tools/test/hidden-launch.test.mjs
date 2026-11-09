@@ -84,11 +84,30 @@ describe('planHiddenLaunch — ต้องได้ wscript ที่ไม่�
     assert.match(fs.readFileSync(b.cmdFile, 'ascii'), /echo B/);
   });
 
-  test('ไม่มี run-hidden.vbs (แพ็กแบบไม่มี tools/) = สร้าง VBS สำรองที่ทำหน้าที่เดียวกัน', () => {
+  test('แพ็ก desktop: run-hidden.vbs อยู่ข้าง hidden-launch.cjs = ใช้ตัวที่ไปกับแพ็ก แม้ rootDir ไม่มี tools/', () => {
     const dir = tmpDir();
-    const plan = planHiddenLaunch({ rootDir: path.join(dir, 'no-such-root'), cli: 'cmd /c echo hi', tmpDir: dir, tag: 'fallback' });
+    fs.copyFileSync(path.join(ROOT, 'tools', 'hidden-launch.cjs'), path.join(dir, 'hidden-launch.cjs'));
+    fs.copyFileSync(path.join(ROOT, 'tools', 'run-hidden.vbs'), path.join(dir, 'run-hidden.vbs'));
+    const mod = require(path.join(dir, 'hidden-launch.cjs'));
+    const plan = mod.planHiddenLaunch({
+      rootDir: path.join(dir, 'install-root'), // ไม่มี tools/ — เหมือนเครื่องปลายทางที่ติดตั้งแอปเดี่ยว
+      cli: 'cmd /c echo hi',
+      tmpDir: dir,
+      tag: 'pack',
+    });
+    assert.ok(plan, 'ต้องวางแผนได้');
+    assert.equal(plan.args[2], path.join(dir, 'run-hidden.vbs'), 'ต้องใช้ run-hidden.vbs ที่ก๊อปไปกับแพ็ก ไม่ใช่ไฟล์ชั่วคราว');
+  });
+
+  test('ก๊อปมาแค่ hidden-launch.cjs (ไม่มี vbs เลย) = สร้าง VBS สำรองที่ทำหน้าที่เดียวกัน', () => {
+    const dir = tmpDir();
+    fs.copyFileSync(path.join(ROOT, 'tools', 'hidden-launch.cjs'), path.join(dir, 'hidden-launch.cjs'));
+    const mod = require(path.join(dir, 'hidden-launch.cjs'));
+    const plan = mod.planHiddenLaunch({ rootDir: path.join(dir, 'no-such-root'), cli: 'cmd /c echo hi', tmpDir: dir, tag: 'fallback' });
     assert.ok(plan, 'ต้องยังวางแผนได้');
     assert.equal(plan.file, WSCRIPT);
+    assert.ok(fs.existsSync(plan.vbs), 'ต้องสร้าง VBS สำรอง');
+    assert.notEqual(plan.vbs, path.join(dir, 'run-hidden.vbs'), 'ห้ามอ้าง vbs ที่ไม่มีอยู่จริง');
     const vbs = fs.readFileSync(plan.vbs, 'ascii');
     assert.match(vbs, /sh\.Run\("cmd \/c echo hi", 0, True\)/, 'ต้องรันแบบซ่อน (0) และรอจบ (True)');
     assert.match(vbs, /WScript\.Quit rc/, 'ต้องคืน exit code ให้ผู้เรียก');
