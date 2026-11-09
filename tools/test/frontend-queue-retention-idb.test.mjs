@@ -3,6 +3,8 @@
 // `npm run test:tools` รัน node --test เฉพาะ tools/test/**/*.test.mjs
 // เทสต์จริงอยู่ที่ sovereign-frontend/src/lib/offline/offlineQueue.idb.test.ts
 // ใช้ fake-indexeddb (devDependency ของ frontend) + tsx (ของ core-api) เป็นตัวรัน
+// ไม่ผูกเข้า arch-gate: job นั้นติดตั้งเฉพาะ deps ของ core-api จึงไม่มี fake-indexeddb
+// (จะเขียวเฉพาะบนเครื่องที่มี frontend node_modules = หลอกตัวเอง) — รันผ่าน npm run verify แทน
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

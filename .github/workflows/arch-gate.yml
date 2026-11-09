@@ -72,4 +72,6 @@ jobs:
           tools/test/queue.test.mjs
           tools/test/license-issue.test.mjs
           tools/test/frontend-queue-retention.test.mjs
-          tools/test/frontend-queue-retention-idb.test.mjs
+          # ไม่อยู่ใน arch-gate: frontend-queue-retention-idb.test.mjs ต้องใช้ fake-indexeddb
+          # (devDependency ของ sovereign-frontend) แต่ job นี้ติดตั้งเฉพาะ deps ของ core-api
+          # เพื่อความเร็ว/ความแน่นอน — ชุดนี้รันใน `npm run verify` (test:tools) ซึ่งมี frontend deps
