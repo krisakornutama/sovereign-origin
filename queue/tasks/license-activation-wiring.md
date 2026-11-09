@@ -2,8 +2,10 @@
 id: license-activation-wiring
 title: ต่อไลเซนส์ออฟไลน์เข้า API + UI (สถานะ/เปิด-ปิดฟีเจอร์)
 priority: 2
-status: todo
-owner: null
+status: done
+owner: buffy
+claimed: 2026-11-09T16:12:09.602Z
+completed: 2026-11-09T16:24:14.798Z
 created: 2026-11-09
 depends_on: []
 gate: npm run verify
@@ -30,3 +32,7 @@ scope:
 ## หลักฐานที่ต้องแนบตอนปิดงาน
 
 `curl` output ของ 4 เคส + เลข PR
+
+## Report — 2026-11-09T16:24:14.798Z
+
+gate: core-api tsc build=0 · licenseGate 11/11 pass · featureGrants 0 · frontend tsc=0 · CI เขียวทุก workflow บน 034dced
