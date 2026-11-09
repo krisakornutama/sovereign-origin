@@ -2,9 +2,10 @@
 id: queue-retention-sweep
 title: Offline queue retention sweep (ตัดคิวเกิน 30 วัน + audit ก่อนลบ)
 priority: 1
-status: doing
+status: done
 owner: buffy
 claimed: 2026-11-09T16:26:46.274Z
+completed: 2026-11-09T16:53:20.211Z
 created: 2026-11-09
 depends_on: []
 gate: npm run verify
@@ -35,3 +36,7 @@ scope:
 ## หลักฐานที่ต้องแนบตอนปิดงาน
 
 คำสั่งที่รัน + exit code + เลข PR/commit
+
+## Report — 2026-11-09T16:53:20.211Z
+
+Sweep runs on boot and on settings mount; queue rows older than 30 days are removed only after the audit record is written (write-ahead), audit store capped at 50, last sweep summarised in settings. Evidence: queue-retention.test.ts 11/11, npm run verify 6/6 (arch + frontend gate), arch-gate now runs tools/test/frontend-queue-retention.test.mjs, CI 8/8 green on 0dcee0f.
