@@ -16,12 +16,13 @@
    ```bash
    bash tools/set-required-checks.sh --apply
    ```
-   script จะ PUT `required_status_checks` ครบ **7 contexts**: `Audit site / audit` · `File size guard / size` · `Deploy portfolio / publish` · `Core API tests / test (ubuntu-latest)` · `Core API tests / test (windows-latest)` · **`Core API tests / test-db`** · **`Architecture Gate / arch-gate`** (ตัวหลังนี้รัน gate ชุดใหม่ no-db-push + ci-ddl-sync ด้วย) แล้วพิมพ์รายการที่ตั้งสำเร็จกลับมาให้เห็น
+   script จะ PUT `required_status_checks` ครบ **7 contexts**: `audit` · `size` · `publish` · `test (ubuntu-latest)` · `test (windows-latest)` · **`test-db`** · **`arch-gate`** (ตัวหลังนี้รัน gate ชุดใหม่ no-db-push + ci-ddl-sync ด้วย) แล้วพิมพ์รายการที่ตั้งสำเร็จกลับมาให้เห็น
+   > ⚠️ **ชื่อ context ต้องเป็นชื่อ job ล้วน ไม่มี `Workflow / ` นำหน้า** — ถ้าใส่แบบมี prefix PR ที่เช็คเขียวครบจะยังขึ้น `BLOCKED` ตลอดกาล (ดูบันทึกบั๊กท้าย 문서)
 5. **ยืนยันผลจริง** (อ่านกลับจาก API — อย่าเชื่อข้อความ success ของ script อย่างเดียว):
    ```bash
    gh api repos/krisakornutama/sovereign-origin/branches/main/protection --jq '.required_status_checks.contexts'
    ```
-   ต้องเห็นครบ 7 แถวรวม `Core API tests / test-db` และ `Architecture Gate / arch-gate`
+   ต้องเห็นครบ 7 แถว: `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate`
 6. ทดสอบพฤติกรรมจริง: ยิง PR จำลอง (สาขาเล็ก ๆ แก้ README) → หน้า PR ต้องบล็อก Merge จนเช็คเขียวครบ + ถ้า push เข้า main โดยข้าม (direct push) ตัว protection `strict=true` จะบังคับอัปเดตสาขาก่อนเสมอ
 
 ## ทางเลือก B — เปลี่ยน repo เป็น public (ไม่เสียเงิน)
@@ -51,7 +52,7 @@
 
 | หลักฐาน | ผลที่เห็น |
 |---|---|
-| `gh pr checks 55` | ขึ้นครบ 7 required contexts — `Architecture Gate / arch-gate` · `Audit site / audit` · `File size guard / size` · `Deploy portfolio / publish` · `Core API tests / test (ubuntu-latest)` · `test (windows-latest)` · `test-db` (มี `test-integration` และ `boundary` เพิ่มมาด้วยแต่ไม่บังคับ) |
+| `gh pr checks 55` | ขึ้นครบทุก context ที่ตั้งเป็น required — `arch-gate` · `audit` · `size` · `publish` · `test (ubuntu-latest)` · `test (windows-latest)` · `test-db` (มี `test-integration` และ `boundary` เพิ่มมาด้วยแต่ไม่บังคับ) |
 | `gh pr view 55 --json mergeStateStatus` ขณะเช็คยัง pending | `BLOCKED`/`BEHIND` — ปุ่ม Merge กดไม่ได้จนกว่าจะเขียวครบ |
 | arch-gate แดง (ตอนลองให้รัน suite เต็มชุด) | PR ยัง merge ไม่ได้ → required check บล็อกจริง ไม่ใช่แค่โชว์สถานะ |
 

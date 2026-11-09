@@ -5,15 +5,20 @@
 # ผ่านการทดสอบ dry-run แล้วเมื่อ 2026-09-17 (apply โดน 403 เพราะ private repo บนแพลนฟรี — ตามคาด)
 set -euo pipefail
 REPO="${REPO:-krisakornutama/sovereign-origin}"
+# ชื่อ context ต้องเป็น "ชื่อ job" ตรง ๆ — ห้ามใส่ "Workflow / " นำหน้า
+# GitHub จับคู่ required check กับ check run ที่มีชื่อเท่ากับ job เท่านั้น
+# บั๊กจริง (9 พ.ย. 69): ตั้งแบบ "Architecture Gate / arch-gate" → PR ที่เช็คเขียวครบทุกตัว
+# ยังขึ้น BLOCKED ตลอดกาล (`gh pr merge` ตอบ "the base branch policy prohibits the merge")
+# ทดลอง A/B บน PR เดียวกัน: "Architecture Gate / arch-gate" = BLOCKED, "arch-gate" = UNSTABLE/CLEAN
 CONTEXTS=(
-  "Audit site / audit"
-  "File size guard / size"
-  "Deploy portfolio / publish"
-  "Core API tests / test (ubuntu-latest)"
-  "Core API tests / test (windows-latest)"
-  "Core API tests / test-db"
+  "audit"
+  "size"
+  "publish"
+  "test (ubuntu-latest)"
+  "test (windows-latest)"
+  "test-db"
   # เพิ่ม 7 พ.ย. 69: arch-gate เป็นที่รันของ gate ชุดใหม่ (no-db-push + ci-ddl-sync)
-  "Architecture Gate / arch-gate"
+  "arch-gate"
 )
 
 # 1) สิทธิ์: repo ส่วนตัวฟรีจะ 403 ที่นี่ — สคริปต์บอกทางออกตรง ๆ ไม่เดา
