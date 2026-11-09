@@ -28,6 +28,8 @@ interface Props {
 }
 
 export default function OfflineQueuePanel({ onMessage, onError }: Props) {
+  // gate probe: ตั้งใจทำ render พังชั่วคราวเพื่อพิสูจน์ว่า required check บล็อกจริง
+  throw new Error('required-check gate probe');
   const t = useLanguageStore((s) => s.t);
   const { queuedCount, syncNow } = useOfflineSync();
   const [queuedItems, setQueuedItems] = useState<QueuedAction[]>([]);
