@@ -62,5 +62,12 @@ jobs:
       # เดิมรันได้แค่ผ่าน tools/verify.mjs บนเครื่อง → CI ไม่เคยบังคับ ตอนนี้เป็น required check แล้ว
       # ระบุไฟล์ตรง ๆ ไม่รันทั้งชุด: suite เต็ม (1349 เทสต์) ค้างบน runner ทั้งที่ในเครื่องใช้ 37 วิ
       # (job นี้เป็น required check — ต้องเร็วและจบแน่นอน) · ชุดเต็มยังรันในเครื่องผ่าน tools/verify.mjs
-      - name: ตรวจ gate ชุดใหม่ (no-db-push + ci-ddl-sync)
-        run: node --test tools/test/no-db-push-gate.test.mjs tools/test/ci-ddl-sync.test.mjs
+      # เพิ่ม 9 พ.ย. 69: คิวงานของ agent (queue) + ไลเซนส์ออฟไลน์ (license) ต้องเป็น required check
+      # เช่นกัน เพราะเป็นระบบที่ "ขายได้/สั่งงานได้" — ถ้าไม่ผูก CI จะพังเงียบ
+      - name: ตรวจ gate (no-db-push + ci-ddl-sync + queue + license)
+        run: >
+          node --test
+          tools/test/no-db-push-gate.test.mjs
+          tools/test/ci-ddl-sync.test.mjs
+          tools/test/queue.test.mjs
+          tools/test/license-issue.test.mjs

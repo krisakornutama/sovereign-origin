@@ -4,6 +4,8 @@
   "private": true,
   "description": "Sovereign Origin — Self-Sovereign Home OS (monorepo ของ sovereign-frontend + sovereign-os/core-api)",
   "scripts": {
+    "queue": "node tools/queue/queue.mjs",
+    "license": "node tools/license/issue.mjs",
     "verify": "node tools/verify.mjs",
     "verify:full": "node tools/verify.mjs --e2e",
     "build:desktop": "node tools/build-desktop.mjs",
