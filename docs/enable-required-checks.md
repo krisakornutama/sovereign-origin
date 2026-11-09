@@ -44,3 +44,18 @@
 | ต้องการเปลี่ยนรายชื่อ checks | — | แก้ array `CONTEXTS` ที่หัวไฟล์ `tools/set-required-checks.sh` (แหล่งเดียวจบ) |
 
 > หลังตั้งสำเร็จ: อัปเดตแถว "Required checks บน main" ใน `docs/ops-runbook.md` §๘ จาก "พร้อมตั้ง 6 — apply ไม่ได้ (403)" เป็น "บังคับจริง 6 contexts ตั้งเมื่อ <วันที่>" — และบรรทัด "รอเจ้าของ" ใน STATUS.md
+
+## บันทึกผลทดสอบจริง — PR #55 (9 พ.ย. 69)
+
+ยิง PR ทดสอบเพื่อยืนยันว่า protection บังคับใช้จริง (ไม่ใช่แค่ตั้งค่าไว้):
+
+| หลักฐาน | ผลที่เห็น |
+|---|---|
+| `gh pr checks 55` | ขึ้นครบ 7 required contexts — `Architecture Gate / arch-gate` · `Audit site / audit` · `File size guard / size` · `Deploy portfolio / publish` · `Core API tests / test (ubuntu-latest)` · `test (windows-latest)` · `test-db` (มี `test-integration` และ `boundary` เพิ่มมาด้วยแต่ไม่บังคับ) |
+| `gh pr view 55 --json mergeStateStatus` ขณะเช็คยัง pending | `BLOCKED`/`BEHIND` — ปุ่ม Merge กดไม่ได้จนกว่าจะเขียวครบ |
+| arch-gate แดง (ตอนลองให้รัน suite เต็มชุด) | PR ยัง merge ไม่ได้ → required check บล็อกจริง ไม่ใช่แค่โชว์สถานะ |
+
+> **ทำไม arch-gate จึงยังรันเฉพาะ 2 gate ไฟล์** (`no-db-push-gate`, `ci-ddl-sync`): tools suite เต็มชุดจบได้แล้ว
+> (แก้เหตุค้างใน #51 — keep-alive socket ในเทสต์ + `--test-force-exit`) แต่ยังมีเทสต์ที่ผูกกับ Windows
+> (`tools/*.cmd`, `*.ps1`, launcher dry-run) และ suite ของ frontend ที่ต้องลง deps ของ `sovereign-frontend`
+> ก่อน — ถ้าจะย้ายมาเป็น required check บน ubuntu ต้องทำ platform guard ให้ครบก่อน (งานแยก)
