@@ -99,28 +99,41 @@ try {
   // ที่ถูก: *.dump (backup-db.ps1) · ที่เก่า: sovereign_backup_*.sql.gz — รับทั้งคู่กันเครื่องเก่าไม่เผลอ
   const isBackup = (f) =>
     f.endsWith('.dump') || (f.startsWith('sovereign_backup_') && f.endsWith('.sql.gz'));
-  let files = [];
+  // เลือกไฟล์ล่าสุดด้วย mtime ไม่ใช่ชื่อ — ชื่อจากสายต่างกัน (sovereign_/sovereign_shadow_orch_)
+  // เคยเรียงตามชื่อแล้วหยิบไฟล์ผิดตัว ทำให้อ่านอายุผิด
+  const newestIn = (dir) => {
+    let best = null;
+    for (const f of readdirSync(dir).filter(isBackup)) {
+      const mtimeMs = statSync(join(dir, f)).mtimeMs;
+      if (!best || mtimeMs > best.mtimeMs) best = { file: f, mtimeMs };
+    }
+    return best;
+  };
+  let found = null;
   let where = DB_BACKUP_DIR;
-  try {
-    files = readdirSync(DB_BACKUP_DIR).filter(isBackup);
-  } catch { files = []; }
-  if (!files.length) {
-    // โฟลเดอร์ที่ถูกไม่มีไฟล์ → ลองโฟลเดอร์เก่าก่อนบอกวิกฤต (กันเตือนปลอมตอนย้ายโฟลเดอร์)
+  let source = 'live';
+  try { found = newestIn(DB_BACKUP_DIR); } catch { found = null; }
+  if (!found) {
+    // โฟลเดอร์ที่ถูกไม่มีไฟล์ → ลองโฟลเดอร์เก่า (กันเตือนปลอมตอนย้ายโฟลเดอร์)
+    // แต่ต้องบอกชัดว่าเป็น legacy: ไฟล์เก่าที่นี่ไม่ใช่หลักฐานว่าสาย 03:00 ยังทำงาน
     try {
-      files = readdirSync(LEGACY_BACKUP_DIR).filter(isBackup);
+      found = newestIn(LEGACY_BACKUP_DIR);
       where = LEGACY_BACKUP_DIR;
-    } catch { files = []; }
+      source = 'legacy';
+    } catch { found = null; }
   }
-  if (!files.length) {
+  if (!found) {
     problems.push({ level: 'critical', area: 'backup', message: `ไม่มีไฟล์ DB backup เลย (${DB_BACKUP_DIR} และ ${LEGACY_BACKUP_DIR}) — สาย backup 03:00 ไม่เคยสำเร็จ` });
     info.dbBackupAgeH = null;
+    info.dbBackupSource = null;
   } else {
-    files.sort();
-    const newest = files.at(-1);
-    const age = ageHours(statSync(join(where, newest)).mtimeMs);
+    const age = ageHours(found.mtimeMs);
     info.dbBackupAgeH = age;
-    info.dbBackupFile = newest;
-    if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'backup', message: `DB backup เก่า ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ไฟล์ล่าสุด ${newest} — สาย 03:00 พัง/ถูกข้ามหลายคืน` });
+    info.dbBackupFile = found.file;
+    info.dbBackupSource = source;
+    const legacyNote = source === 'legacy' ? ` — ไฟล์นี้มาจาก legacy ${LEGACY_BACKUP_DIR}, โฟลเดอร์จริง ${DB_BACKUP_DIR} ไม่มีไฟล์ (สาย 03:00 ไม่ได้เขียน)` : '';
+    if (age > BACKUP_MAX_AGE_H) problems.push({ level: 'critical', area: 'backup', message: `DB backup เก่า ${age} ชม. (> ${BACKUP_MAX_AGE_H}) — ไฟล์ล่าสุด ${found.file}${legacyNote} — สาย 03:00 พัง/ถูกข้ามหลายคืน` });
+    else if (source === 'legacy') problems.push({ level: 'warn', area: 'backup', message: `อ่าน backup จาก legacy ${LEGACY_BACKUP_DIR} (${age} ชม.) แต่โฟลเดอร์จริง ${DB_BACKUP_DIR} ไม่มีไฟล์ — ตรวจว่าสาย 03:00 เขียนลงที่ที่ถูก` });
   }
 } catch (e) {
   info.dbBackupAgeH = null;
