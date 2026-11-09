@@ -49,9 +49,16 @@ test('--remove-files ให้คำสั่งมือ ไม่รันล�
   assert.ok(plan.warnings.some((w) => w.includes('ซอร์ส')));
 });
 
-test('ถอนซ้ำได้: คำสั่งที่อาจล้มเหลวถูกทำเครื่องหมาย tolerateFailure', () => {
+test('ถอนซ้ำได้: คำสั่งที่อาจล้มเหลวต้องไม่ทำให้ทั้งแผนล้ม', () => {
   const plan = buildUninstallPlan({ platform: 'win32', hasCompose: true, purgeData: true });
-  for (const id of ['stop-task', 'compose-down', 'purge-backups']) {
+  for (const id of ['stop-task', 'purge-backups']) {
     assert.equal(plan.steps.find((s) => s.id === id)?.tolerateFailure, true, `${id} ต้องไม่ทำให้ถอนซ้ำล้ม`);
   }
+  // compose-down ใช้ classifyFailure แทน tolerateFailure: "ไม่มี project/container แล้ว" ถือว่าผ่าน
+  // แต่ error จริง (เช่น env ไม่ครบจนหยุดไม่ได้) ต้องล้มให้เห็น — เดิม tolerateFailure กลืนจนรายงาน "ถอนเสร็จ"
+  const down = plan.steps.find((s) => s.id === 'compose-down');
+  assert.equal(typeof down?.classifyFailure, 'function', 'compose-down ต้องใช้ classifyFailure');
+  assert.equal(down?.tolerateFailure, undefined, 'compose-down ต้องไม่กลืน error จริง');
+  assert.equal(down?.classifyFailure('no such project: sovereign'), true, 'ถอนซ้ำ (ไม่มีแล้ว) ต้องผ่าน');
+  assert.equal(down?.classifyFailure('required variable POSTGRES_PASSWORD is missing a value'), false);
 });

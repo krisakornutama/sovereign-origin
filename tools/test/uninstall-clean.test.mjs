@@ -4,7 +4,12 @@
 // จึงรันได้ทั้ง Windows และ Linux โดยไม่ต้องมี Docker/schtasks จริง
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildUninstallPlan } from '../install/uninstall.mjs';
+import {
+  buildComposeDownArgs,
+  buildUninstallPlan,
+  classifyComposeFailure,
+  resolveComposeEnvFile,
+} from '../install/uninstall.mjs';
 
 const stepsOf = (plan, id) => plan.steps.filter((s) => s.id === id || s.id.startsWith(`${id}:`));
 const commands = (plan) => plan.steps.filter((s) => s.command);
@@ -70,7 +75,10 @@ test('U4: ถอนซ้ำได้ — ทุกคำสั่งที่�
   const runnable = plan.steps.filter((s) => s.command && !s.manual);
   assert.ok(runnable.length > 0, 'ต้องมีขั้นที่รันได้จริงให้ตรวจ');
   for (const step of runnable) {
-    assert.equal(step.tolerateFailure, true, `${step.id}: ต้อง tolerateFailure เพื่อให้ถอนซ้ำได้`);
+    // ถอนซ้ำได้ = ขั้นที่ "ไม่มีอะไรให้ถอนแล้ว" ต้องไม่ทำให้ exit 1
+    // compose ใช้classifyFailure (แยก "ไม่มีอะไรให้ถอน" ออกจาก error จริง) ขั้นอื่นใช้ tolerateFailure
+    const rerunnable = step.tolerateFailure === true || typeof step.classifyFailure === 'function';
+    assert.equal(rerunnable, true, `${step.id}: ต้องถอนซ้ำได้โดยไม่ล้ม`);
   }
   // แผนต้อง deterministic — รันซ้ำได้ผลเหมือนเดิม
   assert.deepEqual(buildUninstallPlan({ platform: 'win32', hasCompose: true, purgeData: true, purgeImages: true }), plan);
@@ -108,6 +116,40 @@ test('U7: --remove-files เป็นคำสั่ง manual ตาม OS (ไ
 
   const nix = buildUninstallPlan({ platform: 'linux', hasCompose: true, removeFiles: true });
   assert.match(nix.steps.find((s) => s.id === 'remove-files').manual, /rm -rf/);
+});
+
+test('U9: compose ต้องได้ --env-file จากไฟล์ที่มีอยู่จริง (ไม่งั้น down ล้มเงียบ)', () => {
+  const args = buildComposeDownArgs({ composeFile: '/repo/docker-compose.yml', envFile: '/repo/.env.test' });
+  assert.deepEqual(args.slice(0, 5), ['compose', '--env-file', '/repo/.env.test', '-f', '/repo/docker-compose.yml']);
+  assert.deepEqual(args.slice(-1), ['down']);
+
+  const noEnv = buildComposeDownArgs({ composeFile: '/repo/docker-compose.yml' });
+  assert.deepEqual(noEnv, ['compose', '-f', '/repo/docker-compose.yml', 'down'], 'ไม่มีไฟล์ env = ไม่ต้องส่ง flag ปลอม');
+
+  // เลือกตัวแรกที่มีจริง (เทสแบบ pure ด้วยการฉีด exists)
+  const files = ['/repo/deploy/community/.env', '/repo/deploy/community/.env.test', '/repo/.env'];
+  assert.equal(resolveComposeEnvFile({ candidates: files, exists: (f) => f.endsWith('.env.test') }), files[1]);
+  assert.equal(resolveComposeEnvFile({ candidates: files, exists: () => false }), null);
+});
+
+test('U10: แยก "ไม่มีอะไรให้ถอน" ออกจาก "หยุดไม่ได้จริง"', () => {
+  assert.equal(classifyComposeFailure('no such project: sovereign'), true);
+  assert.equal(classifyComposeFailure('nothing to remove'), true);
+  assert.equal(
+    classifyComposeFailure(
+      'error while interpolating services.api.environment.DATABASE_URL: required variable POSTGRES_PASSWORD is missing a value'
+    ),
+    false,
+    'interpolate env ไม่ครบ = หยุดไม่ได้ ต้องไม่ถูกกลืนเป็นความสำเร็จ'
+  );
+  assert.equal(classifyComposeFailure('error during connect: docker daemon not running'), false);
+
+  // ขั้น compose ต้องไม่ใช้ tolerateFailure แบบเหมารวมอีก
+  const plan = buildUninstallPlan({ platform: 'linux', hasCompose: true, composeEnvFile: '/repo/.env.test' });
+  const down = composeStep(plan);
+  assert.equal(down.tolerateFailure, undefined);
+  assert.equal(typeof down.classifyFailure, 'function');
+  assert.ok(down.args.includes('--env-file'));
 });
 
 test('U8: บอกรายการที่ "ไม่ถอน" ครบและตรงกับตัวเลือก', () => {

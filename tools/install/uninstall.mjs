@@ -23,6 +23,42 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TASK_NAME = 'Sovereign Agent Runner';
 const COMPOSE_FILE = join(ROOT, 'deploy', 'community', 'docker-compose.yml');
 
+/** ไฟล์ env ที่ compose ใช้ interpolate — ต้องส่งให้ `docker compose` เอง ไม่งั้นตัวแปร ${...} ว่าง
+ *  และ `compose down` จะล้มก่อนได้หยุด container (เจอจริง: สแตก community รันด้วย .env.test) */
+export const COMPOSE_ENV_CANDIDATES = [
+  join(ROOT, 'deploy', 'community', '.env'),
+  join(ROOT, 'deploy', 'community', '.env.test'),
+  join(ROOT, '.env'),
+  join(ROOT, 'sovereign-os', 'infra', '.env'),
+];
+
+/** เลือกไฟล์ env ตัวแรกที่มีอยู่ (บริสุทธิ์ — ฉีด exists เพื่อเทส) */
+export function resolveComposeEnvFile({ candidates = COMPOSE_ENV_CANDIDATES, exists = existsSync } = {}) {
+  return candidates.find((file) => exists(file)) || null;
+}
+
+/**
+ * ความล้มเหลวของ `compose down` ที่ “ถอนซ้ำได้” (ไม่มีอะไรให้ถอนแล้ว) — ส่วน error อื่น
+ * เช่น interpolate env ไม่ครบ = หยุดไม่ได้จริง ต้องรายงานเป็นความล้มเหลว ไม่ใช่กลืนหาย
+ */
+const TOLERATED_COMPOSE_FAILURES = [/no such (project|object|service|container)/i, /nothing to (remove|stop)/i, /no resource found/i];
+
+export function classifyComposeFailure(output) {
+  return TOLERATED_COMPOSE_FAILURES.some((re) => re.test(String(output ?? '')));
+}
+
+/** อาร์กิวเมนต์ compose down — แยกออกมาเพื่อเทสลำดับ/การส่ง --env-file */
+export function buildComposeDownArgs({ composeFile = COMPOSE_FILE, envFile = null, purgeData = false } = {}) {
+  return [
+    'compose',
+    ...(envFile ? ['--env-file', envFile] : []),
+    '-f',
+    composeFile,
+    'down',
+    ...(purgeData ? ['-v', '--remove-orphans'] : []),
+  ];
+}
+
 /**
  * สร้างแผนถอน (บริสุทธิ์ — ไม่แตะดิสก์/โปรเซส) เพื่อให้เทสได้โดยไม่ต้องมี Docker
  * แต่ละขั้นมี `command`/`args` ว่างได้ = ไม่มีคำสั่ง (เช่น ข้ามเพราะไม่มีไฟล์)
@@ -35,6 +71,7 @@ export function buildUninstallPlan(options = {}) {
     purgeImages = false,
     removeFiles = false,
     taskName = TASK_NAME,
+    composeEnvFile = resolveComposeEnvFile(),
   } = options;
 
   const steps = [];
@@ -58,8 +95,10 @@ export function buildUninstallPlan(options = {}) {
       id: 'compose-down',
       label: purgeData ? 'หยุด container + ลบ volume/ข้อมูล' : 'หยุด container (เก็บ volume ข้อมูลไว้)',
       command: 'docker',
-      args: ['compose', '-f', COMPOSE_FILE, 'down', ...(purgeData ? ['-v', '--remove-orphans'] : [])],
-      tolerateFailure: true,
+      args: buildComposeDownArgs({ envFile: composeEnvFile, purgeData }),
+      // ไม่ใช้ tolerateFailure: ต้องแยก "ไม่มีอะไรให้ถอน" ออกจาก "หยุดไม่ได้จริง"
+      classifyFailure: classifyComposeFailure,
+      nextAction: 'ตรวจว่า deploy/community/.env มี POSTGRES_PASSWORD/JWT_SECRET/EMQX_PASSWORD ครบ',
     });
   } else {
     add({
@@ -141,6 +180,23 @@ function runStep(step) {
     console.log(`  ! ${step.label}\n    → ${step.manual}`);
     return true;
   }
+  // ขั้นที่ต้องแยกชนิดความล้มเหลว: เก็บ output ไว้ตรวจก่อนตัดสิน
+  if (step.classifyFailure) {
+    const res = spawnSync(step.command, step.args, { encoding: 'utf8', shell: false });
+    const output = `${res.stdout || ''}${res.stderr || ''}`;
+    if (res.status === 0) {
+      console.log(`  ✓ ${step.label}`);
+      return true;
+    }
+    if (step.classifyFailure(output)) {
+      console.log(`  ~ ${step.label} (ไม่มีอะไรให้ถอนแล้ว)`);
+      return true;
+    }
+    console.error(`  ✗ ${step.label} (exit ${res.status ?? 'unknown'})`);
+    for (const line of output.trim().split(/\r?\n/).slice(0, 3)) console.error(`    ${line}`);
+    return false;
+  }
+
   const res = spawnSync(step.command, step.args, { stdio: 'inherit', shell: false });
   if (res.status === 0) {
     console.log(`  ✓ ${step.label}`);
@@ -183,6 +239,6 @@ if (isMain) {
   // พิมพ์ซ้ำหลังทำจริง — ผู้ใช้ปิด transcript ไว้หรือเลื่อนผ่านตอนต้นก็ยังเห็น
   console.log('\n  ไม่ได้ถอน (ข้อมูลของคุณยังอยู่):');
   for (const item of plan.kept) console.log(`  · ${item}`);
-  console.log(ok ? '\n✅ ถอนเสร็จ' : '\n⚠ บางขั้นล้มเหลว — ตรวจข้อความด้านบน');
+  console.log(ok ? '\n✅ ถอนเสร็จ' : '\n⚠ ถอนไม่เสร็จ — มีขั้นที่หยุดไม่ได้ (ดูข้อความด้านบน) แล้วรันซ้ำ');
   process.exit(ok ? 0 : 1);
 }
