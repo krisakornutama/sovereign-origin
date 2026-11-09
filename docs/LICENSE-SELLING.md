@@ -110,3 +110,20 @@ Lemon Squeezy / Gumroad (MoR)
 | ต้องการให้หมดอายุเร็วขึ้น | ออกใหม่ด้วย `--days` น้อยลง (ใบเก่าตายเองตามวัน) |
 
 > ห้าม commit `license-priv.pem` · ห้ามพิมพ์ private key ลงแชท/ล็อก · ห้ามใส่ private key ใน CI
+
+## 8. การบังคับสิทธิ์ในแอป (ต่อเข้า API แล้ว 9 พ.ย. 69)
+
+| ชิ้นส่วน | ที่อยู่ |
+|---|---|
+| สถานะไลเซนส์ | `GET /api/license` (ต้อง login) → `{mode, configured, valid, reason, tier, features, expiresAt, daysLeft, licensee, licenseId, machineBound, expiringSoon}` |
+| middleware | `licenseGuard('/reports')` ต่อจาก `featureGuard` ใน `routes.ts` — ใช้ที่ `/api/reports`, `/api/inventory` (+ waste) |
+| UI | การ์ดในหน้า `/system` (โหมด · tier · วันหมดอายุ · เหลือกี่วัน) |
+
+**กติกา CE (สำคัญ):** ยังไม่ตั้งไลเซนส์ **หรือ** ไลเซนส์ไม่ผ่าน (หมดอายุ / ผิดเครื่อง / ลายเซ็นพัง / ไม่มี public key)
+= ปล่อยผ่านทุกฟีเจอร์ เพราะเครื่องนี้เป็นของลูกค้าและข้อมูลเป็นของเขา — ไลเซนส์หมดอายุต้องไม่ล็อกเอาต์
+
+บังคับสิทธิ์เฉพาะเมื่อ **ไลเซนส์ผ่าน** เท่านั้น: ฟีเจอร์นอก `features` → `403 { code: 'LICENSE_FEATURE_NOT_ENTITLED' }`
+ที่ middleware (ไม่ใช่ซ่อนเมนู) · `features: ["*"]` = ทุกฟีเจอร์
+
+`GET /api/license` ไม่คืน token, public key หรือ machine hash และตอบ `Cache-Control: no-store`
+(มีเทสต์ `tests/licenseGate.test.ts` ล็อกไว้ 11 เคส: CE / ผ่าน / หมดอายุ / ผิดเครื่อง / ลายเซ็นพัง / wildcard / 401)

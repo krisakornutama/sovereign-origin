@@ -92,6 +92,8 @@ import qrRoutes from './modules/system/qr.routes';
 import automationAlertsRoutes from './modules/automation/alerts.routes';
 import traceRoutes from './modules/trace/trace.routes';
 import { featureGuard } from './services/feature-grant.service';
+import { licenseGuard } from './services/license-gate.service';
+import licenseRoutes from './modules/license/license.routes'; // สถานะไลเซนส์ออฟไลน์ (GET /api/license)
 
 // ────────────────────────────────────────────────────────────────────────────
 // mountRoutes — จุดรวมเสียบ route ทั้งหมด (ย้ายมาจาก server.ts)
@@ -136,7 +138,8 @@ export function mountRoutes(app: Express): void {
   app.use('/api/agent-machines', agentMachinesRoutes); // HUB: ลงทะเบียนเครื่อง + สั่งงานข้ามเครื่อง (ผู้ใช้ JWT / runner machine-token)
   app.use('/api/machine-control', machineControlRoutes); // ช่องควบคุมเครื่อง: long-poll ของ runner + state/frame/command ของ SUPERADMIN
   app.use('/api/timescale', timescaleRoutes);
-  app.use('/api/reports', featureGuard('/reports'), reportRoutes);
+  // licenseGuard: ไลเซนส์ผ่าน = บังคับสิทธิ์ตาม tier · ยังไม่มี/ไม่ผ่าน = โหมด CE ปล่อยผ่าน
+  app.use('/api/reports', featureGuard('/reports'), licenseGuard('/reports'), reportRoutes);
   app.use('/api/backup', featureGuard('/backup'), backupRoutes);
   app.use('/api/mesh', featureGuard('/backup'), meshRoutes); // Mesh Lite — สำรองนอกสถานที่แบบเข้ารหัส
   app.use('/api/energy', featureGuard('/energy'), energyRoutes);
@@ -250,8 +253,8 @@ export function mountRoutes(app: Express): void {
   // ── Feature Modules (ENABLED_MODULES) ──
   // เปิด-ปิดกลุ่ม API ระดับโมดูลผ่าน infra/.env — ปิดแล้ว route ไม่ถูก mount (404)
   if (config.modules.isEnabled('inventory')) {
-    app.use('/api/inventory', featureGuard('/inventory'), inventoryRoutes); // Water & Food Inventory + วันหมดอายุ
-    app.use('/api/inventory', featureGuard('/inventory'), wasteRoutes); // S4: ขยะร้าน → ปุ๋ยหมัก — move-to-waste
+    app.use('/api/inventory', featureGuard('/inventory'), licenseGuard('/inventory'), inventoryRoutes); // Water & Food Inventory + วันหมดอายุ
+    app.use('/api/inventory', featureGuard('/inventory'), licenseGuard('/inventory'), wasteRoutes); // S4: ขยะร้าน → ปุ๋ยหมัก — move-to-waste
   }
   // S4: Compost loop — ขยะร้าน → ปุ๋ยหมัก → แปลงเกษตร
   app.use('/api/compost', featureGuard('/farm'), compostRoutes);
@@ -276,6 +279,7 @@ export function mountRoutes(app: Express): void {
 
   // ── สิทธิ์ฟังก์ชั่นต่อคน: API ตั้งสิทธิ์ (catalog / me / users/:id) ──
   app.use('/api/features', featureRoutes);
+  app.use('/api/license', licenseRoutes); // สถานะไลเซนส์ของเครื่องนี้ (ไม่คืน token)
 
   // ── เดิมเป็น inline routes ใน server.ts — แยกเป็น module แล้ว (mount ต่อท้ายตามลำดับเดิม) ──
   app.use('/api', dashboardRoutes); // GET /api/modules + /api/dashboard/stats
