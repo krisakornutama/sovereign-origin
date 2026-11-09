@@ -1,0 +1,103 @@
+name: Settings E2E
+
+# ตรวจหน้า /settings ในเบราว์เซอร์จริงหลังแยก component (OfflineQueuePanel · Telegram · MFA · Voice)
+# ทำไมต้องมี: unit/typecheck ผ่านไม่ได้แปลว่า component ถูก mount — ถ้า import หลุด
+# หรือ panel โยน error ตอน render หน้า settings จะว่าง/ค้าง ซึ่งตาเปล่าจับได้ช้ากว่า CI
+
+on:
+  pull_request:
+    paths:
+      - 'sovereign-frontend/src/pages/settings.tsx'
+      - 'sovereign-frontend/src/components/system/**'
+      - 'sovereign-frontend/e2e/settings.spec.ts'
+      - 'sovereign-frontend/e2e/auth.setup.ts'
+      - 'sovereign-frontend/playwright.config.ts'
+      - '.github/workflows/settings-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'sovereign-frontend/src/pages/settings.tsx'
+      - 'sovereign-frontend/src/components/system/**'
+      - 'sovereign-frontend/e2e/settings.spec.ts'
+      - 'sovereign-frontend/playwright.config.ts'
+      - '.github/workflows/settings-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  settings-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      db:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER: sovereign
+          POSTGRES_PASSWORD: ci-local-password
+          POSTGRES_DB: sovereign
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sovereign -d sovereign"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://sovereign:ci-local-password@localhost:5432/sovereign
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef
+      SEED_ADMIN_PASSWORD: ci-admin-password-1234
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      E2E_API_URL: http://localhost:3001
+      TZ: Asia/Bangkok
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install core-api dependencies
+        run: npm install --no-fund --no-audit
+        working-directory: sovereign-os/core-api
+
+      - name: Generate Prisma client + build
+        run: npx prisma generate && npm run build
+        working-directory: sovereign-os/core-api
+
+      # ใช้สคริปต์เดียวกับชุดติดตั้ง: migrate deploy + baseline (P3005) แล้ว seed
+      - name: Migrate (baseline-safe) + seed
+        run: node dist/scripts/migrate-deploy.js && node dist/scripts/seed.js
+        working-directory: sovereign-os/core-api
+
+      - name: Start core-api
+        run: |
+          node dist/server.js > /tmp/core-api.log 2>&1 &
+          echo $! > /tmp/core-api.pid
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 3 http://localhost:3001/api/health > /dev/null; then
+              echo "core-api ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "core-api ไม่พร้อม — log ท้ายสุด:"; tail -40 /tmp/core-api.log; exit 1
+        working-directory: sovereign-os/core-api
+
+      - name: Install frontend dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: sovereign-frontend
+
+      # playwright.config ใช้ channel: 'chrome' (Chrome ของ runner) — ไม่ต้องโหลด browser binary
+      - name: ตรวจ Chrome ของ runner
+        run: google-chrome --version || chromium --version
+
+      - name: Run settings E2E
+        run: npx playwright test e2e/settings.spec.ts --project=authenticated
+        working-directory: sovereign-frontend
+
+      - name: Dump logs เมื่อล้ม
+        if: failure()
+        run: |
+          echo '── core-api ──'; tail -60 /tmp/core-api.log || true
