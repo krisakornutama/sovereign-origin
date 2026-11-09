@@ -21,6 +21,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import {
   listQueued,
   removeQueued,
+  currentQueueUserId,
   flushSelected,
   type QueuedAction,
 } from '../lib/offlineQueue';
@@ -177,7 +178,8 @@ export default function SettingsPage() {
 
   // ── Offline queue handlers ──
   const reloadQueue = async () => {
-    const items = await listQueued();
+    // แสดงเฉพาะของ session ปัจจุบัน — ของคนอื่น/legacy อยู่ใน IDB แต่มองไม่เห็นจากหน้านี้
+    const items = await listQueued(currentQueueUserId());
     setQueuedItems(items);
     setSelectedIds((prev) => new Set([...prev].filter((id) => items.some((q) => q.id === id))));
   };

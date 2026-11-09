@@ -6,6 +6,9 @@
  * - subscribeOfflineQueue() ใช้แสดง badge จำนวนที่ค้าง
  */
 
+import { useAuthStore } from '../stores/useAuthStore';
+import { ownQueuedActions, stampUserId, type QueueUserId } from './offline/queue-namespace';
+
 const DB_NAME = 'sovereign-offline';
 const STORE = 'actions';
 
@@ -16,6 +19,15 @@ export interface QueuedAction {
   headers?: Record<string, string>;
   body?: string | Blob | null;
   queuedAt: string;
+  /** เจ้าของคิว: user id ของ session ที่ enqueue · null = anonymous
+   *  (record ที่ไม่มี field นี้ = เก่าก่อน deploy = Dormant — ไม่ flush/ไม่โชว์ รอ P1 retention) */
+  userId?: QueueUserId;
+}
+
+/** ตัวตนเจ้าของคิวของ session ปัจจุบัน — อ่านสดจาก auth store ทุกครั้งที่ถูกเรียก
+ *  (สลับบัญชี / logout / 401 ระหว่างทางก็ได้ตัวตนใหม่เสมอ ไม่ต้อง register หรือตั้งค่าล่วงหน้า) */
+export function currentQueueUserId(): QueueUserId {
+  return useAuthStore.getState().user?.id ?? null;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -69,26 +81,33 @@ async function removeAction(id: number): Promise<void> {
   });
 }
 
-export async function countQueued(): Promise<number> {
+/** จำนวน action ที่ค้าง — ไม่ส่ง userId = นับทั้งหมด (compat กับ caller เดิม) · ส่ง = เฉพาะเจ้าของนั้น */
+export async function countQueued(userId?: QueueUserId): Promise<number> {
   try {
-    return (await getAllActions()).length;
+    const all = await getAllActions();
+    return (userId === undefined ? all : ownQueuedActions(all, userId)).length;
   } catch {
     return 0;
   }
 }
 
-/** รายการ action ที่ค้างอยู่ (เรียงเก่าไปใหม่) */
-export async function listQueued(): Promise<QueuedAction[]> {
+/** รายการ action ที่ค้างอยู่ (เรียงเก่าไปใหม่ = FIFO) — ไม่ส่ง userId = ทั้งหมด · ส่ง = เฉพาะเจ้าของนั้น */
+export async function listQueued(userId?: QueueUserId): Promise<QueuedAction[]> {
   try {
-    return (await getAllActions()).sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
+    const sorted = (await getAllActions()).sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
+    return userId === undefined ? sorted : ownQueuedActions(sorted, userId);
   } catch {
     return [];
   }
 }
 
-/** ลบ action ทีละรายการ (ไม่ sync) */
+/** ลบ action ทีละรายการ (ไม่ sync) — ลบได้เฉพาะของ session ปัจจุบันเท่านั้น */
 export async function removeQueued(id: number): Promise<void> {
   try {
+    const all = await getAllActions();
+    const target = all.find((a) => a.id === id);
+    if (!target) return;
+    if (ownQueuedActions([target], currentQueueUserId()).length === 0) return; // ของคนอื่น/legacy → ห้ามแตะ
     await removeAction(id);
     await notify();
   } catch {
@@ -100,7 +119,9 @@ export async function removeQueued(id: number): Promise<void> {
 export async function flushAction(id: number): Promise<boolean> {
   if (!originalFetch) return false;
   const actions = await getAllActions();
-  const action = actions.find((a) => a.id === id);
+  // ส่งได้เฉพาะของ session ปัจจุบัน — ของคนอื่น/legacy มองไม่เห็นแม้รู้ id
+  const owned = ownQueuedActions(actions, currentQueueUserId());
+  const action = owned.find((a) => a.id === id);
   if (!action) return false;
   try {
     const res = await originalFetch(action.url, {
@@ -138,7 +159,8 @@ export function subscribeOfflineQueue(fn: Listener): () => void {
 }
 
 async function notify() {
-  const count = await countQueued();
+  // badge นับเฉพาะของ session ปัจจุบันเสมอ — ของคนอื่น/legacy ไม่โชว์ (Dormant)
+  const count = await countQueued(currentQueueUserId());
   for (const fn of listeners) fn(count);
 }
 
@@ -199,13 +221,18 @@ export function initOfflineQueue(): void {
     // ออฟไลน์ + เป็น action ที่เปลี่ยนสถานะ → เก็บเข้าคิว
     if (!navigator.onLine && sameOrigin && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
       try {
-        await addAction({
-          url,
-          method,
-          headers: normalizeHeaders(init?.headers),
-          body: normalizeBody(init?.body),
-          queuedAt: new Date().toISOString(),
-        });
+        await addAction(
+          stampUserId(
+            {
+              url,
+              method,
+              headers: normalizeHeaders(init?.headers),
+              body: normalizeBody(init?.body),
+              queuedAt: new Date().toISOString(),
+            },
+            currentQueueUserId()
+          )
+        );
         await notify();
         return new Response(JSON.stringify({ queued: true, error: 'Offline — request queued' }), {
           status: 503,
@@ -229,7 +256,9 @@ export async function flushQueue(): Promise<number> {
   if (!originalFetch) return 0;
   notifySync(true);
   try {
-    const actions = await getAllActions();
+    const all = await getAllActions();
+    // flush เฉพาะของ session ปัจจุบัน — คิวคนอื่น/legacy รอเจ้าของกลับมาเอง
+    const actions = ownQueuedActions(all, currentQueueUserId());
     let flushed = 0;
 
     for (const action of actions) {
