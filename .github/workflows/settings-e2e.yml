@@ -4,15 +4,10 @@ name: Settings E2E
 # ทำไมต้องมี: unit/typecheck ผ่านไม่ได้แปลว่า component ถูก mount — ถ้า import หลุด
 # หรือ panel โยน error ตอน render หน้า settings จะว่าง/ค้าง ซึ่งตาเปล่าจับได้ช้ากว่า CI
 
+# on.pull_request ไม่กรอง paths: job นี้เป็น required check — ถ้ากรอง paths จะไม่มีสถานะ
+# ส่งมาเลยใน PR ที่ไม่แตะไฟล์ settings ทำให้ merge ค้าง "Expected — Waiting for status"
 on:
   pull_request:
-    paths:
-      - 'sovereign-frontend/src/pages/settings.tsx'
-      - 'sovereign-frontend/src/components/system/**'
-      - 'sovereign-frontend/e2e/settings.spec.ts'
-      - 'sovereign-frontend/e2e/auth.setup.ts'
-      - 'sovereign-frontend/playwright.config.ts'
-      - '.github/workflows/settings-e2e.yml'
   push:
     branches: [main]
     paths:
