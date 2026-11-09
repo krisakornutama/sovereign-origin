@@ -59,11 +59,14 @@ docker compose --env-file deploy/community/.env.test -f deploy/community/docker-
 volume ของตัวเอง, image timescale ที่มีในเครื่อง) แล้วตรวจ:
 
 ```
-node tools/install/verify-purge.mjs      # ✅ ผ่านครบ 11/11
+node tools/install/verify-purge.mjs      # ✅ ผ่านครบ 24/24
 ```
 
-- โหมดปกติ: `uninstall --yes` → container หาย · **volume ยังอยู่** · เปิดกลับมาเห็นข้อมูลเดิมครบ 3 แถว
-- `--purge-data`: container หาย · **volume หายจริง**
+- ชุดทดสอบมี 4 volume เหมือนชุดจริง: `data` (db) · `mqtt` · `web` · `api`
+- โหมดปกติ: `uninstall --yes` → container หายครบ · **volume ทั้ง 4 ยังอยู่** · marker ของ mqtt/web/api
+  และข้อมูล 3 แถวใน db ยังอ่านได้หลังเปิดกลับ
+- `--purge-data`: container หาย · **volume หายครบทั้ง 4** · network หาย · ไม่มี volume ค้างตาม label
+- **ถอนซ้ำหลัง purge**: `uninstall --yes --purge-data` อีกครั้ง → exit 0 และไม่มี container/volume/network ค้าง
 - `--compose` / `--project`: ใช้ชุดติดตั้งที่ไม่ใช่ค่าเริ่มต้นได้ (จำเป็นสำหรับการทดสอบแยกและ custom install)
 - cleanup อัตโนมัติ (`down -v`) ทั้งสองกรณี ไม่มีอะไรค้างบนเครื่อง
 

@@ -4,11 +4,15 @@
  *
  * ทำไม: การทดสอบบนเครื่องจริงทำได้แค่โหมดเก็บข้อมูล (การลบ volume ถาวรทำลายข้อมูลลูกค้า)
  * สคริปต์นี้จึงสร้าง Docker project ของตัวเอง (ชื่อสุ่ม) + volume ของตัวเอง แล้ว:
- *   1) โหมดปกติ  → container หาย แต่ volume + ข้อมูลยังอยู่
+ *   1) โหมดปกติ  → container หาย แต่ volume + ข้อมูลยังอยู่ (ครบทุก volume ของชุดติดตั้ง)
  *   2) --purge-data → container + volume หายจริง
+ *   3) ถอนซ้ำหลัง purge → exit 0 และไม่มีเศษ (container/volume/network) ค้าง
  * ล้างทุกอย่างใน finally เสมอ (down -v + ลบโฟลเดอร์ชั่วคราว)
  *
  * ใช้: node tools/install/verify-purge.mjs [--image timescale/timescaledb:latest-pg15]
+ *
+ * หมายเหตุ: mqtt/web/api ใช้ alpine แทน image จริง — เป้าหมายคือ "ทุก volume ของ project
+ * ถูกลบครบ" ไม่ใช่ทดสอบพฤติกรรม EMQX/Next ซึ่งไม่เกี่ยวกับ uninstaller
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,8 +25,17 @@ import { buildUninstallPlan } from './uninstall.mjs';
 const IMAGE = process.argv.includes('--image')
   ? process.argv[process.argv.indexOf('--image') + 1]
   : 'timescale/timescaledb:latest-pg15';
+const FAKE_IMAGE = 'alpine:latest';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const UNINSTALL = path.join(ROOT, 'tools', 'install', 'uninstall.mjs');
+
+/** volume ทุกตัวของชุดติดตั้ง — ชื่อต้องตรงกับ compose ด้านล่าง */
+const VOLUMES = [
+  { key: 'data' },
+  { key: 'mqtt', mount: '/opt/mqtt' },
+  { key: 'web', mount: '/srv/web' },
+  { key: 'api', mount: '/data/api' },
+];
 
 const run = (cmd, args, opts = {}) => {
   const res = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
@@ -35,11 +48,18 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-/** สแตกชั่วคราว: postgres ตัวเดียว + named volume ของ project เอง */
+/** สแตกชั่วคราว: db + mqtt + web + api โดยแต่ละตัวมี named volume ของ project เอง */
 function makeStack(tag) {
   const dir = mkdtempSync(path.join(os.tmpdir(), `sovereign-purge-${tag}-`));
   const project = `sovereign-verify-${tag}-${Date.now().toString(36)}`;
   const compose = path.join(dir, 'docker-compose.yml');
+  const sidecar = (name, mount) => [
+    `  ${name}:`,
+    `    image: ${FAKE_IMAGE}`,
+    `    command: ["sh", "-c", "echo ${name}-marker > ${mount}/marker && sleep infinity"]`,
+    '    volumes:',
+    `      - ${name}:${mount}`,
+  ];
   writeFileSync(
     compose,
     [
@@ -57,8 +77,14 @@ function makeStack(tag) {
       '      interval: 2s',
       '      timeout: 3s',
       '      retries: 45',
+      ...sidecar('mqtt', '/opt/mqtt'),
+      ...sidecar('web', '/srv/web'),
+      ...sidecar('api', '/data/api'),
       'volumes:',
       '  data:',
+      '  mqtt:',
+      '  web:',
+      '  api:',
       '',
     ].join('\n')
   );
@@ -71,7 +97,24 @@ function makeStack(tag) {
 }
 
 const composeArgs = (stack) => ['compose', '-p', stack.project, '--env-file', stack.envFile, '-f', stack.compose];
-const containerName = (stack) => `${stack.project}-db-1`;
+const containerName = (stack, service = 'db') => `${stack.project}-${service}-1`;
+const volumeName = (stack, key) => `${stack.project}_${key}`;
+const MARKER = { mqtt: '/opt/mqtt/marker', web: '/srv/web/marker', api: '/data/api/marker' };
+
+/** container/volume/network ที่ยังค้างของ project นี้ (ใช้ label ของ compose = แม่นกว่าเดาชื่อ) */
+function leftovers(stack) {
+  const filter = `label=com.docker.compose.project=${stack.project}`;
+  const names = (args) => {
+    const res = run('docker', args);
+    // อย่าอ่าน stderr เป็นชื่อ — คำสั่งพลาดต้องเห็นเป็น error ไม่ใช่ "มีของค้าง"
+    return res.ok ? res.output.split('\n').map((s) => s.trim()).filter(Boolean) : [`error:${res.status}`];
+  };
+  return {
+    containers: names(['ps', '-a', '--filter', filter, '--format', '{{.Names}}']),
+    networks: names(['network', 'ls', '--filter', filter, '--format', '{{.Name}}']),
+    volumes: names(['volume', 'ls', '--filter', filter, '--format', '{{.Name}}']),
+  };
+}
 
 function waitReady(stack) {
   for (let i = 0; i < 45; i++) {
@@ -83,7 +126,7 @@ function waitReady(stack) {
 }
 
 function up(stack) {
-  const res = run('docker', [...composeArgs(stack), 'up', '-d', '--wait', '--wait-timeout', '120'], { timeout: 180_000 });
+  const res = run('docker', [...composeArgs(stack), 'up', '-d', '--wait', '--wait-timeout', '150'], { timeout: 240_000 });
   if (!res.ok) return { ok: false, output: res.output };
   if (!waitReady(stack)) return { ok: false, output: 'postgres ไม่พร้อม (pg_isready ไม่ผ่านใน 60 วิ)' };
   // เขียนข้อมูลจริงลง volume เพื่อพิสูจน์ว่า "ข้อมูลอยู่/หาย" ไม่ใช่แค่ volume มีชื่ออยู่
@@ -98,11 +141,23 @@ function up(stack) {
     '-tAc',
     'create table probe(id int); insert into probe values (1),(2),(3); select count(*) from probe;',
   ]);
-  return { ok: write.ok, output: write.output };
+  if (!write.ok) return { ok: false, output: write.output };
+  // sidecar เขียน marker เองตอน start — รอให้ครบทุกตัวเพื่อไม่ให้ตรวจเร็วเกิน
+  for (let i = 0; i < 20; i++) {
+    const ready = Object.keys(MARKER).every((svc) => run('docker', ['exec', containerName(stack, svc), 'test', '-f', MARKER[svc]]).ok);
+    if (ready) return { ok: true, output: '' };
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+  }
+  return { ok: false, output: 'sidecar ไม่ได้เขียน marker ภายใน 10 วิ' };
 }
 
 function countRows(stack) {
   const res = run('docker', ['exec', containerName(stack), 'psql', '-U', 'verify', '-d', 'verify', '-tAc', 'select count(*) from probe;']);
+  return res.ok ? res.output.trim() : `error:${res.status}`;
+}
+
+function readMarker(volume, mount) {
+  const res = run('docker', ['run', '--rm', '-v', `${volume}:${mount}`, FAKE_IMAGE, 'cat', `${mount}/marker`]);
   return res.ok ? res.output.trim() : `error:${res.status}`;
 }
 
@@ -126,10 +181,21 @@ function cleanup(stack) {
   }
 }
 
+/** ตรวจว่า volume ทุกตัวของชุดยังอยู่ + ข้อมูลข้างในอ่านได้ */
+function checkVolumesIntact(stack, label) {
+  for (const v of VOLUMES) {
+    check(`${label}: volume ${v.key} ยังอยู่`, volumeExists(volumeName(stack, v.key)));
+  }
+  for (const v of VOLUMES.filter((x) => x.mount)) {
+    const got = readMarker(volumeName(stack, v.key), v.mount);
+    check(`${label}: ข้อมูลใน ${v.key} อ่านได้`, got === `${v.key}-marker`, got);
+  }
+}
+
 function main() {
   console.log(`════ verify purge-data (image: ${IMAGE}) ════\n`);
 
-  // ── 1) โหมดปกติ: เก็บข้อมูล ─────────────────────────────────────────────
+  // ── 1) โหมดปกติ: เก็บข้อมูลทุก volume ───────────────────────────────────
   const keep = makeStack('keep');
   try {
     const started = up(keep);
@@ -141,18 +207,20 @@ function main() {
 
     const removed = uninstall({ stack: keep, purgeData: false });
     check('uninstall --yes exit 0', removed.ok, removed.ok ? '' : removed.output.slice(-300));
-    check('container ถูกลบ', !run('docker', ['ps', '-a', '--format', '{{.Names}}']).output.includes(containerName(keep)));
-    check('volume ยังอยู่', volumeExists(`${keep.project}_data`));
+    const left = leftovers(keep);
+    check('container ถูกลบครบ 4 ตัว', left.containers.length === 0, left.containers.join(','));
+    checkVolumesIntact(keep, 'โหมดเก็บข้อมูล');
 
     // เปิดกลับมาแล้วต้องเห็นข้อมูลเดิม = พิสูจน์ว่า "ไม่ลบข้อมูล"
-    const again = run('docker', [...composeArgs(keep), 'up', '-d', '--wait'], { timeout: 180_000 });
+    const again = run('docker', [...composeArgs(keep), 'up', '-d', '--wait'], { timeout: 240_000 });
     check('เปิดสแตกกลับได้หลังถอน', again.ok, again.ok ? '' : again.output.slice(-200));
     check('ข้อมูลเดิมยังครบ 3 แถว', countRows(keep) === '3', `rows=${countRows(keep)}`);
+    check('marker ของ mqtt/web/api ยังอยู่', Object.keys(MARKER).every((svc) => run('docker', ['exec', containerName(keep, svc), 'test', '-f', MARKER[svc]]).ok));
   } finally {
     cleanup(keep);
   }
 
-  // ── 2) --purge-data: ลบ volume + ข้อมูลจริง ─────────────────────────────
+  // ── 2) --purge-data: ลบ volume + ข้อมูลจริง ทุกตัว ────────────────────────
   const purge = makeStack('purge');
   try {
     const started = up(purge);
@@ -161,8 +229,11 @@ function main() {
 
     const removed = uninstall({ stack: purge, purgeData: true });
     check('uninstall --yes --purge-data exit 0', removed.ok, removed.ok ? '' : removed.output.slice(-300));
-    check('container ถูกลบ', !run('docker', ['ps', '-a', '--format', '{{.Names}}']).output.includes(containerName(purge)));
-    check('volume ถูกลบจริง', !volumeExists(`${purge.project}_data`));
+    const left = leftovers(purge);
+    check('container ถูกลบทั้งหมด', left.containers.length === 0, left.containers.join(','));
+    check('volume ถูกลบครบทุกตัว', VOLUMES.every((v) => !volumeExists(volumeName(purge, v.key))), VOLUMES.map((v) => v.key).join(','));
+    check('ไม่มี volume ค้างตาม label', left.volumes.length === 0, left.volumes.join(','));
+    check('network ถูกลบ', left.networks.length === 0, left.networks.join(','));
     check('backups ของชุดนี้ถูกลบ', !existsSync(purge.backupsDir));
     // กันเคยพลาด (เคสจริง 10/11/69): purge ของชุดทดสอบลบ backups/ ของ repo จริง
     const repoBackups = path.join(ROOT, 'backups', 'postgres');
@@ -170,6 +241,13 @@ function main() {
       const dumps = readdirSync(repoBackups).filter((f) => f.endsWith('.dump'));
       check('backups ของ repo ไม่ถูกแตะ', dumps.length > 0, `${dumps.length} dump`);
     }
+
+    // ── 3) ถอนซ้ำหลัง purge: ต้องไม่ล้มและไม่เหลืออะไร ─────────────────────
+    const twice = uninstall({ stack: purge, purgeData: true });
+    check('ถอนซ้ำหลัง purge exit 0', twice.ok, twice.ok ? '' : twice.output.slice(-300));
+    const after = leftovers(purge);
+    check('ถอนซ้ำ: ไม่มีอะไรค้าง', after.containers.length + after.volumes.length + after.networks.length === 0,
+      `containers=${after.containers.length} volumes=${after.volumes.length} networks=${after.networks.length}`);
   } finally {
     cleanup(purge);
   }
