@@ -142,6 +142,19 @@ async function notify() {
   for (const fn of listeners) fn(count);
 }
 
+// ── pub/sub สำหรับ syncing state (Sprint 2 ระยะ 3) ──
+type SyncListener = (syncing: boolean) => void;
+const syncListeners = new Set<SyncListener>();
+
+export function subscribeOfflineSync(fn: SyncListener): () => void {
+  syncListeners.add(fn);
+  return () => syncListeners.delete(fn);
+}
+
+function notifySync(syncing: boolean) {
+  for (const fn of syncListeners) fn(syncing);
+}
+
 // ── header/body normalization ──
 function normalizeHeaders(headers?: HeadersInit): Record<string, string> | undefined {
   if (!headers) return undefined;
@@ -214,24 +227,29 @@ export function initOfflineQueue(): void {
 /** ส่งคิวทั้งหมดอีกครั้ง — ลบรายการที่สำเร็จ (2xx) */
 export async function flushQueue(): Promise<number> {
   if (!originalFetch) return 0;
-  const actions = await getAllActions();
-  let flushed = 0;
+  notifySync(true);
+  try {
+    const actions = await getAllActions();
+    let flushed = 0;
 
-  for (const action of actions) {
-    try {
-      const res = await originalFetch(action.url, {
-        method: action.method,
-        headers: action.headers,
-        body: action.body ?? undefined,
-      });
-      if (res.ok && action.id != null) {
-        await removeAction(action.id);
-        flushed++;
+    for (const action of actions) {
+      try {
+        const res = await originalFetch(action.url, {
+          method: action.method,
+          headers: action.headers,
+          body: action.body ?? undefined,
+        });
+        if (res.ok && action.id != null) {
+          await removeAction(action.id);
+          flushed++;
+        }
+      } catch {
+        // network error → เก็บไว้ retry ครั้งหน้า
       }
-    } catch {
-      // network error → เก็บไว้ retry ครั้งหน้า
     }
+    await notify();
+    return flushed;
+  } finally {
+    notifySync(false);
   }
-  await notify();
-  return flushed;
 }

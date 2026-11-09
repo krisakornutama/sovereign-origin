@@ -147,6 +147,8 @@ export const common = {
   info: 'Info',
   online: 'Online',
   offline: 'Offline',
+  syncing: 'Syncing',
+  pendingQueue: '{n} pending',
   active: 'Active',
   inactive: 'Inactive',
   pending: 'Pending',

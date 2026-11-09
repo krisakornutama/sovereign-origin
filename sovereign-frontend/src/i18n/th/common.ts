@@ -151,6 +151,8 @@ export const common = {
   info: 'ข้อมูล',
   online: 'ออนไลน์',
   offline: 'ออฟไลน์',
+  syncing: 'กำลังซิงก์',
+  pendingQueue: '{n} รายการรอส่ง',
   active: 'ทำงานอยู่',
   inactive: 'ไม่ทำงาน',
   pending: 'รอดำเนินการ',

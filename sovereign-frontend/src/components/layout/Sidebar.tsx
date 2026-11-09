@@ -12,6 +12,7 @@ import { useHideInternalNav } from '../../lib/useHideInternalNav';
 import { openCommandPalette } from '../CommandPalette';
 import Icon from '../ui/Icon';
 import { useLanguageStore } from '../../stores/useLanguageStore';
+import { useOfflineCachePurge } from '../../hooks/useOfflineCachePurge';
 
 // sidebar เป็น scroll container ของตัวเอง และหน้า (Pages Router) remount ใหม่ทุกครั้งที่สลับ
 // → scrollTop หายเป็น 0 ทุกครั้ง จำไว้ระดับ module (module อยู่ข้ามการสลับหน้า) แล้วคืนให้ตอน mount
@@ -47,6 +48,8 @@ function useScrollToTopOnRouteChange() {
 
 export default function Sidebar() {
   useScrollToTopOnRouteChange();
+  // Attach logout cache purge (Sprint 2 ระยะ 3)
+  useOfflineCachePurge();
   const pathname = usePathname();
   const router = useRouter();
   const asideRef = useRef<HTMLElement>(null);

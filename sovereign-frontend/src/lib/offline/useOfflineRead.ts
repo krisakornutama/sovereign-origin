@@ -1,18 +1,20 @@
 "use client";
-// useOfflineRead — hook อ่านข้อมูลแบบ offline-first
+// useOfflineRead — hook อ่านข้อมูลแบบ offline-first (user-namespaced)
 //
 // พฤติกรรม:
 //   - mount → อ่านแคชก่อน; ถ้าแคชสดได้ผลทันที (source='cache')
 //   - network ล่มแต่มีแคช → แสดงข้อมูลเดิมพร้อม stale=true ไม่ crash
 //   - network ล่มและไม่มีแคช → offline=true, data=null (ให้หน้าแสดง empty state เอง)
 //   - SWR → เมื่อ refresh เบื้องหลังเสร็จ จะอัปเดต state ให้อัตโนมัติ
+//   - cache instance ผูกกับ userId (ได้จาก auth store) — logout จะล้าง namespace นั้นทิ้ง
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuthStore } from '../../stores/useAuthStore';
 import {
   OfflineReadUnavailableError,
   type CacheDomain,
   type CachedReadResult,
 } from './read-cache';
-import { offlineReadCache } from './cache';
+import { getOfflineReadCache } from './cache';
 
 export interface OfflineReadState<T> {
   data: T | null;
@@ -42,6 +44,7 @@ export function useOfflineRead<T>(
   options: UseOfflineReadOptions = {}
 ): UseOfflineReadResult<T> {
   const { ttlMs, staleWhileRevalidate, enabled = true } = options;
+  const userId = useAuthStore((s) => s.user?.id ?? null);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
@@ -84,7 +87,9 @@ export function useOfflineRead<T>(
       }
       if (mounted.current) setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
-        const result = await offlineReadCache.read<T>(domain, resource, () => fetcherRef.current(), {
+        // ใช้ cache ต่อ userId
+        const cache = getOfflineReadCache(userId);
+        const result = await cache.read<T>(domain, resource, () => fetcherRef.current(), {
           ttlMs,
           staleWhileRevalidate,
           forceRefresh,
@@ -107,7 +112,7 @@ export function useOfflineRead<T>(
         }));
       }
     },
-    [domain, resource, enabled, ttlMs, staleWhileRevalidate, applyResult]
+    [domain, resource, enabled, ttlMs, staleWhileRevalidate, applyResult, userId]
   );
 
   useEffect(() => {
