@@ -58,6 +58,21 @@ jobs:
       - name: ตรวจ fingerprint parity (tools ↔ runtime)
         run: node tools/check-parity.mjs
 
+      # frontend deps — จำเป็นเฉพาะเทสต์ retention บน IndexedDB (fake-indexeddb)
+      # --ignore-scripts: ข้าม electron/postinstall (ไม่ใช้ และกันดาวน์โหลดไบนารี ~100MB)
+      # cache เฉพาะ node_modules: cache hit = ติดตั้งไม่ถึง 10 วิ, hit miss = ~60-90 วิ
+      - name: Cache frontend node_modules
+        uses: actions/cache@v4
+        with:
+          path: sovereign-frontend/node_modules
+          key: fe-${{ runner.os }}-${{ hashFiles('sovereign-frontend/package-lock.json') }}
+          restore-keys: |
+            fe-${{ runner.os }}-
+
+      - name: ติดตั้ง dependencies ของ frontend (สำหรับเทสต์ retention บน IndexedDB)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: sovereign-frontend
+
       # gate ชุดใหม่ (7 พ.ย. 69): no-db-push (ห้ามสแกน DB จริง) + ci-ddl-sync (DDL ใน CI ต้องตรง schema)
       # เดิมรันได้แค่ผ่าน tools/verify.mjs บนเครื่อง → CI ไม่เคยบังคับ ตอนนี้เป็น required check แล้ว
       # ระบุไฟล์ตรง ๆ ไม่รันทั้งชุด: suite เต็ม (1349 เทสต์) ค้างบน runner ทั้งที่ในเครื่องใช้ 37 วิ
@@ -72,6 +87,5 @@ jobs:
           tools/test/queue.test.mjs
           tools/test/license-issue.test.mjs
           tools/test/frontend-queue-retention.test.mjs
-          # ไม่อยู่ใน arch-gate: frontend-queue-retention-idb.test.mjs ต้องใช้ fake-indexeddb
-          # (devDependency ของ sovereign-frontend) แต่ job นี้ติดตั้งเฉพาะ deps ของ core-api
-          # เพื่อความเร็ว/ความแน่นอน — ชุดนี้รันใน `npm run verify` (test:tools) ซึ่งมี frontend deps
+          tools/test/frontend-queue-retention-idb.test.mjs
+          tools/test/uninstall-clean.test.mjs
