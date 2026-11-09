@@ -2,8 +2,10 @@
 id: install-uninstall-clean
 title: ติดตั้งจบครั้งเดียว + ถอนสะอาด (ไม่มีเศษค้าง)
 priority: 2
-status: todo
-owner: null
+status: done
+owner: buffy
+claimed: 2026-11-09T17:25:49.439Z
+completed: 2026-11-09T17:50:03.394Z
 created: 2026-11-09
 depends_on: []
 gate: npm run verify
@@ -31,3 +33,7 @@ scope:
 ## หลักฐานที่ต้องแนบตอนปิดงาน
 
 ผลรันบนเครื่องจริง 1 รอบ (ก่อน/หลัง) + exit code
+
+## Report — 2026-11-09T17:50:03.394Z
+
+Uninstall plan now lists what stays on the machine (volume, backups, images, install dir, .env) and prints it again after the run; acceptance tests U1-U8 cover no-volume-delete by default, --purge-data volume+backup removal with an unrecoverable warning, tolerateFailure on every executable step (re-runnable), no schtasks on Linux/macOS, manual --remove-files per OS, and the kept list matching the flags. Found and fixed a shipping bug: .gitignore allowed install.* but not uninstall.mjs/.sh/.cmd, so the uninstaller never reached a clone or customer bundle. Evidence: tools/test/uninstall-clean.test.mjs 8/8; real run on Windows = dry-run exit 0 with before/after identical (no 'Sovereign Agent Runner' task, 6 sovereign containers still up); --yes was NOT run because this machine hosts live containers. npm run verify 6/6; CI 8/8 green on 4542513.
