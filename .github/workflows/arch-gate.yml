@@ -58,9 +58,10 @@ jobs:
       - name: ตรวจ fingerprint parity (tools ↔ runtime)
         run: node tools/check-parity.mjs
 
-      # gate ชุดใหม่ (7 พ.ย. 69): no-db-push (ห้ามสแกน DB จริง) + ci-ddl-sync (DDL ใน CI ต้องตรง schema)
-      # เดิมรันได้แค่ผ่าน tools/verify.mjs บนเครื่อง → CI ไม่เคยบังคับ ตอนนี้เป็น required check แล้ว
-      # ระบุไฟล์ตรง ๆ ไม่รันทั้งชุด: suite เต็ม (1349 เทสต์) ค้างบน runner ทั้งที่ในเครื่องใช้ 37 วิ
-      # (job นี้เป็น required check — ต้องเร็วและจบแน่นอน) · ชุดเต็มยังรันในเครื่องผ่าน tools/verify.mjs
-      - name: ตรวจ gate ชุดใหม่ (no-db-push + ci-ddl-sync)
-        run: node --test tools/test/no-db-push-gate.test.mjs tools/test/ci-ddl-sync.test.mjs
+      # tools suite เต็มชุด (1349 เทสต์) — เดิมค้างบน runner เพราะเทสต์หนึ่งปิด HTTP server
+      # ทั้งที่ยังมี keep-alive socket (Node ≥19) → ปิด socket ก่อน close + `--test-force-exit`
+      # ในสคริปต์ test:tools แล้ว ชุดจึงจบใน ~30 วิ (ทั้งเครื่องและ CI) · ต้องมี deps ของ core-api
+      # (step ด้านบนลงให้แล้ว) เพราะ backend-conflict-resolver เรียก tsx จาก node_modules
+      - name: ตรวจ tools suite เต็มชุด (test:tools)
+        run: npm run test:tools
+        timeout-minutes: 10
