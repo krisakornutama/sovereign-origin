@@ -140,6 +140,44 @@ try {
   problems.push({ level: 'critical', area: 'backup', message: `อ่านโฟลเดอร์ DB backup ไม่ได้ (${String(e?.message || e).slice(0, 80)})` });
 }
 
+// 4a-2) restore drill — "backup กู้ได้จริงไหม" ไม่ใช่แค่ "มีไฟล์ใหม่ไหม"
+//   tools/verify/backup-restore-check.mjs กู้ dump ล่าสุดลงฐานข้อมูลชั่วคราวแล้วเทียบตาราง/จำนวนแถว
+//   nightly-verify เรียกทุกคืน · ที่นี่อ่านผลลัพธ์ (logs/backup-restore-check.json) มารวมใน verdict เดียว
+//   ไม่เคยมีไฟล์ = ยังไม่เคยพิสูจน์ว่ากู้ได้ — ต้องเห็น ไม่ใช่เงียบ
+const RESTORE_CHECK_FILE = process.env.MH_RESTORE_CHECK_FILE || join(REPO, 'logs', 'backup-restore-check.json');
+const RESTORE_MAX_AGE_H = Number(process.env.MH_RESTORE_MAX_AGE_H ?? 36); // nightly + เผื่อรอบหลุด 1 คืน
+try {
+  if (!existsSync(RESTORE_CHECK_FILE)) {
+    info.restoreDrill = null;
+    problems.push({ level: 'warn', area: 'restore', message: `ยังไม่มีผล restore drill (${RESTORE_CHECK_FILE}) — ยังไม่เคยพิสูจน์ว่า dump กู้คืนได้ (nightly-verify ต้องสร้างไฟล์นี้)` });
+  } else {
+    const rec = JSON.parse(readFileSync(RESTORE_CHECK_FILE, 'utf8'));
+    const ageH = rec?.at ? ageHours(new Date(rec.at).getTime()) : null;
+    info.restoreDrill = {
+      at: rec?.at ?? null,
+      ageH,
+      ok: rec?.ok === true,
+      dump: rec?.dump ?? null,
+      liveTables: rec?.liveTables ?? null,
+      restoredTables: rec?.restoredTables ?? null,
+    };
+    if (rec?.ok !== true) {
+      const first = Array.isArray(rec?.problems) && rec.problems.length ? ` — ${String(rec.problems[0]).slice(0, 160)}` : '';
+      problems.push({ level: 'critical', area: 'restore', message: `restore drill ล้มเหลว (${rec?.at ?? 'ไม่ทราบเวลา'})${first}` });
+    }
+    if (typeof ageH === 'number' && ageH > RESTORE_MAX_AGE_H) {
+      problems.push({ level: 'warn', area: 'restore', message: `ผล restore drill เก่า ${ageH} ชม. (> ${RESTORE_MAX_AGE_H}) — ไม่มีการพิสูจน์การกู้คืนล่าสุด` });
+    }
+    // ตารางที่กู้ได้ต้องไม่น้อยกว่าจริง (missing ถูกจับแล้วใน restore-check แต่กันกรณีไฟล์ถูกเขียนมือ)
+    if (typeof rec?.liveTables === 'number' && typeof rec?.restoredTables === 'number' && rec.restoredTables < rec.liveTables) {
+      problems.push({ level: 'critical', area: 'restore', message: `กู้ได้ ${rec.restoredTables} ตาราง แต่ของจริงมี ${rec.liveTables} — backup ขาดตาราง` });
+    }
+  }
+} catch (e) {
+  info.restoreDrill = null;
+  problems.push({ level: 'warn', area: 'restore', message: `อ่านผล restore drill ไม่ได้ (${String(e?.message || e).slice(0, 80)})` });
+}
+
 // 4b) offsite (เป้า ~20:30 ทุกคืน — offsite-log.jsonl จดทั้งส่งสำเร็จและ failed; .enc = staging ก่อนส่ง)
 try {
   if (existsSync(OFFSITE_LOG)) {
