@@ -189,7 +189,7 @@ Installed on a real empty database with `docker compose up -d --build`, succeede
 | web :3000 (tested on :3101) | 200 · dashboard loads |
 | login | `POST /api/auth/login` = 200 |
 
-> Note: the `migrate` service uses `prisma db push` (sync from schema), not `migrate deploy`,
+> Note: the `migrate` service uses `prisma migrate deploy` (baseline 20261107190000), not `db push`,
 > because the migration history has drift — a fresh database would be incomplete and seeding would fail (`P2022`).
 > The existing production deployment still uses `migrate deploy` and is unaffected.
 

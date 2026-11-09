@@ -14,6 +14,7 @@ $tasks = [ordered]@{
   'Sovereign DB Backup' = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "E:\My work\Project Sovereign Origin\tools\backup-db.ps1"'
   'Sovereign Machine Watch' = '"C:\Program Files\nodejs\node.exe" "E:\My work\Project Sovereign Origin\tools\machine-alert.mjs"'
   'Sovereign Nightly Verify' = '"C:\Program Files\nodejs\node.exe" "E:\My work\Project Sovereign Origin\tools\nightly-verify.mjs"'
+  'Sovereign Nightly Deadman' = '"C:\Program Files\nodejs\node.exe" "E:\My work\Project Sovereign Origin\tools\nightly-deadman.mjs"'
   'Sovereign Nightly Quality Gate' = 'cmd.exe /c "E:\My work\Project Sovereign Origin\nightly-gate-task.cmd"'
   'Sovereign Offsite Backup' = 'cmd.exe /c "E:\My work\Project Sovereign Origin\sovereign-offsite-task.cmd"'
   'Sovereign Security Digest' = 'cmd.exe /c "E:\My work\Project Sovereign Origin\security-digest-task.cmd"'

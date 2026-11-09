@@ -6,17 +6,61 @@
 
 ---
 
-## [v1.2.0] — กำลังพัฒนา (unreleased)
+## [Unreleased] — 2026-11-07
 
-รวมทุกสิ่งที่ commit หลังจาก `v1.1.1` จนถึงปัจจุบัน (HEAD = `5f4277d`) — ครอบทั้ง frontend, backend, deploy, ops, test และเอกสาร
+> งานหลัง tag `v1.2.0` — จะรวมใน release ถัดไป (image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้)
+
+### 🔧 งานหลังปล่อย v1.2.0
+
+- **CI / images** — แยก build amd64/arm64, ตัด QEMU, ใช้ runner ARM จริง + จำกัดเวลา 45 นาที; ทุก tag ของ `api`/`web` ชี้ manifest เดียวกัน
+- **ความปลอดภัย / คุณภาพ** — ปิด Dependabot advisories ที่เหลือ, mount farm executive API ให้ตรงกับหน้าที่เรียก, เพิ่มเทสต์ route/E2E
+- **Module boundary** — ปิด 6 เส้นข้ามโมดูลผ่าน service ของเจ้าของตาราง (`consent → health`, `consent → ai`, `farm → livestock`)
+- **Nightly** — แก้ restore-check false positive (แยก pure compare + เทสต์ 5/5) และรัน restore จริงผ่าน 149/149 ตาราง
+- **Nightly (8 พ.ย.)** — `migration head` แยกสายสถานะให้ถูกเจตนา: dump ที่ถ่าย *ก่อน* migration ใหม่ถูก apply (จริงสูงกว่ากู้) = ปกติของ snapshot ไม่ตีเป็นแดง — เฉพาะ "กู้สูงกว่าจริง" (live ถอยหลัง/มีการลบ migration) จึงฟ้อง, `notify()` เคารพสวิตช์ `alert-settings.json` (`enabled:false` → `{ok:true, status:'skipped_by_config'}` — แยก "ข้ามเพราะตั้งใจปิด" ออกจาก "ส่งไม่ผ่านเพราะพัง") และ main-guard ให้ `import` เพื่อเทสต์ไม่ยิง docker จริง (29.4s → 0.1s) · PR #52 (`d1687d`) — เทสต์ red-first 8/8 + รันจริง `--strict` ผ่าน (กู้ครบ 150/150 ตาราง)
+- **Ops / Nightly (P0)** — ปิด `ShipShop3000` ที่ค้าง, ยืนยัน `Sovereign Nightly Verify` ผ่านจริงผ่าน Task Scheduler (Last Result 0), เพิ่ม **dead-man alert 03:30** เตือน Telegram เมื่อ nightly ไม่ผ่าน/ไม่ส่งผลติดกัน 2 คืน และแก้ `nightly-report` ให้ใช้ creds กลาง (DB → `infra/.env`) แทนการอ่าน DB อย่างเดียว
+- **Release Automation (Sprint 1)** — `.github/workflows/release.yml` ปล่อยชุดติดตั้ง Windows อัตโนมัติเมื่อ push tag `v*`: ตรวจ tag ↔ version ก่อน build, build core-api + static export, แพ็ก portable exe/zip ด้วย electron-builder บน `windows-latest`, เขียน/ตรวจ `SHA256SUMS.txt` ด้วย `tools/release-build.mjs` แล้วแนบ GitHub Release · เทสต์ red-first 11 ตัว (`tools/test/release-build.test.mjs`) ครอบการคัด artifact, รูปแบบ checksum, tag gate และสัญญาของ workflow
+- **Offline-First Read Cache (Sprint 2 · ระยะ 1)** — `src/lib/offline/read-cache.ts` เก็บข้อมูลอ่านลง IndexedDB แยกโดเมน (`system`/`menu`/`farm`/`inventory`/`telemetry`) พร้อม TTL ต่อคำขอ, stale-while-revalidate, ถอยไปใช้แคชเก่าเมื่อ network ล่ม และไม่ทำให้การอ่านพังเมื่อ IndexedDB ใช้ไม่ได้/เขียนไม่ได้ · เพิ่ม hook `useOfflineRead` สำหรับหน้าเว็บ · เทสต์ red-first 13 เคส (`read-cache.test.ts`) ผูกเข้า `npm run verify` ผ่าน `tools/test/frontend-offline-read-cache.test.mjs`
+- **Offline-First Conflict Resolver (Sprint 2 · ระยะ 2)** — `sovereign-os/core-api/src/modules/sync/conflict-resolver.ts` คุมการ replay คิวออฟไลน์ตอนกลับมาออนไลน์: telemetry replay ได้เสมอ (ไม่ reject), ยอด stock/money ที่ทับกันจะยึดค่าที่เครื่องอื่นเขียนล่าสุด (ไม่ใช่ Last-Write-Wins ย้อนกลับไม่ได้) และเขียน `SyncConflictLog` แบบ upsert by `mutationId` — retry ไม่สร้าง log ซ้ำ · เทสต์ red-first จบเขียว 6/6 (`conflict-resolver.test.ts`, ผูกเข้า verify ผ่าน `tools/test/backend-conflict-resolver.test.mjs`) · migration แบบ additive `20261107120000_add_sync_conflict_logs` · ตารางใหม่ผูกเจ้าของใน `tools/module-owners.json` (`sync_conflict_logs → sync`) ให้ arch-gate เขียว
+- **CI hardening — ปิดการค้างใน CI** — แก้ `npm run test:tools` ค้างบน runner: ไฟล์ตัวค้างจริงคือ `tools/test/desktop-shell-functions.test.mjs` (HANG 60s บน runner, run `42410357754`) — ปิด keep-alive socket ของ test server และยก script เป็น `node --test --test-force-exit --test-timeout=120000` · ใส่ `timeout-minutes` ครบทุก job ในทุก workflow (14 jobs หลังลบ probe ชั่วคราว) · พิสูจน์ผ่าน PR #51: required checks ทั้ง 7 รันจริง (10/10 pass), policy บล็อก merge ขณะ checks pending (`mergeable_state=blocked`, `gh pr merge` ปฏิเสธ "base branch policy prohibits the merge") และ merge เมื่อเขียวครบ (`d652698`)
+- **Desktop** — แพ็ก `hidden-launch.cjs` + `run-hidden.vbs` ไปกับแอป (J6f) ให้เปิด `.bat` แบบไม่มีหน้าต่างได้ครบ
+- **เอกสาร** — อัปเดต `CHANGELOG` / `README` / `STATUS` / `QUEUE` ให้ตรงกับสถานะจริง
+
+---
+
+## [v1.2.0] — 2026-11-06 (released)
+
+**Community Edition (CE) เปิดตัวเป็น repo สาธารณะ** — repo นี้เหลือ CE เพียว ไม่มีโมดูล Pro
+(Pro ย้ายไป private repo แล้ว ดู [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md))
+ตัวเลข ณ วันปล่อย: backend 1,823 tests (ข้าม 1) · tooling/CI 1,287 tests (ข้าม 6) · `tsc` + `next build` สะอาด
+
+### 🚀 งานเปิดตัว Community Edition (4–7 พ.ย. 2026)
+
+- **แยก Pro ออกจาก CE (Clean Hard Cut)** — ลบโมดูล/หน้า/เทสต์ Pro 90+ ไฟล์, ทำ Pro registry + 404 ที่บอกชื่อโมดูล, ขยาย open-core boundary gate ให้ตรวจ frontend ด้วย
+- **ชุดติดตั้ง CE คำสั่งเดียว** — `deploy/community/docker-compose.yml` (db · mqtt · migrate · api · web), named volume ล้วน, `.env.example` บังคับ 3 secrets, พิสูจน์ติดตั้งใหม่บนฐานข้อมูลว่างแล้ว
+- **สมัครด้วยรหัสเชิญ (ไม่มี SMTP)** — CLI/API/UI, เก็บ SHA-256, ใช้ครั้งเดียว/มีวันหมดอายุ/เพิกถอนได้ + การ์ดจัดการในหน้าผู้ใช้
+- **Alert fanout 3 ช่อง** — Telegram ยืนยัน end-to-end; Discord + LINE ผ่าน stub (รูปแบบ/headers/plain-text/mention hardening)
+- **เดโม 15 วินาที 11 ฉาก** — `docs/media/demo.gif` + ภาพนิ่ง `docs/media/screens/` ฝังใน README ไทย/อังกฤษ
+- **README ภาษาอังกฤษ** — `README.en.md` + สลับภาษาที่หัว README, แก้ตัวเลขเทสต์/โมดูลให้ตรงจริง, เติมขั้นตั้ง 3 secrets
+- **GHCR multi-arch images** — workflow `publish-images.yml` แยก build amd64 (ubuntu) + arm64 (ubuntu-24.04-arm) แล้ว merge manifest; image `api`/`web` เป็น public, tags `1.2.0`, `1.2`, `latest` (+ `main`, `sha-*`)
+- **คู่มือ/FAQ ภาษาอังกฤษ** — `deploy/community/README.en.md`, `docs/FAQ-REDDIT.md`, ด่านตรวจ image ก่อนโพสต์ใน `docs/LAUNCH-REDDIT.md`
+- **ความปลอดภัย/คุณภาพรอบปล่อย** — ปิด Dependabot advisories (high 5 + moderate ที่เหลือ), mount farm executive API ให้ตรงกับหน้าที่เรียก, เทสต์ route/E2E ของ farm executive
+- **UI CE** — ตัดเมนู Pro ออกจาก `navigation.ts` (Ecosystem/ร้านอาหาร/ธุรกิจ/ฟลีท/การเงิน) และ QuickDeck ชี้หน้า CE จริง
+
+> หมายเหตุ: หลัง tag `v1.2.0` (6 พ.ย.) มี commit วันที่ 7 พ.ย. ปรับ CI + ปิด advisories + farm executive
+> — image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้ จะรวมใน release ถัดไป
+
+### 📚 ประวัติการพัฒนาก่อนแยก Pro (ถึง 2026-11-05)
+
+รายการด้านล่างคือสิ่งที่พัฒนาตั้งแต่ `v1.1.1` จนถึงวันที่แยก Pro ออก —
+บางรายการเป็นงาน Pro ที่ **ย้ายออกจาก repo นี้แล้ว** เก็บไว้เพื่อเป็นประวัติ ไม่ใช่สิ่งที่ CE ใช้งานได้ในตอนนี้
 
 ### 🚀 ฟีเจอร์ใหญ่ที่เพิ่มเข้ามา
 
 **ระบบติดตั้งและการเผยแพร่ (Deploy / Packaging)**
-- **CE1 — ชุดติดตั้ง Community Edition แบบ Docker Compose คำสั่งเดียว** (`deploy/community/`): db · mqtt · migrate · api · web ใช้ named volume ล้วน ไม่ bind mount ซอร์ส รันบนเครื่องใดก็ได้ (x86_64/arm64) `migrate` รัน `prisma migrate deploy + seed` แล้ว `api` จึงเริ่ม
+- **CE1 — ชุดติดตั้ง Community Edition แบบ Docker Compose คำสั่งเดียว** (`deploy/community/`): db · mqtt · migrate · api · web ใช้ named volume ล้วน ไม่ bind mount ซอร์ส รันบนเครื่องใดก็ได้ (x86_64/arm64) `migrate` รัน `prisma db push + seed` แล้ว `api` จึงเริ่ม
 - แก้บัคจริง: `Dockerfile.prod` ของ frontend ใช้ `node:18` แต่ Next 16 บังคับ ≥ 20.9 → เปลี่ยนเป็น `node:22-alpine`
 - `next.config.js`: เติม origin จาก `NEXT_PUBLIC_API_URL` เข้า CSP `connect-src` (http + ws) กัน CSP บล็อกเมื่อเปิดจากเครื่องอื่น
-- เทสต์ `tools/test/community-stack.test.mjs` 11/11 (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
+- เทสต์ `tools/test/community-stack.test.mjs` 13/13 (แดงก่อนแก้ 4 ข้อ) · `docker compose config` ผ่านจริง
 - `INSTALL-CHECK` doctor พร้อม `SUPPORT.txt` (ซ่อนข้อมูล敏感) สำหรับตรวจก่อน/หลังติดตั้ง
 - ตัวติดตั้งเครื่องใหม่แบบไฟล์เดียว 4.7 KB + ชุดติดตั้งเครื่องลูก (agent-pack) 36 MB
 
@@ -139,5 +183,6 @@
 ---
 
 ### หมายเหตุ
-- ยังไม่ได้ push ไป GitHub (main นำ `origin/main` อยู่ 12 commit) รอเจ้าของอนุญาตก่อน push
-- งานใดที่ระบุ "รอเจ้าของอนุมัติ" (เช่น การลบข้อมูลจริงตาม retention, push GitHub, เปิด /shop สู่อินเทอร์เน็ต) ยังไม่ได้ดำเนินการ
+- v1.2.0 ถูก push ขึ้น `origin/main` และปล่อย Release แล้ว (2026-11-06) · image `api`/`web` ขึ้น GHCR เป็น public แล้ว
+- สถานะงานค้างล่าสุดดูที่ [`QUEUE.md`](QUEUE.md) · snapshot สภาพระบบดูที่ [`STATUS.md`](STATUS.md)
+- CHANGELOG นี้เก็บประวัติก่อนแยก Pro ไว้ด้วย; งาน Pro ใหม่ไม่ได้อยู่ใน repo นี้

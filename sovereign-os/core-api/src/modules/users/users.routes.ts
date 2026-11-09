@@ -93,14 +93,19 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
       }
     }
     // บังคับ/ยกเลิกบังคับเปลี่ยนรหัสผ่าน (เช่น ลืมรหัส → ตั้งรหัสใหม่ + บังคับเปลี่ยน)
-    if (must_change_password !== undefined) data.must_change_password = must_change_password === true;
-    // เปลี่ยนสิทธิ์/โหนด/สาขา/สถานะบังคับรหัส = เพิ่ม token_version ทันที
+    const forcingPasswordChange = must_change_password === true;
+    if (must_change_password !== undefined) data.must_change_password = forcingPasswordChange;
+    // เปลี่ยนสิทธิ์/โหนด/สาขา หรือ "เพิ่งสั่งบังคับ" เปลี่ยนรหัส = เพิ่ม token_version ทันที
     // token เก่าของ user คนนั้นใช้ไม่ได้อีก (middleware เทียบ version ทุก request)
+    //
+    // ข้อยกเว้นที่เจอจาก CI: การ "ยกเลิก" บังคับเปลี่ยนรหัส (true → false) ต้องไม่ bump version
+    // เพราะ session ที่ยัง live อยู่อาจเป็นทางเดียวที่ user ใช้ทำงานต่อได้ และการยกเลิกไม่ได้
+    // ให้สิทธิ์อะไรเพิ่ม — reset-password/change-password bump เองอยู่แล้วเมื่อถึงเวลาจริง
     if (
       role !== undefined ||
       assigned_node_id !== undefined ||
       assigned_site_id !== undefined ||
-      must_change_password !== undefined
+      forcingPasswordChange
     ) {
       data.token_version = { increment: 1 };
     }

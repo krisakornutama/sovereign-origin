@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   initOfflineQueue,
   countQueued,
+  currentQueueUserId,
   flushQueue,
   subscribeOfflineQueue,
 } from '../lib/offlineQueue';
@@ -22,7 +23,7 @@ export function useOfflineSync() {
 
   useEffect(() => {
     initOfflineQueue();
-    countQueued().then(setQueuedCount);
+    countQueued(currentQueueUserId()).then(setQueuedCount);
 
     const unsub = subscribeOfflineQueue(setQueuedCount);
     const onOnline = () => {
@@ -43,7 +44,7 @@ export function useOfflineSync() {
 
   const syncNow = useCallback(async (): Promise<number> => {
     const flushed = await flushQueue();
-    setQueuedCount(await countQueued());
+    setQueuedCount(await countQueued(currentQueueUserId()));
     return flushed;
   }, []);
 

@@ -164,7 +164,11 @@ test('workflow เผยแพร่ GHCR: tag v*, api+web, linux/amd64+arm64', 
   assert.match(wf, /tags:\s*\n\s*-\s*'v\*'/, 'ต้อง trigger จาก tag v*');
   assert.match(wf, /ghcr\.io/, 'ต้อง push ขึ้น GHCR');
   assert.match(wf, /packages:\s*write/, 'ต้องมีสิทธิ์ push package');
-  assert.match(wf, /linux\/amd64,linux\/arm64/, 'ต้อง build ทั้ง amd64 และ arm64');
+  // ตั้งแต่ b08ba90 build แยก job ต่อสถาปัตยกรรมบน runner จริง (ไม่ใช้ QEMU)
+  // → platform อยู่ใน matrix (`platform: linux/amd64` / `platform: linux/arm64`) ไม่ได้อยู่ในบรรทัดเดียว
+  assert.match(wf, /platform:\s*linux\/amd64/, 'ต้อง build amd64');
+  assert.match(wf, /platform:\s*linux\/arm64/, 'ต้อง build arm64');
+  assert.match(wf, /imagetools create/, 'ต้องรวมผลเป็น multi-arch manifest');
   assert.match(wf, /sovereign-os\/core-api\/Dockerfile\.prod/, 'ต้อง build API จาก Dockerfile.prod');
   assert.match(wf, /sovereign-frontend\/Dockerfile\.prod/, 'ต้อง build web จาก Dockerfile.prod');
 });

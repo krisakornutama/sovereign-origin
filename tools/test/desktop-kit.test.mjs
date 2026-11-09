@@ -115,6 +115,21 @@ describe('แพ็กแอปตอนที่แอปเปิดค้า�
         fs.existsSync(path.join(tmp, 'resources', 'app', 'electron', 'main.js')),
         'overlay ต้องถูกเขียนลงโฟลเดอร์ที่สั่งด้วย --out',
       );
+      // J6f: แพ็กต้องพาตัวเปิดแบบไม่มีหน้าต่างไปด้วย — electron/main.js require
+      // resources/app/electron/../../tools/hidden-launch.cjs (= resources/tools/)
+      // และ planHiddenLaunch ใช้ run-hidden.vbs ที่อยู่ข้างกัน ⇒ ครบโดยไม่ต้องพึ่ง tools/ ของเครื่องที่แพ็ก
+      for (const name of ['hidden-launch.cjs', 'run-hidden.vbs']) {
+        const dest = path.join(tmp, 'resources', 'tools', name);
+        assert.ok(
+          fs.existsSync(dest),
+          `แพ็กขาด resources/tools/${name} — แอปจะถอยไปใช้ cmd /c call (ไม่มีหน้าต่าง แต่ .bat อาจตายเมื่อปิดแอปกลางทาง)`,
+        );
+        assert.equal(
+          fs.readFileSync(dest).compare(fs.readFileSync(path.join(ROOT, 'tools', name))),
+          0,
+          `resources/tools/${name} ต้องตรงกับซอร์สทุกไบต์`,
+        );
+      }
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }

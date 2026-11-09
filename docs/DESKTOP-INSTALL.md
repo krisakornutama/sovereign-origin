@@ -56,6 +56,7 @@ node PACK-DESKTOP.mjs
 2. `node tools/build-desktop.mjs`
    - คัด runtime → `dist-portable/`
    - เขียน overlay จาก `sovereign-frontend/electron/` (ตรวจตรงซอร์ส 100% ก่อนผ่าน)
+   - คัด `tools/hidden-launch.cjs` + `tools/run-hidden.vbs` → `resources/tools/` (ตัวเปิด .bat แบบไม่มีหน้าต่าง — ตรวจตรงซอร์ส)
    - คัด sidecar → `resources/core-api/`
 3. ถ้า **แอปเปิดอยู่** จะเขียนลง `dist-portable-staging/` แทน (ไม่ทับโฟลเดอร์ที่กำลังรัน)
 4. คัดสำเนา → `Install\desktop\Sovereign-OS\` + portable exe + `DESKTOP-INFO.json`

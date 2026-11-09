@@ -115,7 +115,11 @@ This repository is pure Community Edition: no hidden Pro imports, no dead stubs.
 
 ## Docs
 
+- [`CHANGELOG.md`](CHANGELOG.md) — release history and what changed in each version (latest: v1.2.0)
+- [`QUEUE.md`](QUEUE.md) — current work queue and launch status
 - [`deploy/community/README.md`](deploy/community/README.md) — install, ports, invite codes, LAN access (Thai)
+- [`deploy/community/README.en.md`](deploy/community/README.en.md) — the same install guide in English
+- [`docs/FAQ-REDDIT.md`](docs/FAQ-REDDIT.md) — canned answers for launch comments
 - [`docs/PRELAUNCH-DEMO.md`](docs/PRELAUNCH-DEMO.md) — demo storyboard and how to reproduce it
 - [`docs/OPEN-CORE.md`](docs/OPEN-CORE.md) — what stays in CE and what moved to Pro
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system design and module boundaries

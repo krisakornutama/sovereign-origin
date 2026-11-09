@@ -1,7 +1,8 @@
 # คู่มือเปิด Required Checks จริงบน main (5 นาที หลังแพลนพร้อม)
 
 > เป้าหมาย: ทำให้ `Core API tests / test-db` (ชุด real-Postgres) และเช็คอื่น ๆ เป็น**เงื่อนไขบังคับ**ก่อน merge เข้า main
-> สถานะปัจจุบัน: script พร้อมครบ 6 contexts แล้ว แต่**ตั้งจริงไม่ได้บนแพลนฟรี + repo private** (GitHub ตอบ HTTP 403 ทั้ง rulesets และ branch protection — ทดสอบด้วย `gh api` ล่าสุด 17 ก.ย. 2026)
+> สถานะปัจจุบัน (7 พ.ย. 69): **ตั้งจริงแล้ว 7 contexts** — branch protection API ตอบอ่าน/เขียนได้บนแพลนนี้แล้ว
+> (เดิม: script พร้อมครบ 6 contexts แต่**ตั้งจริงไม่ได้บนแพลนฟรี + repo private** (GitHub ตอบ HTTP 403 ทั้ง rulesets และ branch protection — ทดสอบด้วย `gh api` ล่าสุด 17 ก.ย. 2026)
 
 ## ทางเลือก A — อัปเกรด GitHub Pro (repo ยัง private ได้) — เหมาะกับ repo นี้
 
@@ -15,12 +16,13 @@
    ```bash
    bash tools/set-required-checks.sh --apply
    ```
-   script จะ PUT `required_status_checks` ครบ **6 contexts**: `Audit site / audit` · `File size guard / size` · `Deploy portfolio / publish` · `Core API tests / test (ubuntu-latest)` · `Core API tests / test (windows-latest)` · **`Core API tests / test-db`** แล้วพิมพ์รายการที่ตั้งสำเร็จกลับมาให้เห็น
+   script จะ PUT `required_status_checks` ครบ **7 contexts**: `audit` · `size` · `publish` · `test (ubuntu-latest)` · `test (windows-latest)` · **`test-db`** · **`arch-gate`** (ตัวหลังนี้รัน gate ชุดใหม่ no-db-push + ci-ddl-sync ด้วย) แล้วพิมพ์รายการที่ตั้งสำเร็จกลับมาให้เห็น
+   > ⚠️ **ชื่อ context ต้องเป็นชื่อ job ล้วน ไม่มี `Workflow / ` นำหน้า** — ถ้าใส่แบบมี prefix PR ที่เช็คเขียวครบจะยังขึ้น `BLOCKED` ตลอดกาล (ดูบันทึกบั๊กท้าย 문서)
 5. **ยืนยันผลจริง** (อ่านกลับจาก API — อย่าเชื่อข้อความ success ของ script อย่างเดียว):
    ```bash
    gh api repos/krisakornutama/sovereign-origin/branches/main/protection --jq '.required_status_checks.contexts'
    ```
-   ต้องเห็นครบ 6 แถวรวม `Core API tests / test-db`
+   ต้องเห็นครบ 7 แถว: `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate`
 6. ทดสอบพฤติกรรมจริง: ยิง PR จำลอง (สาขาเล็ก ๆ แก้ README) → หน้า PR ต้องบล็อก Merge จนเช็คเขียวครบ + ถ้า push เข้า main โดยข้าม (direct push) ตัว protection `strict=true` จะบังคับอัปเดตสาขาก่อนเสมอ
 
 ## ทางเลือก B — เปลี่ยน repo เป็น public (ไม่เสียเงิน)
@@ -43,3 +45,18 @@
 | ต้องการเปลี่ยนรายชื่อ checks | — | แก้ array `CONTEXTS` ที่หัวไฟล์ `tools/set-required-checks.sh` (แหล่งเดียวจบ) |
 
 > หลังตั้งสำเร็จ: อัปเดตแถว "Required checks บน main" ใน `docs/ops-runbook.md` §๘ จาก "พร้อมตั้ง 6 — apply ไม่ได้ (403)" เป็น "บังคับจริง 6 contexts ตั้งเมื่อ <วันที่>" — และบรรทัด "รอเจ้าของ" ใน STATUS.md
+
+## บันทึกผลทดสอบจริง — PR #55 (9 พ.ย. 69)
+
+ยิง PR ทดสอบเพื่อยืนยันว่า protection บังคับใช้จริง (ไม่ใช่แค่ตั้งค่าไว้):
+
+| หลักฐาน | ผลที่เห็น |
+|---|---|
+| `gh pr checks 55` | ขึ้นครบทุก context ที่ตั้งเป็น required — `arch-gate` · `audit` · `size` · `publish` · `test (ubuntu-latest)` · `test (windows-latest)` · `test-db` (มี `test-integration` และ `boundary` เพิ่มมาด้วยแต่ไม่บังคับ) |
+| `gh pr view 55 --json mergeStateStatus` ขณะเช็คยัง pending | `BLOCKED`/`BEHIND` — ปุ่ม Merge กดไม่ได้จนกว่าจะเขียวครบ |
+| arch-gate แดง (ตอนลองให้รัน suite เต็มชุด) | PR ยัง merge ไม่ได้ → required check บล็อกจริง ไม่ใช่แค่โชว์สถานะ |
+
+> **ทำไม arch-gate จึงยังรันเฉพาะ 2 gate ไฟล์** (`no-db-push-gate`, `ci-ddl-sync`): tools suite เต็มชุดจบได้แล้ว
+> (แก้เหตุค้างใน #51 — keep-alive socket ในเทสต์ + `--test-force-exit`) แต่ยังมีเทสต์ที่ผูกกับ Windows
+> (`tools/*.cmd`, `*.ps1`, launcher dry-run) และ suite ของ frontend ที่ต้องลง deps ของ `sovereign-frontend`
+> ก่อน — ถ้าจะย้ายมาเป็น required check บน ubuntu ต้องทำ platform guard ให้ครบก่อน (งานแยก)

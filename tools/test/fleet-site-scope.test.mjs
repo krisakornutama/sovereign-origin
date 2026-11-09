@@ -22,7 +22,8 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const BACKEND = 'sovereign-os/core-api';
 const SCHEMA = `${BACKEND}/prisma/schema.prisma`;
-const MIGRATION = `${BACKEND}/prisma/migrations/20261024130000_site_admin_role/migration.sql`;
+// migration chain เดิมถูก squash เป็น baseline (20261107190000) — DDL ต้นทางเก็บไว้ที่ migrations_archive
+const MIGRATION = `${BACKEND}/prisma/migrations_archive/20261024130000_site_admin_role/migration.sql`;
 const AUDIT = `${BACKEND}/src/services/audit.service.ts`;
 const AUTH_MW = `${BACKEND}/src/middleware/auth.middleware.ts`;
 const USERS = `${BACKEND}/src/modules/users/users.routes.ts`;

@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth.middleware';
 import { buildFarmExecutive } from '../../services/farm-executive.service';
+import { loadLivestockExecutiveSnapshot } from '../../services/livestock-executive.service';
 
 const router = Router();
 const DAY_MS = 86_400_000;
@@ -13,22 +14,12 @@ const DAY_MS = 86_400_000;
 router.get('/', authenticate, async (_req, res) => {
   try {
     const now = new Date();
-    const [plots, groups, silos] = await Promise.all([
+    // ปศุสัตว์/ไซโล/THI เป็นตารางของโมดูล livestock → โหลดผ่าน service ของเจ้าของ
+    const [plots, livestock] = await Promise.all([
       prisma.farmPlot.findMany(),
-      prisma.livestockGroup.findMany({ include: { records: true, schedules: true, dailyLogs: true } }),
-      prisma.feedSilo.findMany(),
+      loadLivestockExecutiveSnapshot(),
     ]);
-
-    // THI ล่าสุด — ตาราง climate เป็น hypertable ที่อ่านผ่าน SQL (เหมือน livestock dashboard)
-    let climate: { thi: number; status: string } | null = null;
-    try {
-      const rows: any[] = await prisma.$queryRawUnsafe(
-        `SELECT thi, status FROM livestock_climate_logs ORDER BY at DESC LIMIT 1`
-      );
-      if (rows[0]) climate = { thi: Number(rows[0].thi), status: String(rows[0].status) };
-    } catch (dbErr) {
-      console.error('Farm executive climate error:', dbErr);
-    }
+    const { groups, silos, climate } = livestock;
 
     const result = buildFarmExecutive({
       now,

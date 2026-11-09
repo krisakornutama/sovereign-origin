@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeJsonWithChecksum } from './json-checksum.mjs';
+import { decodeTaskResult } from './ops-task-state.mjs';
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 // log/ไฟล์ runtime อยู่ที่ MAIN tree เสมอ (worktree ไม่มี logs/ — กันอ่านผิดฝั่งแบบสาย backup)
@@ -29,6 +30,7 @@ const now = () => new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok',
 const TASKS = [
   { name: 'ShipShop3000', label: 'ShipShop 23:59' },
   { name: 'Sovereign Nightly Verify', label: 'Verify 02:00' },
+  { name: 'Sovereign Nightly Deadman', label: 'Deadman 03:30' },
   { name: 'Sovereign DB Backup', label: 'DB Backup 03:00' },
   { name: 'Sovereign Nightly Quality Gate', label: 'Gate 03:20' },
   { name: 'Sovereign Offsite Backup', label: 'Offsite 03:30' },
@@ -37,13 +39,6 @@ const TASKS = [
   { name: 'Sovereign Docker Watch', label: 'Docker Watch' },
   { name: 'Sovereign Synthetic Browser Check', label: 'Synthetic Check' },
 ];
-
-function decodeResult(code) {
-  if (code === 0) return { ok: true, text: 'OK' };
-  if (code === 267009) return { ok: true, text: 'ยังไม่เคยรัน (0x41303)' };
-  if (code === 2147946720) return { ok: false, text: 'ถูกบล็อกเงื่อนไข (0x800710E0 — แบต/หลับ)' };
-  return { ok: false, text: `0x${(code >>> 0).toString(16).toUpperCase().padStart(8, '0')}` };
-}
 
 // PS 5.1 ConvertTo-Json คืน DateTime เป็น "/Date(1695768976167)/" — รองรับทั้งนี้และ ISO
 function parsePsDate(v) {
@@ -58,15 +53,21 @@ function parsePsDate(v) {
 function taskLines() {
   const names = TASKS.map((t) => `'${t.name}'`).join(',');
   try {
-    const out = execSync(
-      `powershell -NoProfile -Command "Get-ScheduledTask -TaskName ${names} | Get-ScheduledTaskInfo | Select-Object TaskName,LastRunTime,LastTaskResult | ConvertTo-Json"`,
-      { encoding: 'utf8', timeout: 30_000 },
-    );
+    // ต้องอ่าน State ด้วย: task ที่ disable ตั้งใจยังเก็บ LastTaskResult=1 ของรอบสุดท้าย
+    // ⇒ ถ้าไม่ดู State จะฟ้อง "ล้ม" ตลอดกาล (เคสจริง ShipShop3000 หลังปิดตาม QUEUE)
+    const cmd = 'powershell -NoProfile -Command "Get-ScheduledTask -TaskName ' + names +
+      ' | ForEach-Object { $t = $_; $i = $t | Get-ScheduledTaskInfo; ' +
+      '[pscustomobject]@{ TaskName = $t.TaskName; State = [string]$t.State; LastRunTime = $i.LastRunTime; LastTaskResult = $i.LastTaskResult } }' +
+      ' | ConvertTo-Json -Compress"';
+    const out = execSync(cmd, { encoding: 'utf8', timeout: 30_000 });
     const arr = JSON.parse(out);
     return (Array.isArray(arr) ? arr : [arr]).map((r) => ({
       name: String(r.TaskName ?? ''),
-      lastRun: parsePsDate(r.LastRunTime)?.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false }) ?? '—',
-      result: decodeResult(Number(r.LastTaskResult)),
+      state: String(r.State ?? ''),
+      lastRun: Number(r.LastTaskResult) === 267011
+        ? '—' // ยังไม่เคยรัน — อย่าโชว์ 30/11/2542 (Windows epoch) ให้เข้าใจผิด
+        : parsePsDate(r.LastRunTime)?.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false }) ?? '—',
+      result: decodeTaskResult(Number(r.LastTaskResult), r.State),
     }));
   } catch {
     return null;
@@ -166,9 +167,9 @@ if (tasks) {
   for (const t of TASKS) {
     const r = tasks.find((x) => x.name === t.name);
     if (!r) { line(`   ? ${t.label.padEnd(16)} ไม่พบ task`); continue; }
-    const icon = r.result.ok ? '✓' : '✗';
+    const icon = r.result.disabled ? '⏸' : r.result.ok ? '✓' : '✗';
     line(`   ${icon} ${t.label.padEnd(16)} ${r.result.text.padEnd(40)} ล่าสุด ${r.lastRun}`);
-    if (!r.result.ok) watch.push(`task "${t.label}" ${r.result.text}`);
+    if (r.result.ok === false) watch.push(`task "${t.label}" ${r.result.text}`);
   }
 } else {
   console.log('▶ Task Scheduler ถามไม่ได้');
