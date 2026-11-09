@@ -15,7 +15,7 @@
 |---|---|
 | Repo visibility | public · license AGPL-3.0 · description "Sovereign Origin — self-sovereign home OS" |
 | Topics | **ครบแล้ว** — self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql, agpl |
-| Branch protection `main` | **เปิดแล้ว** — required checks 6 ตัว: `Audit site / audit`, `File size guard / size`, `Deploy portfolio / publish`, `Core API tests / test (ubuntu-latest)`, `Core API tests / test (windows-latest)`, `Core API tests / test-db` |
+| Branch protection `main` | **เปิดแล้ว** — required checks 7 ตัว (ชื่อ job ล้วน): `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate` |
 | Release `v1.2.0` | published (ไม่ใช่ draft) — release note เขียนใหม่แล้ว มีคำสั่ง `docker pull` + บันทึกการเผยแพร่ image |
 | Release note | ระบุว่า `api` เผยแพร่สำเร็จ และ `latest`/`1.2` ของ `web` ถูกย้ายมาชี้ build ล่าสุดแล้ว |
 | Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที |
