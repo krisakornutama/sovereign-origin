@@ -16,9 +16,13 @@ const router = Router();
 router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true, role: true, assigned_node_id: true, assigned_site_id: true, must_change_password: true },
+      select: { id: true, username: true, role: true, assigned_node_id: true, assigned_site_id: true, must_change_password: true, mfa_secret: true },
     });
-    res.json(users);
+    // ส่งแค่ว่าเปิด 2FA ไหม — secret/backup hash ไม่เคยออกจากเซิร์ฟเวอร์ (strip ซ้ำอีกชั้นกัน select ถูกแก้ในอนาคต)
+    res.json(users.map(({ mfa_secret, ...u }: any) => {
+      const { mfa_backup_hash, pending_mfa_secret, ...safe } = u;
+      return { ...safe, mfa_enabled: !!mfa_secret };
+    }));
   } catch (err) {
     console.error('Users API error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -69,6 +73,28 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
     console.error('[reset-password] failed:', err?.code || '', err?.message || err);
     if (err?.message === 'User not found') return res.status(404).json({ error: 'User not found' });
     res.status(500).json({ error: 'Reset failed', reason: err?.message || 'unknown' });
+  }
+});
+// POST /api/users/:id/reset-mfa — กู้สมาชิกที่โทรศัพท์ (authenticator) หาย (SUPERADMIN)
+// รีเซ็ต 2FA = ลดความแข็งแรงของบัญชี ⇒ audit ทุกครั้ง + token เดิมตายทั้งหมด (bump token_version)
+// บัญชีตัวเองต้องใช้หน้า Settings (บังคับยืนยันรหัสผ่าน) — endpoint นี้ไม่ให้ข้ามขั้นนั้น
+router.post('/:id/reset-mfa', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  if (req.params.id === req.user!.id) {
+    return res.status(400).json({ error: 'รีเซ็ต 2FA ของตัวเองผ่านหน้านี้ไม่ได้ — ใช้หน้าตั้งค่าที่ต้องยืนยันรหัสผ่าน' });
+  }
+  try {
+    const result = await AuthService.adminResetMfa(req.params.id);
+    await AuditService.logAction({
+      userId: req.user!.id,
+      actionType: 'USER_MFA_RESET_BY_ADMIN',
+      payload: { target_user_id: req.params.id, target_username: result.username, had_mfa: result.had_mfa, ip: req.ip },
+    });
+    disconnectUserSockets(req.params.id);
+    return res.json(result);
+  } catch (err: any) {
+    if (err?.message === 'User not found') return res.status(404).json({ error: 'User not found' });
+    console.error('[reset-mfa] failed:', err?.message || err);
+    return res.status(500).json({ error: 'Reset MFA failed' });
   }
 });
 router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {

@@ -6,6 +6,9 @@
 ## ข้อห้าม / ระวัง
 - การเปลี่ยน role ของบัญชี = เปลี่ยนสิทธิ์ทั้งระบบทันที — ต้องผ่านผู้ดูแลสูงสุดเท่านั้น
 - `reset-password` ต้องบังคับเปลี่ยนรหัสรอบแรก (must-change-password) และถูกบันทึก audit ทุกครั้ง
+- `POST /:id/reset-mfa` เป็น**ทางกู้เมื่อสมาชิกทำ authenticator หาย** — SUPERADMIN เท่านั้น, เขียน audit `USER_MFA_RESET_BY_ADMIN` ทุกครั้ง, ล้าง `mfa_secret`/`pending_mfa_secret`/`mfa_backup_hash` และ **bump `token_version`** ให้ session เดิมตายทันที
+  - **รีเซ็ต 2FA ของตัวเองผ่าน endpoint นี้ไม่ได้ (400)** — ต้องใช้หน้าตั้งค่าที่บังคับยืนยันรหัสผ่าน (กันคนที่ยึด session อยู่ไล่ปิด 2FA ของเจ้าของ)
+  - `GET /` ส่งเฉพาะ `mfa_enabled` (boolean) — **ห้ามส่ง `mfa_secret`/`mfa_backup_hash`/`pending_mfa_secret` ออกไปไม่ว่ากรณีใด**
 - ห้ามลบบัญชีที่ยังผูก node/ข้อมูลธุรกิจอยู่โดยไม่โอนย้ายความเป็นเจ้าของก่อน
 - `PUT /:id` รับ `assigned_site_id` (สาขาของ `SITE_ADMIN`) — ตรวจว่าสาขามีจริงผ่าน service ของ fleet
   (โมดูลนี้ไม่ query ตาราง `fleet_*` เอง) และ bump `token_version` ทุกครั้งที่เปลี่ยนสาขา
