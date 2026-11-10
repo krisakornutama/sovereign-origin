@@ -11,6 +11,7 @@ import net from 'net';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { sendTelegramAlert } from './telegram-alert.service';
 
@@ -124,12 +125,15 @@ let lastSpeedtest: SpeedtestResult | null = null;
 let knownDevices = new Set<string>();
 let started = false;
 
-async function writeMetric(metric: string, value: number, deviceId = 'wan-monitor'): Promise<void> {
+/** คำสั่งบันทึก metric — deviceId/metric มาจากข้อมูลที่ router รายงานได้ จึงต้องเป็น parameter */
+export function metricInsertQuery(metric: string, value: number, deviceId = 'wan-monitor'): Prisma.Sql {
+  return Prisma.sql`INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value)
+    VALUES (NOW(), ${NODE_ID}::uuid, ${deviceId}, ${metric}, ${value})`;
+}
+
+export async function writeMetric(metric: string, value: number, deviceId = 'wan-monitor'): Promise<void> {
   try {
-    await prisma.$queryRawUnsafe(
-      `INSERT INTO sensor_telemetry (time, node_id, device_id, metric, value) VALUES (NOW(), '${NODE_ID}'::uuid, '${deviceId}', '${metric}', $1)`,
-      value
-    );
+    await prisma.$queryRaw(metricInsertQuery(metric, value, deviceId));
   } catch { /* DB ล่ม = offline-first — ข้าม */ }
 }
 
