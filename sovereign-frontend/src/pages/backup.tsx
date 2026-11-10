@@ -8,7 +8,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import { useLanguageStore } from '../stores/useLanguageStore';
-import { fmtLocale } from '../lib/formatDate';
+import { fmtDate, fmtLocale } from '../lib/formatDate';
 
 interface BackupEntry {
   file: string;
@@ -21,6 +21,20 @@ interface Schedule {
   time: string;
 }
 
+/**
+ * ความสดของ backup ล่าสุด — ตัดสินที่ฝั่ง server เท่านั้น
+ * (เกณฑ์ 26 ชม. อยู่ที่ backup.service; ฝั่ง UI ห้ามคำนวณซ้ำเพื่อไม่ให้สองที่เพี้ยนจากกัน)
+ */
+interface BackupStatus {
+  lastBackupAt: string | null;
+  ageHours: number | null;
+  staleAfterHours: number;
+  stale: boolean;
+  never: boolean;
+  count: number;
+  schedule: Schedule;
+}
+
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
   if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -31,6 +45,7 @@ export default function BackupPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [schedule, setSchedule] = useState<Schedule>({ enabled: false, time: '02:00' });
+  const [status, setStatus] = useState<BackupStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -48,11 +63,18 @@ export default function BackupPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      // สถานะความสดเป็นคนละคำถามกับรายการไฟล์ — ยิงพร้อมกัน แต่ถ้าตัว status ล้ม
+      // ต้องไม่ทำให้รายการที่โหลดได้หายไป (แค่ไม่มีแบนเนอร์)
+      const [listRes, statusRes] = await Promise.all([
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup/status`).catch(() => null),
+      ]);
+      if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
+      const data = await listRes.json();
       setBackups(data.backups || []);
       setSchedule(data.schedule || { enabled: false, time: '02:00' });
+      if (statusRes && statusRes.ok) setStatus(await statusRes.json());
+      else setStatus(null);
     } catch (err) {
       console.error(err);
       setError(t('backup.loadingFail', 'โหลดข้อมูล backup ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
@@ -167,6 +189,37 @@ export default function BackupPage() {
 
         {message && <div className="card p-3 text-sm text-emerald-400">{message}</div>}
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
+
+        {/* ความสดของ backup — สำคัญกว่าจำนวนไฟล์: 30 ไฟล์ที่หยุดไปเมื่อสัปดาห์ก่อนคือ "ไม่มี backup" */}
+        {isSuperAdmin && status && (
+          <div
+            className={`card px-4 py-3 text-sm flex flex-wrap items-center gap-x-2 gap-y-1 ${
+              status.never || status.stale ? 'text-amber-300' : 'text-emerald-400'
+            }`}
+          >
+            <Icon name={status.never || status.stale ? 'clock' : 'backup'} size={14} />
+            {status.never ? (
+              <span>{t('backup.status.never', 'ยังไม่เคยสำรองข้อมูล — กด "Backup ตอนนี้" หรือเปิดตารางเวลาอัตโนมัติ')}</span>
+            ) : status.stale ? (
+              <span>
+                {t('backup.status.stale', 'สำรองล่าสุด {hours} ชม. ที่แล้ว (เกิน {limit} ชม.) — ตรวจว่า backup อัตโนมัติยังทำงาน', {
+                  hours: status.ageHours ?? 0,
+                  limit: status.staleAfterHours,
+                })}
+              </span>
+            ) : (
+              <span>
+                {t('backup.status.fresh', 'สำรองล่าสุด {hours} ชม. ที่แล้ว', { hours: status.ageHours ?? 0 })}
+                {status.lastBackupAt ? <span className="text-gray-500"> · {fmtDate(status.lastBackupAt)}</span> : null}
+              </span>
+            )}
+            {!status.schedule.enabled && (
+              <span className="text-amber-400">
+                {t('backup.status.scheduleOff', '· ตารางเวลาอัตโนมัติปิดอยู่ — ต้องกดสำรองเอง')}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Backup ตอนนี้ */}
