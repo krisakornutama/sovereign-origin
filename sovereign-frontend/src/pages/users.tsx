@@ -17,6 +17,8 @@ interface User {
   role: string;
   assigned_node_id: string | null;
   must_change_password?: boolean;
+  /** เปิด 2FA อยู่หรือไม่ — server ส่งมาแค่สถานะ ไม่ส่ง secret ออกมา */
+  mfa_enabled?: boolean;
 }
 
 interface FeatureDef {
@@ -224,6 +226,24 @@ export default function UsersPage() {
       loadUsers();
     } catch (err: any) {
       setError(`${err.message || t('users.resetPwFailed', 'ตั้งรหัสใหม่ไม่สำเร็จ')}`);
+    }
+  };
+
+  // กู้สมาชิกที่โทรศัพท์ (authenticator) หาย — ล้าง secret 2FA ให้ตั้งใหม่ได้
+  // เป็นการลดความแข็งแรงของบัญชี: server audit ทุกครั้ง + ตัด session เดิมทั้งหมด (token_version)
+  // ของตัวเองต้องใช้หน้า Settings ที่บังคับยืนยันรหัสผ่าน — ปุ่มนี้ปิดไว้สำหรับแถวของตัวเอง
+  const resetMfa = async (id: string, username: string) => {
+    if (!confirm(t('users.resetMfaConfirm', 'รีเซ็ต 2FA ให้ {username}? — เขาจะต้องตั้งแอปยืนยันตัวตนใหม่ และ session เดิมทั้งหมดจะถูกตัดทันที', { username }))) return;
+    setMessage('');
+    setError('');
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}/reset-mfa`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || t('users.resetMfaFailed', 'รีเซ็ต 2FA ไม่สำเร็จ'));
+      setMessage(t('users.resetMfaDone', 'รีเซ็ต 2FA ให้ {username} แล้ว — ให้เขาตั้งแอปยืนยันตัวตนใหม่ที่หน้าตั้งค่า', { username }));
+      loadUsers();
+    } catch (err: any) {
+      setError(err.message || t('users.resetMfaFailed', 'รีเซ็ต 2FA ไม่สำเร็จ'));
     }
   };
 
@@ -455,6 +475,19 @@ export default function UsersPage() {
                       >
                         <Icon name="refresh" size={12} /> {t('users.resetPwBtn', 'ตั้งรหัสใหม่')}
                       </button>
+                      {/* แสดงเฉพาะคนที่เปิด 2FA อยู่ — ปุ่มนี้คือทางกู้เมื่อโทรศัพท์หาย */}
+                      {u.mfa_enabled && (
+                        <button
+                          onClick={() => resetMfa(u.id, u.username)}
+                          disabled={u.id === user.id}
+                          title={u.id === user.id
+                            ? t('users.resetMfaSelfTitle', 'รีเซ็ต 2FA ของตัวเองที่นี่ไม่ได้ — ไปที่หน้าตั้งค่า (ต้องยืนยันรหัสผ่าน)')
+                            : t('users.resetMfaTitle', 'ล้าง 2FA ให้ตั้งแอปใหม่ — session เดิมตัดทันที')}
+                          className="text-fuchsia-400 hover:text-fuchsia-300 text-xs disabled:opacity-30 mr-3"
+                        >
+                          <Icon name="shield" size={12} /> {t('users.resetMfaBtn', 'รีเซ็ต 2FA')}
+                        </button>
+                      )}
                       <button
                         onClick={() => setForceChange(u.id, u.username, !u.must_change_password)}
                         disabled={u.id === user.id}
