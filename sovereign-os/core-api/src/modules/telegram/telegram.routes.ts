@@ -236,12 +236,17 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res
   if (!creds.botToken) return res.status(400).json({ error: 'ตั้ง Bot Token ก่อน' });
   try {
     const r = await axios.get(`https://api.telegram.org/bot${creds.botToken}/getUpdates`, { timeout: 8000 });
-    const chats = ((r.data?.result as any[]) || []).map((u: any) => ({
-      chatId: String(u.message?.chat?.id || u.channel_post?.chat?.id || ''),
-      title: u.message?.chat?.title || u.message?.chat?.username || u.message?.chat?.first_name || '',
-      type: u.message?.chat?.type || u.channel_post?.chat?.type || 'unknown',
-      text: (u.message?.text || u.channel_post?.text || '').slice(0, 60),
-    })).filter((c: any) => c.chatId);
+    // ⚠ ต้องอ่าน chat จาก channel_post ด้วย ไม่ใช่แค่ message: โพสต์ในช่องไม่มี `message`
+    //   เดิม title ของโพสต์ในช่องจึงว่างเสมอ (เจอตอนเขียน unit test 10 พ.ย. 69) แม้ chat_id/type จะถูก
+    const chats = ((r.data?.result as any[]) || []).map((u: any) => {
+      const chat = u.message?.chat ?? u.channel_post?.chat ?? null;
+      return {
+        chatId: String(chat?.id || ''),
+        title: chat?.title || chat?.username || chat?.first_name || '',
+        type: chat?.type || 'unknown',
+        text: (u.message?.text || u.channel_post?.text || '').slice(0, 60),
+      };
+    }).filter((c: any) => c.chatId);
     // dedup
     const seen = new Set<string>();
     const uniq = chats.filter((c: any) => !seen.has(c.chatId) && seen.add(c.chatId));
