@@ -22,6 +22,7 @@
 ## ห้ามแตะ / ระวัง
 - `users` เป็นตารางที่ทุกโมดูลอ้าง (FK) — เปลี่ยน schema ต้องคิดข้ามโมดูลเสมอ
 - ห้าม log รหัสผ่าน/MFA secret ลง audit_logs หรือ response
+- **audit body ปิดความลับทุกชั้น + จำกัดขนาด 4 KB** (`sanitizeAuditBody` ใน `auth.middleware.ts`) — key ที่มีคำว่า password/pass/secret/token/authorization/wifi ถูกแทนด้วย `[REDACTED]` แม้ซ้อนใน object/array · body ใหญ่เกินเพดานเก็บแค่ `{_truncated,_bytes,_keys}` (เดิม body 25 MB ของ import ไหลลง audit_logs ทั้งก้อน) — **ห้ามลดเกณฑ์นี้หรือปิดการปิดความลับ** เพื่อความสะดวกในการ debug
 - **ห้ามเรียก `jwt.verify` ตรง ๆ** — ใช้ `verifyJwt()` จาก `src/lib/jwt-verify.ts` (ล็อก `algorithms: ['HS256']`) ทุกจุด: middleware, socket handshake, automation, nextgen · `jsonwebtoken` ยอมรับ HS512 ที่เซ็นด้วย secret เดียวกัน ถ้าไม่ล็อกอัลกอริทึมจะกลายเป็นทางเซ็นที่ระบบไม่ได้ออกเอง
 - `POST /mfa/disable` ต้องยืนยันด้วยรหัสผ่านปัจจุบัน — token อย่างเดียวปิด 2FA ไม่ได้ (กัน session ที่ถูกยึด)
 - บัญชี `e2e-bot` ใช้โดยเกต E2E (auth.setup) — ห้ามลบ/เปลี่ยนรหัสโดยไม่แจ้ง
