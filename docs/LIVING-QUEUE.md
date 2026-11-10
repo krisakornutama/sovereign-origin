@@ -68,11 +68,20 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | ID           | รายการ                                                                                                                     | ที่มา                                       | สถานะ                                          | หลักฐาน                                                                 |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
 | SEC-001      | P0: `POST /api/auth/rate-limit/clear` ต้องผ่าน MFA เต็มขั้น + audit `RATE_LIMIT_CLEAR`; parser 25 MB ของ `/api/clone/import` ย้ายไปหลัง auth | คำสั่งเจ้าของ (security audit 2026-11-10)   | done 2026-11-10                                 | `ca4ce33` · PR #60 · tests 8/8 · `npm run verify` 6/6                  |
-| SEC-002      | P1: SSRF guard ให้ vision `analyze-url` (LAN camera ยังใช้ได้, loopback/metadata/redirect ปิด); `GET /api/backup` + `processes/kill` = SUPERADMIN; actuation ปฏิเสธ `SYSTEM_AI`; MFA disable ต้องยืนยันรหัสผ่านปัจจุบัน + audit | คำสั่งเจ้าของ (security audit 2026-11-10)   | in-progress (PR #61 รอ CI)                      | `6fcdc04` (แก้ตาม CI: `c3e8d19`) · PR #61 · tests 68/68 · verify 6/6    |
-| SYSTRUTH-001 | หน้า `/system` เลิก hardcode "● Running" — เพิ่ม `GET /api/system/services` probe DB/MQTT/Ollama จริงพร้อม timeout และแสดง `down`/`ไม่ทราบสถานะ` ตามจริง | คำสั่งเจ้าของ (ใช้งานง่าย/ตอบความจริงของระบบ) | in-progress (branch `ai/production-truth-ui`)   | เทสต์ `tests/systemServices.test.ts` 5/5 · หลักฐานแดง 404 ≠ 401 ก่อนเพิ่ม route |
+| SEC-002      | P1: SSRF guard ให้ vision `analyze-url` (LAN camera ยังใช้ได้, loopback/metadata/redirect ปิด); `GET /api/backup` + `processes/kill` = SUPERADMIN; actuation ปฏิเสธ `SYSTEM_AI`; MFA disable ต้องยืนยันรหัสผ่านปัจจุบัน + audit | คำสั่งเจ้าของ (security audit 2026-11-10)   | done 2026-11-10                                 | `0404d3a` · PR #61 (squash) · tests 68/68 · verify 6/6 · E2E fix `c3e8d19` |
+| SYSTRUTH-001 | หน้า `/system` เลิก hardcode "● Running" — เพิ่ม `GET /api/system/services` probe DB/MQTT/Ollama จริงพร้อม timeout และแสดง `down`/`ไม่ทราบสถานะ` ตามจริง | คำสั่งเจ้าของ (ใช้งานง่าย/ตอบความจริงของระบบ) | done 2026-11-10                                 | `85dc09e` · PR #62 (squash) · `tests/systemServices.test.ts` 5/5 · แดง 404 ≠ 401 ก่อนเพิ่ม route · verify 6/6 |
+| MFAADMIN-001 | ผู้ดูแลรีเซ็ต 2FA ของสมาชิกที่ทำ authenticator หายได้โดยไม่ต้องเปิด DB console — `POST /api/users/:id/reset-mfa` (SUPERADMIN), audit `USER_MFA_RESET_BY_ADMIN`, ตัด session เดิม (bump `token_version`), รีเซ็ตของตัวเองผ่าน endpoint นี้ไม่ได้; `GET /api/users` ส่งแค่ `mfa_enabled` | คำสั่งเจ้าของ (มีระบบจัดการครบ/ใช้งานง่าย) | in-progress (branch `ai/admin-reset-mfa`)       | `tests/adminResetMfa.test.ts` 5/5 · แดง 404 ≠ 401 / 401 ≠ 403 ก่อนเพิ่ม route |
 | SEC-003      | ล็อกการ verify JWT ให้รับอัลกอริทึมเดียว (`HS256`) ที่จุดเดียว — ก่อนหน้านี้ `jwt.verify` รับ HS512 ที่เซ็นด้วย secret เดียวกันได้ (รวมถึง `alg: none` ต้องถูกปฏิเสธ) ใช้ทั้ง `authenticate`, `authenticatePartial`, socket handshake, automation และ nextgen | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | in-progress (branch `ai/jwt-algorithms`)       | `tests/jwtAlgorithmLock.test.ts` 4/4 · หลักฐานแดง 200 ≠ 401 สองจุดก่อนแก้ |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** `SYSTEM_AI` ยังถือ JWT ได้ตามปกติ — การกันอยู่ที่ route ที่สั่ง actuator ต้องขยายไปทุก endpoint ที่แตะฮาร์ดแวร์เมื่อเพิ่ม endpoint ใหม่; recovery ของเจ้าของที่ล็อก MFA ต้องทำที่เครื่อง/คอนเทนเนอร์ (ยังไม่มี UI สำหรับ recovery ระดับเครื่อง)
+
+### 2.3 คุณภาพและโครงสร้างพื้นฐาน (QA)
+
+| ID     | รายการ                                                                                                 | ที่มา                        | สถานะ           | หลักฐาน                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- | --------------- | --------------------------------------------------------- |
+| QA-001 | ทำให้ tools tests เป็น hermetic: offsite/backup ข้ามเฉพาะเมื่อยังไม่ติดตั้งไปป์ไลน์; update-bundle ใช้ ephemeral Ed25519 key | รัน `npm run verify` บนเครื่อง dev | done 2026-11-10 | PR #65 · `3246dd1` · CI `42862080560` (ubuntu + windows) |
+| QA-002 | ติดตั้ง/กู้ไปป์ไลน์สำรองนอกเครื่อง (03:00 DB + ~20:30 offsite) บนเครื่อง operational                          | `machine-health` แจ้ง critical | blocked — ต้องทำบนเครื่องที่มี DB/creds จริง                     | —                                                         |
+| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | queued          | —                                                         |
 
 ---
 
@@ -105,3 +114,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-10 — สร้างไฟล์; บันทึก M1/M2 ของ `sovereign-vault` พร้อมหลักฐาน commit/CI; ตั้งกฎ append-only เป็นข้อปฏิบัติหลักใน `AGENTS.md` ข้อ 9
 - 2026-11-10 — เพิ่ม §2.3 งาน core security (`SEC-001`, `SEC-002`) และความจริงของหน้า `/system` (`SYSTRUTH-001`) หลังเจ้าของสั่งโฟกัสความปลอดภัย/ใช้งานง่ายก่อนปิด Cold Soak
+
+## 6. บันทึกการวินิจฉัย (append-only)
+
+- 2026-11-10 — `npm run verify` บนเช็คเอาต์นี้: Architecture Gate, Frontend Gate, backend build+test, frontend typecheck+build **ผ่าน**;
+  `tools: unit tests` เหลือ fail 5 จาก 1389 (pass 1367, skipped 17) โดยทั้งหมดผูกกับเครื่อง operational:
+  `tools/cleanup-finish.cmd` + `tools/repair-shell.cmd` (ถูก gitignore ตาม `tools/*` จึงไม่มีใน clone),
+  Ollama bundle ของ `build-node-kit --with-ollama`, และ autostart task ที่ `doctor` ต้องเห็น
+- 2026-11-10 — เหตุที่ offsite backup ไม่มีหลักฐานบนเครื่องนี้: `tools/verify/offsite-push.mjs`  hardcode
+  `ROOT = 'E:/My work/Project Sovereign Origin'` และ `backups/postgres`, `sovereign-os/infra/offsite` ไม่มีอยู่จริง
+  ⇒ เครื่องนี้เป็นเช็คเอาต์พัฒนา ไม่ใช่เครื่องที่รันไปป์ไลน์สำรอง; `QA-002` ต้องทำบนเครื่อง operational เท่านั้น

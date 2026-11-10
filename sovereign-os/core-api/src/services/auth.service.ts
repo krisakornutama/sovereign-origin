@@ -167,6 +167,27 @@ export class AuthService {
     return { enabled: false };
   }
 
+  /**
+   * รีเซ็ต MFA ให้สมาชิกโดยผู้ดูแล (SUPERADMIN) — ทางกู้เมื่อโทรศัพท์ที่ถือ authenticator หาย
+   * เป็นการลดความแข็งแรงของบัญชี ⇒ ต้อง bump token_version ให้ session เดิมทั้งหมดตาย
+   * และ route ที่เรียกต้องเขียน audit เสมอ (ห้ามเรียกจากที่ไม่มีคนกำกับ)
+   */
+  static async adminResetMfa(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('User not found');
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfa_secret: null,
+        pending_mfa_secret: null,
+        mfa_backup_hash: null,
+        // token เก่าใช้ไม่ได้ทันที — กัน session ที่ถูกขโมยอยู่ก่อนการรีเซ็ต
+        token_version: { increment: 1 },
+      },
+    });
+    return { username: user.username, had_mfa: !!user.mfa_secret };
+  }
+
   static async mfaStatus(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
