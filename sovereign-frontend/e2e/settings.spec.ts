@@ -202,3 +202,71 @@ test.describe('settings — Telegram บันทึกค่าจริงแ�
     }
   });
 });
+
+// ── Telegram: ดึง Chat ID อัตโนมัติ (ไม่แตะ Telegram จริง) ──
+// เจตนา: ปุ่ม "ดึง Chat ID อัตโนมัติ" เรียก `GET /api/telegram/updates` ซึ่งฝั่ง server จะไปยิง
+//   api.telegram.org ด้วย token จริงของเครื่อง — เทสต์จึง **intercept ที่ชั้นเบราว์เซอร์**
+//   (`page.route`) ให้ตอบ fixture แทน ⇒ ไม่มี request ใดออกไป Telegram และไม่ต้องมี token จริง
+// ตรวจสองอย่าง: (1) รายการที่ได้มากดเลือกแล้วเติม chatId ให้ และ (2) ผลว่างต้องบอกผู้ใช้ตามจริง
+// ไม่กด "บันทึก" เลย ⇒ ไม่มีการเขียน DB; ตอนจบยืนยันผ่าน API ว่า config ยังเหมือนก่อนรัน
+test.describe('settings — Telegram ดึง Chat ID อัตโนมัติ', () => {
+  test('กดดึง Chat ID → เติม chatId จากรายการที่ API คืน (ไม่ยิง Telegram จริง)', async ({ page, request }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('sovereign-api-url', window.location.origin);
+      } catch {
+        // about:blank — ข้าม
+      }
+    });
+
+    const telegramCalls: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (url.includes('api.telegram.org')) telegramCalls.push(url);
+    });
+
+    // fixture: 1 แชท (จำลองผล getUpdates ที่ผ่านการ map ฝั่ง server แล้ว)
+    let fixture = { chats: [{ chatId: '1000000001', title: 'E2E Room', type: 'group', text: 'สวัสดี' }] };
+    await page.route('**/api/telegram/updates*', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
+    });
+
+    await page.goto('/settings/');
+    const token = await authToken(page);
+    const headers = { Authorization: `Bearer ${token}` };
+    const configUrl = `${API_BASE}/api/telegram/config`;
+    const before = await (await request.get(configUrl, { headers })).json();
+
+    const section = page.locator('section', { hasText: 'Telegram Alerts' }).first();
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    const tokenInput = page.locator('#settings-telegram-bot-token');
+    const chatInput = page.locator('#settings-telegram-chat-id');
+    const fetchButton = section.getByRole('button', { name: /ดึง Chat ID อัตโนมัติ/ });
+
+    // ปุ่มต้องกดไม่ได้จนกว่าจะมี token ให้ลอง (กันการยิง API เปล่า ๆ) — ไม่ต้องมี token จริง
+    await expect(fetchButton).toBeDisabled();
+    await tokenInput.fill(DUMMY_BOT_TOKEN);
+    await expect(fetchButton).toBeEnabled();
+
+    await fetchButton.click();
+    await expect(page.getByText('พบ 1 แชท', { exact: false })).toBeVisible({ timeout: 20_000 });
+    const row = section.getByRole('button', { name: /1000000001/ });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('E2E Room');
+
+    // กดเลือกแชท → chatId ถูกเติมให้ (ยังไม่บันทึก)
+    await row.click();
+    await expect(chatInput).toHaveValue('1000000001');
+
+    // ผลว่าง: ต้องบอกผู้ใช้ ไม่ใช่ปล่อยเงียบ
+    fixture = { chats: [] };
+    await fetchButton.click();
+    await expect(page.getByText('ยังไม่พบข้อความ', { exact: false })).toBeVisible({ timeout: 20_000 });
+
+    // ไม่มีอะไรออกไป Telegram จริง และไม่มีอะไรถูกเขียนลง DB
+    expect(telegramCalls, 'ต้องไม่มี request ไป api.telegram.org').toEqual([]);
+    const after = await (await request.get(configUrl, { headers })).json();
+    expect(after, 'การดึง Chat ID ต้องไม่เปลี่ยน config ของเครื่อง').toEqual(before);
+  });
+});

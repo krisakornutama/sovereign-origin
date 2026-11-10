@@ -21,19 +21,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SELF = fileURLToPath(import.meta.url);
+const ROOT = path.join(path.dirname(SELF), '..');
 const FE = path.join(ROOT, 'sovereign-frontend');
 const DIST = path.join(FE, 'dist-electron');
-
-const argv = process.argv.slice(2);
-const value = (name, fallback = '') => {
-  const hit = argv.find((a) => a.startsWith(`--${name}=`));
-  return hit ? hit.slice(name.length + 3) : fallback;
-};
-
-const INSTALL = path.resolve(value('install', path.join(ROOT, '..', 'Project Sovereign Origin Install')));
-const version = JSON.parse(fs.readFileSync(path.join(FE, 'package.json'), 'utf8')).version || '0.0.0';
-const OUT = path.resolve(value('out', path.join(ROOT, 'release', `Sovereign-OS-${version}-win-x64`)));
 
 /**
  * คัดเฉพาะ artifact ของเวอร์ชันที่กำลังจัด — dist-electron มีของรุ่นเก่าค้างอยู่เสมอ
@@ -60,63 +51,92 @@ const sha256File = (file) =>
     s.on('end', () => resolve(h.digest('hex')));
   });
 
-say('══════════════════════════════════════════════════');
-say(`  stage-release — Sovereign OS v${version}`);
-say('══════════════════════════════════════════════════');
+// ── ตัวสคริปต์จริง ────────────────────────────────────────────────────────────
+// ทำไมต้องอยู่ในฟังก์ชัน: เดิมโค้ดทั้งหมดอยู่ที่ top-level ทำให้ `import` โมดูลนี้
+// (เช่นเทสต์ของ selectArtifacts) รันสคริปต์ทั้งไฟล์ทันที แล้ว die() เพราะไม่มี artifact
+// ของเวอร์ชันปัจจุบันใน dist-electron — เทสต์ pure ต้องไม่พึ่งของที่ build ไว้ในเครื่อง
+async function main() {
+  const argv = process.argv.slice(2);
+  const value = (name, fallback = '') => {
+    const hit = argv.find((a) => a.startsWith(`--${name}=`));
+    return hit ? hit.slice(name.length + 3) : fallback;
+  };
 
-if (!fs.existsSync(DIST)) die(`ไม่พบ ${DIST} — รัน "npm run electron:build" ใน sovereign-frontend ก่อน`);
+  const INSTALL = path.resolve(value('install', path.join(ROOT, '..', 'Project Sovereign Origin Install')));
+  const version = JSON.parse(fs.readFileSync(path.join(FE, 'package.json'), 'utf8')).version || '0.0.0';
+  const OUT = path.resolve(value('out', path.join(ROOT, 'release', `Sovereign-OS-${version}-win-x64`)));
 
-// ── 1) เก็บ artifact จาก electron-builder ──────────────────────────────────────
-const all = fs.readdirSync(DIST);
-const { portable, zips } = selectArtifacts(all, version);
-if (!portable.length) {
-  die('ไม่พบไฟล์ portable exe ใน dist-electron — ตรวจ target "portable" ใน electron-builder แล้ว build ใหม่');
+  say('══════════════════════════════════════════════════');
+  say(`  stage-release — Sovereign OS v${version}`);
+  say('══════════════════════════════════════════════════');
+
+  if (!fs.existsSync(DIST)) die(`ไม่พบ ${DIST} — รัน "npm run electron:build" ใน sovereign-frontend ก่อน`);
+
+  // ── 1) เก็บ artifact จาก electron-builder ──────────────────────────────────
+  const all = fs.readdirSync(DIST);
+  const { portable, zips } = selectArtifacts(all, version);
+  if (!portable.length) {
+    die('ไม่พบไฟล์ portable exe ใน dist-electron — ตรวจ target "portable" ใน electron-builder แล้ว build ใหม่');
+  }
+
+  // เตือนถ้า artifact เก่ากว่าซอร์สที่เพิ่งแก้ (เคสจริง: แพ็กแล้วเปิดแอปแล้วยังเป็นของเก่า)
+  const exeMtime = Math.max(...portable.map((n) => fs.statSync(path.join(DIST, n)).mtimeMs));
+  const srcProbe = path.join(FE, 'electron', 'main.js');
+  if (fs.existsSync(srcProbe) && fs.statSync(srcProbe).mtimeMs > exeMtime) {
+    say('  ⚠ ไฟล์ติดตั้งเก่ากว่า electron/main.js — ควรสั่ง PACK-DESKTOP.mjs ใหม่ก่อนส่งมอบ');
+  }
+
+  const wanted = [...portable, ...zips];
+
+  // ── 2) เขียนโฟลเดอร์ส่งมอบ ────────────────────────────────────────────────
+  fs.rmSync(OUT, { recursive: true, force: true });
+  fs.mkdirSync(OUT, { recursive: true });
+
+  const staged = [];
+  for (const name of wanted) {
+    fs.copyFileSync(path.join(DIST, name), path.join(OUT, name));
+    staged.push(name);
+    say(`  + ${name}  (${mb(fs.statSync(path.join(OUT, name)).size)})`);
+  }
+
+  const info = path.join(INSTALL, 'desktop', 'DESKTOP-INFO.json');
+  if (fs.existsSync(info)) {
+    fs.copyFileSync(info, path.join(OUT, 'DESKTOP-INFO.json'));
+    staged.push('DESKTOP-INFO.json');
+    say('  + DESKTOP-INFO.json  (version/hash/ชิ้นส่วนที่ครบ)');
+  } else {
+    say(`  ! ไม่พบ ${info} — ข้าม DESKTOP-INFO.json (รัน PACK-DESKTOP.mjs ถ้าต้องการชุด unpacked)`);
+  }
+
+  const doc = path.join(ROOT, 'docs', 'DESKTOP-INSTALL.md');
+  if (fs.existsSync(doc)) {
+    fs.copyFileSync(doc, path.join(OUT, 'README-INSTALL.md'));
+    staged.push('README-INSTALL.md');
+    say('  + README-INSTALL.md');
+  }
+
+  // ── 3) SHA256SUMS.txt (ตรวจก่อนก๊อปไปเครื่องอื่น) ──────────────────────────
+  const lines = [];
+  for (const name of staged) {
+    lines.push(`${await sha256File(path.join(OUT, name))}  ${name}`);
+  }
+  fs.writeFileSync(path.join(OUT, 'SHA256SUMS.txt'), `${lines.join('\n')}\n`, 'utf8');
+
+  say('');
+  say(`✅ พร้อมส่งมอบ: ${path.relative(ROOT, OUT)}`);
+  say(`   ${staged.length} ไฟล์ · SHA256SUMS.txt เขียนแล้ว`);
+  say('   วิธีติดตั้งที่เครื่องปลายทาง: ดู README-INSTALL.md (portable = ดับเบิลคลิกได้เลย)');
 }
 
-// เตือนถ้า artifact เก่ากว่าซอร์สที่เพิ่งแก้ (เคสจริง: แพ็กแล้วเปิดแอปแล้วยังเป็นของเก่า)
-const exeMtime = Math.max(...portable.map((n) => fs.statSync(path.join(DIST, n)).mtimeMs));
-const srcProbe = path.join(FE, 'electron', 'main.js');
-if (fs.existsSync(srcProbe) && fs.statSync(srcProbe).mtimeMs > exeMtime) {
-  say('  ⚠ ไฟล์ติดตั้งเก่ากว่า electron/main.js — ควรสั่ง PACK-DESKTOP.mjs ใหม่ก่อนส่งมอบ');
+/** true เมื่อถูกเรียกเป็นสคริปต์ (ไม่ใช่ตอนถูก import) — เทียบ path จริงเพื่อกัน case เพี้ยนบน Windows */
+function isEntryPoint() {
+  const arg = process.argv[1];
+  if (!arg) return false;
+  try {
+    return fs.realpathSync.native(path.resolve(arg)) === fs.realpathSync.native(SELF);
+  } catch {
+    return false;
+  }
 }
 
-const wanted = [...portable, ...zips];
-
-// ── 2) เขียนโฟลเดอร์ส่งมอบ ────────────────────────────────────────────────────
-fs.rmSync(OUT, { recursive: true, force: true });
-fs.mkdirSync(OUT, { recursive: true });
-
-const staged = [];
-for (const name of wanted) {
-  fs.copyFileSync(path.join(DIST, name), path.join(OUT, name));
-  staged.push(name);
-  say(`  + ${name}  (${mb(fs.statSync(path.join(OUT, name)).size)})`);
-}
-
-const info = path.join(INSTALL, 'desktop', 'DESKTOP-INFO.json');
-if (fs.existsSync(info)) {
-  fs.copyFileSync(info, path.join(OUT, 'DESKTOP-INFO.json'));
-  staged.push('DESKTOP-INFO.json');
-  say('  + DESKTOP-INFO.json  (version/hash/ชิ้นส่วนที่ครบ)');
-} else {
-  say(`  ! ไม่พบ ${info} — ข้าม DESKTOP-INFO.json (รัน PACK-DESKTOP.mjs ถ้าต้องการชุด unpacked)`);
-}
-
-const doc = path.join(ROOT, 'docs', 'DESKTOP-INSTALL.md');
-if (fs.existsSync(doc)) {
-  fs.copyFileSync(doc, path.join(OUT, 'README-INSTALL.md'));
-  staged.push('README-INSTALL.md');
-  say('  + README-INSTALL.md');
-}
-
-// ── 3) SHA256SUMS.txt (ตรวจก่อนก๊อปไปเครื่องอื่น) ─────────────────────────────
-const lines = [];
-for (const name of staged) {
-  lines.push(`${await sha256File(path.join(OUT, name))}  ${name}`);
-}
-fs.writeFileSync(path.join(OUT, 'SHA256SUMS.txt'), `${lines.join('\n')}\n`, 'utf8');
-
-say('');
-say(`✅ พร้อมส่งมอบ: ${path.relative(ROOT, OUT)}`);
-say(`   ${staged.length} ไฟล์ · SHA256SUMS.txt เขียนแล้ว`);
-say('   วิธีติดตั้งที่เครื่องปลายทาง: ดู README-INSTALL.md (portable = ดับเบิลคลิกได้เลย)');
+if (isEntryPoint()) await main();
