@@ -13,6 +13,11 @@ import { createInvite } from '../../services/invite.service';
 // ────────────────────────────────────────────────────────────────────────────
 const router = Router();
 
+// role ที่ระบบรองรับ — ที่เดียว (POST และ PUT ต้องตรวจชุดเดียวกัน ไม่งั้นสร้างบัญชี
+// ด้วย role ที่ระบบไม่รู้จักได้ แล้ว middleware จะปิดประตูทุกบานให้ user คนนั้น)
+const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI', 'SITE_ADMIN'];
+const MAX_USERNAME_LENGTH = 64;
+
 router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -28,19 +33,55 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+// POST /api/users — สร้างบัญชี (SUPERADMIN)
+// ต้องตรวจ input ให้ครบก่อนแตะ bcrypt/prisma: handler นี้เป็น async และ Express 4
+// ไม่ส่ง error ออกจาก async handler ⇒ อะไรที่ throw จะกลายเป็น request ที่ **ค้าง**
+// ไม่ใช่ 500 (เจอจริง: ไม่ส่ง password → bcrypt.hash(undefined) throw = admin รอไม่จบ;
+// username ซ้ำ → Prisma P2002 = ค้างเช่นกัน)
 router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
-  const { username, password, role } = req.body;
-  const hash = await bcrypt.hash(password, 12);
-  await prisma.user.create({
-    data: {
-      username,
-      password_hash: hash,
-      role: role || 'OPERATOR',
-      // สมาชิกใหม่ต้องเปลี่ยนรหัสผ่านหลัง login ครั้งแรก (รหัสแรกเข้าเป็นรหัสชั่วคราว)
-      must_change_password: true,
-    },
-  });
-  res.json({ success: true });
+  try {
+    const body = req.body ?? {};
+    const username = typeof body.username === 'string' ? body.username.trim() : '';
+    const password = body.password;
+    const role = body.role ?? 'OPERATOR';
+
+    if (!username) {
+      return res.status(400).json({ error: 'ต้องระบุชื่อผู้ใช้' });
+    }
+    if (username.length > MAX_USERNAME_LENGTH) {
+      return res.status(400).json({ error: `ชื่อผู้ใช้ยาวเกินไป (สูงสุด ${MAX_USERNAME_LENGTH} ตัวอักษร)` });
+    }
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'สิทธิ์ (role) ไม่ถูกต้อง' });
+    }
+    try {
+      // กฎเดียวกับตอนผู้ใช้ตั้งรหัสเอง — บัญชีใหม่ต้องไม่เริ่มด้วยรหัสที่ระบบจะปฏิเสธภายหลัง
+      AuthService.validateNewPassword(password);
+    } catch (err: any) {
+      return res.status(400).json({ error: err?.message || 'รหัสผ่านไม่ถูกต้อง' });
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    const createdUser = await prisma.user.create({
+      data: {
+        username,
+        password_hash: hash,
+        role,
+        // สมาชิกใหม่ต้องเปลี่ยนรหัสผ่านหลัง login ครั้งแรก (รหัสแรกเข้าเป็นรหัสชั่วคราว)
+        must_change_password: true,
+      },
+      select: { id: true, username: true, role: true },
+    });
+    // คงสถานะ 200 ไว้ตามเดิม — มีสคริปต์ตรวจ (tools/verify) ที่ยึด 200 อยู่ และ UI ใช้ res.ok
+    return res.json({ success: true, user: createdUser });
+  } catch (err: any) {
+    // P2002 = unique constraint (username ซ้ำ) — 409 อ่านรู้เรื่องกว่า 500
+    if (err?.code === 'P2002') {
+      return res.status(409).json({ error: 'มีชื่อผู้ใช้นี้อยู่แล้ว' });
+    }
+    console.error('[users:create] failed:', err?.code || '', err?.message || err);
+    return res.status(500).json({ error: 'สร้างผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
+  }
 });
 router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
@@ -100,7 +141,6 @@ router.post('/:id/reset-mfa', authenticate, requireRole('SUPERADMIN'), async (re
 router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const { role, assigned_node_id, assigned_site_id, must_change_password } = req.body;
-    const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI', 'SITE_ADMIN'];
     if (role !== undefined && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
