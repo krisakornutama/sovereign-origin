@@ -263,7 +263,13 @@ describe('ช่องอัปเดตแอปจาก HUB (ไม่ต้�
     assert.match(svc, /export function readDesktopManifest/, 'ต้องมีตัวอ่าน manifest ฝั่ง HUB');
     assert.match(svc, /export async function resolveVerifiedDesktopAsset/, 'ต้องตรวจแฮช/ขนาดก่อนปล่อยไฟล์');
     assert.match(svc, /hashFileStream/, 'ต้องแฮชแบบสตรีม — ไฟล์ติดตั้งระดับร้อย MB ห้ามอ่านทั้งก้อน');
-    const routes = read('sovereign-os/core-api/src/modules/agent-machines/agent-machines.routes.ts');
+    // อ่านทั้งโมดูล เพราะ route ถูกแยกเป็น shared/updates/routes (arch-gate file-budget)
+    const moduleDir = 'sovereign-os/core-api/src/modules/agent-machines';
+    const routes = fs
+      .readdirSync(path.join(ROOT, moduleDir))
+      .filter((name) => name.endsWith('.ts'))
+      .map((name) => read(path.join(moduleDir, name)))
+      .join(String.fromCharCode(10));
     assert.match(routes, /desktop-update\/manifest/, 'ต้องมี route บอกเวอร์ชันล่าสุด');
     assert.match(routes, /desktop-update\/asset/, 'ต้องมี route ส่งไฟล์ให้เครื่องลูก');
     const main = read('sovereign-frontend/electron/main.js');
