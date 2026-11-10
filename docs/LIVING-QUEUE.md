@@ -48,7 +48,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | done 2026-11-10 | PR vault #2 · `0e6f1d5` · CI `42880040950` |
 | VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | done 2026-11-10 | PR vault #1 · `00dce9f` · CI `42876459888` |
 | VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | done 2026-11-10 | PR vault #3 · `7a78d83` · CI `42882770489` |
-| VAULT-009  | เก็บกวาด orphan chunk (GC) เมื่อเขียน chunk ไม่จบ แล้ว index ไม่เคย commit          | VAULT-008 ต่อยอด  | queued          | —                                         |
+| VAULT-009  | เก็บกวาด orphan chunk (GC) เมื่อเขียน chunk ไม่จบ แล้ว index ไม่เคย commit          | VAULT-008 ต่อยอด  | done 2026-11-10 | PR vault #4 · `3290a44` · CI `42901667670` |
 | AUTH-001     | เพดานรหัสผ่านต้องตรงกับสิ่งที่ bcrypt ทำได้จริง — `validateNewPassword` ปฏิเสธรหัสที่ยาวเกิน 72 ไบต์ (เดิมรับถึง 128 ตัวอักษร แล้ว bcrypt ตัดส่วนเกินทิ้งเงียบ ๆ ⇒ รหัสต่างกันท้ายใช้แทนกันได้; อักษรไทย 25 ตัว = 75 ไบต์ก็โดน) ใช้กฎเดียวทั้ง `POST /api/users`, เปลี่ยนรหัสผ่าน และรับคำเชิญ | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | in-progress (branch `ai/password-byte-limit`) | `tests/passwordByteLimit.test.ts` 4/4 · แดง: `Missing expected exception` 2 เคส + POST 73 ไบต์สร้างบัญชีได้ |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** anchor เป็น checkpoint ที่เรียกเอง ไม่ได้ผูกทุก `put`; ถ้าไม่มี anchor หรือ pin ที่เก็บนอก vault จะยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้
@@ -121,6 +121,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-10 — สร้างไฟล์; บันทึก M1/M2 ของ `sovereign-vault` พร้อมหลักฐาน commit/CI; ตั้งกฎ append-only เป็นข้อปฏิบัติหลักใน `AGENTS.md` ข้อ 9
 - 2026-11-10 — เพิ่ม §2.3 งาน core security (`SEC-001`, `SEC-002`) และความจริงของหน้า `/system` (`SYSTRUTH-001`) หลังเจ้าของสั่งโฟกัสความปลอดภัย/ใช้งานง่ายก่อนปิด Cold Soak
 - 2026-11-10 — ปิด `VAULT-008` (streaming), ตั้ง `VAULT-009` (GC orphan chunk) เป็นคิวถัดไปของสาย vault — แถวเดิมไม่ถูกแก้หรือลบ
+- 2026-11-10 — ปิด `VAULT-009` (GC orphan blob) — คิว vault ที่ตั้งไว้ตอนปิด `VAULT-008` ปิดครบแล้ว
 
 ## 6. บันทึกการวินิจฉัย (append-only)
 
@@ -159,3 +160,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   `get`/`delete`/`rekey`/`revokeKey`/`verifyAll` รู้จัก chunk และลบ chunk เก่าเมื่อ overwrite/delete;
   ข้อจำกัด: crash ระหว่างเขียนทำได้แค่ทิ้ง orphan blob (ยังไม่มี GC — ตั้งเป็น `VAULT-009`), chunk boundary ไม่ได้ content-defined
   (แทรกไบต์ต้นไฟล์ทำให้ chunk ที่ตามมาทั้งหมดเปลี่ยน), `get()` ยังโหลดทั้งก้อน (ใช้ `getStream()`), 95 tests cov 97.71/91.51/98.36/97.95
+
+- 2026-11-10 — ปิด `VAULT-009` ที่ฝั่ง `sovereign-vault` (`0.6.0`): `pruneOrphans({ dryRun? })` สแกน `objects/` + `chunks/` แล้วลบเฉพาะ path ที่ index ไม่ได้อ้างถึง
+  (index เป็นแหล่งความจริง ⇒ ค่าที่ใช้งานอยู่ไม่ถูกลบ; chunk ที่ *หาย* ยังเป็นเรื่องของ `verifyAll()` ไม่ใช่การลบ),
+  ทำงานผ่าน write queue ของ vault และคืน `{ paths, bytes }`; `dryRun` ใช้ตรวจก่อนลบ; เทสต์จำลอง crash กลาง `putStream` (index commit ล้ม) แล้วเปิด vault ใหม่ → GC เก็บ chunk ที่ค้างและข้อมูลเดิมยังถอดได้,
+  ข้อจำกัด: ยังไม่มีตัวเรียกอัตโนมัติ (ต้องตั้ง scheduler เอง) และถือว่ามี writer เดียวต่อ store, 99 tests cov 97.95/91.72/98.38/98.18
