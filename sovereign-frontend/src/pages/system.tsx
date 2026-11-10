@@ -274,14 +274,18 @@ export default function SystemHealthPage() {
                     <td className="px-4 py-2 text-gray-200">{p.name}</td>
                     <td className="px-4 py-2 text-xs text-gray-400">{p.mem || '-'}</td>
                     <td className="px-4 py-2">
-                      <button
-                        onClick={() => killProcess(p)}
-                        disabled={busyPid === p.pid}
-                        title={t('system.killTitle', 'Kill {name} (pid {pid})', { name: p.name, pid: p.pid })}
-                        className="text-[10px] px-2 py-1 rounded bg-red-900/40 border border-red-700 text-red-300 hover:bg-red-900/60 transition disabled:opacity-50"
-                      >
-                        {busyPid === p.pid ? t('system.killing', 'กำลัง...') : t('system.kill', 'Kill')}
-                      </button>
+                      {roleIsSuperadmin(user.role) ? (
+                        <button
+                          onClick={() => killProcess(p)}
+                          disabled={busyPid === p.pid}
+                          title={t('system.killTitle', 'Kill {name} (pid {pid})', { name: p.name, pid: p.pid })}
+                          className="text-[10px] px-2 py-1 rounded bg-red-900/40 border border-red-700 text-red-300 hover:bg-red-900/60 transition disabled:opacity-50"
+                        >
+                          {busyPid === p.pid ? t('system.killing', 'กำลัง...') : t('system.kill', 'Kill')}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-gray-600" title={t('system.killSuperadminOnly', 'เฉพาะ SUPERADMIN')}>—</span>
+                      )}
                     </td>
                   </tr>
                 ))}

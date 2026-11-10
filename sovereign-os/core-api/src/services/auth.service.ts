@@ -149,10 +149,17 @@ export class AuthService {
     return { enabled: true, backupCodes };
   }
 
-  /** ปิด MFA ชั่วคราว (ยกเลิก enrollment ด้วย) */
-  static async disableMfa(userId: string) {
+  /**
+   * ปิด MFA — ต้องยืนยันด้วยรหัสผ่านปัจจุบันเสมอ
+   * token ที่ยังมีชีวิต (หรือถูกขโมย) ต้องปิด 2FA เองไม่ได้
+   */
+  static async disableMfa(userId: string, password: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
+    const ok = typeof password === 'string' && password.length > 0 && !!user.password_hash
+      ? await bcrypt.compare(password, user.password_hash)
+      : false;
+    if (!ok) throw new Error('Invalid password');
     await prisma.user.update({
       where: { id: userId },
       data: { mfa_secret: null, pending_mfa_secret: null, mfa_backup_hash: null },

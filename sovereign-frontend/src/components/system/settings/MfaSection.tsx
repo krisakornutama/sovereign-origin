@@ -19,6 +19,9 @@ export default function MfaSection() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  // ปิด 2FA ต้องยืนยันด้วยรหัสผ่าน (backend บังคับ) — แสดงช่องกรอกแทน window.confirm
+  const [confirmingDisable, setConfirmingDisable] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
 
   const refresh = async () => {
     try {
@@ -80,14 +83,23 @@ export default function MfaSection() {
   };
 
   const disable = async () => {
-    if (!window.confirm(t('settings.mfa.disableConfirm', 'ปิด 2FA ชั่วคราว? (เข้าระบบด้วยรหัสผ่านอย่างเดียว — เปิดใหม่ได้เสมอ)'))) return;
+    if (!disablePassword) {
+      setErr(t('settings.mfa.passwordRequired', 'กรอกรหัสผ่านเพื่อยืนยันการปิด 2FA'));
+      return;
+    }
     setBusy(true); setMsg(''); setErr('');
     try {
-      const res = await authFetch(`${getApiUrl()}/api/auth/mfa/disable`, { method: 'POST' });
+      const res = await authFetch(`${getApiUrl()}/api/auth/mfa/disable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: disablePassword }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t('settings.mfa.disableFailed', 'ปิดไม่สำเร็จ'));
       setQr(''); setSecret(''); setCode('');
       setBackupCodes(null);
+      setConfirmingDisable(false);
+      setDisablePassword('');
       setMsg(t('settings.mfa.disabled', 'ปิด 2FA ชั่วคราวแล้ว — เปิดใหม่ได้จากหน้านี้'));
       await refresh();
     } catch (e: any) {
@@ -142,16 +154,45 @@ export default function MfaSection() {
               </div>
             </div>
           )}
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={regenerateCodes} disabled={busy} className="btn-primary">
-              <Icon name="refresh" size={14} />
-              {t('settings.mfa.backupRegen', 'สร้างรหัสสำรองใหม่')}
-            </button>
-            <button onClick={disable} disabled={busy} className="btn-danger disabled:opacity-50">
-              <Icon name="x-circle" size={14} />
-              {t('settings.mfa.disable', 'ปิด 2FA ชั่วคราว')}
-            </button>
-          </div>
+          {confirmingDisable ? (
+            <div className="card p-3 space-y-2">
+              <p className="text-xs text-amber-300">
+                {t('settings.mfa.disableReauth', 'ยืนยันด้วยรหัสผ่านปัจจุบัน — ปิด 2FA แล้ว login จะใช้รหัสผ่านอย่างเดียว')}
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  placeholder={t('settings.mfa.currentPassword', 'รหัสผ่านปัจจุบัน')}
+                  autoComplete="current-password"
+                  className="input text-sm flex-1 min-w-[180px]"
+                />
+                <button onClick={disable} disabled={busy || !disablePassword} className="btn-danger disabled:opacity-50">
+                  <Icon name="x-circle" size={14} />
+                  {t('settings.mfa.disableConfirmBtn', 'ยืนยันปิด 2FA')}
+                </button>
+                <button
+                  onClick={() => { setConfirmingDisable(false); setDisablePassword(''); }}
+                  disabled={busy}
+                  className="btn-secondary"
+                >
+                  {t('common.cancel', 'ยกเลิก')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={regenerateCodes} disabled={busy} className="btn-primary">
+                <Icon name="refresh" size={14} />
+                {t('settings.mfa.backupRegen', 'สร้างรหัสสำรองใหม่')}
+              </button>
+              <button onClick={() => setConfirmingDisable(true)} disabled={busy} className="btn-danger disabled:opacity-50">
+                <Icon name="x-circle" size={14} />
+                {t('settings.mfa.disable', 'ปิด 2FA ชั่วคราว')}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

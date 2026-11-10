@@ -351,4 +351,24 @@ describe('vision routes', () => {
       await ts.close();
     }
   });
+
+  test('POST /analyze-url blocks loopback / link-local / metadata targets (SSRF)', async () => {
+    const ts = await createTestServer((app) => app.use('/', visionRoutes));
+    try {
+      for (const url of [
+        'http://127.0.0.1:9/snap.jpg',
+        'http://localhost:9/snap.jpg',
+        'http://169.254.169.254/latest/meta-data',
+      ]) {
+        const res = await fetch(`${ts.baseUrl}/analyze-url`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        assert.equal(res.status, 400, `${url} ต้องถูกปฏิเสธก่อนยิงออกนอกเครื่อง`);
+      }
+    } finally {
+      await ts.close();
+    }
+  });
 });
