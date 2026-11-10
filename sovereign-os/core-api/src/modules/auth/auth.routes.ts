@@ -235,20 +235,31 @@ router.get('/rate-limit-status', authenticate, requireRole('SUPERADMIN'), (req, 
 });
 
 // POST /api/auth/rate-limit/clear — ล้าง MFA rate limit ของ IP/account ที่ระบุ (หรือทั้งหมด)
-// ใช้ authenticatePartial (แค่พิสูจน์รหัสผ่าน) เพื่อให้ใช้เป็น recovery path
-// ตอน user ถูกล็อกที่ขั้น MFA — ยังต้องมี role SUPERADMIN + ถูก audit log
+// ต้องผ่าน MFA เต็มขั้น (authenticate) เท่านั้น — **ห้ามใช้ authenticatePartial**
+// เพราะนั่นเท่ากับให้คนที่รู้แค่รหัสผ่านล้าง lockout ของขั้น OTP ได้
+// (โจมตีได้: login → clear → เดารหัส OTP ต่อไม่จำกัด) · recovery ของเจ้าของที่ล็อกจริง
+// ต้องทำที่เครื่อง/คอนเทนเนอร์ ไม่ใช่ผ่าน API ระยะไกล
 // body: { ip?: string, username?: string } — ไม่ส่งอะไรเลย = ล้างทั้งหมด
-router.post('/rate-limit/clear', clearLimiter, authenticatePartial, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const { ip, username } = req.body || {};
   let cleared = 0;
+  let scope: string = 'all';
   if (typeof username === 'string' && username) {
+    scope = 'account';
     const user = await prisma.user.findUnique({ where: { username }, select: { id: true } });
     if (user) cleared += mfaAccountLimiter.store.clear(user.id).length;
   } else if (typeof ip === 'string' && ip) {
+    scope = 'ip';
     cleared += mfaLimiter.store.clear(ip).length;
   } else {
     cleared += mfaLimiter.store.clear().length + mfaAccountLimiter.store.clear().length;
   }
+  // หลักฐานการใช้อำนาจ: ใครล้าง อะไร จำนวนเท่าไร (ตรวจย้อนได้เสมอ)
+  await AuditService.logAction({
+    userId: req.user!.id,
+    actionType: 'RATE_LIMIT_CLEAR',
+    payload: { scope, ip: typeof ip === 'string' ? ip : undefined, username: typeof username === 'string' ? username : undefined, cleared, requestIp: req.ip },
+  });
   res.json({ cleared });
 });
 
