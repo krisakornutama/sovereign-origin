@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { resolveTrustProxy } from '../lib/net';
 dotenv.config();
 
 // Known weak secrets that must never be accepted as the signing key.
@@ -94,6 +95,9 @@ export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: (process.env.NODE_ENV || 'development') === 'production',
+  // TRUST_PROXY = จำนวน hop ของ reverse proxy ที่อยู่ข้างหน้า (ไม่ตั้ง = ไม่เชื่อ X-Forwarded-For)
+  // เปิดเฉพาะเมื่อมี proxy จริงคั่นอยู่เท่านั้น — ถ้า API เปิดตรง header นี้ client ปลอมได้
+  trustProxy: resolveTrustProxy(process.env.TRUST_PROXY),
   jwtSecret: getJwtSecret(),
   // โมดูล API ที่เปิดใช้งาน — enabled ว่าง = เปิดทั้งหมด, ถ้าตั้งค่าไว้ = เปิดตามรายการ
   modules: {
