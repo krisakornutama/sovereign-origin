@@ -74,6 +74,14 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** `SYSTEM_AI` ยังถือ JWT ได้ตามปกติ — การกันอยู่ที่ route ที่สั่ง actuator ต้องขยายไปทุก endpoint ที่แตะฮาร์ดแวร์เมื่อเพิ่ม endpoint ใหม่; recovery ของเจ้าของที่ล็อก MFA ต้องทำที่เครื่อง/คอนเทนเนอร์ (ยังไม่มี UI สำหรับ recovery ระดับเครื่อง)
 
+### 2.3 คุณภาพและโครงสร้างพื้นฐาน (QA)
+
+| ID     | รายการ                                                                                                 | ที่มา                        | สถานะ           | หลักฐาน                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- | --------------- | --------------------------------------------------------- |
+| QA-001 | ทำให้ tools tests เป็น hermetic: offsite/backup ข้ามเฉพาะเมื่อยังไม่ติดตั้งไปป์ไลน์; update-bundle ใช้ ephemeral Ed25519 key | รัน `npm run verify` บนเครื่อง dev | done 2026-11-10 | PR #65 · `3246dd1` · CI `42862080560` (ubuntu + windows) |
+| QA-002 | ติดตั้ง/กู้ไปป์ไลน์สำรองนอกเครื่อง (03:00 DB + ~20:30 offsite) บนเครื่อง operational                          | `machine-health` แจ้ง critical | blocked — ต้องทำบนเครื่องที่มี DB/creds จริง                     | —                                                         |
+| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | queued          | —                                                         |
+
 ---
 
 ## 3. แนวคิดที่จองไว้ (ยังไม่เริ่ม — ห้ามลบ)
@@ -105,3 +113,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-10 — สร้างไฟล์; บันทึก M1/M2 ของ `sovereign-vault` พร้อมหลักฐาน commit/CI; ตั้งกฎ append-only เป็นข้อปฏิบัติหลักใน `AGENTS.md` ข้อ 9
 - 2026-11-10 — เพิ่ม §2.3 งาน core security (`SEC-001`, `SEC-002`) และความจริงของหน้า `/system` (`SYSTRUTH-001`) หลังเจ้าของสั่งโฟกัสความปลอดภัย/ใช้งานง่ายก่อนปิด Cold Soak
+
+## 6. บันทึกการวินิจฉัย (append-only)
+
+- 2026-11-10 — `npm run verify` บนเช็คเอาต์นี้: Architecture Gate, Frontend Gate, backend build+test, frontend typecheck+build **ผ่าน**;
+  `tools: unit tests` เหลือ fail 5 จาก 1389 (pass 1367, skipped 17) โดยทั้งหมดผูกกับเครื่อง operational:
+  `tools/cleanup-finish.cmd` + `tools/repair-shell.cmd` (ถูก gitignore ตาม `tools/*` จึงไม่มีใน clone),
+  Ollama bundle ของ `build-node-kit --with-ollama`, และ autostart task ที่ `doctor` ต้องเห็น
+- 2026-11-10 — เหตุที่ offsite backup ไม่มีหลักฐานบนเครื่องนี้: `tools/verify/offsite-push.mjs`  hardcode
+  `ROOT = 'E:/My work/Project Sovereign Origin'` และ `backups/postgres`, `sovereign-os/infra/offsite` ไม่มีอยู่จริง
+  ⇒ เครื่องนี้เป็นเช็คเอาต์พัฒนา ไม่ใช่เครื่องที่รันไปป์ไลน์สำรอง; `QA-002` ต้องทำบนเครื่อง operational เท่านั้น
