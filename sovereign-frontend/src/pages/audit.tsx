@@ -39,6 +39,33 @@ export default function AuditPage() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [passwordOnly, setPasswordOnly] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // ดาวน์โหลด CSV ตามตัวกรองปัจจุบัน — ใช้เป็นหลักฐานส่งผู้ตรวจได้โดยไม่ต้องเปิด DB
+  const exportCsv = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('q', query.trim());
+      if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit/export?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(t('audit.exportError', 'ส่งออกไม่สำเร็จ: {msg}', { msg: err.message || '' }));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadLogs = async () => {
     setLoading(true);
@@ -124,6 +151,9 @@ export default function AuditPage() {
               className={passwordOnly ? 'btn-primary' : 'btn-secondary'}
             >
               🔑 {t('audit.passwordOnly', 'เรื่องรหัสผ่าน')}
+            </button>
+            <button onClick={exportCsv} className="btn-secondary" disabled={exporting || loading}>
+              ⬇ {exporting ? t('audit.exporting', 'กำลังส่งออก...') : t('audit.exportCsv', 'ส่งออก CSV')}
             </button>
             <select
               value={limit}
