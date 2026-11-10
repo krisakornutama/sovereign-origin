@@ -73,7 +73,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | MFAADMIN-001 | ผู้ดูแลรีเซ็ต 2FA ของสมาชิกที่ทำ authenticator หายได้โดยไม่ต้องเปิด DB console — `POST /api/users/:id/reset-mfa` (SUPERADMIN), audit `USER_MFA_RESET_BY_ADMIN`, ตัด session เดิม (bump `token_version`), รีเซ็ตของตัวเองผ่าน endpoint นี้ไม่ได้; `GET /api/users` ส่งแค่ `mfa_enabled` | คำสั่งเจ้าของ (มีระบบจัดการครบ/ใช้งานง่าย) | done 2026-11-10                                 | `2305ac9` · PR #63 (squash) · `tests/adminResetMfa.test.ts` 5/5 · แดง 404 ≠ 401 / 401 ≠ 403 ก่อนเพิ่ม route · verify 6/6 |
 | AUDIT-001    | ส่งออก audit log เป็น CSV (`GET /api/audit/export`, SUPERADMIN) — ตัวกรองเดียวกับรายการ + `from`/`to`, เพดาน 10,000 แถว, UTF-8 BOM, กัน CSV formula injection, เขียน `AUDIT_EXPORT` ทุกครั้งที่ดึงออก และปุ่ม "ส่งออก CSV" ในหน้า `/audit` | คำสั่งเจ้าของ (ตรวจย้อนได้/มีระบบจัดการครบ) | done 2026-11-11                                 | `57ed179` · PR #64 (squash) · `tests/auditExport.test.ts` 5/5 · แดง 404 ≠ 401 / 404 ≠ 200 · verify 6/6 |
 | AUDIT-002    | audit body ปลอดภัย: ปิดความลับทุกชั้น (object/array ไม่ใช่แค่ key ชั้นบน) + จำกัด 4 KB ต่อ body — body 25 MB ของ `/api/clone/import` ไม่ไหลลง `audit_logs` ทั้งก้อนอีก | คำสั่งเจ้าของ (กันโจมตี/ตรวจย้อนได้อย่างปลอดภัย) | in-progress (branch `ai/audit-body-safety`)    | `tests/auditBodySafety.test.ts` 5/5 · แดง 3 เคส (nested/array leak, ไม่มีการตัดขนาด) |
-| SEC-003      | ล็อกการ verify JWT ให้รับอัลกอริทึมเดียว (`HS256`) ที่จุดเดียว — ก่อนหน้านี้ `jwt.verify` รับ HS512 ที่เซ็นด้วย secret เดียวกันได้ (รวมถึง `alg: none` ต้องถูกปฏิเสธ) ใช้ทั้ง `authenticate`, `authenticatePartial`, socket handshake, automation และ nextgen | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | in-progress (branch `ai/jwt-algorithms`)       | `tests/jwtAlgorithmLock.test.ts` 4/4 · หลักฐานแดง 200 ≠ 401 สองจุดก่อนแก้ |
+| SEC-003      | ล็อกการ verify JWT ให้รับอัลกอริทึมเดียว (`HS256`) ที่จุดเดียว — ก่อนหน้านี้ `jwt.verify` รับ HS512 ที่เซ็นด้วย secret เดียวกันได้ (รวมถึง `alg: none` ต้องถูกปฏิเสธ) ใช้ทั้ง `authenticate`, `authenticatePartial`, socket handshake, automation และ nextgen | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | done 2026-11-11 | `e439f3a` · PR #66 (squash) · `tests/jwtAlgorithmLock.test.ts` 4/4 · หลักฐานแดง 200 ≠ 401 สองจุดก่อนแก้ · verify 6/6 |
+| BACKUP-001   | บอกความสดของ backup จริง — `computeBackupStatus` + `GET /api/backup/status` (SUPERADMIN) คืน `lastBackupAt`/`ageHours`/`stale` (เกณฑ์ 26 ชม. ที่เดียว) และแบนเนอร์ในหน้า `/backup` เตือนเมื่อยังไม่เคยสำรอง/ค้างเกินเกณฑ์/ปิดตารางอัตโนมัติ | คำสั่งเจ้าของ (ข้อมูลไม่หาย/ใช้งานง่าย) | done 2026-11-11 | `c423c38` · PR #68 (squash) · `tests/backupFreshness.test.ts` 7/7 · แดง 404 ≠ 401 / 404 ≠ 200 ก่อนเพิ่ม route · verify 6/6 |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** `SYSTEM_AI` ยังถือ JWT ได้ตามปกติ — การกันอยู่ที่ route ที่สั่ง actuator ต้องขยายไปทุก endpoint ที่แตะฮาร์ดแวร์เมื่อเพิ่ม endpoint ใหม่; recovery ของเจ้าของที่ล็อก MFA ต้องทำที่เครื่อง/คอนเทนเนอร์ (ยังไม่มี UI สำหรับ recovery ระดับเครื่อง)
 
@@ -83,7 +84,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | ------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- | --------------- | --------------------------------------------------------- |
 | QA-001 | ทำให้ tools tests เป็น hermetic: offsite/backup ข้ามเฉพาะเมื่อยังไม่ติดตั้งไปป์ไลน์; update-bundle ใช้ ephemeral Ed25519 key | รัน `npm run verify` บนเครื่อง dev | done 2026-11-10 | PR #65 · `3246dd1` · CI `42862080560` (ubuntu + windows) |
 | QA-002 | ติดตั้ง/กู้ไปป์ไลน์สำรองนอกเครื่อง (03:00 DB + ~20:30 offsite) บนเครื่อง operational                          | `machine-health` แจ้ง critical | blocked — ต้องทำบนเครื่องที่มี DB/creds จริง                     | —                                                         |
-| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | queued          | —                                                         |
+| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | done 2026-11-10 | PR #70 · `npm run verify` ผ่าน 6/6 (exit 0) · tools 1369 pass / 0 fail |
 
 ---
 
@@ -126,3 +127,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-10 — เหตุที่ offsite backup ไม่มีหลักฐานบนเครื่องนี้: `tools/verify/offsite-push.mjs`  hardcode
   `ROOT = 'E:/My work/Project Sovereign Origin'` และ `backups/postgres`, `sovereign-os/infra/offsite` ไม่มีอยู่จริง
   ⇒ เครื่องนี้เป็นเช็คเอาต์พัฒนา ไม่ใช่เครื่องที่รันไปป์ไลน์สำรอง; `QA-002` ต้องทำบนเครื่อง operational เท่านั้น
+
+- 2026-11-10 — ปิด `QA-003`: `doctor` อ่าน `process.env.APPDATA` แทน `env` ที่ถูก inject (Startup entry จริงของเครื่องรั่วเข้าเทสต์)
+  ⇒ ใช้ `env.APPDATA`; `batch-codepage` ข้ามเฉพาะ launcher ที่ยังไม่ติดตั้ง (ไฟล์ `tools/*.cmd` ถูก gitignore) แต่ยังบังคับกฎเดิมกับไฟล์ที่มีอยู่;
+  `build-node-kit --with-ollama` ข้ามเฉพาะเมื่อไม่มีโฟลเดอร์ `Ollama/` ในเครื่อง — ผลคือ `npm run verify` ผ่านครบ 6/6 ขั้น (9.2 นาที, exit 0),
+  tools tests 1369 pass / 0 fail / 20 skipped

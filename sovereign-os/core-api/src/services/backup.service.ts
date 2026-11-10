@@ -87,6 +87,61 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+/** เกณฑ์เตือน backup ค้าง — 1 วัน + 2 ชม. เผื่อเวลาเครื่องหลับ/backup ช้ากว่ากำหนด */
+export const BACKUP_STALE_AFTER_HOURS = 26;
+
+export interface BackupStatus {
+  /** เวลาของไฟล์ .sql.gz ที่ใหม่ที่สุด (null = ยังไม่เคยสำรอง) */
+  lastBackupAt: string | null;
+  /** อายุเป็นชั่วโมง (ปัดขึ้น) — null เมื่อยังไม่เคยสำรอง */
+  ageHours: number | null;
+  staleAfterHours: number;
+  stale: boolean;
+  never: boolean;
+  count: number;
+  schedule: { enabled: boolean; time: string };
+}
+
+/**
+ * แปลงรายการไฟล์ backup เป็นคำตอบเดียวที่ UI/ตัวเฝ้าระวังใช้ตัดสินได้
+ *
+ * แยกเป็นฟังก์ชันบริสุทธิ์เพราะ "เงียบ" คือโหมดพังที่อันตรายที่สุดของ backup:
+ * ถ้า backup หยุดแล้วไม่มีใครรู้ เท่ากับไม่มี backup — และเทสต์ขอบเวลา
+ * (26 ชม.พอดี / เกิน 1 ms) ต้องทำได้โดยไม่ต้องสร้างไฟล์จริง
+ */
+export function computeBackupStatus(
+  backups: { file: string; size: number; date: string }[],
+  schedule: { enabled: boolean; time: string },
+  nowMs: number
+): BackupStatus {
+  const times = backups
+    .map((b) => Date.parse(b.date))
+    .filter((t) => Number.isFinite(t));
+  if (times.length === 0) {
+    return {
+      lastBackupAt: null,
+      ageHours: null,
+      staleAfterHours: BACKUP_STALE_AFTER_HOURS,
+      stale: true,
+      never: true,
+      count: 0,
+      schedule,
+    };
+  }
+  const newest = Math.max(...times);
+  const ageMs = Math.max(0, nowMs - newest);
+  return {
+    lastBackupAt: new Date(newest).toISOString(),
+    ageHours: Math.ceil(ageMs / (60 * 60 * 1000)),
+    staleAfterHours: BACKUP_STALE_AFTER_HOURS,
+    stale: ageMs > BACKUP_STALE_AFTER_HOURS * 60 * 60 * 1000,
+    never: false,
+    count: backups.length,
+    schedule,
+  };
+}
+
+
 function dbCredentials(): { user: string; db: string } {
   try {
     const u = new URL(DB_URL);
@@ -212,6 +267,11 @@ class BackupService {
     if (!isSafeBackupName(file)) throw new Error('Invalid backup file name');
     const filePath = path.join(BACKUP_DIR, file);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+
+  /** สรุปความสดของ backup ล่าสุด — ใช้ทั้งหน้า /backup และตัวเฝ้าระวัง */
+  status(nowMs: number = Date.now()): BackupStatus {
+    return computeBackupStatus(this.listBackups(), this.getSchedule(), nowMs);
   }
 
   getSchedule(): { enabled: boolean; time: string } {

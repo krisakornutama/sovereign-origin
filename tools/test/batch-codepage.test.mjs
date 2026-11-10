@@ -125,9 +125,14 @@ describe('launcher .cmd ที่แปลงแล้ว: บรรทัดเ
   ];
 
   for (const name of ONE_LINE_LAUNCHERS) {
-    test(name, () => {
+    test(name, (t) => {
       const file = path.join(ROOT, name);
-      assert.ok(fs.existsSync(file), `${name} ต้องมีอยู่`);
+      // tools/* ถูก gitignore ⇒ launcher ที่ติดตั้งในเครื่องเจ้าของไม่มีใน clone
+      // ข้ามเฉพาะไฟล์ที่ยังไม่ถูกติดตั้ง; ไฟล์ที่มีอยู่ต้องผ่านทุกข้อบังคับเดิม
+      if (!fs.existsSync(file)) {
+        t.skip(`${name} ยังไม่ถูกติดตั้งบนเครื่องนี้ (gitignore: tools/*)`);
+        return;
+      }
       const text = fs.readFileSync(file, 'utf8');
       const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
       assert.equal(lines.length, 1, `${name}: launcher ต้องเหลือบรรทัดเดียว (พบ ${lines.length})`);
@@ -137,11 +142,18 @@ describe('launcher .cmd ที่แปลงแล้ว: บรรทัดเ
     });
   }
 
-  test('launcher ที่คนดับเบิลคลิกเองต้องมี pause ให้อ่านผลก่อนหน้าต่างปิด', () => {
+  test('launcher ที่คนดับเบิลคลิกเองต้องมี pause ให้อ่านผลก่อนหน้าต่างปิด', (t) => {
     // ตัวที่ Task Scheduler เรียก (nightly/security/offsite/visitor) ไม่ต้อง pause — ห้ามค้างในรอบอัตโนมัติ
-    for (const name of ['tools/install/install.cmd', 'tools/cleanup-finish.cmd', 'tools/repair-shell.cmd']) {
-      const text = fs.readFileSync(path.join(ROOT, name), 'utf8');
-      assert.match(text, /\bpause\b/i, `${name}: ต้องมี pause`);
+    const launchers = ['tools/install/install.cmd', 'tools/cleanup-finish.cmd', 'tools/repair-shell.cmd']
+      .map((name) => path.join(ROOT, name))
+      .filter((file) => fs.existsSync(file));
+    if (launchers.length === 0) {
+      t.skip('ยังไม่มี launcher ที่ติดตั้งบนเครื่องนี้ (gitignore: tools/*)');
+      return;
+    }
+    for (const file of launchers) {
+      const text = fs.readFileSync(file, 'utf8');
+      assert.match(text, /\bpause\b/i, `${path.basename(file)}: ต้องมี pause`);
     }
   });
 });
