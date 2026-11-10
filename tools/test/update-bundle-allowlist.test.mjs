@@ -12,6 +12,7 @@
 //   · path อันตราย (../, absolute, ไดรฟ์, นามสกุลนอกชุด) ต้องถูกปฏิเสธเสมอ
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,13 @@ import { isAllowedUpdatePath } from '../../sovereign-os/agent-runner/src/selfUpd
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
+
+// signing key จริงอยู่ที่ tools/agent-pack/keys/signing-key.pem (gitignored) — เช็คเอาต์ใหม่จึงไม่มี
+// เทสต์ต้องพิสูจน์ตรรกะ excludePaths ไม่ใช่พึ่งความลับของเครื่อง ⇒ สร้างคีย์ชั่วคราวต่อรอบ
+function ephemeralSigningKey() {
+  const { privateKey } = crypto.generateKeyPairSync('ed25519');
+  return privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+}
 
 test('ทุกไฟล์ที่ pack จะเผยแพร่ ต้องผ่าน allowlist ของ runner (ไม่งั้นเครื่องลูกปฏิเสธทั้งชุดก่อนดาวน์โหลด)', () => {
   const files = pack.bundleFiles(ROOT);
@@ -50,6 +58,7 @@ test('publishUpdateBundle({ excludePaths }) — ตัดไฟล์สำห�
     const out = pack.publishUpdateBundle({
       root: ROOT,
       dataDir: dir,
+      signingKey: ephemeralSigningKey(),
       excludePaths: ['install-plan.mjs', 'INSTALL.cmd'],
     });
     const paths = out.files.map((f) => f.path);
@@ -66,7 +75,13 @@ test('publishUpdateBundle ปฏิเสธชื่อไฟล์ที่ส
   const dir = path.join(ROOT, '.freebuff', 'tmp', `update-exclude-bad-${Date.now()}`);
   try {
     assert.throws(
-      () => pack.publishUpdateBundle({ root: ROOT, dataDir: dir, excludePaths: ['src/does-not-exist.mjs'] }),
+      () =>
+        pack.publishUpdateBundle({
+          root: ROOT,
+          dataDir: dir,
+          signingKey: ephemeralSigningKey(),
+          excludePaths: ['src/does-not-exist.mjs'],
+        }),
       /excludePaths/,
     );
   } finally {

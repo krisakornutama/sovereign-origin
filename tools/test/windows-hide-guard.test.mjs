@@ -172,6 +172,14 @@ describe('ผลจริงบนเครื่องนี้ (กันแ�
     encoding: 'utf8', windowsHide: true, cwd: REPO, timeout: 180_000,
   });
 
+  // เทสต์ offsite ตรวจ "ผลจริงของเครื่องที่ติดตั้งไปป์ไลน์สำรองแล้ว" — เช็คเอาต์ใหม่/เครื่อง dev
+  // ยังไม่มี backups/postgres และ infra/offsite (ทั้งคู่ gitignored) ⇒ machine-health แจ้งวิกฤต
+  // "ไม่เคยสำรองนอกเครื่อง" ถูกต้องตามจริง ไม่ใช่ false alarm ที่เทสต์นี้มีไว้ดัก
+  // ⇒ ข้ามเฉพาะเมื่อยังไม่ติดตั้ง; บนเครื่อง operational ที่มีโฟลเดอร์แล้ว assertion เดิมทำงานเต็ม
+  const backupProvisioned =
+    fs.existsSync(path.join(REPO, 'backups/postgres')) ||
+    fs.existsSync(path.join(REPO, 'sovereign-os/infra/offsite'));
+
   test('เครื่องนี้ไม่ควรถูกแจ้งว่า container ล่ม', (t) => {
     let up = '';
     try {
@@ -188,6 +196,10 @@ describe('ผลจริงบนเครื่องนี้ (กันแ�
   });
 
   test('backup ต้องไม่ถูกแจ้งว่าเก่า (รอบ 03:00 เขียนที่ backups/postgres จริง)', (t) => {
+    if (!backupProvisioned) {
+      t.skip('เครื่องนี้ยังไม่มีไปป์ไลน์สำรอง (backups/postgres · infra/offsite) — health แจ้งวิกฤตถูกต้องแล้ว');
+      return;
+    }
     const json = JSON.parse(runHealth().trim());
     const backup = (json.problems || []).find((p) => p.area === 'backup');
     if (!backup) return; // ไม่มีปัญหา = ผ่าน
@@ -196,6 +208,10 @@ describe('ผลจริงบนเครื่องนี้ (กันแ�
   });
 
   test('offsite ต้องไม่ถูกแจ้งว่าไม่เคยสำรอง (มี log อยู่จริง)', (t) => {
+    if (!backupProvisioned) {
+      t.skip('เครื่องนี้ยังไม่มีไปป์ไลน์สำรอง (backups/postgres · infra/offsite) — health แจ้งวิกฤตถูกต้องแล้ว');
+      return;
+    }
     const json = JSON.parse(runHealth().trim());
     const offsite = (json.problems || []).find((p) => p.area === 'offsite');
     if (!offsite) return;
