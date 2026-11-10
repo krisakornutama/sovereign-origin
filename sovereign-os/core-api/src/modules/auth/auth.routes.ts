@@ -181,12 +181,23 @@ router.post('/mfa/confirm', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/auth/mfa/disable — ปิด MFA ชั่วคราว (เข้าได้ด้วยรหัสผ่านอย่างเดียว)
+// POST /api/auth/mfa/disable — ปิด MFA (ต้องยืนยันด้วยรหัสผ่านปัจจุบัน)
+// กัน session ที่ถูกขโมยปิด 2FA: มี token อย่างเดียวไม่พอ ต้องรู้รหัสผ่านด้วย
 router.post('/mfa/disable', authenticate, async (req, res) => {
+  const password = req.body?.password;
+  if (typeof password !== 'string' || !password) {
+    return res.status(400).json({ error: 'password is required to disable MFA' });
+  }
   try {
-    const result = await AuthService.disableMfa(req.user!.id);
+    const result = await AuthService.disableMfa(req.user!.id, password);
+    await AuditService.logAction({
+      userId: req.user!.id,
+      actionType: 'MFA_DISABLED',
+      payload: { ip: req.ip },
+    });
     res.json(result);
   } catch (err: any) {
+    if (err?.message === 'Invalid password') return res.status(401).json({ error: 'Invalid password' });
     res.status(500).json({ error: err.message });
   }
 });

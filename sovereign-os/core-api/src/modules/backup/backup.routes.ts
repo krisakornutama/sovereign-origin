@@ -4,8 +4,8 @@ import { backupService } from '../../services/backup.service';
 
 const router = Router();
 
-// GET /api/backup – รายการไฟล์ backup
-router.get('/', authenticate, (req, res) => {
+// GET /api/backup – รายการไฟล์ backup (SUPERADMIN — ชื่อไฟล์/เวลา/ขนาดเป็นข้อมูลของผู้ดูแล)
+router.get('/', authenticate, requireRole('SUPERADMIN'), (req, res) => {
   try {
     res.json({ backups: backupService.listBackups(), schedule: backupService.getSchedule() });
   } catch (err) {

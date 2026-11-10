@@ -40,6 +40,11 @@ export default function BackupPage() {
   const t = useLanguageStore((s) => s.t);
 
   const load = useCallback(async () => {
+    // backend จำกัดรายการ backup เป็น SUPERADMIN — ผู้ใช้ทั่วไปไม่ต้องยิง 403 แล้วโชว์ error
+    if (!isSuperAdmin) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -54,12 +59,12 @@ export default function BackupPage() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, isSuperAdmin]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user || !isSuperAdmin) return;
     load();
-  }, [isAuthenticated, user, load]);
+  }, [isAuthenticated, user, isSuperAdmin, load]);
 
   const createBackup = async () => {
     setBusy(true);

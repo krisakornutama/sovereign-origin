@@ -2,6 +2,7 @@ import './setup-env';
 import { test, before } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import speakeasy from 'speakeasy';
 import jwt from 'jsonwebtoken';
 import { AuthService, prisma } from '../src/services/auth.service';
@@ -110,10 +111,17 @@ test('regenerateBackupCodes replaces the whole set and requires MFA enabled', as
   for (const c of result.backupCodes) assert.ok(stored.includes(sha256(c)));
 });
 
-test('disableMfa clears the backup code hashes too', async () => {
-  userRow = { id: USER_ID, username: 'admin', role: 'SYSTEM_AI', mfa_secret: 'x', mfa_backup_hash: '["h"]' };
-  await AuthService.disableMfa(USER_ID);
+test('disableMfa clears the backup code hashes too (ต้องยืนยันด้วยรหัสผ่าน)', async () => {
+  const hash = await bcrypt.hash('Backup-Code-Pass-1', 4);
+  userRow = { id: USER_ID, username: 'admin', role: 'SYSTEM_AI', mfa_secret: 'x', mfa_backup_hash: '["h"]', password_hash: hash };
+  lastUpdate = null;
+  await AuthService.disableMfa(USER_ID, 'Backup-Code-Pass-1');
   assert.ok('mfa_backup_hash' in lastUpdate, 'ต้องส่ง mfa_backup_hash: null ไปกับ update');
   assert.strictEqual(lastUpdate.mfa_backup_hash, null);
   assert.strictEqual(lastUpdate.mfa_secret, null);
+
+  // รหัสผ่านผิด = ไม่แตะ secret (session ที่ถูกขโมยปิด 2FA ไม่ได้)
+  lastUpdate = null;
+  await assert.rejects(() => AuthService.disableMfa(USER_ID, 'wrong'), /Invalid password/);
+  assert.strictEqual(lastUpdate, null);
 });
