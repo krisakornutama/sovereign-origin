@@ -156,6 +156,8 @@ export default {
     notAdmin: 'เฉพาะ SUPERADMIN ตั้งค่า Telegram ได้',
     useEnv: 'ใช้ค่าจาก .env',
     reverted: 'ลบ override แล้ว — กลับไปใช้ค่าใน .env',
+    rateLimited: 'เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลังใน {s} วินาที',
+    rateLimitedNoWait: 'เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลัง',
   },
   language: {
     title: 'ภาษา / Language',

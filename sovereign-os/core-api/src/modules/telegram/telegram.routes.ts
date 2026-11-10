@@ -17,6 +17,7 @@ import {
 } from '../../services/telegram-credentials.service';
 import { sendBusinessAlert, sendBusinessAlertTo } from '../../services/telegram-alert.service';
 import { fanoutAlert, resolveExternalAlertTargets } from '../../services/alert-fanout.service'; // CE3: Discord + LINE
+import { takeUpdatesSlot } from './updates-throttle';
 import { listAlertEvents, alertStats24h } from '../../services/alert-store.service'; // Phase 3: ประวัติ alert ในระบบ
 import { synthesizeWav } from '../../services/tts.service'; // ระดับที่ 2: ส่งเสียงพูดไทย
 
@@ -231,9 +232,20 @@ router.delete('/config', authenticate, requireRole('SUPERADMIN'), async (req, re
 });
 
 // GET /api/telegram/updates — ดึง chat ID อัตโนมัติจาก getUpdates (SUPERADMIN) — ช่วยกรอก Chat ID ไม่ต้องพิมพ์เอง
-router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const creds = await getTelegramCredentials();
   if (!creds.botToken) return res.status(400).json({ error: 'ตั้ง Bot Token ก่อน' });
+
+  // กันกดรัว: getUpdates มีโควตาของ Telegram เอง — ยิงถี่เกินไปจะโดน 429/จำกัดชั่วคราว
+  // กันที่ฝั่งเรา (ต่อผู้ใช้) ก่อนออกเน็ต เพื่อไม่ให้เสียงโควตาไปกับการกดซ้ำของผู้ใช้คนเดียว
+  const slot = takeUpdatesSlot(req.user?.id ?? 'anonymous');
+  if (!slot.allowed) {
+    return res.status(429).json({
+      error: `เรียกบ่อยเกินไป — ลองใหม่ภายหลังใน ${slot.retryAfter} วินาที`,
+      retryAfter: slot.retryAfter,
+    });
+  }
+
   try {
     const r = await axios.get(`https://api.telegram.org/bot${creds.botToken}/getUpdates`, { timeout: 8000 });
     // ⚠ ต้องอ่าน chat จาก channel_post ด้วย ไม่ใช่แค่ message: โพสต์ในช่องไม่มี `message`
@@ -261,7 +273,12 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res
     const upstream = e?.response?.status;
     const described = e?.response?.data?.description;
     const message = described ? (upstream ? `Telegram ${upstream}: ${described}` : described) : e?.message || 'getUpdates failed';
-    res.status(upstream === 429 ? 429 : 500).json({ error: message });
+    // Telegram บอกเวลารอได้ 2 ทาง: parameters.retry_after หรือฝังใน description ("retry after 12")
+    const retryAfter =
+      Number(e?.response?.data?.parameters?.retry_after) ||
+      Number(/retry after (\d+)/i.exec(String(described ?? ''))?.[1]) ||
+      0;
+    res.status(upstream === 429 ? 429 : 500).json({ error: message, ...(retryAfter > 0 ? { retryAfter } : {}) });
   }
 });
 

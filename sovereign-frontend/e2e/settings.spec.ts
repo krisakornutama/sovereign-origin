@@ -316,3 +316,51 @@ test.describe('settings — Telegram รายการห้องแบบช�
     await expect(page.locator('#settings-telegram-chat-id')).toHaveValue('-1001234567890');
   });
 });
+
+// ── Telegram: ถูกจำกัดความถี่ (429) ต้องบอกให้ลองใหม่พร้อมเวลารอ ──
+// server ตอบ 429 พร้อม `retryAfter` ทั้งจาก throttle ของเราเองและจาก Telegram (429 ของ Telegram)
+// UI เดิมจะโชว์ error ดิบของ HTTP — เคสนี้ล็อกว่าผู้ใช้เห็น "ลองใหม่ภายหลังใน N วินาที"
+// intercept ที่ชั้นเบราว์เซอร์ ⇒ ไม่แตะ Telegram จริง และไม่มี side effect ต่อ config
+test.describe('settings — Telegram 429', () => {
+  test('โดนจำกัดความถี่ → แสดงเวลาที่ต้องรอ ไม่ใช่ error ดิบ', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('sovereign-api-url', window.location.origin);
+      } catch {
+        // about:blank — ข้าม
+      }
+    });
+
+    let calls = 0;
+    await page.route('**/api/telegram/updates*', async (route) => {
+      calls += 1;
+      if (calls === 1) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ chats: [{ chatId: '1000000001', title: 'ห้องแรก', type: 'group', text: 'hi' }] }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'เรียกบ่อยเกินไป — ลองใหม่ภายหลังใน 12 วินาที', retryAfter: 12 }),
+      });
+    });
+
+    await page.goto('/settings/');
+    const section = page.locator('section', { hasText: 'Telegram Alerts' }).first();
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    await page.locator('#settings-telegram-bot-token').fill(DUMMY_BOT_TOKEN);
+    const fetchButton = section.getByRole('button', { name: /ดึง Chat ID อัตโนมัติ/ });
+
+    await fetchButton.click();
+    await expect(section.getByRole('button', { name: /1000000001/ })).toBeVisible({ timeout: 20_000 });
+
+    await fetchButton.click();
+    await expect(page.getByText('ลองใหม่ภายหลังใน 12 วินาที', { exact: false })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('429', { exact: false })).toHaveCount(0, { timeout: 2_000 });
+  });
+});

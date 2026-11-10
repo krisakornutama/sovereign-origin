@@ -1,10 +1,11 @@
 import './setup-env';
-import { test, before, after, mock } from 'node:test';
+import { test, before, after, beforeEach, mock } from 'node:test';
 import assert from 'node:assert';
 import axios from 'axios';
 import { prisma } from '../src/lib/prisma';
 import telegramRoutes from '../src/modules/telegram/telegram.routes';
 import { __resetTelegramCredentialCache } from '../src/services/telegram-credentials.service';
+import { takeUpdatesSlot, __resetUpdatesThrottle } from '../src/modules/telegram/updates-throttle';
 import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
 
 // GET /api/telegram/updates — ดึง chat ID อัตโนมัติ (ปุ่มในหน้า settings)
@@ -24,6 +25,9 @@ before(async () => {
   server = await createTestServer((app) => app.use('/api/telegram', telegramRoutes));
   adminToken = makeToken('SUPERADMIN');
 });
+
+// throttle ของ route เป็น state ในหน่วยความจำ — แต่ละเคสต้องเริ่มจากศูนย์ ไม่งั้นเคสหลังจะโดน 429 ของเราเอง
+beforeEach(() => __resetUpdatesThrottle());
 
 after(async () => {
   mock.restoreAll();
@@ -195,6 +199,7 @@ test('Telegram ตอบ 429 → คืน 429 พร้อมข้อควา
     const body = (await res.json()) as { error?: string; chats?: unknown };
     assert.match(String(body.error), /Too Many Requests/, 'ต้องส่งคำอธิบายจาก Telegram ต่อให้ผู้ใช้');
     assert.strictEqual(body.chats, undefined, 'ห้ามคืนรายการว่างปนกับ error');
+    assert.strictEqual((body as { retryAfter?: number }).retryAfter, 12, 'ต้องส่งเวลารอให้ UI (จาก description)');
     assert.strictEqual(getMock.mock.callCount(), 1, 'rate limit = ห้ามยิงซ้ำอัตโนมัติ');
   } finally {
     getMock.mock.restore();
@@ -211,6 +216,8 @@ test('result ที่ไม่ใช่ array (หรือไม่มี data
   ];
 
   for (const payload of cases) {
+    // แต่ละ payload = การกดครั้งใหม่ของผู้ใช้ → ต้องไม่ติด throttle ของเคสก่อนในลูป
+    __resetUpdatesThrottle();
     const getMock = mock.method(axios, 'get', async () => payload as any);
     try {
       const res = await getUpdates();
@@ -221,6 +228,41 @@ test('result ที่ไม่ใช่ array (หรือไม่มี data
       getMock.mock.restore();
     }
   }
+});
+
+test('กดดึง Chat ID รัว ๆ → ครั้งที่สองได้ 429 จากเรา พร้อมวินาทีที่ต้องรอ (ไม่ยิง Telegram ซ้ำ)', async () => {
+  const getMock = mock.method(axios, 'get', async () =>
+    updatesResponse([{ update_id: 1, message: { message_id: 1, chat: { id: 9000000009, type: 'group' }, text: 'hi' } }])
+  );
+
+  try {
+    const first = await getUpdates();
+    assert.strictEqual(first.status, 200, 'ครั้งแรกต้องผ่าน');
+
+    const second = await getUpdates();
+    assert.strictEqual(second.status, 429, 'ครั้งที่สองในทันทีต้องถูกกันที่ฝั่งเรา');
+    const body = (await second.json()) as { error?: string; retryAfter?: number };
+    assert.match(String(body.error), /ลองใหม่/, 'ต้องบอกผู้ใช้ให้ลองใหม่');
+    assert.ok(Number(body.retryAfter) >= 1, 'ต้องบอกจำนวนวินาทีที่ต้องรอ');
+    assert.strictEqual(getMock.mock.callCount(), 1, 'ถูกกันแล้วต้องไม่ออก request ไป Telegram');
+  } finally {
+    getMock.mock.restore();
+  }
+});
+
+test('throttle ปล่อยผ่านอีกครั้งเมื่อพ้นช่วงขั้นต่ำ และแยกคีย์ต่อผู้ใช้', () => {
+  const t0 = 1_000_000;
+  assert.deepStrictEqual(takeUpdatesSlot('user-a', t0), { allowed: true, retryAfter: 0 });
+
+  const blocked = takeUpdatesSlot('user-a', t0 + 500);
+  assert.strictEqual(blocked.allowed, false);
+  assert.ok(blocked.retryAfter >= 1);
+
+  // ผู้ใช้อื่นไม่ควรโดนผลของคนแรก
+  assert.deepStrictEqual(takeUpdatesSlot('user-b', t0 + 500), { allowed: true, retryAfter: 0 });
+
+  // พ้นช่วงขั้นต่ำแล้วกลับมาใช้ได้ (route ใช้ค่า default 3 วิ)
+  assert.deepStrictEqual(takeUpdatesSlot('user-a', t0 + 3000), { allowed: true, retryAfter: 0 });
 });
 
 test('ยังไม่มี bot token → 400 บอกให้ตั้ง token ก่อน (ไม่ยิง outbound เลย)', async () => {

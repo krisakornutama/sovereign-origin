@@ -103,6 +103,14 @@ export default function TelegramSection() {
     setBusy(true); setErr(''); try {
       const res = await authFetch(`${getApiUrl()}/api/telegram/updates`);
       const data = await res.json();
+      // 429 = โดนจำกัดความถี่ (ของเราหรือของ Telegram) — บอกให้ลองใหม่พร้อมเวลารอ ไม่ใช่ error ดิบ
+      if (res.status === 429) {
+        const wait = Number(data?.retryAfter) || 0;
+        setErr(wait > 0
+          ? t('settings.telegram.rateLimited', 'เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลังใน {s} วินาที', { s: wait })
+          : t('settings.telegram.rateLimitedNoWait', 'เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลัง'));
+        return;
+      }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setChats(data.chats || []);
       if ((data.chats||[]).length===0) setErr('ยังไม่พบข้อความ — ส่งข้อความหา bot หรือเชิญบอทเข้ากลุ่มแล้วพิมพ์อะไรสักอย่างก่อน');
