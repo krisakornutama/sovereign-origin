@@ -16,11 +16,19 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-const AGENT = 'sovereign-os/core-api/src/modules/agent-machines/agent-machines.routes.ts';
+const AGENT_DIR = 'sovereign-os/core-api/src/modules/agent-machines';
+// อ่านทั้งโมดูล ไม่ใช่ไฟล์เดียว: โมดูลนี้ถูกแยกเป็น shared/updates/routes เพื่อคุมขนาดไฟล์
+// (arch-gate file-budget) — ด่านต้องตามให้ทันการแยก ไม่ใช่ผูกกับชื่อไฟล์ใดไฟล์หนึ่ง
+const AGENT = fs
+  .readdirSync(path.join(ROOT, AGENT_DIR))
+  .filter((name) => name.endsWith('.ts'))
+  .sort()
+  .map((name) => read(path.join(AGENT_DIR, name)))
+  .join(String.fromCharCode(10));
 
 describe('Fleet wiring — CE', () => {
   test('ด่าน rollout ถูกใช้ทั้ง manifest และ asset (runner + desktop)', () => {
-    const agent = read(AGENT);
+    const agent = AGENT;
     const calls = agent.split('gateFleetUpdate(machine, res)').length - 1;
     // update/manifest · update/file · desktop-update/manifest · desktop-update/asset
     assert.ok(calls >= 4, `ต้องเรียก gateFleetUpdate อย่างน้อย 4 จุด (พบ ${calls})`);
@@ -29,7 +37,7 @@ describe('Fleet wiring — CE', () => {
   });
 
   test('GET /api/agent-machines ไม่ spread row ทั้งก้อน (กัน token_hash รั่ว)', () => {
-    const agent = read(AGENT);
+    const agent = AGENT;
     assert.ok(agent.includes('function publicMachine'), 'ต้องมี publicMachine helper');
     assert.ok(!agent.includes('return { ...m, ip:'), 'ห้าม spread row เดิม');
     assert.ok(agent.includes('...publicMachine(m)'), 'ต้องใช้ publicMachine');
