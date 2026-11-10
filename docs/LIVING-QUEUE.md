@@ -48,6 +48,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | queued          | —                                         |
 | VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | queued          | —                                         |
 | VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | queued          | —                                         |
+| USERS-002    | กันการล็อกตัวเองออกจากระบบที่ระดับ API (ปุ่มที่ UI disable ไม่ใช่ด่าน): `DELETE /api/users/:id` ปฏิเสธลบตัวเอง/`SUPERADMIN` คนสุดท้าย (400) และแปลง FK `P2003`→400, ไม่พบ→404, id ผิดรูป `P2023`→400; `PUT /:id` ลดสิทธิ์ `SUPERADMIN` คนสุดท้ายไม่ได้ · หน้า `/users` แสดงเหตุผลที่ server ปฏิเสธแทนการขึ้นว่าสำเร็จ | คำสั่งเจ้าของ (มีระบบจัดการครบ/ใช้งานง่าย) | in-progress (branch `ai/users-lockout-guards`) | `tests/userLockoutGuards.test.ts` 9/9 · แดง 5 เคส (ลบตัวเอง/คนสุดท้ายสำเร็จ, 404→500, P2003→500) |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** anchor เป็น checkpoint ที่เรียกเอง ไม่ได้ผูกทุก `put`; ถ้าไม่มี anchor หรือ pin ที่เก็บนอก vault จะยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้
 

@@ -32,7 +32,12 @@ function row(overrides: Record<string, any> = {}) {
 
 before(async () => {
   mockModel(prisma, 'user', {
-    findUnique: async ({ where }: any) => (where?.id === USER_ID ? userRow : null),
+    // TARGET_ID ต้องมีแถวจริง: DELETE/PUT อ่าน role ของเป้าหมายก่อนตัดสินใจ (lockout guard)
+    findUnique: async ({ where }: any) => {
+      if (where?.id === USER_ID) return userRow;
+      if (where?.id === TARGET_ID) return { id: TARGET_ID, role: 'OPERATOR', assigned_node_id: null, assigned_site_id: null, token_version: 0, must_change_password: false };
+      return null;
+    },
     update: async (args: any) => {
       updateArgs = args;
       return { id: args?.where?.id, ...(args?.data ?? {}) };
