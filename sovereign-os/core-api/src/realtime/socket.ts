@@ -1,7 +1,7 @@
 import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { verifyJwt } from '../lib/jwt-verify';
 import { getSessionUser } from '../services/auth.service';
 import { setIo, userRoom } from './io-registry';
 import { registerMachineControl } from './machine-control.socket';
@@ -59,7 +59,7 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     try {
-      const decoded = jwt.verify(String(token || ''), config.jwtSecret) as {
+      const decoded = verifyJwt(String(token || '')) as {
         userId?: string;
         role?: string;
         mfa_verified?: boolean;

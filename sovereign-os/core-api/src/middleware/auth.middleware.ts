@@ -1,12 +1,9 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { AuditService } from '../services/audit.service';
-import { config } from '../config';
+import { verifyJwt } from '../lib/jwt-verify';
 import { warRoomPulse } from '../services/war-room.service';
-
-const JWT_SECRET = config.jwtSecret;
 
 // Extend Express Request to include authenticated user
 declare global {
@@ -41,7 +38,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = verifyJwt(token) as any;
     if (!decoded.mfa_verified) {
       return res.status(403).json({ error: 'MFA verification required' });
     }
@@ -228,7 +225,7 @@ export async function authenticatePartial(req: Request, res: Response, next: Nex
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = verifyJwt(token) as any;
     // Token versioning (เช่น admin รีเซ็ตรหัสซ้ำระหว่าง user ค้างอยู่หน้าบังคับเปลี่ยน)
     // → token ชั่วคราวใบเก่าตายทันที · DB คือแหล่งความจริงของ role/สถานะ user
     let dbUser: any;
