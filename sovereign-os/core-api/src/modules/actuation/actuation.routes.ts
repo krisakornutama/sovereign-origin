@@ -20,7 +20,9 @@ router.get('/rules', authenticate, (_req, res) => {
   res.json(actuationService.envelopeRules());
 });
 
-router.post('/execute', authenticate, async (req, res) => {
+// มนุษย์สั่ง actuator — SYSTEM_AI สั่งผ่าน HTTP ไม่ได้ (Strict AI/Actuator Separation)
+// role อื่นที่เหลือยังใช้ได้ตามเดิม: SUPERADMIN / NODE_ADMIN / SITE_ADMIN / OPERATOR
+router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'), async (req, res) => {
   const { actuatorId, state, reason } = req.body || {};
   if (!actuatorId || !state) return res.status(400).json({ error: 'ต้องระบุ actuatorId + state' });
   const r = await actuationService.executeCommand({
