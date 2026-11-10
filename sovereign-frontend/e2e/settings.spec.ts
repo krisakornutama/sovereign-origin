@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
 
 // ── หน้า /settings หลังแยก component (OfflineQueuePanel · Telegram · MFA · Voice) ──
 // กันการแตกของการ refactor: ถ้า component ไหนหลุด/พัง import หน้า settings จะไม่ขึ้น
@@ -45,6 +46,21 @@ test.describe('settings — section หลัก', () => {
 // เลือก 2FA เพราะเป็นการตั้งค่า **ต่อผู้ใช้** (ไม่แตะ config ระดับเครื่อง) และปิดคืนได้ด้วย API เดียว
 // ขั้นตอน: อ่านสถานะ → enroll → API ต้องเห็น pending → reload แล้ว UI ยังแสดง flow → disable คืนสภาพ
 const API_BASE = process.env.E2E_API_URL ?? 'http://localhost:3001';
+
+// รหัสผ่านของบัญชี e2e รอบนี้ — global-setup เขียนไว้ที่ e2e/.auth/creds.json
+// (และตั้ง process.env.E2E_BOT_PASS ไว้ด้วย) · mfa/disable บังคับยืนยันรหัสผ่านแล้ว
+function runPassword(): string {
+  try {
+    const p = 'e2e/.auth/creds.json';
+    if (existsSync(p)) {
+      const j = JSON.parse(readFileSync(p, 'utf8')) as { password?: string };
+      if (j.password) return j.password;
+    }
+  } catch {
+    // อ่านไม่ได้ = ตกไปใช้ env ด้านล่าง
+  }
+  return process.env.E2E_BOT_PASS ?? '';
+}
 
 async function authToken(page: Page): Promise<string> {
   const token = await page.evaluate(() => {
@@ -103,7 +119,10 @@ test.describe('settings — บันทึกค่าจริงและต�
       await expect(afterReload.getByPlaceholder('รหัส 6 หลักจากแอป')).toBeVisible({ timeout: 30_000 });
     } finally {
       // คืนสภาพเสมอ — disable ล้างทั้ง secret และ pending secret (auth.service.disableMfa)
-      const reset = await request.post(`${API_BASE}/api/auth/mfa/disable`, { headers });
+      // ต้องส่งรหัสผ่านปัจจุบัน (ปลายทางบังคับ) — มี token อย่างเดียวปิด 2FA ไม่ได้อีกแล้ว
+      const password = runPassword();
+      expect(password, 'ต้องมีรหัสผ่านบัญชี e2e (e2e/.auth/creds.json) เพื่อปิด 2FA คืนสภาพ').toBeTruthy();
+      const reset = await request.post(`${API_BASE}/api/auth/mfa/disable`, { headers, data: { password } });
       expect(reset.ok(), 'ปิด 2FA คืนสภาพต้องสำเร็จ').toBeTruthy();
     }
 
