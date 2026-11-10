@@ -51,7 +51,7 @@ await vault.anchorNow(anchors);          // checkpoint (nightly หรือต�
 
 ## คุณภาพ
 
-- 95 tests · coverage 97.71 statements / 91.51 branches / 98.36 functions / 97.95 lines (gate 90/80/90/90)
+- 99 tests · coverage 97.95 statements / 91.72 branches / 98.38 functions / 98.18 lines (gate 90/80/90/90)
 - lint (type-aware), typecheck, prettier, build ผ่าน; CI รัน Node 20 + 22
 - entrypoint: `dist/index.js` + `.d.ts` (`npm run build`)
 
@@ -61,4 +61,5 @@ await vault.anchorNow(anchors);          // checkpoint (nightly หรือต�
 - ถ้าไม่มี anchor หรือ pin ที่เก็บนอก vault จะแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้
 - group key/rotation ทำได้แล้ว (VAULT-006): `Vault.open({ keyring })`, `rotateKey()`, `rekey()`, `revokeKey()`
 - ไฟล์ใหญ่ทำได้แล้วผ่าน `putStream`/`getStream` (chunk 1 MiB, ตรวจทีละก้อน — VAULT-008) แต่ `get()` ยังโหลดทั้งก้อน
-- ยังไม่มี compression, dedupe หรือ GC: chunk ที่เขียนไม่จบกลายเป็น orphan blob (VAULT-009, IDEA-001)
+- ยังไม่มี compression หรือ dedupe (IDEA-001); orphan blob เก็บกวาดได้ด้วย `pruneOrphans()` แต่ไม่มีตัวเรียกอัตโนมัติ
+  และถือว่ามี writer เดียวต่อ store (VAULT-009)
