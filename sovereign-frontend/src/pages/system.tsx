@@ -20,6 +20,15 @@ interface ProcessInfo {
   mem?: string;
 }
 
+// สถานะบริการจาก GET /api/system/services ( probe จริง: DB / MQTT / Ollama )
+interface ServiceProbe {
+  id: string;
+  label: string;
+  status: 'up' | 'down' | 'unknown';
+  detail?: string;
+  latencyMs?: number;
+}
+
 type ActionMsgType = 'success' | 'info' | 'error';
 interface ActionMsg {
   type: ActionMsgType;
@@ -37,6 +46,8 @@ export default function SystemHealthPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [health, setHealth] = useState<any>({});
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
+  const [services, setServices] = useState<ServiceProbe[]>([]);
+  const [servicesCheckedAt, setServicesCheckedAt] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [actionMsg, setActionMsg] = useState<ActionMsg | null>(null);
   const [busyPid, setBusyPid] = useState<number | null>(null);
@@ -45,16 +56,21 @@ export default function SystemHealthPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [healthRes, procsRes] = await Promise.all([
+      const [healthRes, procsRes, servicesRes] = await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system/health`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system/processes`),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system/services`),
       ]);
-      const [healthData, procsData] = await Promise.all([
+      const [healthData, procsData, servicesData] = await Promise.all([
         healthRes.json(),
         procsRes.ok ? procsRes.json() : [],
+        servicesRes.ok ? servicesRes.json() : null,
       ]);
       setHealth(healthData);
       setProcesses(procsData);
+      // ไม่มีข้อมูล = ว่าง (หน้าแสดง "ไม่ทราบสถานะ" ไม่ใช่เขียวหลอก)
+      setServices(Array.isArray(servicesData?.services) ? servicesData.services : []);
+      setServicesCheckedAt(servicesData?.checkedAt || null);
     } catch (err) {
       console.error('System data fetch error:', err);
     } finally {
@@ -156,12 +172,41 @@ export default function SystemHealthPage() {
           ))}
         </div>
         <div className="panel panel-cyan p-4">
-          <h3 className="text-sm text-gray-400 mb-2 glow-text-cyan">{t('system.runningServices', 'Running Services')}</h3>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h3 className="text-sm text-gray-400 glow-text-cyan">{t('system.runningServices', 'Running Services')}</h3>
+            {servicesCheckedAt && (
+              <span className="text-[10px] text-gray-600">
+                {t('system.servicesCheckedAt', 'ตรวจล่าสุด {time}', { time: new Date(servicesCheckedAt).toLocaleTimeString() })}
+              </span>
+            )}
+          </div>
           <div className="space-y-2">
-            {['TimescaleDB', 'EMQX', 'Backend API', 'Frontend'].map((service) => (
-              <div key={service} className="flex justify-between">
-                <span>{service}</span>
-                <span className="text-emerald-400 glow-text">{t('system.runningDot', '● Running')}</span>
+            {/* Backend API + หน้านี้ = หลักฐานว่าทำงานอยู่จริง (response นี้ถูกส่งกลับมาแล้ว) */}
+            {[
+              ...services,
+              { id: 'api', label: t('system.svcApi', 'Backend API'), status: 'up' as const, detail: undefined as string | undefined },
+              { id: 'web', label: t('system.svcFrontend', 'Frontend (หน้านี้)'), status: 'up' as const, detail: undefined as string | undefined },
+            ].map((svc) => (
+              <div key={svc.id} className="flex justify-between gap-3">
+                <span>{svc.label}</span>
+                <span
+                  className={
+                    svc.status === 'up'
+                      ? 'text-emerald-400 glow-text'
+                      : svc.status === 'down'
+                        ? 'text-rose-400'
+                        : 'text-amber-300'
+                  }
+                  title={svc.detail || undefined}
+                >
+                  {svc.status === 'up'
+                    ? t('system.runningDot', '● Running')
+                    : svc.status === 'down'
+                      ? t('system.downDot', '● Down')
+                      : t('system.unknownDot', '● ไม่ทราบสถานะ')}
+                  {typeof svc.latencyMs === 'number' && svc.status === 'up' ? ` · ${svc.latencyMs}ms` : ''}
+                  {svc.status === 'down' && svc.detail ? ` · ${svc.detail}` : ''}
+                </span>
               </div>
             ))}
           </div>

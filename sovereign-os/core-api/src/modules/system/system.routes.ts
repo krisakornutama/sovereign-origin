@@ -7,6 +7,7 @@ import { getDiskInfo } from '../../services/system-monitor.service';
 import { getClientHealthSummary } from '../../services/client-monitor.service';
 import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
 import { fetchRouterSimData, setAdminPassword } from '../../services/tplink-mr505.service';
+import { probeSystemServices } from '../../services/system-services.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -45,6 +46,16 @@ router.get('/health', authenticate, async (_req, res) => {
     memory,
     disk
   });
+});
+
+// GET /api/system/services — สถานะบริการจริง (DB / MQTT / Ollama)
+// หน้า /system ใช้แทนรายการ hardcode เดิมที่โชว์ "● Running" ตลอดเวลา
+router.get('/services', authenticate, async (_req, res) => {
+  try {
+    res.json(await probeSystemServices());
+  } catch {
+    res.status(500).json({ error: 'Failed to probe services' });
+  }
 });
 
 // GET /api/system/processes - รายการ process ที่รันอยู่ (สำหรับปุ่ม killProcess)

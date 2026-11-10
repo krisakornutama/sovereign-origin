@@ -8,6 +8,7 @@
 - `system_settings` เป็นตาราง **shared cross-cutting** — ห้ามย้ายเป็นของเฉพาะโมดูล
 - หน้า `/system-health` และ truth-watchdog อ่านความจริงจากโมดูลนี้ — ห้ามแตะรูปแบบ `/api/health`/`/api/health/truth` โดยไม่อัปเดตผู้อ่านทั้งชุด
 - การเปลี่ยนรหัสผ่าน router (`wan/admin-password`) ต้องมี audit และยืนยันซ้ำ
+- หน้า `/system` ต้องแสดงสถานะบริการจาก `GET /api/system/services` (probe จริง: DB/MQTT/Ollama) — **ห้าม hardcode "● Running"** เพราะจะกลบเหตุที่บริการล่ม
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
