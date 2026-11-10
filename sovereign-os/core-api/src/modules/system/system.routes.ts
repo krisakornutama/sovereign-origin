@@ -7,6 +7,7 @@ import { getDiskInfo } from '../../services/system-monitor.service';
 import { getClientHealthSummary } from '../../services/client-monitor.service';
 import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
 import { fetchRouterSimData, setAdminPassword } from '../../services/tplink-mr505.service';
+import { probeSystemServices } from '../../services/system-services.service';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -47,6 +48,16 @@ router.get('/health', authenticate, async (_req, res) => {
   });
 });
 
+// GET /api/system/services — สถานะบริการจริง (DB / MQTT / Ollama)
+// หน้า /system ใช้แทนรายการ hardcode เดิมที่โชว์ "● Running" ตลอดเวลา
+router.get('/services', authenticate, async (_req, res) => {
+  try {
+    res.json(await probeSystemServices());
+  } catch {
+    res.status(500).json({ error: 'Failed to probe services' });
+  }
+});
+
 // GET /api/system/processes - รายการ process ที่รันอยู่ (สำหรับปุ่ม killProcess)
 router.get('/processes', authenticate, async (_req, res) => {
   try {
@@ -59,7 +70,8 @@ router.get('/processes', authenticate, async (_req, res) => {
 
 // POST /api/system/processes/kill - kill ผ่าน guard + autonomy เดียวกับ AI agent
 // 200 = สำเร็จ, 202 = รออนุมัติ (โหมด suggest), 403 = ถูกปฏิเสธ (view / guard)
-router.post('/processes/kill', authenticate, async (req, res) => {
+// SUPERADMIN เท่านั้น: การฆ่า process ของ host เป็นการกระทำระดับเครื่อง ไม่ใช่ระดับผู้ใช้ทั่วไป
+router.post('/processes/kill', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   const { pid, name } = req.body || {};
   const args: any = {};
   if (pid !== undefined && pid !== null && pid !== '') {

@@ -76,6 +76,11 @@ describe('GET /api/backup', () => {
     const res = await fetch(server.baseUrl + '/api/backup');
     assert.strictEqual(res.status, 401);
   });
+
+  test('role ที่ไม่ใช่ SUPERADMIN = 403 (รายชื่อ/เวลา backup ไม่ใช่ข้อมูลของทุกคน)', async () => {
+    const res = await fetch(server.baseUrl + '/api/backup', { headers: { Authorization: `Bearer ${VIEWER}` } });
+    assert.strictEqual(res.status, 403);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────

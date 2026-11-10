@@ -4,6 +4,11 @@ import { authenticate } from '../../middleware/auth.middleware';
 import { uploadLimiter } from '../../middleware/upload-rate-limit';
 import { hardenUpload, verifyUploadedContent, IMAGE_MIME, IMAGE_EXTS } from '../../lib/harden-upload';
 import {
+  OutboundUrlBlocked,
+  assertSafeOutboundUrl,
+  createGuardedLookup,
+} from '../../lib/outbound-url-guard';
+import {
   prisma,
   runVisionAnalysis,
   VISION_ENABLED,
@@ -61,11 +66,24 @@ router.post('/analyze-url', authenticate, async (req, res) => {
     const cameraId = typeof req.body?.camera_id === 'string' && req.body.camera_id.trim() ? req.body.camera_id.trim() : null;
     if (cameraId && !isUuid(cameraId)) return res.status(400).json({ error: 'Invalid camera_id format' });
 
-    const resp = await axios.get(url, {
+    // SSRF guard — กล้องใน LAN (RFC1918/ULA) คือการใช้งานจริง จึงอนุญาต
+    // แต่ loopback/link-local/cloud metadata/URL ที่ฝังรหัสผ่าน ต้องไม่ถูกยิงออกไป
+    let target: URL;
+    try {
+      target = assertSafeOutboundUrl(url);
+    } catch (e) {
+      if (e instanceof OutboundUrlBlocked) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
+    const resp = await axios.get(target.toString(), {
       responseType: 'arraybuffer',
       timeout: 20000,
+      maxRedirects: 0, // redirect ไป private/metadata = ช่อง SSRF ปิดที่ต้นทาง
+      maxContentLength: Math.max(1, VISION_MAX_IMAGE_MB) * 1024 * 1024,
       headers: { 'User-Agent': 'sovereign-os/1.0' },
-    });
+      lookup: createGuardedLookup(), // DNS rebinding: ตรวจ IP ที่ resolve จริงก่อนเชื่อม
+    } as any);
     const contentType = String(resp.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
     if (!IMAGE_MIME.has(contentType)) {
       return res.status(400).json({ error: 'URL does not point to an image (unsupported content-type)' });
@@ -74,6 +92,9 @@ router.post('/analyze-url', authenticate, async (req, res) => {
     const result = await runVisionAnalysis(base64, { cameraId });
     res.json(result);
   } catch (e: any) {
+    if (e?.code === 'EBLOCKEDADDRESS') {
+      return res.status(400).json({ error: 'url points to a blocked address' });
+    }
     res.status(500).json({ error: 'Vision analysis failed', detail: e?.message || 'unknown' });
   }
 });

@@ -61,6 +61,18 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | ENERGY-001 | `sovereign-energy`: พยากรณ์/ตัดสินใจจากข้อมูล local ที่เข้ารหัส         | ROADMAP §6   | queued | —       |
 | SUCC-001   | `sovereign-succession`: heir key + policy ให้ระบบอยู่ต่อหลังเจ้าของหาย   | ROADMAP §6   | queued | —       |
 
+### 2.3 Sovereign OS core — ความปลอดภัยและความจริงของระบบ
+
+ที่มา: คำสั่งเจ้าของ 2026-11-10 (โฟกัส "ใช้งานง่าย · ตอบเป้าหมาย offline-first · กันโจมตีทางไซเบอร์ · มีระบบจัดการครบ" ก่อนปิด Cold Soak) — งานชุดนี้แก้เฉพาะช่องโหว่/ข้อมูลปลอมใน UI ไม่แตะ runtime หรือ migration
+
+| ID           | รายการ                                                                                                                     | ที่มา                                       | สถานะ                                          | หลักฐาน                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| SEC-001      | P0: `POST /api/auth/rate-limit/clear` ต้องผ่าน MFA เต็มขั้น + audit `RATE_LIMIT_CLEAR`; parser 25 MB ของ `/api/clone/import` ย้ายไปหลัง auth | คำสั่งเจ้าของ (security audit 2026-11-10)   | done 2026-11-10                                 | `ca4ce33` · PR #60 · tests 8/8 · `npm run verify` 6/6                  |
+| SEC-002      | P1: SSRF guard ให้ vision `analyze-url` (LAN camera ยังใช้ได้, loopback/metadata/redirect ปิด); `GET /api/backup` + `processes/kill` = SUPERADMIN; actuation ปฏิเสธ `SYSTEM_AI`; MFA disable ต้องยืนยันรหัสผ่านปัจจุบัน + audit | คำสั่งเจ้าของ (security audit 2026-11-10)   | in-progress (PR #61 รอ CI)                      | `6fcdc04` (แก้ตาม CI: `c3e8d19`) · PR #61 · tests 68/68 · verify 6/6    |
+| SYSTRUTH-001 | หน้า `/system` เลิก hardcode "● Running" — เพิ่ม `GET /api/system/services` probe DB/MQTT/Ollama จริงพร้อม timeout และแสดง `down`/`ไม่ทราบสถานะ` ตามจริง | คำสั่งเจ้าของ (ใช้งานง่าย/ตอบความจริงของระบบ) | in-progress (branch `ai/production-truth-ui`)   | เทสต์ `tests/systemServices.test.ts` 5/5 · หลักฐานแดง 404 ≠ 401 ก่อนเพิ่ม route |
+
+**ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** `SYSTEM_AI` ยังถือ JWT ได้ตามปกติ — การกันอยู่ที่ route ที่สั่ง actuator ต้องขยายไปทุก endpoint ที่แตะฮาร์ดแวร์เมื่อเพิ่ม endpoint ใหม่; recovery ของเจ้าของที่ล็อก MFA ต้องทำที่เครื่อง/คอนเทนเนอร์ (ยังไม่มี UI สำหรับ recovery ระดับเครื่อง)
+
 ---
 
 ## 3. แนวคิดที่จองไว้ (ยังไม่เริ่ม — ห้ามลบ)
@@ -91,3 +103,4 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 ## 5. ประวัติของไฟล์นี้ (append-only)
 
 - 2026-11-10 — สร้างไฟล์; บันทึก M1/M2 ของ `sovereign-vault` พร้อมหลักฐาน commit/CI; ตั้งกฎ append-only เป็นข้อปฏิบัติหลักใน `AGENTS.md` ข้อ 9
+- 2026-11-10 — เพิ่ม §2.3 งาน core security (`SEC-001`, `SEC-002`) และความจริงของหน้า `/system` (`SYSTRUTH-001`) หลังเจ้าของสั่งโฟกัสความปลอดภัย/ใช้งานง่ายก่อนปิด Cold Soak
