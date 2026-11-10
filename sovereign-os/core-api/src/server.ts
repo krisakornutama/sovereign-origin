@@ -50,7 +50,9 @@ app.use((_req, res, next) => {
   next();
 });
 // อยู่หลัง proxy (nginx/caddy) → rate-limit นับ IP จริงได้
-app.set('trust proxy', 1);
+// ค่าเริ่มต้นคือ "ไม่เชื่อ" (TRUST_PROXY ไม่ตั้ง = false): ถ้า API เปิดตรง ผู้เรียกจะใส่
+// X-Forwarded-For เองแล้วกลายเป็น IP อะไรก็ได้ (หลบ rate limit / ปลอม audit / อ้างเป็น loopback)
+app.set('trust proxy', config.trustProxy);
 // request-id + access log (JSON) + ตัวนับ/metrics — ต้องอยู่ต้น stack เพื่อให้ครอบทุกคำขอ
 // (รวมคำขอที่ถูกปฏิเสธด้วย 401/413/429 ซึ่งเป็นคำขอที่อยากเห็นที่สุดเวลามีปัญหา)
 app.use(getObservability().requestContext);
