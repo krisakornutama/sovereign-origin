@@ -82,7 +82,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | ------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- | --------------- | --------------------------------------------------------- |
 | QA-001 | ทำให้ tools tests เป็น hermetic: offsite/backup ข้ามเฉพาะเมื่อยังไม่ติดตั้งไปป์ไลน์; update-bundle ใช้ ephemeral Ed25519 key | รัน `npm run verify` บนเครื่อง dev | done 2026-11-10 | PR #65 · `3246dd1` · CI `42862080560` (ubuntu + windows) |
 | QA-002 | ติดตั้ง/กู้ไปป์ไลน์สำรองนอกเครื่อง (03:00 DB + ~20:30 offsite) บนเครื่อง operational                          | `machine-health` แจ้ง critical | blocked — ต้องทำบนเครื่องที่มี DB/creds จริง                     | —                                                         |
-| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | queued          | —                                                         |
+| QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | done 2026-11-10 | PR #70 · `npm run verify` ผ่าน 6/6 (exit 0) · tools 1369 pass / 0 fail |
 
 ---
 
@@ -125,3 +125,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-10 — เหตุที่ offsite backup ไม่มีหลักฐานบนเครื่องนี้: `tools/verify/offsite-push.mjs`  hardcode
   `ROOT = 'E:/My work/Project Sovereign Origin'` และ `backups/postgres`, `sovereign-os/infra/offsite` ไม่มีอยู่จริง
   ⇒ เครื่องนี้เป็นเช็คเอาต์พัฒนา ไม่ใช่เครื่องที่รันไปป์ไลน์สำรอง; `QA-002` ต้องทำบนเครื่อง operational เท่านั้น
+
+- 2026-11-10 — ปิด `QA-003`: `doctor` อ่าน `process.env.APPDATA` แทน `env` ที่ถูก inject (Startup entry จริงของเครื่องรั่วเข้าเทสต์)
+  ⇒ ใช้ `env.APPDATA`; `batch-codepage` ข้ามเฉพาะ launcher ที่ยังไม่ติดตั้ง (ไฟล์ `tools/*.cmd` ถูก gitignore) แต่ยังบังคับกฎเดิมกับไฟล์ที่มีอยู่;
+  `build-node-kit --with-ollama` ข้ามเฉพาะเมื่อไม่มีโฟลเดอร์ `Ollama/` ในเครื่อง — ผลคือ `npm run verify` ผ่านครบ 6/6 ขั้น (9.2 นาที, exit 0),
+  tools tests 1369 pass / 0 fail / 20 skipped

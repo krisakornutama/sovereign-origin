@@ -432,7 +432,7 @@ export async function runDoctor({
       // (ทางหลังไม่ต้องสิทธิ์ admin — เป็นทางที่รอดจริงบนเครื่องที่ path มีเว้นวรรค)
       // ⚠️ ชื่อไฟล์ต้องตรงกับ STARTUP_FILE_NAME ใน sovereign-os/agent-runner/src/autostart.mjs
       const startupFile = path.join(
-        String(process.env.APPDATA ?? ''),
+        String(env.APPDATA ?? ''),
         'Microsoft',
         'Windows',
         'Start Menu',
@@ -440,7 +440,7 @@ export async function runDoctor({
         'Startup',
         'Sovereign Agent Runner.vbs',
       );
-      const hasStartupEntry = !!process.env.APPDATA && fs.existsSync(startupFile);
+      const hasStartupEntry = !!env.APPDATA && fs.existsSync(startupFile);
       try {
         const r = await exec('schtasks', ['/query', '/tn', taskName]);
         if (r?.code === 0) add('task', 'ok', 'งานอัตโนมัติ (autostart)', `พบ "${taskName}"`);
