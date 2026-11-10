@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import jwt from 'jsonwebtoken';
 import { authenticate } from '../../middleware/auth.middleware';
-import { config } from '../../config';
+import { verifyJwt } from '../../lib/jwt-verify';
 import { getSessionUser } from '../../services/auth.service';
 import { automationEngine, automationEmitter } from '../../services/automation.service';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
@@ -98,7 +97,7 @@ router.get('/alerts/stream', async (req, res) => {
   const token = String(req.query.token || '');
   if (!token) return res.status(401).json({ error: 'Missing token' });
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    const decoded = verifyJwt(token) as any;
     if (!decoded.mfa_verified) return res.status(403).json({ error: 'MFA verification required' });
     if (!decoded.userId) return res.status(401).json({ error: 'Invalid token' });
     const dbUser = await getSessionUser(String(decoded.userId));

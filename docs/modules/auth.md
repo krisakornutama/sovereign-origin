@@ -22,6 +22,8 @@
 ## ห้ามแตะ / ระวัง
 - `users` เป็นตารางที่ทุกโมดูลอ้าง (FK) — เปลี่ยน schema ต้องคิดข้ามโมดูลเสมอ
 - ห้าม log รหัสผ่าน/MFA secret ลง audit_logs หรือ response
+- **ห้ามเรียก `jwt.verify` ตรง ๆ** — ใช้ `verifyJwt()` จาก `src/lib/jwt-verify.ts` (ล็อก `algorithms: ['HS256']`) ทุกจุด: middleware, socket handshake, automation, nextgen · `jsonwebtoken` ยอมรับ HS512 ที่เซ็นด้วย secret เดียวกัน ถ้าไม่ล็อกอัลกอริทึมจะกลายเป็นทางเซ็นที่ระบบไม่ได้ออกเอง
+- `POST /mfa/disable` ต้องยืนยันด้วยรหัสผ่านปัจจุบัน — token อย่างเดียวปิด 2FA ไม่ได้ (กัน session ที่ถูกยึด)
 - บัญชี `e2e-bot` ใช้โดยเกต E2E (auth.setup) — ห้ามลบ/เปลี่ยนรหัสโดยไม่แจ้ง
 
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
