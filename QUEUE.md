@@ -3,9 +3,10 @@
 ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
 งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
-> อัปเดตล่าสุด 2026-11-09: required checks **8 ตัว** (เพิ่ม `settings-e2e` เป็นด่านบังคับแล้ว · พิสูจน์ด้วย PR #58 ว่า merge ถูกบล็อกจริง)
+> อัปเดตล่าสุด 2026-11-10: **ปล่อย `v1.3.0` แล้ว** — GH Release เป็น Latest พร้อม 3 asset (portable exe · win zip · SHA256SUMS) และ image `api`/`web` tag `1.3.0`/`1.3`/`latest` ขึ้น GHCR แล้ว (multi-arch, digest ตรงกัน)
+> · required checks **8 ตัว** (เพิ่ม `settings-e2e` เป็นด่านบังคับแล้ว · พิสูจน์ด้วย PR #58 ว่า merge ถูกบล็อกจริง)
 > · restore drill รายงานผลใน `machine-health` · E2E settings บันทึก 2FA จริง และ Telegram บันทึก–คืนค่า config เดิม
-> · version `1.2.0` (ยังไม่ push tag ใหม่) · `npm run verify` ผ่าน 6/6
+> · version `1.3.0` (tag ปล่อยแล้ว) · `npm run verify` ผ่าน 6/6 (2026-11-10, 4.8 นาที)
 > · อัปเดต 2026-11-07: ตรวจ image manifest ครบ 6 tag ผ่านทั้งหมด (ดึงได้โดยไม่ล็อกอิน, amd64+arm64) · topics ครบรวม `agpl`
 > · เหลือแค่เจ้าของ rotate token กับโพสต์ Reddit
 
@@ -19,15 +20,16 @@
 | Topics | **ครบแล้ว** — self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql, agpl |
 | Branch protection `main` | **เปิดแล้ว** — required checks 8 ตัว (ชื่อ job ล้วน): `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate`, `settings-e2e` · strict = true · enforce_admins = false · ยืนยันจาก API 2026-11-09 |
 | Release `v1.2.0` | published (ไม่ใช่ draft) — release note เขียนใหม่แล้ว มีคำสั่ง `docker pull` + บันทึกการเผยแพร่ image |
+| Release `v1.3.0` | **published 2026-11-10 (Latest)** — แนบ `Sovereign-OS-1.3.0-portable.exe` (188 MB) · `Sovereign.OS-1.3.0-win.zip` (340 MB) · `SHA256SUMS.txt` · tag ชี้ commit `d92d359` |
 | Release note | ระบุว่า `api` เผยแพร่สำเร็จ และ `latest`/`1.2` ของ `web` ถูกย้ายมาชี้ build ล่าสุดแล้ว |
-| Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที |
-| Image `api` | public · tags `1.2.0`, `1.2`, `latest`, `main`, `sha-11b07ef`, `sha-97dd0fe`, `sha-b08ba90` · multi-arch amd64+arm64 |
-| Image `web` | public · tags `1.2.0`, `1.2`, `latest`, `main`, `sha-11b07ef`, `sha-97dd0fe`, `sha-b08ba90`, `sha-c000361` · multi-arch amd64+arm64 |
-| เอกสารที่อ้าง tag image | ตรงกับของจริงแล้ว (`1.2.0` ไม่มี `v` นำหน้า) — `deploy/community/README.en.md`, `.env.example`, `docker-compose.yml`, `docs/FAQ-REDDIT.md` |
+| Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที · รอบ `v1.3.0`: run `42826599153` success (base `d92d359`) |
+| Image `api` | public · `1.3.0`/`1.3`/`latest` ชี้ digest เดียวกัน (`sha256:b7154104…`) · รุ่นก่อน: `1.2.0`, `1.2`, `main`, `sha-*` · multi-arch amd64+arm64 |
+| Image `web` | public · `1.3.0`/`1.3`/`latest` ชี้ digest เดียวกัน (`sha256:945782fa…`) · รุ่นก่อน: `1.2.0`, `1.2`, `main`, `sha-*` · multi-arch amd64+arm64 |
+| เอกสารที่อ้าง tag image | ตรงกับของจริงแล้ว (`1.3.0` ไม่มี `v` นำหน้า) — `deploy/community/README.en.md`, `.env.example`, `docker-compose.yml`, `docs/FAQ-REDDIT.md` |
 | ด่านตรวจ image ก่อนโพสต์ | มีแล้วใน `docs/LAUNCH-REDDIT.md` (หัวข้อ "Verify the published images before posting") |
 | Demo GIF | ฝังใน `README.md` และ `README.en.md` แล้ว (`docs/media/demo.gif`) |
 | Telegram token | ใช้งานได้ (sendMessage → 200) แต่ **ควร rotate** ถ้าเคยหลุดใน log |
-| Quality gate | **ผ่าน 6/6** (2026-11-07, 2.5 นาที) — แก้ module-boundary 6 เส้นที่ค้างหลังแยก Pro + อัปเดตเทสต์ E2E/GHCR ที่อ้าง spec/workflow รุ่นเก่า |
+| Quality gate | **ผ่าน 6/6** (2026-11-10, 4.8 นาที) — แก้ module-boundary 6 เส้นที่ค้างหลังแยก Pro + อัปเดตเทสต์ E2E/GHCR ที่อ้าง spec/workflow รุ่นเก่า |
 
 ---
 
@@ -40,14 +42,14 @@
 docker compose -f sovereign-os/infra/docker-compose.yml up -d core-api
 ```
 
-### 2. ✅ ตรวจ image แล้ว (2026-11-07) — ผ่าน
-ตรวจ manifest แบบไม่ล็อกอินครบ 6 tag: `api`/`web` × `1.2.0`/`1.2`/`latest`
-→ ทุกตัวมี `linux/amd64` + `linux/arm64` และดึงได้โดยไม่ต้องล็อกอิน
+### 2. ✅ ตรวจ image แล้ว (2026-11-10) — ผ่าน
+ตรวจ manifest แบบไม่ล็อกอินครบ 6 tag: `api`/`web` × `1.3.0`/`1.3`/`latest`
+→ ทุกตัวมี `linux/amd64` + `linux/arm64`, ดึงได้โดยไม่ต้องล็อกอิน และ `latest` ชี้ digest เดียวกับ `1.3.0`
 คำสั่งนี้รันซ้ำได้ก่อนโพสต์ทุกครั้ง (รายละเอียดใน `docs/LAUNCH-REDDIT.md`):
 
 ```bash
 # ทุก tag ที่เอกสารอ้างต้องดึงได้แบบไม่ล็อกอิน
-for img in api web; do for t in 1.2.0 1.2 latest; do
+for img in api web; do for t in 1.3.0 1.3 latest; do
   docker manifest inspect "ghcr.io/krisakornutama/sovereign-origin/$img:$t" >/dev/null && echo "ok $img:$t";
 done; done
 ```

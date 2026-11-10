@@ -134,7 +134,7 @@ npm run build  # tsc ตรวจ type + build dist/
 
 ## 📚 เอกสารและประวัติการพัฒนา
 
-- [`CHANGELOG.md`](CHANGELOG.md) — สรุปสิ่งที่พัฒนา/แก้ในแต่ละเวอร์ชัน (ล่าสุด v1.2.0)
+- [`CHANGELOG.md`](CHANGELOG.md) — สรุปสิ่งที่พัฒนา/แก้ในแต่ละเวอร์ชัน (ล่าสุด v1.3.0)
 - [`QUEUE.md`](QUEUE.md) — งานค้างและสถานะ launch ล่าสุด
 - [`docs/FAQ-REDDIT.md`](docs/FAQ-REDDIT.md) — คำตอบสำหรับคอมเมนต์เปิดตัว
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — สถาปัตยกรรมและเส้นแบ่งโมดูล

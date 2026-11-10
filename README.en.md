@@ -115,7 +115,7 @@ This repository is pure Community Edition: no hidden Pro imports, no dead stubs.
 
 ## Docs
 
-- [`CHANGELOG.md`](CHANGELOG.md) — release history and what changed in each version (latest: v1.2.0)
+- [`CHANGELOG.md`](CHANGELOG.md) — release history and what changed in each version (latest: v1.3.0)
 - [`QUEUE.md`](QUEUE.md) — current work queue and launch status
 - [`deploy/community/README.md`](deploy/community/README.md) — install, ports, invite codes, LAN access (Thai)
 - [`deploy/community/README.en.md`](deploy/community/README.en.md) — the same install guide in English

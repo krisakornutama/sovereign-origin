@@ -38,11 +38,11 @@ CI publishes multi-arch images (amd64 + arm64) to GHCR on every `v*` tag:
 
 | Service | Image |
 |---|---|
-| API | `ghcr.io/krisakornutama/sovereign-origin/api:1.2.0` |
-| Web | `ghcr.io/krisakornutama/sovereign-origin/web:1.2.0` |
+| API | `ghcr.io/krisakornutama/sovereign-origin/api:1.3.0` |
+| Web | `ghcr.io/krisakornutama/sovereign-origin/web:1.3.0` |
 
-> Image tags drop the leading `v`: pushing git tag `v1.2.0` publishes `1.2.0`, `1.2` and `latest`.
-> `v1.2.0` is not a valid image tag and will fail to pull. `latest` / `main` follow the newest build.
+> Image tags drop the leading `v`: pushing git tag `v1.3.0` publishes `1.3.0`, `1.3` and `latest`.
+> `v1.3.0` is not a valid image tag and will fail to pull. `latest` / `main` follow the newest build.
 
 Point `API_IMAGE` / `WEB_IMAGE` in `.env` at a published tag and run:
 
