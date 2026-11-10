@@ -6,6 +6,12 @@ import { prisma } from '../lib/prisma';
 import { config } from '../config';
 import crypto from 'node:crypto';
 
+/**
+ * เพดานรหัสผ่านที่ bcrypt นำไปใช้จริง (ไบต์) — ไม่ใช่ตัวเลขที่เราเลือกเอง
+ * แต่เป็นข้อจำกัดของอัลกอริทึม: เกินกว่านี้ถูกตัดทิ้งเงียบ ๆ
+ */
+export const BCRYPT_MAX_PASSWORD_BYTES = 72;
+
 export { prisma };
 
 /** Minimal user row used by HTTP/socket authentication (owned by auth module). */
@@ -239,8 +245,15 @@ export class AuthService {
     if (typeof password !== 'string' || password.length < 8) {
       throw new Error('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
     }
-    if (password.length > 128) {
-      throw new Error('รหัสผ่านยาวเกินไป (สูงสุด 128 ตัวอักษร)');
+    // bcrypt ใช้เพียง 72 ไบต์แรกของรหัส — ส่วนที่เกินถูกตัดทิ้งเงียบ ๆ
+    // ⇒ รหัสที่ยาวกว่านั้นสองตัวซึ่งต่างกันแค่ท้ายจะใช้แทนกันได้ (ตัวอักษรไทย = 3 ไบต์/ตัว
+    // ดังนั้น 25 ตัวอักษรก็เกินแล้ว) การรับถึง 128 ตัวอักษรจึงเป็นการโกหกผู้ใช้
+    const bytes = Buffer.byteLength(password, 'utf8');
+    if (bytes > BCRYPT_MAX_PASSWORD_BYTES) {
+      throw new Error(
+        `รหัสผ่านยาวเกินไป — ระบบเข้ารหัสรับได้ไม่เกิน ${BCRYPT_MAX_PASSWORD_BYTES} ไบต์ ` +
+          `(อักษรไทยนับตัวละ 3 ไบต์; รหัสนี้ ${bytes} ไบต์)`
+      );
     }
     // กันรหัสยอดฮิตที่เดาง่าย
     const WEAK = new Set(['password', 'password1', 'password123', '12345678', '123456789', '1234567890', 'qwerty123', 'abc12345', 'admin123', 'letmein1', 'welcome1', 'monkey123']);
