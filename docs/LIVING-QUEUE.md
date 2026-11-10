@@ -45,10 +45,10 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | VAULT-003  | Snapshot API สำหรับ rule engine (versioned + SHA-256 checksum)                       | ROADMAP §6        | done 2026-11-10 | `609d006` · 46 tests                      |
 | VAULT-004  | Anchor log แบบ hash-chain + pinned root → ตรวจจับ rollback ทั้ง store                | ROADMAP §6 (M2)   | done 2026-11-10 | `8be1fbb` · 64 tests · cov 98.84/97.98/98.78/99.38 |
 | VAULT-005  | ต่อ snapshot เข้ากับ `sovereign-rule-engine`: boot → load, หลังเปลี่ยน rule/sync → save            | ROADMAP §6        | done 2026-11-10 | PR rule-engine #5 · `157bcb6` · CI `42872531142` |
-| VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | queued          | —                                         |
+| VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | done 2026-11-10 | PR vault #2 · `0e6f1d5` · CI `42880040950` |
 | VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | done 2026-11-10 | PR vault #1 · `00dce9f` · CI `42876459888` |
-| VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | queued          | —                                         |
-| AUTH-001     | เพดานรหัสผ่านต้องตรงกับสิ่งที่ bcrypt ทำได้จริง — `validateNewPassword` ปฏิเสธรหัสที่ยาวเกิน 72 ไบต์ (เดิมรับถึง 128 ตัวอักษร แล้ว bcrypt ตัดส่วนเกินทิ้งเงียบ ๆ ⇒ รหัสต่างกันท้ายใช้แทนกันได้; อักษรไทย 25 ตัว = 75 ไบต์ก็โดน) ใช้กฎเดียวทั้ง `POST /api/users`, เปลี่ยนรหัสผ่าน และรับคำเชิญ | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | in-progress (branch `ai/password-byte-limit`) | `tests/passwordByteLimit.test.ts` 4/4 · แดง: `Missing expected exception` 2 เคส + POST 73 ไบต์สร้างบัญชีได้ |
+| VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | done 2026-11-10 | PR vault #3 · `7a78d83` · CI `42882770489` |
+| VAULT-009  | เก็บกวาด orphan chunk (GC) เมื่อเขียน chunk ไม่จบ แล้ว index ไม่เคย commit          | VAULT-008 ต่อยอด  | queued          | —                                         |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** anchor เป็น checkpoint ที่เรียกเอง ไม่ได้ผูกทุก `put`; ถ้าไม่มี anchor หรือ pin ที่เก็บนอก vault จะยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้
 
@@ -77,6 +77,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | AUDIT-002    | audit body ปลอดภัย: ปิดความลับทุกชั้น (object/array ไม่ใช่แค่ key ชั้นบน) + จำกัด 4 KB ต่อ body — body 25 MB ของ `/api/clone/import` ไม่ไหลลง `audit_logs` ทั้งก้อนอีก | คำสั่งเจ้าของ (กันโจมตี/ตรวจย้อนได้อย่างปลอดภัย) | done 2026-11-11 | `0a838fe` · PR #69 (squash) · `tests/auditBodySafety.test.ts` 5/5 · แดง 3 เคส (nested/array leak, ไม่มีการตัดขนาด) · verify 6/6 |
 | SEC-003      | ล็อกการ verify JWT ให้รับอัลกอริทึมเดียว (`HS256`) ที่จุดเดียว — ก่อนหน้านี้ `jwt.verify` รับ HS512 ที่เซ็นด้วย secret เดียวกันได้ (รวมถึง `alg: none` ต้องถูกปฏิเสธ) ใช้ทั้ง `authenticate`, `authenticatePartial`, socket handshake, automation และ nextgen | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | done 2026-11-11 | `e439f3a` · PR #66 (squash) · `tests/jwtAlgorithmLock.test.ts` 4/4 · หลักฐานแดง 200 ≠ 401 สองจุดก่อนแก้ · verify 6/6 |
 | BACKUP-001   | บอกความสดของ backup จริง — `computeBackupStatus` + `GET /api/backup/status` (SUPERADMIN) คืน `lastBackupAt`/`ageHours`/`stale` (เกณฑ์ 26 ชม. ที่เดียว) และแบนเนอร์ในหน้า `/backup` เตือนเมื่อยังไม่เคยสำรอง/ค้างเกินเกณฑ์/ปิดตารางอัตโนมัติ | คำสั่งเจ้าของ (ข้อมูลไม่หาย/ใช้งานง่าย) | done 2026-11-11 | `c423c38` · PR #68 (squash) · `tests/backupFreshness.test.ts` 7/7 · แดง 404 ≠ 401 / 404 ≠ 200 ก่อนเพิ่ม route · verify 6/6 |
+| USERS-002    | กันการล็อกตัวเองออกจากระบบที่ระดับ API (ปุ่มที่ UI disable ไม่ใช่ด่าน): `DELETE /api/users/:id` ปฏิเสธลบตัวเอง/`SUPERADMIN` คนสุดท้าย (400) และแปลง FK `P2003`→400, ไม่พบ→404, id ผิดรูป `P2023`→400; `PUT /:id` ลดสิทธิ์ `SUPERADMIN` คนสุดท้ายไม่ได้ · หน้า `/users` แสดงเหตุผลที่ server ปฏิเสธแทนการขึ้นว่าสำเร็จ | คำสั่งเจ้าของ (มีระบบจัดการครบ/ใช้งานง่าย) | done 2026-11-11 | `5578852` · PR #75 (squash) · `tests/userLockoutGuards.test.ts` 9/9 · แดง 5 เคส (ลบตัวเอง/คนสุดท้ายสำเร็จ, 404→500, P2003→500, ไม่มี reason ใน response) · verify 6/6 |
+| AUTH-001     | เพดานรหัสผ่านต้องตรงกับสิ่งที่ bcrypt ทำได้จริง — `validateNewPassword` ปฏิเสธรหัสที่ยาวเกิน 72 ไบต์ (เดิมรับถึง 128 ตัวอักษร แล้ว bcrypt ตัดส่วนเกินทิ้งเงียบ ๆ ⇒ รหัสต่างกันท้ายใช้แทนกันได้; อักษรไทย 25 ตัว = 75 ไบต์ก็โดน) ใช้กฎเดียวทั้ง `POST /api/users`, เปลี่ยนรหัสผ่าน และรับคำเชิญ | คำสั่งเจ้าของ (กันโจมตีทางไซเบอร์) | done 2026-11-11 | `3dce1d6` · PR #73 (squash) · `tests/passwordByteLimit.test.ts` 4/4 · แดง: `Missing expected exception` 2 เคส + POST 73 ไบต์สร้างบัญชีได้ · verify 6/6 |
 | AUDIT-003    | ค้น audit ด้วยชื่อผู้ใช้ได้จริง — `q` เดิมค้นแค่ `action_type` + `payload::text` แต่ placeholder หน้า `/audit` บอกว่าค้น `somchai` ได้ ⇒ พิมพ์ชื่อคนแล้วได้ผลว่างเสมอ (payload ไม่มี username) · เพิ่มเงื่อนไข `user.username contains (insensitive)` เป็น OR กับผล raw search และคง `actionPrefix`/`from`/`to` เป็น AND · `q` ว่าง = ไม่ยิง query | คำสั่งเจ้าของ (ตรวจย้อนได้/ใช้งานง่าย) | in-progress (branch `ai/audit-username-search`) | `tests/auditSearchUsername.test.ts` 8/8 · แดง 6 เคส (ไม่มีเงื่อนไข username ทั้งรายการและ export, id hit ไม่ถูกส่งต่อ) |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** `SYSTEM_AI` ยังถือ JWT ได้ตามปกติ — การกันอยู่ที่ route ที่สั่ง actuator ต้องขยายไปทุก endpoint ที่แตะฮาร์ดแวร์เมื่อเพิ่ม endpoint ใหม่; recovery ของเจ้าของที่ล็อก MFA ต้องทำที่เครื่อง/คอนเทนเนอร์ (ยังไม่มี UI สำหรับ recovery ระดับเครื่อง)
@@ -120,6 +122,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-10 — สร้างไฟล์; บันทึก M1/M2 ของ `sovereign-vault` พร้อมหลักฐาน commit/CI; ตั้งกฎ append-only เป็นข้อปฏิบัติหลักใน `AGENTS.md` ข้อ 9
 - 2026-11-10 — เพิ่ม §2.3 งาน core security (`SEC-001`, `SEC-002`) และความจริงของหน้า `/system` (`SYSTRUTH-001`) หลังเจ้าของสั่งโฟกัสความปลอดภัย/ใช้งานง่ายก่อนปิด Cold Soak
+- 2026-11-10 — ปิด `VAULT-008` (streaming), ตั้ง `VAULT-009` (GC orphan chunk) เป็นคิวถัดไปของสาย vault — แถวเดิมไม่ถูกแก้หรือลบ
+- 2026-11-11 — ปิด `USERS-002` (ด่านกันล็อกตัวเองออกจากระบบอยู่ที่ API ไม่ใช่ปุ่มที่ UI disable) พร้อมหลักฐาน commit `5578852` + PR #75; คิวในไฟล์นี้ยังคง append-only — เติมเฉพาะช่องสถานะ/หลักฐานของแถวเดิม
 
 ## 6. บันทึกการวินิจฉัย (append-only)
 
@@ -146,3 +150,15 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   append เฉพาะเมื่อ root เปลี่ยนหรือ head เก่ากว่า `maxAgeMs` (default 20h) ⇒ รันซ้ำ/รันช้าไม่ทำให้ chain แตก,
   `maxAgeMs` ที่ผิดรูป (ติดลบ/NaN) โยน `RangeError` แทนการเขียน anchor เงียบ ๆ; ข้อจำกัด: ไม่มี cross-process lock
   (สองรอบพร้อมกันจะได้สอง entry ที่ถูกต้องทั้งคู่) — ใช้ scheduler ตัวเดียวต่อ anchor log, 70 tests
+
+- 2026-11-10 — ปิด `VAULT-006` ที่ฝั่ง `sovereign-vault` (`0.4.0`): เพิ่ม `Keyring` (ต้องระบุ active key เมื่อมีหลายกุญแจ),
+  `Vault.open({ keyring })`, `rotateKey()`, `rekey()` (re-seal ทุก object + index, plaintext/root ไม่เปลี่ยน ⇒ anchor เดิมยังใช้ได้),
+  `revokeKey()` (ปฏิเสธ active key และ key ที่ยัง seal object อยู่ — ต้อง `rekey()` ก่อน) และ `envelopeKeyId()` ให้เลือกกุญแจจาก header;
+  ข้อจำกัด: การแจกจ่ายกุญแจข้ามเครื่องยังต้องทำนอกระบบ (ไม่มี key exchange/membership list), `rekey`/`revoke` เป็นงาน offline O(n)
+
+- 2026-11-10 — ปิด `VAULT-008` ที่ฝั่ง `sovereign-vault` (`0.5.0`): `putStream(key, source, { chunkSize? })` / `getStream(key)`
+  แบ่งค่าเป็น chunk (default 1 MiB) แล้ว seal/ตรวจแยกทีละก้อน ⇒ ไฟล์ใหญ่ไม่ต้องอยู่ในหน่วยความจำทั้งก้อน,
+  index entry เก็บ `chunks: [{ hash, size }]` และ hash ของ entry คือ SHA-256 ของ chunk hash ต่อกัน (single-blob คงเป็น digest ของ plaintext),
+  `get`/`delete`/`rekey`/`revokeKey`/`verifyAll` รู้จัก chunk และลบ chunk เก่าเมื่อ overwrite/delete;
+  ข้อจำกัด: crash ระหว่างเขียนทำได้แค่ทิ้ง orphan blob (ยังไม่มี GC — ตั้งเป็น `VAULT-009`), chunk boundary ไม่ได้ content-defined
+  (แทรกไบต์ต้นไฟล์ทำให้ chunk ที่ตามมาทั้งหมดเปลี่ยน), `get()` ยังโหลดทั้งก้อน (ใช้ `getStream()`), 95 tests cov 97.71/91.51/98.36/97.95
