@@ -178,11 +178,14 @@ export default function UsersPage() {
     setMessage('');
     setError('');
     try {
-      await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      // server ปฏิเสธได้ (ลบตัวเอง / SUPERADMIN คนสุดท้าย / ยังมีข้อมูลผูก) — ต้องบอกเหตุ ไม่ใช่ขึ้นว่าสำเร็จ
+      if (!res.ok) throw new Error(data.error || t('users.deleteFailed', 'ไม่สามารถลบผู้ใช้ได้'));
       setMessage(t('users.userDeleted', 'ลบผู้ใช้สำเร็จ'));
       loadUsers();
-    } catch {
-      setError(t('users.deleteFailed', 'ไม่สามารถลบผู้ใช้ได้'));
+    } catch (err: any) {
+      setError(err.message || t('users.deleteFailed', 'ไม่สามารถลบผู้ใช้ได้'));
     }
   };
 

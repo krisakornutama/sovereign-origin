@@ -83,16 +83,39 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
     return res.status(500).json({ error: 'สร้างผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
   }
 });
+// DELETE /api/users/:id — ลบบัญชี (SUPERADMIN)
+// ต้องกันสามเรื่องก่อนลบจริง ไม่งั้นระบบไม่มีผู้ดูแลเหลือและกู้ได้ด้วย DB console เท่านั้น:
+//   1) ลบตัวเอง            2) ลบ SUPERADMIN คนสุดท้าย            3) FK ที่ยังผูกข้อมูลอยู่
+// UI ปิดปุ่มของแถวตัวเองไว้แล้ว แต่ API ต้องกันเอง (ปุ่มเป็นแค่ความสะดวก ไม่ใช่ด่าน)
 router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const targetId = req.params.id;
+  if (targetId === req.user!.id) {
+    return res.status(400).json({ error: 'ลบบัญชีของตัวเองไม่ได้ — ให้ผู้ดูแลคนอื่นเป็นผู้ลบ' });
+  }
   try {
-    await prisma.user.delete({ where: { id: req.params.id } });
+    const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, role: true } });
+    if (!target) return res.status(404).json({ error: 'ไม่พบผู้ใช้ที่ระบุ' });
+    if (target.role === 'SUPERADMIN') {
+      const admins = await prisma.user.count({ where: { role: 'SUPERADMIN' } });
+      if (admins <= 1) {
+        return res.status(400).json({ error: 'ลบไม่ได้ — ต้องเหลือผู้ดูแลสูงสุด (SUPERADMIN) อย่างน้อย 1 คน' });
+      }
+    }
+    await prisma.user.delete({ where: { id: targetId } });
     // ตัด socket ที่ค้างอยู่ทันที — user ที่ถูกลบต้องไม่ได้รับ realtime ต่อ
-    disconnectUserSockets(req.params.id);
-    res.json({ success: true });
+    disconnectUserSockets(targetId);
+    return res.json({ success: true });
   } catch (err: any) {
+    // P2003 = ยังมีข้อมูลผูกอยู่ (FK) → 400 อ่านรู้เรื่อง ; P2025 = ถูกลบไปแล้วระหว่างทาง
+    if (err?.code === 'P2003') {
+      return res.status(400).json({ error: 'ลบไม่ได้ — บัญชีนี้ยังมีข้อมูลผูกอยู่ (โอนย้ายหรือลบข้อมูลก่อน)' });
+    }
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'ไม่พบผู้ใช้ที่ระบุ' });
+    // P2023 = id ไม่ใช่ UUID — 400 ไม่ใช่ 500 (Prisma โยนตอน parse ไม่ใช่ตอน compile)
+    if (err?.code === 'P2023') return res.status(400).json({ error: 'รูปแบบ id ของผู้ใช้ไม่ถูกต้อง' });
     // เคสจริง: Prisma error ถูก catch-all กลืนเงียบ ๆ วินิจฉัยไม่ได้ — log เต็ม + ส่ง reason เสมอ
     console.error('[users:delete] failed:', err?.code || '', err?.message || err);
-    res.status(500).json({ error: 'ลบผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
+    return res.status(500).json({ error: 'ลบผู้ใช้ไม่สำเร็จ', reason: err?.message || 'unknown' });
   }
 });
 
@@ -144,6 +167,19 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
     if (role !== undefined && !VALID_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
+    const targetId = req.params.id;
+    // ลดสิทธิ์ SUPERADMIN คนสุดท้าย = ล็อกตัวเองออกจากระบบถาวร (ไม่มีใครอนุมัติ/กู้ได้)
+    // UI ปิดช่องนี้ของแถวตัวเอง แต่ API ต้องกันเอง
+    if (role !== undefined) {
+      const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, role: true } });
+      if (!target) return res.status(404).json({ error: 'ไม่พบผู้ใช้ที่ระบุ' });
+      if (target.role === 'SUPERADMIN' && role !== 'SUPERADMIN') {
+        const admins = await prisma.user.count({ where: { role: 'SUPERADMIN' } });
+        if (admins <= 1) {
+          return res.status(400).json({ error: 'ลดสิทธิ์ไม่ได้ — ต้องเหลือผู้ดูแลสูงสุด (SUPERADMIN) อย่างน้อย 1 คน' });
+        }
+      }
+    }
     const data: any = {};
     if (role !== undefined) data.role = role;
     if (assigned_node_id !== undefined) data.assigned_node_id = assigned_node_id || null;
@@ -176,12 +212,16 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
       data.token_version = { increment: 1 };
     }
     // ทุก PUT นี้ลง audit อัตโนมัติผ่าน auditStateChange (server.ts) — actionType = "PUT /api/users/:id"
-    await prisma.user.update({ where: { id: req.params.id }, data });
+    await prisma.user.update({ where: { id: targetId }, data });
     // role/โหนด/สถานะรหัสเปลี่ยน → token version ใหม่แล้ว; ตัด socket เดิมไม่ให้ค้างสิทธิ์เก่า
-    disconnectUserSockets(req.params.id);
+    disconnectUserSockets(targetId);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Update failed' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'ไม่พบผู้ใช้ที่ระบุ' });
+    if (err?.code === 'P2023') return res.status(400).json({ error: 'รูปแบบ id ของผู้ใช้ไม่ถูกต้อง' });
+    if (err?.code === 'P2003') return res.status(400).json({ error: 'อ้างถึงข้อมูลที่ไม่มีอยู่ (เช่น โหนด/สาขา)' });
+    console.error('[users:update] failed:', err?.code || '', err?.message || err);
+    return res.status(500).json({ error: 'Update failed' });
   }
 });
 
