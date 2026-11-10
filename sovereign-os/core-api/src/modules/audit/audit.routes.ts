@@ -46,7 +46,14 @@ async function buildWhere(filters: AuditFilters): Promise<Prisma.AuditLogWhereIn
     const hits = await prisma.$queryRaw<Array<{ id: string }>>(
       Prisma.sql`SELECT id FROM "audit_logs" WHERE action_type ILIKE ${`%${filters.q}%`} OR payload::text ILIKE ${`%${filters.q}%`}`,
     );
-    where.id = { in: hits.map((h) => h.id) };
+    // ชื่อผู้ใช้อยู่ในตาราง users ไม่ได้อยู่ใน payload (payload เก็บ ip/method/path/body)
+    // ถ้าไม่กรองที่ relation นี้ ผู้ใช้จะพิมพ์ชื่อคนในช่องค้นหาแล้วได้ผลว่างเสมอ
+    // ทั้งที่ placeholder ของหน้า /audit บอกว่าค้นชื่อได้ — ต้องเป็น OR กับผลของ raw search
+    // (ไม่ใช่แทนกัน) และคงตัวกรองอื่นไว้เป็น AND ตามปกติ
+    where.OR = [
+      { id: { in: hits.map((h) => h.id) } },
+      { user: { username: { contains: filters.q, mode: 'insensitive' } } },
+    ];
   }
   return where;
 }
