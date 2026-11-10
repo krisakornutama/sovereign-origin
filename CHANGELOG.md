@@ -6,9 +6,13 @@
 
 ---
 
-## [Unreleased] — 2026-11-07
+## [Unreleased]
 
-> งานหลัง tag `v1.2.0` — จะรวมใน release ถัดไป (image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้)
+---
+
+## [v1.3.0] — 2026-11-10 (released)
+
+> งานหลัง tag `v1.2.0` — รวมในรุ่นนี้ (image `1.2.0` build จาก `11b07ef` จึงยังไม่มีส่วนนี้)
 
 ### 🔧 งานหลังปล่อย v1.2.0
 
@@ -30,9 +34,13 @@
 - **แก้ชื่อห้องว่างของโพสต์ในช่อง Telegram + unit test การ map `getUpdates` (10 พ.ย.)** — `GET /api/telegram/updates` เดิมอ่าน `chat` จาก `message` เท่านั้น โพสต์ในช่อง (มีแต่ `channel_post`) จึงได้ `title` ว่างเสมอ ทำให้รายการที่ผู้ใช้เลือกในหน้า settings ไม่มีชื่อห้อง · อ่าน `chat` จากทั้งสองที่ทางเดียว และเพิ่ม `sovereign-os/core-api/tests/telegramUpdates.test.ts` (7 เคส, mock axios ไม่ยิง Telegram จริง): dedup chatId ซ้ำ, กรอง `chatId` ว่าง, `channel_post` ได้ชื่อห้องถูก, ตัดข้อความที่ 60 ตัวอักษร, `type` หาย → `unknown`, จำกัด 10 แชท, Telegram ตอบ 401 → 500 พร้อมสาเหตุและไม่ retry, ไม่มี token → 400 และไม่ออก request, ไม่ล็อกอิน → 401 · Telegram ตอบ 429 → ส่ง 429 พร้อม `retry after` ต่อให้ UI (ไม่กลายเป็น 500 เหมือนบั๊กฝั่งเรา) · `result` ที่ไม่ใช่ array หรือไม่มี `data` → คืนลิสต์ว่างแทนการโยน 500
 - **ตรวจ `stage-release` หลัง refactor ด้วยการจัด release จริง (10 พ.ย.)** — รัน `node tools/stage-release.mjs` หนึ่งรอบเทียบกับ `SHA256SUMS.txt` ที่โค้ดเวอร์ชันก่อน refactor สร้างไว้: **เหมือนกันไบต์ต่อไบต์** (portable `af09483…`, zip `0d20f5a…`, README `bc2d998…`) และ `sha256sum` ที่คำนวณใหม่จากไฟล์จริงตรงกับที่สคริปต์เขียน · โฟลเดอร์เวอร์ชันอื่น (`Sovereign-OS-1.1.1-win-x64`) ไม่ถูกแตะ
 - **E2E ยืนยันชื่อห้องแบบช่องในรายการ Telegram (10 พ.ย.)** — เพิ่มเคสใน `settings.spec.ts`: payload ที่มี `type: 'channel'` และ chatId ติดลบต้องแสดงชื่อห้อง (`ประกาศกรรมการ`), type และข้อความในแถว — ไม่ใช่เหลือแค่ตัวเลขอย่างก่อนแก้ route — และกดเลือกแล้วช่อง Chat ID ต้องได้ค่าติดลบ · ยัง intercept ที่ชั้นเบราว์เซอร์ (ไม่เรียก Telegram จริง, ไม่แตะ config เครื่อง) · local 8 passed (19.6 วิ)
-- **throttle ของ `/api/telegram/updates` แชร์ข้าม process ผ่าน Postgres (10 พ.ย.)** — ตัวกันกดรัวเดิมเป็น Map ในหน่วยความจำ ⇒ กันได้เฉพาะ process เดียวและหายเมื่อรีสตาร์ท · ย้ายไปตาราง `telegram_updates_slot` (migration `20261110120000_telegram_updates_slot`, 1 แถวต่อผู้ใช้) ตัดสินผ่าน/ไม่ผ่านด้วย `INSERT … ON CONFLICT (user_key) DO UPDATE … WHERE last_hit_at <= cutoff RETURNING last_hit_at` คำสั่งเดียว (atomic — 5 request พร้อมกันผ่านได้ 1 ตามที่ทดสอบกับ Postgres จริง) · เทสต์ route ยังใช้ store ในหน่วยความจำ (`__setUpdatesSlotStore`) จึงไม่ต้องมี DB ตอน unit test · เลือก DB แทน Redis เพราะมีอยู่แล้วทุก deployment ไม่ต้องเพิ่ม infra
-- **กันกดรัว + UI บอกเวลารอเมื่อโดน 429 (10 พ.ย.)** — `GET /api/telegram/updates` ยิง `api.telegram.org/getUpdates` ทุกครั้งที่กด ⇒ เพิ่ม throttle ฝั่ง server ต่อผู้ใช้ (`src/modules/telegram/updates-throttle.ts`, ค่าเริ่มต้น 3 วิ ปรับได้ด้วย `TELEGRAM_UPDATES_MIN_INTERVAL_MS`, ตั้ง 0 = ปิด) ตอบ `429 { retryAfter }` ก่อนออกเน็ต · route ส่ง `retryAfter` ต่อให้ UI ด้วยทั้งกรณี 429 ของเราเองและของ Telegram (อ่าน `parameters.retry_after` หรือ `retry after N` ใน description) · หน้า settings แสดง "เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลังใน N วินาที" แทน error ดิบ (i18n th/en) · เทสต์: unit 11/11 (throttle ผ่าน/บล็อก/พ้นช่วง/แยกคีย์, กดรัวแล้วไม่ยิง Telegram ซ้ำ, retryAfter=12) + E2E 9 passed (29.6 วิ) รวมเคส 429
+- **throttle ของ `/api/telegram/updates` แชร์ข้าม process ผ่าน Postgres (10 พ.ย.)** — ตัวกันกดรัวเดิมเป็น Map ในหน่วยความจำ ⇒ กันได้เฉพาะ process เดียวและหายเมื่อรีสตาร์ท · ย้ายไปตาราง `telegram_updates_slot` (migration `20261110120000_telegram_updates_slot`, 1 แถวต่อผู้ใช้) ตัดสินผ่าน/ไม่ผ่านด้วย `INSERT … ON CONFLICT (user_key) DO UPDATE … WHERE last_hit_at <= cutoff RETURNING last_hit_at` คำสั่งเดียว (atomic — 5 request พร้อมกันผ่านได้ 1 ตามที่ทดสอบกับ Postgres จริง) · เทสต์ route ยังใช้ store ในหน่วยความจำ (`__setUpdatesSlotStore`) จึงไม่ต้องมี DB ตอน unit test · เลือก DB แทน Redis เพราะมีอยู่แล้วทุก deployment ไม่ต้องเพิ่ม infra · ตรวจกับ Postgres จริง (schema ชั่วคราวแล้วลบ): ยิง 5 claim พร้อมกันผ่าน 1, ผู้ใช้อื่นไม่ถูกบล็อก, พ้น 3 วิ ผ่านอีกครั้ง, `TELEGRAM_UPDATES_MIN_INTERVAL_MS=0` ปิดได้ · ยืนยันผ่าน HTTP บน container จริง: call#1 `500` (Telegram 401 จาก token ปลอม) → call#2 `429 retryAfter=2` → รอ 3.2 วิ กลับเป็น `500`
+- **กันกดรัว + UI บอกเวลารอเมื่อโดน 429 (10 พ.ย.)** — `GET /api/telegram/updates` ยิง `api.telegram.org/getUpdates` ทุกครั้งที่กด ⇒ เพิ่ม throttle ฝั่ง server ต่อผู้ใช้ (`src/modules/telegram/updates-throttle.ts`, ค่าเริ่มต้น 3 วิ ปรับได้ด้วย `TELEGRAM_UPDATES_MIN_INTERVAL_MS`, ตั้ง 0 = ปิด) ตอบ `429 { retryAfter }` ก่อนออกเน็ต · route ส่ง `retryAfter` ต่อให้ UI ด้วยทั้งกรณี 429 ของเราเองและของ Telegram (อ่าน `parameters.retry_after` หรือ `retry after N` ใน description) · หน้า settings แสดง "เรียก Telegram บ่อยเกินไป — ลองใหม่ภายหลังใน N วินาที" แทน error ดิบ (i18n th/en) · เทสต์: unit 13/13 (throttle ผ่าน/บล็อก/พ้นช่วง/แยกคีย์, กดรัวแล้วไม่ยิง Telegram ซ้ำ, retryAfter=12, Telegram 401 ยังคง map เป็น 500 ตามเจตนา) + E2E 9 passed (29.6 วิ) รวมเคส 429
 - **เอกสาร** — อัปเดต `CHANGELOG` / `README` / `STATUS` / `QUEUE` ให้ตรงกับสถานะจริง
+
+### ⬆️ อัปเกรดจาก `v1.2.0`
+
+- **ต้องมี migration 1 ตัว** — `20261110120000_telegram_updates_slot` (ตาราง `telegram_updates_slot`, 1 แถวต่อผู้ใช้) ต้องถูก apply ก่อนใช้ throttle ชุดนี้ · ชุดติดตั้ง community รัน `node dist/scripts/migrate-deploy.js` ตอนคอนเทนเนอร์สตาร์ทให้เอง (baseline P3005 ได้ถ้าฐานเก่าไม่มี `_prisma_migrations`) · สแตกที่รัน `docker compose` เอง (เช่น `sovereign-os/infra`) ต้องสั่ง `npx prisma migrate deploy` เอง — ห้าม `db push` (มี gate `tools/test/no-db-push-gate.test.mjs`)
 
 ---
 
