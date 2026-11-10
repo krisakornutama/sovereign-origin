@@ -29,6 +29,11 @@ declare global {
  * 1. Verify JWT and MFA status (production mode only, no dev bypass)
  */
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
+  // Idempotent: a stricter auth step may already have run earlier in the chain
+  // (e.g. the 25 MB body parser for /api/clone/import is mounted behind auth).
+  // Never skip when only a partial token was verified.
+  if (req.user?.mfa_verified) return next();
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing token' });
