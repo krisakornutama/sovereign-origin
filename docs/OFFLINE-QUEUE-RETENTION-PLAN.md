@@ -1,8 +1,9 @@
 # OFFLINE QUEUE — Retention Sweep (P1① — งานต่อจาก P0 user namespace)
 
-> แผนฉบับเทคนิค — อ้างอิงโค้ดจริงบน main `b5675aa` · สถานะ: **โครงร่าง รอเจ้าของอนุมัติก่อนลุยโค้ด**
+> แผนฉบับเทคนิค — อ้างอิงโค้ดจริงบน main `0dcee0f` · สถานะ: **เสร็จแล้ว (implement + tests ผูกใน verify)**
 > ตัดสินจากเจ้าของแล้ว 3 เรื่อง: **เพดานอายุ 30 วัน** · **บันทึก audit ใน IDB store ใหม่ (bump v1→v2)** · **ทริกเกอร์ = บูต + ครั้งแรกที่เปิดหน้า settings**
 > P0 ปิดสมบูรณ์: PR #54 (merge `b5675aa`) — stamp/กรองเจ้าของครบ 6 จุด · legacy = Dormant · งานนี้คือขาจัดการกองพักตามสัญญาในข้อเสนอเดิม
+> **ผลลัพธ์จริง (2026-11-10):** `0dcee0f` — โมดูล pure `queue-retention.ts` (11 เคส) + IDB integration 4 เคส (`offlineQueue.idb.test.ts`) + `QueueRetentionNote` แสดงใน `OfflineQueuePanel` · ผูกเข้า verify ผ่าน `tools/test/frontend-queue-retention*.test.mjs` · `npm run verify` 6/6
 
 ---
 
@@ -27,7 +28,7 @@ P0 ทำให้คิว sticky ตามเจ้าของ — ถูก�
 ## 3. ขอบเขต
 
 ### Sprint นี้ (P1①)
-- รักร้องกำหนดเดิม: เกตเพดานอายุ 30 วันคำนวณจาก queuedAt · sweep เฉพาะอายุเกิน
+- เกณฑ์คงเดิม: เพดานอายุ 30 วันคำนวณจาก queuedAt · sweep เฉพาะอายุเกิน
 - store `audit` ใหม่ (DB version 2) · sweep ลบ = เขียน audit สำเร็จก่อน (write-ahead)
 - โชว์ผลล่าสุดในหน้า settings (บรรทัดเดียว — จำนวน + เวลา)
 - ทริก: บูต (initOfflineQueue) + ครั้งแรกที่เปิดหน้า settings (debounce กันซ้ำ)
@@ -84,7 +85,7 @@ export interface AuditStore {
 ```
 
 ### 4.2 แก้ `src/lib/offlineQueue.ts` (additive — คง signature เดิมทั้งหมด)
-1. **`openDb`** — `indexedDB.open(DB_NAME, 2)` พร้อม `onupgradeneeded`: if-block ของ store `actions` คงเดิมครบ — **สร้าง store `audit` เพิ่มอีกชิ้น** `{ keyPath: 'id', autoIncrement: true }` — การเพิ่ม store ใหม่ตอน upgrade ไม่แตะข้อมูล store เดิมของเครื่องเก่า (IndexedDB ปฏิบัติตามเงื่อนไขตัวเดิมโดยตรง · เครื่องที่เคยเปิด v1 แล้วัก進งการ变更สิ่งแวดล้อมอัตโนมัติ)
+1. **`openDb`** — `indexedDB.open(DB_NAME, 2)` พร้อม `onupgradeneeded`: if-block ของ store `actions` คงเดิมครบ — **สร้าง store `audit` เพิ่มอีกชิ้น** `{ keyPath: 'id', autoIncrement: true }` — การเพิ่ม store ใหม่ตอน upgrade ไม่แตะข้อมูล store เดิมของเครื่องเก่า (เครื่องที่เคยเปิด v1 จะ upgrade เป็น v2 เองเมื่อเปิดแอปครั้งถัดไป โดยข้อมูลเดิมยังครบ)
 2. **`getAuditStore`** — list/put ผ่าน transaction เหมือน getAllActions/getAllActions รอบเดิม (รักษา pattern `tx.oncomplete = () => db.close()` แบบเดียวกัน)
 3. **`sweepExpiredQueue(): Promise<{ removed: number }>`** — ตัวห่อรวม:
    - `getAllActions()` (แนว flushQueue เดิม) → `splitByAge(all, Date.now(), QUEUE_MAX_AGE_DAYS)`
@@ -107,7 +108,7 @@ export interface AuditStore {
 - **R4** audit สำเร็จ → record เดียว/รอบ · `removedCount` ตรงชุดที่ลบ · รายชื่อ id เป๊ะต้องตรงกันตามลำดับอายุ
 - **R5** sweep ที่ removables ว่าง = ไม่เขียนบันทึก (ไม่เขียนรายการลบเปล่าให้ store โตเปล่า ๆ)
 - **R6** `AUDIT_CAP = 50` · ตัดรายการเก่าทิ้งเกินเพดาน — ยัง **คงลำดับใหม่→เก่า** ของรายการที่เก็บ
-- **R7** คิว "ที่เหลือ" (kept) ลำดับ FIFO คงเดิมรหัสรถเก็ต — เส้น P0 ทั้งหมดยังผ่าน เข้ากันได้
+- **R7** คิว "ที่เหลือ" (kept) ลำดับ FIFO คงเดิมเป๊ะ — เส้น P0 ทั้งหมดยังผ่าน เข้ากันได้
 
 ## 6. Test Cases (red-first)
 
@@ -128,17 +129,16 @@ export interface AuditStore {
 
 ## 7. Manual check บน production (ตบท้าย)
 
-- ถนนสาย normal: ใช้เครื่อง dev ตั้ง IDB ใส่ record อายุ 40 วัน (1 รายการ) + อายุ 1 วัน (3 รายการ) โปร่ง inspect (DevTools → IndexedDB `sovereign-offline` → `actions`) → reload หน้า → badge ลดลงอัตโนมัติ · DevTools ตาราง `audit` ต้องมีรายการเดียว (นับ 1)
-- รายการที่ตรวจตามเส้น 7 (normal path): ใส่ record อายุ 40 วัน (1 รายการ) + อายุ 1 วัน (3 รายการ) ผ่าน DevTools → IndexedDB `sovereign-offline` → `actions` → reload หน้า → badge ลดลงอัตโนมัติ · store `audit` ต้องมีรายการเดียว (removedCount = 1) · คิวใหม่ 3 รายการคงอยู่จน flush ตามปกติ
-- หน้า settings แสดงผล: "เก็บกวาดคิวเกินอายุ 30 วัน · ลบ 1 รายการ" — ปุ่ม sync/ลบปกติยังทำงานได้เหมือนเดิม
+- เส้นปกติ: บนเครื่อง dev ใส่ record อายุ 40 วัน (1 รายการ) + อายุ 1 วัน (3 รายการ) ผ่าน DevTools → IndexedDB `sovereign-offline` → `actions` → reload หน้า → badge ลดลงอัตโนมัติ · store `audit` ต้องมีรายการเดียว (`removedCount = 1`) · คิวใหม่ 3 รายการคงอยู่จน flush ตามปกติ
+- หน้า settings แสดงผล: "เก็บกวาดคิวเกินอายุ 30 วัน · รอบเมื่อ <เวลา> · ลบ 1 รายการ" — ปุ่ม sync/ลบปกติยังทำงานได้เหมือนเดิม
 
 ## 8. ขั้นตอนการนำไปใช้ (ตามกติกา AGENTS)
 
 ```
 1. backup commit ก่อนแก้ (tree สะอาดหลัง docs commit)
 2. git checkout -b ai/queue-retention
-3. red: queue-retention.test.ts (T1-T7) → exit 1 พิสูจน์ก่อนโค้ดจริง
-4. เขียว: queue-retention.ts (pure) + offlineQueue.ts (openDb v2 + sweepExpiredQueue + ทริกบูต) + settings.tsx (ทริก + บรรทัดผล)
+3. red: queue-retention.test.ts (T1-T11) → exit 1 พิสูจน์ก่อนโค้ดจริง
+4. เขียว: queue-retention.ts (pure) + offlineQueue.ts (openDb v2 + sweepExpiredQueue + ทริกบูต) + QueueRetentionNote ใน OfflineQueuePanel (ทริก + บรรทัดผล)
 5. npm run verify ผ่าน 6/6
 6. commit → push → PR → CI เขียว → squash ผ่าน REST API → ลบ branch สองข้าง
 7. regen changelog/status → docs commit ตรง main
