@@ -44,7 +44,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | VAULT-002  | Encrypted index + serialized writes + `verifyAll` + `FileBlobStore` atomic rename    | ROADMAP §6        | done 2026-11-10 | `609d006` · 46 tests                      |
 | VAULT-003  | Snapshot API สำหรับ rule engine (versioned + SHA-256 checksum)                       | ROADMAP §6        | done 2026-11-10 | `609d006` · 46 tests                      |
 | VAULT-004  | Anchor log แบบ hash-chain + pinned root → ตรวจจับ rollback ทั้ง store                | ROADMAP §6 (M2)   | done 2026-11-10 | `8be1fbb` · 64 tests · cov 98.84/97.98/98.78/99.38 |
-| VAULT-005  | ต่อ `saveSnapshot` จริงเข้ากับ `sovereign-rule-engine` (boot → load, รอบ sync → save) | ROADMAP §6        | queued          | —                                         |
+| VAULT-005  | ต่อ snapshot เข้ากับ `sovereign-rule-engine`: boot → load, หลังเปลี่ยน rule/sync → save            | ROADMAP §6        | done 2026-11-10 | PR rule-engine #5 · `157bcb6` · CI `42872531142` |
 | VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | queued          | —                                         |
 | VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | queued          | —                                         |
 | VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | queued          | —                                         |
@@ -133,3 +133,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   ⇒ ใช้ `env.APPDATA`; `batch-codepage` ข้ามเฉพาะ launcher ที่ยังไม่ติดตั้ง (ไฟล์ `tools/*.cmd` ถูก gitignore) แต่ยังบังคับกฎเดิมกับไฟล์ที่มีอยู่;
   `build-node-kit --with-ollama` ข้ามเฉพาะเมื่อไม่มีโฟลเดอร์ `Ollama/` ในเครื่อง — ผลคือ `npm run verify` ผ่านครบ 6/6 ขั้น (9.2 นาที, exit 0),
   tools tests 1369 pass / 0 fail / 20 skipped
+
+- 2026-11-10 — ปิด `VAULT-005` ที่ฝั่ง `sovereign-rule-engine`: `src/persistence/engine-store.ts` เก็บ rule table + `engine.getState()`
+  เป็น snapshot มี version ในตัว ผ่าน key `rule-engine/state`; `captureEngineState`/`applyEngineState` เป็น pure (เทสต์ได้โดยไม่ต้องมี vault),
+  `saveEngineState`/`loadEngineState` รับเฉพาะ `has`/`get`/`put` (structural) ⇒ `Vault` ของ `sovereign-vault` ใช้ได้ทันทีโดยไม่ต้องเพิ่ม dependency
+  (ตัดสินใจไม่ใช้ `file:`/GitHub dependency เพราะ vault ไม่มี `prepare` build และจะทำให้ `npm ci` ของ CI พัง)
