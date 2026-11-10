@@ -134,16 +134,48 @@ export function ensureNodeAccess() {
 
 // Never store secrets in the audit trail – redact any value whose key looks
 // sensitive (password, tokens, MFA secrets, WiFi credentials, ...).
-function sanitizeAuditBody(body: any): any {
-  if (!body || typeof body !== 'object') return body;
-  const sensitivePatterns = ['password', 'pass', 'secret', 'token', 'authorization', 'wifi'];
-  const sanitized: any = {};
-  for (const [key, value] of Object.entries(body)) {
-    sanitized[key] = sensitivePatterns.some((p) => key.toLowerCase().includes(p))
-      ? '[REDACTED]'
-      : value;
+//
+// แก้ 11/11/69: เดิมปิดเฉพาะ key ชั้นบน ⇒ `{user:{password}}` หลุดลง audit_logs
+// เต็ม ๆ (และ array ของบัญชีก็หลุดทั้งชุด) — ตอนนี้ไล่ปิดทุกชั้น + จำกัดขนาด
+// เพราะ body ของ `/api/clone/import` รับได้ถึง 25 MB; เก็บทั้งก้อน = audit_logs บวม
+// และคัดข้อมูลลูกค้าเข้าสายตรวจสอบโดยไม่ตั้งใจ
+const SENSITIVE_KEY_PATTERNS = ['password', 'pass', 'secret', 'token', 'authorization', 'wifi'];
+/** เพดานขนาด body ที่เก็บจริง (byte) — เกินกว่านี้เก็บแค่ "โครง" ไม่เก็บเนื้อ */
+export const MAX_AUDIT_BODY_BYTES = 4096;
+const MAX_AUDIT_DEPTH = 6;
+const MAX_AUDIT_ARRAY_ITEMS = 50;
+
+function redactAuditValue(value: any, depth: number): any {
+  if (value === null || typeof value !== 'object') return value;
+  if (depth >= MAX_AUDIT_DEPTH) return '[TRUNCATED_DEPTH]';
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_AUDIT_ARRAY_ITEMS).map((v) => redactAuditValue(v, depth + 1));
   }
-  return sanitized;
+  const out: Record<string, any> = {};
+  for (const [key, child] of Object.entries(value)) {
+    out[key] = SENSITIVE_KEY_PATTERNS.some((p) => key.toLowerCase().includes(p))
+      ? '[REDACTED]'
+      : redactAuditValue(child, depth + 1);
+  }
+  return out;
+}
+
+export function sanitizeAuditBody(body: any): any {
+  const redacted = redactAuditValue(body, 0);
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(redacted ?? null);
+  } catch {
+    return '[UNSERIALIZABLE]';
+  }
+  const bytes = Buffer.byteLength(serialized, 'utf8');
+  if (bytes <= MAX_AUDIT_BODY_BYTES) return redacted;
+  // เก็บแค่ "ส่ง key อะไรมาบ้าง" — พอสำหรับตรวจย้อนว่ามีการเรียกอะไร ไม่ใช่ก๊อปข้อมูลทั้งก้อน
+  const keys =
+    redacted && typeof redacted === 'object' && !Array.isArray(redacted)
+      ? Object.keys(redacted).slice(0, 20)
+      : [];
+  return { _truncated: true, _bytes: bytes, _keys: keys };
 }
 
 export function auditStateChange(req: Request, res: Response, next: NextFunction) {
