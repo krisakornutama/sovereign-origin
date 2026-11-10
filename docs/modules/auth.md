@@ -22,6 +22,7 @@
 ## ห้ามแตะ / ระวัง
 - `users` เป็นตารางที่ทุกโมดูลอ้าง (FK) — เปลี่ยน schema ต้องคิดข้ามโมดูลเสมอ
 - ห้าม log รหัสผ่าน/MFA secret ลง audit_logs หรือ response
+- **audit body ปิดความลับทุกชั้น + จำกัดขนาด 4 KB** (`sanitizeAuditBody` ใน `auth.middleware.ts`) — key ที่มีคำว่า password/pass/secret/token/authorization/wifi ถูกแทนด้วย `[REDACTED]` แม้ซ้อนใน object/array · body ใหญ่เกินเพดานเก็บแค่ `{_truncated,_bytes,_keys}` (เดิม body 25 MB ของ import ไหลลง audit_logs ทั้งก้อน) — **ห้ามลดเกณฑ์นี้หรือปิดการปิดความลับ** เพื่อความสะดวกในการ debug
 - บัญชี `e2e-bot` ใช้โดยเกต E2E (auth.setup) — ห้ามลบ/เปลี่ยนรหัสโดยไม่แจ้ง
 
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
