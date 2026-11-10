@@ -179,6 +179,50 @@ test('Telegram ตอบ 401 → ตอบ 500 พร้อมสาเหตุ
   }
 });
 
+test('Telegram ตอบ 429 → คืน 429 พร้อมข้อความให้ลองใหม่ ไม่ใช่ 500 เหมือนบั๊กฝั่งเรา', async () => {
+  const getMock = mock.method(axios, 'get', async () => {
+    throw Object.assign(new Error('Request failed with status code 429'), {
+      response: {
+        status: 429,
+        data: { ok: false, error_code: 429, description: 'Too Many Requests: retry after 12' },
+      },
+    });
+  });
+
+  try {
+    const res = await getUpdates();
+    assert.strictEqual(res.status, 429, 'ต้องแยก 429 ของ Telegram ออกจาก 5xx ของเรา');
+    const body = (await res.json()) as { error?: string; chats?: unknown };
+    assert.match(String(body.error), /Too Many Requests/, 'ต้องส่งคำอธิบายจาก Telegram ต่อให้ผู้ใช้');
+    assert.strictEqual(body.chats, undefined, 'ห้ามคืนรายการว่างปนกับ error');
+    assert.strictEqual(getMock.mock.callCount(), 1, 'rate limit = ห้ามยิงซ้ำอัตโนมัติ');
+  } finally {
+    getMock.mock.restore();
+  }
+});
+
+test('result ที่ไม่ใช่ array (หรือไม่มี data) → คืนลิสต์ว่าง ไม่ throw 500', async () => {
+  const cases: unknown[] = [
+    { data: { ok: true, result: { message: { chat: { id: 1 } } } } }, // object เดี่ยว
+    { data: { ok: true, result: 'oops' } },                          // string
+    { data: { ok: true } },                                          // ไม่มี result
+    { data: null },                                                  // response ว่าง
+    {},                                                              // ไม่มี data เลย
+  ];
+
+  for (const payload of cases) {
+    const getMock = mock.method(axios, 'get', async () => payload as any);
+    try {
+      const res = await getUpdates();
+      assert.strictEqual(res.status, 200, `payload ${JSON.stringify(payload)} ต้องไม่ทำให้ route ล้ม`);
+      const body = (await res.json()) as { chats: unknown[] };
+      assert.deepStrictEqual(body.chats, [], 'รูปผลผิด → ถือว่าไม่มีแชท (ให้ผู้ใช้กดใหม่)');
+    } finally {
+      getMock.mock.restore();
+    }
+  }
+});
+
 test('ยังไม่มี bot token → 400 บอกให้ตั้ง token ก่อน (ไม่ยิง outbound เลย)', async () => {
   const saved = process.env.TELEGRAM_BOT_TOKEN;
   delete process.env.TELEGRAM_BOT_TOKEN;

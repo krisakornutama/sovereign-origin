@@ -238,7 +238,11 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res
     const r = await axios.get(`https://api.telegram.org/bot${creds.botToken}/getUpdates`, { timeout: 8000 });
     // ⚠ ต้องอ่าน chat จาก channel_post ด้วย ไม่ใช่แค่ message: โพสต์ในช่องไม่มี `message`
     //   เดิม title ของโพสต์ในช่องจึงว่างเสมอ (เจอตอนเขียน unit test 10 พ.ย. 69) แม้ chat_id/type จะถูก
-    const chats = ((r.data?.result as any[]) || []).map((u: any) => {
+    // `result` ต้องเป็น array ตามสัญญา getUpdates แต่ถ้า Telegram/admin ปั้นรูปอื่นมา
+    // (object เดี่ยว, string, ไม่มี result) ต้องถือว่า "ยังไม่มีแชท" ไม่ใช่ปล่อยให้ .map โยน 500
+    const raw = (r.data as { result?: unknown } | undefined)?.result;
+    const updates = Array.isArray(raw) ? raw : [];
+    const chats = updates.map((u: any) => {
       const chat = u.message?.chat ?? u.channel_post?.chat ?? null;
       return {
         chatId: String(chat?.id || ''),
@@ -252,7 +256,12 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (_req, res
     const uniq = chats.filter((c: any) => !seen.has(c.chatId) && seen.add(c.chatId));
     res.json({ chats: uniq.slice(0, 10) });
   } catch (e: any) {
-    res.status(500).json({ error: e.message || 'getUpdates failed' });
+    // 429 มาจาก Telegram (rate limit) ไม่ใช่บั๊กของเรา — ส่งสถานะเดิมต่อให้ UI บอก "ลองใหม่ภายหลัง"
+    // ⚠ ไม่ส่ง 401 ของ Telegram กลับเป็น 401 ของเรา: authFetch ฝั่งเว็บถือ 401 = session หมดอายุ แล้วเด้งออกจากระบบ
+    const upstream = e?.response?.status;
+    const described = e?.response?.data?.description;
+    const message = described ? (upstream ? `Telegram ${upstream}: ${described}` : described) : e?.message || 'getUpdates failed';
+    res.status(upstream === 429 ? 429 : 500).json({ error: message });
   }
 });
 

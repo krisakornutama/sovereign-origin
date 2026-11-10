@@ -270,3 +270,49 @@ test.describe('settings — Telegram ดึง Chat ID อัตโนมัต�
     expect(after, 'การดึง Chat ID ต้องไม่เปลี่ยน config ของเครื่อง').toEqual(before);
   });
 });
+
+// ── Telegram: ห้องที่เป็นช่อง (channel) ต้องมีชื่อห้องในรายการ ──
+// ที่มา: server เคยอ่าน chat จาก `message` เท่านั้น โพสต์ในช่อง (channel_post) จึงได้ title ว่าง
+//   → แถวในหน้านี้เหลือแค่ตัวเลข + type ดูไม่ออกว่าห้องไหน (แก้ที่ route แล้ว + unit test ฝั่ง server)
+// เทสต์นี้ล็อกสัญญาฝั่ง UI: payload ที่ server ส่งมา (chatId/title/type) ต้องถูกแสดงครบ
+//   รวม chatId ติดลบของช่อง และกดเลือกแล้วเติมค่าติดลบได้ถูกต้อง
+// ยัง intercept ที่ชั้นเบราว์เซอร์ ⇒ ไม่มีการเรียก Telegram จริง และไม่แตะ config ของเครื่อง
+test.describe('settings — Telegram รายการห้องแบบช่อง (channel)', () => {
+  test('แถวของช่องแสดงชื่อห้อง (ไม่ใช่แค่ตัวเลข) และเลือกแล้วได้ chatId ติดลบ', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('sovereign-api-url', window.location.origin);
+      } catch {
+        // about:blank — ข้าม
+      }
+    });
+
+    await page.route('**/api/telegram/updates*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          // รูปเดียวกับที่ route คืนหลังแก้: ชื่อห้องมาจาก chat ของ channel_post
+          chats: [{ chatId: '-1001234567890', title: 'ประกาศกรรมการ', type: 'channel', text: 'ข่าวสารประจำวัน' }],
+        }),
+      });
+    });
+
+    await page.goto('/settings/');
+    const section = page.locator('section', { hasText: 'Telegram Alerts' }).first();
+    await expect(section).toBeVisible({ timeout: 30_000 });
+
+    await page.locator('#settings-telegram-bot-token').fill(DUMMY_BOT_TOKEN);
+    await section.getByRole('button', { name: /ดึง Chat ID อัตโนมัติ/ }).click();
+
+    const row = section.getByRole('button', { name: /-1001234567890/ });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    await expect(row, 'ชื่อห้องต้องแสดง ไม่ใช่ปล่อยว่าง').toContainText('ประกาศกรรมการ');
+    await expect(row).toContainText('channel');
+    await expect(row).toContainText('ข่าวสารประจำวัน');
+
+    await row.click();
+    await expect(page.locator('#settings-telegram-chat-id')).toHaveValue('-1001234567890');
+  });
+});
