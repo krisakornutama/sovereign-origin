@@ -111,3 +111,94 @@ test.describe('settings — บันทึกค่าจริงและต�
     expect(after).toMatchObject({ enabled: false, pending: false });
   });
 });
+
+// ── Telegram: บันทึกค่าจริง → ตรวจผ่าน API → คืนค่าเดิมของเครื่อง ──
+// เจตนา: พิสูจน์ว่าปุ่ม "บันทึก" ของ panel Telegram เขียนลง DB จริง (ไม่ใช่แค่แสดงข้อความสำเร็จ)
+// และ **ไม่ทิ้งค่าเทสต์ไว้ในเครื่อง**: จบเทสต์ต้องได้ config เดิมกลับมาเป๊ะ ๆ (source/mask/chatId)
+//
+// ข้อจำกัดที่ต้องออกแบบรับ: API คืน bot token แบบ mask เท่านั้น → ถ้าเครื่องมี override ใน DB อยู่
+// (source='db') เราไม่สามารถเขียน token เดิมกลับได้ ⇒ เคสนั้นทดสอบเฉพาะ chatId (merge เก็บ token เดิมไว้)
+// ส่วนเครื่องที่ยังไม่มี override (env/none) เขียน token ปลอมได้ เพราะล้างด้วย DELETE /config = กลับค่าเดิม
+//
+// ❌ ห้ามกด "ส่งข้อความทดสอบ": จะยิงออก Telegram จริงด้วย credential ของเจ้าของเครื่อง
+const DUMMY_CHAT_ID = '1000000001';
+const DUMMY_BOT_TOKEN = '123456789:AAFakeTokenForE2E2026110900';
+/** จำลอง maskBotToken ของ core-api (4 ตัวหน้า … 4 ตัวท้าย) */
+const maskOf = (t: string) => (t.length <= 8 ? '••••' : `${t.slice(0, 4)}…${t.slice(-4)}`);
+
+type TelegramConfig = { configured: boolean; source: 'env' | 'db' | 'none'; botTokenMasked: string; chatId: string };
+const pickConfig = (c: TelegramConfig) => ({
+  configured: c.configured,
+  source: c.source,
+  botTokenMasked: c.botTokenMasked,
+  chatId: c.chatId,
+});
+
+test.describe('settings — Telegram บันทึกค่าจริงและคืนค่าเดิม', () => {
+  test('บันทึกผ่าน UI → API เห็นค่าใหม่ → คืนค่าเดิมของเครื่อง', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('sovereign-api-url', window.location.origin);
+      } catch {
+        // about:blank — ข้าม
+      }
+    });
+    await page.goto('/settings/');
+    const token = await authToken(page);
+    const headers = { Authorization: `Bearer ${token}` };
+    const configUrl = `${API_BASE}/api/telegram/config`;
+    const readConfig = async (): Promise<TelegramConfig> => (await request.get(configUrl, { headers })).json();
+
+    const probe = await request.get(configUrl, { headers });
+    test.skip(probe.status() === 403, 'บัญชี e2e ไม่ใช่ SUPERADMIN — ตั้งค่า Telegram ไม่ได้');
+    expect(probe.ok(), 'อ่าน /api/telegram/config ต้องได้ 200').toBeTruthy();
+    const before = pickConfig(await probe.json());
+
+    const section = page.locator('section', { hasText: 'Telegram Alerts' }).first();
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    const chatInput = page.locator('#settings-telegram-chat-id');
+    const tokenInput = page.locator('#settings-telegram-bot-token');
+    const saveButton = section.getByRole('button', { name: /^บันทึก$/ });
+    const savedMsg = page.getByText('บันทึก Telegram credentials แล้ว', { exact: false });
+
+    // เครื่องที่มี override ใน DB อยู่ → แตะเฉพาะ chatId (token เดิมไม่ถูกเขียนทับ และกู้กลับได้)
+    const chatIdOnly = before.source === 'db';
+
+    try {
+      await expect(chatInput).toBeVisible();
+      if (!chatIdOnly) await tokenInput.fill(DUMMY_BOT_TOKEN);
+      await chatInput.fill(DUMMY_CHAT_ID);
+      await saveButton.click();
+
+      // ข้อความสำเร็จ = PUT ผ่าน (ถ้า auth/permission พังจะขึ้น error แดงแทน)
+      await expect(savedMsg).toBeVisible({ timeout: 20_000 });
+
+      const afterSave = await readConfig();
+      expect(afterSave.chatId, 'chatId ต้องถูกบันทึกลง DB จริง').toBe(DUMMY_CHAT_ID);
+      if (chatIdOnly) {
+        expect(afterSave.botTokenMasked, 'chatId-only ต้องไม่แตะ token เดิม').toBe(before.botTokenMasked);
+        expect(afterSave.source).toBe('db');
+      } else {
+        expect(afterSave.botTokenMasked, 'token ปลอมต้องเข้า DB (เห็นได้จาก mask)').toBe(maskOf(DUMMY_BOT_TOKEN));
+        expect(afterSave.configured).toBe(true);
+        expect(afterSave.source).toBe('db');
+      }
+
+      // reload = mount ใหม่ทั้งหน้า → ค่าต้องมาจาก API ไม่ใช่ state ที่ค้างใน client
+      await page.reload();
+      await expect(page.locator('#settings-telegram-chat-id')).toHaveValue(DUMMY_CHAT_ID, { timeout: 30_000 });
+    } finally {
+      // คืนค่าเดิมเสมอ
+      if (chatIdOnly) {
+        const res = await request.put(configUrl, { headers, data: { chatId: before.chatId } });
+        expect(res.ok(), 'คืน chatId เดิมต้องสำเร็จ').toBeTruthy();
+      } else {
+        const res = await request.delete(configUrl, { headers });
+        expect(res.ok(), 'ลบ override เพื่อกลับไปใช้ค่าเดิมต้องสำเร็จ').toBeTruthy();
+      }
+      const restored = pickConfig(await readConfig());
+      expect(restored, 'หลังจบเทสต์ config ของเครื่องต้องเหมือนก่อนรันเป๊ะ ๆ').toEqual(before);
+    }
+  });
+});

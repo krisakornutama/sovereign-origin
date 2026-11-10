@@ -3,8 +3,10 @@
 ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
 งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
-> อัปเดตล่าสุด 2026-11-07: ตรวจ image manifest ครบ 6 tag ผ่านทั้งหมด (ดึงได้โดยไม่ล็อกอิน, amd64+arm64)
-> · branch protection เปิดจริง 6 required checks · topics ครบรวม `agpl` · `npm run verify` ผ่าน 6/6
+> อัปเดตล่าสุด 2026-11-09: required checks **8 ตัว** (เพิ่ม `settings-e2e` เป็นด่านบังคับแล้ว · พิสูจน์ด้วย PR #58 ว่า merge ถูกบล็อกจริง)
+> · restore drill รายงานผลใน `machine-health` · E2E settings บันทึก 2FA จริง และ Telegram บันทึก–คืนค่า config เดิม
+> · version `1.2.0` (ยังไม่ push tag ใหม่) · `npm run verify` ผ่าน 6/6
+> · อัปเดต 2026-11-07: ตรวจ image manifest ครบ 6 tag ผ่านทั้งหมด (ดึงได้โดยไม่ล็อกอิน, amd64+arm64) · topics ครบรวม `agpl`
 > · เหลือแค่เจ้าของ rotate token กับโพสต์ Reddit
 
 ---
@@ -15,7 +17,7 @@
 |---|---|
 | Repo visibility | public · license AGPL-3.0 · description "Sovereign Origin — self-sovereign home OS" |
 | Topics | **ครบแล้ว** — self-hosted, iot, mqtt, docker-compose, homelab, typescript, nextjs, postgresql, agpl |
-| Branch protection `main` | **เปิดแล้ว** — required checks 7 ตัว (ชื่อ job ล้วน): `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate` |
+| Branch protection `main` | **เปิดแล้ว** — required checks 8 ตัว (ชื่อ job ล้วน): `audit`, `size`, `publish`, `test (ubuntu-latest)`, `test (windows-latest)`, `test-db`, `arch-gate`, `settings-e2e` · strict = true · enforce_admins = false · ยืนยันจาก API 2026-11-09 |
 | Release `v1.2.0` | published (ไม่ใช่ draft) — release note เขียนใหม่แล้ว มีคำสั่ง `docker pull` + บันทึกการเผยแพร่ image |
 | Release note | ระบุว่า `api` เผยแพร่สำเร็จ และ `latest`/`1.2` ของ `web` ถูกย้ายมาชี้ build ล่าสุดแล้ว |
 | Workflow "Publish images (GHCR)" | **เสร็จและเขียว** — run `42338553428` (base `11b07ef`) success 6/6 job ใน ~2 นาที |
