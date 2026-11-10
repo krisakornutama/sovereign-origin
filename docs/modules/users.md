@@ -14,6 +14,12 @@
   (โมดูลนี้ไม่ query ตาราง `fleet_*` เอง) และ bump `token_version` ทุกครั้งที่เปลี่ยนสาขา
 - role ที่รับได้: `SUPERADMIN`, `NODE_ADMIN`, `OPERATOR`, `SYSTEM_AI`, `SITE_ADMIN`
   (`SITE_ADMIN` อ่าน `/api/fleet` ได้อย่างเดียวและเห็นเฉพาะสาขาตัวเอง — ไม่ผูกสาขา = 403)
+- `POST /` (สร้างบัญชี) ต้องตรวจ input **ก่อน** แตะ bcrypt/prisma เพราะ Express 4 ไม่ส่ง error
+  ออกจาก async handler ⇒ สิ่งที่ throw จะกลายเป็น request ที่ **ค้าง** ไม่ใช่ 500
+  - `username` ถูก trim, ต้องไม่ว่างและ ≤ 64 ตัวอักษร · `role` ต้องอยู่ในชุด `VALID_ROLES` (ที่เดียวกับ `PUT`)
+  - `password` ผ่าน `AuthService.validateNewPassword` (8–128 + บล็อกรหัสยอดนิยม) — กฎเดียวกับตอนผู้ใช้ตั้งรหัสเอง
+  - username ซ้ำ = Prisma `P2002` → **409** (ไม่ใช่ 500/ค้าง) · สำเร็จคืน 200 + `{ success, user:{id,username,role} }`
+  - **ห้ามคืน `password_hash` หรือรหัสผ่านจริงใน response** — ใช้ `select` ที่ `create` เสมอ
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
