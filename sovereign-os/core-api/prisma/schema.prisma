@@ -2563,6 +2563,16 @@ model TraceEvent {
 // IDEMPOTENCY (กลาง) — กันงานซ้ำจาก retry/เน็ตหลุด/คิวออฟไลน์
 // 1 แถว = 1 คีย์ของ 1 endpoint scope · เก็บเฉพาะผลสำเร็จไว้ replay ตาม TTL
 // ─────────────────────────────────────────────────────────────────────────────
+// ── throttle ของ GET /api/telegram/updates (10 พ.ย. 69) ─────────────────────
+// 1 แถวต่อผู้ใช้ = เวลาที่ "ยอมให้ยิง getUpdates" ครั้งล่าสุด
+// ใช้ประสานงานข้าม instance (เขียนแบบ atomic ด้วย ON CONFLICT ใน updates-throttle.ts)
+model TelegramUpdatesSlot {
+  userKey   String   @id @map("user_key")
+  lastHitAt DateTime @map("last_hit_at") @db.Timestamptz
+
+  @@map("telegram_updates_slot")
+}
+
 model IdempotencyKey {
   id           String   @id @default(uuid()) @db.Uuid
   scope        String // เช่น "business.order" — กันคีย์ชนกันข้าม endpoint

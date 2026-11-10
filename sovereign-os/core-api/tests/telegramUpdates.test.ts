@@ -5,7 +5,13 @@ import axios from 'axios';
 import { prisma } from '../src/lib/prisma';
 import telegramRoutes from '../src/modules/telegram/telegram.routes';
 import { __resetTelegramCredentialCache } from '../src/services/telegram-credentials.service';
-import { takeUpdatesSlot, __resetUpdatesThrottle } from '../src/modules/telegram/updates-throttle';
+import {
+  takeUpdatesSlot,
+  __resetUpdatesThrottle,
+  __setUpdatesSlotStore,
+  createMemorySlotStore,
+  prismaSlotStore,
+} from '../src/modules/telegram/updates-throttle';
 import { createTestServer, makeToken, mockModel, TestServer } from './helpers';
 
 // GET /api/telegram/updates — ดึง chat ID อัตโนมัติ (ปุ่มในหน้า settings)
@@ -26,8 +32,10 @@ before(async () => {
   adminToken = makeToken('SUPERADMIN');
 });
 
-// throttle ของ route เป็น state ในหน่วยความจำ — แต่ละเคสต้องเริ่มจากศูนย์ ไม่งั้นเคสหลังจะโดน 429 ของเราเอง
-beforeEach(() => __resetUpdatesThrottle());
+// throttle จริงเก็บใน DB (telegram_updates_slot) — เทสต์ route ใช้ store ในหน่วยความจำแทน
+// เพื่อไม่ให้ต้องมี Postgres ตอนรัน unit test · แต่ละเคสต้องเริ่มจากศูนย์ ไม่งั้นเคสหลังจะโดน 429 ของเราเอง
+__setUpdatesSlotStore(createMemorySlotStore());
+beforeEach(async () => { await __resetUpdatesThrottle(); });
 
 after(async () => {
   mock.restoreAll();
@@ -217,7 +225,7 @@ test('result ที่ไม่ใช่ array (หรือไม่มี data
 
   for (const payload of cases) {
     // แต่ละ payload = การกดครั้งใหม่ของผู้ใช้ → ต้องไม่ติด throttle ของเคสก่อนในลูป
-    __resetUpdatesThrottle();
+    await __resetUpdatesThrottle();
     const getMock = mock.method(axios, 'get', async () => payload as any);
     try {
       const res = await getUpdates();
@@ -250,19 +258,55 @@ test('กดดึง Chat ID รัว ๆ → ครั้งที่สอ�
   }
 });
 
-test('throttle ปล่อยผ่านอีกครั้งเมื่อพ้นช่วงขั้นต่ำ และแยกคีย์ต่อผู้ใช้', () => {
+test('throttle ปล่อยผ่านอีกครั้งเมื่อพ้นช่วงขั้นต่ำ และแยกคีย์ต่อผู้ใช้', async () => {
   const t0 = 1_000_000;
-  assert.deepStrictEqual(takeUpdatesSlot('user-a', t0), { allowed: true, retryAfter: 0 });
+  assert.deepStrictEqual(await takeUpdatesSlot('user-a', t0), { allowed: true, retryAfter: 0 });
 
-  const blocked = takeUpdatesSlot('user-a', t0 + 500);
+  const blocked = await takeUpdatesSlot('user-a', t0 + 500);
   assert.strictEqual(blocked.allowed, false);
   assert.ok(blocked.retryAfter >= 1);
 
   // ผู้ใช้อื่นไม่ควรโดนผลของคนแรก
-  assert.deepStrictEqual(takeUpdatesSlot('user-b', t0 + 500), { allowed: true, retryAfter: 0 });
+  assert.deepStrictEqual(await takeUpdatesSlot('user-b', t0 + 500), { allowed: true, retryAfter: 0 });
 
   // พ้นช่วงขั้นต่ำแล้วกลับมาใช้ได้ (route ใช้ค่า default 3 วิ)
-  assert.deepStrictEqual(takeUpdatesSlot('user-a', t0 + 3000), { allowed: true, retryAfter: 0 });
+  assert.deepStrictEqual(await takeUpdatesSlot('user-a', t0 + 3000), { allowed: true, retryAfter: 0 });
+});
+
+// ── store ที่ใช้จริง (DB) — ต้องกันข้าม process ด้วยคำสั่งเดียว ──
+// mock prisma.$queryRaw เพื่อดูลำดับคำสั่ง/ค่า retryAfter โดยไม่ต้องมี Postgres
+test('store DB: จองสิทธิ์ด้วย INSERT … ON CONFLICT … RETURNING คำสั่งเดียว (atomic)', async () => {
+  const t0 = 1_700_000_000_000;
+  const raw = mock.method(prisma as any, '$queryRaw', async () => [{ last_hit_at: new Date(t0) }] as any);
+  try {
+    assert.deepStrictEqual(await prismaSlotStore.claim('user-a', t0, 3000), { allowed: true, retryAfter: 0 });
+    assert.strictEqual(raw.mock.callCount(), 1, 'ทางที่ผ่านต้องจบในคำสั่งเดียว (ไม่มี read-modify-write ให้แข่งกัน)');
+    const sql = String((raw.mock.calls[0].arguments as any[])[0].join('?'));
+    assert.match(sql, /INSERT INTO telegram_updates_slot/);
+    assert.match(sql, /ON CONFLICT \(user_key\) DO UPDATE/, 'ต้องใช้ ON CONFLICT เพื่อความ atomic ข้าม process');
+    assert.match(sql, /WHERE telegram_updates_slot\.last_hit_at <=/, 'เงื่อนไขเวลาต้องอยู่ที่ WHERE ของ DO UPDATE');
+    assert.match(sql, /RETURNING last_hit_at/);
+    // คีย์ถูกส่งเป็น bind parameter ไม่ต่อสตริงเอง
+    assert.ok((raw.mock.calls[0].arguments as any[]).includes('user-a'));
+  } finally {
+    raw.mock.restore();
+  }
+});
+
+test('store DB: ถูกบล็อก → อ่านค่าเดิมแล้วคืนวินาทีที่ต้องรอ (ปัดขึ้น)', async () => {
+  const t0 = 1_700_000_000_000;
+  const hitAt = t0 - 2000; // ผ่านมา 2 วิ จากหน้าต่าง 3 วิ → เหลือ ~1 วิ
+  let call = 0;
+  const raw = mock.method(prisma as any, '$queryRaw', async () => {
+    call += 1;
+    return (call === 1 ? [] : [{ last_hit_at: new Date(hitAt) }]) as any;
+  });
+  try {
+    assert.deepStrictEqual(await prismaSlotStore.claim('user-a', t0, 3000), { allowed: false, retryAfter: 1 });
+    assert.strictEqual(call, 2, 'ทางที่ถูกบล็อกอ่านค่าเดิมหนึ่งครั้งเพื่อบอกเวลารอ');
+  } finally {
+    raw.mock.restore();
+  }
 });
 
 test('ยังไม่มี bot token → 400 บอกให้ตั้ง token ก่อน (ไม่ยิง outbound เลย)', async () => {

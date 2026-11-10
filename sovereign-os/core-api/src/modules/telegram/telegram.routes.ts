@@ -238,7 +238,7 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (req, res)
 
   // กันกดรัว: getUpdates มีโควตาของ Telegram เอง — ยิงถี่เกินไปจะโดน 429/จำกัดชั่วคราว
   // กันที่ฝั่งเรา (ต่อผู้ใช้) ก่อนออกเน็ต เพื่อไม่ให้เสียงโควตาไปกับการกดซ้ำของผู้ใช้คนเดียว
-  const slot = takeUpdatesSlot(req.user?.id ?? 'anonymous');
+  const slot = await takeUpdatesSlot(req.user?.id ?? 'anonymous');
   if (!slot.allowed) {
     return res.status(429).json({
       error: `เรียกบ่อยเกินไป — ลองใหม่ภายหลังใน ${slot.retryAfter} วินาที`,
