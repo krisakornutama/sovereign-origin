@@ -200,3 +200,24 @@ ledger, backup ทั้งหมดต้องพึ่งชั้นนี�
 
 เหตุผล: vault ปลดล็อกทุกอย่าง; attest ทำให้ของที่โหลดเข้ามาเชื่อถือได้; agents ต้องมีทั้ง vault และ attest;
 fabric ต้องมี identity + vault; energy/succession เป็น use case ที่พิสูจน์ว่าทั้ง stack ทำงานจริง
+
+---
+
+## 10. บันทึกความคืบหน้า (append-only — ห้ามลบ)
+
+ส่วนนี้เป็น log ต่อท้ายเท่านั้น: บันทึกว่า milestone ไหนปิดแล้วด้วยหลักฐานอะไร
+รายละเอียดคิวและงานที่ยังเปิดอยู่ดูที่ [`LIVING-QUEUE.md`](./LIVING-QUEUE.md)
+
+### 2026-11-10 — `sovereign-vault` M1 + M2
+
+- **M1 (VAULT-001–003)**: envelope v1 (AES-256-GCM ต่อ object, HKDF-SHA256, AAD = header ‖ key),
+  encrypted index + serialized writes, `verifyAll`, `FileBlobStore` atomic rename,
+  snapshot API (versioned + checksum) สำหรับ state ของ rule engine
+  → repo <https://github.com/krisakornutama/sovereign-vault> commit `609d006` · CI `42628286788` เขียว (Node 20/22)
+- **M2 (VAULT-004)**: anchor log แบบ hash-chain (`MemoryAnchorLog` / `BlobAnchorLog`) + `expectedRoot` pin
+  → ตรวจจับการถอย store ทั้งชุดด้วย `VaultRollbackError`; 64 tests, coverage 98.84/97.98/98.78/99.38
+  → commit `8be1fbb`
+- **ข้อจำกัดที่ยังเปิด**: anchor เป็น checkpoint ที่เรียกเอง; ถ้าไม่มี anchor/pin ที่เก็บนอก vault
+  ยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้ · group key/rotation = M3 (`VAULT-006`)
+- **งานถัดไปที่ผูกไว้แล้ว**: `VAULT-005` ต่อ `saveSnapshot` เข้า `sovereign-rule-engine`,
+  `VAULT-007` anchor checkpoint อัตโนมัติ (nightly)

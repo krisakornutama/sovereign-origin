@@ -104,3 +104,17 @@ done; done
 - `jq` ไม่มีในเครื่องนี้ · python console เป็น cp1252 (พิมพ์ไทยแล้ว `UnicodeEncodeError`) → ใช้ `node -e` กับ JSON แทน
 - `str_replace` ต้องใช้ absolute path (`E:\My work\Project Sovereign Origin\...`) เพราะ project root ของเซสชันคือ `Sovereign Guard Temp`
 - ประวัติคิวงานเก่าอยู่ที่ `QUEUE-ARCHIVE.md`
+
+---
+
+## คิวงานถาวร (LIVING QUEUE) — ตั้งแต่ 2026-11-10
+
+คิว Reddit ในไฟล์นี้ยังคงอยู่แบบห้ามลบ แต่ **งานใหม่ทั้งหมดให้บันทึกที่
+[`docs/LIVING-QUEUE.md`](./LIVING-QUEUE.md)** ซึ่งเป็นคิวถาวรแบบ append-only
+(กฎอยู่ใน `AGENTS.md` ข้อ 9) — ห้ามลบ entry, ทุกงานมี ID + ที่มา + หลักฐาน commit/CI
+
+สิ่งที่เริ่มแล้วในคิวใหม่:
+
+- `VAULT-001`–`VAULT-004`: `sovereign-vault` M1 (envelope + index + snapshots) และ M2 (anchor log + pinned root)
+  → <https://github.com/krisakornutama/sovereign-vault> (`609d006`, `8be1fbb`)
+- เอกสารประกอบ: [`docs/SOVEREIGN-VAULT.md`](./docs/SOVEREIGN-VAULT.md)
