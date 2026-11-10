@@ -46,7 +46,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | VAULT-004  | Anchor log แบบ hash-chain + pinned root → ตรวจจับ rollback ทั้ง store                | ROADMAP §6 (M2)   | done 2026-11-10 | `8be1fbb` · 64 tests · cov 98.84/97.98/98.78/99.38 |
 | VAULT-005  | ต่อ snapshot เข้ากับ `sovereign-rule-engine`: boot → load, หลังเปลี่ยน rule/sync → save            | ROADMAP §6        | done 2026-11-10 | PR rule-engine #5 · `157bcb6` · CI `42872531142` |
 | VAULT-006  | Group key: หลายอุปกรณ์ใช้ vault เดียวกัน, rotation + revocation                     | ROADMAP §6 (M3)   | queued          | —                                         |
-| VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | queued          | —                                         |
+| VAULT-007  | Anchor checkpoint อัตโนมัติ (nightly task เขียน root ลง log นอก store)               | VAULT-004 ต่อยอด  | done 2026-11-10 | PR vault #1 · `00dce9f` · CI `42876459888` |
 | VAULT-008  | Streaming/CHUNK envelope สำหรับไฟล์ใหญ่ (>64 MiB) แบบไม่โหลดทั้งก้อน               | ROADMAP §6        | queued          | —                                         |
 
 **ข้อจำกัดที่ยังเปิดอยู่ (ห้ามลบ):** anchor เป็น checkpoint ที่เรียกเอง ไม่ได้ผูกทุก `put`; ถ้าไม่มี anchor หรือ pin ที่เก็บนอก vault จะยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้
@@ -138,3 +138,9 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   เป็น snapshot มี version ในตัว ผ่าน key `rule-engine/state`; `captureEngineState`/`applyEngineState` เป็น pure (เทสต์ได้โดยไม่ต้องมี vault),
   `saveEngineState`/`loadEngineState` รับเฉพาะ `has`/`get`/`put` (structural) ⇒ `Vault` ของ `sovereign-vault` ใช้ได้ทันทีโดยไม่ต้องเพิ่ม dependency
   (ตัดสินใจไม่ใช้ `file:`/GitHub dependency เพราะ vault ไม่มี `prepare` build และจะทำให้ `npm ci` ของ CI พัง)
+
+- 2026-11-10 — ปิด `VAULT-007` ที่ฝั่ง `sovereign-vault` (`0.3.0`): `checkpointAnchor(vault, log, { maxAgeMs?, now? })`
+  เป็น helper ที่ไม่ถือ timer เอง — scheduler (Task Scheduler/cron) เรียกได้บ่อยเท่าที่ต้องการ,
+  append เฉพาะเมื่อ root เปลี่ยนหรือ head เก่ากว่า `maxAgeMs` (default 20h) ⇒ รันซ้ำ/รันช้าไม่ทำให้ chain แตก,
+  `maxAgeMs` ที่ผิดรูป (ติดลบ/NaN) โยน `RangeError` แทนการเขียน anchor เงียบ ๆ; ข้อจำกัด: ไม่มี cross-process lock
+  (สองรอบพร้อมกันจะได้สอง entry ที่ถูกต้องทั้งคู่) — ใช้ scheduler ตัวเดียวต่อ anchor log, 70 tests
