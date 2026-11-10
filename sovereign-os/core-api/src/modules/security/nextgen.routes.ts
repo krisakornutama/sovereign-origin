@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
+import { verifyJwt } from '../../lib/jwt-verify';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { getSessionUser } from '../../services/auth.service';
 import { threatIntel } from '../../services/threat-intel.service';
@@ -336,7 +336,7 @@ export async function securityEventsSse(req: any, res: any) {
   let user: { id: string; role: string; mfa_verified: boolean } | null = null;
   let decoded: any;
   try {
-    decoded = jwt.verify(token, config.jwtSecret) as any;
+    decoded = verifyJwt(token) as any;
     if (!decoded.mfa_verified) return res.status(403).json({ error: 'MFA verification required' });
     if (!decoded.userId) return res.status(401).json({ error: 'Invalid token' });
   } catch {
