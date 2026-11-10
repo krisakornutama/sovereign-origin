@@ -135,10 +135,15 @@ describe('collectKitFiles — เดินได้จริงและไม�
     );
   });
 
-  test('ไม่มี Ollama เว้นแต่สั่ง --with-ollama', () => {
+  test('ไม่มี Ollama เว้นแต่สั่ง --with-ollama', (t) => {
     const noO = collectKitFiles(REPO, { withOllama: false });
-    const withO = collectKitFiles(REPO, { withOllama: true });
     assert.ok(!noO.files.some((f) => f.rel.startsWith('Ollama/')));
+    // โฟลเดอร์ Ollama (~11 GB) อยู่เฉพาะเครื่องที่เจ้าของเลือกโหลดโมเดล — clone จะไม่มี
+    if (!fs.existsSync(path.join(REPO, 'Ollama'))) {
+      t.skip('เครื่องนี้ไม่มีโฟลเดอร์ Ollama — ทดสอบด้าน "ไม่รวม" ไปแล้ว');
+      return;
+    }
+    const withO = collectKitFiles(REPO, { withOllama: true });
     assert.ok(withO.files.some((f) => f.rel.startsWith('Ollama/')), '--with-ollama ต้องเก็บ Ollama');
   });
 });

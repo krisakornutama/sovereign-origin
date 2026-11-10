@@ -13,6 +13,16 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), (req, res) => {
   }
 });
 
+// GET /api/backup/status – ความสดของ backup ล่าสุด (SUPERADMIN)
+// แยกจาก GET / เพราะตัวเฝ้าระวังต้องถามซ้ำได้โดยไม่ดึงรายการไฟล์ทั้งชุด
+router.get('/status', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+  try {
+    res.json(backupService.status());
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read backup status' });
+  }
+});
+
 // POST /api/backup – สร้าง backup ตอนนี้ (SUPERADMIN เท่านั้น)
 router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
