@@ -94,6 +94,7 @@ import {
   publicMachine,
   requireMachineToken,
   screenshotUpload,
+  machineScopeFor,
 } from './agent-machines.shared';
 import updatesRouter from './agent-machines-updates.routes';
 
@@ -114,9 +115,12 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // GET /api/agent-machines — รายการเครื่องที่ลงทะเบียน (หน้าเว็บใช้วาด)
-router.get('/', authenticate, async (_req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
-    const machines = await listMachines();
+    const allMachines = await listMachines();
+    // SUPERADMIN เห็นทั้งฟลีต (ใช้ผูก/ลงทะเบียนเครื่องใหม่) — role อื่นเห็นเฉพาะเครื่องที่ผูกกับตัวเอง
+    const scope = await machineScopeFor(req.user);
+    const machines = scope ? allMachines.filter((m) => scope.has(m.id)) : allMachines;
     // แนบ IP ที่เห็นล่าสุดจาก heartbeat — หน้า /machine-console ใช้บอกว่าเครื่องอยู่ที่ไหนในวง
     res.json({
       machines: machines.map((m) => {
@@ -197,8 +201,23 @@ router.post('/jobs', authenticate, requireRole('SUPERADMIN'), async (req: Reques
 router.get('/queue', authenticate, async (req: Request, res: Response) => {
   try {
     const limit = Number(req.query.limit ?? 100) || 100;
-    const [jobs, stats] = await Promise.all([listQueue(limit), queueStats()]);
-    res.json({ jobs, stats });
+    const allJobs = await listQueue(limit);
+    // คิวงานผูกกับเครื่อง ⇒ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะงานบนเครื่องของตัวเอง
+    const scope = await machineScopeFor(req.user);
+    if (!scope) {
+      const stats = await queueStats();
+      return res.json({ jobs: allJobs, stats });
+    }
+    const jobs = allJobs.filter((j) => j.machineId && scope.has(j.machineId));
+    const stats = { queued: 0, running: 0, awaitingApproval: 0, done: 0, error: 0, total: jobs.length };
+    for (const j of jobs) {
+      if (j.status === 'queued') stats.queued += 1;
+      else if (j.status === 'running') stats.running += 1;
+      else if (j.status === 'awaiting_approval') stats.awaitingApproval += 1;
+      else if (j.status === 'done') stats.done += 1;
+      else if (j.status === 'error') stats.error += 1;
+    }
+    return res.json({ jobs, stats });
   } catch (err) {
     console.error('GET /api/agent-machines/queue error:', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'Failed to load queue' });

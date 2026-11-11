@@ -13,6 +13,7 @@
         {
           "type": "list",
           "items": [
+            "จำกัดรายการเครื่อง/คิวงานตามเจ้าของ — GET /api/agent-machines และ /queue เคยคืนทุกเครื่อง (พร้อม IP) และทุกงานของทั้งฟลีตให้ทุก role ที่ล็อกอิน · ตอนนี้ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะเครื่องที่ผูกกับตัวเองและงานบนเครื่องนั้น (SUPERADMIN ยังเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่) · เทสต์ agentMachinesFleetScope ผ่าน",
             "ปิด SSRF ที่ตัวนำเข้าเว็บของ Knowledge — POST /api/knowledge/import ยิง URL ที่ผู้ใช้ส่งไปตรง ๆ ทำให้สั่งเซิร์ฟเวอร์อ่าน API ภายใน/metadata ได้ · ตอนนี้ใช้ outbound-url-guard ตัวเดียวกับ vision: ปฏิเสธ loopback/link-local/URL ที่ฝังรหัสผ่าน, ตรวจ IP ที่ resolve จริง (กัน DNS rebinding), ไม่ตาม redirect, จำกัดขนาด 8 MB · เทสต์ knowledgeImportSsrf ผ่าน",
             "ปิดการเปิดภาพหน้าจอข้ามเครื่อง — GET /api/agent-machines/screenshots/:file ตรวจแค่ว่าล็อกอิน ทำให้ผู้ใช้ที่ไม่ได้ผูกเครื่องเปิดภาพจบงานของเครื่องคนอื่นได้ · ตอนนี้ดึง jobId จากชื่อไฟล์ → ตรวจเจ้าของเครื่องด้วย userCanControl() (ไม่ตรงรูปแบบ/ไม่พบงาน/ไม่ได้ผูก = 403) · เทสต์ agentMachinesRoutes ผ่านครบ",
             "ปิดประตู OTA ที่เปิดโล่ง — GET /api/ota/firmwares/:file เดิมเปิดให้ใครก็ได้เมื่อไม่ได้ตั้ง OTA_TOKEN และเทียบ token ด้วย !==; ตอนนี้เทียบแบบคงเวลา และถ้าไม่ตั้ง token จะเปิดเฉพาะ peer ในวง LAN/loopback · POST /api/ota/deploy ปฏิเสธ OTA_BASE_URL ที่เป็น http ไปยัง host สาธารณะ (อุปกรณ์ตรวจลายเซ็นไม่ได้ ⇒ บนเส้นทางสลับไฟล์ได้) · เทสต์ tests/otaAccess.test.ts 4/4",
