@@ -9,7 +9,14 @@
       "dateLabel": "",
       "released": false,
       "ref": "",
-      "summary": [],
+      "summary": [
+        {
+          "type": "list",
+          "items": [
+            "ปิดช่องควบคุมเครื่องข้ามเจ้าของ (Socket.IO) — control:join ตรวจแค่ role ทำให้ SUPERADMIN ที่ไม่ได้ผูกเครื่องเข้าห้อง รับภาพจอ และสั่งเมาส์/คีย์บอร์ด/ไฟล์ได้ (HTTP counterparts ตรวจ userCanControl() อยู่แล้ว) · ตอนนี้ join ต้องผ่าน userCanControl() และ control:fs/control:snapshot/control:fps บังคับให้ join ก่อน · เทสต์ socket 17/17"
+          ]
+        }
+      ],
       "sections": []
     },
     {
