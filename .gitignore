@@ -152,6 +152,7 @@ tools/*
 !tools/status-doc.mjs
 !tools/stage-release.mjs
 !tools/release-build.mjs
+!tools/release-check.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md
 !tools/test/

@@ -17,6 +17,7 @@
     "clean:logs": "node tools/clean-logs.mjs",
     "preview:stack": "node tools/preview-stack.mjs",
     "preview:check": "node tools/preview-stack.mjs --check",
-    "stage:release": "node tools/stage-release.mjs"
+    "stage:release": "node tools/stage-release.mjs",
+    "release:check": "node tools/release-check.mjs"
   }
 }
