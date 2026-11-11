@@ -71,8 +71,13 @@ test('download: รับ token ทาง header และยังรับท�
   });
   assert.equal(viaHeader.status, 200);
 
+  const blockedQuery = await fetch(`${server.baseUrl}/api/ota/firmwares/esp32_v1.2.bin?token=${TOKEN}`);
+  assert.equal(blockedQuery.status, 401, 'ค่าเริ่มต้นต้องไม่รับ token จาก URL');
+
+  process.env.OTA_ALLOW_QUERY_TOKEN = '1';
   const viaQuery = await fetch(`${server.baseUrl}/api/ota/firmwares/esp32_v1.2.bin?token=${TOKEN}`);
-  assert.equal(viaQuery.status, 200, 'อุปกรณ์รุ่นเดิมที่ส่ง token ทาง query ต้องยังอัปเดตได้');
+  assert.equal(viaQuery.status, 200, 'เปิดสวิตช์แล้วอุปกรณ์รุ่นเดิมต้องอัปเดตได้');
+  delete process.env.OTA_ALLOW_QUERY_TOKEN;
 
   const wrong = await fetch(`${server.baseUrl}/api/ota/firmwares/esp32_v1.2.bin`, {
     headers: { 'x-ota-token': 'wrong' },

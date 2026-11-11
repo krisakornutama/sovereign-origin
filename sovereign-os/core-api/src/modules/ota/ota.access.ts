@@ -68,3 +68,28 @@ export function checkDeployBaseUrl(baseUrl: string): DeployUrlCheck {
     reason: 'http ไปยัง host สาธารณะไม่ได้ — token และเฟิร์มแวร์จะวิ่งแบบอ่านได้กลางทาง; ใช้วงภายในหรือ https',
   };
 }
+
+/** อ่านสวิตช์ OTA_ALLOW_QUERY_TOKEN — เปิดเฉพาะค่าที่ชัดเจน ค่าอื่น/ไม่ตั้ง = ปิด (fail closed) */
+export function parseAllowQueryToken(raw: string | null | undefined): boolean {
+  const value = (raw ?? '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(value);
+}
+
+/**
+ * เลือก token ที่จะใช้ตรวจการดาวน์โหลด
+ *
+ * - header มาก่อนเสมอ (ไม่ติด log/ประวัติ URL)
+ * - query ใช้ได้เฉพาะเมื่อผู้ดูแลเปิดสวิตช์ชั่วคราวให้อุปกรณ์รุ่นเดิม
+ * - ไม่มีทางได้ token ⇒ null (ผู้เรียกตอบ 401)
+ */
+export function resolveDownloadToken(input: {
+  headerToken: unknown;
+  queryToken: unknown;
+  allowQueryToken: boolean;
+}): string | null {
+  const header = typeof input.headerToken === 'string' ? input.headerToken.trim() : '';
+  if (header) return header;
+  if (!input.allowQueryToken) return null;
+  const query = typeof input.queryToken === 'string' ? input.queryToken.trim() : '';
+  return query || null;
+}

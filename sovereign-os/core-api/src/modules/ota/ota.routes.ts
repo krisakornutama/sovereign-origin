@@ -4,7 +4,7 @@ import path from 'path';
 import mqtt from 'mqtt';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { checkDeployBaseUrl, isDownloadAllowed } from './ota.access';
+import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
 
 export { prisma };
 
@@ -86,9 +86,13 @@ router.get('/firmwares/:file', (req, res) => {
 
   // ด่านที่แท้จริงอยู่ที่ ota.access.ts: ตั้ง token → ต้องส่งให้ตรง (เทียบแบบคงเวลา);
   // ไม่ตั้ง token → เปิดเฉพาะ peer ในวงภายใน เพื่อไม่ให้ทั้งอินเทอร์เน็ตดึงเฟิร์มแวร์ได้
-  // รับ token ทาง header ก่อน (?token= ยังรับไว้ให้อุปกรณ์รุ่นเดิมที่ฝังมาแล้ว)
-  // header ไม่ติดไปใน access log ของ proxy และไม่ค้างในประวัติ URL
-  const providedToken = req.get('x-ota-token') || req.query.token;
+  // token ทาง header เท่านั้น (ค่าเริ่มต้น) — ?token= ต้องเปิดสวิตช์ชั่วคราวก่อน
+  // เพราะ token ใน URL ติดไปใน access log ของ proxy และค้างในประวัติ
+  const providedToken = resolveDownloadToken({
+    headerToken: req.get('x-ota-token'),
+    queryToken: req.query.token,
+    allowQueryToken: parseAllowQueryToken(process.env.OTA_ALLOW_QUERY_TOKEN),
+  });
   const allowed = isDownloadAllowed({
     peer: req.socket?.remoteAddress,
     configuredToken: OTA_TOKEN,
@@ -96,7 +100,10 @@ router.get('/firmwares/:file', (req, res) => {
   });
   if (!allowed) {
     return OTA_TOKEN
-      ? res.status(401).json({ error: 'Invalid token' })
+      ? res.status(401).json({
+          error: 'Invalid token',
+          hint: 'ส่ง token ทาง header x-ota-token (อุปกรณ์รุ่นเดิมที่ส่ง ?token= ต้องเปิด OTA_ALLOW_QUERY_TOKEN=1 ชั่วคราว)',
+        })
       : res.status(403).json({
           error: 'Downloads are limited to the local network',
           hint: 'ตั้ง OTA_TOKEN ถ้าอุปกรณ์ต้องโหลดจากนอกวง หรือเรียกผ่าน host ในวง LAN',
