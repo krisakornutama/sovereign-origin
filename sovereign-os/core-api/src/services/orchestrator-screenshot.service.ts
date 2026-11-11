@@ -28,6 +28,15 @@ export function screenshotDir(): string {
 /** นามสกุลที่ยอมรับ (คู่กับ harden-upload IMAGE_EXTS ฝั่ง route) */
 const ALLOWED_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
+/**
+ * ดึง jobId จากชื่อไฟล์ที่ service นี้สร้างเอง (รูปแบบ job-<jobId>-<เวลา>-<สุ่ม8>.png)
+ * คืน null เมื่อไม่ตรงรูปแบบ — ผู้เรียกต้องถือว่า "ไม่รู้ว่าเป็นของใคร" = ปฏิเสธ
+ */
+export function jobIdFromScreenshotFile(name: string): string | null {
+  const m = /^job-(.+?)-\d{10,16}-[0-9a-f]{8}\.(?:png|jpe?g|webp)$/i.exec(String(name || ''));
+  return m ? m[1] : null;
+}
+
 /** URL ภายในที่หน้าเว็บใช้เรียกภาพ (relative — authFetch เติม origin ให้เอง) */
 export function screenshotUrlFor(filename: string): string {
   return `/api/agent-machines/screenshots/${filename}`;
