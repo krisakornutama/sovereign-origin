@@ -10,6 +10,12 @@
 
 ---
 
+## [v1.3.2] — 2026-11-11 (released)
+
+### 🔧 แก้ของที่ปล่อย v1.3.1
+
+- **`SHA256SUMS.txt` ตรวจไฟล์ที่ปล่อยได้จริง** — เดิม manifest เขียนชื่อ `Sovereign OS-<ver>-win.zip` (เว้นวรรค) แต่ GitHub เก็บ asset เป็น `Sovereign.OS-<ver>-win.zip` ทำให้ `sha256sum -c` ล้มทั้งที่เนื้อไฟล์ถูก (hash ตรง) · ตอนนี้ตั้งชื่อด้วย `githubAssetName()` ก่อนคัดลอก/เขียน manifest ⇒ ชื่อไฟล์ที่ stage = ชื่อ asset ที่ปล่อย = ชื่อใน checksum · เทสต์ `release-asset-names` 2/2 และ `release-build` 11/11
+
 ## [v1.3.1] — 2026-11-11 (released)
 
 ### 🔒 ความปลอดภัยและความถูกต้องของข้อมูล (patch)
