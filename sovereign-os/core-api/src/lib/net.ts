@@ -64,3 +64,31 @@ export function isLoopbackClient(req: Request, trustProxy: TrustProxySetting): b
   if (trustProxy !== false) return false;
   return isLoopbackPeer(req.socket?.remoteAddress);
 }
+
+/**
+ * ที่อยู่วงภายใน (LAN / link-local / ULA) หรือไม่ — ใช้เป็นด่าน "อนุญาตเฉพาะในบ้าน"
+ *
+ * ใช้คู่กับ isLoopbackPeer สำหรับ endpoint ที่อุปกรณ์ในบ้านต้องเรียกเองโดยไม่ต้องมี token
+ * รับเฉพาะรูปแบบที่เขียนชัดเจน: IPv4 สี่ช่วง 0–255 หรือ IPv6 (ไม่รองรับ hostname)
+ */
+export function isPrivatePeer(raw: string | null | undefined): boolean {
+  const address = normalizePeerAddress(raw);
+  if (!address) return false;
+  if (isLoopbackPeer(address)) return true;
+
+  // IPv6: fe80::/10 (link-local) และ fc00::/7 (ULA)
+  if (address.includes(':')) {
+    return /^fe[89ab][0-9a-f]:/.test(address) || /^f[cd][0-9a-f]{2}:/.test(address);
+  }
+
+  const parts = address.split('.');
+  if (parts.length !== 4) return false;
+  const octets = parts.map((p) => (/^\d{1,3}$/.test(p) ? Number(p) : NaN));
+  if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a, b] = octets;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  return false;
+}

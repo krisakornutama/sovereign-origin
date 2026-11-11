@@ -4,6 +4,7 @@ import path from 'path';
 import mqtt from 'mqtt';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { checkDeployBaseUrl, isDownloadAllowed } from './ota.access';
 
 export { prisma };
 
@@ -82,7 +83,22 @@ router.post(
 router.get('/firmwares/:file', (req, res) => {
   const file = req.params.file;
   if (!isSafeFileName(file)) return res.status(400).json({ error: 'Invalid file name' });
-  if (OTA_TOKEN && req.query.token !== OTA_TOKEN) return res.status(401).json({ error: 'Invalid token' });
+
+  // ด่านที่แท้จริงอยู่ที่ ota.access.ts: ตั้ง token → ต้องส่งให้ตรง (เทียบแบบคงเวลา);
+  // ไม่ตั้ง token → เปิดเฉพาะ peer ในวงภายใน เพื่อไม่ให้ทั้งอินเทอร์เน็ตดึงเฟิร์มแวร์ได้
+  const allowed = isDownloadAllowed({
+    peer: req.socket?.remoteAddress,
+    configuredToken: OTA_TOKEN,
+    providedToken: req.query.token,
+  });
+  if (!allowed) {
+    return OTA_TOKEN
+      ? res.status(401).json({ error: 'Invalid token' })
+      : res.status(403).json({
+          error: 'Downloads are limited to the local network',
+          hint: 'ตั้ง OTA_TOKEN ถ้าอุปกรณ์ต้องโหลดจากนอกวง หรือเรียกผ่าน host ในวง LAN',
+        });
+  }
 
   const filePath = path.join(OTA_DIR, file);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
@@ -107,6 +123,10 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
     if (!isSafeFileName(String(file || ''))) return res.status(400).json({ error: 'Invalid firmware file' });
     const filePath = path.join(OTA_DIR, String(file));
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Firmware not found' });
+
+    // อุปกรณ์ไม่มีทางตรวจลายเซ็น ⇒ ห้ามให้มันโหลดผ่าน http สาธารณะ (ใครบนเส้นทางก็สลับไฟล์ได้)
+    const urlCheck = checkDeployBaseUrl(OTA_BASE_URL);
+    if (!urlCheck.ok) return res.status(400).json({ error: urlCheck.reason, hint: 'ตั้ง OTA_BASE_URL เป็น https หรือ host ในวง LAN' });
 
     const url = `${OTA_BASE_URL}/api/ota/firmwares/${encodeURIComponent(file)}${OTA_TOKEN ? `?token=${OTA_TOKEN}` : ''}`;
     const topic = `sovereign/${nodeId}/ota/command`;
