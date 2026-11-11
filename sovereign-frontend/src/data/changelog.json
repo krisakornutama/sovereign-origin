@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.1",
+  "currentVersion": "1.3.2",
   "versions": [
     {
       "version": "Unreleased",
@@ -11,6 +11,27 @@
       "ref": "",
       "summary": [],
       "sections": []
+    },
+    {
+      "version": "v1.3.2",
+      "dateISO": "2026-11-11",
+      "dateLabel": "11 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [],
+      "sections": [
+        {
+          "title": "🔧 แก้ของที่ปล่อย v1.3.1",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "SHA256SUMS.txt ตรวจไฟล์ที่ปล่อยได้จริง — เดิม manifest เขียนชื่อ Sovereign OS-<ver>-win.zip (เว้นวรรค) แต่ GitHub เก็บ asset เป็น Sovereign.OS-<ver>-win.zip ทำให้ sha256sum -c ล้มทั้งที่เนื้อไฟล์ถูก (hash ตรง) · ตอนนี้ตั้งชื่อด้วย githubAssetName() ก่อนคัดลอก/เขียน manifest ⇒ ชื่อไฟล์ที่ stage = ชื่อ asset ที่ปล่อย = ชื่อใน checksum · เทสต์ release-asset-names 2/2 และ release-build 11/11"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "version": "v1.3.1",
