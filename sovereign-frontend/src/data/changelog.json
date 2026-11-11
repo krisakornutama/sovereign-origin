@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.0",
+  "currentVersion": "1.3.1",
   "versions": [
     {
       "version": "Unreleased",
@@ -9,25 +9,40 @@
       "dateLabel": "",
       "released": false,
       "ref": "",
-      "summary": [
+      "summary": [],
+      "sections": []
+    },
+    {
+      "version": "v1.3.1",
+      "dateISO": "2026-11-11",
+      "dateLabel": "11 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [],
+      "sections": [
         {
-          "type": "list",
-          "items": [
-            "OTA: รายงานว่าใครยังใช้ ?token= — เพิ่มตัวนับในหน่วยความจำ (ไม่เก็บค่า token, จำกัด 200 รายการ) และ GET /api/ota/legacy-clients (SUPERADMIN) ที่บอก readyToDisable จากหน้าต่าง 24 ชม. เพื่อให้รู้ว่าเมื่อไรลบ OTA_ALLOW_QUERY_TOKEN ได้ · เทสต์ otaLegacyClients ผ่าน",
-            "OTA: ค่าเริ่มต้นไม่รับ token จาก URL — เพิ่ม OTA_ALLOW_QUERY_TOKEN เป็นสวิตช์ชั่วคราวสำหรับอุปกรณ์ที่แฟลชด้วยสัญญาเดิม (เปิดเฉพาะค่า 1/true/yes/on); ไม่ตั้ง = รับเฉพาะ header x-ota-token และตอบ 401 พร้อม hint · เทสต์ otaQueryTokenSwitch ผ่าน",
-            "OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN — /deploy ไม่ฝัง ?token= ใน URL แล้ว (ส่ง x-ota-token ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ GET /ota/events จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ otaDeployToken ผ่าน",
-            "ปิดการดึงงานซ้ำ (double dispatch) — pullJobs() เดิมเปลี่ยนสถานะงานเป็น running ด้วย update ที่ไม่มีเงื่อนไขสถานะ สองคำขอที่ดึงพร้อมกันจึงได้งานเดียวกันไปรันซ้ำ · ตอนนี้จองด้วย updateMany แบบมีเงื่อนไข status=queued และทิ้งงานที่มีคนคว้าไปก่อน · เทสต์ jobPullClaim ผ่าน",
-            "ปิดช่อง upload สองจุด — verifyUploadedContent() เดิมจับแค่ MZ/ELF ทำให้ไฟล์ Mach-O, Java class และ WebAssembly ผ่านด่านได้ · และ knowledge upload (disk mode) ทิ้งไฟล์ค้างเมื่อบันทึก DB ล้ม · ตอนนี้ปฏิเสธ magic ของโค้ดที่รันได้ครบขึ้นและลบไฟล์ทิ้งเมื่อบันทึกไม่สำเร็จ · เทสต์ uploadMagicCleanup ผ่าน",
-            "จำกัดรายการเครื่อง/คิวงานตามเจ้าของ — GET /api/agent-machines และ /queue เคยคืนทุกเครื่อง (พร้อม IP) และทุกงานของทั้งฟลีตให้ทุก role ที่ล็อกอิน · ตอนนี้ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะเครื่องที่ผูกกับตัวเองและงานบนเครื่องนั้น (SUPERADMIN ยังเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่) · เทสต์ agentMachinesFleetScope ผ่าน",
-            "ปิด SSRF ที่ตัวนำเข้าเว็บของ Knowledge — POST /api/knowledge/import ยิง URL ที่ผู้ใช้ส่งไปตรง ๆ ทำให้สั่งเซิร์ฟเวอร์อ่าน API ภายใน/metadata ได้ · ตอนนี้ใช้ outbound-url-guard ตัวเดียวกับ vision: ปฏิเสธ loopback/link-local/URL ที่ฝังรหัสผ่าน, ตรวจ IP ที่ resolve จริง (กัน DNS rebinding), ไม่ตาม redirect, จำกัดขนาด 8 MB · เทสต์ knowledgeImportSsrf ผ่าน",
-            "ปิดการเปิดภาพหน้าจอข้ามเครื่อง — GET /api/agent-machines/screenshots/:file ตรวจแค่ว่าล็อกอิน ทำให้ผู้ใช้ที่ไม่ได้ผูกเครื่องเปิดภาพจบงานของเครื่องคนอื่นได้ · ตอนนี้ดึง jobId จากชื่อไฟล์ → ตรวจเจ้าของเครื่องด้วย userCanControl() (ไม่ตรงรูปแบบ/ไม่พบงาน/ไม่ได้ผูก = 403) · เทสต์ agentMachinesRoutes ผ่านครบ",
-            "ปิดประตู OTA ที่เปิดโล่ง — GET /api/ota/firmwares/:file เดิมเปิดให้ใครก็ได้เมื่อไม่ได้ตั้ง OTA_TOKEN และเทียบ token ด้วย !==; ตอนนี้เทียบแบบคงเวลา และถ้าไม่ตั้ง token จะเปิดเฉพาะ peer ในวง LAN/loopback · POST /api/ota/deploy ปฏิเสธ OTA_BASE_URL ที่เป็น http ไปยัง host สาธารณะ (อุปกรณ์ตรวจลายเซ็นไม่ได้ ⇒ บนเส้นทางสลับไฟล์ได้) · เทสต์ tests/otaAccess.test.ts 4/4",
-            "ปิดการปลอมผลข้ามเครื่อง — POST /api/machine-control/result รับผลตาม commandId โดยไม่เทียบว่าเครื่องที่ส่งคือเครื่องที่ได้รับคำสั่ง ทำให้ runner ที่ถือ token ของเครื่องหนึ่งปลอมผล (หรือเนื้อหาไฟล์) ของคำสั่งที่ออกให้อีกเครื่อง และปิดคำสั่งนั้นทิ้งได้ · ตอนนี้ตรวจเจ้าของคำสั่งก่อนรับผล เครื่องอื่นได้ 403 และคำสั่งยังอยู่ในคิวของเครื่องจริง",
-            "ปิดช่องควบคุมเครื่องข้ามเจ้าของ (Socket.IO) — control:join ตรวจแค่ role ทำให้ SUPERADMIN ที่ไม่ได้ผูกเครื่องเข้าห้อง รับภาพจอ และสั่งเมาส์/คีย์บอร์ด/ไฟล์ได้ (HTTP counterparts ตรวจ userCanControl() อยู่แล้ว) · ตอนนี้ join ต้องผ่าน userCanControl() และ control:fs/control:snapshot/control:fps บังคับให้ join ก่อน · เทสต์ socket 17/17"
+          "title": "🔒 ความปลอดภัยและความถูกต้องของข้อมูล (patch)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "ด่านพร้อมปล่อยแพทช์ — npm run release:check ตรวจ version ตรงกันทุก package (root/core-api/frontend), มีหัวข้อ CHANGELOG ของรุ่นพร้อมวันที่, และ [Unreleased] ว่าง ก่อน push tag — เดิมรู้ตัวตอน workflow ปล่อยรุ่นหยุดกลาง build · เทสต์ release-check 4/4",
+                "OTA: รายงานว่าใครยังใช้ ?token= — เพิ่มตัวนับในหน่วยความจำ (ไม่เก็บค่า token, จำกัด 200 รายการ) และ GET /api/ota/legacy-clients (SUPERADMIN) ที่บอก readyToDisable จากหน้าต่าง 24 ชม. เพื่อให้รู้ว่าเมื่อไรลบ OTA_ALLOW_QUERY_TOKEN ได้ · เทสต์ otaLegacyClients ผ่าน",
+                "OTA: ค่าเริ่มต้นไม่รับ token จาก URL — เพิ่ม OTA_ALLOW_QUERY_TOKEN เป็นสวิตช์ชั่วคราวสำหรับอุปกรณ์ที่แฟลชด้วยสัญญาเดิม (เปิดเฉพาะค่า 1/true/yes/on); ไม่ตั้ง = รับเฉพาะ header x-ota-token และตอบ 401 พร้อม hint · เทสต์ otaQueryTokenSwitch ผ่าน",
+                "OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN — /deploy ไม่ฝัง ?token= ใน URL แล้ว (ส่ง x-ota-token ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ GET /ota/events จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ otaDeployToken ผ่าน",
+                "ปิดการดึงงานซ้ำ (double dispatch) — pullJobs() เดิมเปลี่ยนสถานะงานเป็น running ด้วย update ที่ไม่มีเงื่อนไขสถานะ สองคำขอที่ดึงพร้อมกันจึงได้งานเดียวกันไปรันซ้ำ · ตอนนี้จองด้วย updateMany แบบมีเงื่อนไข status=queued และทิ้งงานที่มีคนคว้าไปก่อน · เทสต์ jobPullClaim ผ่าน",
+                "ปิดช่อง upload สองจุด — verifyUploadedContent() เดิมจับแค่ MZ/ELF ทำให้ไฟล์ Mach-O, Java class และ WebAssembly ผ่านด่านได้ · และ knowledge upload (disk mode) ทิ้งไฟล์ค้างเมื่อบันทึก DB ล้ม · ตอนนี้ปฏิเสธ magic ของโค้ดที่รันได้ครบขึ้นและลบไฟล์ทิ้งเมื่อบันทึกไม่สำเร็จ · เทสต์ uploadMagicCleanup ผ่าน",
+                "จำกัดรายการเครื่อง/คิวงานตามเจ้าของ — GET /api/agent-machines และ /queue เคยคืนทุกเครื่อง (พร้อม IP) และทุกงานของทั้งฟลีตให้ทุก role ที่ล็อกอิน · ตอนนี้ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะเครื่องที่ผูกกับตัวเองและงานบนเครื่องนั้น (SUPERADMIN ยังเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่) · เทสต์ agentMachinesFleetScope ผ่าน",
+                "ปิด SSRF ที่ตัวนำเข้าเว็บของ Knowledge — POST /api/knowledge/import ยิง URL ที่ผู้ใช้ส่งไปตรง ๆ ทำให้สั่งเซิร์ฟเวอร์อ่าน API ภายใน/metadata ได้ · ตอนนี้ใช้ outbound-url-guard ตัวเดียวกับ vision: ปฏิเสธ loopback/link-local/URL ที่ฝังรหัสผ่าน, ตรวจ IP ที่ resolve จริง (กัน DNS rebinding), ไม่ตาม redirect, จำกัดขนาด 8 MB · เทสต์ knowledgeImportSsrf ผ่าน",
+                "ปิดการเปิดภาพหน้าจอข้ามเครื่อง — GET /api/agent-machines/screenshots/:file ตรวจแค่ว่าล็อกอิน ทำให้ผู้ใช้ที่ไม่ได้ผูกเครื่องเปิดภาพจบงานของเครื่องคนอื่นได้ · ตอนนี้ดึง jobId จากชื่อไฟล์ → ตรวจเจ้าของเครื่องด้วย userCanControl() (ไม่ตรงรูปแบบ/ไม่พบงาน/ไม่ได้ผูก = 403) · เทสต์ agentMachinesRoutes ผ่านครบ",
+                "ปิดประตู OTA ที่เปิดโล่ง — GET /api/ota/firmwares/:file เดิมเปิดให้ใครก็ได้เมื่อไม่ได้ตั้ง OTA_TOKEN และเทียบ token ด้วย !==; ตอนนี้เทียบแบบคงเวลา และถ้าไม่ตั้ง token จะเปิดเฉพาะ peer ในวง LAN/loopback · POST /api/ota/deploy ปฏิเสธ OTA_BASE_URL ที่เป็น http ไปยัง host สาธารณะ (อุปกรณ์ตรวจลายเซ็นไม่ได้ ⇒ บนเส้นทางสลับไฟล์ได้) · เทสต์ tests/otaAccess.test.ts 4/4",
+                "ปิดการปลอมผลข้ามเครื่อง — POST /api/machine-control/result รับผลตาม commandId โดยไม่เทียบว่าเครื่องที่ส่งคือเครื่องที่ได้รับคำสั่ง ทำให้ runner ที่ถือ token ของเครื่องหนึ่งปลอมผล (หรือเนื้อหาไฟล์) ของคำสั่งที่ออกให้อีกเครื่อง และปิดคำสั่งนั้นทิ้งได้ · ตอนนี้ตรวจเจ้าของคำสั่งก่อนรับผล เครื่องอื่นได้ 403 และคำสั่งยังอยู่ในคิวของเครื่องจริง",
+                "ปิดช่องควบคุมเครื่องข้ามเจ้าของ (Socket.IO) — control:join ตรวจแค่ role ทำให้ SUPERADMIN ที่ไม่ได้ผูกเครื่องเข้าห้อง รับภาพจอ และสั่งเมาส์/คีย์บอร์ด/ไฟล์ได้ (HTTP counterparts ตรวจ userCanControl() อยู่แล้ว) · ตอนนี้ join ต้องผ่าน userCanControl() และ control:fs/control:snapshot/control:fps บังคับให้ join ก่อน · เทสต์ socket 17/17"
+              ]
+            }
           ]
         }
-      ],
-      "sections": []
+      ]
     },
     {
       "version": "v1.3.0",
