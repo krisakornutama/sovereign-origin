@@ -141,12 +141,12 @@ test('stageReleaseArtifacts คัดเฉพาะเวอร์ชัน + �
   const res = await stageReleaseArtifacts({ distDir: dist, outDir: out, version: '1.2.1' });
 
   assert.deepEqual(res.files.slice().sort(), [
-    'Sovereign OS-1.2.1-win.zip',
     'Sovereign-OS-1.2.1-portable.exe',
+    'Sovereign.OS-1.2.1-win.zip',
   ]);
   assert.deepEqual(fs.readdirSync(out).sort(), [
     CHECKSUM_FILE,
-    'Sovereign OS-1.2.1-win.zip',
+    'Sovereign.OS-1.2.1-win.zip',
     'Sovereign-OS-1.2.1-portable.exe',
   ].sort());
   assert.equal(fs.existsSync(path.join(out, 'Sovereign-OS-1.2.0-portable.exe')), false);
