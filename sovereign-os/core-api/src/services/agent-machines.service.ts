@@ -287,10 +287,13 @@ export async function pullJobs(machine: MachineRow, limit = 3) {
 
   const out: any[] = [];
   for (const job of mine.slice(0, Math.max(1, limit))) {
-    await prisma.agentJob.update({
-      where: { id: job.id },
+    // จองงานแบบมีเงื่อนไขสถานะ: สองคำขอที่ดึงพร้อมกันเห็นงานเดียวกันได้
+    // ⇒ ใครที่ updateMany ได้ count=0 แปลว่าอีกคนคว้าไปแล้ว ต้องไม่ส่งงานนี้ซ้ำ
+    const claimed = await prisma.agentJob.updateMany({
+      where: { id: job.id, status: 'queued' },
       data: { status: 'running', dispatched_at: new Date() },
     });
+    if (Number((claimed as { count?: number })?.count ?? 0) === 0) continue;
     out.push({
       id: job.id,
       executor: job.executor,
