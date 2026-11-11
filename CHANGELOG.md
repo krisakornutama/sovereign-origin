@@ -8,6 +8,13 @@
 
 ## [Unreleased]
 
+---
+
+## [v1.3.1] — 2026-11-11 (released)
+
+### 🔒 ความปลอดภัยและความถูกต้องของข้อมูล (patch)
+
+- **ด่านพร้อมปล่อยแพทช์** — `npm run release:check` ตรวจ version ตรงกันทุก package (root/core-api/frontend), มีหัวข้อ CHANGELOG ของรุ่นพร้อมวันที่, และ `[Unreleased]` ว่าง ก่อน push tag — เดิมรู้ตัวตอน workflow ปล่อยรุ่นหยุดกลาง build · เทสต์ `release-check` 4/4
 - **OTA: รายงานว่าใครยังใช้ `?token=`** — เพิ่มตัวนับในหน่วยความจำ (ไม่เก็บค่า token, จำกัด 200 รายการ) และ `GET /api/ota/legacy-clients` (SUPERADMIN) ที่บอก `readyToDisable` จากหน้าต่าง 24 ชม. เพื่อให้รู้ว่าเมื่อไรลบ `OTA_ALLOW_QUERY_TOKEN` ได้ · เทสต์ `otaLegacyClients` ผ่าน
 - **OTA: ค่าเริ่มต้นไม่รับ token จาก URL** — เพิ่ม `OTA_ALLOW_QUERY_TOKEN` เป็นสวิตช์ชั่วคราวสำหรับอุปกรณ์ที่แฟลชด้วยสัญญาเดิม (เปิดเฉพาะค่า `1/true/yes/on`); ไม่ตั้ง = รับเฉพาะ header `x-ota-token` และตอบ 401 พร้อม hint · เทสต์ `otaQueryTokenSwitch` ผ่าน
 - **OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN** — `/deploy` ไม่ฝัง `?token=` ใน URL แล้ว (ส่ง `x-ota-token` ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ `GET /ota/events` จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ `otaDeployToken` ผ่าน
@@ -19,8 +26,6 @@
 - **ปิดประตู OTA ที่เปิดโล่ง** — `GET /api/ota/firmwares/:file` เดิมเปิดให้ใครก็ได้เมื่อไม่ได้ตั้ง `OTA_TOKEN` และเทียบ token ด้วย `!==`; ตอนนี้เทียบแบบคงเวลา และถ้าไม่ตั้ง token จะเปิดเฉพาะ peer ในวง LAN/loopback · `POST /api/ota/deploy` ปฏิเสธ `OTA_BASE_URL` ที่เป็น http ไปยัง host สาธารณะ (อุปกรณ์ตรวจลายเซ็นไม่ได้ ⇒ บนเส้นทางสลับไฟล์ได้) · เทสต์ `tests/otaAccess.test.ts` 4/4
 - **ปิดการปลอมผลข้ามเครื่อง** — `POST /api/machine-control/result` รับผลตาม `commandId` โดยไม่เทียบว่าเครื่องที่ส่งคือเครื่องที่ได้รับคำสั่ง ทำให้ runner ที่ถือ token ของเครื่องหนึ่งปลอมผล (หรือเนื้อหาไฟล์) ของคำสั่งที่ออกให้อีกเครื่อง และปิดคำสั่งนั้นทิ้งได้ · ตอนนี้ตรวจเจ้าของคำสั่งก่อนรับผล เครื่องอื่นได้ 403 และคำสั่งยังอยู่ในคิวของเครื่องจริง
 - **ปิดช่องควบคุมเครื่องข้ามเจ้าของ (Socket.IO)** — `control:join` ตรวจแค่ role ทำให้ SUPERADMIN ที่ไม่ได้ผูกเครื่องเข้าห้อง รับภาพจอ และสั่งเมาส์/คีย์บอร์ด/ไฟล์ได้ (HTTP counterparts ตรวจ `userCanControl()` อยู่แล้ว) · ตอนนี้ join ต้องผ่าน `userCanControl()` และ `control:fs`/`control:snapshot`/`control:fps` บังคับให้ join ก่อน · เทสต์ socket 17/17
-
----
 
 ## [v1.3.0] — 2026-11-10 (released)
 
