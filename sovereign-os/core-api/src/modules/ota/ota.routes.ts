@@ -5,6 +5,7 @@ import mqtt from 'mqtt';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
+import { legacyClientReport, recordLegacyTokenUse } from './ota.legacy';
 
 export { prisma };
 
@@ -93,11 +94,22 @@ router.get('/firmwares/:file', (req, res) => {
     queryToken: req.query.token,
     allowQueryToken: parseAllowQueryToken(process.env.OTA_ALLOW_QUERY_TOKEN),
   });
+  const usedQueryToken =
+    !String(req.get('x-ota-token') ?? '').trim() && typeof req.query.token === 'string' && req.query.token.length > 0;
   const allowed = isDownloadAllowed({
     peer: req.socket?.remoteAddress,
     configuredToken: OTA_TOKEN,
     providedToken,
   });
+
+  // ตัวนับสำหรับวางแผนปิดสวิตช์: ใครยังพยายามใช้ ?token= (ไม่บันทึกค่าของ token)
+  if (usedQueryToken) {
+    recordLegacyTokenUse({
+      ip: String(req.socket?.remoteAddress ?? 'unknown'),
+      userAgent: req.get('user-agent') ?? null,
+      accepted: allowed,
+    });
+  }
   if (!allowed) {
     return OTA_TOKEN
       ? res.status(401).json({
@@ -167,6 +179,13 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
     console.error('OTA deploy error:', err);
     res.status(500).json({ error: 'Deploy failed' });
   }
+});
+
+// GET /api/ota/legacy-clients — ใครยังดาวน์โหลดด้วย ?token= (ใช้ตัดสินใจปิดสวิตช์)
+// ตัวเลขนี้บอก "ถึงเวลาเลิกใช้ query token หรือยัง" — ไม่คืนค่า token ใด ๆ
+router.get('/legacy-clients', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(legacyClientReport());
 });
 
 // GET /api/ota/events?limit=50 – ประวัติ OTA ทั้งหมด (คำสั่ง + ผลจากอุปกรณ์)

@@ -13,6 +13,7 @@
         {
           "type": "list",
           "items": [
+            "OTA: รายงานว่าใครยังใช้ ?token= — เพิ่มตัวนับในหน่วยความจำ (ไม่เก็บค่า token, จำกัด 200 รายการ) และ GET /api/ota/legacy-clients (SUPERADMIN) ที่บอก readyToDisable จากหน้าต่าง 24 ชม. เพื่อให้รู้ว่าเมื่อไรลบ OTA_ALLOW_QUERY_TOKEN ได้ · เทสต์ otaLegacyClients ผ่าน",
             "OTA: ค่าเริ่มต้นไม่รับ token จาก URL — เพิ่ม OTA_ALLOW_QUERY_TOKEN เป็นสวิตช์ชั่วคราวสำหรับอุปกรณ์ที่แฟลชด้วยสัญญาเดิม (เปิดเฉพาะค่า 1/true/yes/on); ไม่ตั้ง = รับเฉพาะ header x-ota-token และตอบ 401 พร้อม hint · เทสต์ otaQueryTokenSwitch ผ่าน",
             "OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN — /deploy ไม่ฝัง ?token= ใน URL แล้ว (ส่ง x-ota-token ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ GET /ota/events จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ otaDeployToken ผ่าน",
             "ปิดการดึงงานซ้ำ (double dispatch) — pullJobs() เดิมเปลี่ยนสถานะงานเป็น running ด้วย update ที่ไม่มีเงื่อนไขสถานะ สองคำขอที่ดึงพร้อมกันจึงได้งานเดียวกันไปรันซ้ำ · ตอนนี้จองด้วย updateMany แบบมีเงื่อนไข status=queued และทิ้งงานที่มีคนคว้าไปก่อน · เทสต์ jobPullClaim ผ่าน",
