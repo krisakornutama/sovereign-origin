@@ -12,6 +12,7 @@ import path from 'path';
 import { hardenUpload, handledUpload, safeDisplayName, resolveInsideRoot } from '../../lib/harden-upload';
 import { uploadLimiter } from '../../middleware/upload-rate-limit';
 import axios from 'axios';
+import { assertSafeOutboundUrl, createGuardedLookup, OutboundUrlBlocked } from '../../lib/outbound-url-guard';
 import { authenticate } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
 import { hashEngine } from '../../services/hash-engine.service';
@@ -232,12 +233,27 @@ router.post('/import', authenticate, async (req, res) => {
     if (!/^https?:\/\//i.test(url)) {
       return res.status(400).json({ error: 'url ต้องขึ้นต้นด้วย http(s)://' });
     }
-    const fetched = await axios.get(url, {
+    // SSRF guard — ผู้ใช้เลือก URL แต่คนที่ยิง request คือเซิร์ฟเวอร์
+    // ⇒ loopback / link-local (169.254.169.254 metadata) / URL ที่ฝังรหัสผ่าน ห้ามถูกยิง
+    // (วิกิในวง LAN ยังใช้ได้ — กติกาเดียวกับ /api/vision/analyze-url)
+    let target: URL;
+    try {
+      target = assertSafeOutboundUrl(url);
+    } catch (e) {
+      if (e instanceof OutboundUrlBlocked) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
+    const fetched = await axios.get(target.toString(), {
       timeout: 20000,
       responseType: 'text',
-      maxRedirects: 5,
+      // ไม่ตาม redirect: 302 จากปลายทางปลอมคือช่องวกกลับเข้าหา loopback/metadata
+      maxRedirects: 0,
+      maxContentLength: 8 * 1024 * 1024,
+      maxBodyLength: 8 * 1024 * 1024,
       headers: { 'User-Agent': 'Mozilla/5.0 (sovereign-os/1.0; knowledge-importer)' },
-    });
+      lookup: createGuardedLookup(), // DNS rebinding: ตรวจ IP จริงตอนเชื่อม
+    } as Parameters<typeof axios.get>[1]);
     const html = String(fetched.data || '');
     const text = htmlToText(html);
     const title = String(req.body?.title || '').trim() || htmlTitle(html) || url;
@@ -258,6 +274,14 @@ router.post('/import', authenticate, async (req, res) => {
       note: text.length === 0 ? 'ไม่สามารถสกัดข้อความจากหน้านี้ได้ (อาจเป็น JavaScript-only) — บันทึกเป็นลิงก์ไว้ก่อน' : undefined,
     });
   } catch (err: any) {
+    if (err?.code === 'EBLOCKEDADDRESS') {
+      return res.status(400).json({ error: 'url points to a blocked address' });
+    }
+    // 3xx ที่ไม่ได้ตามต่อ = PRD ตั้งใจปฏิเสธ เพื่อไม่ให้ redirect พาไปโดเมนภายใน
+    const status = Number(err?.response?.status || 0);
+    if (status >= 300 && status < 400) {
+      return res.status(400).json({ error: 'url redirects — ใส่ URL ปลายทางตรง ๆ' });
+    }
     console.error('Knowledge import error:', err?.message || err);
     res.status(500).json({ error: `นำเข้าจาก URL ไม่สำเร็จ (${err?.code || err?.message || 'network error'})` });
   }
