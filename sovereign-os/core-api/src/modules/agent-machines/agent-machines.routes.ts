@@ -27,6 +27,7 @@ import {
   reportJobResult,
   setMachineStatus,
   type MachineRow,
+  jobMachineId,
 } from '../../services/agent-machines.service';
 import {
   listMachinesForUser,
@@ -57,6 +58,7 @@ import {
 import {
   saveJobScreenshot,
   screenshotDir,
+  jobIdFromScreenshotFile,
 } from '../../services/orchestrator-screenshot.service';
 import {
   decideEnrollAttempt,
@@ -265,13 +267,21 @@ router.post('/call-test', authenticate, requireRole('SUPERADMIN'), async (_req: 
 
 // GET /api/agent-machines/screenshots/:file — เปิดภาพหน้าจอตอนจบงาน (ต้องล็อกอิน)
 // ไม่เปิดสาธารณะ: ภาพหน้าจอของเครื่องเป็นข้อมูลส่วนตัวของผู้ใช้
-router.get('/screenshots/:file', authenticate, (req: Request, res: Response) => {
+router.get('/screenshots/:file', authenticate, async (req: Request, res: Response) => {
   let resolved: string;
   try {
     // resolveInsideRoot กัน path traversal (..\..\ หรือ absolute) ก่อนแตะดิสก์เสมอ
     resolved = resolveInsideRoot(screenshotDir(), req.params.file);
   } catch {
     return res.status(400).json({ error: 'Invalid file path' });
+  }
+  // ภาพหน้าจอเป็นข้อมูลของผู้ใช้ ไม่ใช่ของทุกคนที่ล็อกอินได้: ชื่อไฟล์มี jobId อยู่
+  // ⇒ ต้องคุมเครื่องที่งานนั้นรันอยู่จริง (เดิมตรวจแค่ว่าล็อกอิน)
+  const jobId = jobIdFromScreenshotFile(req.params.file);
+  const shotMachine = jobId ? await jobMachineId(jobId) : null;
+  const mine = shotMachine ? await userCanControl(req.user!.id, shotMachine) : false;
+  if (!jobId || !shotMachine || !mine) {
+    return res.status(403).json({ error: 'ภาพนี้ไม่ใช่งานของเครื่องที่คุณควบคุม' });
   }
   try {
     if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File not found' });
