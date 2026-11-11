@@ -203,6 +203,14 @@ export function awaitCommand(
  * runner รายงานผลของคำสั่งกลับ — คืน machineId เพื่อให้ชั้นบนรู้ว่าต้อง emit ไปห้องไหน
  * (คืน null = คำสั่งนี้ไม่รู้จัก/หมดเวลาไปแล้ว — ไม่ใช่ error ของ runner)
  */
+/**
+ * คำสั่งนี้ถูกส่งให้เครื่องไหน — ใช้ตรวจก่อนรับผล ห้ามให้เครื่องอื่นรายงานแทน
+ * (อ่านอย่างเดียว ไม่ถอดคำสั่งออกจากคิว/ไม่เคลียร์ timeout)
+ */
+export function peekCommandMachine(commandId: string): string | null {
+  return inflight.get(commandId)?.machineId ?? null;
+}
+
 export function submitResult(commandId: string, ok: boolean, result?: unknown, error?: string) {
   const entry = inflight.get(commandId);
   if (!entry) return null;
