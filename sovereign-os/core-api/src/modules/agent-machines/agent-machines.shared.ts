@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { hardenUpload, IMAGE_MIME } from '../../lib/harden-upload';
 import { normalizePeerAddress } from '../../lib/net';
 import { authenticateToken, type MachineRow } from '../../services/agent-machines.service';
+import { listMachinesForUser } from '../../services/agent-machine-hub.service';
 import { safeEqual } from '../../services/machine-enroll.service';
 import { isEnrollTokenFormat, verifyEnrollToken } from '../../services/fleet-enrollment.service';
 import { currentFleetPolicy, decideUpdateGate, type FleetChannel } from '../../services/fleet-policy.service';
@@ -181,3 +182,19 @@ export function requireMachineToken(req: Request, res: Response, next: NextFunct
     });
 }
 
+
+
+/**
+ * เครื่องที่ผู้ใช้คนนี้เห็นได้ในรายการฟลีต — null = เห็นทั้งหมด
+ *
+ * SUPERADMIN (เจ้าของ) ต้องเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่ (UI ใช้ลิงก์เครื่อง)
+ * role อื่นเห็นเฉพาะเครื่องที่ผูกกับตัวเอง — กติกาเดียวกับ /mine
+ */
+export async function machineScopeFor(
+  user: { id?: string; role?: string } | undefined | null,
+): Promise<Set<string> | null> {
+  const role = String(user?.role ?? '').trim().toUpperCase();
+  if (role === 'SUPERADMIN') return null;
+  const mine = await listMachinesForUser(String(user?.id ?? ''));
+  return new Set(mine.map((m) => m.id));
+}
