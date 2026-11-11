@@ -86,10 +86,13 @@ router.get('/firmwares/:file', (req, res) => {
 
   // ด่านที่แท้จริงอยู่ที่ ota.access.ts: ตั้ง token → ต้องส่งให้ตรง (เทียบแบบคงเวลา);
   // ไม่ตั้ง token → เปิดเฉพาะ peer ในวงภายใน เพื่อไม่ให้ทั้งอินเทอร์เน็ตดึงเฟิร์มแวร์ได้
+  // รับ token ทาง header ก่อน (?token= ยังรับไว้ให้อุปกรณ์รุ่นเดิมที่ฝังมาแล้ว)
+  // header ไม่ติดไปใน access log ของ proxy และไม่ค้างในประวัติ URL
+  const providedToken = req.get('x-ota-token') || req.query.token;
   const allowed = isDownloadAllowed({
     peer: req.socket?.remoteAddress,
     configuredToken: OTA_TOKEN,
-    providedToken: req.query.token,
+    providedToken,
   });
   if (!allowed) {
     return OTA_TOKEN
@@ -128,9 +131,15 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
     const urlCheck = checkDeployBaseUrl(OTA_BASE_URL);
     if (!urlCheck.ok) return res.status(400).json({ error: urlCheck.reason, hint: 'ตั้ง OTA_BASE_URL เป็น https หรือ host ในวง LAN' });
 
-    const url = `${OTA_BASE_URL}/api/ota/firmwares/${encodeURIComponent(file)}${OTA_TOKEN ? `?token=${OTA_TOKEN}` : ''}`;
+    // URL ไม่ฝัง token แล้ว — token เดินทางใน header ที่แนบมากับ payload แทน
+    const url = `${OTA_BASE_URL}/api/ota/firmwares/${encodeURIComponent(file)}`;
     const topic = `sovereign/${nodeId}/ota/command`;
-    const payload = JSON.stringify({ url, file, version: String(file).replace(/\.bin$/, '') });
+    const payload = JSON.stringify({
+      url,
+      file,
+      version: String(file).replace(/.bin$/, ''),
+      headers: OTA_TOKEN ? { 'x-ota-token': OTA_TOKEN } : {},
+    });
 
     mqttClient.publish(topic, payload);
 
@@ -154,7 +163,7 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
 });
 
 // GET /api/ota/events?limit=50 – ประวัติ OTA ทั้งหมด (คำสั่ง + ผลจากอุปกรณ์)
-router.get('/events', authenticate, async (req, res) => {
+router.get('/events', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const events = await prisma.otaEvent.findMany({
