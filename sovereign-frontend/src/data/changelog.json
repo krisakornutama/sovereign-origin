@@ -13,6 +13,7 @@
         {
           "type": "list",
           "items": [
+            "OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN — /deploy ไม่ฝัง ?token= ใน URL แล้ว (ส่ง x-ota-token ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ GET /ota/events จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ otaDeployToken ผ่าน",
             "ปิดการดึงงานซ้ำ (double dispatch) — pullJobs() เดิมเปลี่ยนสถานะงานเป็น running ด้วย update ที่ไม่มีเงื่อนไขสถานะ สองคำขอที่ดึงพร้อมกันจึงได้งานเดียวกันไปรันซ้ำ · ตอนนี้จองด้วย updateMany แบบมีเงื่อนไข status=queued และทิ้งงานที่มีคนคว้าไปก่อน · เทสต์ jobPullClaim ผ่าน",
             "ปิดช่อง upload สองจุด — verifyUploadedContent() เดิมจับแค่ MZ/ELF ทำให้ไฟล์ Mach-O, Java class และ WebAssembly ผ่านด่านได้ · และ knowledge upload (disk mode) ทิ้งไฟล์ค้างเมื่อบันทึก DB ล้ม · ตอนนี้ปฏิเสธ magic ของโค้ดที่รันได้ครบขึ้นและลบไฟล์ทิ้งเมื่อบันทึกไม่สำเร็จ · เทสต์ uploadMagicCleanup ผ่าน",
             "จำกัดรายการเครื่อง/คิวงานตามเจ้าของ — GET /api/agent-machines และ /queue เคยคืนทุกเครื่อง (พร้อม IP) และทุกงานของทั้งฟลีตให้ทุก role ที่ล็อกอิน · ตอนนี้ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะเครื่องที่ผูกกับตัวเองและงานบนเครื่องนั้น (SUPERADMIN ยังเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่) · เทสต์ agentMachinesFleetScope ผ่าน",
