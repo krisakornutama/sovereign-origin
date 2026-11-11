@@ -352,6 +352,15 @@ router.post('/upload', authenticate, uploadLimiter, handledUpload(upload, 'file'
       note: isPdf && content.length === 0 ? 'อ่านข้อความจาก PDF ไม่ได้ (อาจเป็นภาพสแกน) — บันทึกไฟล์ไว้แล้ว ใส่หมายเหตุเพิ่มได้' : undefined,
     });
   } catch (err) {
+    // disk mode: multer เขียนไฟล์ลงดิสก์ก่อน handler ทำงาน — บันทึกไม่สำเร็จต้องลบทิ้ง
+    const uploaded = (req as unknown as { file?: { path?: string } }).file;
+    if (uploaded?.path) {
+      try {
+        fs.unlinkSync(uploaded.path);
+      } catch {
+        /* ลบไม่ได้ก็ไม่ทำให้คำตอบพัง */
+      }
+    }
     console.error('Knowledge upload error:', err);
     res.status(500).json({ error: 'อัปโหลดไฟล์ไม่สำเร็จ' });
   }
