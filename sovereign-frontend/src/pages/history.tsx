@@ -100,7 +100,11 @@ export default function HistoryPage() {
             params.append('range', range);
           }
           const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/history?${params}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status} for ${metric}`);
+          if (!res.ok) {
+            // 400 จากเพดานจำนวนจุดมีทางแก้อยู่ในข้อความ — ต้องแสดงข้อความนั้น ไม่ใช่ "HTTP 400"
+            const payload = await res.json().catch(() => ({} as any));
+            throw new Error(payload?.error || `HTTP ${res.status}`);
+          }
           const result = await res.json();
           return {
             metric,
@@ -116,7 +120,12 @@ export default function HistoryPage() {
       setSeries(results);
     } catch (err) {
       console.error(err);
-      setError(t('history.loadError', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB'));
+      // ข้อความจาก server (เช่น "ช่วงกว้างเกินไป…ให้ใช้ interval ที่ใหญ่ขึ้น") มีประโยชน์กว่าข้อความกลาง ๆ
+      const serverMessage = err instanceof Error && !/^HTTP \d+/.test(err.message) ? err.message : '';
+      setError(
+        serverMessage ||
+          t('history.loadError', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB')
+      );
       setSeries([]);
     } finally {
       setLoading(false);
