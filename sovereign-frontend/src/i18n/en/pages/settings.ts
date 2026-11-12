@@ -30,7 +30,7 @@ export default {
   },
   queue: {
     title: 'Offline queue ({n})',
-    desc: 'Actions pending while offline (POST/PUT/PATCH/DELETE) — synced automatically when back online, or manage them below',
+    desc: 'Actions pending while offline (POST/PUT/PATCH/DELETE) — synced automatically when back online, or manage them below · Items the server rejects permanently (4xx) are parked, not deleted, and never retried automatically',
     empty: 'No pending actions — queue is empty',
     syncAllOk: 'All {n} items synced successfully',
     syncPartial: 'Synced {n} items ({kept} remaining)',
@@ -43,6 +43,8 @@ export default {
     syncSelected: 'Sync selected ({n})',
     deleteSelected: 'Delete selected',
     syncAllDone: 'All {n} items synced',
+    syncAllPartial: 'Synced {n} item(s) · {kept} still unsent (parked — see the reason in the table)',
+    syncAllNone: 'Nothing was sent · {kept} item(s) parked (see the reason in the table)',
     syncAll: 'Sync all',
   },
   api: {
