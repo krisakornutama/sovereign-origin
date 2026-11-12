@@ -10,6 +10,7 @@ import StatCard from '../ui/StatCard';
 import EmptyState from '../ui/EmptyState';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { fmtLocale } from '../../lib/formatDate';
+import { useTelemetryDelete } from '../../lib/sensors/use-telemetry-delete';
 
 type Tab = 'devices' | 'data';
 
@@ -212,33 +213,17 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
   };
 
   // ── Actions: ข้อมูล ──
-  const deleteOne = async (record: SensorRecord) => {
+  // ผลลัพธ์ของคำขอลบ: ข้อความ + reload ต้องมาจาก server จริง (403/500 ≠ "ลบแล้ว")
+  const { deleteByUrl } = useTelemetryDelete({ t, setMessage, reload: loadData });
+
+  const deleteOne = (record: SensorRecord) => {
     if (!confirm(t('sensorsHub.confirmDeleteOne', 'ลบ {label} = {value}?', { label: t(`sensorsHub.metric.${record.metric}`, METRIC_LABEL[record.metric] || record.metric), value: record.value }))) return;
-    try {
-      const res = await authFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/sensors/${record.metric}?device_id=${record.device_id}`,
-        { method: 'DELETE' }
-      );
-      const data = await res.json();
-      setMessage(data.success ? t('sensorsHub.deletedOne', '✅ ลบแล้ว') : `❌ ${data.error}`);
-      loadData();
-    } catch {
-      setMessage(t('sensorsHub.deleteFailed', '❌ ลบไม่สำเร็จ'));
-    }
+    deleteByUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/${record.metric}?device_id=${record.device_id}`, t('sensorsHub.deletedOne', '✅ ลบแล้ว'));
   };
 
-  const deleteAll = async (metric: string) => {
+  const deleteAll = (metric: string) => {
     if (!confirm(t('sensorsHub.confirmDeleteAll', 'ลบข้อมูล "{label}" ทั้งหมด?', { label: t(`sensorsHub.metric.${metric}`, METRIC_LABEL[metric] || metric) }))) return;
-    try {
-      await authFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/sensors/${metric}/all`,
-        { method: 'DELETE' }
-      );
-      setMessage(t('sensorsHub.deleteAllSuccess', '✅ ลบ {label} ทั้งหมดแล้ว', { label: t(`sensorsHub.metric.${metric}`, METRIC_LABEL[metric] || metric) }));
-      loadData();
-    } catch {
-      setMessage(t('sensorsHub.deleteFailed', '❌ ลบไม่สำเร็จ'));
-    }
+    deleteByUrl(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/${metric}/all`, t('sensorsHub.deleteAllSuccess', '✅ ลบ {label} ทั้งหมดแล้ว', { label: t(`sensorsHub.metric.${metric}`, METRIC_LABEL[metric] || metric) }));
   };
 
   if (!isHydrated) {
