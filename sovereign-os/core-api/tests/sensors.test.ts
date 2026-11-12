@@ -248,6 +248,64 @@ describe('POST /api/sensors/generate-code', () => {
     const { code }: any = await res.json();
     assert.match(code, /not yet available/);
   });
+
+  // ── ของที่ผู้ใช้พิมพ์ต้องไม่กลายเป็นโค้ดหรือทำให้คำขอค้าง ──────────────────
+  // Express 4 ไม่ดัก async throw: handler ที่โยน error จะ "ค้างไม่ตอบ" ไม่ใช่ 500
+  // ⇒ `sensors` ที่ไม่ใช่ array เคยทำให้ request แขวนจน timeout
+  test('sensors ไม่ใช่ array = 400 ทันที ไม่ค้าง', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: 'temperature' }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match((await res.json()).error, /sensors/);
+  });
+
+  test('ไม่ส่ง sensors มาเลย = 400 ไม่ใช่ค้าง', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32' }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('รายการ sensor ยาวผิดปกติ = 400 (ไม่สร้างโค้ดเป็นพันบรรทัด)', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: Array.from({ length: 500 }, () => 'temperature') }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('รหัส WiFi ที่มี " หรือ \\ ต้องถูก escape ไม่หลุดออกจากสตริง C', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: ['temperature'], wifiSSID: 'a"b', wifiPass: 'p"w\\d' }),
+    });
+    const { code }: any = await res.json();
+    assert.strictEqual(res.status, 200);
+    // ค่าที่มี quote ต้องกลายเป็น \" เท่านั้น ไม่งั้นสเก็ตช์คอมไพล์ไม่ผ่าน (หรือแย่กว่า: หลุดเป็นโค้ด)
+    assert.ok(code.includes('const char* ssid = "a\\"b";'), 'ssid ต้องถูก escape');
+    assert.ok(code.includes('const char* password = "p\\"w\\\\d";'), 'password ต้อง escape ทั้ง " และ \\');
+  });
+
+  test('ค่าใหม่ในสตริงต้องไม่สร้างบรรทัดโค้ดใหม่', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: [], wifiSSID: 'x";\nvoid evil() {}\n//' }),
+    });
+    const { code }: any = await res.json();
+    assert.doesNotMatch(code, /\nvoid evil\(\)/, 'ต้องไม่มีฟังก์ชันที่ผู้ใช้แอบใส่เข้ามา');
+    assert.ok(code.includes('\\nvoid evil()'), 'ขึ้นบรรทัดใหม่ต้องกลายเป็น \\n ในสตริง');
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────
