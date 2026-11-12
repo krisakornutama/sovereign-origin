@@ -1,7 +1,16 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+
+/**
+ * บทบาทที่ลบข้อมูลเทเลเมตรีได้ — ลบแล้วกู้ไม่ได้ (ไม่มี retention ที่กู้คืนได้)
+ * KID/SYSTEM_AI ต้องไม่ถึงมือ: ข้อมูลจริงใน hypertable คือหลักฐานย้อนหลังของทั้งระบบ
+ */
+const DELETE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
+
+/** เพดานจำนวนแถวต่อคำขอ — `sensor_telemetry` โตไม่จำกัด, `limit` จาก query คือทางดึงทั้งตาราง */
+const MAX_LIST_ROWS = 5000;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Sensor data CRUD ด้วยมือ (UI) — ย้ายมาจาก inline routes ใน server.ts
@@ -63,6 +72,11 @@ router.get('/metrics', authenticate, async (_req, res) => {
 router.get('/all', authenticate, async (req, res) => {
   try {
     const { metric, limit } = req.query;
+    // limit ต้องเป็นจำนวนเต็ม 1..MAX_LIST_ROWS — ห้าม clamp เงียบ ๆ (ผู้เรียกต้องรู้ว่าไม่ได้ของครบ)
+    const requested = limit === undefined ? 50 : Number(limit);
+    if (!Number.isInteger(requested) || requested < 1 || requested > MAX_LIST_ROWS) {
+      return res.status(400).json({ error: `limit ต้องเป็นจำนวนเต็ม 1-${MAX_LIST_ROWS}` });
+    }
     let query = `SELECT time, node_id, device_id, metric, value FROM sensor_telemetry WHERE 1=1`;
     const params: any[] = [];
     if (metric && metric !== 'all') {
@@ -70,7 +84,7 @@ router.get('/all', authenticate, async (req, res) => {
       params.push(metric);
     }
     query += ` ORDER BY time DESC LIMIT $${params.length + 1}`;
-    params.push(parseInt(limit as string) || 50);
+    params.push(requested);
     const result = await prisma.$queryRawUnsafe<Array<any>>(query, ...params);
     res.json(result);
   } catch (err) {
@@ -79,7 +93,7 @@ router.get('/all', authenticate, async (req, res) => {
 });
 
 // Delete sensor record
-router.delete('/:metric', authenticate, async (req, res) => {
+router.delete('/:metric', authenticate, requireRole(...DELETE_ROLES), async (req, res) => {
   try {
     const { metric } = req.params;
     const { device_id } = req.query;
@@ -95,7 +109,7 @@ router.delete('/:metric', authenticate, async (req, res) => {
 });
 
 // Delete all records of a metric
-router.delete('/:metric/all', authenticate, async (req, res) => {
+router.delete('/:metric/all', authenticate, requireRole(...DELETE_ROLES), async (req, res) => {
   try {
     await prisma.$queryRawUnsafe(`DELETE FROM sensor_telemetry WHERE metric = $1`, req.params.metric);
     res.json({ success: true, message: `ลบ ${req.params.metric} ทั้งหมดสำเร็จ` });

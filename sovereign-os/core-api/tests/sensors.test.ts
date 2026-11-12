@@ -442,6 +442,30 @@ describe('GET /api/sensors/metrics + /all', () => {
     assert.deepStrictEqual(await res.json(), []);
     (prisma as any).$queryRawUnsafe = saved;
   });
+
+  // ── เพดาน limit: sensor_telemetry โตไม่จำกัด "ดึงทั้งตาราง" ต้องไม่ใช่คำขอเดียว ──
+  test('/all?limit เกินเพดาน = 400 และไม่ยิง SQL', async () => {
+    rawCalls.length = 0;
+    const res = await authed(dataServer.baseUrl + '/api/sensors/all?limit=100000');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(rawCalls.length, 0, 'ห้ามดึงแถวออกมาก่อนจะรู้ว่าเกิน');
+  });
+
+  test('/all?limit ที่ไม่ใช่จำนวนเต็มบวก = 400 (ไม่ใช่ 500 แล้วคืน array ว่าง)', async () => {
+    for (const bad of ['abc', '0', '-5', '2.5']) {
+      rawCalls.length = 0;
+      const res = await authed(dataServer.baseUrl + `/api/sensors/all?limit=${bad}`);
+      assert.strictEqual(res.status, 400, `limit=${bad} ควรเป็น 400`);
+      assert.strictEqual(rawCalls.length, 0, `limit=${bad} ห้ามแตะ DB`);
+    }
+  });
+
+  test('/all?limit ที่เพดานพอดี = ผ่าน', async () => {
+    rawCalls.length = 0;
+    const res = await authed(dataServer.baseUrl + '/api/sensors/all?limit=5000');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(rawCalls[0].params, [5000]);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -483,6 +507,42 @@ describe('DELETE /api/sensors/:metric', () => {
     const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature', { method: 'DELETE', headers: AUTH });
     assert.strictEqual(res.status, 500);
     (prisma as any).$queryRawUnsafe = saved;
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ลบข้อมูลเทเลเมตรี = ทำลายหลักฐานย้อนหลัง (กู้ไม่ได้) — ต้องมีสิทธิ์ระดับผู้ดูแล
+describe('สิทธิ์การลบข้อมูลเทเลเมตรี', () => {
+  const kidAuth = { Authorization: `Bearer ${makeToken('KID')}` };
+
+  test('KID ลบ record เดียว = 403 และไม่แตะ DB', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature', {
+      method: 'DELETE',
+      headers: kidAuth,
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(rawCalls.length, 0, 'คำขอที่ไม่มีสิทธิ์ต้องไม่ถึง DB');
+  });
+
+  test('KID ลบทั้ง metric = 403 และไม่แตะ DB', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature/all', {
+      method: 'DELETE',
+      headers: kidAuth,
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(rawCalls.length, 0);
+  });
+
+  test('OPERATOR ยังลบได้ — ไม่เข้มเกินจนงานประจำทำไม่ได้', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature/all', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${makeToken('OPERATOR')}` },
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(rawCalls.length, 1);
   });
 });
 

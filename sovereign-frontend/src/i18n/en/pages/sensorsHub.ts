@@ -58,6 +58,7 @@ export default {
   gpsSetError: '❌ Could not set coordinates',
   confirmDeleteOne: 'Delete {label} = {value}?',
   deletedOne: '✅ Deleted',
+  deleteForbidden: '❌ You do not have permission to delete telemetry — admin role required',
   deleteFailed: '❌ Delete failed',
   confirmDeleteAll: 'Delete all "{label}"?',
   deleteAllSuccess: '✅ Deleted all {label}',

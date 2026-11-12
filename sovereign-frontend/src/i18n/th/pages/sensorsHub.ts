@@ -58,6 +58,7 @@ export default {
   gpsSetError: '❌ ไม่สามารถตั้งพิกัดได้',
   confirmDeleteOne: 'ลบ {label} = {value}?',
   deletedOne: '✅ ลบแล้ว',
+  deleteForbidden: '❌ ไม่มีสิทธิ์ลบข้อมูลเทเลเมตรี — ต้องเป็นผู้ดูแลระบบ',
   deleteFailed: '❌ ลบไม่สำเร็จ',
   confirmDeleteAll: 'ลบข้อมูล "{label}" ทั้งหมด?',
   deleteAllSuccess: '✅ ลบ {label} ทั้งหมดแล้ว',
