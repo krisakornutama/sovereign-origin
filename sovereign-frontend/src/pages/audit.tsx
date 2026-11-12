@@ -40,18 +40,43 @@ export default function AuditPage() {
   const [query, setQuery] = useState('');
   const [passwordOnly, setPasswordOnly] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // ช่วงวันเวลา — ต้องเป็นเวลาสัมบูรณ์ (ISO) ไม่ใช่สตริง datetime-local ดิบ ๆ
+  // เพราะ browser กับ server อยู่คนละ timezone ได้: แปลงที่ browser แล้วส่ง ISO
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  // ผลของการส่งออก — ไฟล์ที่ถูกตัดเพดานต้องบอกให้รู้ ไม่ใช่เงียบ
+  const [exportNote, setExportNote] = useState<{ rows: number; total: number; truncated: boolean } | null>(null);
+
+  const rangeParams = (params: URLSearchParams) => {
+    if (from) {
+      const d = new Date(from);
+      if (!Number.isNaN(d.getTime())) params.set('from', d.toISOString());
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!Number.isNaN(d.getTime())) params.set('to', d.toISOString());
+    }
+    return params;
+  };
 
   // ดาวน์โหลด CSV ตามตัวกรองปัจจุบัน — ใช้เป็นหลักฐานส่งผู้ตรวจได้โดยไม่ต้องเปิด DB
   const exportCsv = async () => {
     setExporting(true);
     setError('');
+    setExportNote(null);
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set('q', query.trim());
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit/export?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
+      // server บอกจำนวนจริงของไฟล์นี้ (header ถูก expose ใน CORS แล้ว) — ถ้าอ่านไม่ได้
+      // ให้ถือว่า "ไม่รู้" ไม่ใช่ "ครบ" เพื่อไม่ให้ผู้ใช้เชื่อไฟล์ที่อาจถูกตัด
+      const rows = Number(res.headers.get('X-Audit-Export-Rows'));
+      const total = Number(res.headers.get('X-Audit-Export-Total'));
+      const truncated = res.headers.get('X-Audit-Export-Truncated') === 'true';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -60,6 +85,7 @@ export default function AuditPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      if (Number.isFinite(rows) && Number.isFinite(total)) setExportNote({ rows, total, truncated });
     } catch (err: any) {
       setError(t('audit.exportError', 'ส่งออกไม่สำเร็จ: {msg}', { msg: err.message || '' }));
     } finally {
@@ -74,6 +100,7 @@ export default function AuditPage() {
       const params = new URLSearchParams({ limit: String(limit) });
       if (query.trim()) params.set('q', query.trim());
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -167,7 +194,49 @@ export default function AuditPage() {
           </div>
         </div>
 
+        {/* ช่วงเวลา — ตัวกรองใช้ทั้งรายการและไฟล์ export (กด "ค้นหา" เพื่อใช้กับรายการ) */}
+        <div className="flex flex-wrap gap-2 items-center text-sm">
+          <span className="text-gray-500">{t('audit.rangeLabel', 'ช่วงเวลา')}</span>
+          <input
+            type="datetime-local"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="input text-sm"
+            aria-label={t('audit.fromLabel', 'ตั้งแต่')}
+          />
+          <span className="text-gray-500">–</span>
+          <input
+            type="datetime-local"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="input text-sm"
+            aria-label={t('audit.toLabel', 'ถึง')}
+          />
+          {(from || to) && (
+            <button
+              type="button"
+              onClick={() => { setFrom(''); setTo(''); }}
+              className="btn-secondary"
+            >
+              {t('audit.clearRange', 'ล้างช่วง')}
+            </button>
+          )}
+          <span className="text-xs text-gray-500">{t('audit.rangeHint', 'ใช้กับทั้งรายการและไฟล์ที่ส่งออก')}</span>
+        </div>
+
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
+
+        {exportNote && (
+          <div className={`card p-3 text-sm ${exportNote.truncated ? 'text-amber-300 border border-amber-700/60' : 'text-emerald-300'}`}>
+            {exportNote.truncated
+              ? t(
+                  'audit.exportTruncated',
+                  'ไฟล์ที่ได้มี {rows} จากทั้งหมด {total} รายการ — ถูกตัดเพราะถึงเพดานต่อไฟล์ อย่าส่งต่อว่าเป็นข้อมูลครบทั้งช่วง ให้แบ่งช่วงวันที่แล้วส่งออกหลายไฟล์',
+                  { rows: exportNote.rows, total: exportNote.total }
+                )
+              : t('audit.exportComplete', 'ส่งออกครบทั้งช่วงแล้ว: {rows} รายการ', { rows: exportNote.rows })}
+          </div>
+        )}
 
         <div className="card panel-cyan overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />

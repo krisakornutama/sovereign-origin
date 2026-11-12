@@ -96,18 +96,29 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
 
 // GET /api/audit/export — ดาวน์โหลด CSV ตามตัวกรองเดียวกับหน้า audit
 // ตัว export เองถูกบันทึกเป็น AUDIT_EXPORT (ใครดึงไป จำนวนเท่าไร ตรวจย้อนได้)
+//
+// ไฟล์ที่ถูกตัดเงียบ ๆ คือหลักฐานที่โกหก: ผู้ตรวจได้ CSV ไปแล้วเชื่อว่าเป็นทั้งช่วง
+// ที่ขอ ทั้งที่เพดาน 10,000 แถวตัดไปแล้ว ⇒ ต้องบอกจำนวนที่ได้จริง เทียบกับจำนวน
+// ทั้งหมดที่ตรงตัวกรอง (คำถามเดียวกัน) แล้วส่งธง "ถูกตัด" ให้ UI เตือนก่อน/หลังโหลด
 router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const filters = readFilters(req);
     const requested = parseInt(req.query.limit as string) || EXPORT_MAX_ROWS;
     const take = Math.max(1, Math.min(requested, EXPORT_MAX_ROWS));
 
-    const logs = await prisma.auditLog.findMany({
-      where: await buildWhere(filters),
-      orderBy: { timestamp: 'desc' },
-      take,
-      include: { user: { select: { username: true } } },
-    });
+    // where ก้อนเดียวใช้ทั้งสองคำถาม — นับด้วยตัวกรองอื่นไม่ครบเมื่อไร ตัวเลข "ทั้งหมด"
+    // จะเกินความจริงทันที (เช่นลืม q ที่เป็น OR ระหว่าง id กับ username)
+    const where = await buildWhere(filters);
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take,
+        include: { user: { select: { username: true } } },
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+    const truncated = total > logs.length;
 
     const lines = [csvRow(['timestamp', 'user', 'action', 'ip', 'method', 'path', 'payload'])];
     for (const log of logs as any[]) {
@@ -127,6 +138,10 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="audit-export-${stamp}.csv"`);
+    // ตัวเลขจริงของไฟล์นี้ — UI อ่านเพื่อเตือนว่า "ไม่ครบทั้งช่วง" (CORS ต้อง expose header)
+    res.setHeader('X-Audit-Export-Rows', String(logs.length));
+    res.setHeader('X-Audit-Export-Total', String(total));
+    res.setHeader('X-Audit-Export-Truncated', truncated ? 'true' : 'false');
     res.send('\ufeff' + lines.join('\n') + '\n');
 
     await AuditService.logAction({
@@ -134,6 +149,8 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
       actionType: 'AUDIT_EXPORT',
       payload: {
         rows: logs.length,
+        total,
+        truncated,
         q: filters.q || undefined,
         actionPrefix: filters.actionPrefix || undefined,
         from: filters.from?.toISOString(),
