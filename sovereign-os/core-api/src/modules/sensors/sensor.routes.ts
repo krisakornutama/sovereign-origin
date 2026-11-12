@@ -1,9 +1,29 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../../lib/prisma';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
 
 const router = Router();
+
+// อุปกรณ์ = config จริงของบ้าน (ลบแล้วประวัติ/ค่า sensor ของอุปกรณ์นั้นหายตาม)
+// ⇒ เขียนได้เฉพาะ role ที่ดูแลระบบ ไม่ใช่ทุกบัญชีที่ล็อกอินแล้ว (KID/SYSTEM_AI ไม่ได้)
+const DEVICE_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
+const DEVICE_TYPE_PATTERN = /^[A-Za-z0-9 _.-]{1,32}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * ทำชื่ออุปกรณ์ให้เป็น segment ของ MQTT topic ที่ปลอดภัย
+ * — `/`, `+`, `#` ในชื่อจะกลายเป็น wildcard/ชั้น topic ที่ไม่ตั้งใจ (`#` = ทุก topic)
+ * — ภาษาไทยใช้ได้ (MQTT เป็น UTF-8) แต่ช่องว่างกลายเป็น `-` เพื่อให้ topic อ่านง่าย
+ */
+function topicSegment(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .trim()
+    .replace(/[\s/+#\u0000-\u001f\u007f]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
 
 /**
  * ค่าที่จะฝังลงสตริง C (`const char* ssid = "…"`) ต้องถูก escape ก่อนเสมอ
@@ -28,6 +48,7 @@ function cString(value: unknown, max: number): string {
 const MAX_GENERATED_SENSORS = 32;
 
 // GET /api/sensors/devices
+// อ่าน DB ไม่ได้ ≠ ไม่มีอุปกรณ์ — คืน degraded flag ให้ UI พูดว่า "ไม่รู้" ไม่ใช่ "0 อุปกรณ์"
 router.get('/devices', authenticate, async (req, res) => {
   try {
     const devices = await prisma.device.findMany({
@@ -48,37 +69,72 @@ router.get('/devices', authenticate, async (req, res) => {
         sensors: sensors.map(s => ({ metric: s.metric, value: s.value })),
       });
     }
-    res.json(result);
+    res.json({ devices: result, degraded: false, source: 'db' });
   } catch (err) {
-    res.status(500).json([]);
+    res.json({
+      devices: [],
+      degraded: true,
+      source: 'unavailable',
+      reason: 'อ่านรายการอุปกรณ์จากฐานข้อมูลไม่ได้',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
 // POST /api/sensors/devices
-router.post('/devices', authenticate, async (req, res) => {
+router.post('/devices', authenticate, requireRole(...DEVICE_WRITE_ROLES), async (req, res) => {
+  const type = typeof req.body?.type === 'string' ? req.body.type.trim() : '';
+  if (!DEVICE_TYPE_PATTERN.test(type)) {
+    return res.status(400).json({
+      error: 'type ต้องเป็นตัวอักษร/ตัวเลข/ขีด ยาว 1-32 ตัว (เช่น ESP32, ESP8266, RaspberryPi)',
+    });
+  }
+  const nodeId = req.body?.node_id;
+  if (nodeId !== undefined && nodeId !== null && nodeId !== '' && (typeof nodeId !== 'string' || !UUID_PATTERN.test(nodeId))) {
+    return res.status(400).json({ error: 'node_id ต้องเป็น UUID ที่ถูกต้อง' });
+  }
+  // name ไม่มีคอลัมน์เก็บใน devices — ใช้สร้าง mqtt_topic เท่านั้น (ต้องบอกในเอกสาร)
+  const segment = topicSegment(req.body?.name) || 'device';
+  const providedTopic = req.body?.mqtt_topic;
+  let mqttTopic: string;
+  if (providedTopic !== undefined && providedTopic !== null && providedTopic !== '') {
+    if (typeof providedTopic !== 'string' || providedTopic.trim().length < 3 || providedTopic.trim().length > 200 || /[\s\u0000-\u001f]/.test(providedTopic)) {
+      return res.status(400).json({ error: 'mqtt_topic ต้องยาว 3-200 ตัวและไม่มีช่องว่าง/อักขระควบคุม' });
+    }
+    mqttTopic = providedTopic.trim();
+  } else {
+    mqttTopic = `sovereign/${segment}/sensor/+`;
+  }
   try {
-    const { name, type, mqtt_topic, node_id } = req.body;
     const device = await prisma.device.create({
       data: {
-        node_id: node_id || config.defaults.telemetryNodeId,
+        node_id: (nodeId as string) || config.defaults.telemetryNodeId,
         type,
-        mqtt_topic: mqtt_topic || `sovereign/${name}/sensor/+`,
+        mqtt_topic: mqttTopic,
         is_active: true,
       },
     });
     res.status(201).json(device);
   } catch (err) {
-    res.status(500).json({ error: 'สร้างอุปกรณ์ไม่สำเร็จ' });
+    res.status(500).json({ error: 'สร้างอุปกรณ์ไม่สำเร็จ', detail: String((err as Error)?.message || '').slice(0, 200) });
   }
 });
 
 // DELETE /api/sensors/devices/:id
-router.delete('/devices/:id', authenticate, async (req, res) => {
+router.delete('/devices/:id', authenticate, requireRole(...DEVICE_WRITE_ROLES), async (req, res) => {
+  const id = req.params.id;
+  // @db.Uuid: id ผิดรูปแบบทำให้ Prisma โยน P2023 — ต้องบอกก่อนถึง DB
+  if (!UUID_PATTERN.test(id)) {
+    return res.status(400).json({ error: 'id ต้องเป็น UUID ของอุปกรณ์' });
+  }
   try {
-    await prisma.device.delete({ where: { id: req.params.id } });
+    await prisma.device.delete({ where: { id } });
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'ลบไม่สำเร็จ' });
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      return res.status(404).json({ error: 'ไม่พบอุปกรณ์นี้ (อาจถูกลบไปแล้ว)' });
+    }
+    res.status(500).json({ error: 'ลบไม่สำเร็จ', detail: String(err?.message || '').slice(0, 200) });
   }
 });
 

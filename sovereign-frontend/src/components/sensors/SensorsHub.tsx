@@ -11,42 +11,13 @@ import EmptyState from '../ui/EmptyState';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import { fmtLocale } from '../../lib/formatDate';
 import { useTelemetryDelete } from '../../lib/sensors/use-telemetry-delete';
+import { METRIC_OPTIONS, METRIC_LABEL } from '../../lib/sensors/metrics';
+import DeviceCard, { type Device } from './DeviceCard';
+import GenerateCodeModal from './GenerateCodeModal';
 
 type Tab = 'devices' | 'data';
 
-// ── ข้อมูลร่วมระหว่างแท็บ ──
-const METRIC_OPTIONS = [
-  { value: 'all', label: 'ทั้งหมด' },
-  { value: 'battery_soc', label: 'แบตเตอรี่' },
-  { value: 'water_level_cm', label: 'ระดับน้ำ' },
-  { value: 'power_kw', label: 'กำลังไฟฟ้า' },
-  { value: 'temperature', label: 'อุณหภูมิ' },
-  { value: 'humidity', label: 'ความชื้นอากาศ' },
-  { value: 'soil_moisture', label: 'ความชื้นดิน' },
-  { value: 'ec_value', label: 'ค่า EC' },
-  { value: 'ph', label: 'pH ดิน' },
-  { value: 'solar_radiation', label: 'แสงอาทิตย์' },
-  { value: 'wind_speed', label: 'ความเร็วลม' },
-  { value: 'rainfall', label: 'ปริมาณน้ำฝน' },
-  { value: 'ultrasonic_distance', label: 'Ultrasonic' },
-  { value: 'pir_motion', label: 'PIR Motion' },
-  { value: 'rain_detect', label: 'ตรวจจับฝน' },
-  { value: 'smoke', label: 'Smoke' },
-  { value: 'gas_leak', label: 'Gas Leak' },
-  { value: 'door_state', label: 'Door' },
-];
-
-interface Device {
-  id: string;
-  type: string;
-  mqtt_topic: string;
-  is_active: boolean;
-  online: boolean;
-  latitude?: number | null;
-  longitude?: number | null;
-  sensors: { metric: string; value: number }[];
-}
-
+// ── ข้อมูลร่วมระหว่างแท็บ (METRIC_OPTIONS / METRIC_LABEL อยู่ใน lib/sensors/metrics.ts) ──
 interface SensorRecord {
   time: string;
   node_id: string;
@@ -54,26 +25,6 @@ interface SensorRecord {
   metric: string;
   value: number;
 }
-
-const METRIC_LABEL: Record<string, string> = {
-  battery_soc: 'แบตเตอรี่',
-  water_level_cm: 'ระดับน้ำ',
-  power_kw: 'กำลังไฟฟ้า',
-  temperature: 'อุณหภูมิ',
-  humidity: 'ความชื้นอากาศ',
-  soil_moisture: 'ความชื้นดิน',
-  ec_value: 'ค่า EC',
-  ph: 'pH ดิน',
-  solar_radiation: 'แสงอาทิตย์',
-  wind_speed: 'ความเร็วลม',
-  rainfall: 'ปริมาณน้ำฝน',
-  ultrasonic_distance: 'Ultrasonic',
-  pir_motion: 'PIR Motion',
-  rain_detect: 'ตรวจจับฝน',
-  smoke: 'Smoke',
-  gas_leak: 'Gas Leak',
-  door_state: 'Door',
-};
 
 export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Tab }) {
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
@@ -92,15 +43,18 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
 
   // ── แท็บอุปกรณ์ (Device Manager) ──
   const [devices, setDevices] = useState<Device[]>([]);
+  // อ่านรายการไม่ได้ ≠ ไม่มีอุปกรณ์ — ต้องแยกสถานะให้ผู้ใช้เห็น (หลักฐานเท็จ = ห้าม)
+  const [devicesDegraded, setDevicesDegraded] = useState(false);
+  const [devicesReason, setDevicesReason] = useState('');
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('ESP8266');
   const [message, setMessage] = useState('');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [generatedCode, setGeneratedCode] = useState('');
 
   // ── แท็บข้อมูล (Sensor Data) ──
   const [records, setRecords] = useState<SensorRecord[]>([]);
+  const [dataError, setDataError] = useState('');
   const [filter, setFilter] = useState('all');
   const [limit, setLimit] = useState(50);
   const [loading, setLoading] = useState(false);
@@ -110,9 +64,15 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/devices`);
       const data = await res.json();
-      setDevices(data);
-    } catch (err) {
-      console.error('Load devices error:', err);
+      // รูปแบบจริงคือ { devices, degraded, reason } — รองรับ array เดิมของ mock/preview ด้วย
+      const list = Array.isArray(data) ? data : Array.isArray(data?.devices) ? data.devices : [];
+      setDevices(list);
+      setDevicesDegraded(!Array.isArray(data) && data?.degraded === true);
+      setDevicesReason(String(data?.reason || ''));
+    } catch {
+      setDevices([]);
+      setDevicesDegraded(true);
+      setDevicesReason(t('sensorsHub.devicesUnreachable', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — สถานะอุปกรณ์ไม่ทราบ'));
     }
   };
 
@@ -123,11 +83,15 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
         `${process.env.NEXT_PUBLIC_API_URL}/api/sensors/all?metric=${filter}&limit=${limit}`
       );
       const data = await res.json();
+      const rows = Array.isArray(data) ? data : Array.isArray(data?.records) ? data.records : [];
       // กรอง row ที่ metric ว่าง (ข้อมูลเสียจากอดีต) — แสดงไม่ได้และลบทีละแถวไม่ได้
       // เพราะ URL ลบคือ /api/sensors/{metric} (segment ว่างไม่ match route)
-      setRecords(Array.isArray(data) ? data.filter((r: SensorRecord) => r.metric && r.metric.trim()) : []);
+      setRecords(rows.filter((r: SensorRecord) => r.metric && r.metric.trim()));
+      // อ่านไม่สำเร็จ = ต้องบอก ไม่ใช่โชว์ตารางว่างที่อ่านว่า "ไม่มีข้อมูล"
+      setDataError(res.ok ? '' : String(data?.error || t('sensorsHub.dataUnavailable', 'อ่านข้อมูลเซ็นเซอร์ไม่ได้')));
     } catch {
       setRecords([]);
+      setDataError(t('sensorsHub.dataUnavailable', 'อ่านข้อมูลเซ็นเซอร์ไม่ได้'));
     }
     setLoading(false);
   };
@@ -156,7 +120,6 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
         body: JSON.stringify({
           name: deviceName,
           type: deviceType,
-          mqtt_topic: `sovereign/${deviceName}/sensor/+`,
         }),
       });
       const data = await res.json();
@@ -175,10 +138,20 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
 
   const deleteDevice = async (id: string) => {
     if (!confirm(t('sensorsHub.confirmDeleteDevice', 'ยืนยันการลบอุปกรณ์?'))) return;
-    await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/devices/${id}`, {
-      method: 'DELETE',
-    });
-    loadDevices();
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/devices/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(`❌ ${data?.error || t('sensorsHub.deleteDeviceFailed', 'ลบอุปกรณ์ไม่สำเร็จ')}`);
+        return;
+      }
+      setMessage(t('sensorsHub.deleteDeviceSuccess', '✅ ลบอุปกรณ์แล้ว'));
+      loadDevices();
+    } catch {
+      setMessage(t('sensorsHub.deleteDeviceFailed', 'ลบอุปกรณ์ไม่สำเร็จ'));
+    }
   };
 
   const setDeviceLocation = async (device: Device) => {
@@ -275,6 +248,12 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
           {/* ════════════════ แท็บ: อุปกรณ์ ════════════════ */}
           {tab === 'devices' && (
             <>
+              {devicesDegraded && (
+                <div className="p-3 rounded text-sm bg-amber-900/30 text-amber-300">
+                  {t('sensorsHub.devicesDegraded', 'อ่านรายการอุปกรณ์จากเซิร์ฟเวอร์ไม่ได้ — สถานะ "ไม่ทราบ" ไม่ใช่ "ไม่มีอุปกรณ์"')}
+                  {devicesReason ? ` (${devicesReason})` : ''}
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('sensorsHub.deviceCount', 'อุปกรณ์ทั้งหมด ({n})', { n: devices.length })}</h2>
                 <button onClick={() => setShowAddDevice(!showAddDevice)} className="btn-primary text-sm px-4 py-2">
@@ -298,79 +277,20 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
 
               <div className="space-y-4">
                 {devices.map((device) => (
-                  <div key={device.id} className="card p-4 card-hover">
-                    <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-200">{device.type}</h3>
-                        <p className="text-xs text-gray-400">{device.id}</p>
-                        <p className="text-xs text-gray-500">{device.mqtt_topic}</p>
-                        <span className={`inline-flex items-center gap-1 text-xs ${device.online ? 'text-emerald-400' : 'text-red-400'}`}>
-                          <span className={`w-2 h-2 rounded-full ${device.online ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                          {device.online ? t('common.online', 'ออนไลน์') : t('common.offline', 'ออฟไลน์')}
-                        </span>
-                        {device.latitude != null && device.longitude != null && (
-                          <span className="inline-flex items-center gap-1 text-xs text-cyan-500 ml-2"><Icon name="map-pin" size={11} /> {device.latitude.toFixed(3)}, {device.longitude.toFixed(3)}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setSelectedDevice(device)} className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"><Icon name="code" size={12} /> Generate Code</button>
-                        <button onClick={() => setDeviceLocation(device)} className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1" title={t('sensorsHub.setLocationTitle', 'ตั้งพิกัด GPS สำหรับแผนที่')}><Icon name="map-pin" size={12} /> {t('sensorsHub.locationBtn', 'พิกัด')}</button>
-                        <button onClick={() => deleteDevice(device.id)} className="text-red-400 hover:text-red-300 text-sm"><Icon name="trash" size={13} /></button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {device.sensors?.map((sensor) => (
-                        <div key={sensor.metric} className="inset p-2 text-center">
-                          <div className="text-xs text-gray-400">{t(`sensorsHub.metric.${sensor.metric}`, METRIC_LABEL[sensor.metric] || sensor.metric)}</div>
-                          <div className="text-lg font-bold text-emerald-400 glow-text">{sensor.value}</div>
-                        </div>
-                      ))}
-                      {(!device.sensors || device.sensors.length === 0) && (
-                        <div className="text-xs text-gray-500 col-span-3">{t('sensorsHub.noSensorData', 'ยังไม่มีข้อมูลเซ็นเซอร์ — ดูข้อมูลที่แท็บ "ข้อมูลเซ็นเซอร์"')}</div>
-                      )}
-                    </div>
-                  </div>
+                  <DeviceCard
+                    key={device.id}
+                    device={device}
+                    onGenerate={setSelectedDevice}
+                    onLocation={setDeviceLocation}
+                    onDelete={deleteDevice}
+                  />
                 ))}
-                {devices.length === 0 && <div className="card"><EmptyState icon={<Icon name="sensors" size={20} />} title={t('sensorsHub.noDevices', 'ยังไม่มีอุปกรณ์')} description={t('sensorsHub.noDevicesDesc', 'เพิ่มอุปกรณ์แรกของคุณ')} /></div>}
+                {devices.length === 0 && !devicesDegraded && <div className="card"><EmptyState icon={<Icon name="sensors" size={20} />} title={t('sensorsHub.noDevices', 'ยังไม่มีอุปกรณ์')} description={t('sensorsHub.noDevicesDesc', 'เพิ่มอุปกรณ์แรกของคุณ')} /></div>}
               </div>
 
               {/* Generate Code Modal */}
               {selectedDevice && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-                  <div className="card p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
-                    <h3 className="text-lg font-bold mb-4">{t('sensorsHub.modalTitle', 'Generate Arduino Code for {type}', { type: selectedDevice.type })}</h3>
-                    <div className="mb-4">
-                      <label htmlFor="wifiSSID" className="label">WiFi SSID</label>
-                      <input id="wifiSSID" className="input w-full" defaultValue="SolarKiller" />
-                    </div>
-                    <div className="mb-4">
-                      <label htmlFor="wifiPass" className="label">WiFi Password</label>
-                      <input id="wifiPass" type="password" className="input w-full" />
-                    </div>
-                    <button onClick={async () => {
-                      const ssid = (document.getElementById('wifiSSID') as HTMLInputElement).value;
-                      const pass = (document.getElementById('wifiPass') as HTMLInputElement).value;
-                      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sensors/generate-code`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          type: selectedDevice.type,
-                          sensors: selectedDevice.sensors?.map(s => s.metric) || ['rain_detect'],
-                          wifiSSID: ssid,
-                          wifiPass: pass,
-                          deviceId: selectedDevice.id,
-                        }),
-                      });
-                      const data = await res.json();
-                      setGeneratedCode(data.code);
-                    }} className="px-4 py-2 btn-primary mb-4">Generate</button>
-                    {generatedCode && (
-                      <textarea readOnly className="w-full h-64 bg-gray-800 text-emerald-400 text-xs p-2 rounded" value={generatedCode} />
-                    )}
-                    <button onClick={() => { setSelectedDevice(null); setGeneratedCode(''); }} className="mt-4 px-4 py-2 btn-secondary rounded">Close</button>
-                  </div>
-                </div>
+                <GenerateCodeModal device={selectedDevice} onClose={() => setSelectedDevice(null)} />
               )}
             </>
           )}
@@ -378,6 +298,11 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
           {/* ════════════════ แท็บ: ข้อมูลเซ็นเซอร์ ════════════════ */}
           {tab === 'data' && (
             <>
+              {dataError && (
+                <div className="p-3 rounded text-sm bg-amber-900/30 text-amber-300">
+                  {t('sensorsHub.dataDegraded', 'อ่านข้อมูลเซ็นเซอร์ไม่ได้ — ตารางว่างไม่ใช่ "ไม่มีข้อมูล"')}: {dataError}
+                </div>
+              )}
               {/* สถิติรวม */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard label={t('sensorsHub.statShowing', 'ข้อมูลที่แสดง')} value={records.length} icon={<Icon name="database" size={14} />} />
@@ -444,7 +369,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                         </td>
                       </tr>
                     ))}
-                    {records.length === 0 && !loading && (
+                    {records.length === 0 && !loading && !dataError && (
                       <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                         {filter === 'all' ? t('sensorsHub.emptyAll', 'ยังไม่มีข้อมูลเซ็นเซอร์') : t('sensorsHub.emptyFiltered', 'ไม่มีข้อมูลสำหรับ "{metric}"', { metric: t(`sensorsHub.metric.${filter}`, METRIC_LABEL[filter] || filter) })}
                       </td></tr>

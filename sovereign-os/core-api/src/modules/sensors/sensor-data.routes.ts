@@ -57,14 +57,20 @@ router.post('/data', authenticate, async (req, res) => {
 });
 
 // Sensor metrics list
+// อ่าน DB ไม่ได้ ≠ ไม่มี metric — ต้อง 500 พร้อมเหตุผล ไม่ใช่ 200 [] (ผู้เรียกอ่านว่า "ไม่มีข้อมูล")
 router.get('/metrics', authenticate, async (_req, res) => {
   try {
     const result = await prisma.$queryRawUnsafe<Array<any>>(
       `SELECT DISTINCT metric FROM sensor_telemetry ORDER BY metric`
     );
-    res.json(result.map((r: any) => r.metric));
+    res.json({ metrics: result.map((r: any) => r.metric), degraded: false });
   } catch (err) {
-    res.json([]);
+    res.status(500).json({
+      error: 'อ่านรายชื่อ metric จากฐานข้อมูลไม่ได้',
+      metrics: [],
+      degraded: true,
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
@@ -88,7 +94,12 @@ router.get('/all', authenticate, async (req, res) => {
     const result = await prisma.$queryRawUnsafe<Array<any>>(query, ...params);
     res.json(result);
   } catch (err) {
-    res.status(500).json([]);
+    // เคยตอบ `500 []` ⇒ อ่านว่า "ไม่มีข้อมูล" ทั้งที่จริงคือ "อ่านไม่ได้"
+    res.status(500).json({
+      error: 'อ่านข้อมูลเซ็นเซอร์ไม่สำเร็จ',
+      records: [],
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 

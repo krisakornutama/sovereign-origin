@@ -62,4 +62,11 @@ export default {
   deleteFailed: '❌ ลบไม่สำเร็จ',
   confirmDeleteAll: 'ลบข้อมูล "{label}" ทั้งหมด?',
   deleteAllSuccess: '✅ ลบ {label} ทั้งหมดแล้ว',
+  devicesDegraded: 'อ่านรายการอุปกรณ์จากเซิร์ฟเวอร์ไม่ได้ — สถานะ "ไม่ทราบ" ไม่ใช่ "ไม่มีอุปกรณ์"',
+  devicesUnreachable: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — สถานะอุปกรณ์ไม่ทราบ',
+  deleteDeviceSuccess: '✅ ลบอุปกรณ์แล้ว',
+  deleteDeviceFailed: 'ลบอุปกรณ์ไม่สำเร็จ',
+  dataUnavailable: 'อ่านข้อมูลเซ็นเซอร์ไม่ได้',
+  dataDegraded: 'อ่านข้อมูลเซ็นเซอร์ไม่ได้ — ตารางว่างไม่ใช่ "ไม่มีข้อมูล"',
+  generateFailed: 'สร้างโค้ดไม่สำเร็จ',
 } as const;

@@ -62,4 +62,11 @@ export default {
   deleteFailed: '❌ Delete failed',
   confirmDeleteAll: 'Delete all "{label}"?',
   deleteAllSuccess: '✅ Deleted all {label}',
+  devicesDegraded: 'Could not read the device list from the server — status is unknown, not "no devices"',
+  devicesUnreachable: 'Could not reach the server — device status unknown',
+  deleteDeviceSuccess: '✅ Device deleted',
+  deleteDeviceFailed: 'Could not delete the device',
+  dataUnavailable: 'Could not read sensor data',
+  dataDegraded: 'Could not read sensor data — an empty table does not mean there is no data',
+  generateFailed: 'Could not generate the code',
 } as const;

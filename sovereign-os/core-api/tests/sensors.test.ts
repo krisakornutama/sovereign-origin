@@ -117,16 +117,17 @@ describe('GET /api/sensors/devices', () => {
     const res = await authed(server.baseUrl + '/api/sensors/devices');
     assert.strictEqual(res.status, 200);
     const body: any = await res.json();
-    assert.strictEqual(body.length, 2, 'ไม่ควรมีอุปกรณ์ is_active=false');
-    assert.strictEqual(body[0].name, 'SENSOR-SHOP-1');
-    assert.strictEqual(body[0].online, true, 'heartbeat 30 วิ = ออนไลน์');
-    assert.strictEqual(body[1].online, false, 'heartbeat 30 นาที = ออฟไลน์');
+    assert.strictEqual(body.degraded, false);
+    assert.strictEqual(body.devices.length, 2, 'ไม่ควรมีอุปกรณ์ is_active=false');
+    assert.strictEqual(body.devices[0].type, 'ESP32');
+    assert.strictEqual(body.devices[0].online, true, 'heartbeat 30 วิ = ออนไลน์');
+    assert.strictEqual(body.devices[1].online, false, 'heartbeat 30 นาที = ออฟไลน์');
   });
 
   test('แนบค่าล่าสุดต่อ metric ของอุปกรณ์นั้น', async () => {
     const res = await authed(server.baseUrl + '/api/sensors/devices');
     const body: any = await res.json();
-    assert.deepStrictEqual(body[0].sensors, [
+    assert.deepStrictEqual(body.devices[0].sensors, [
       { metric: 'temperature', value: 31.4 },
       { metric: 'humidity', value: 68 },
     ]);
@@ -136,14 +137,17 @@ describe('GET /api/sensors/devices', () => {
     assert.strictEqual(deviceQuery.params[0], 'aaaaaaaa-0000-4000-8000-000000000001');
   });
 
-  test('DB ล้ม = 500 กับ array ว่าง (หน้าเว็บจะเห็น 0 อุปกรณ์ ไม่ใช่ error ดิบ)', async () => {
+  test('DB ล้ม = degraded: true + เหตุผล (ไม่ใช่ "0 อุปกรณ์" ที่อ่านว่าบ้านไม่มีอุปกรณ์)', async () => {
     const saved = (prisma as any).device.findMany;
     (prisma as any).device.findMany = async () => {
       throw new Error('db down');
     };
     const res = await authed(server.baseUrl + '/api/sensors/devices');
-    assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(await res.json(), []);
+    assert.strictEqual(res.status, 200);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.devices, []);
+    assert.strictEqual(body.degraded, true);
+    assert.ok(String(body.reason).length > 0);
     (prisma as any).device.findMany = saved;
   });
 });
@@ -183,14 +187,18 @@ describe('POST /api/sensors/devices', () => {
 // ────────────────────────────────────────────────────────────────────────────
 describe('DELETE /api/sensors/devices/:id', () => {
   test('ลบสำเร็จคืน { success: true }', async () => {
-    devices.push({ id: 'temp-del', name: 'TEMP', is_active: true, last_heartbeat: null });
-    const res = await fetch(server.baseUrl + '/api/sensors/devices/temp-del', { method: 'DELETE', headers: AUTH });
+    const id = 'aaaaaaaa-0000-4000-8000-0000000000aa';
+    devices.push({ id, name: 'TEMP', is_active: true, last_heartbeat: null });
+    const res = await fetch(server.baseUrl + `/api/sensors/devices/${id}`, { method: 'DELETE', headers: AUTH });
     assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(await res.json(), { success: true });
   });
 
   test('ลบ id ที่ไม่มี = 500 (ไม่เงียบว่าสำเร็จ)', async () => {
-    const res = await fetch(server.baseUrl + '/api/sensors/devices/nope', { method: 'DELETE', headers: AUTH });
+    const res = await fetch(
+      server.baseUrl + '/api/sensors/devices/aaaaaaaa-0000-4000-8000-0000000000ff',
+      { method: 'DELETE', headers: AUTH }
+    );
     assert.strictEqual(res.status, 500);
     assert.ok((await res.json()).error);
   });
@@ -395,17 +403,22 @@ describe('GET /api/sensors/metrics + /all', () => {
   test('/metrics คืนรายชื่อ metric เป็น array ของ string', async () => {
     const res = await authed(dataServer.baseUrl + '/api/sensors/metrics');
     assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), ['temperature', 'humidity']);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.metrics, ['temperature', 'humidity']);
+    assert.strictEqual(body.degraded, false);
   });
 
-  test('/metrics ที่ DB ล้ม = 200 กับ array ว่าง (ไม่ throw)', async () => {
+  test('/metrics ที่ DB ล้ม = 500 + degraded (ไม่ใช่ 200 [] ที่อ่านว่า "ไม่มี metric")', async () => {
     const saved = (prisma as any).$queryRawUnsafe;
     (prisma as any).$queryRawUnsafe = async () => {
       throw new Error('db down');
     };
     const res = await authed(dataServer.baseUrl + '/api/sensors/metrics');
-    assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), []);
+    assert.strictEqual(res.status, 500);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.metrics, []);
+    assert.strictEqual(body.degraded, true);
+    assert.ok(String(body.error).length > 0);
     (prisma as any).$queryRawUnsafe = saved;
   });
 
@@ -432,14 +445,16 @@ describe('GET /api/sensors/metrics + /all', () => {
     assert.doesNotMatch(rawCalls[0].sql, /AND metric/);
   });
 
-  test('/all ที่ DB ล้ม = 500 กับ array ว่าง', async () => {
+  test('/all ที่ DB ล้ม = 500 + records: [] + error (ไม่ใช่ array ว่าง)', async () => {
     const saved = (prisma as any).$queryRawUnsafe;
     (prisma as any).$queryRawUnsafe = async () => {
       throw new Error('db down');
     };
     const res = await authed(dataServer.baseUrl + '/api/sensors/all');
     assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(await res.json(), []);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.records, []);
+    assert.ok(String(body.error).length > 0);
     (prisma as any).$queryRawUnsafe = saved;
   });
 
