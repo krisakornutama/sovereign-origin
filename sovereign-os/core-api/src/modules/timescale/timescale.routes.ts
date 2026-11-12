@@ -114,10 +114,19 @@ router.get('/history', authenticate, async (req, res) => {
     query += ` GROUP BY bucket, metric ORDER BY bucket ASC`;
 
     const result = await prisma.$queryRawUnsafe<Array<any>>(query, ...params);
+    if (!Array.isArray(result)) {
+      // body ต้องไม่ถูกอ่านเป็น "ไม่มีข้อมูล" — array เท่านั้นที่แปลว่าอ่านสำเร็จ
+      return res.status(500).json({ error: 'อ่านประวัติ Timescale ไม่ได้ — ผลลัพธ์ไม่ใช่ชุดข้อมูล', buckets: [] });
+    }
     res.json(result);
   } catch (err) {
     console.error('Timescale history error:', err);
-    res.status(500).json([]);
+    // เดิม 500 + [] ⇒ ผู้เรียกที่อ่าน body ก่อน status เข้าใจว่า "ไม่มีข้อมูลในช่วงนี้"
+    res.status(500).json({
+      error: 'อ่านประวัติ Timescale ไม่ได้',
+      buckets: [],
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
@@ -127,9 +136,21 @@ router.get('/metrics', authenticate, async (req, res) => {
     const result = await prisma.$queryRawUnsafe<Array<any>>(
       `SELECT DISTINCT metric FROM sensor_telemetry ORDER BY metric`
     );
-    res.json(result.map((r: any) => r.metric));
+    // metric ว่าง/null เอาไป query ต่อไม่ได้ (หน้า /history จะได้กราฟเปล่าที่ไม่มีสาเหตุ)
+    const metrics = (Array.isArray(result) ? result : [])
+      .map((r: any) => r?.metric)
+      .filter((m: any) => m != null && String(m).trim().length > 0)
+      .map((m: any) => String(m));
+    res.json({ metrics, degraded: false });
   } catch (err) {
-    res.json([]);
+    console.error('Timescale metrics error:', err);
+    // เดิม catch แล้ว res.json([]) = 200 [] ⇒ หน้า /history ขึ้น "ยังไม่มีข้อมูลเซ็นเซอร์" ทั้งที่อ่าน DB ไม่ได้
+    res.status(500).json({
+      error: 'อ่านรายชื่อ metric จากฐานข้อมูลไม่ได้',
+      metrics: [],
+      degraded: true,
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
