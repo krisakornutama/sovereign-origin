@@ -160,3 +160,16 @@ export interface AuditStore {
 - **ห้ามเปลี่ยนเป็นลบอัตโนมัติในอนาคต** เว้นแต่เจ้าของสั่ง: quiesce คือด่านกันข้อมูลหาย ไม่ใช่ของประดับ
 
 **เทสต์:** `queue-rejection.test.ts` 8/8 (pure) · `offlineQueue.rejection.idb.test.ts` 4/4 (fake-indexeddb: 400 ไม่ถูกลบ + ไม่ยิงซ้ำ, 200 ถูกลบ, 5xx ยัง retry, 429 ไม่ติดป้าย, ป้าย persist ลง IDB จริง, flushAction ลองใหม่ได้) · wrapper ใน `tools/test/frontend-queue-rejection*.test.mjs` ผูกเข้า `npm run verify`
+
+### 9.1 ข้อความ "Sync ทั้งหมด" ต้องตรงกับคิวจริง (เพิ่ม 2026-11-12)
+
+ปุ่ม "Sync ทั้งหมด" เคยขึ้นแบนเนอร์ **"sync ทั้งหมดสำเร็จ {n} รายการ"** โดยดูแค่จำนวนที่ส่งสำเร็จ — ทั้งที่รายการที่ถูกพักไว้ยังอยู่ในคิว ⇒ ผู้ใช้อ่านว่า "จบแล้ว" แล้วเลิกดู ทั้งที่ยังมีข้อมูลค้างที่ต้องตัดสินใจ (การพักไม่ลบเพื่อกันข้อมูลหาย แต่ถ้าไม่บอก ก็หายจากสายตาอยู่ดี)
+
+- `lib/offline/sync-summary.ts` (pure) — `syncOutcomeMessage(flushed, remaining)` คืน `{ key, vars, tone }`
+  - `remaining = 0` → `syncAllDone` (ok) — บอกสำเร็จทั้งหมดได้เฉพาะตอนคิวว่างจริง
+  - `remaining > 0 && flushed > 0` → `syncAllPartial` (warn) — บอกจำนวนที่ส่งได้ **และ** ที่ยังเหลือ
+  - `flushed = 0 && remaining > 0` → `syncAllNone` (warn) — "ยังไม่ได้ส่งรายการใด" ไม่ใช่ "สำเร็จ 0 รายการ"
+- panel เรียก `reloadQueue()` หลัง `syncNow()` แล้วใช้ **จำนวนที่เหลือจริง** เป็นตัวตัดสินข้อความ · `tone: warn` แสดงผ่าน `onError` เพื่อให้เห็น ไม่ใช่แบนเนอร์เขียว
+- คำอธิบายคิว (th/en) ต้องบอกนโยบาย "4xx ถูกพักไว้ ไม่ลบ" ด้วย — ก่อนหน้านี้มีเฉพาะข้อความ fallback ในโค้ด ไม่ได้อยู่ในพจนานุกรม
+
+**เทสต์:** `sync-summary.test.ts` 4/4 · wrapper `tools/test/frontend-queue-sync-truth.test.mjs` 3/3 (รันชุด TS + กัน panel กลับไปประกาศสำเร็จตายตัว + กันคีย์หายจาก th/en)

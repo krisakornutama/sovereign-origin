@@ -30,7 +30,7 @@ export default {
   },
   queue: {
     title: 'คิว Offline ({n})',
-    desc: 'action ที่ค้างไว้ตอนออฟไลน์ (POST/PUT/PATCH/DELETE) — จะ sync อัตโนมัติเมื่อกลับ online หรือเลือกจัดการด้านล่าง',
+    desc: 'action ที่ค้างไว้ตอนออฟไลน์ (POST/PUT/PATCH/DELETE) — จะ sync อัตโนมัติเมื่อกลับ online หรือเลือกจัดการด้านล่าง · รายการที่ถูก server ปฏิเสธถาวร (4xx) จะถูกพักไว้ ไม่ลบ และไม่ถูกส่งซ้ำเอง',
     empty: 'ไม่มี action ค้าง — คิวว่าง',
     syncAllOk: 'sync สำเร็จทั้งหมด {n} รายการ',
     syncPartial: 'sync สำเร็จ {n} รายการ (เหลือ {kept} ที่ยังไม่ได้)',
@@ -43,6 +43,8 @@ export default {
     syncSelected: 'Sync ที่เลือก ({n})',
     deleteSelected: 'ลบที่เลือก',
     syncAllDone: 'sync ทั้งหมดสำเร็จ {n} รายการ',
+    syncAllPartial: 'sync สำเร็จ {n} รายการ · ยังเหลือ {kept} รายการที่ยังไม่ถูกส่ง (ถูกพักไว้ — ดูเหตุผลในตาราง)',
+    syncAllNone: 'ยังไม่ได้ส่งรายการใด · เหลือ {kept} รายการที่ถูกพักไว้ (ดูเหตุผลในตาราง)',
     syncAll: 'Sync ทั้งหมด',
   },
   api: {

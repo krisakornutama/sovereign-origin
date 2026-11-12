@@ -16,6 +16,7 @@ import {
   type QueuedAction,
 } from '../../lib/offlineQueue';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { syncOutcomeMessage } from '../../lib/offline/sync-summary';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import Icon from '../ui/Icon';
 import QueueRetentionNote from './QueueRetentionNote';
@@ -39,6 +40,7 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
     const items = await listQueued(currentQueueUserId());
     setQueuedItems(items);
     setSelectedIds((prev) => new Set([...prev].filter((id) => items.some((q) => q.id === id))));
+    return items;
   };
 
   useEffect(() => {
@@ -198,10 +200,22 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
             <button
               onClick={async () => {
                 setQueueBusy(true);
-                const flushed = await syncNow();
-                onMessage(t('settings.queue.syncAllDone', 'sync ทั้งหมดสำเร็จ {n} รายการ', { n: flushed }));
-                await reloadQueue();
-                setQueueBusy(false);
+                onError('');
+                try {
+                  const flushed = await syncNow();
+                  // ต้องดู "ของที่เหลือ" จริงหลัง sync — รายการที่ถูกพักไว้ (4xx) ไม่ถูกส่งซ้ำ
+                  // แต่ยังอยู่ในคิว ⇒ ประกาศ "สำเร็จทั้งหมด" ตามจำนวนที่ส่งได้คือโกหกผู้ใช้
+                  const remaining = (await reloadQueue()).length;
+                  const outcome = syncOutcomeMessage(flushed, remaining);
+                  const text = t(outcome.key, undefined, outcome.vars);
+                  if (outcome.tone === 'ok') onMessage(text);
+                  else onError(text);
+                } catch (err) {
+                  console.error(err);
+                  onError(t('settings.queue.syncFailed', 'sync ไม่สำเร็จ'));
+                } finally {
+                  setQueueBusy(false);
+                }
               }}
               disabled={queueBusy || queuedItems.length === 0}
               className="btn-primary"
