@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import EventEmitter from 'events';
 import { prisma } from '../lib/prisma';
+import { normalizeSingleIp } from '../lib/ip-address';
 import { threatIntel } from './threat-intel.service';
 import { securityStream } from './security-stream.service';
 
@@ -166,12 +167,13 @@ export class ThreatDetectionService {
       });
       // Auto-block (opt-in) — เฉพาะ IP ใหม่ภายนอก
       let blocked = false;
-      if (FIREWALL_BLOCK_CMD && ip && severity === 'warning') {
+      const blockTarget = normalizeSingleIp(ip);
+      if (FIREWALL_BLOCK_CMD && blockTarget && severity === 'warning') {
         try {
-          const cmd = FIREWALL_BLOCK_CMD.replace(/\{ip\}/g, ip);
+          const cmd = FIREWALL_BLOCK_CMD.replace(/\{ip\}/g, blockTarget);
           await execAsync(cmd, { timeout: 15000 });
           blocked = true;
-          console.warn(`🚫 Auto-blocked ${ip}`);
+          console.warn(`🚫 Auto-blocked ${blockTarget}`);
         } catch (err) {
           console.error('Firewall block failed:', err instanceof Error ? err.message : err);
         }
