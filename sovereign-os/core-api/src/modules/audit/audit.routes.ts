@@ -17,6 +17,24 @@ const LIST_MAX_ROWS = 500;
 /** เพดาน offset — กัน deep pagination ที่กิน CPU/IO โดยไม่มีใครได้ประโยชน์ */
 const LIST_MAX_OFFSET = 100000;
 
+/**
+ * เพดานจำนวน id ที่ raw search (`q`) ยอมดึงขึ้นหน่วยความจำต่อคำขอ
+ * audit_logs โตได้ไม่จำกัด (ไม่มี retention) — คำค้นกว้าง ๆ เช่น "a" วันหนึ่งจะดึง id
+ * แสนรายการทำ `IN (...)` ต่อหนึ่งคำขอ = กิน RAM/DB จนบริการล้มได้ด้วยคำขอเดียว
+ */
+export const AUDIT_SEARCH_MAX_HITS = 20000;
+
+/** คำค้นกว้างเกินจนต้องปฏิเสธ — ต้องตอบ 400 ไม่ใช่ตัดผลเงียบ ๆ */
+export class AuditSearchTooBroadError extends Error {
+  constructor() {
+    super(
+      `คำค้นกว้างเกินไป — พบเกิน ${AUDIT_SEARCH_MAX_HITS.toLocaleString('en-US')} รายการ ` +
+        'ให้ใส่คำที่เฉพาะเจาะจงขึ้น หรือระบุช่วงวันที่/actionPrefix เพื่อแคบผลลัพธ์'
+    );
+    this.name = 'AuditSearchTooBroadError';
+  }
+}
+
 interface AuditFilters {
   q: string;
   actionPrefix: string;
@@ -48,8 +66,11 @@ async function buildWhere(filters: AuditFilters): Promise<Prisma.AuditLogWhereIn
   if (filters.q) {
     // payload เป็น JSONB (Prisma filter ยังครอบไม่หมด) → ค้นด้วย ILIKE บน text dump ตรง ๆ
     const hits = await prisma.$queryRaw<Array<{ id: string }>>(
-      Prisma.sql`SELECT id FROM "audit_logs" WHERE action_type ILIKE ${`%${filters.q}%`} OR payload::text ILIKE ${`%${filters.q}%`}`,
+      Prisma.sql`SELECT id FROM "audit_logs" WHERE action_type ILIKE ${`%${filters.q}%`} OR payload::text ILIKE ${`%${filters.q}%`} LIMIT ${AUDIT_SEARCH_MAX_HITS + 1}`,
     );
+    // ดึงเกินมา 1 แถวเพื่อรู้ว่า "เกินเพดาน" — ปฏิเสธพร้อมบอกทางแคบคำค้น
+    // (ตัดเงียบแล้วคืนผลบางส่วน = หลักฐานที่ดูครบแต่ไม่ครบ ซึ่งแย่กว่าปฏิเสธ)
+    if (hits.length > AUDIT_SEARCH_MAX_HITS) throw new AuditSearchTooBroadError();
     // ชื่อผู้ใช้อยู่ในตาราง users ไม่ได้อยู่ใน payload (payload เก็บ ip/method/path/body)
     // ถ้าไม่กรองที่ relation นี้ ผู้ใช้จะพิมพ์ชื่อคนในช่องค้นหาแล้วได้ผลว่างเสมอ
     // ทั้งที่ placeholder ของหน้า /audit บอกว่าค้นชื่อได้ — ต้องเป็น OR กับผลของ raw search
@@ -113,6 +134,7 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
     res.setHeader('X-Audit-List-Limit', String(limit));
     res.json(logs);
   } catch (err) {
+    if (err instanceof AuditSearchTooBroadError) return res.status(400).json({ error: err.message });
     console.error('Audit API error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -183,6 +205,9 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
       },
     });
   } catch (err) {
+    if (err instanceof AuditSearchTooBroadError) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error('Audit export error:', err);
     if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
   }

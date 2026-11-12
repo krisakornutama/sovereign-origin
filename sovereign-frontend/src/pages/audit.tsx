@@ -74,7 +74,10 @@ export default function AuditPage() {
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
       rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit/export?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
       const blob = await res.blob();
       // server บอกจำนวนจริงของไฟล์นี้ (header ถูก expose ใน CORS แล้ว) — ถ้าอ่านไม่ได้
       // ให้ถือว่า "ไม่รู้" ไม่ใช่ "ครบ" เพื่อไม่ให้ผู้ใช้เชื่อไฟล์ที่อาจถูกตัด
@@ -107,7 +110,11 @@ export default function AuditPage() {
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
       rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // 400 จากเพดานผลค้นหามีข้อความบอกทางแก้ — ต้องแสดงข้อความนั้น ไม่ใช่ "HTTP 400"
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
       setLogs(data);
       setHasMore(res.headers.get('X-Audit-List-Has-More') === 'true');
