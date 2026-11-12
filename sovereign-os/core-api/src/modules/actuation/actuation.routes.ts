@@ -9,6 +9,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { actuationService } from '../../services/actuation.service';
+import { parseOccupancyInput } from '../../services/actuation-occupancy';
 
 const router = Router();
 
@@ -49,9 +50,12 @@ router.put('/mode', authenticate, requireRole('SUPERADMIN'), (req, res) => {
 });
 
 router.put('/occupancy', authenticate, requireRole('SUPERADMIN'), (req, res) => {
-  const v = req.body?.occupied;
-  const r = actuationService.setOccupancy(v == null ? null : !!v);
-  res.json(r);
+  // แปลเฉพาะค่าที่ชัดเจน: true/false/1/0/'true'/'false'/'unknown'/null — ค่าอื่น = 400
+  const parsed = parseOccupancyInput(req.body?.occupied);
+  if (!parsed.ok) {
+    return res.status(400).json({ error: 'occupied ต้องเป็น true, false, null หรือ "unknown" เท่านั้น' });
+  }
+  res.json(actuationService.setOccupancy(parsed.value));
 });
 
 router.post('/simulate-failure', authenticate, requireRole('SUPERADMIN'), (req, res) => {
