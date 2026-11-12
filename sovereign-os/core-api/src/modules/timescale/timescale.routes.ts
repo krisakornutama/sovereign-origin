@@ -4,9 +4,32 @@ import { authenticate } from '../../middleware/auth.middleware';
 
 const router = Router();
 
-// Only allow safe time_bucket intervals – never interpolate user input into SQL.
+// Only allow safe time_bucket intervals – validate before it is interpolated into SQL.
 const INTERVAL_PATTERN = /^\d+\s+(second|minute|hour|day|week|month)s?$/i;
 const DEFAULT_INTERVAL = '5 minutes';
+
+/**
+ * เพดานจำนวนจุดต่อคำขอ — query นี้ GROUP BY bucket (ไม่มี LIMIT)
+ * ⇒ จำนวนแถวขึ้นกับ "ช่วงวันที่ ÷ interval" ล้วน ๆ: 1 ปีที่ 5 นาที = ~105,000 จุด
+ * เกินเพดาน = 400 พร้อมทางแก้ (interval ใหญ่ขึ้น/แคบช่วง) ไม่ใช่ตัดเงียบ
+ */
+export const MAX_HISTORY_BUCKETS = 20000;
+
+const UNIT_SECONDS: Record<string, number> = {
+  second: 1,
+  minute: 60,
+  hour: 3600,
+  day: 86400,
+  week: 604800,
+  month: 2592000,
+};
+
+/** วินาทีต่อหนึ่ง bucket (0 = อ่านไม่ได้) */
+export function intervalSeconds(interval: string): number {
+  const m = /^(\d+)\s+(second|minute|hour|day|week|month)s?$/i.exec(String(interval || '').trim());
+  if (!m) return 0;
+  return Number(m[1]) * (UNIT_SECONDS[m[2].toLowerCase()] || 0);
+}
 
 // ช่วงเวลาสำเร็จรูป 24h/7d/30d -> bucket size อัตโนมัติ (กันกราฟมีจุดเยอะเกินไป)
 // interval/sql เป็นค่าคงที่ในโค้ด ไม่รับจาก user input -> ปลอดภัยต่อ SQL injection
@@ -27,6 +50,40 @@ router.get('/history', authenticate, async (req, res) => {
     if (!metric) return res.status(400).json({ error: 'metric required' });
     if (!INTERVAL_PATTERN.test(interval)) {
       return res.status(400).json({ error: 'Invalid interval format (e.g. 5 minutes, 1 hour, 1 day)' });
+    }
+    const bucketSeconds = intervalSeconds(interval);
+    if (bucketSeconds <= 0) {
+      return res.status(400).json({ error: 'interval ต้องมากกว่า 0 (เช่น 5 minutes, 1 hour)' });
+    }
+
+    // ── เพดานจำนวนจุด: ช่วงวันที่กำหนดจำนวนแถว ไม่ใช่ LIMIT ──────────────────
+    if (!RANGE_CONFIG[range]) {
+      let fromMs = from ? Date.parse(String(from)) : NaN;
+      // to ก่อน from / วันที่ผิดรูป ต้องเป็น 400 ไม่ใช่ปล่อยให้ Postgres โยนแล้วตอบ []
+      if (from && Number.isNaN(fromMs)) {
+        return res.status(400).json({ error: 'from ต้องเป็นวันที่ที่อ่านได้ (ISO เช่น 2026-01-01T00:00:00Z)' });
+      }
+      let toMs = to ? Date.parse(String(to)) : NaN;
+      if (to && Number.isNaN(toMs)) {
+        return res.status(400).json({ error: 'to ต้องเป็นวันที่ที่อ่านได้ (ISO เช่น 2026-01-02T00:00:00Z)' });
+      }
+      if (!to && from) toMs = Date.now(); // เปิดช่วงถึงปัจจุบัน = ขอบเขตที่คำนวณได้
+      if (to && !from) {
+        return res.status(400).json({ error: 'ระบุ from ด้วยเมื่อส่ง to (ต้องรู้จุดเริ่มของช่วง)' });
+      }
+      if (from && to && toMs < fromMs) {
+        return res.status(400).json({ error: 'to ต้องมาหลัง from' });
+      }
+      if (from) {
+        const buckets = Math.ceil((toMs - fromMs) / 1000 / bucketSeconds) + 1;
+        if (buckets > MAX_HISTORY_BUCKETS) {
+          return res.status(400).json({
+            error:
+              `ช่วงกว้างเกินไปสำหรับ interval "${interval}" — จะได้ ~${buckets.toLocaleString('en-US')} จุด ` +
+              `(เพดาน ${MAX_HISTORY_BUCKETS.toLocaleString('en-US')}) ให้ใช้ interval ที่ใหญ่ขึ้นหรือแคบช่วงวันที่`,
+          });
+        }
+      }
     }
 
     let query = `
