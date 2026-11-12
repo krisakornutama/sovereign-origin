@@ -46,7 +46,38 @@ export interface PhysicalSnapshot {
   batterySoc: number | null; // %
   powerKw: number | null; // kW (ติดลบ = discharge)
   tempC: number | null; // อุณหภูมิสูงสุดล่าสุด
-  occupied: boolean; // มีคนอยู่บ้าน?
+  occupied: boolean | null; // true = มีคน, false = ยืนยันว่าไม่มีคน, null = ไม่รู้ (presence อ่านไม่ได้/ไม่มี sensor)
+}
+
+export interface TelemetryRows {
+  latest: Array<{ metric?: any; value?: any }>;
+  temp?: Array<{ max_temp?: any }>;
+  occupancy?: Array<{ value?: any }>;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * แปลงแถว telemetry → snapshot (ใช้ทั้งใน service และ worker ที่อ่าน TimescaleDB จริง)
+ * — presence ที่ไม่มีแถว/แปลงไม่ได้ = null ("ไม่รู้") ห้ามยุบเป็น false ("ไม่มีคน")
+ */
+export function snapshotFromTelemetry(rows: TelemetryRows): PhysicalSnapshot {
+  const map: Record<string, number> = {};
+  for (const r of rows.latest ?? []) {
+    const n = numOrNull(r?.value);
+    if (r?.metric != null && n != null) map[String(r.metric)] = n;
+  }
+  const occVal = numOrNull(rows.occupancy?.[0]?.value);
+  return {
+    batterySoc: map.battery_soc ?? null,
+    powerKw: map.power_kw ?? null,
+    tempC: numOrNull(rows.temp?.[0]?.max_temp),
+    occupied: occVal == null ? null : occVal > 0,
+  };
 }
 
 export interface EnvelopeConfig {
@@ -173,10 +204,18 @@ export function evaluateEnvelope(
     return { allowed: false, rule: 'RELAY_COOLDOWN', reason: `relay ${actuator.id} เพิ่งถูกสั่งเมื่อ ${Math.round((Date.now() - lastCommandAt) / 1000)}s ก่อน — ต้องรอ ${Math.round(envelope.relayCooldownMs / 1000)}s` };
   }
 
-  // 5) 🏠 OCCUPANCY — มีคนอยู่บ้าน + action กลุ่ม shutdown (ปิดน้ำ/ปิดโลก) → AI ห้าม
+  // 5) 🏠 OCCUPANCY — มีคนอยู่บ้าน "หรือไม่รู้" + action กลุ่ม shutdown (ปิดน้ำ/ปิดโลก) → AI/system ห้าม
+  // "ไม่รู้" ต้องไม่ถูกอ่านว่า "ไม่มีคน" (fail-open): presence อ่านไม่ได้/ไม่มี sensor = ห้ามปิดเช่นกัน
+  // human สั่งได้เสมอ (เจ้าของเครื่องต้องปิดน้ำได้ด้วยมือ)
   const SHUTDOWN_CLASS = new Set(['wan-link', 'water-valve']);
-  if (snap.occupied && actor !== 'human' && desiredState === 'off' && SHUTDOWN_CLASS.has(actuator.id)) {
-    return { allowed: false, rule: 'OCCUPANCY', reason: `มีคนอยู่บ้าน — AI ห้ามปิด ${actuator.id} (กลุ่ม shutdown)` };
+  if (snap.occupied !== false && actor !== 'human' && desiredState === 'off' && SHUTDOWN_CLASS.has(actuator.id)) {
+    return {
+      allowed: false,
+      rule: 'OCCUPANCY',
+      reason: snap.occupied
+        ? `มีคนอยู่บ้าน — AI ห้ามปิด ${actuator.id} (กลุ่ม shutdown)`
+        : `ไม่รู้ว่ามีคนอยู่บ้านหรือไม่ (presence อ่านไม่ได้/ไม่มีข้อมูล) — AI ห้ามปิด ${actuator.id} (กลุ่ม shutdown)`,
+    };
   }
 
   return { allowed: true };
@@ -311,8 +350,6 @@ export class ActuationService {
          WHERE metric IN ('battery_soc', 'power_kw')
          ORDER BY metric, time DESC`
       );
-      const map: Record<string, number> = {};
-      for (const r of latest) map[r.metric] = Number(r.value);
       const temp = await prisma.$queryRawUnsafe<Array<any>>(
         `SELECT MAX(value) AS max_temp
          FROM sensor_telemetry
@@ -326,16 +363,11 @@ export class ActuationService {
            AND time >= NOW() - INTERVAL '${graceMin} minutes'
          ORDER BY time DESC LIMIT 1`
       );
-      const occVal = occ.length ? Number(occ[0].value) : null;
-      return {
-        batterySoc: map.battery_soc != null ? Number(map.battery_soc) : null,
-        powerKw: map.power_kw != null ? Number(map.power_kw) : null,
-        tempC: temp[0]?.max_temp != null ? Number(temp[0].max_temp) : null,
-        occupied: occVal != null ? occVal > 0 : false,
-      };
+      return snapshotFromTelemetry({ latest, temp, occupancy: occ });
     } catch (err) {
       console.error('Actuation: cannot load snapshot:', err instanceof Error ? err.message : err);
-      return { batterySoc: null, powerKw: null, tempC: null, occupied: false };
+      // อ่านไม่ได้ = ไม่รู้สถานะ (ห้ามสมมติว่า "ไม่มีคน")
+      return { batterySoc: null, powerKw: null, tempC: null, occupied: null };
     }
   }
 
@@ -364,6 +396,8 @@ export class ActuationService {
     }
 
     const snap = await this.loadSnapshot();
+    // PUT /occupancy = "บังคับ" สถานะจริง (เดิมบันทึกค่าแต่ไม่เคยใช้ในการตัดสิน ⇒ endpoint ที่ดูเหมือนทำงานแต่ไม่มีผล)
+    if (state.occupiedOverride !== null) snap.occupied = state.occupiedOverride;
     const verdict = evaluateEnvelope(actuator, desiredState, cmd.actor, snap, cfg, this.lastCommandAt[cmd.actuatorId] || 0);
     if (!verdict.allowed) {
       this.record(state, { actuatorId: cmd.actuatorId, action: 'denied', actor: cmd.actor, reason: `${verdict.rule}: ${verdict.reason}` });
@@ -453,7 +487,7 @@ export class ActuationService {
         { id: 'BATTERY_HOLD', desc: `แบต < ${cfg.batteryHoldPct}% → ห้ามเปิดโหลด > ${cfg.heavyDrawKw}kW`, active: true },
         { id: 'TEMP_CEILING', desc: `อุณหภูมิ ≥ ${cfg.tempCeilingC}°C → อนุญาตเฉพาะลดโหลด`, active: true },
         { id: 'RELAY_COOLDOWN', desc: `relay เดิมห้าม toggle ซ้ำใน ${Math.round(cfg.relayCooldownMs / 1000)}s`, active: true },
-        { id: 'OCCUPANCY', desc: `มีคนอยู่บ้าน → AI ห้ามปิด wan-link/water-valve`, active: true },
+        { id: 'OCCUPANCY', desc: `มีคนอยู่บ้าน (หรือไม่รู้สถานะ) → AI ห้ามปิด wan-link/water-valve`, active: true },
       ],
     };
   }
@@ -488,7 +522,7 @@ export class ActuationService {
   }
 }
 
-export const actuationService = new ActuationService({ loadSnapshot: () => Promise.resolve({ batterySoc: null, powerKw: null, tempC: null, occupied: false }) });
+export const actuationService = new ActuationService({ loadSnapshot: () => Promise.resolve({ batterySoc: null, powerKw: null, tempC: null, occupied: null }) });
 
 /** Governor hook ตัวสั้น — levers → actuator (ผ่าน Safety Envelope) */
 export function syncActuatorsFromLevers(levers: Record<string, any>, actor: ActorKind = 'governor'): Promise<CommandResult[]> {

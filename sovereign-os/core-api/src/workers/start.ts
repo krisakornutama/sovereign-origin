@@ -41,7 +41,7 @@ import { createRiskWorker, riskEmitter } from '../services/risk-monitor.service'
 import { runAndReportStripeReconcile } from '../services/stripe-reconcile.runtime';
 import { createDefconEngine, defconEmitter, type DefconAction, type DefconLevel } from '../services/defcon-engine.service';
 import { runDefconAction } from '../services/defcon-actions.service';
-import { actuationService } from '../services/actuation.service';
+import { actuationService, snapshotFromTelemetry } from '../services/actuation.service';
 import { PowerGuardWorker } from '../services/power-guard.service';
 import { UpsMonitorWorker, fetchNutVars } from '../services/ups-monitor.service';
 import { UpsShutdownService } from '../services/ups-shutdown.service';
@@ -377,8 +377,6 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
            WHERE metric IN ('battery_soc', 'power_kw')
            ORDER BY metric, time DESC`
         );
-        const latest: Record<string, number> = {};
-        for (const r of latestRows) latest[r.metric] = Number(r.value);
         const tempRows = await prisma.$queryRawUnsafe<Array<any>>(
           `SELECT MAX(value) AS max_temp
            FROM sensor_telemetry
@@ -391,15 +389,11 @@ export function startWorkers(app: Express, io: SocketIOServer): void {
              AND time >= NOW() - INTERVAL '30 minutes'
            ORDER BY time DESC LIMIT 1`
         );
-        return {
-          batterySoc: latest.battery_soc != null ? Number(latest.battery_soc) : null,
-          powerKw: latest.power_kw != null ? Number(latest.power_kw) : null,
-          tempC: tempRows[0]?.max_temp != null ? Number(tempRows[0].max_temp) : null,
-          occupied: occRows.length ? Number(occRows[0].value) > 0 : false,
-        };
+        return snapshotFromTelemetry({ latest: latestRows, temp: tempRows, occupancy: occRows });
       } catch (err) {
         console.error('Actuation: snapshot load failed:', err instanceof Error ? err.message : err);
-        return { batterySoc: null, powerKw: null, tempC: null, occupied: false };
+        // อ่านไม่ได้ = ไม่รู้สถานะ (ห้ามสมมติว่า "ไม่มีคน" — AI จะปิดน้ำ/เน็ตทั้งที่อาจมีคนอยู่)
+        return { batterySoc: null, powerKw: null, tempC: null, occupied: null };
       }
     },
     publishReal: (actuatorId, state) => {
