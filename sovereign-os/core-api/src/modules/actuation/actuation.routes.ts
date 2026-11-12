@@ -7,6 +7,7 @@
 // PUT    /api/actuation/occupancy    — บังคับสถานะ "มีคนอยู่บ้าน" (ทดสอบกฎ OCCUPANCY)
 // POST   /api/actuation/simulate-failure — จำลอง relay ค้าง (ทดสอบ ACTUATION_FAILED + rollback)
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { actuationService } from '../../services/actuation.service';
 
@@ -22,7 +23,7 @@ router.get('/rules', authenticate, (_req, res) => {
 
 // มนุษย์สั่ง actuator — SYSTEM_AI สั่งผ่าน HTTP ไม่ได้ (Strict AI/Actuator Separation)
 // role อื่นที่เหลือยังใช้ได้ตามเดิม: SUPERADMIN / NODE_ADMIN / SITE_ADMIN / OPERATOR
-router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'), async (req, res) => {
+router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
   const { actuatorId, state, reason } = req.body || {};
   if (!actuatorId || !state) return res.status(400).json({ error: 'ต้องระบุ actuatorId + state' });
   const r = await actuationService.executeCommand({
@@ -32,15 +33,15 @@ router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'S
     reason: String(reason || 'มนุษย์สั่งผ่าน UI'),
   });
   res.status(r.ok ? 200 : 403).json(r);
-});
+}));
 
-router.post('/sync-levers', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/sync-levers', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const levers = req.body?.levers;
   if (!levers || typeof levers !== 'object') return res.status(400).json({ error: 'ต้องส่ง levers object' });
   const actor = req.body?.actor === 'governor' ? 'governor' : 'human';
   const results = await actuationService.syncActuatorsFromLevers(levers, actor);
   res.json({ actor, results });
-});
+}));
 
 router.put('/mode', authenticate, requireRole('SUPERADMIN'), (req, res) => {
   const r = actuationService.setMode(String(req.body?.mode || 'sandbox') as any);

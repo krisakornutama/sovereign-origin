@@ -63,6 +63,8 @@ sovereign-os/core-api/src/
   middleware/        # authenticate, requireRole, rateLimit
 ```
 
+**Express 4 ไม่ดัก promise ที่ reject** — async handler ที่ `await` แล้วโยน error จะทำให้คำขอ **ค้าง** จน client timeout (ไม่ใช่ 500) ⇒ route handler ที่ `await` ต้องมี `try/catch` ของตัวเอง หรือห่อด้วย `asyncRoute()` จาก `src/lib/async-handler.ts` (ตอบ 500 JSON + `detail` ให้อัตโนมัติ) · มีด่านบังคับอยู่ที่ `tests/routeAsyncSafety.test.ts` (สแกนด้วย TypeScript AST — handler ใหม่ที่ลืมจะทำให้ CI แดง)
+
 ## เครื่องมือใน tools/ (แหล่งความจริง)
 
 | เครื่องมือ | หน้าที่ |
