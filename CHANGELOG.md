@@ -8,8 +8,17 @@
 
 ## [Unreleased]
 
+_(ยังไม่มีรายการ)_
+
+---
+
+## [v1.3.3] — 2026-11-12 (released)
+
+### 🔒 ความถูกต้องของข้อมูลความปลอดภัย (patch)
+
 - **`PUT /api/actuation/occupancy` ไม่เดาค่าที่พิมพ์ผิด** — เดิมใช้ `!!v` ⇒ สตริง `"false"` กลายเป็น "มีคน" และ `0` กลายเป็น "ไม่มีคน" เงียบ ๆ ทั้งที่กฎ OCCUPANCY ใช้ค่านี้กัน AI ปิดน้ำ/เน็ต · ตอนนี้ `parseOccupancyInput()` แปลเฉพาะ `true/false/1/0/"true"/"false"/"unknown"/null` และตอบ 400 เมื่อค่าไม่รู้จัก · เทสต์ `actuationOccupancyInput` 2/2
 - **เดสก์ท็อปไม่แอบใช้ API ของคนอื่น** — sidecar เดิมยึด `PORT=3001` ตายตัวและกลืน stderr ⇒ ถ้าพอร์ตถูกคอนเทนเนอร์/บริการอื่นยึด แอปจะคุยกับเซิร์ฟเวอร์รุ่นเก่าโดยไม่มีสัญญาณ (endpoint ใหม่ตอบ 404) · ตอนนี้ตรวจ `/api/health` เทียบ `build.version` กับบิลด์ในตัวก่อน spawn: เป็นของเรา = ใช้ต่อ, ว่าง = spawn 3001, ของคนอื่น = log `backend-port-conflict` + spawn พอร์ตสำรองและบอก renderer ผ่าน `sovereign-api-url` · เทสต์ `desktop-backend-port` 3/3
+
 ---
 
 ## [v1.3.2] — 2026-11-11 (released)
