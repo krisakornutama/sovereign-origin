@@ -16,6 +16,7 @@ import {
   type FontScale,
 } from '../lib/config';
 import { authFetch } from '../lib/apiFetch';
+import { roleIsSuperadmin } from '../lib/roles';
 import OfflineQueuePanel from '../components/system/OfflineQueuePanel';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
@@ -26,6 +27,9 @@ import VoiceAutoSection from '../components/system/settings/VoiceAutoSection';
 
 export default function SettingsPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
+  // Export & Clone ทั้งระบบ = SUPERADMIN เท่านั้น (server บังคับ role อยู่แล้ว) —
+  // UI ต้องไม่โชว์ปุ่มที่กดแล้วได้ 403 อย่างเดียว
+  const isSuperadmin = roleIsSuperadmin(user?.role);
   const t = useLanguageStore((s) => s.t);
   const lang = useLanguageStore((s) => s.lang);
   const setLang = useLanguageStore((s) => s.setLang);
@@ -524,7 +528,8 @@ export default function SettingsPage() {
         </section>
         <OfflineQueuePanel onMessage={setMessage} onError={setError} />
 
-        {/* ── Export & Clone: ถอดแบบฟังก์ชั่นไปติดตั้งเครื่องอื่น ── */}
+        {/* ── Export & Clone: ถอดแบบฟังก์ชั่นไปติดตั้งเครื่องอื่น (SUPERADMIN เท่านั้น) ── */}
+        {isSuperadmin ? (
         <section className="panel panel-cyan p-5 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -615,6 +620,14 @@ export default function SettingsPage() {
             {t('settings.clone.warnBefore', 'การนำเข้าจะ ')}<span className="text-amber-300">{t('settings.clone.warnHighlight', 'ล้างและแทนที่')}</span>{t('settings.clone.warnAfter', ' ข้อมูลของฟังก์ชั่นที่เลือกในเครื่องนี้ด้วยข้อมูลจากแพ็กเกจ — เหมาะกับการติดตั้งระบบใหม่/เครื่องที่สอง (ควรสำรองข้อมูลก่อน)')}
           </div>
         </section>
+        ) : (
+          <section className="panel panel-cyan p-5 space-y-2">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('settings.clone.title', 'Export & Clone (ถอดแบบระบบ)')}</h2>
+            <p className="text-xs text-gray-500">
+              {t('settings.clone.superadminOnly', 'การถอดแบบ/ติดตั้งทั้งระบบทำได้เฉพาะ SUPERADMIN — export อ่านข้อมูลทุกตารางของโมดูลที่เลือก และ import จะล้างและแทนที่ข้อมูลจริง · บัญชีนี้คือ {role}', { role: user?.role || '—' })}
+            </p>
+          </section>
+        )}
 
         </div>
         {/* รีเซ็ต */}

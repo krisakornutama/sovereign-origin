@@ -105,6 +105,7 @@ export default {
     warnBefore: 'Importing will ',
     warnHighlight: 'clear and replace',
     warnAfter: ' the selected modules\u2019 data on this machine with the package data — ideal for new/second-machine setups (back up first)',
+    superadminOnly: 'Cloning/installing the whole system is SUPERADMIN-only — export reads every table of the selected modules and import clears and replaces real data · this account is {role}',
   },
   reset: {
     button: 'Reset all settings',

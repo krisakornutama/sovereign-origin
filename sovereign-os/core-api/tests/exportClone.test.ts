@@ -149,7 +149,7 @@ test('applyPackage on an older-schema target restores only existing columns (no 
   assert.ok(insert && !insert.includes('"name"'), 'ต้องไม่ใส่คอลัมน์ที่เป้าหมายไม่มี');
 });
 
-test('applyPackage skips tables missing on the target (no truncate, no error)', async () => {
+test('applyPackage skips manifest tables missing on the target (no truncate, no error)', async () => {
   const calls: string[] = [];
   const prismaLike = {
     $executeRawUnsafe: async (sql: string) => { calls.push(sql); return 1; },
@@ -159,8 +159,9 @@ test('applyPackage skips tables missing on the target (no truncate, no error)', 
     version: 1,
     modules: [
       {
-        key: 'x',
-        tables: [{ table: 'not_yet_migrated_table', rows: [{ id: '1' }] }],
+        key: 'water',
+        // ตารางที่อยู่ใน MODULE_MANIFEST จริง แต่เครื่องนี้ยังไม่ migrate → ข้าม ไม่ TRUNCATE
+        tables: [{ table: 'water_quality_readings', rows: [{ id: '1' }] }],
       },
     ],
   };

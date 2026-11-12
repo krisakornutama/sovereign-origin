@@ -130,6 +130,16 @@ export function resolveModules(keys: string[]): ManifestModule[] {
   return MODULE_MANIFEST.filter((m) => list.includes(m.key));
 }
 
+/** ทุกตารางที่ "ถอดแบบได้" — ตารางนอกชุดนี้ห้ามถูก TRUNCATE/INSERT จากแพ็กเกจ */
+export const MANIFEST_TABLES: ReadonlySet<string> = new Set(MODULE_MANIFEST.flatMap((m) => m.tables));
+
+/** คีย์ที่ผู้ใช้ส่งมาแต่ไม่มีใน manifest (เดิมถูกตัดเงียบ ⇒ ได้แพ็กเกจเปล่าที่อ่านว่า "สำรองแล้ว") */
+export function findUnknownModuleKeys(keys: string[]): string[] {
+  const list = Array.isArray(keys) ? keys.map((k) => String(k)) : [];
+  const known = new Set(MODULE_MANIFEST.map((m) => m.key));
+  return [...new Set(list.filter((k) => !known.has(k)))];
+}
+
 // ── Dump ข้อมูลจาก DB (ใช้ $queryRawUnsafe — ทำงานกับ PrismaClient หรือ mock) ──
 interface DumpDb {
   $queryRawUnsafe: (sql: string) => Promise<any[]>;
@@ -190,10 +200,27 @@ export async function buildExportPackage(keys: string[], appInfo?: { appName?: s
 }
 
 // ── ตรวจสอบแพ็กเกจก่อนนำเข้า ──
+// ตารางต้องอยู่ใน MODULE_MANIFEST เท่านั้น — applyPackage ทำ TRUNCATE TABLE ... CASCADE
+// กับทุกตารางที่แพ็กเกจระบุ ⇒ ถ้าไม่กรอง ชื่อเดียวอย่าง "users" หรือ "audit_logs"
+// ก็ลบข้อมูลทั้งระบบได้ (และ INSERT เข้า users เพื่อสร้างบัญชีใหม่ก็ได้)
 export function validatePackage(pkg: any): string | null {
   if (!pkg || typeof pkg !== 'object') return 'แพ็กเกจไม่ถูกต้อง — ข้อมูลว่างเปล่า';
   if (pkg.version !== 1) return `เวอร์ชันของแพ็กเกจไม่รองรับ (${pkg.version}) — ต้องเป็นเวอร์ชัน 1`;
   if (!Array.isArray(pkg.modules)) return 'แพ็กเกจไม่มี modules';
+  for (const mod of pkg.modules) {
+    for (const t of mod?.tables ?? []) {
+      const table = t?.table;
+      if (typeof table !== 'string' || !table) {
+        return 'แพ็กเกจมีตารางที่ไม่มีชื่อ — นำเข้าไม่ได้';
+      }
+      if (!MANIFEST_TABLES.has(table)) {
+        return `ตาราง "${table.slice(0, 60)}" ไม่อยู่ในรายการที่ถอดแบบได้ (MODULE_MANIFEST) — นำเข้าได้เฉพาะตารางของโมดูลที่ระบบรองรับ (ดูรายการ: GET /api/clone/manifest)`;
+      }
+      if (!Array.isArray(t?.rows)) {
+        return `ตาราง "${table}" ต้องมี rows เป็น array (แพ็กเกจเปล่าจะลบข้อมูลเดิมทิ้ง)`;
+      }
+    }
+  }
   return null;
 }
 
