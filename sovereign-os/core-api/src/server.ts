@@ -68,6 +68,9 @@ app.use(cors({
     'X-Audit-Export-Rows',
     'X-Audit-Export-Total',
     'X-Audit-Export-Truncated',
+    'X-Audit-List-Has-More',
+    'X-Audit-List-Offset',
+    'X-Audit-List-Limit',
   ],
 }));
 // Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
