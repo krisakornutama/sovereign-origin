@@ -41,6 +41,8 @@ export default function HistoryPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   const [metrics, setMetrics] = useState<string[]>([]);
+  // อ่านรายชื่อ metric ไม่ได้ ≠ ไม่มีข้อมูล — ต้องแยกสถานะให้ผู้ใช้เห็น
+  const [metricsError, setMetricsError] = useState('');
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   // Hydration-safe: server เรนเดอร์ '24h' เสมอ — อ่าน ?range= จาก URL หลัง hydration
   // (เดิม: useState(() => window ? URLSearchParams... : '24h') → เปิด /history?range=7d
@@ -62,9 +64,25 @@ export default function HistoryPage() {
   // โหลดรายชื่อ metric ที่มีข้อมูลจริงใน TimescaleDB
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/metrics`)
-      .then((res) => res.json())
-      .then((list: string[]) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timescale/metrics`);
+        const payload = await res.json().catch(() => null);
+        // รูปแบบใหม่ { metrics, degraded } — รองรับ array เดิมของ mock/preview
+        const list: string[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.metrics)
+            ? payload.metrics
+            : [];
+        if (cancelled) return;
+        if (!res.ok || payload?.degraded === true) {
+          // อ่านไม่ได้ ≠ ไม่มีข้อมูล — ขึ้นแบนเนอร์ ไม่ใช่ "ยังไม่มีข้อมูลเซ็นเซอร์"
+          setMetrics([]);
+          setMetricsError(String(payload?.error || `HTTP ${res.status}`));
+          return;
+        }
+        setMetricsError('');
         setMetrics(list);
         setSelectedMetrics((prev) => {
           // มี metric ที่เลือกอยู่แล้ว -> เก็บเฉพาะตัวที่ยังมีข้อมูล
@@ -80,8 +98,15 @@ export default function HistoryPage() {
           if (initial && list.includes(initial)) return [initial];
           return list[0] ? [list[0]] : [];
         });
-      })
-      .catch(console.error);
+      } catch {
+        if (cancelled) return;
+        setMetrics([]);
+        setMetricsError(t('history.metricsLoadError', 'อ่านรายชื่อ metric ไม่ได้ — ไม่ทราบว่ามีข้อมูลอะไรในฐานข้อมูล'));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, user]);
 
   const fetchHistory = useCallback(async () => {
@@ -357,7 +382,7 @@ export default function HistoryPage() {
             <div className="col-span-12 lg:col-span-5 card p-3">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-[11px] font-bold tracking-widest text-gray-200">Lifestyle Activities & Goals</h3>
-                <span className="text-[9px] font-mono tracking-widest text-gray-500">{metrics.length} METRICS</span>
+                <span className="text-[9px] font-mono tracking-widest text-gray-500">{metricsError ? '—' : metrics.length} METRICS</span>
               </div>
               <div className="space-y-1.5">
                 {[
@@ -452,7 +477,16 @@ export default function HistoryPage() {
           })}
         </div>
 
-        {metrics.length === 0 && (
+        {metricsError && (
+          <div className="flex items-start gap-2 text-sm text-amber-400 bg-gray-900 border border-amber-700/60 rounded-lg px-4 py-3">
+            <Icon name="alert-triangle" size={15} className="shrink-0 mt-0.5" />
+            <span>
+              {t('history.metricsDegraded', 'อ่านรายชื่อ metric จากเซิร์ฟเวอร์ไม่ได้ — สถานะ "ไม่ทราบ" ไม่ใช่ "ไม่มีข้อมูล"')}: {metricsError}
+            </span>
+          </div>
+        )}
+
+        {metrics.length === 0 && !metricsError && (
           <div className="flex items-start gap-2 text-sm text-amber-400 bg-gray-900 border border-amber-700/60 rounded-lg px-4 py-3">
             <Icon name="alert-triangle" size={15} className="shrink-0 mt-0.5" />
             <span>{t('history.noDataHint', 'ยังไม่มีข้อมูลเซ็นเซอร์ในฐานข้อมูล — รอข้อมูลจาก MQTT หรือเพิ่มข้อมูลด้วยมือที่หน้า Sensors')}</span>
