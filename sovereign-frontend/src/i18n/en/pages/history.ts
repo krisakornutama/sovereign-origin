@@ -22,4 +22,6 @@ export default {
   loadingChart: 'Loading data…',
   noDataInRange: 'No sensor data in this time range',
   loadError: 'Failed to load data — make sure the backend is running and TimescaleDB has data',
+  metricsDegraded: 'Could not read the metric list from the server — unknown is not the same as no data',
+  metricsLoadError: 'Could not read the metric list — the contents of the database are unknown',
 } as const;

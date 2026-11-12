@@ -22,4 +22,6 @@ export default {
   loadingChart: 'กำลังโหลดข้อมูล…',
   noDataInRange: 'ยังไม่มีข้อมูลเซ็นเซอร์ในช่วงเวลานี้',
   loadError: 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่และมีข้อมูลใน TimescaleDB',
+  metricsDegraded: 'อ่านรายชื่อ metric จากเซิร์ฟเวอร์ไม่ได้ — สถานะ "ไม่ทราบ" ไม่ใช่ "ไม่มีข้อมูล"',
+  metricsLoadError: 'อ่านรายชื่อ metric ไม่ได้ — ไม่ทราบว่ามีข้อมูลอะไรในฐานข้อมูล',
 } as const;
