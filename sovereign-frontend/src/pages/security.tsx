@@ -55,6 +55,9 @@ export default function SecurityPage() {
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
   const [connections, setConnections] = useState<Connection[]>([]);
+  // อ่าน netstat ไม่ได้ ≠ ไม่มีการเชื่อมต่อ — ต้องแยกสองสถานะนี้ให้ผู้ใช้เห็น
+  const [connectionsDegraded, setConnectionsDegraded] = useState(false);
+  const [connectionsReason, setConnectionsReason] = useState('');
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [firewallStatus, setFirewallStatus] = useState<string>('unknown');
   const [blockedIps, setBlockedIps] = useState<string[]>([]);
@@ -116,7 +119,11 @@ export default function SecurityPage() {
         frRes.ok ? frRes.json() : null,
         realityRes.ok ? realityRes.json() : null,
       ]);
-      setConnections(connData);
+      // รองรับทั้งรูปแบบใหม่ { connections, degraded } และรูปแบบเก่า (array ล้วน)
+      const connPayload = Array.isArray(connData) ? { connections: connData, degraded: false, reason: '' } : connData || {};
+      setConnections(connPayload.connections || []);
+      setConnectionsDegraded(Boolean(connPayload.degraded));
+      setConnectionsReason(String(connPayload.reason || ''));
       setEvents(eventData);
       setFirewallStatus(fwData.status || 'unknown');
       setBlockedIps(blocksData.blockedIps || []);
@@ -366,7 +373,7 @@ export default function SecurityPage() {
             <div className="text-sm text-gray-400 flex items-center gap-1.5"><Icon name="shield" size={14} className="text-emerald-400" /> {t('security.firewall', 'Firewall')} <span className="text-gray-600">{t('security.firewallHint', '(ไฟร์วอลล์)')}</span></div>
             <div className="mt-2"><StatusPill variant={firewallStatus === 'active' ? 'ok' : 'err'} label={firewallStatus.toUpperCase()} pulse={firewallStatus === 'active'} /></div>
           </div>
-          <StatCard label={t('security.activeConnections', 'Active Connections')} value={connections.length} icon={<Icon name="relay" size={14} />} />
+          <StatCard label={t('security.activeConnections', 'Active Connections')} value={connectionsDegraded ? t('security.connectionsUnknown', 'ไม่ทราบ') : connections.length} icon={<Icon name="relay" size={14} />} />
           <StatCard label={t('security.securityEvents', 'Security Events')} value={events.length} icon={<Icon name="alerts" size={14} />} />
         </div>
 
@@ -527,6 +534,11 @@ export default function SecurityPage() {
         {/* Network Connections Table — ตารางการเชื่อมต่อเครือข่าย */}
         <div className="card panel-cyan overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
+          {connectionsDegraded && (
+            <div className="px-4 py-2 text-[11px] text-amber-300 bg-amber-900/20 border-b border-amber-800/40">
+              {t('security.connectionsUnavailable', 'อ่านรายการเชื่อมต่อจริงไม่ได้ ({reason}) — ตารางว่างเพราะ "ไม่รู้" ไม่ใช่ "ไม่มี"', { reason: connectionsReason || 'netstat' })}
+            </div>
+          )}
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800/60">{t('security.activeConnections', 'Active Connections')} <span className="text-xs text-gray-500 font-normal">{t('security.connectionsNote', '— การเชื่อมต่อเครือข่ายที่กำลังใช้งาน (ตรวจสอบ + block IP แปลกปลอม)')}</span></h2>
           <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -571,7 +583,7 @@ export default function SecurityPage() {
                 );
               })}
               {connections.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{t('security.noConnections', 'ยังไม่มีการเชื่อมต่อที่ใช้งานอยู่')}</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{connectionsDegraded ? t('security.connectionsUnavailableShort', 'อ่านรายการเชื่อมต่อไม่ได้ — ไม่ใช่ว่าไม่มี') : t('security.noConnections', 'ยังไม่มีการเชื่อมต่อที่ใช้งานอยู่')}</td></tr>
               )}
             </tbody>
           </table>
