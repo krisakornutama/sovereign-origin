@@ -38,8 +38,10 @@ P0 ทำให้คิว sticky ตามเจ้าของ — ถูก�
 - flush/notify/badge/settings แสดงเช็คเจ้าของตามเดิม — sweep ไม่สะสมข้ามสถานะ
 - คิวที่ไม่เกินอายุ **แม้แต่รายการเดียว** ไม่เข้าชุดลบ (R1)
 
-### อยู่รอ (P1②/P1③ ยังไม่แตะ)
-- 4xx drop policy · Authorization refresh — ไม่ลากเข้ามาในงานนี้
+### อยู่รอ (P1③ ยังไม่แตะ)
+- Authorization refresh — ไม่ลากเข้ามาในงานนี้
+
+> **P1② (4xx) — ทำแล้ว:** ไม่ใช่ "drop" แต่เป็น **quiesce** (พักไว้ ไม่ลบ) เพราะข้อมูลผู้ใช้ห้ามหายเพื่อให้คิวสวย · ดู §9
 
 ## 4. การออกแบบ
 
@@ -144,3 +146,17 @@ export interface AuditStore {
 7. regen changelog/status → docs commit ตรง main
 8. รายงานผล + เสนอ P1② (4xx drop) ขึ้นคิวต่อ
 ```
+
+---
+
+## 9. P1② — คำขอที่ถูกปฏิเสธถาวร (ทำแล้ว 2026-11-12)
+
+**ตัดสินใจต่างจากแผนเดิม:** ชื่อ "4xx drop policy" ฟังดูเหมือนลบคำขอทิ้ง — ซึ่งขัดหลักสูงสุดของโปรเจ็กต์ ("ข้อมูลไม่หาย") ถ้า server ตอบ 400 เพราะผู้ใช้กรอกข้อมูลผิด การลบทิ้งเงียบ ๆ คือการทำลายงานที่ผู้ใช้ทำไว้ ⇒ ที่ทำคือ **quiesce (พัก)** ไม่ใช่ drop:
+
+- `queue-rejection.ts` (pure) — `classifyFlushStatus`: 2xx = ok · 4xx ที่ไม่ใช่ 408/425/429 = **rejected** · ที่เหลือ (5xx/0) = retry
+  - 401/403 ก็นับเป็น rejected: token เก่าถูกฝังใน headers แล้ว การ retry ด้วยของเดิมทุกครั้งที่ online ไม่มีทางผ่าน (retry storm) — แต่ **ไม่ลบ** ผู้ใช้ล็อกอินใหม่แล้วกดลองเองได้
+- `offlineQueue.ts` — `QueuedAction.lastRejection?: { status, at }` · flush อัตโนมัติ **ข้าม** รายการที่ถูกพัก (`shouldAttempt`) · `flushAction` (มือคนกด) ยิงจริงเสมอ แม้ถูกพัก
+- `OfflineQueuePanel` — แสดงสถานะ "ถูกปฏิเสธ (400) เมื่อ … — ไม่ส่งซ้ำอัตโนมัติ" ต่อรายการ
+- **ห้ามเปลี่ยนเป็นลบอัตโนมัติในอนาคต** เว้นแต่เจ้าของสั่ง: quiesce คือด่านกันข้อมูลหาย ไม่ใช่ของประดับ
+
+**เทสต์:** `queue-rejection.test.ts` 8/8 (pure) · `offlineQueue.rejection.idb.test.ts` 4/4 (fake-indexeddb: 400 ไม่ถูกลบ + ไม่ยิงซ้ำ, 200 ถูกลบ, 5xx ยัง retry, 429 ไม่ติดป้าย, ป้าย persist ลง IDB จริง, flushAction ลองใหม่ได้) · wrapper ใน `tools/test/frontend-queue-rejection*.test.mjs` ผูกเข้า `npm run verify`
