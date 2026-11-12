@@ -158,6 +158,75 @@ function isSafeBackupName(file: string): boolean {
   return !!file && path.basename(file) === file && file.endsWith('.sql.gz') && !file.includes('..');
 }
 
+/**
+ * ข้อผิดพลาดที่ "ผู้เรียก" เป็นคนก่อ (ชื่อไฟล์ผิดรูป/ไฟล์ไม่มี) — ต้องตอบ 400/404
+ * ไม่ใช่ 500 ซึ่งอ่านว่าเซิร์ฟเวอร์พังและทำให้เครื่องมือ/คนกด retry ซ้ำโดยไม่จำเป็น
+ */
+export class BackupRequestError extends Error {
+  constructor(message: string, readonly status: 400 | 404) {
+    super(message);
+    this.name = 'BackupRequestError';
+  }
+}
+
+// ── Restore journal ────────────────────────────────────────────────────────
+// เก็บประวัติการกู้คืนเป็นไฟล์ JSONL ข้าง backup ไม่ใช่ใน DB เพราะการกู้คืนคือการ
+// "แทนที่ฐานข้อมูลทั้งก้อน" — audit row ที่เพิ่งเขียนมีสิทธิ์ถูก dump รุ่นเก่าทับหายไป
+const RESTORE_JOURNAL_FILE = 'restore-history.jsonl';
+/** เพดานรายการที่เก็บ — ไฟล์เล็กมาก (รายการละ ~200 ไบต์) แต่ไม่ควรโตตลอดไป */
+export const RESTORE_JOURNAL_MAX = 50;
+
+export interface RestoreJournalEntry {
+  at: string;
+  file: string;
+  ok: boolean;
+  status: number;
+  error?: string;
+  userId?: string | null;
+  ip?: string | null;
+}
+
+function restoreJournalPath(): string {
+  return path.join(BACKUP_DIR, RESTORE_JOURNAL_FILE);
+}
+
+/** ต่อท้ายประวัติการกู้คืน — best-effort: เขียน log ไม่ได้ต้องไม่ทำให้ผลลัพธ์ของ restore เปลี่ยน */
+export function appendRestoreJournal(entry: RestoreJournalEntry): void {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const file = restoreJournalPath();
+    fs.appendFileSync(file, JSON.stringify(entry) + '\n');
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim() !== '');
+    if (lines.length > RESTORE_JOURNAL_MAX) {
+      fs.writeFileSync(file, lines.slice(-RESTORE_JOURNAL_MAX).join('\n') + '\n');
+    }
+  } catch (err) {
+    console.error('[backup] append restore journal failed:', (err as Error).message);
+  }
+}
+
+/** อ่านประวัติการกู้คืนล่าสุด (ใหม่สุดก่อน) — บรรทัดที่เสียหายถูกข้าม ไม่ทำให้ทั้งรายการล้ม */
+export function readRestoreJournal(limit = 10): RestoreJournalEntry[] {
+  const file = restoreJournalPath();
+  if (!fs.existsSync(file)) return [];
+  try {
+    const take = Math.max(1, Math.min(Number.isFinite(limit) ? limit : 10, RESTORE_JOURNAL_MAX));
+    const entries: RestoreJournalEntry[] = [];
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      if (line.trim() === '') continue;
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed && typeof parsed === 'object' && typeof parsed.file === 'string') entries.push(parsed);
+      } catch {
+        // บรรทัดเสีย (เขียนค้าง/ไฟล์ถูกแก้) — ข้าม
+      }
+    }
+    return entries.slice(-take).reverse();
+  } catch {
+    return [];
+  }
+}
+
 /** dump DB เป็น .sql.gz — พยายามใช้ pg_dump ในเครื่องก่อน ถ้าไม่มีค่อยใช้ docker exec */
 async function dumpDatabase(): Promise<Buffer> {
   try {
@@ -255,9 +324,9 @@ class BackupService {
   }
 
   async restoreBackup(file: string): Promise<void> {
-    if (!isSafeBackupName(file)) throw new Error('Invalid backup file name');
+    if (!isSafeBackupName(file)) throw new BackupRequestError('Invalid backup file name', 400);
     const filePath = path.join(BACKUP_DIR, file);
-    if (!fs.existsSync(filePath)) throw new Error('Backup file not found');
+    if (!fs.existsSync(filePath)) throw new BackupRequestError('Backup file not found', 404);
     const sql = gunzipSync(fs.readFileSync(filePath)).toString('utf-8');
     await restoreDatabase(sql);
     console.log(`♻️ Restored from backup: ${file}`);
