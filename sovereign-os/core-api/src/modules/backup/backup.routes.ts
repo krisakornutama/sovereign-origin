@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { backupService } from '../../services/backup.service';
+import { backupService, appendRestoreJournal, readRestoreJournal, BackupRequestError } from '../../services/backup.service';
 
 const router = Router();
 
@@ -34,14 +34,53 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   }
 });
 
-// POST /api/backup/restore { file } – กู้คืนจากไฟล์ (SUPERADMIN, มีผลกับทั้ง DB!)
-router.post('/restore', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+// GET /api/backup/restore-history – ประวัติการกู้คืนล่าสุด (SUPERADMIN)
+// journal อยู่ข้างไฟล์ backup (ไม่ใช่ DB) จึงอยู่รอดแม้เพิ่งกู้คืนทับฐานข้อมูลทั้งก้อน
+router.get('/restore-history', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+  const requested = parseInt(String(req.query.limit ?? '10'), 10);
+  const limit = Math.min(Math.max(Number.isFinite(requested) ? requested : 10, 1), 50);
   try {
-    await backupService.restoreBackup(String(req.body?.file || ''));
+    res.json({ restores: readRestoreJournal(limit) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read restore history' });
+  }
+});
+
+// POST /api/backup/restore { file, confirm } – กู้คืนจากไฟล์ (SUPERADMIN, มีผลกับทั้ง DB!)
+// เป็นการกระทำที่ทำลายข้อมูลมากที่สุดในระบบ ⇒ ต้องบังคับ "เจตนาชัดเจน":
+//   - `confirm` ต้องตรงกับชื่อไฟล์ (พิมพ์ผิดตัวเดียวก็ไม่ผ่าน) — window.confirm ฝั่ง UI
+//     เป็นแค่ความสะดวก ปุ่ม/yิง API ตรงได้เสมอ จึงต้องมีด่านที่ server
+//   - ทุกความพยายาม (สำเร็จหรือไม่) ถูกบันทึกใน journal ข้าง backup ซึ่งรอดจากการกู้คืน
+router.post('/restore', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+  const file = typeof req.body?.file === 'string' ? req.body.file.trim() : '';
+  const confirm = typeof req.body?.confirm === 'string' ? req.body.confirm.trim() : '';
+  const actor = { userId: req.user?.id ?? null, ip: req.ip ?? null };
+
+  if (!file) {
+    return res.status(400).json({ error: 'ต้องระบุชื่อไฟล์ backup ที่จะกู้คืน' });
+  }
+  if (!confirm || confirm !== file) {
+    return res.status(400).json({
+      error: 'ยืนยันไม่ถูกต้อง — พิมพ์ชื่อไฟล์ backup ให้ตรงทุกตัวอักษรเพื่อยืนยันว่าต้องการกู้คืน (ข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด)',
+    });
+  }
+
+  try {
+    await backupService.restoreBackup(file);
+    appendRestoreJournal({ at: new Date().toISOString(), file, ok: true, status: 200, ...actor });
     res.json({ success: true });
   } catch (err) {
+    const status = err instanceof BackupRequestError ? err.status : 500;
+    appendRestoreJournal({
+      at: new Date().toISOString(),
+      file,
+      ok: false,
+      status,
+      error: (err as Error).message || 'unknown error',
+      ...actor,
+    });
     console.error('Restore backup error:', err);
-    res.status(500).json({ error: (err as Error).message || 'Restore failed' });
+    res.status(status).json({ error: (err as Error).message || 'Restore failed' });
   }
 });
 
