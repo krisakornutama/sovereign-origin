@@ -11,6 +11,9 @@
 - **ห้ามคืนข้อมูลจำลองใน endpoint ที่ใช้ตัดสินใจด้านความปลอดภัย** — `GET /connections` เดิมส่ง 2 แถวปลอมเมื่อเรียก netstat ไม่ได้ (หน้าความปลอดภัยจึงโชว์ "การเชื่อมต่อ" ที่ไม่มีจริง) ตอนนี้อ่านไม่ได้ = `connections: []` + `degraded: true` + `reason` และ UI ต้องแสดงสถานะนั้น (ตัวเลข "ไม่ทราบ" ไม่ใช่ 0)
   - `host-connections.service.ts` เป็นเจ้าของการอ่าน netstat — ต้อง `throw` เมื่อคำสั่งใช้ไม่ได้ ให้ route เป็นคนตัดสินใจ ห้ามกลืน error แล้วแต่งข้อมูล
   - UI ต้องรองรับทั้ง `{connections, degraded}` (ใหม่) และ array ล้วน (mock/preview เก่า)
+- **`security_events` เป็นหลักฐาน ไม่ใช่กล่องข้อความ** — `POST /events` จำกัดที่ `EVENT_WRITE_ROLES` (`SUPERADMIN`/`NODE_ADMIN`/`SITE_ADMIN`/`OPERATOR`) เพราะ log ที่ใครก็เขียนได้ (รวม KID/SYSTEM_AI) = หลักฐานที่ปลอมได้ และถล่ม 50 แถวล่าสุดจนของจริงหลุดจากสายตา
+  - ตรวจก่อนเก็บ: `event_type` = `[A-Za-z0-9_]{2,40}` (normalize เป็นตัวใหญ่) · `severity` ∈ {info, warning, critical} (ตัวเล็ก) · `description` ไม่ว่างและ ≤ 500 · IP ≤ 45 ตัวอักษรและเป็น hex/`.`/`:` เท่านั้น · `raw_data` ต้องเป็น object
+  - `GET /events` คืน `{ events, degraded, reason }`: อ่าน DB ไม่ได้ = `degraded: true` (การ์ดขึ้น "ไม่ทราบ" ไม่ใช่ 0) — ห้ามกลับไปตอบ `[]` เปล่า ๆ
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)

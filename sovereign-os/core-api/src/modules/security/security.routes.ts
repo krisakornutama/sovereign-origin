@@ -91,35 +91,89 @@ router.post('/firewall/unblock', authenticate, async (req, res) => {
 });
 
 // GET /api/security/events - ดึง security events ล่าสุด
-router.get('/events', authenticate, async (req, res) => {
+// อ่าน DB ไม่ได้ ≠ ไม่มีเหตุการณ์ — ต้องมี degraded flag (หลักฐานความปลอดภัยต้องไม่โกหก)
+router.get('/events', authenticate, async (_req, res) => {
   try {
     const events = await prisma.securityEvent.findMany({
       orderBy: { timestamp: 'desc' },
       take: 50,
     });
-    res.json(events);
+    res.json({ events, degraded: false, source: 'db' });
   } catch (err) {
-    res.json([]);
+    res.json({
+      events: [],
+      degraded: true,
+      source: 'unavailable',
+      reason: 'อ่านเหตุการณ์ความปลอดภัยจากฐานข้อมูลไม่ได้',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
 // POST /api/security/events - บันทึก security event ใหม่
-router.post('/events', authenticate, async (req, res) => {
+// เขียนได้เฉพาะ role ที่เชื่อถือได้ (KID/SYSTEM_AI = ไม่) และค่าต้องถูกตรวจก่อนเก็บ:
+// event log ที่ใครก็เขียนได้ = หลักฐานที่ปลอมได้ (และถล่ม 50 แถวล่าสุดจนของจริงหลุดสายตา)
+const EVENT_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
+const EVENT_TYPE_PATTERN = /^[A-Za-z0-9_]{2,40}$/;
+const EVENT_SEVERITIES = new Set(['info', 'warning', 'critical']);
+const MAX_EVENT_DESCRIPTION = 500;
+const MAX_IP_LENGTH = 45; // IPv6 สูงสุด 45 ตัวอักษร
+
+function normalizeIp(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === undefined || value === null || value === '') return { ok: true, value: null };
+  if (typeof value !== 'string') return { ok: false };
+  const trimmed = value.trim();
+  if (trimmed.length > MAX_IP_LENGTH) return { ok: false };
+  if (!/^[0-9a-fA-F:.]+$/.test(trimmed)) return { ok: false };
+  return { ok: true, value: trimmed };
+}
+
+router.post('/events', authenticate, requireRole(...EVENT_WRITE_ROLES), async (req, res) => {
+  const body = req.body || {};
+  const eventType = typeof body.event_type === 'string' ? body.event_type.trim().toUpperCase() : '';
+  if (!EVENT_TYPE_PATTERN.test(eventType)) {
+    return res.status(400).json({
+      error: 'event_type ต้องเป็นตัวอักษร/ตัวเลข/underscore 2-40 ตัว (เช่น INTRUSION, PORT_SCAN)',
+    });
+  }
+  const severity = String(body.severity ?? 'info').trim().toLowerCase();
+  if (!EVENT_SEVERITIES.has(severity)) {
+    return res.status(400).json({ error: 'severity ต้องเป็น info, warning หรือ critical' });
+  }
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  if (!description) {
+    return res.status(400).json({ error: 'description ต้องไม่ว่าง' });
+  }
+  if (description.length > MAX_EVENT_DESCRIPTION) {
+    return res.status(400).json({ error: `description ยาวเกิน ${MAX_EVENT_DESCRIPTION} ตัวอักษร` });
+  }
+  const sourceIp = normalizeIp(body.source_ip);
+  const destIp = normalizeIp(body.dest_ip);
+  if (!sourceIp.ok || !destIp.ok) {
+    return res.status(400).json({ error: `source_ip/dest_ip ต้องเป็น IP ที่ถูกต้อง (ยาวไม่เกิน ${MAX_IP_LENGTH})` });
+  }
+  const rawData = body.raw_data;
+  if (rawData !== undefined && rawData !== null && (typeof rawData !== 'object' || Array.isArray(rawData))) {
+    return res.status(400).json({ error: 'raw_data ต้องเป็น object' });
+  }
+
   try {
-    const { event_type, severity, source_ip, dest_ip, description, raw_data } = req.body;
     const event = await prisma.securityEvent.create({
       data: {
-        event_type,
-        severity: severity || 'info',
-        source_ip,
-        dest_ip,
+        event_type: eventType,
+        severity,
+        source_ip: sourceIp.value,
+        dest_ip: destIp.value,
         description,
-        raw_data: raw_data || {},
+        raw_data: rawData ?? {},
       },
     });
     res.status(201).json(event);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create event' });
+    res.status(500).json({
+      error: 'บันทึกเหตุการณ์ไม่สำเร็จ',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
