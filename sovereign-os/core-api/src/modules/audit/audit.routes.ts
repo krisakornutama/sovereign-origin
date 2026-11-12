@@ -12,6 +12,10 @@ const router = Router();
 
 /** เพดานแถวของไฟล์ export — กันการดึงทั้งตารางโดยไม่ตั้งใจ (ไม่ใช่ทาง backup) */
 const EXPORT_MAX_ROWS = 10000;
+/** เพดานแถวของหน้ารายการ — เกินกว่านี้ให้ใช้ export ไม่ใช่เลื่อนดู */
+const LIST_MAX_ROWS = 500;
+/** เพดาน offset — กัน deep pagination ที่กิน CPU/IO โดยไม่มีใครได้ประโยชน์ */
+const LIST_MAX_OFFSET = 100000;
 
 interface AuditFilters {
   q: string;
@@ -77,16 +81,36 @@ function payloadField(payload: any, key: string): string {
   return value === null || value === undefined ? '' : String(value);
 }
 
-// GET /api/audit — รายการล่าสุด (ตัวกรองเดิม: q, actionPrefix, limit)
+// GET /api/audit — รายการล่าสุด (ตัวกรองเดิม: q, actionPrefix, limit) + offset สำหรับแบ่งหน้า
+//
+// หัวใจของการ "ตรวจย้อนได้": ถ้าเห็นได้แค่ N แถวล่าสุด ผู้ตรวจถามไม่ได้ว่าเมื่อวานเกิดอะไร
+// (ต้อง export ทั้งช่วงแทนซึ่งหนักและไม่ตอบคำถาม "ขอดูหน้าถัดไป") ⇒ รองรับ offset/skip
+// แต่ไม่นับทั้งตาราง (audit_logs โตไม่จำกัด): ดึง `limit+1` แถวแล้วใช้แถวเกินเป็นสัญญาณ
+// "มีต่อ" ที่เชื่อถือได้ ไม่ต้องเดาจากจำนวนที่ได้พอดี
 router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
-    const logs = await prisma.auditLog.findMany({
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const limit = Math.max(1, Math.min(Number.isFinite(rawLimit) ? rawLimit : 100, LIST_MAX_ROWS));
+    const rawOffset = parseInt(req.query.offset as string, 10);
+    if (Number.isFinite(rawOffset) && rawOffset > LIST_MAX_OFFSET) {
+      // เงียบ ๆ คืนลิสต์ว่างจะอ่านว่า "ไม่มีข้อมูลแล้ว" — ซึ่งเป็นการโกหกอีกแบบ
+      return res.status(400).json({ error: `offset เกินเพดาน ${LIST_MAX_OFFSET} — ใช้ export CSV สำหรับช่วงใหญ่` });
+    }
+    const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+
+    const fetched = await prisma.auditLog.findMany({
       where: await buildWhere(readFilters(req)),
       orderBy: { timestamp: 'desc' },
-      take: limit,
+      skip: offset,
+      take: limit + 1,
       include: { user: { select: { username: true } } },
     });
+    const hasMore = fetched.length > limit;
+    const logs = hasMore ? fetched.slice(0, limit) : fetched;
+
+    res.setHeader('X-Audit-List-Has-More', hasMore ? 'true' : 'false');
+    res.setHeader('X-Audit-List-Offset', String(offset));
+    res.setHeader('X-Audit-List-Limit', String(limit));
     res.json(logs);
   } catch (err) {
     console.error('Audit API error:', err);
