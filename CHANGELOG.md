@@ -8,6 +8,7 @@
 
 ## [Unreleased]
 
+- **เดสก์ท็อปไม่แอบใช้ API ของคนอื่น** — sidecar เดิมยึด `PORT=3001` ตายตัวและกลืน stderr ⇒ ถ้าพอร์ตถูกคอนเทนเนอร์/บริการอื่นยึด แอปจะคุยกับเซิร์ฟเวอร์รุ่นเก่าโดยไม่มีสัญญาณ (endpoint ใหม่ตอบ 404) · ตอนนี้ตรวจ `/api/health` เทียบ `build.version` กับบิลด์ในตัวก่อน spawn: เป็นของเรา = ใช้ต่อ, ว่าง = spawn 3001, ของคนอื่น = log `backend-port-conflict` + spawn พอร์ตสำรองและบอก renderer ผ่าน `sovereign-api-url` · เทสต์ `desktop-backend-port` 3/3
 ---
 
 ## [v1.3.2] — 2026-11-11 (released)

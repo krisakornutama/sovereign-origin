@@ -124,7 +124,13 @@ function loadShell(opts = {}) {
       if (id === 'electron') return stub.electron;
       // โมดูลในเครื่องของ shell (./x) ทุกตัว resolve จากโฟลเดอร์ electron เสมอ
       // (เดิมไล่ชื่อทีละตัว — เพิ่มโมดูลใหม่แล้วเทสต์ล้มทั้งไฟล์โดยไม่เกี่ยวกับบั๊กจริง)
-      if (typeof id === 'string' && id.startsWith('./')) return require(path.join(ROOT, 'sovereign-frontend/electron', `${id.slice(2)}.js`));
+      if (typeof id === 'string' && id.startsWith('./')) {
+        const rel = id.slice(2);
+        const file = path.extname(rel)
+          ? path.join(ROOT, 'sovereign-frontend/electron', rel)
+          : path.join(ROOT, 'sovereign-frontend/electron', rel + '.js');
+        return require(file);
+      }
       return require(id);
     },
     console: opts.quiet ? { log() {}, error() {}, warn() {} } : console,
