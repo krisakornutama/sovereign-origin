@@ -13,6 +13,11 @@
 - **`POST /generate-code`: ทุกค่าที่ผู้ใช้พิมพ์และจะถูกฝังลงสตริง C ต้องผ่าน `cString()`** (escape `\` `"` และ control char + cap ความยาว) — ไม่ escape = `"` เดียวก็หลุดออกจากสตริงกลายเป็นโค้ดที่ถูกแฟลชลงอุปกรณ์ หรืออย่างน้อยสเก็ตช์คอมไพล์ไม่ผ่าน (รหัส WiFi ที่มี `\` เป็นของจริง)
   - `sensors` ต้องเป็น **array** และ ≤ `MAX_GENERATED_SENSORS` (32) — ค่าที่ไม่ใช่ array เคยทำให้ `sensors.map` โยนใน async handler ⇒ Express 4 ไม่ดัก = คำขอค้าง ไม่ใช่ 400
   - handler เป็นฟังก์ชัน sync ที่ถูกเรียกใน `try/catch` — อย่าเปลี่ยนกลับเป็น `async` ตรง ๆ โดยไม่มี catch
+- **`GET /devices` คืน `{ devices, degraded, reason, source }`** — อ่าน DB ไม่ได้ = `degraded: true` + `reason` (ไม่ใช่ `500 []` ที่ UI อ่านว่า "0 อุปกรณ์") ⇒ UI ต้องขึ้นแบนเนอร์ "ไม่ทราบ" และต้องไม่ขึ้น EmptyState "ยังไม่มีอุปกรณ์" พร้อมกัน
+- **`POST /devices` + `DELETE /devices/:id` ต้องมี `DEVICE_WRITE_ROLES`** (`SUPERADMIN`/`NODE_ADMIN`/`SITE_ADMIN`/`OPERATOR`) — ตาราง `devices` เป็น config จริงของบ้าน (ลบอุปกรณ์ = ประวัติ/ค่าที่ผูกกับอุปกรณ์นั้นหาย) ⇒ KID/SYSTEM_AI ต้องได้ 403 ก่อนแตะ DB
+- **`name` ไม่มีคอลัมน์เก็บในตาราง `devices`** — ใช้สร้าง `mqtt_topic` เท่านั้น ผ่าน `topicSegment()` (`/`, `+`, `#`, ช่องว่าง, control char → `-`; cap 64 ตัว; ว่าง = `device`) ⇒ ห้ามคืนชื่อให้ผู้ใช้อ่านว่า "บันทึกชื่อแล้ว" · `type` ต้อง match `DEVICE_TYPE_PATTERN` (1–32 ตัว `A-Za-z0-9 _.-`) และ `node_id` ต้องเป็น UUID — ผิดรูปแบบ = 400 ก่อนถึง Prisma
+- **`DELETE /devices/:id`**: id ที่ไม่ใช่ UUID = 400 (กัน P2023 จาก `@db.Uuid`), id ที่ไม่มีจริง (P2025) = 404 — ห้ามปล่อยเป็น 500 "ลบไม่สำเร็จ" ที่แยกไม่ออกว่าพิมพ์ผิดหรือถูกลบไปแล้ว
+- **`GET /metrics` และ `GET /all` อ่านไม่สำเร็จ = 500 พร้อม `{ error, metrics: [] }` / `{ error, records: [] }`** — ห้ามกลับไป `200 []`: หน้าเว็บจะขึ้น "ไม่มีข้อมูล" ทั้งที่ความจริงคือ "อ่านไม่ได้"
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)
