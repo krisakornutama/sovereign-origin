@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import net from 'net';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { normalizeSingleIp } from '../lib/ip-address';
 import { AgentPolicy, agentPolicy } from './agent-policy.service';
 import { AuditService } from './audit.service';
 import { aiKillSwitch } from './ai-kill-switch.service';
@@ -77,6 +78,11 @@ async function run(cmd: string, args: string[]): Promise<string> {
 
 export const realSystemExecutor: SystemExecutor = {
   async blockIp(ip) {
+    // ชั้นที่สอง: ถึงตรงนี้ต้องเป็น IP เดี่ยวเท่านั้น — `0.0.0.0/0` บน netsh/iptables
+    // คือ "บล็อกทุกทราฟฟิก" (ล็อกตัวเองออกจากระบบ) และค่าแปลกไม่ควรถูกตีความโดย OS
+    const safe = normalizeSingleIp(ip);
+    if (!safe) return `refused: not a single IP (${String(ip).slice(0, 45)})`;
+    ip = safe;
     if (process.platform === 'win32') {
       // Windows Firewall — one named rule per IP so it can be removed later.
       const rule = `SovereignOS-AI-Block-${ip}`;
@@ -100,6 +106,9 @@ export const realSystemExecutor: SystemExecutor = {
   },
 
   async unblockIp(ip) {
+    const safe = normalizeSingleIp(ip);
+    if (!safe) return `refused: not a single IP (${String(ip).slice(0, 45)})`;
+    ip = safe;
     if (process.platform === 'win32') {
       const rule = `SovereignOS-AI-Block-${ip}`;
       const out = await run('netsh', ['advfirewall', 'firewall', 'delete', 'rule', `name=${rule}`]);

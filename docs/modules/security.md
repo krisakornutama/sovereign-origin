@@ -14,6 +14,8 @@
 - **`security_events` เป็นหลักฐาน ไม่ใช่กล่องข้อความ** — `POST /events` จำกัดที่ `EVENT_WRITE_ROLES` (`SUPERADMIN`/`NODE_ADMIN`/`SITE_ADMIN`/`OPERATOR`) เพราะ log ที่ใครก็เขียนได้ (รวม KID/SYSTEM_AI) = หลักฐานที่ปลอมได้ และถล่ม 50 แถวล่าสุดจนของจริงหลุดจากสายตา
   - ตรวจก่อนเก็บ: `event_type` = `[A-Za-z0-9_]{2,40}` (normalize เป็นตัวใหญ่) · `severity` ∈ {info, warning, critical} (ตัวเล็ก) · `description` ไม่ว่างและ ≤ 500 · IP ≤ 45 ตัวอักษรและเป็น hex/`.`/`:` เท่านั้น · `raw_data` ต้องเป็น object
   - `GET /events` คืน `{ events, degraded, reason }`: อ่าน DB ไม่ได้ = `degraded: true` (การ์ดขึ้น "ไม่ทราบ" ไม่ใช่ 0) — ห้ามกลับไปตอบ `[]` เปล่า ๆ
+- **`/firewall/block` + `/firewall/unblock` รับเฉพาะ IP เดี่ยว** (`normalizeSingleIp` ใน `lib/ip-address.ts`) — `0.0.0.0/0` หรือ CIDR/ช่วง = บล็อกทุกทราฟฟิกขาเข้า = ล็อกตัวเองออกจากระบบด้วยคำขอเดียว ⇒ ตอบ **400** ก่อนถึง `agentActions` · executor (`realSystemExecutor.blockIp/unblockIp`) และ `threat-detection` ตรวจซ้ำเป็นชั้นที่สอง (ค่าแปลกต้องไม่ถูกตีความโดย netsh/iptables หรือ shell ของ `FIREWALL_BLOCK_CMD`)
+  - handler ทั้งสองเป็น async ที่ await executor — ต้องมี `try/catch` ในตัวเองเสมอ (Express 4 ไม่ดัก async throw ⇒ คำขอค้าง ไม่ใช่ 500)
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)

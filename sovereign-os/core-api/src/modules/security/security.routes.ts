@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
+import { normalizeSingleIp } from '../../lib/ip-address';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
 import { hostConnections } from '../../services/host-connections.service';
@@ -59,35 +60,49 @@ router.get('/firewall/blocks', authenticate, (req, res) => {
 
 // POST /api/security/firewall/block - block IP ผ่าน guard + autonomy เดียวกับ AI agent
 // 200 = ดำเนินการแล้ว, 202 = ส่งคำขออนุมัติ (โหมด suggest), 403 = ถูกปฏิเสธ (โหมด view / guard)
+// รับเฉพาะ IP เดี่ยว — `0.0.0.0/0` = บล็อกทุกทราฟฟิกขาเข้า (ล็อกตัวเองออกจากระบบ)
+const SINGLE_IP_ERROR = 'ip ต้องเป็น IP เดี่ยว (IPv4/IPv6) เท่านั้น — ไม่รับ CIDR/ช่วง IP/ชื่อโฮสต์';
+
 router.post('/firewall/block', authenticate, async (req, res) => {
-  const { ip } = req.body;
-  if (typeof ip !== 'string' || !ip.trim()) {
-    return res.status(400).json({ error: 'ip is required' });
+  const ip = normalizeSingleIp(req.body?.ip);
+  if (!ip) return res.status(400).json({ error: SINGLE_IP_ERROR });
+  try {
+    const result = await agentActions.executeAction(
+      'blockIP',
+      { ip },
+      { actor: req.user?.id, source: 'security-ui', ip: req.ip }
+    );
+    if (result.status === 'denied') return res.status(403).json(result);
+    if (result.status === 'requires_approval') return res.status(202).json(result);
+    return res.json(result);
+  } catch (err) {
+    // Express 4 ไม่ดัก async throw — ถ้าไม่จับ คำขอจะค้างจน client timeout
+    return res.status(500).json({
+      error: 'สั่ง block ไม่สำเร็จ (executor ล้ม)',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
-  const result = await agentActions.executeAction(
-    'blockIP',
-    { ip: ip.trim() },
-    { actor: req.user?.id, source: 'security-ui', ip: req.ip }
-  );
-  if (result.status === 'denied') return res.status(403).json(result);
-  if (result.status === 'requires_approval') return res.status(202).json(result);
-  return res.json(result);
 });
 
 // POST /api/security/firewall/unblock - ยกเลิกการ block IP
 router.post('/firewall/unblock', authenticate, async (req, res) => {
-  const { ip } = req.body;
-  if (typeof ip !== 'string' || !ip.trim()) {
-    return res.status(400).json({ error: 'ip is required' });
+  const ip = normalizeSingleIp(req.body?.ip);
+  if (!ip) return res.status(400).json({ error: SINGLE_IP_ERROR });
+  try {
+    const result = await agentActions.executeAction(
+      'unblockIP',
+      { ip },
+      { actor: req.user?.id, source: 'security-ui', ip: req.ip }
+    );
+    if (result.status === 'denied') return res.status(403).json(result);
+    if (result.status === 'requires_approval') return res.status(202).json(result);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      error: 'สั่ง unblock ไม่สำเร็จ (executor ล้ม)',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
-  const result = await agentActions.executeAction(
-    'unblockIP',
-    { ip: ip.trim() },
-    { actor: req.user?.id, source: 'security-ui', ip: req.ip }
-  );
-  if (result.status === 'denied') return res.status(403).json(result);
-  if (result.status === 'requires_approval') return res.status(202).json(result);
-  return res.json(result);
 });
 
 // GET /api/security/events - ดึง security events ล่าสุด
