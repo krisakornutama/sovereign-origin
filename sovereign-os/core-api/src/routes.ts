@@ -3,6 +3,7 @@ import type { Express } from 'express';
 import { join } from 'node:path';
 import { readFile as readFileCb } from 'node:fs';
 import { config } from './config';
+import { appVersion } from './lib/app-version';
 import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
 import { buildOpsSummary } from './services/ops-summary.service';
 import { prisma } from './lib/prisma';
@@ -179,7 +180,12 @@ export function mountRoutes(app: Express): void {
             .catch(() => null as Array<{ migration_name: string }> | null),
         ]);
         return {
-          build: { fingerprint: fp.fingerprint, files: fp.files, loadedDir: getLoadedCodeDirLabel() },
+          build: {
+            version: appVersion(),
+            fingerprint: fp.fingerprint,
+            files: fp.files,
+            loadedDir: getLoadedCodeDirLabel(),
+          },
           db: { migrationHead: migrationHead?.[0]?.migration_name ?? null },
         };
       })();
