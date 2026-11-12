@@ -8,6 +8,9 @@
 - `security_events` เป็นตาราง **shared cross-cutting** (ทุกโมดูลเขียนได้) — ห้ามย้ายไปเป็นของเฉพาะโมดูล
 - กติกาไฟร์วอลล์ (`firewall_rules`) ต้องเก็บลำดับ (order/priority) ให้ถูกต้อง — ลำดับผิด = กฎตีความผิดทั้งชุด
 - แหล่ง intel ภายนอกอัปเดตได้เอง (`update-feeds`) — ห้ามเชื่อเนื้อหา feed โดยไม่ validate
+- **ห้ามคืนข้อมูลจำลองใน endpoint ที่ใช้ตัดสินใจด้านความปลอดภัย** — `GET /connections` เดิมส่ง 2 แถวปลอมเมื่อเรียก netstat ไม่ได้ (หน้าความปลอดภัยจึงโชว์ "การเชื่อมต่อ" ที่ไม่มีจริง) ตอนนี้อ่านไม่ได้ = `connections: []` + `degraded: true` + `reason` และ UI ต้องแสดงสถานะนั้น (ตัวเลข "ไม่ทราบ" ไม่ใช่ 0)
+  - `host-connections.service.ts` เป็นเจ้าของการอ่าน netstat — ต้อง `throw` เมื่อคำสั่งใช้ไม่ได้ ให้ route เป็นคนตัดสินใจ ห้ามกลืน error แล้วแต่งข้อมูล
+  - UI ต้องรองรับทั้ง `{connections, degraded}` (ใหม่) และ array ล้วน (mock/preview เก่า)
 <!-- auto:begin — ส่วนนี้ gen จากโค้ดจริง (node tools/gen-module-docs.mjs) ห้ามแก้มือ -->
 
 ## ของจริงในโค้ด (auto-generated)

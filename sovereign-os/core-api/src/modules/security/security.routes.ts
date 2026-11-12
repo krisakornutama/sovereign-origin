@@ -5,33 +5,26 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
+import { hostConnections } from '../../services/host-connections.service';
 
 const router = Router();
 const execAsync = promisify(exec);
 
 // GET /api/security/connections - ดึงการเชื่อมต่อปัจจุบัน (netstat)
-router.get('/connections', authenticate, async (req, res) => {
+// อ่านไม่ได้ = คืน connections ว่าง + degraded: true + เหตุผล — **ห้ามคืนแถวจำลอง**
+// (หน้าความปลอดภัยที่โชว์ "การเชื่อมต่อ" ที่ไม่มีจริง = หลักฐานเท็จ)
+router.get('/connections', authenticate, async (_req, res) => {
   try {
-    // สำหรับ Windows ใช้ netstat, Linux ใช้ ss
-    const { stdout } = await execAsync('netstat -ano | findstr ESTABLISHED');
-    const lines = stdout.trim().split('\n').filter(line => line);
-    const connections = lines.map(line => {
-      const parts = line.trim().split(/\s+/);
-      return {
-        protocol: parts[0] || 'TCP',
-        local_address: parts[1] || '0.0.0.0:0',
-        foreign_address: parts[2] || '0.0.0.0:0',
-        state: parts[3] || 'ESTABLISHED',
-        pid: parts[4] || 'N/A'
-      };
-    });
-    res.json(connections);
+    const connections = await hostConnections.read();
+    res.json({ connections, degraded: false, source: 'netstat' });
   } catch (error) {
-    // fallback: ส่งข้อมูลจำลอง
-    res.json([
-      { protocol: 'TCP', local_address: '192.168.1.100:3001', foreign_address: '10.12.55.5:54321', state: 'ESTABLISHED', pid: '1234' },
-      { protocol: 'TCP', local_address: '127.0.0.1:5432', foreign_address: '127.0.0.1:54321', state: 'ESTABLISHED', pid: '5678' }
-    ]);
+    res.json({
+      connections: [],
+      degraded: true,
+      source: 'unavailable',
+      reason: 'อ่าน netstat ของโฮสต์ไม่ได้จากสภาพแวดล้อมนี้ (คอนเทนเนอร์/host)',
+      detail: String((error as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
