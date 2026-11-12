@@ -35,6 +35,10 @@ export default function AuditPage() {
   const t = useLanguageStore((s) => s.t);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [limit, setLimit] = useState(100);
+  // แบ่งหน้าแบบ offset: เห็นแค่ N แถวล่าสุดไม่พอสำหรับ "ตรวจย้อนได้"
+  // — API บอก "มีต่อไหม" ทาง header (ดึงเกินมา 1 แถว) ไม่ต้องนับทั้งตาราง
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -98,6 +102,7 @@ export default function AuditPage() {
     setError('');
     try {
       const params = new URLSearchParams({ limit: String(limit) });
+      if (offset > 0) params.set('offset', String(offset));
       if (query.trim()) params.set('q', query.trim());
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
       rangeParams(params);
@@ -105,6 +110,7 @@ export default function AuditPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLogs(data);
+      setHasMore(res.headers.get('X-Audit-List-Has-More') === 'true');
     } catch (err: any) {
       setError(`${err.message || t('audit.loadError', 'ไม่สามารถดึง audit log ได้')}`);
       setLogs([]);
@@ -116,7 +122,7 @@ export default function AuditPage() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated) return;
     loadLogs();
-  }, [isHydrated, isAuthenticated, limit, passwordOnly]);
+  }, [isHydrated, isAuthenticated, limit, passwordOnly, offset]);
 
   if (!isHydrated) {
     return <div className="text-white p-8">{t('common.loading', 'กำลังโหลด...')}</div>;
@@ -160,7 +166,13 @@ export default function AuditPage() {
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('audit.title', 'ประวัติการกระทำ (Audit Log)')}</h2>
           <div className="flex gap-3 items-center">
             <form
-              onSubmit={(e) => { e.preventDefault(); loadLogs(); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // เปลี่ยนตัวกรองแล้วต้องกลับหน้าแรก ไม่งั้นจะค้างอยู่ offset เก่า
+                // แล้วเห็น "ว่าง" ทั้งที่มีข้อมูล (อ่านผิดว่าไม่มีเหตุการณ์)
+                if (offset !== 0) setOffset(0);
+                else loadLogs();
+              }}
               className="flex gap-2 items-center"
             >
               <input
@@ -174,7 +186,10 @@ export default function AuditPage() {
               </button>
             </form>
             <button
-              onClick={() => setPasswordOnly((v) => !v)}
+              onClick={() => {
+                setPasswordOnly((v) => !v);
+                if (offset !== 0) setOffset(0);
+              }}
               className={passwordOnly ? 'btn-primary' : 'btn-secondary'}
             >
               🔑 {t('audit.passwordOnly', 'เรื่องรหัสผ่าน')}
@@ -184,7 +199,10 @@ export default function AuditPage() {
             </button>
             <select
               value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                if (offset !== 0) setOffset(0);
+              }}
               className="input text-sm"
             >
               {LIMIT_OPTIONS.map((n) => (
@@ -297,7 +315,33 @@ export default function AuditPage() {
           </div>
         </div>
 
-        <div className="text-xs text-gray-500">{t('audit.countLabel', 'แสดง {n} รายการ (ล่าสุดก่อน)', { n: logs.length })}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+          <span>
+            {logs.length > 0
+              ? t('audit.rangeShown', 'รายการที่ {from}–{to} (ใหม่สุดก่อน)', { from: offset + 1, to: offset + logs.length })
+              : offset > 0
+                ? t('audit.emptyPage', 'ไม่พบรายการในหน้านี้ — กลับไปหน้าแรก')
+                : t('audit.noLogsShort', 'ยังไม่มีรายการ')}
+          </span>
+          <div className="flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+              disabled={offset === 0 || loading}
+              className="btn-secondary"
+            >
+              {t('audit.prevPage', '← ก่อนหน้า')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOffset(offset + limit)}
+              disabled={!hasMore || loading}
+              className="btn-secondary"
+            >
+              {t('audit.nextPage', 'ถัดไป →')}
+            </button>
+          </div>
+        </div>
       </main>
     </div>
       </div>
