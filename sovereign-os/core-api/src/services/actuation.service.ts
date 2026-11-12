@@ -42,6 +42,8 @@ export interface LeverMapEntry {
   note?: string;
 }
 
+export { parseOccupancyInput } from './actuation-occupancy';
+
 export interface PhysicalSnapshot {
   batterySoc: number | null; // %
   powerKw: number | null; // kW (ติดลบ = discharge)
