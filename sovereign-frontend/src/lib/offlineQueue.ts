@@ -8,6 +8,7 @@
 
 import { useAuthStore } from '../stores/useAuthStore';
 import { ownQueuedActions, stampUserId, type QueueUserId } from './offline/queue-namespace';
+import { classifyFlushStatus, shouldAttempt, withRejection } from './offline/queue-rejection';
 import {
   QUEUE_MAX_AGE_MS,
   buildAuditRecord,
@@ -34,6 +35,9 @@ export interface QueuedAction {
   /** เจ้าของคิว: user id ของ session ที่ enqueue · null = anonymous
    *  (record ที่ไม่มี field นี้ = เก่าก่อน deploy = Dormant — ไม่ flush/ไม่โชว์ รอ P1 retention) */
   userId?: QueueUserId;
+  /** ถูก server ปฏิเสธถาวร (4xx ที่ไม่ใช่ 408/425/429) — ไม่ถูกลองซ้ำอัตโนมัติ
+   *  แต่ **ไม่ถูกลบ**: record ยังอยู่ให้ผู้ใช้ตรวจ/กดลองใหม่/ลบเอง */
+  lastRejection?: { status: number; at: string };
 }
 
 /** ตัวตนเจ้าของคิวของ session ปัจจุบัน — อ่านสดจาก auth store ทุกครั้งที่ถูกเรียก
@@ -88,6 +92,21 @@ async function removeAction(id: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** เขียนทับ action เดิม (ใช้ติดป้าย "ถูกปฏิเสธ") — ไม่เพิ่มแถวใหม่ */
+async function updateAction(action: QueuedAction): Promise<void> {
+  if (action.id == null) throw new Error('updateAction: ต้องมี id');
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(action);
     tx.oncomplete = () => {
       db.close();
       resolve();
@@ -209,7 +228,8 @@ export async function removeQueued(id: number): Promise<void> {
   }
 }
 
-/** ส่ง action เฉพาะรายการเดียว — คืน true ถ้าสำเร็จ (2xx และลบจากคิวแล้ว) */
+/** ส่ง action เฉพาะรายการเดียว — คืน true ถ้าสำเร็จ (2xx และลบจากคิวแล้ว)
+ *  ใช้กับการกด "ลองใหม่" ของผู้ใช้: ยิงจริงแม้รายการนั้นถูกพักไว้ (ป้าย lastRejection ไม่บล็อกมือคน) */
 export async function flushAction(id: number): Promise<boolean> {
   if (!originalFetch) return false;
   const actions = await getAllActions();
@@ -223,10 +243,16 @@ export async function flushAction(id: number): Promise<boolean> {
       headers: action.headers,
       body: action.body ?? undefined,
     });
-    if (res.ok && action.id != null) {
+    const verdict = classifyFlushStatus(res.status);
+    if (verdict === 'ok' && action.id != null) {
       await removeAction(action.id);
       await notify();
       return true;
+    }
+    // ถูกปฏิเสธอีกครั้ง = อัปเดตป้ายเวลา/สถานะล่าสุด (ยังไม่ลบ — ข้อมูลเป็นของผู้ใช้)
+    if (verdict === 'rejected' && action.id != null) {
+      await updateAction(withRejection(action, res.status));
+      await notify();
     }
     return false;
   } catch {
@@ -348,14 +374,15 @@ export function initOfflineQueue(): void {
   void sweepExpiredQueue();
 }
 
-/** ส่งคิวทั้งหมดอีกครั้ง — ลบรายการที่สำเร็จ (2xx) */
+/** ส่งคิวทั้งหมดอีกครั้ง — ลบเฉพาะที่สำเร็จ (2xx) · พักรายการที่ถูกปฏิเสธถาวร (ไม่ลบ) */
 export async function flushQueue(): Promise<number> {
   if (!originalFetch) return 0;
   notifySync(true);
   try {
     const all = await getAllActions();
     // flush เฉพาะของ session ปัจจุบัน — คิวคนอื่น/legacy รอเจ้าของกลับมาเอง
-    const actions = ownQueuedActions(all, currentQueueUserId());
+    // และข้ามรายการที่ถูกปฏิเสธถาวรแล้ว: ยิงซ้ำทุกครั้งที่ online = retry storm ที่ไม่มีทางสำเร็จ
+    const actions = ownQueuedActions(all, currentQueueUserId()).filter(shouldAttempt);
     let flushed = 0;
 
     for (const action of actions) {
@@ -365,9 +392,13 @@ export async function flushQueue(): Promise<number> {
           headers: action.headers,
           body: action.body ?? undefined,
         });
-        if (res.ok && action.id != null) {
+        const verdict = classifyFlushStatus(res.status);
+        if (verdict === 'ok' && action.id != null) {
           await removeAction(action.id);
           flushed++;
+        } else if (verdict === 'rejected' && action.id != null) {
+          // พักไว้พร้อมเหตุผล — ไม่ลบ ผู้ใช้ยังเห็นและกดลองใหม่เองได้
+          await updateAction(withRejection(action, res.status));
         }
       } catch {
         // network error → เก็บไว้ retry ครั้งหน้า
