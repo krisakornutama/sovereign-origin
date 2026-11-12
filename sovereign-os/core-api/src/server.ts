@@ -60,7 +60,15 @@ app.use(cors({
   origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
   // เปิดให้ browser อ่าน Retry-After ได้ (ใช้แสดง countdown ตอนโดน rate limit)
   // x-request-id: ผู้ใช้แจ้งเลขนี้มา = ไล่ log ได้ทันทีว่าคำขอนั้นเกิดอะไรขึ้น
-  exposedHeaders: ['Retry-After', 'x-request-id'],
+  // X-Audit-Export-*: หน้า /audit ต้องรู้ว่าไฟล์ CSV ถูกตัดแถวหรือไม่ (ถ้าไม่ expose
+  // browser จะซ่อน header ⇒ UI เตือน "ไม่ครบ" ไม่ได้เลย และไฟล์ที่ขาดจะเงียบสนิท)
+  exposedHeaders: [
+    'Retry-After',
+    'x-request-id',
+    'X-Audit-Export-Rows',
+    'X-Audit-Export-Total',
+    'X-Audit-Export-Truncated',
+  ],
 }));
 // Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
 // express.json() ทั้งแอปจะ parse ทิ้ง (แบบเดียวกับ client-monitor ที่ใช้ parser เฉพาะ route)

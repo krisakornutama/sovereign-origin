@@ -31,6 +31,9 @@ before(async () => {
       findManyArgs = args;
       return rows;
     },
+    // export นับ "ทั้งหมดที่ตรงตัวกรอง" เพื่อบอกว่าไฟล์ถูกตัดหรือไม่ — ชุดนี้สนใจตัว CSV
+    // จึงให้ total เท่ากับจำนวนแถวที่ส่ง (truncated = false); เพดาน/ธงถูกคุมใน auditExportRange.test.ts
+    count: async () => rows.length,
   });
   mock.method(AuditService, 'logAction', async (p: any) => {
     auditLogs.push(p);
