@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { meshLiteService } from '../../services/mesh-lite.service';
 
@@ -26,10 +27,10 @@ router.get('/latest', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
   res.json({ file: latest.file, bundle: latest.bundle });
 });
 
-router.post('/replicate', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/replicate', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
   const result = await meshLiteService.replicate();
   if (!result.ok) return res.status(400).json(result);
   res.json(result);
-});
+}));
 
 export default router;

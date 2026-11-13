@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   buildAutonomyOverview, getSettings, saveSettings,
@@ -21,9 +22,9 @@ router.get('/overview', authenticate, async (req, res) => {
 });
 
 // GET /api/selfreliance/settings — ค่าตั้งบ้านปัจจุบัน
-router.get('/settings', authenticate, async (_req, res) => {
+router.get('/settings', authenticate, asyncRoute(async (_req, res) => {
   res.json(await getSettings());
-});
+}));
 
 // PUT /api/selfreliance/settings — ตั้งค่าบ้าน { people, waterTankL, waterLPerPersonDay, foodKgPerPersonDay, targetDays }
 router.put('/settings', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
