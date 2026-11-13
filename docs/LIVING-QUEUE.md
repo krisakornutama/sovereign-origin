@@ -140,6 +140,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | QA-001 | ทำให้ tools tests เป็น hermetic: offsite/backup ข้ามเฉพาะเมื่อยังไม่ติดตั้งไปป์ไลน์; update-bundle ใช้ ephemeral Ed25519 key | รัน `npm run verify` บนเครื่อง dev | done 2026-11-10 | PR #65 · `3246dd1` · CI `42862080560` (ubuntu + windows) |
 | QA-002 | ติดตั้ง/กู้ไปป์ไลน์สำรองนอกเครื่อง (03:00 DB + ~20:30 offsite) บนเครื่อง operational                          | `machine-health` แจ้ง critical | blocked — ต้องทำบนเครื่องที่มี DB/creds จริง                     | —                                                         |
 | QA-003 | ปิด tools tests ที่ยังผูกกับไฟล์ local: `tools/*.cmd` (gitignored), Ollama bundle, autostart task           | QA-001 ต่อยอด               | done 2026-11-10 | PR #70 · `npm run verify` ผ่าน 6/6 (exit 0) · tools 1369 pass / 0 fail |
+| QA-004 | ย่อ VHDX ของ Docker Desktop — `Docker\wsl` บวมเป็น 47.95 GB ทั้งที่ของจริงใน docker ~19 GB (ย่อคืนได้ ~25 GB) · ขั้นตอน: ปิด Docker Desktop → `wsl --shutdown` → ย่อ vhdx (`Optimize-VHD -Mode Full` หรือ `diskpart` compact vdisk) → เปิด Docker แล้วรอ stack 8 คอนเทนเนอร์กลับมา healthy ทั้งหมด | ล้างดิสก์ E: 2026-11-14 (เหลือ 8.2 GB ต่ำกว่าเกณฑ์ 20 GB) | blocked — ต้องหยุด Docker = ขัด Cold Soak จึงรอหน้าต่างบำรุงรักษาที่เจ้าของอนุญาต | ล้างได้แล้ว 2026-11-14: ลบ `wazuh-manager` (คืน 6.0 GB), `docker volume prune` (671.8 MB), bak-1.2.0/1.3.2/1.3.3 + staging(v1.2.0) + prev-20261019(v1.1.1) (คืน 3.6 GB) ⇒ E: 8.2 → 11.82 GB · รูป docker ที่ไม่ใช้ 2.5 GB เจ้าของเลือก**ไม่**ลบ |
 
 ---
 
