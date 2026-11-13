@@ -9,6 +9,22 @@ import { buildOpsSummary } from './services/ops-summary.service';
 import { prisma } from './lib/prisma';
 import { getObservability } from './middleware/observability.middleware';
 
+/**
+ * อ่าน migration head พร้อม "ทำไมอ่านไม่ได้" — `null` เฉย ๆ แยกไม่ออกว่า
+ * "ยังไม่มี migration" หรือ "ต่อ DB ไม่ได้เลย" และนั่นคือข้อมูลที่ผู้ปฏิบัติการต้องการ
+ */
+async function readMigrationHead(): Promise<{ migrationHead: string | null; state: 'ok' | 'unavailable'; reason: string | null }> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ migration_name: string }>>(
+      'SELECT migration_name FROM "_prisma_migrations" ORDER BY migration_name DESC LIMIT 1'
+    );
+    return { migrationHead: rows?.[0]?.migration_name ?? null, state: 'ok', reason: null };
+  } catch (err) {
+    const message = String((err as Error)?.message ?? err).split('\n')[0].slice(0, 200);
+    return { migrationHead: null, state: 'unavailable', reason: message };
+  }
+}
+
 // อ่านไฟล์ JSON แบบ "ไม่มีก็ได้" — ใช้กับ data/system-truth.json (ผลเกตล่าสุดที่ verify เขียน)
 const readJsonIfExists = async (p: string): Promise<unknown | null> =>
   new Promise((resolve) => {
@@ -171,14 +187,7 @@ export function mountRoutes(app: Express): void {
   const healthExtrasLazy = () => {
     if (!healthExtras) {
       healthExtras = (async () => {
-        const [fp, migrationHead] = await Promise.all([
-          getSelfFingerprint(),
-          prisma
-            .$queryRawUnsafe<Array<{ migration_name: string }>>(
-              'SELECT migration_name FROM "_prisma_migrations" ORDER BY migration_name DESC LIMIT 1'
-            )
-            .catch(() => null as Array<{ migration_name: string }> | null),
-        ]);
+        const [fp, dbInfo] = await Promise.all([getSelfFingerprint(), readMigrationHead()]);
         return {
           build: {
             version: appVersion(),
@@ -186,7 +195,7 @@ export function mountRoutes(app: Express): void {
             files: fp.files,
             loadedDir: getLoadedCodeDirLabel(),
           },
-          db: { migrationHead: migrationHead?.[0]?.migration_name ?? null },
+          db: dbInfo,
         };
       })();
       // ล้ม = รีเซ็ตให้ลองใหม่ request ถัดไป (เช่น DB ยังบูตไม่เสร็จ)
@@ -216,13 +225,9 @@ export function mountRoutes(app: Express): void {
   // (ข้อมูล recon ที่ใช้เลือกช่องโหว่) — ตอนนี้ต้องล็อกอิน ส่วน /api/health ที่มีแค่ status ยังเปิดไว้ให้ watchdog
   app.get('/api/health/truth', authenticate, async (_req, res) => {
     try {
-      const [fp, migrationHead, gateRaw, nightlyHist] = await Promise.all([
+      const [fp, dbInfo, gateRaw, nightlyHist] = await Promise.all([
         getSelfFingerprint(),
-        prisma
-          .$queryRawUnsafe<Array<{ migration_name: string }>>(
-            'SELECT migration_name FROM "_prisma_migrations" ORDER BY migration_name DESC LIMIT 1'
-          )
-          .catch(() => null as Array<{ migration_name: string }> | null),
+        readMigrationHead(),
       readJsonIfExists(join(process.cwd(), 'data', 'system-truth.json')).catch(() => null),
       readJsonIfExists(join(process.cwd(), 'data', 'nightly-history.json')).catch(() => null),
       ]);
@@ -236,7 +241,7 @@ export function mountRoutes(app: Express): void {
       const gateSteps = (gate?.steps ?? []).map((s) => ({ name: s.name ?? '?', ok: !!s.ok, skipped: !!s.skipped }));
       res.json({
         runtime: { fingerprint: runtimeFp, files: fp.files, loadedDir: getLoadedCodeDirLabel() },
-        db: { migrationHead: migrationHead?.[0]?.migration_name ?? null },
+        db: dbInfo,
         lastGateRun: gate
           ? { writtenAt: gate.writtenAt ?? null, ok: gateSteps.length > 0 && gateSteps.every((s) => s.ok || s.skipped), steps: gateSteps }
           : null,
