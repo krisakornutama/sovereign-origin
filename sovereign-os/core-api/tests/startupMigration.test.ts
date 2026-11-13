@@ -62,6 +62,8 @@ test('Postgres + เปิดสวิตช์ = รัน migrate-deploy ด�
   assert.equal(run.calls[0].cmd, 'node');
   assert.deepEqual(run.calls[0].args, ['/app/dist/scripts/migrate-deploy.js']);
   assert.equal(run.calls[0].opts.env.DATABASE_URL, env.DATABASE_URL);
+  // migrate-deploy หา prisma/ จาก cwd — ต้องเป็นราก core-api ไม่ใช่ dist/
+  assert.equal(run.calls[0].opts.cwd, '/app');
 });
 
 test('migrate ล้ม = ok:false พร้อมท่อนท้ายของ output (ไม่กลืนสาเหตุ)', () => {

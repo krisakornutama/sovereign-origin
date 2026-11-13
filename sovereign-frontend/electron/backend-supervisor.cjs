@@ -106,6 +106,14 @@ async function superviseBackend(options) {
     return { ...result, verdict: 'no-sidecar' };
   }
 
+  // core-api บังคับ DATABASE_URL ตั้งแต่ import และ Prisma ที่ฝังมาเป็น postgresql
+  // ⇒ ไม่มี Postgres = spawn ไปก็ตาย อย่าเปิดพอร์ตหลอกให้ renderer ตามไป
+  const baseEnv = options && options.env ? options.env : process.env;
+  if (!baseEnv.DATABASE_URL) {
+    log('backend: ไม่มี DATABASE_URL — sidecar ต้องใช้ Postgres (desktop ไม่รองรับ SQLite) → ข้ามการ spawn');
+    return { ...result, verdict: 'no-database' };
+  }
+
   const bundledVersion = readBundledVersion(coreApiPath);
   const probePort = typeof probe === 'function' ? probe : (port) => probeHealth(http, port);
   const occupant = await probePort(PREFERRED_PORT);
@@ -136,23 +144,22 @@ async function superviseBackend(options) {
   const cwd = path.dirname(path.dirname(coreApiPath));
 
   // sidecar ตายทันทีถ้าไม่มี JWT_SECRET ⇒ เตรียมให้ก่อน spawn (ค่าไม่ถูก log)
-  const baseEnv = env || process.env;
+  const baseEnvLocal = env || baseEnv; // env ที่ส่งเข้ามา (เทสต์) ชนะ process.env
   const jwt = loadOrCreateJwtSecret({
     dir: app.getPath('userData'),
-    envSecret: baseEnv.JWT_SECRET,
+    envSecret: baseEnvLocal.JWT_SECRET,
   });
   if (jwt.error) log('backend-secret: เก็บ secret ลงดิสก์ไม่ได้ (' + jwt.error + ') — ใช้ค่าในหน่วยความจำรอบนี้');
   else if (jwt.created) log('backend-secret: สร้าง JWT_SECRET ใหม่ให้เครื่องนี้ (' + jwt.source + ')');
-  if (!baseEnv.DATABASE_URL) log('backend: ไม่มี DATABASE_URL — sidecar จะไม่มี DB (desktop ไม่รองรับ SQLite)');
 
   const child = spawn('node', [coreApiPath], {
     env: {
-      ...baseEnv,
+      ...baseEnvLocal,
       JWT_SECRET: jwt.secret,
       PORT: String(port),
       // Prisma ที่ฝังมาเป็น postgresql — `file:` (SQLite) ใช้ไม่ได้จริง (DESKTOP-003)
       // จึงไม่แต่ง DATABASE_URL เอง: ไม่มี Postgres = sidecar ไม่มี DB และ health บอกความจริง
-      ...(baseEnv.DATABASE_URL ? { MIGRATE_ON_START: baseEnv.MIGRATE_ON_START || '1' } : {}),
+      ...(baseEnvLocal.DATABASE_URL ? { MIGRATE_ON_START: baseEnvLocal.MIGRATE_ON_START || '1' } : {}),
     },
     // stderr ต้องถูกอ่าน: sidecar ที่ตายเงียบคือปัญหาที่ตามหาไม่เจอ (DESKTOP-002)
     stdio: ['ignore', 'ignore', 'pipe'],

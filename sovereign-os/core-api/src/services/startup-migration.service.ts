@@ -79,7 +79,8 @@ export function runStartupMigrations(options: RunStartupMigrationsOptions = {}):
   const res = run(options.nodePath ?? process.execPath, [scriptPath], {
     encoding: 'utf8',
     env,
-    cwd: path.dirname(path.dirname(scriptPath)),
+    // migrate-deploy หา prisma/ จาก process.cwd() ⇒ ต้องรันที่ราก core-api (<core-api>/dist/scripts/x.js → <core-api>)
+    cwd: path.dirname(path.dirname(path.dirname(scriptPath))),
     timeout: 120_000,
   });
   const output = `${res.stdout ?? ''}${res.stderr ?? ''}`;
