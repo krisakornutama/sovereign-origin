@@ -55,3 +55,32 @@ async function findFreePort(options) {
 exports.parseHealthVersion = parseHealthVersion;
 exports.evaluatePortOccupant = evaluatePortOccupant;
 exports.findFreePort = findFreePort;
+
+/**
+ * URL ของ API ที่ renderer ควรใช้ — 3001 คือค่าเริ่มต้น ⇒ null (ต้อง "ล้าง" key ทิ้ง)
+ *
+ * ปัญหาที่กัน: key `sovereign-api-url` ถูกเขียนครั้งเดียวตอนแอปหันไปพอร์ตสำรองแล้ว
+ * ไม่มีใครล้าง ⇒ รอบถัดไปที่แอปกลับไปใช้ 3001 (หรือไม่ spawn sidecar เลย)
+ * renderer ยังชี้ไปที่ http://localhost:3011 ที่ไม่มีอะไรฟังอยู่
+ */
+function apiUrlFor(port) {
+  if (!Number.isInteger(port) || port === 3001) return null;
+  return 'http://localhost:' + port;
+}
+
+/** เขียน/ล้าง key ให้ตรงกับพอร์ตที่ใช้จริง (target = win.webContents) */
+function applyApiUrl(target, port) {
+  if (!target || typeof target.executeJavaScript !== 'function') return Promise.resolve();
+  var url = apiUrlFor(port);
+  var js = url
+    ? "localStorage.setItem('sovereign-api-url','" + url + "')"
+    : "localStorage.removeItem('sovereign-api-url')";
+  try {
+    return Promise.resolve(target.executeJavaScript(js)).catch(function () {});
+  } catch (e) {
+    return Promise.resolve();
+  }
+}
+
+exports.apiUrlFor = apiUrlFor;
+exports.applyApiUrl = applyApiUrl;

@@ -12,6 +12,7 @@ const http = require('http');
 const { verifyAsset, sha256File } = require('./verify-asset');
 const { downloadFile } = require('./download');
 const { superviseBackend } = require('./backend-supervisor.cjs');
+const { applyApiUrl } = require('./backend-port.cjs');
 const yt = require('./youtube');
 const { registerYouTubeIpc } = require('./youtube-ipc');
 
@@ -492,12 +493,10 @@ async function checkForUpdates(interactive) {
 
 // ── sidecar backend — เลือกพอร์ต/ตรวจว่าเป็น API ของเราหรือของคนอื่น อยู่ใน backend-supervisor.cjs
 function startBackend() {
-  superviseBackend({ app, http, spawn, dlog, onPort: (port) => {
-    if (port === 3001 || !win || !win.webContents) return;
-    // พอร์ตสำรอง: บอก renderer ผ่านค่าที่ config.ts อ่านอยู่แล้ว (localStorage)
-    win.webContents.executeJavaScript("localStorage.setItem('sovereign-api-url','http://localhost:" + port + "')").catch(() => {});
-  } })
-    .then((res) => { if (res.child) backend = res.child; })
+  // พอร์ตสำรอง: บอก renderer ผ่านค่าที่ config.ts อ่านอยู่แล้ว (localStorage)
+  // 3001 = ค่าเริ่มต้น ⇒ ต้องล้าง key ที่ค้างจากการหันไปพอร์ตสำรองรอบก่อน
+  superviseBackend({ app, http, spawn, dlog, onPort: (port) => applyApiUrl(win && win.webContents, port) })
+    .then((res) => { if (res.child) backend = res.child; applyApiUrl(win && win.webContents, res.port); })
     .catch((e) => console.error('startBackend failed', e.message));
 }
 
