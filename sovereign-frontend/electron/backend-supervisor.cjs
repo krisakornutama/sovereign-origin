@@ -14,9 +14,49 @@ const net = require('net');
 const path = require('path');
 
 const { evaluatePortOccupant, findFreePort, parseHealthVersion } = require('./backend-port.cjs');
+const { loadOrCreateJwtSecret } = require('./backend-secret.cjs');
 
 const PREFERRED_PORT = 3001;
 const FALLBACK_PORTS = [3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020];
+const STDERR_TAIL_LINES = 12;
+const STDERR_LINE_MAX = 300;
+
+/** เก็บ stderr ของ sidecar ไว้เป็นก้อนสุดท้าย — พอให้เห็นสาเหตุโดยไม่บวม log */
+function tailStderr(stream, log) {
+  const lines = [];
+  let rest = '';
+  const push = (line) => {
+    const clean = String(line).replace(/\s+$/, '').slice(0, STDERR_LINE_MAX);
+    if (!clean) return;
+    lines.push(clean);
+    if (lines.length > STDERR_TAIL_LINES) lines.shift();
+  };
+  stream.setEncoding('utf8');
+  stream.on('data', (chunk) => {
+    rest += chunk;
+    const parts = rest.split(/\r?\n/);
+    rest = parts.pop();
+    for (const part of parts) push(part);
+  });
+  stream.on('error', () => {});
+  return {
+    /** sidecar อาจตายก่อน 'data' ถูกส่ง — ต้องกวาดบัฟเฟอร์ที่ค้างอยู่ออกมาก่อน */
+    drain() {
+      let chunk = null;
+      while ((chunk = stream.read()) !== null) {
+        rest += String(chunk);
+        const parts = rest.split(/\r?\n/);
+        rest = parts.pop();
+        for (const part of parts) push(part);
+      }
+      this.flush();
+    },
+    flush() {
+      if (rest) { push(rest); rest = ''; }
+      for (const line of lines) log('backend stderr: ' + line);
+    },
+  };
+}
 
 function probeHealth(http, port, timeoutMs) {
   return new Promise((resolve) => {
@@ -53,9 +93,9 @@ function readBundledVersion(coreApiPath) {
 }
 
 async function superviseBackend(options) {
-  const { app, http, spawn, dlog, onPort } = options || {};
+  const { app, http, spawn, dlog, onPort, probe, env } = options || {};
   const log = typeof dlog === 'function' ? dlog : () => {};
-  const result = { child: null, port: PREFERRED_PORT, verdict: 'unknown', bundledVersion: null };
+  const result = { child: null, port: PREFERRED_PORT, verdict: 'unknown', bundledVersion: null, jwtSecret: null };
 
   const coreApiPath = app.isPackaged
     ? path.join(process.resourcesPath, 'core-api/dist/server.js')
@@ -67,7 +107,8 @@ async function superviseBackend(options) {
   }
 
   const bundledVersion = readBundledVersion(coreApiPath);
-  const occupant = await probeHealth(http, PREFERRED_PORT);
+  const probePort = typeof probe === 'function' ? probe : (port) => probeHealth(http, port);
+  const occupant = await probePort(PREFERRED_PORT);
   const verdict = evaluatePortOccupant({
     listening: occupant.listening,
     healthVersion: occupant.version,
@@ -93,19 +134,40 @@ async function superviseBackend(options) {
 
   if (typeof onPort === 'function') { try { onPort(port); } catch { /* ไม่ให้ log พังการ spawn */ } }
   const cwd = path.dirname(path.dirname(coreApiPath));
+
+  // sidecar ตายทันทีถ้าไม่มี JWT_SECRET ⇒ เตรียมให้ก่อน spawn (ค่าไม่ถูก log)
+  const baseEnv = env || process.env;
+  const jwt = loadOrCreateJwtSecret({
+    dir: app.getPath('userData'),
+    envSecret: baseEnv.JWT_SECRET,
+  });
+  if (jwt.error) log('backend-secret: เก็บ secret ลงดิสก์ไม่ได้ (' + jwt.error + ') — ใช้ค่าในหน่วยความจำรอบนี้');
+  else if (jwt.created) log('backend-secret: สร้าง JWT_SECRET ใหม่ให้เครื่องนี้ (' + jwt.source + ')');
+
   const child = spawn('node', [coreApiPath], {
     env: {
-      ...process.env,
+      ...baseEnv,
+      JWT_SECRET: jwt.secret,
       PORT: String(port),
       // ถ้าเครื่องแม่มี DATABASE_URL อยู่แล้ว อย่าทับ
-      ...(process.env.DATABASE_URL ? {} : { DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db') }),
+      ...(baseEnv.DATABASE_URL ? {} : { DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db') }),
     },
-    stdio: 'ignore',
+    // stderr ต้องถูกอ่าน: sidecar ที่ตายเงียบคือปัญหาที่ตามหาไม่เจอ (DESKTOP-002)
+    stdio: ['ignore', 'ignore', 'pipe'],
     cwd,
     detached: false,
   });
   child.on('error', (e) => log('backend spawn error ' + e.message));
-  return { child: child, port: port, verdict: verdict, bundledVersion: bundledVersion };
+  if (child.stderr) {
+    const tail = tailStderr(child.stderr, log);
+    child.on('exit', (code, signal) => {
+      log('backend exit code=' + code + ' signal=' + (signal || 'none') + ' port=' + port);
+      tail.drain();
+    });
+  } else {
+    child.on('exit', (code, signal) => log('backend exit code=' + code + ' signal=' + (signal || 'none') + ' port=' + port));
+  }
+  return { child: child, port: port, verdict: verdict, bundledVersion: bundledVersion, jwtSecret: jwt.secret };
 }
 
 exports.PREFERRED_PORT = PREFERRED_PORT;
