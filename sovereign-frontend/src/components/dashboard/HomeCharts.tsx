@@ -1,6 +1,7 @@
 // components/dashboard/HomeCharts.tsx — กราฟตกแต่งหน้า Dashboard ที่ย้ายมาจาก pages/dashboard.tsx
-// (IDEA-011: ย้ายเพื่อลดขนาดหน้า — GaugeCircle/RadarPentagon/SankeyAlluvial/PerfGauges
-//  ยังทำงานเหมือนเดิมทุกอย่าง การแก้ข้อมูลปลอมใน PerfGauges อยู่ในงานแยกของคิว)
+// (IDEA-011: ย้ายเพื่อลดขนาดหน้า — GaugeCircle/RadarPentagon/SankeyAlluvial ย้ายตามเดิม
+//  IDEA-012: PerfGauges แก้ข้อมูลปลอมแล้ว — ตัด CPU/MEM ที่แต่งจากสูตร (ระบบไม่มีแหล่งข้อมูล)
+//  และไม่มี fallback ตัวเลขเมื่อไม่มีข้อมูล: ข้ามช่องนั้นไป ถ้าไม่มีเลยแสดงสถานะจริง)
 
 function GaugeCircle({ value, label, sub, color = '#10b981', size = 64 }: { value: number; label: string; sub?: string; color?: string; size?: number }) {
   const pct = Math.max(0, Math.min(100, value));
@@ -137,17 +138,34 @@ export function SankeyAlluvial({ wealth, inventory, farm }: { wealth: any; inven
 }
 
 export function PerfGauges({ metrics, deviceStatus }: { metrics: Record<string, number>; deviceStatus: any }) {
-  const ds = deviceStatus ?? { total:0, online:0, offline:0 };
-  const gauges = [
-    { label: 'CPU', val: 38 + ((metrics.temperature ?? 30) % 20), color: '#22d3ee' },
-    { label: 'MEM', val: 56 + ((metrics.humidity ?? 50) % 16), color: '#a78bfa' },
-    { label: 'NET', val: ds.total ? (ds.online / Math.max(1, ds.total)) * 100 : 72, color: '#34d399' },
-    { label: 'PWR', val: metrics.battery_soc != null ? metrics.battery_soc : 64, color: metrics.battery_soc != null && metrics.battery_soc < 20 ? '#ef4444' : '#10b981' },
-    { label: 'HUM', val: metrics.humidity ?? 58, color: '#38bdf8' },
-    { label: 'TMP', val: metrics.temperature ? Math.min(100, (metrics.temperature / 45) * 100) : 62, color: metrics.temperature != null && metrics.temperature > 40 ? '#ef4444' : '#f59e0b' },
-    { label: 'WTR', val: metrics.water_level_cm != null ? Math.min(100, metrics.water_level_cm) : 44, color: '#22d3ee' },
-    { label: 'SOL', val: metrics.solar_radiation ? Math.min(100, metrics.solar_radiation / 12) : 31, color: '#facc15' },
-  ];
+  // IDEA-012: เฉพาะ gauge ที่มีแหล่งข้อมูลจริงเท่านั้น — ไม่มีข้อมูล = ไม่แสดง (ห้ามแต่งตัวเลขแทน)
+  // NET = อัตราอุปกรณ์ออนไลน์จริงจาก /api/devices/status (total=0 คือยังไม่มีข้อมูล/ไม่มีอุปกรณ์ จึงไม่วาด)
+  const gauges: Array<{ label: string; val: number; color: string }> = [];
+  if (deviceStatus && typeof deviceStatus.total === 'number' && deviceStatus.total > 0) {
+    gauges.push({ label: 'NET', val: (deviceStatus.online / deviceStatus.total) * 100, color: '#34d399' });
+  }
+  if (metrics.battery_soc != null) {
+    gauges.push({ label: 'PWR', val: metrics.battery_soc, color: metrics.battery_soc < 20 ? '#ef4444' : '#10b981' });
+  }
+  if (metrics.humidity != null) {
+    gauges.push({ label: 'HUM', val: metrics.humidity, color: '#38bdf8' });
+  }
+  if (metrics.temperature != null) {
+    gauges.push({ label: 'TMP', val: Math.min(100, (metrics.temperature / 45) * 100), color: metrics.temperature > 40 ? '#ef4444' : '#f59e0b' });
+  }
+  if (metrics.water_level_cm != null) {
+    gauges.push({ label: 'WTR', val: Math.min(100, metrics.water_level_cm), color: '#22d3ee' });
+  }
+  if (metrics.solar_radiation != null) {
+    gauges.push({ label: 'SOL', val: Math.min(100, metrics.solar_radiation / 12), color: '#facc15' });
+  }
+  if (gauges.length === 0) {
+    return (
+      <div className="bg-gray-800/40 border border-gray-700/40 rounded-xl p-3 text-center">
+        <span className="text-[10px] font-mono tracking-widest text-gray-500">ยังไม่มีข้อมูลเซ็นเซอร์/สถานะอุปกรณ์ — รอข้อมูลจริงจากระบบ</span>
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-4 gap-2">
       {gauges.map((g) => (
