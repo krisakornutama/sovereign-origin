@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.5",
+  "currentVersion": "1.3.6",
   "versions": [
     {
       "version": "Unreleased",
@@ -16,6 +16,38 @@
         }
       ],
       "sections": []
+    },
+    {
+      "version": "v1.3.6",
+      "dateISO": "2026-11-13",
+      "dateLabel": "13 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [],
+      "sections": [
+        {
+          "title": "🧹 ล้าง sovereign-api-url ค้างในแอปเดสก์ท็อป (DESKTOP-004)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "ค่า api-url ที่ค้างถูกล้างทิ้งจริง — เดิมแอปเขียน key sovereign-api-url ใน localStorage เฉพาะตอนหันไปพอร์ตสำรอง (เช่น http://localhost:3011) แล้วไม่เคยล้าง ⇒ รอบเปิดถัดไปที่กลับมาใช้ 3001 หรือไม่ spawn sidecar เลย renderer ยังชี้ไปพอร์ตที่ตาย (โหลดไม่รู้จบทั้งแอป) · ตอนนี้ apiUrlFor()/applyApiUrl() ใน backend-port.cjs คำนวณค่าจากพอร์ตที่ใช้จริงและ removeItem('sovereign-api-url') เมื่อกลับมาที่ 3001 · main.js เรียกทั้งตอนเลือกพอร์ต (onPort) และหลัง supervisor สรุปผล · เทสต์ desktop-backend-port 5/5 (เคสใหม่แดงก่อนแก้: module ไม่มี apiUrlFor)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🛡️ คำขอที่ล้มใน backend ตอบ 500 ไม่ค้าง (SEC-030)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "handler async ที่โยน error ไม่แขวนคำขออีกต่อไป — Express 4 ไม่ดัก promise ที่ reject ⇒ handler ที่ await DB/executor แล้วโยน error จะไม่ตอบ 500 แต่ปล่อยคำขอค้างจน client timeout (connection ถูกจับไว้) · สแกนด้วย TypeScript AST พบ 60 handler ใน 15 ไฟล์ routes ที่ await โดยไม่มี try/.catch (เคยเกิดจริงที่ SEC-023/026/029) · แก้: src/lib/async-handler.ts asyncRoute() (rejection → 500 JSON + detail ≤200 ตัวอักษร, headersSent → next(err) ไม่เขียนทับ) ห่อครบ 60 handler · เพิ่มด่าน tests/routeAsyncSafety.test.ts สแกน AST ทุก *.routes.ts — handler ใหม่ที่ลืมห่อ = CI แดง · กติกาใน docs/ARCHITECTURE.md"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "version": "v1.3.5",
