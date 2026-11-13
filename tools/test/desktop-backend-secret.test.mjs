@@ -90,6 +90,7 @@ test('superviseBackend: ส่ง JWT_SECRET ให้ sidecar และไม�
     app, http: { get: () => ({ on() {}, destroy() {} }) }, spawn,
     dlog: (m) => logs.push(String(m)),
     probe: async () => ({ listening: false, version: null }),
+    env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });
   assert.equal(res.verdict, 'free');
   assert.ok(spawnArgs, 'ต้อง spawn sidecar');
@@ -115,6 +116,7 @@ test('superviseBackend: sidecar ตายต้องทิ้งร่องร
     spawn,
     dlog: (m) => logs.push(String(m)),
     probe: async () => ({ listening: false, version: null }),
+    env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });
   assert.ok(res.child);
 
@@ -127,9 +129,10 @@ test('superviseBackend: sidecar ตายต้องทิ้งร่องร
   assert.match(text, /JWT_SECRET is not set/, 'ต้องเก็บ stderr ไว้ให้เห็นสาเหตุ');
 });
 
-test('superviseBackend: ไม่แต่ง DATABASE_URL เป็น SQLite ที่ Prisma ใช้ไม่ได้', async () => {
+test('superviseBackend: ไม่มี DATABASE_URL = ไม่ spawn (ไม่แต่ง file: ให้ Prisma postgresql)', async () => {
   const dir = tmpDir();
   let spawnOpts = null;
+  const logs = [];
   const spawn = (cmd, args, opts) => {
     spawnOpts = opts;
     const child = new EventEmitter();
@@ -137,16 +140,17 @@ test('superviseBackend: ไม่แต่ง DATABASE_URL เป็น SQLite �
     child.stdout = new Readable({ read() {} });
     return child;
   };
-  await superviseBackend({
+  const res = await superviseBackend({
     app: { isPackaged: false, getPath: () => dir },
     http: { get: () => ({ on() {}, destroy() {} }) },
     spawn,
-    dlog: () => {},
+    dlog: (m) => logs.push(String(m)),
     probe: async () => ({ listening: false, version: null }),
     env: {}, // เครื่องที่ไม่มี Postgres
   });
-  assert.equal(spawnOpts.env.DATABASE_URL, undefined, 'ห้ามแต่ง file: ให้ Prisma postgresql');
-  assert.equal(spawnOpts.env.MIGRATE_ON_START, undefined);
+  assert.equal(res.verdict, 'no-database');
+  assert.equal(spawnOpts, null, 'ไม่มี DB = ไม่เปิดพอร์ตหลอก');
+  assert.match(logs.join(' '), /DATABASE_URL/, 'ต้องบอกเหตุผลใน log');
 });
 
 test('superviseBackend: มี DATABASE_URL จริง = เปิด migrate ก่อนเสิร์ฟให้เอง', async () => {

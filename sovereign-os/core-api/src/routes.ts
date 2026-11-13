@@ -20,8 +20,16 @@ async function readMigrationHead(): Promise<{ migrationHead: string | null; stat
     );
     return { migrationHead: rows?.[0]?.migration_name ?? null, state: 'ok', reason: null };
   } catch (err) {
-    const message = String((err as Error)?.message ?? err).split('\n')[0].slice(0, 200);
-    return { migrationHead: null, state: 'unavailable', reason: message };
+    // Prisma บาง error มี message ว่างแต่มี code/name — ต้องไม่คืน reason เป็น ""
+    const e = err as { message?: string; name?: string; code?: string } | undefined;
+    const lines = String(e?.message || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    // Prisma ขึ้นบรรทัดแรกเป็น "Invalid `prisma.$queryRawUnsafe()` invocation:" — สาเหตุจริงอยู่ถัดไป
+    const raw = lines.find((l) => /error:/i.test(l))
+      || lines.find((l) => !/^invalid `/i.test(l))
+      || e?.name
+      || 'อ่าน DB ไม่ได้';
+    const reason = (e?.code && !raw.includes(e.code) ? e.code + ': ' + raw : raw).slice(0, 200);
+    return { migrationHead: null, state: 'unavailable', reason };
   }
 }
 

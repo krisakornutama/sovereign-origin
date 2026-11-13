@@ -13,7 +13,8 @@
         {
           "type": "list",
           "items": [
-            "sidecar migrate DB ก่อนเสิร์ฟ + health บอกความจริงเรื่อง DB — MIGRATE_ON_START=1 รัน migrate-deploy ก่อน listen(); file: (SQLite) ถูกปฏิเสธพร้อมเหตุผลเพราะ Prisma เป็น postgresql; /api/health เพิ่ม db.state + db.reason แทน migrationHead: null ที่แยกไม่ออกว่า \"ยังไม่มี migration\" หรือ \"ต่อ DB ไม่ได้\" · เทสต์ startupMigration 6/6, desktop-backend-secret 8/8"
+            "sidecar migrate DB ก่อนเสิร์ฟ + health บอกความจริงเรื่อง DB — MIGRATE_ON_START=1 รัน migrate-deploy ก่อน listen() (worker เริ่มหลัง migrate); file: (SQLite) ถูกปฏิเสธพร้อมเหตุผลเพราะ Prisma เป็น postgresql; /api/health เพิ่ม db.state + db.reason แทน migrationHead: null ที่แยกไม่ออกว่า \"ยังไม่มี migration\" หรือ \"ต่อ DB ไม่ได้\"; แอปไม่ spawn sidecar เลยถ้าเครื่องไม่มี DATABASE_URL (เดิมแต่ง file: ให้แล้วตายเงียบ) · เทสต์ startupMigration 6/6, desktop-backend-secret 8/8, migrate-baseline 7/7",
+            "migrate-deploy เรียก npx ได้บน Windows — spawnSync('npx', …, shell:false) บน Windows ได้ ENOENT แล้วถูกอ่านผิดเป็น \"migrate ล้มและ baseline ไม่ปลอดภัย\" ทั้งที่ DB ปกติ · ตอนนี้ใช้ shell เฉพาะ win32 (npxSpawnOptions()) และ health รายงาน head จริงหลัง migrate · เทสต์ migrate-baseline 7/7"
           ]
         },
         {

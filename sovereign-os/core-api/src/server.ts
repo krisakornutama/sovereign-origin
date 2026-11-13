@@ -82,7 +82,8 @@ app.use(auditStateChange);
 
 mountRoutes(app);
 
-startWorkers(app, io);
+// worker เริ่มหลัง migrate: cron/timer ของ worker ไม่ควรคิวรี DB ก่อนตารางพร้อม
+// (seed ของ route module ยังทำงานตอน import — คนละจุดกัน)
 
 // ── HTTPS (production): ถ้าตั้ง TLS_CERT + TLS_KEY จะรันผ่าน TLS ──
 function startListener() {
@@ -113,6 +114,7 @@ function startAfterMigrations() {
   } else {
     console.error('🗄️ migrate: ล้มเหลว — ' + migration.detail);
   }
+  startWorkers(app, io);
   startListener();
 }
 

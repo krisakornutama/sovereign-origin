@@ -13,13 +13,13 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { decideMigrateAction, listMigrationNames } from '../lib/migrate-baseline';
+import { decideMigrateAction, listMigrationNames, npxSpawnOptions } from '../lib/migrate-baseline';
 
 const PRISMA_DIR = path.resolve(process.cwd(), 'prisma');
 const MIGRATIONS_DIR = path.join(PRISMA_DIR, 'migrations');
 
 function prisma(args: string[]): { ok: boolean; output: string } {
-  const res = spawnSync('npx', ['prisma', ...args], { encoding: 'utf8', shell: false });
+  const res = spawnSync('npx', ['prisma', ...args], { encoding: 'utf8', ...npxSpawnOptions() });
   const output = `${res.stdout ?? ''}${res.stderr ?? ''}`;
   process.stdout.write(output);
   return { ok: res.status === 0, output };

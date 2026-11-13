@@ -2,7 +2,7 @@
 // รันด้วย: npx tsx --test tests/migrate-baseline.test.ts
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decideMigrateAction, isUnmanagedSchemaError, listMigrationNames } from '../src/lib/migrate-baseline';
+import { decideMigrateAction, isUnmanagedSchemaError, listMigrationNames, npxBin, npxSpawnOptions } from '../src/lib/migrate-baseline';
 
 const P3005 = `Error: P3005
 
@@ -46,4 +46,15 @@ test('decideMigrateAction: error อื่น = fail เสมอ', () => {
     decideMigrateAction({ deployOk: false, deployOutput: 'P1001: Can\'t reach database server', driftOk: true }),
     'fail'
   );
+});
+
+// Windows ไม่มี `npx` แบบ executable — ต้องเรียก `npx.cmd` ไม่งั้น migrate ล้มด้วย ENOENT
+// แล้วถูกอ่านผิดว่า "baseline ไม่ปลอดภัย" ทั้งที่ยังไม่เคยลอง deploy
+test('npxBin: Windows ใช้ npx.cmd, ที่เหลือใช้ npx', () => {
+  assert.equal(npxBin('win32'), 'npx.cmd');
+  assert.equal(npxBin('linux'), 'npx');
+  assert.equal(npxBin('darwin'), 'npx');
+  // npx.cmd ต้องผ่าน shell บน Windows ไม่งั้น ENOENT
+  assert.equal(npxSpawnOptions('win32').shell, true);
+  assert.equal(npxSpawnOptions('linux').shell, false);
 });
