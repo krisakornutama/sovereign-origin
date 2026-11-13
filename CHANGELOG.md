@@ -8,6 +8,7 @@
 
 ## [Unreleased]
 
+- **sidecar migrate DB ก่อนเสิร์ฟ + health บอกความจริงเรื่อง DB** — `MIGRATE_ON_START=1` รัน `migrate-deploy` ก่อน `listen()`; `file:` (SQLite) ถูกปฏิเสธพร้อมเหตุผลเพราะ Prisma เป็น postgresql; `/api/health` เพิ่ม `db.state` + `db.reason` แทน `migrationHead: null` ที่แยกไม่ออกว่า "ยังไม่มี migration" หรือ "ต่อ DB ไม่ได้" · เทสต์ `startupMigration` 6/6, `desktop-backend-secret` 8/8
 _(ยังไม่มีรายการ)_
 
 ---

@@ -143,14 +143,16 @@ async function superviseBackend(options) {
   });
   if (jwt.error) log('backend-secret: เก็บ secret ลงดิสก์ไม่ได้ (' + jwt.error + ') — ใช้ค่าในหน่วยความจำรอบนี้');
   else if (jwt.created) log('backend-secret: สร้าง JWT_SECRET ใหม่ให้เครื่องนี้ (' + jwt.source + ')');
+  if (!baseEnv.DATABASE_URL) log('backend: ไม่มี DATABASE_URL — sidecar จะไม่มี DB (desktop ไม่รองรับ SQLite)');
 
   const child = spawn('node', [coreApiPath], {
     env: {
       ...baseEnv,
       JWT_SECRET: jwt.secret,
       PORT: String(port),
-      // ถ้าเครื่องแม่มี DATABASE_URL อยู่แล้ว อย่าทับ
-      ...(baseEnv.DATABASE_URL ? {} : { DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db') }),
+      // Prisma ที่ฝังมาเป็น postgresql — `file:` (SQLite) ใช้ไม่ได้จริง (DESKTOP-003)
+      // จึงไม่แต่ง DATABASE_URL เอง: ไม่มี Postgres = sidecar ไม่มี DB และ health บอกความจริง
+      ...(baseEnv.DATABASE_URL ? { MIGRATE_ON_START: baseEnv.MIGRATE_ON_START || '1' } : {}),
     },
     // stderr ต้องถูกอ่าน: sidecar ที่ตายเงียบคือปัญหาที่ตามหาไม่เจอ (DESKTOP-002)
     stdio: ['ignore', 'ignore', 'pipe'],

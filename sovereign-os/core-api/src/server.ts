@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fs from 'fs';
 import { config } from './config';
+import { runStartupMigrations } from './services/startup-migration.service';
 import { auditStateChange } from './middleware/auth.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import { applyJsonBodyParsers } from './lib/http-body';
@@ -102,8 +103,21 @@ function startListener() {
   });
 }
 
-void initFleetPolicyCache().finally(() => {
+/** migrate ก่อนเริ่มรับ request — ล้มเหลวก็ยังเสิร์ฟต่อ แต่ต้องมีร่องรอยและ health บอกความจริง */
+function startAfterMigrations() {
+  const migration = runStartupMigrations({ env: process.env });
+  if (!migration.ran) {
+    console.log(`🗄️ migrate: ข้าม (${migration.reason}) — ${migration.detail}`);
+  } else if (migration.ok) {
+    console.log('🗄️ migrate: เรียบร้อย (' + migration.detail.split('\n').slice(-1)[0] + ')');
+  } else {
+    console.error('🗄️ migrate: ล้มเหลว — ' + migration.detail);
+  }
   startListener();
+}
+
+void initFleetPolicyCache().finally(() => {
+  startAfterMigrations();
   console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
 });
 
