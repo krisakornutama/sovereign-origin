@@ -23,9 +23,10 @@ import SearchResultsPanel from '../components/knowledge/SearchResultsPanel';
 import KnowledgeList from '../components/knowledge/KnowledgeList';
 import ItemDetailPanel from '../components/knowledge/ItemDetailPanel';
 import { useKidHome } from '../components/knowledge/use-kid-home';
+import { useTeach } from '../components/knowledge/use-teach';
 import {
-  ACTIVE_KID_KEY, LESSON_TAG,
-  AllowanceHistoryKid, CurriculumOverview, ItemType, KidProfile, KidProgressRow, KidStats, KnowledgeItem, TeachLesson,
+  ACTIVE_KID_KEY,
+  AllowanceHistoryKid, CurriculumOverview, ItemType, KidProfile, KidProgressRow, KidStats, KnowledgeItem,
   videoEmbedUrl,
 } from '../components/knowledge/knowledge-types';
 
@@ -65,20 +66,7 @@ export default function KnowledgePage() {
   const [manualFile, setManualFile] = useState('');
   const [manualContent, setManualContent] = useState('');
 
-  // ── AI สอนลูก ──
-  const [teachTopic, setTeachTopic] = useState('');
-  const [teachAge, setTeachAge] = useState('6-8');
-  const [teachQuizCount, setTeachQuizCount] = useState(3); // จำนวนข้อแบบทดสอบ (1-10)
-  const [teachModel, setTeachModel] = useState(''); // '' = โมเดลเริ่มต้นของระบบ
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [teaching, setTeaching] = useState(false);
-  const [teachError, setTeachError] = useState('');
-  const [lesson, setLesson] = useState<TeachLesson | null>(null);
-  const [lessonUsedKnowledge, setLessonUsedKnowledge] = useState(false);
-  const [savedLessons, setSavedLessons] = useState<KnowledgeItem[]>([]);
-  const [lessonSaving, setLessonSaving] = useState(false);
-  // สถานะทำแบบทดสอบ: quizAnswers[i] = ตัวเลือกที่เลือก (-1 = ยังไม่ได้ตอบ)
-  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
+  // ── AI สอนลูก (FE-002): state + handlers + effects ทั้งก้อนย้ายไป hook useTeach — call อยู่หลังโปรไฟล์เด็กด้านล่าง ──
 
   // ── โปรไฟล์เด็ก ──
   const [kids, setKids] = useState<KidProfile[]>([]);
@@ -87,10 +75,47 @@ export default function KnowledgePage() {
   const [kidProgress, setKidProgress] = useState<KidProgressRow[]>([]);
   const [showAddKid, setShowAddKid] = useState(false);
   const [kidForm, setKidForm] = useState<{ name: string; age: string; emoji: string }>({ name: '', age: '', emoji: '🧒' });
-  const kidRecordedRef = useRef<string | null>(null); // กันบันทึกคะแนนซ้ำ
 
   // ── หน้าที่ของลูก — งานบ้าน / บิล / กระเป๋าเงิน (state + handlers ทั้งหมดอยู่ใน hook) ──
   const [showKidHome, setShowKidHome] = useState(false);
+
+  // เปิดรายการคลัง (ย้ายขึ้นก่อน hook — useTeach ใช้เป็นทางเลือกของ openSavedLesson) (FE-002)
+  const openItem = async (item: KnowledgeItem) => {
+    setSelected(item);
+    setDetail(null);
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/items/${item.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDetail(data);
+        setSelected(data);
+      }
+    } catch {
+      setDetail(item);
+    }
+  };
+
+  // โหลดความคืบหน้าของเด็กที่เลือก (ย้ายขึ้นก่อน hook — useTeach ใช้หลังทำแบบทดสอบเสร็จ) (FE-002)
+  const loadKidProgress = useCallback(async (kidId: string) => {
+    try {
+      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/kids/${kidId}/progress`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setKidProgress(data.progress || []);
+      setKidStats((prev) => ({ ...prev, [kidId]: data.stats }));
+    } catch {
+      // เงียบ
+    }
+  }, []);
+
+  // ── AI สอนลูก — state + handlers ทั้งหมดอยู่ใน hook (ย้ายตามเดิม FE-002) ──
+  const {
+    teachTopic, setTeachTopic, teachAge, setTeachAge, teachQuizCount, setTeachQuizCount,
+    teachModel, setTeachModel, ollamaModels, teaching, teachError, setTeachError,
+    lesson, setLesson, lessonUsedKnowledge, savedLessons, lessonSaving, quizAnswers,
+    runTeachGenerate, saveGeneratedLesson, openSavedLesson, pickQuizOption, resetQuiz,
+  } = useTeach({ isHydrated, isAuthenticated, token, setMessage, openItem, activeKidId, loadKidProgress });
+
   const home = useKidHome({ activeKidId, showKidHome, isHydrated, isAuthenticated, setMessage, setTeachError });
   const { kidHome, setKidHome, loadKidHome } = home;
 
@@ -140,41 +165,16 @@ export default function KnowledgePage() {
     }
   }, []);
 
-  // โมเดล Ollama ที่เลือกได้สำหรับสร้างบทเรียน
-  const loadOllamaModels = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/models`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const models = (data.models || []).filter((m: string) => !m.startsWith('nomic-embed')); // เอา embedding model ออก
-      setOllamaModels(models);
-    } catch {
-      // เงียบ — ใช้โมเดลเริ่มต้นของระบบ
-    }
-  }, []);
+  // โหลดโมเดล Ollama ที่เลือกได้ — ย้ายไป hook useTeach (FE-002)
 
   useEffect(() => {
     if (!isHydrated || !isAuthenticated || !token) return;
     loadItems();
     loadManualFiles();
     loadIndexStatus();
-    loadOllamaModels();
-  }, [isHydrated, isAuthenticated, token, loadItems, loadManualFiles, loadIndexStatus, loadOllamaModels]);
+  }, [isHydrated, isAuthenticated, token, loadItems, loadManualFiles, loadIndexStatus]);
 
-  const openItem = async (item: KnowledgeItem) => {
-    setSelected(item);
-    setDetail(null);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/items/${item.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setDetail(data);
-        setSelected(data);
-      }
-    } catch {
-      setDetail(item);
-    }
-  };
+  // openItem ย้ายขึ้นก่อน hook useTeach (FE-002) — ดูด้านบน
 
   const parseTags = (raw: string): string[] => raw.split(',').map((x) => x.trim()).filter(Boolean);
 
@@ -353,99 +353,7 @@ export default function KnowledgePage() {
     setSearchResults(null);
   };
 
-  // ── AI สอนลูก ──
-
-  // โหลดบทเรียนที่เคยเก็บไว้ (NOTE + แท็ก "บทเรียน")
-  const loadSavedLessons = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/items`);
-      if (!res.ok) return;
-      const all = (await res.json()) as KnowledgeItem[];
-      setSavedLessons(all.filter((i) => (i.tags || []).includes(LESSON_TAG)));
-    } catch {
-      // เงียบ — ยังเปิดใช้งานโหมดอื่นได้
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isHydrated && isAuthenticated) loadSavedLessons();
-  }, [isHydrated, isAuthenticated, loadSavedLessons]);
-
-  // เรียก AI สร้างบทเรียน (ผู้ใหญ่เลือกหัวข้อ + ระดับอายุ)
-  const runTeachGenerate = async () => {
-    const topic = teachTopic.trim();
-    if (!topic) {
-      setTeachError(t('knowledge.errors.topicRequired', 'กรุณากรอกหัวข้อที่อยากให้ AI สอนลูก — เช่น "น้ำ", "ระบบสุริยะ", "การเอาตัวรอดจากน้ำท่วม"'));
-      return;
-    }
-    setTeaching(true);
-    setTeachError('');
-    setLesson(null);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, ageRange: teachAge, quizCount: teachQuizCount, model: teachModel || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('knowledge.errors.lessonFailed', 'สร้างบทเรียนไม่สำเร็จ'));
-      setLesson(data.lesson);
-      setLessonUsedKnowledge(!!data.usedKnowledge);
-      setQuizAnswers(data.lesson.quiz ? data.lesson.quiz.map(() => -1) : []);
-    } catch (err: any) {
-      setTeachError(err.message || t('knowledge.errors.lessonNoOllama', 'สร้างบทเรียนไม่สำเร็จ — ตรวจว่า Ollama เปิดอยู่'));
-      setLesson(null);
-    } finally {
-      setTeaching(false);
-    }
-  };
-
-  // เก็บบทเรียนนี้ไว้ในคลังความรู้
-  const saveGeneratedLesson = async () => {
-    if (!lesson || lessonSaving) return;
-    setLessonSaving(true);
-    setTeachError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lesson }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t('knowledge.errors.saveFailed', 'บันทึกไม่สำเร็จ'));
-      setMessage(t('knowledge.lessonSaved', 'เก็บบทเรียน "{title}" ไว้ในคลังความรู้แล้ว', { title: lesson.title }));
-      loadSavedLessons();
-    } catch (err: any) {
-      setTeachError(err.message || t('knowledge.errors.saveFailed', 'บันทึกไม่สำเร็จ'));
-    } finally {
-      setLessonSaving(false);
-    }
-  };
-
-  // เปิดบทเรียนที่เคยเก็บไว้ — ใช้ notes (JSON) เพื่อเล่นแบบทดสอบแบบอินเทอร์แอคทีฟ
-  const openSavedLesson = (item: KnowledgeItem) => {
-    try {
-      const parsed = JSON.parse(item.notes || '');
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.quiz)) {
-        setLesson(parsed as TeachLesson);
-        setLessonUsedKnowledge(false);
-        setQuizAnswers(parsed.quiz.map(() => -1));
-        setTeachError('');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
-    } catch {
-      // notes ไม่ใช่ JSON — เปิดเป็น NOTE ธรรมดา
-    }
-    openItem(item);
-  };
-
-  const pickQuizOption = (qi: number, oi: number) => {
-    if (quizAnswers[qi] >= 0) return; // ตอบแล้ว — ล็อกคำตอบ
-    setQuizAnswers((prev) => prev.map((a, i) => (i === qi ? oi : a)));
-  };
-
-  const resetQuiz = () => setQuizAnswers((prev) => prev.map(() => -1));
+  // ── AI สอนลูก: loadSavedLessons / runTeachGenerate / saveGeneratedLesson / openSavedLesson / quiz — ย้ายไป hook useTeach (FE-002) ──
 
   // ── โปรไฟล์เด็ก ──
 
@@ -464,17 +372,7 @@ export default function KnowledgePage() {
     }
   }, []);
 
-const loadKidProgress = useCallback(async (kidId: string) => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/kids/${kidId}/progress`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setKidProgress(data.progress || []);
-      setKidStats((prev) => ({ ...prev, [kidId]: data.stats }));
-    } catch {
-      // เงียบ
-    }
-  }, []);
+  // loadKidProgress ย้ายขึ้นก่อน hook useTeach (FE-002) — ดูด้านบน
 
   const loadCurriculum = useCallback(async () => {
     try {
@@ -568,28 +466,7 @@ const loadKidProgress = useCallback(async (kidId: string) => {
     }
   };
 
-  // เมื่อทำแบบทดสอบเสร็จครบทุกข้อ (และมีโปรไฟล์เด็กที่เลือก) → บันทึกคะแนนอัตโนมัติ
-  useEffect(() => {
-    if (!lesson || !activeKidId || lesson.quiz.length === 0) return;
-    const allAnswered = quizAnswers.every((a) => a >= 0);
-    if (!allAnswered) return;
-    const score = lesson.quiz.filter((_, i) => quizAnswers[i] === lesson.quiz[i].answer).length;
-    const signature = `${lesson.title}|${score}/${lesson.quiz.length}`;
-    if (kidRecordedRef.current === signature) return;
-    kidRecordedRef.current = signature;
-    authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/knowledge/teach/kids/${activeKidId}/progress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lessonTitle: lesson.title,
-        score,
-        total: lesson.quiz.length,
-        lessonItemId: null,
-      }),
-    })
-      .then((res) => (res.ok ? loadKidProgress(activeKidId) : null))
-      .catch(() => { kidRecordedRef.current = null; });
-  }, [lesson, activeKidId, quizAnswers, loadKidProgress]);
+  // บันทึกคะแนนอัตโนมัติหลังทำแบบทดสอบครบทุกข้อ — ย้ายไป hook useTeach (FE-002)
 
   // ── ประวัติค่าขนมทุกคน + จ่ายย้อนหลัง ──
   const loadAllowanceHistory = useCallback(async () => {
