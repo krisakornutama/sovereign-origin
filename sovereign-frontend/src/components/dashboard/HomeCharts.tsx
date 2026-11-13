@@ -1,7 +1,9 @@
 // components/dashboard/HomeCharts.tsx — กราฟตกแต่งหน้า Dashboard ที่ย้ายมาจาก pages/dashboard.tsx
 // (IDEA-011: ย้ายเพื่อลดขนาดหน้า — GaugeCircle/RadarPentagon/SankeyAlluvial ย้ายตามเดิม
 //  IDEA-012: PerfGauges แก้ข้อมูลปลอมแล้ว — ตัด CPU/MEM ที่แต่งจากสูตร (ระบบไม่มีแหล่งข้อมูล)
-//  และไม่มี fallback ตัวเลขเมื่อไม่มีข้อมูล: ข้ามช่องนั้นไป ถ้าไม่มีเลยแสดงสถานะจริง)
+//  และไม่มี fallback ตัวเลขเมื่อไม่มีข้อมูล: ข้ามช่องนั้นไป ถ้าไม่มีเลยแสดงสถานะจริง
+//  IDEA-013: RadarPentagon วาดเมื่อมีข้อมูลจริงครบ 5 แกน · SankeyAlluvial สร้างจาก wealth
+//  จริงเท่านั้น — ตัด fallback 42000/8000/5000/6.2/850/3 ทั้งหมด)
 
 function GaugeCircle({ value, label, sub, color = '#10b981', size = 64 }: { value: number; label: string; sub?: string; color?: string; size?: number }) {
   const pct = Math.max(0, Math.min(100, value));
@@ -30,25 +32,30 @@ function GaugeCircle({ value, label, sub, color = '#10b981', size = 64 }: { valu
 
 export function RadarPentagon({ metrics }: { metrics: Record<string, number> }) {
   // 5 axes: temp, humidity, battery, water, power
-  const raw: Record<string, number> = {
-    temp: metrics.temperature ?? 28,
-    humidity: metrics.humidity ?? 60,
-    battery: metrics.battery_soc ?? 70,
-    water: metrics.water_level_cm ?? 45,
-    power: (metrics.power_kw ?? 1.2) * 40,
-  };
+  // IDEA-013: วาดเฉพาะเมื่อมีข้อมูลจริงครบทั้ง 5 แกน — ไม่ครบ = แจ้งสถานะจริง (บอกแกนที่ขาด)
+  // (เดิมวาดรูปห้าเหลี่ยมจากค่าแต่ง temp 28 / humidity 60 / battery 70 / water 45 / power 1.2)
+  const defs: Array<{ label: string; val: number | null; norm: (v: number) => number }> = [
+    { label: 'TEMP', val: metrics.temperature ?? null, norm: (v) => Math.max(0, Math.min(100, (v / 50) * 100)) },
+    { label: 'HUM', val: metrics.humidity ?? null, norm: (v) => Math.max(0, Math.min(100, v)) },
+    { label: 'BAT', val: metrics.battery_soc ?? null, norm: (v) => Math.max(0, Math.min(100, v)) },
+    { label: 'WTR', val: metrics.water_level_cm ?? null, norm: (v) => Math.max(0, Math.min(100, v)) },
+    { label: 'PWR', val: metrics.power_kw != null ? metrics.power_kw * 40 : null, norm: (v) => Math.max(0, Math.min(100, v)) },
+  ];
   const keys = ['temp', 'humidity', 'battery', 'water', 'power'] as const;
   const labels: Record<string, string> = { temp: 'TEMP', humidity: 'HUM', battery: 'BAT', water: 'WTR', power: 'PWR' };
-  // normalize 0-100
-  const norm = (k: typeof keys[number], v: number) => {
-    if (k === 'temp') return Math.max(0, Math.min(100, (v / 50) * 100));
-    if (k === 'humidity') return Math.max(0, Math.min(100, v));
-    if (k === 'battery') return Math.max(0, Math.min(100, v));
-    if (k === 'water') return Math.max(0, Math.min(100, v));
-    if (k === 'power') return Math.max(0, Math.min(100, v));
-    return v;
-  };
-  const vals = keys.map((k) => norm(k, raw[k]));
+  const missing = defs.filter((d) => d.val == null).map((d) => d.label);
+  if (missing.length > 0) {
+    return (
+      <div className="flex flex-col items-center justify-center" style={{ height: 140 }}>
+        <span className="text-[10px] tracking-widest font-mono text-gray-500 text-center">
+          {missing.length === defs.length
+            ? 'ยังไม่มีข้อมูลเซ็นเซอร์ — รอข้อมูลจริงจากระบบ'
+            : `ยังไม่มีข้อมูลครบ 5 แกน (ขาด: ${missing.join(', ')}) — รอข้อมูลจริง`}
+        </span>
+      </div>
+    );
+  }
+  const vals = defs.map((d) => d.norm(d.val as number));
   const W = 140, H = 140, cx = 70, cy = 70, R = 52;
   const angle = (i: number) => (-90 + i * 72) * Math.PI / 180;
   const pt = (i: number, r: number) => [cx + Math.cos(angle(i)) * r, cy + Math.sin(angle(i)) * r] as const;
@@ -79,15 +86,24 @@ export function RadarPentagon({ metrics }: { metrics: Record<string, number> }) 
 }
 
 export function SankeyAlluvial({ wealth, inventory, farm }: { wealth: any; inventory: any; farm: any }) {
-  // Left sources -> Center -> Right sinks
-  const sources = [
-    { label: 'Portfolio', val: wealth?.portfolioUsd ?? 42000, color: '#10b981' },
-    { label: 'Inventory', val: wealth?.inventoryUsd ?? 8000, color: '#22d3ee' },
-    { label: 'Cash', val: wealth?.cashUsd ?? 5000, color: '#a78bfa' },
-  ];
+  // Left sources -> Center -> Right sinks — สร้างเฉพาะแหล่งที่มีค่าจริงเท่านั้น (IDEA-013)
+  // (เดิมแต่งค่า fallback แข็งทุกแหล่งเมื่อ wealth ไม่มี ทำให้จุดที่เรียกด้วย wealth={null}
+  //  แสดงตัวเลขปลอมตลอดเวลา — ค่าแต่งเดิมถูกลบ ดูประวัติใน git และเทสต์ tools/test/dashboard-fallback-truth.test.mjs)
+  const sources: Array<{ label: string; val: number; color: string }> = [];
+  if (wealth && typeof wealth.portfolioUsd === 'number') sources.push({ label: 'Portfolio', val: wealth.portfolioUsd, color: '#10b981' });
+  if (wealth && typeof wealth.inventoryUsd === 'number') sources.push({ label: 'Inventory', val: wealth.inventoryUsd, color: '#22d3ee' });
+  if (wealth && typeof wealth.cashUsd === 'number') sources.push({ label: 'Cash', val: wealth.cashUsd, color: '#a78bfa' });
+  const runway = wealth?.runway && typeof wealth.runway.months === 'number' ? wealth.runway.months : null;
+  const burn = wealth?.runway && typeof wealth.runway.monthlyBurnUsd === 'number' ? wealth.runway.monthlyBurnUsd : null;
+  const growing = farm && typeof farm.growing === 'number' ? farm.growing : null;
+  if (sources.length === 0) {
+    return (
+      <div className="h-[88px] flex items-center justify-center">
+        <span className="text-[10px] tracking-widest font-mono text-gray-500">ยังไม่มีข้อมูลพอร์ต/ทรัพยากร — รอข้อมูลจริงจากระบบ</span>
+      </div>
+    );
+  }
   const total = sources.reduce((a, b) => a + b.val, 0) || 1;
-  const runway = wealth?.runway?.months ?? 6.2;
-  const growing = farm?.growing ?? 3;
   const W = 320, H = 88;
   const leftX = 8, midX = 150, rightX = 312;
   // vertical layout
@@ -98,7 +114,7 @@ export function SankeyAlluvial({ wealth, inventory, farm }: { wealth: any; inven
       {/* labels */}
       <text x={leftX} y={7} fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">SOURCE</text>
       <text x={midX} y={7} textAnchor="middle" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">SOVEREIGN HUB</text>
-      <text x={rightX} y={7} textAnchor="end" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">RUNWAY {runway.toFixed(1)}M</text>
+      <text x={rightX} y={7} textAnchor="end" fill="#6b7889" fontSize="6" fontFamily="JetBrains Mono" letterSpacing="1">{runway != null ? `RUNWAY ${runway.toFixed(1)}M` : 'RUNWAY —'}</text>
       {sources.map((s, i) => {
         const h = Math.max(8, (s.val / total) * hScale);
         const y = yOff;
@@ -124,15 +140,15 @@ export function SankeyAlluvial({ wealth, inventory, farm }: { wealth: any; inven
       {/* center hub */}
       <rect x={midX - 18} y={18} width={44} height={48} rx={6} fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" strokeWidth="0.9" />
       <text x={midX} y={34} textAnchor="middle" fill="#34d399" fontSize="6" fontFamily="JetBrains Mono" fontWeight="700">HUB</text>
-      <text x={midX} y={42} textAnchor="middle" fill="#9ca3af" fontSize="6" fontFamily="JetBrains Mono">{growing} PLOTS</text>
-      <text x={midX} y={50} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">{inventory ? `${inventory.items} ITEMS` : 'STOCK'}</text>
+      <text x={midX} y={42} textAnchor="middle" fill="#9ca3af" fontSize="6" fontFamily="JetBrains Mono">{growing != null ? `${growing} PLOTS` : 'PLOTS —'}</text>
+      <text x={midX} y={50} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">{inventory && typeof inventory.items === 'number' ? `${inventory.items} ITEMS` : '— ITEMS'}</text>
       {/* right sink */}
       <rect x={rightX - 54} y={14} width={54} height={22} rx={4} fill="rgba(245,158,11,0.14)" stroke="rgba(245,158,11,0.4)" strokeWidth="0.8" />
       <text x={rightX - 27} y={24} textAnchor="middle" fill="#f59e0b" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">SURVIVAL</text>
-      <text x={rightX - 27} y={30} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">{runway > 6 ? 'STABLE' : 'LOW'}</text>
+      <text x={rightX - 27} y={30} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">{runway != null ? (runway > 6 ? 'STABLE' : 'LOW') : '—'}</text>
       <rect x={rightX - 54} y={44} width={54} height={22} rx={4} fill="rgba(239,68,68,0.10)" stroke="rgba(239,68,68,0.35)" strokeWidth="0.8" />
       <text x={rightX - 27} y={54} textAnchor="middle" fill="#f87171" fontSize="6" fontWeight="700" fontFamily="JetBrains Mono">RESERVE</text>
-      <text x={rightX - 27} y={60} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">BURN ${(wealth?.runway?.monthlyBurnUsd ?? 850).toLocaleString()}</text>
+      <text x={rightX - 27} y={60} textAnchor="middle" fill="#6b7889" fontSize="5.5" fontFamily="JetBrains Mono">{burn != null ? `BURN $${burn.toLocaleString()}` : 'BURN —'}</text>
     </svg>
   );
 }
