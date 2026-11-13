@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.3",
+  "currentVersion": "1.3.4",
   "versions": [
     {
       "version": "Unreleased",
@@ -16,6 +16,28 @@
         }
       ],
       "sections": []
+    },
+    {
+      "version": "v1.3.4",
+      "dateISO": "2026-11-13",
+      "dateLabel": "13 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [],
+      "sections": [
+        {
+          "title": "🔧 แอปเดสก์ท็อปใช้ API ของตัวเองได้จริง",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "sidecar มี JWT_SECRET ของเครื่องเอง — core-api โยน JWT_SECRET is not set ทันทีถ้าไม่มีค่า แต่แอปที่แพ็กไม่ได้เตรียมอะไรให้ พอร์ตสำรองที่เลือกไว้จึงว่างเปล่าและ frontend ชี้ไปที่ API ที่ไม่มีอยู่ · ตอนนี้ loadOrCreateJwtSecret() สร้าง hex 32 ไบต์ใน userData (โหมด 0600, เขียนผ่านไฟล์ชั่วคราว + rename) ใช้ค่าเดิมทุกครั้งที่เปิดแอป, ค่าที่ผู้ปฏิบัติการตั้งใน env ชนะเสมอ, ไฟล์ที่สั้น/ว่างถูกสร้างใหม่ · เทสต์ desktop-backend-secret 6/6",
+                "sidecar ตายแล้วต้องมีร่องรอย — เดิม spawn ด้วย stdio:'ignore' ⇒ ตายเงียบไม่มี log · ตอนนี้เก็บ stderr ท้ายสุด 12 บรรทัดและ log backend exit code=<n> signal=<s> port=<p> เมื่อโปรเซสจบ · ค่า secret ไม่ถูก log · เทสต์ desktop-backend-port 3/3 + desktop-backend-secret 6/6"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "version": "v1.3.3",
