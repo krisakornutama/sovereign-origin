@@ -72,7 +72,11 @@ export function SensorCard({ label, value, metric, trendRange }: { label: string
         trendCache.set(cacheKey, points);
         setTrend(points);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        // IDEA-013: อ่านประวัติไม่ได้ = แสดง "—" (sparkline ชุดว่าง) ไม่ใช่จุดโหลดค้างตลอด
+        setTrend([]);
+      });
     return () => { cancelled = true; };
   }, [metric, trendRange]);
   return (
