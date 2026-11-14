@@ -10,7 +10,7 @@
 
 ## ขั้นที่ 0 — เตรียมของ
 
-- บัญชี Google ที่เป็นเจ้าของเว็บ (ตอนนี้ใช้ owenhoper@gmail.com อยู่แล้ว)
+- บัญชี Google ที่เป็นเจ้าของเว็บ (ตอนนี้ใช้ owner@example.com อยู่แล้ว)
 - แท็กยืนยันวางรอบนหน้าแรกแล้ว — ตรวจได้: เปิด https://krisakornutama.github.io/project-sovereign/ → คลิกขวา → "ดูแหล่งเพจ" (View page source) → Ctrl+F ค้นคำว่า `google-site-verification` ต้องเจอบรรทัดเดียว
 
 ## ขั้นที่ 1 — เปิด Search Console และยืนยันเว็บ
