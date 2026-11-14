@@ -1,449 +1,50 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState } from 'react';
 import { useIsSuperadmin } from '../lib/roles';
 import Link from 'next/link';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { authFetch } from '../lib/apiFetch';
-import { asArray } from '../lib/fetchJson';
-import { withMbti } from '../lib/mbtiAi';
-import { useAiChatHistory } from '../lib/useAiChatHistory';
+import { AUTONOMY_META, fmtArgs, fmtTime } from '../lib/ai-agent-types';
+import type { AutonomyLevel } from '../lib/ai-agent-types';
 import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import EmptyState from '../components/ui/EmptyState';
 import { SkeletonGrid } from '../components/ui/SkeletonCard';
 import CodingIde from '../components/coding/CodingIde';
-
-type AutonomyLevel = 'view' | 'suggest' | 'autonomous';
-type ToolKind = 'read-only' | 'action';
-type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-
-interface AiToolInfo {
-  name: string;
-  kind: ToolKind;
-  description: string;
-  available: boolean;
-}
-
-interface AiPolicy {
-  autonomy: AutonomyLevel;
-  approvalTtlMs: number;
-  protectedIps: string[];
-  protectedProcesses: string[];
-  tools: AiToolInfo[];
-}
-
-interface Approval {
-  id: string;
-  tool: string;
-  args: any;
-  reason: string;
-  createdAt: number;
-  status: ApprovalStatus;
-  result?: string;
-  decidedAt?: number;
-}
-
-interface AiStatus {
-  ollamaOnline: boolean;
-  ollamaUrl: string;
-  currentModel: string;
-  models: Array<{ name: string; size: string }>;
-  resources: {
-    cpuCores: number;
-    cpuUsagePercent: number | null;
-    memoryTotalGb: number;
-    memoryFreeGb: number;
-    memoryUsedPercent: number | null;
-  };
-  uptimeSeconds: number;
-}
-
-interface ChatMsg {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  created_at: string;
-}
-
-const AUTONOMY_META: Record<AutonomyLevel, { label: string; desc: string; color: string; active: string }> = {
-  view: {
-    label: 'ดูอย่างเดียว',
-    desc: 'AI อ่านข้อมูลได้อย่างเดียว — คำสั่ง action (blockIP / unblockIP / killProcess) ถูกปิดทั้งหมด',
-    color: 'text-gray-400 border-gray-600',
-    active: 'bg-gray-600 text-white',
-  },
-  suggest: {
-    label: 'แนะนำ + ขออนุมัติ',
-    desc: 'AI เสนอคำสั่ง action แล้วรอ Superadmin อนุมัติก่อนดำเนินการ (ค่าเริ่มต้น)',
-    color: 'text-amber-300 border-amber-600',
-    active: 'bg-amber-600 text-white',
-  },
-  autonomous: {
-    label: 'ลงมือเอง',
-    desc: 'AI ดำเนินการ action ทันที — ระบบยัง guard คำสั่งวิกฤตเสมอ (ห้าม block IP ตัวเอง / kill process ระบบ)',
-    color: 'text-emerald-400 border-emerald-600',
-    active: 'bg-green-600 text-white',
-  },
-};
-
-function fmtTime(ts?: number): string {
-  if (!ts) return '-';
-  return new Date(ts).toLocaleString(fmtLocale());
-}
-
-function fmtArgs(args: any): string {
-  if (!args || Object.keys(args).length === 0) return '{}';
-  try {
-    return JSON.stringify(args, null, 2);
-  } catch {
-    return String(args);
-  }
-}
+import { useAiChat } from '../components/ai-agent/use-ai-chat';
+import { useAiTeam } from '../components/ai-agent/use-ai-team';
+import { useAiPolicy } from '../components/ai-agent/use-ai-policy';
 
 export default function AiAgentPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
   const isSuperadmin = useIsSuperadmin();
 
-  const [policy, setPolicy] = useState<AiPolicy | null>(null);
-  const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ── ข้อความแจ้งผล/ผิดพลาด — แชท/ทีม/นโยบาย ใช้ร่วมกันผ่าน hook ──
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  // สถานะ + ทำงานกับ AI
-  const [status, setStatus] = useState<AiStatus | null>(null);
-  // B4: ประวัติแชทใช้ hook กลาง useAiChatHistory (เจ้าของเดียวกับ AiChatPanel บน dashboard)
-  // หน้านี้โหลดหลัง auth พร้อม (enabled = isHydrated && isAuthenticated) และข้อความมี created_at แนบ
-  const aiHistory = useAiChatHistory(50, isHydrated && isAuthenticated);
-  const chatMsgs: ChatMsg[] = useMemo(
-    () => aiHistory.messages.map((m, i) => ({ id: m.id ?? `h-${i}`, role: m.role === 'user' ? 'user' : 'assistant', content: m.content, created_at: new Date().toISOString() })),
-    [aiHistory.messages]
-  );
-  const chatLoaded = aiHistory.loaded;
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState('');
-const chatEndRef = useRef<HTMLDivElement>(null);
 
   // แท็บ: policy (เดิม) | team (ทีม Agent) | jobs (งานเบื้องหลัง) | coding (Coding Agent แบบ IDE — อยู่ใน CodingIde)
   const [tab, setTab] = useState<'policy' | 'team' | 'jobs' | 'coding'>('policy');
 
-  // ── ทีม Agent + งานเบื้องหลัง ──
-  const [roles, setRoles] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [roleForm, setRoleForm] = useState<Record<string, string>>({});
-  const [runPrompt, setRunPrompt] = useState<Record<string, string>>({});
-  const [teamBusy, setTeamBusy] = useState<string | null>(null);
-  const [jobsLoading, setJobsLoading] = useState(false);
+  // ── state/handlers แยกตาม domain (FE-005: ย้ายจากหน้านี้แบบ verbatim) ──
+  const {
+    chatMsgs, chatLoaded, chatInput, setChatInput, chatLoading, chatError,
+    chatImage, setChatImage, chatEndRef, fileToBase64, sendChat,
+  } = useAiChat(isHydrated, isAuthenticated);
 
-  const [chatImage, setChatImage] = useState<string | null>(null); // base64 รูปในแชท (ถ้ามี)
+  const {
+    roles, jobs, roleForm, setRoleForm, runPrompt, setRunPrompt, teamBusy, jobsLoading,
+    loadRoles, loadJobs, createRole, updateRole, deleteRole, runRole, cancelJob, deleteJob,
+  } = useAiTeam({ isSuperadmin, tab, setTab, setMessage, setError });
 
-  const fileToBase64 = (file: File, cb: (b64: string) => void) => {
-    const reader = new FileReader();
-    reader.onload = () => cb(String(reader.result || ''));
-    reader.readAsDataURL(file);
-  };
-
-  const loadRoles = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/roles`);
-      if (res.ok) {
-        const data = await res.json();
-        setRoles(data.roles || []);
-      }
-    } catch {
-      // เงียบ
-    }
-  }, []);
-
-  const loadJobs = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/jobs`);
-      if (res.ok) {
-        const data = await res.json();
-        setJobs(data.jobs || []);
-      }
-    } catch {
-      // เงียบ
-    } finally {
-      setJobsLoading(false);
-    }
-  }, []);
-
-  const createRole = async () => {
-    if (!isSuperadmin) return;
-    setError('');
-    setMessage('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/roles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: roleForm.name || '',
-          emoji: roleForm.emoji || '🤖',
-          description: roleForm.description || '',
-          system_prompt: roleForm.system_prompt || '',
-          capability: roleForm.capability || 'general',
-          count: Number(roleForm.count) || 1,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-setMessage(t('aiAgent.team.roleAdded', 'เพิ่มบทบาทแล้ว'));
-        setRoleForm({});
-        await loadRoles();
-      } else {
-        setError(data?.error || t('aiAgent.team.roleAddFailed', 'เพิ่มบทบาทไม่สำเร็จ'));
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-  const updateRole = async (id: string, patch: Record<string, unknown>) => {
-    if (!isSuperadmin) return;
-    setError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/roles/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-      if (res.ok) {
-        setMessage(t('aiAgent.team.roleSaved', 'บันทึกบทบาทแล้ว'));
-        await loadRoles();
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-  const deleteRole = async (id: string, name: string) => {
-    if (!isSuperadmin) return;
-    if (!window.confirm(t('aiAgent.team.deleteRoleConfirm', 'ลบบทบาท "{name}"? (งานที่รันอยู่จะถูกยกเลิกด้วย)', { name }))) return;
-    setError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/roles/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setMessage(t('aiAgent.team.roleDeleted', 'ลบบทบาทแล้ว'));
-        await loadRoles();
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-  const runRole = async (id: string) => {
-    if (!isSuperadmin) return;
-    const prompt = (runPrompt[id] || '').trim();
-    if (!prompt) {
-      setError(t('aiAgent.team.promptRequired', 'พิมพ์ภารกิจให้ agent ก่อนกดรัน'));
-      return;
-    }
-    setError('');
-    setMessage('');
-    setTeamBusy(id);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/roles/${id}/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMessage(t('aiAgent.team.runSent', 'ส่งงานให้ AI แล้ว — รันเบื้องหลัง ไปดูหน้าอื่นได้เลย (ป้ายมุมขวาล่างจะแจ้ง)') + (data?.job?.id ? ` · ID: ${data.job.id.slice(0, 8)}` : ''));
-        setRunPrompt((prev) => ({ ...prev, [id]: '' }));
-        setTab('jobs');
-        await loadJobs();
-      } else {
-        setError(data?.error || t('aiAgent.team.runFailed', 'สั่งงานไม่สำเร็จ'));
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setTeamBusy(null);
-    }
-  };
-
-  const cancelJob = async (id: string) => {
-    if (!isSuperadmin) return;
-    setError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/jobs/${id}/cancel`, { method: 'POST' });
-      if (res.ok) {
-        setMessage(t('aiAgent.jobs.cancelledMsg', 'ยกเลิกงานแล้ว'));
-        await loadJobs();
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-  const deleteJob = async (id: string) => {
-    if (!isSuperadmin) return;
-    setError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/agent/jobs/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        await loadJobs();
-      }
-    } catch {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-// ── Coding Agent: state + แฮนเดลทั้งหมดย้ายไปอยู่ใน CodingIde.tsx ──
-
-  // Poll งานเบื้องหลังทุก 3 วิ (เฉพาะหน้า jobs — ป้าย global ดูแลใน _app)
-  useEffect(() => {
-    if (tab !== 'jobs') return;
-    setJobsLoading(true);
-    loadJobs();
-    const interval = setInterval(loadJobs, 3000);
-    return () => clearInterval(interval);
-  }, [tab, loadJobs]);
-
-  // โหลดบทบาทครั้งแรกเมื่อเข้าแท็บ team
-  useEffect(() => {
-    if (tab === 'team') loadRoles();
-  }, [tab, loadRoles]);
-
-  const loadPolicy = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/policy`);
-      if (res.ok) setPolicy(await res.json());
-      else setError(t('aiAgent.autonomy.policyLoadFailed', 'โหลดนโยบาย AI ไม่สำเร็จ'));
-    } catch (err) {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadApprovals = useCallback(async () => {
-    if (!isSuperadmin) return;
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/approvals`);
-      if (res.ok) setApprovals(asArray(await res.json()));
-    } catch (err) {
-      // เงียบๆ — หน้า policy ยังใช้งานได้
-    }
-  }, [isSuperadmin]);
-
-  const loadStatus = useCallback(async () => {
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/status`);
-      if (res.ok) setStatus(await res.json());
-    } catch (err) {
-      // เงียบ ๆ — แสดงเฉพาะตอนโหลดได้
-    }
-  }, []);
-
-  // เลื่อนลงล่างสุดอัตโนมัติเมื่อมีข้อความใหม่
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [chatMsgs.length, chatLoading]);
-
-  const sendChat = async () => {
-    const text = chatInput.trim();
-    if ((!text && !chatImage) || chatLoading) return;
-    setChatInput('');
-    setChatError('');
-    aiHistory.appendLocal({ role: 'user', content: chatImage ? `[รูปภาพ] ${text}` : text });
-    setChatLoading(true);
-    const imageBase64 = chatImage || undefined;
-    setChatImage(null);
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(withMbti({ message: text || 'ดูรูปภาพนี้ให้หน่อย', imageBase64 })),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        aiHistory.appendLocal({ role: 'ai', content: data.reply || t('aiAgent.chat.noReply', '(ไม่มีคำตอบ)') });
-      } else {
-        setChatError(data.error || `API error ${res.status}`);
-      }
-    } catch (err) {
-      setChatError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isHydrated || !isAuthenticated) return;
-    loadPolicy();
-    loadApprovals();
-    loadStatus();
-    const interval = setInterval(() => {
-      loadPolicy();
-      loadApprovals();
-      loadStatus();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [isHydrated, isAuthenticated, loadPolicy, loadApprovals, loadStatus]);
-
-  const changeAutonomy = async (next: AutonomyLevel) => {
-    if (!isSuperadmin) return;
-    setMessage('');
-    setError('');
-    try {
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/policy`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autonomy: next }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMessage(t('aiAgent.autonomy.changed', 'เปลี่ยนระดับ autonomy เป็น "{label}" แล้ว', { label: t(`aiAgent.autonomy.${next}.label`, AUTONOMY_META[next].label) }));
-        await loadPolicy();
-      } else {
-        setError(data?.error || t('aiAgent.autonomy.changeFailed', 'เปลี่ยน autonomy ไม่สำเร็จ'));
-      }
-    } catch (err) {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    }
-  };
-
-  const decideApproval = async (id: string, action: 'approve' | 'reject') => {
-    if (action === 'approve') {
-      const ok = window.confirm(t('aiAgent.approvals.approveConfirm', 'อนุมัติให้ AI ดำเนินการคำสั่งนี้ทันที?\n\nคำสั่งที่กำลังจะทำงานจริงบนระบบ — ตรวจสอบให้แน่ใจ'));
-      if (!ok) return;
-    } else {
-      const ok = window.confirm(t('aiAgent.approvals.rejectConfirm', 'ปฏิเสธคำสั่งนี้?'));
-      if (!ok) return;
-    }
-    setBusyId(id);
-    setMessage('');
-    setError('');
-    try {
-      const res = await authFetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/ai/approvals/${id}/${action}`,
-        { method: 'POST' }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMessage(action === 'approve'
-          ? t('aiAgent.approvals.approvedResult', 'อนุมัติแล้ว: {result}', { result: data?.result || t('aiAgent.approvals.doneFallback', 'ดำเนินการสำเร็จ') })
-          : t('aiAgent.approvals.rejected', 'ปฏิเสธคำสั่งแล้ว'));
-        await loadApprovals();
-      } else {
-        setError(data?.reason || data?.error || t('aiAgent.approvals.cannotVerb', 'ไม่สามารถ{verb}ได้', { verb: action === 'approve' ? t('aiAgent.approvals.approveVerb', 'อนุมัติ') : t('aiAgent.approvals.rejectVerb', 'ปฏิเสธ') }));
-        await loadApprovals();
-      }
-    } catch (err) {
-      setError(t('aiAgent.coreApiError', 'เชื่อมต่อ Core API ไม่ได้'));
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const {
+    policy, approvals, loading, status, busyId,
+    changeAutonomy, decideApproval,
+  } = useAiPolicy({ isSuperadmin, isHydrated, isAuthenticated, setMessage, setError });
 
   if (!isHydrated) {
     // C6: skeleton หน้า AI Agent แทนข้อความเฉย ๆ
