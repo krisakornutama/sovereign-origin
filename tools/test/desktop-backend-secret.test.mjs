@@ -174,3 +174,27 @@ test('superviseBackend: มี DATABASE_URL จริง = เปิด migrate 
   assert.equal(spawnOpts.env.DATABASE_URL, 'postgresql://u:p@127.0.0.1:5432/sovereign');
   assert.equal(spawnOpts.env.MIGRATE_ON_START, '1');
 });
+
+test('superviseBackend: sidecar พ่น stderr แล้วยังไม่ตาย ก็ต้องเห็นใน log ทันที', async () => {
+  const dir = tmpDir();
+  const logs = [];
+  let child = null;
+  const spawn = () => {
+    child = new EventEmitter();
+    child.stderr = new Readable({ read() {} });
+    child.stdout = new Readable({ read() {} });
+    return child;
+  };
+  await superviseBackend({
+    app: { isPackaged: false, getPath: () => dir },
+    http: { get: () => ({ on() {}, destroy() {} }) },
+    spawn,
+    dlog: (m) => logs.push(String(m)),
+    probe: async () => ({ listening: false, version: null }),
+    env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
+  });
+  // migrate ล้มเหลวจะถูกเขียนลง stderr แต่โปรเซสยังไม่ตาย — ต้องไม่รอถึง exit
+  child.stderr.push('🗄️ migrate: ล้มเหลว — drift\n');
+  await new Promise((r) => setTimeout(r, 60));
+  assert.match(logs.join('\n'), /migrate: ล้มเหลว/, 'ต้อง log ทันทีที่ได้บรรทัด');
+});
