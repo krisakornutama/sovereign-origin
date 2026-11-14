@@ -11,7 +11,6 @@
   "violations": [
     "import-layers|sovereign-frontend/src/components/CommandPaletteHost.tsx|ข้ามกลุ่ม component CommandPaletteHost.tsx → CommandPalette.tsx (sovereign-frontend/src/components/CommandPalette.tsx)",
     "line-budget|sovereign-frontend/src/components/coding/CodingIde.tsx|791 บรรทัด > เพดาน 400 (components)",
-    "line-budget|sovereign-frontend/src/components/knowledge/KidHomePanel.tsx|765 บรรทัด > เพดาน 400 (components)",
     "sidebar-rule|sovereign-frontend/src/pages/about.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/community.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
     "sidebar-rule|sovereign-frontend/src/pages/partners/guide.tsx|หน้าไม่ import Sidebar (ทุกหน้าต้องมี layout เดียวกัน)",
