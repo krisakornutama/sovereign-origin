@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { normalizeSingleIp } from '../lib/ip-address';
 import { threatIntel } from './threat-intel.service';
 import { securityStream } from './security-stream.service';
+import { createLogOnce } from '../lib/log-once';
 
 export { prisma };
 export const threatEmitter = new EventEmitter();
@@ -182,10 +183,16 @@ export class ThreatDetectionService {
       securityStream.push('THREAT', { ...event, blocked });
       return { ...event, blocked };
     } catch (err) {
-      console.error('Failed to record anomaly:', err instanceof Error ? err.message : err);
+      // DB ล่ม/ตารางหาย = ทุกคำขอ error เหมือนกัน ⇒ บอกครั้งเดียวแล้วสรุปเป็นรอบ
+      logAnomalyFailure(
+        'threat.recordAnomaly',
+        `Failed to record anomaly: ${err instanceof Error ? err.message : err}`
+      );
       return null;
     }
   }
 }
 
 export const threatDetector = new ThreatDetectionService();
+
+const logAnomalyFailure = createLogOnce();
