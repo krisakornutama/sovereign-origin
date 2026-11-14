@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+## [1.3.8] — 2026-11-14
+
+- **ตอน DB ใช้ไม่ได้ log ไม่สแปมแล้ว** — `createLogOnce` พิมพ์เหตุเต็มครั้งแรก ครั้งต่อไปนับเงียบ แล้วสรุปทุก 5 นาที (`ซ้ำ N ครั้งใน … วิ`) ใช้กับ `threat-detection.recordAnomaly` และ `relay.ensureDefaultRelays` · รอบทดสอบบน 1.3.7 ได้ stderr 830 บรรทัดในไม่กี่วินาที ตอนนี้เหลือไม่กี่บรรทัด · เทสต์ใหม่ `log-once` 4/4 · `verify` 6/6
+
 - **stderr ของ sidecar ขึ้น log ทันที** — เดิมเก็บเป็นก้อนแล้วพิมพ์ตอน exit ⇒ migrate ที่ล้มแต่โปรเซสยังเสิร์ฟต่อ (schema drift/ไม่มีสิทธิ์) ไม่เหลือร่องรอยใน `desktop-shell.log` เลย · ตอนนี้ทุกบรรทัดที่ sidecar เขียนลง stderr ถูก log ทันที (`backend stderr: …`) · เทสต์ `desktop-backend-secret` 9/9
 _(ยังไม่มีรายการ)_
 
