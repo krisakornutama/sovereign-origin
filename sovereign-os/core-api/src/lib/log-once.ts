@@ -20,6 +20,21 @@ interface LogOnceOptions {
 }
 
 const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
+const ONE_LINE_HEAD = 180;
+const ONE_LINE_TAIL = 100;
+
+/**
+ * ยุบข้อความหลายบรรทัดให้เหลือบรรทัดเดียว
+ *
+ * Prisma พิมพ์ error หนึ่งครั้งเป็นสิบกว่าบรรทัด และ supervisor ของเดสก์ท็อป log ทีละบรรทัด
+ * เหตุการณ์เดียวจึงกลายเป็น 10+ บรรทัด · เก็บทั้งหัว (worker ไหนล้ม) และท้าย
+ * (สาเหตุจริง เช่น The table `public.x` does not exist)
+ */
+export function oneLine(message: string, maxHead = ONE_LINE_HEAD, maxTail = ONE_LINE_TAIL): string {
+  const flat = String(message).replace(/\s+/g, ' ').trim();
+  if (flat.length <= maxHead + maxTail + 3) return flat;
+  return flat.slice(0, maxHead) + ' … ' + flat.slice(-maxTail);
+}
 
 export function createLogOnce(options: LogOnceOptions = {}) {
   const windowMs = options.windowMs ?? DEFAULT_WINDOW_MS;
@@ -73,7 +88,10 @@ export function installErrorDedupe(
   target.error = (...args: unknown[]) => {
     const full = text(args);
     if (!full) return original();
-    logOnce(full.split('\n')[0].slice(0, 120), full);
+    // Prisma พิมพ์ error หนึ่งครั้งเป็น 10 กว่าบรรทัด ⇒ supervisor จึง log ทีละบรรทัด
+    // ยุบเหลือบรรทัดเดียว: หัว (บอกว่า worker ไหน) + ท้าย (บอกว่าตารางอะไรหาย)
+    // key จากบรรทัดแรกของข้อความเดิม (ชนิดปัญหา) — รายละเอียดใน stack ต่างกันได้โดยไม่ถือเป็นคนละเหตุ
+    logOnce(full.split('\n')[0].slice(0, 120), oneLine(full));
   };
   return () => {
     target.error = original;
