@@ -1,6 +1,6 @@
 {
   "name": "sovereign-origin",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "private": true,
   "description": "Sovereign Origin — Self-Sovereign Home OS (monorepo ของ sovereign-frontend + sovereign-os/core-api)",
   "scripts": {

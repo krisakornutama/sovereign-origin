@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.6",
+  "currentVersion": "1.3.7",
   "versions": [
     {
       "version": "Unreleased",
