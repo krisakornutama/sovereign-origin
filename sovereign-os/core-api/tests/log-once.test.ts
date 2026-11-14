@@ -1,7 +1,7 @@
 // log-once: ตอน DB ใช้ไม่ได้ แอปต้องบอกเหตุครั้งเดียว ไม่สแปม stderr ทุกคำขอ
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLogOnce, installErrorDedupe } from '../src/lib/log-once.js';
+import { createLogOnce, installErrorDedupe, oneLine } from '../src/lib/log-once.js';
 
 function harness(windowMs = 300_000) {
   let now = 1_000_000;
@@ -67,4 +67,34 @@ test('installErrorDedupe: บรรทัดแรกเหมือนกัน
   fake.error('Power guard: cannot load energy state:\n  relation "sensor_telemetry" does not exist');
   fake.error('Power guard: cannot load energy state:\n  relation "other" does not exist');
   assert.equal(seen.length, 1);
+});
+
+test('oneLine: ยุบหลายบรรทัดเป็นบรรทัดเดียว เก็บหัวและท้าย', () => {
+  const prisma = [
+    '',
+    'Invalid `prisma_1.prisma.kidProfile.findMany()` invocation in',
+    'E:\\app\\dist\\services\\teach-kids-allowance.js:47:20',
+    '',
+    '  46 async function payWeeklyAllowances() {',
+    '-> 47   const kids = await prisma.kidProfile.findMany(',
+    'The table `public.kid_profiles` does not exist in the current database.',
+  ].join('\n');
+  const out = oneLine(prisma);
+  assert.ok(!out.includes('\n'), 'ต้องไม่มีบรรทัดใหม่');
+  assert.match(out, /^Invalid/);
+  assert.match(out, /public\.kid_profiles/);
+  assert.ok(out.length < 300);
+});
+
+test('installErrorDedupe: ข้อความหลายบรรทัดถูกส่งออกเป็นบรรทัดเดียว', () => {
+  const seen: string[] = [];
+  const fake = { error: (...args: unknown[]) => seen.push(args.join(' ')) };
+  installErrorDedupe(fake);
+  fake.error(
+    'Coding queue error:',
+    new Error('Invalid `prisma.x` invocation in\nfile.js:1\n\nThe table `public.coding_jobs` does not exist')
+  );
+  assert.equal(seen.length, 1);
+  assert.ok(!seen[0].includes('\n'));
+  assert.match(seen[0], /public\.coding_jobs/);
 });
