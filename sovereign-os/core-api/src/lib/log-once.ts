@@ -45,3 +45,37 @@ export function createLogOnce(options: LogOnceOptions = {}) {
     log(suppressed > 0 ? `${message} — ซ้ำ ${suppressed} ครั้งใน ${seconds} วิ` : message);
   };
 }
+
+/**
+ * ครอบ `console.error` ของโปรเซสด้วยตัวกรองกันซ้ำ
+ *
+ * เหตุผลจากของจริง: ตอน DB ไม่มีตาราง มี worker ~15 ตัวที่ยิง error เองทุก 15–60 วิ
+ * (coding queue, agent queue, relay scheduler, vision, power guard, learning …)
+ * แก้ทีละจุดไม่ทันและลืมง่าย — ครอบที่เดียวจึงคุมได้ทั้งโปรเซส
+ *
+ * key = บรรทัดแรกของข้อความ (ตัดที่ 120 ตัวอักษร) — Prisma พิมพ์รายละเอียดหลายบรรทัด
+ * แต่บรรทัดแรกบอกชนิดปัญหาเสมอ
+ */
+export function installErrorDedupe(
+  target: { error: (...args: unknown[]) => void } = console,
+  options: { windowMs?: number } = {}
+): () => void {
+  const original = target.error.bind(target) as (...args: unknown[]) => void;
+  const logOnce = createLogOnce({
+    windowMs: options.windowMs,
+    log: (message) => original(message),
+  });
+  const text = (args: unknown[]) =>
+    args
+      .map((a) => (a instanceof Error ? a.message : typeof a === 'string' ? a : String(a)))
+      .join(' ')
+      .trim();
+  target.error = (...args: unknown[]) => {
+    const full = text(args);
+    if (!full) return original();
+    logOnce(full.split('\n')[0].slice(0, 120), full);
+  };
+  return () => {
+    target.error = original;
+  };
+}

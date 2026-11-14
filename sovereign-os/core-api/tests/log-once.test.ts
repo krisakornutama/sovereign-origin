@@ -1,7 +1,7 @@
 // log-once: ตอน DB ใช้ไม่ได้ แอปต้องบอกเหตุครั้งเดียว ไม่สแปม stderr ทุกคำขอ
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLogOnce } from '../src/lib/log-once.js';
+import { createLogOnce, installErrorDedupe } from '../src/lib/log-once.js';
 
 function harness(windowMs = 300_000) {
   let now = 1_000_000;
@@ -43,4 +43,28 @@ test('ข้อความที่เปลี่ยนไปภายใต�
   logOnce('anomaly', 'id 1');
   logOnce('anomaly', 'id 2');
   assert.equal(out.length, 1);
+});
+
+test('installErrorDedupe: console.error ที่ซ้ำถูกกลืน แต่ข้อความอื่นยังผ่าน', () => {
+  const seen: string[] = [];
+  const fake = { error: (...args: unknown[]) => seen.push(args.join(' ')) };
+  const restore = installErrorDedupe(fake);
+  fake.error('Coding queue error: PrismaClientKnownRequestError:', 'table missing');
+  fake.error('Coding queue error: PrismaClientKnownRequestError:', 'table missing');
+  fake.error('Agent queue error: PrismaClientKnownRequestError:', 'table missing');
+  assert.equal(seen.length, 2);
+  assert.match(seen[0], /Coding queue error/);
+  assert.match(seen[1], /Agent queue error/);
+  restore();
+  fake.error('Coding queue error: PrismaClientKnownRequestError:', 'again');
+  assert.equal(seen.length, 3);
+});
+
+test('installErrorDedupe: บรรทัดแรกเหมือนกันแต่รายละเอียดต่างกัน ยังถูกกลืน (Prisma พิมพ์ stack ยาว)', () => {
+  const seen: string[] = [];
+  const fake = { error: (...args: unknown[]) => seen.push(args.join(' ')) };
+  installErrorDedupe(fake);
+  fake.error('Power guard: cannot load energy state:\n  relation "sensor_telemetry" does not exist');
+  fake.error('Power guard: cannot load energy state:\n  relation "other" does not exist');
+  assert.equal(seen.length, 1);
 });
