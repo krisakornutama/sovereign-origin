@@ -13,6 +13,10 @@ import { mountRoutes } from './routes';
 import { getObservability } from './middleware/observability.middleware';
 import { createSocketServer } from './realtime/socket';
 import { startWorkers } from './workers/start';
+import { installErrorDedupe } from './lib/log-once';
+
+// DB ล่มทีเดียว worker หลายตัวยิง error ซ้ำทุกวินาที — กลืนที่ประตูเดียวของโปรเซส
+installErrorDedupe();
 import { initFleetPolicyCache } from './services/fleet-policy.service';
 import './services/livestock-cron.service'; // ปลดล็อก withdrawal + เตือนวัคซีน รายวัน
 
