@@ -11,6 +11,12 @@
       "ref": "",
       "summary": [
         {
+          "type": "list",
+          "items": [
+            "stderr ของ sidecar ขึ้น log ทันที — เดิมเก็บเป็นก้อนแล้วพิมพ์ตอน exit ⇒ migrate ที่ล้มแต่โปรเซสยังเสิร์ฟต่อ (schema drift/ไม่มีสิทธิ์) ไม่เหลือร่องรอยใน desktop-shell.log เลย · ตอนนี้ทุกบรรทัดที่ sidecar เขียนลง stderr ถูก log ทันที (backend stderr: …) · เทสต์ desktop-backend-secret 9/9"
+          ]
+        },
+        {
           "type": "paragraph",
           "text": "_(ยังไม่มีรายการ)_"
         }

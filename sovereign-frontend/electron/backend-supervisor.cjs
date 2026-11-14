@@ -18,18 +18,20 @@ const { loadOrCreateJwtSecret } = require('./backend-secret.cjs');
 
 const PREFERRED_PORT = 3001;
 const FALLBACK_PORTS = [3011, 3012, 3013, 3014, 3015, 3016, 3017, 3018, 3019, 3020];
-const STDERR_TAIL_LINES = 12;
 const STDERR_LINE_MAX = 300;
 
-/** เก็บ stderr ของ sidecar ไว้เป็นก้อนสุดท้าย — พอให้เห็นสาเหตุโดยไม่บวม log */
+/**
+ * ส่ง stderr ของ sidecar ออก log **ทันทีที่ได้บรรทัด**
+ *
+ * เดิมเก็บเป็นก้อนแล้วพิมพ์ตอน exit เท่านั้น ⇒ migrate ล้ม (ซึ่งเขียน stderr แต่โปรเซส
+ * ยังเสิร์ฟต่อ) ไม่เหลือร่องรอยเลย — ผู้ปฏิบัติการเห็นแค่ health ที่บอกว่า DB ใช้ไม่ได้
+ */
 function tailStderr(stream, log) {
-  const lines = [];
   let rest = '';
   const push = (line) => {
     const clean = String(line).replace(/\s+$/, '').slice(0, STDERR_LINE_MAX);
     if (!clean) return;
-    lines.push(clean);
-    if (lines.length > STDERR_TAIL_LINES) lines.shift();
+    log('backend stderr: ' + clean);
   };
   stream.setEncoding('utf8');
   stream.on('data', (chunk) => {
@@ -49,11 +51,7 @@ function tailStderr(stream, log) {
         rest = parts.pop();
         for (const part of parts) push(part);
       }
-      this.flush();
-    },
-    flush() {
       if (rest) { push(rest); rest = ''; }
-      for (const line of lines) log('backend stderr: ' + line);
     },
   };
 }
