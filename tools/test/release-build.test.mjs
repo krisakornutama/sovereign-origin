@@ -217,7 +217,7 @@ test('release.yml ทำงานเมื่อ push tag, build บน Windows,
   assert.match(yml, /release-build\.mjs\s+--verify/, 'ต้องตรวจ SHA256SUMS ก่อนปล่อย');
   assert.match(yml, /SHA256SUMS\.txt/, 'ต้องอัปโหลด SHA256SUMS.txt');
   assert.match(yml, /files:\s*release-assets\/\*/, 'ต้องแนบไฟล์จาก staging dir ทั้งชุด');
-  assert.match(yml, /softprops\/action-gh-release@v2|gh release create/, 'ต้องสร้าง GitHub Release');
+  assert.match(yml, /softprops\/action-gh-release@(v2|[0-9a-f]{40})|gh release create/, 'ต้องสร้าง GitHub Release');
   assert.match(yml, /fail_on_unmatched_files:\s*true/, 'ไฟล์ไม่ครบต้อง fail ไม่ปล่อย release เปล่า');
   assert.doesNotMatch(yml, /actions\/upload-release-asset/, 'ห้ามใช้ action ที่ถูก deprecate');
 });

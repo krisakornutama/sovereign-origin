@@ -27,11 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # file-budget ต้อง diff กับ base branch ได้
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
 
@@ -62,7 +62,7 @@ jobs:
       # --ignore-scripts: ข้าม electron/postinstall (ไม่ใช้ และกันดาวน์โหลดไบนารี ~100MB)
       # cache เฉพาะ node_modules: cache hit = ติดตั้งไม่ถึง 10 วิ, hit miss = ~60-90 วิ
       - name: Cache frontend node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: sovereign-frontend/node_modules
           key: fe-${{ runner.os }}-${{ hashFiles('sovereign-frontend/package-lock.json') }}
