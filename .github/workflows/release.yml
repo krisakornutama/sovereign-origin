@@ -118,7 +118,7 @@ jobs:
         if: ${{ vars.ATTEST_ENABLED == 'true' }}
         shell: bash
         env:
-          ATTEST_MASTER_KEY: ${{ secrets.ATTEST_MASTER_KEY }}
+          ATTEST_SIGNING_KEY: ${{ secrets.ATTEST_SIGNING_KEY }}
         run: |
           prev_arg=""
           [ -f .attest-prev/sovereign-attest.json ] && prev_arg="--previous=.attest-prev/sovereign-attest.json"

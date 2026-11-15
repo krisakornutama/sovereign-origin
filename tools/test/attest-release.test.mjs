@@ -185,6 +185,27 @@ test('เอกสารว่างหรือผิดเวอร์ชั�
   assert.throws(() => verifyDocument(null), /อ่านไม่ได้/);
 });
 
+// ── กุญแจแบบพกพา (CI: secret → import เข้า vault ของรอบนั้น) ──
+test(
+  'signing key ที่ import ให้ fingerprint เดิมทุกครั้ง แม้ state dir ใหม่',
+  { skip: hasSiblings ? false : 'sibling repos ยังไม่ถูก build' },
+  async () => {
+    const { keyInfo } = await import('../attest-release.mjs');
+    const { privateKey } = crypto.generateKeyPairSync('ed25519');
+    const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const dirs = [fs.mkdtempSync(path.join(os.tmpdir(), 'attest-k1-'))];
+    dirs.push(fs.mkdtempSync(path.join(os.tmpdir(), 'attest-k2-')));
+    try {
+      const first = await keyInfo({ keyId: 'release', stateDir: dirs[0], signingKeyPem: pem, now: () => 1 });
+      const second = await keyInfo({ keyId: 'release', stateDir: dirs[1], signingKeyPem: pem, now: () => 2 });
+      assert.equal(first.fingerprint, second.fingerprint);
+      assert.equal(first.publicKey, second.publicKey);
+    } finally {
+      for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
+
 // ── integration กับของจริง (ข้ามเมื่อ sibling repo ยังไม่ถูก build) ──
 test(
   'เซ็นด้วย sovereign-attest จริงแล้วตรวจกลับด้วยตัวตรวจของ tool ได้',
