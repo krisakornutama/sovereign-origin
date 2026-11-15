@@ -261,6 +261,30 @@ async function loadAttestModules() {
   return { attest, vault };
 }
 
+/**
+ * กุญแจเซ็นแบบพกพา: CI ไม่มี state ของ vault ข้ามรอบ จึงต้องมีตัวตนกุญแจที่คงที่
+ * — ส่ง PEM ผ่าน secret แล้ว import เข้า vault ของรอบนั้น (vault ยังผูก/enctypt ตามปกติ)
+ */
+export function readSigningKeyPem(argv) {
+  const env = process.env.ATTEST_SIGNING_KEY;
+  const file = argOf(argv, 'signing-key-file', process.env.ATTEST_SIGNING_KEY_FILE);
+  if (env) {
+    const pem = Buffer.from(env, 'base64').toString('utf8');
+    if (!pem.includes('PRIVATE KEY')) throw new Error('ATTEST_SIGNING_KEY ต้องเป็น base64 ของ PEM private key');
+    return pem;
+  }
+  if (file) return fs.readFileSync(file, 'utf8');
+  return null;
+}
+
+/** public key ที่คู่กับ private key — ใช้ทั้งตอน import และตอนประกาศ fingerprint */
+export function publicKeyFromPrivate(privatePem) {
+  return crypto.createPublicKey({ key: privatePem, format: 'pem' }).export({
+    type: 'spki',
+    format: 'pem',
+  }).toString();
+}
+
 export function readMasterKey(argv) {
   const inline = process.env.ATTEST_MASTER_KEY;
   const file = argOf(argv, 'master-key-file', process.env.ATTEST_MASTER_KEY_FILE);
@@ -277,6 +301,16 @@ export function readMasterKey(argv) {
   throw fail('E_KEY', 'ต้องมี ATTEST_MASTER_KEY (base64 32 ไบต์) หรือ --master-key-file');
 }
 
+function resolveMasterKey(argv, hasSigningKey) {
+  try {
+    return readMasterKey(argv);
+  } catch (error) {
+    if (!hasSigningKey) throw error;
+    // CI: vault เป็นของชั่วคราวของรอบนั้น กุญแจถาวรอยู่ใน secret
+    return new Uint8Array(crypto.randomBytes(32));
+  }
+}
+
 function previousReceipts(file) {
   if (!file) return [];
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -286,9 +320,10 @@ function previousReceipts(file) {
 
 /** เซ็น artifact ทุกไฟล์ในโฟลเดอร์ แล้วเขียนเอกสารที่ผู้ใช้ตรวจเองได้ */
 export async function signRelease(options) {
-  const { dir, tag, out, keyId, stateDir, masterKey, previousFile, now } = options;
+  const { dir, tag, out, keyId, stateDir, now, previousFile, signingKeyPem } = options;
+  const masterKey = options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem));
   const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
-  const { Attest } = attestModule;
+  const { Attest, loadSigningKey, saveSigningKey } = attestModule;
   const { BlobAnchorLog, FileBlobStore, Vault } = vaultModule;
 
   const files = collectArtifacts(dir);
@@ -300,6 +335,19 @@ export async function signRelease(options) {
   fs.mkdirSync(anchorDir, { recursive: true });
 
   const vault = await Vault.open({ store: new FileBlobStore(vaultDir), masterKey });
+  if (signingKeyPem) {
+    const existing = await loadSigningKey(vault, keyId);
+    if (!existing) {
+      await saveSigningKey(vault, {
+        keyId,
+        privateKey: signingKeyPem,
+        publicKey: publicKeyFromPrivate(signingKeyPem),
+        createdAt: now(),
+      });
+    } else if (existing.publicKey !== publicKeyFromPrivate(signingKeyPem)) {
+      throw fail('E_KEY', `vault มีกุญแจ "${keyId}" ที่ไม่ใช่กุญแจที่ให้มา — อย่าเซ็นด้วยตัวตนสลับกัน`);
+    }
+  }
   const attest = await Attest.open({ vault, keyId });
   const anchors = new BlobAnchorLog(new FileBlobStore(anchorDir));
 
@@ -354,8 +402,56 @@ export async function signRelease(options) {
   return { file: outFile, doc, signer: { keyId: attest.keyId, fingerprint: doc.fingerprint } };
 }
 
+/** แสดง public key + fingerprint ของกุญแจใน state dir (หรือกุญแจที่ import) */
+export async function keyInfo(options) {
+  const { keyId, stateDir, signingKeyPem, now } = options;
+  const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
+  const { Attest, loadSigningKey, saveSigningKey } = attestModule;
+  const { FileBlobStore, Vault } = vaultModule;
+  fs.mkdirSync(path.join(stateDir, 'vault'), { recursive: true });
+  const vault = await Vault.open({
+    store: new FileBlobStore(path.join(stateDir, 'vault')),
+    masterKey: options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem)),
+  });
+  if (signingKeyPem && !(await loadSigningKey(vault, keyId))) {
+    await saveSigningKey(vault, {
+      keyId,
+      privateKey: signingKeyPem,
+      publicKey: publicKeyFromPrivate(signingKeyPem),
+      createdAt: now(),
+    });
+  }
+  const attest = await Attest.open({ vault, keyId });
+  return {
+    keyId: attest.keyId,
+    publicKey: attest.publicKey,
+    fingerprint: attestModule.publicKeyFingerprint(attest.publicKey),
+  };
+}
+
 async function main(argv) {
-  const mode = flagOf(argv, 'sign') ? 'sign' : flagOf(argv, 'verify') ? 'verify' : null;
+  const mode = flagOf(argv, 'sign')
+    ? 'sign'
+    : flagOf(argv, 'verify')
+      ? 'verify'
+      : flagOf(argv, 'key-info')
+        ? 'key-info'
+        : null;
+  if (mode === 'key-info') {
+    const info = await keyInfo({
+      keyId: argOf(argv, 'key-id', 'release'),
+      stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
+      signingKeyPem: readSigningKeyPem(argv),
+      masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
+      now: () => Date.now(),
+    });
+    console.log(`keyId:       ${info.keyId}`);
+    console.log(`fingerprint: ${info.fingerprint}`);
+    console.log('public key:');
+    console.log(info.publicKey.trim());
+    return 0;
+  }
+
   if (mode === 'sign') {
     const dir = argOf(argv, 'dir', 'release-assets');
     const tag = argOf(argv, 'tag', process.env.GITHUB_REF_NAME);
@@ -366,7 +462,8 @@ async function main(argv) {
       out: argOf(argv, 'out', dir),
       keyId: argOf(argv, 'key-id', 'release'),
       stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
-      masterKey: readMasterKey(argv),
+      masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
+      signingKeyPem: readSigningKeyPem(argv),
       previousFile: argOf(argv, 'previous', undefined),
       now: () => Date.now(),
     });

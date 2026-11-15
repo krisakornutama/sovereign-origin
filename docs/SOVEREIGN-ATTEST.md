@@ -84,9 +84,9 @@ const body = openReceipt(receiptFromARegistry, { publicKey: pinnedReleaseKey });
 ### เซ็น (เครื่องเจ้าของ หรือ CI ที่เปิดสวิตช์แล้ว)
 
 ```bash
-# กุญแจ master 32 ไบต์ (base64) — ห้าม commit; state dir เก็บ vault + anchor log
-ATTEST_MASTER_KEY=<base64> node tools/attest-release.mjs --sign   --dir=release-assets --tag=v1.3.11   --previous=<attestation ของรุ่นก่อน>        # ไม่ใส่ก็ได้ = เริ่ม chain ใหม่
-node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
+# กุญแจเซ็น: PEM ของกุญแจ release (อยู่นอก repo: E: DocumentsSoverignPinHead.secrets)
+node tools/attest-release.mjs --sign --dir=release-assets --tag=v1.3.11   --signing-key-file=../.secrets/attest-release-key.pem   --previous=<attestation ของรุ่นก่อน>        # ไม่ใส่ก็ได้ = เริ่ม chain ใหม่
+node tools/attest-release.mjs --verify release-assets/sovereign-attest.json   --fingerprint=1afcc7d951d822a7dfe384d89209aed2
 ```
 
 ผลลัพธ์คือ `release-assets/sovereign-attest.json`: receipt ต่อไฟล์ (name/sha256/size), chain `prev`,
@@ -107,11 +107,26 @@ node tools/attest-release.mjs --verify sovereign-attest.json   --fingerprint=<fi
 
 release workflow มีขั้นเซ็นอยู่แล้วแต่ **ปิดโดยปริยาย** — ต้องตั้ง:
 - repo variable `ATTEST_ENABLED=true`
-- secret `ATTEST_MASTER_KEY` (base64 ของ 32 ไบต์)
+- secret `ATTEST_SIGNING_KEY` (base64 ของ PEM private key) — ตั้งไว้แล้ว 2026-11-15
+
+CI ไม่มี state ของ vault ข้ามรอบ จึงส่งกุญแจเข้ามาเป็น secret แล้ว `--sign` import เข้า vault
+ของรอบนั้น (vault ยังผนึกด้วย master key สุ่มต่อรอบ) ⇒ fingerprint คงที่และ chain ต่อด้วย
+`--previous` ตัวตนกุญแจจึงไม่ผูกกับดิสก์ของ runner
 
 ขั้นนี้จะ clone + build `sovereign-vault`/`sovereign-attest` เป็น sibling, ดึง `sovereign-attest.json`
 ของ release ล่าสุดมาเป็น `--previous` (ต่อ chain ข้ามรุ่น) แล้วเซ็น + ตรวจซ้ำก่อนอัปโหลด
 ไม่ตั้ง variable = ไม่มีใบรับรอง (ดีกว่าใบรับรองที่เซ็นด้วยกุญแจปลอม)
+
+### กุญแจ release ที่ประกาศแล้ว
+
+```
+keyId:       release
+fingerprint: 1afcc7d951d822a7dfe384d89209aed2
+```
+
+public key อยู่ใน repo นี้ที่ [`docs/keys/attest-release.pub.pem`](./keys/attest-release.pub.pem)
+(private key ไม่เคยเข้า repo: เก็บที่ `.secrets/` ของเครื่องเจ้าของ + GitHub secret)
+ตัวตรวจต้องเทียบ fingerprint นี้จากช่องทางที่ผู้โจมตีแก้ไม่ได้ — ประกาศซ้ำใน README เว็บ/กระดาษในตู้เซฟด้วย
 
 ### ข้อจำกัดที่ต้องรู้
 
