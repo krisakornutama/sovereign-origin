@@ -128,6 +128,27 @@ public key อยู่ใน repo นี้ที่ [`docs/keys/attest-release
 (private key ไม่เคยเข้า repo: เก็บที่ `.secrets/` ของเครื่องเจ้าของ + GitHub secret)
 ตัวตรวจต้องเทียบ fingerprint นี้จากช่องทางที่ผู้โจมตีแก้ไม่ได้ — ประกาศซ้ำใน README เว็บ/กระดาษในตู้เซฟด้วย
 
+### Rotation: เปลี่ยนกุญแจโดยไม่ทำให้ประวัติขาด
+
+กุญแจเก่าเซ็นใบรับรองกุญแจใหม่ (`sealRotation`) — ใบนี้คือหลักฐานว่า "การเปลี่ยนกุญแจเป็นเจตนาของเจ้าของ"
+ไม่ใช่ผู้บุกรุกเซ็นแทน ถ้าไม่มีใบนี้ ผู้ตรวจจะปฏิเสธ receipt ของกุญแจใหม่อย่างถูกต้อง
+
+```ts
+import { Attest } from 'sovereign-attest';
+const statement = await attest.rotate('release-2027');   // กุญแจเก่า endorse กุญแจใหม่
+await attest.provenance(digest, { trustedKeys: { release: oldPublic }, rotations: [statement] });
+```
+
+ฝั่ง release tool:
+
+```bash
+node tools/attest-release.mjs --sign --dir=release-assets --tag=v1.4.0   --signing-key-file=../.secrets/attest-release-2027.pem   --previous=.attest-prev/sovereign-attest.json   --rotation=../.secrets/rotation-release-2027.json
+```
+
+เอกสารที่ได้จะมี `rotations` ฝังอยู่ และตัวตรวจจะยอมรับ receipt รุ่นก่อนที่เซ็นด้วยกุญแจเก่า
+โดยเริ่มจาก fingerprint ที่ pin ไว้แล้วเดินถอยหลังตามใบ endorsement — กุญแจแปลกปลอมไม่สามารถ
+bootstrap ตัวเองเข้า set ได้ เพราะใบต้องเซ็นด้วยกุญแจที่เชื่ออยู่แล้วเท่านั้น
+
 ### ข้อจำกัดที่ต้องรู้
 
 - **กุญแจเปลี่ยน = chain ขาด** — ตัวตรวจจะบอกว่า receipt ถูกเซ็นด้วยกุญแจคนละตัวกับ fingerprint ของรุ่นนั้น;
