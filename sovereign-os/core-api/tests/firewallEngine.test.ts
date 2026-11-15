@@ -67,6 +67,9 @@ test('buildHostScript generates netsh advfirewall commands from rules', () => {
   assert.ok(script.includes('netsh advfirewall'));
   assert.ok(script.includes('block-bad'));
   assert.ok(script.includes('10.12.55.5'));
-  assert.ok(script.includes('allprofiles firewallpolicy'));
+  // ห้ามมีคำสั่งเปลี่ยนนโยบายเริ่มต้นของทั้งเครื่อง: `blockoutbound` เคยทำให้
+  // เครื่องขาดเน็ตหลังรีบูต (2026-11-15) — ต้องมีแต่กฎรายพอร์ต/ราย IP
+  assert.ok(!script.includes('allprofiles firewallpolicy'));
+  assert.ok(!script.includes('blockoutbound'));
   assert.ok(script.includes('REM') || script.includes('#')); // มีคำอธิบาย
 });

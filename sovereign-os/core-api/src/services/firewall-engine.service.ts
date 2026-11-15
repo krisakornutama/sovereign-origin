@@ -170,8 +170,10 @@ export function buildHostScript(rules: FirewallRule[], defaultPolicy: RuleAction
   lines.push('REM SOVEREIGN OS Firewall — สคริปต์บังคับใช้กับ Windows Firewall');
   lines.push('REM รันด้วยสิทธิ์ Administrator (คลิกขวา → Run as administrator)');
   lines.push('REM ─────────────────────────────────────────────');
-  lines.push('REM ตั้งค่านโยบายเริ่มต้นสำหรับทุกโพรไฟล์');
-  lines.push(`netsh advfirewall set allprofiles firewallpolicy blockinbound,${defaultPolicy === 'DENY' ? 'blockoutbound' : 'allowoutbound'}`);
+  // ห้ามแตะนโยบายเริ่มต้นของทุกโพรไฟล์: `blockoutbound` = เครื่องขาดเน็ตทั้งตัว
+  // (เหตุจริง 2026-11-15 — ดู tools/security/host-network-guard.mjs) จึงเพิ่มได้
+  // เฉพาะกฎรายพอร์ต/ราย IP ด้านล่างเท่านั้น
+  lines.push(`REM ไม่แตะนโยบายเริ่มต้นของทั้งเครื่อง (default policy ใช้จำแนกเท่านั้น: ${defaultPolicy})`);
   lines.push('');
   lines.push('REM ── กฎจากระบบ ──');
   const used = new Set<string>();
