@@ -184,7 +184,11 @@ describe('Mesh Lite: bundle + replicate (sandbox dirs)', () => {
     writeFakeBackup(d.backupDir);
     svc.createBundle();
     assert.equal(svc.hasPendingBackup(), false);
-    fs.writeFileSync(path.join(d.backupDir, 'sovereign_backup_20260816_020000.sql.gz'), Buffer.from('newer'));
+    const newer = path.join(d.backupDir, 'sovereign_backup_20260816_020000.sql.gz');
+    fs.writeFileSync(newer, Buffer.from('newer'));
+    // ตั้ง mtime ให้ใหม่กว่าจริง ๆ — เดิมพึ่งความละเอียดของเวลาไฟล์ จึงพังแบบสุ่ม
+    const future = new Date(Date.now() + 60_000);
+    fs.utimesSync(newer, future, future);
     assert.equal(svc.hasPendingBackup(), true);
   });
 

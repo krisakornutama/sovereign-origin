@@ -1,4 +1,5 @@
 // learning-engine.service.ts — ระบบเรียนรู้เอง: Ollama qwen3:8b + heuristic fallback, เรียนรู้ต่อจาก actual
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://host.docker.internal:11434';
@@ -19,12 +20,17 @@ async function ollamaGenerate(prompt: string, model = DEFAULT_MODEL): Promise<st
 }
 
 // ── Sensor trend predictor (Engine A) — linear regression 7วัน → ทำนาย 7วันข้างหน้า ──
-async function fetchMetricSeries(metric: string, days = 7): Promise<{ t: number; v: number }[]> {
+/** คำสั่งดึงอนุกรมเวลา — ค่าทุกตัวเป็น parameter ไม่ได้ต่อเข้าข้อความ SQL (ทดสอบได้โดยไม่ต้องมี DB) */
+export function metricSeriesQuery(metric: string, days: number): Prisma.Sql {
+  return Prisma.sql`SELECT EXTRACT(EPOCH FROM time) as t, value as v FROM sensor_telemetry
+    WHERE metric = ${metric}
+      AND time > NOW() - (${days}::int * INTERVAL '1 day')
+    ORDER BY time ASC LIMIT 500`;
+}
+
+export async function fetchMetricSeries(metric: string, days = 7): Promise<{ t: number; v: number }[]> {
   try {
-    const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT EXTRACT(EPOCH FROM time) as t, value as v FROM sensor_telemetry WHERE metric = $1 AND time > NOW() - INTERVAL '${days} days' ORDER BY time ASC LIMIT 500`,
-      metric
-    );
+    const rows: any[] = await prisma.$queryRaw(metricSeriesQuery(metric, days));
     return rows.map(r => ({ t: Number(r.t), v: Number(r.v) }));
   } catch { return []; }
 }

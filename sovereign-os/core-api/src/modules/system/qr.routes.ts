@@ -8,8 +8,18 @@
 // หลักการ: ไม่แตะ DB · ไม่มี migration · stateless · จำกัดขนาด text
 import { Router } from 'express';
 import QRCode from 'qrcode';
+import { rateLimit } from '../../middleware/rateLimit.middleware';
 
 const router = Router();
+
+// endpoint นี้สาธารณะ (ไม่ต้องล็อกอิน) และทุกคำขอคือการเข้ารหัส+สร้างภาพจริง
+// ⇒ ต้องมีเพดานต่อ IP: 240/นาที พอสำหรับพิมพ์สติกเกอร์ทั้งล็อต
+// แต่ตัดจบการยิงวนเผา CPU จากคนที่ไม่มีบัญชี
+const qrLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 240,
+  message: 'สร้าง QR ถี่เกินไป — ลองใหม่ภายหลัง',
+});
 
 const MAX_TEXT = 512;      // QR เวอร์ชัน 40 (byte mode, EC L) รับได้ ~2953 ไบต์
                           // เผื่อ headroom ไว้ เพราะเราเข้าเงื่อนไข margin/ECC ต่างกัน
@@ -17,7 +27,7 @@ const MAX_SIZE = 1024;
 const MIN_SIZE = 64;
 
 /** GET /api/util/qr?text=...&size=256&margin=1 → image/png */
-router.get('/qr', async (req, res) => {
+router.get('/qr', qrLimiter, async (req, res) => {
   try {
     const text = String(req.query.text ?? '').trim();
     if (!text) return res.status(400).json({ error: 'ต้องส่ง text' });

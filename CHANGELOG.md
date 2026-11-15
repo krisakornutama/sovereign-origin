@@ -8,7 +8,88 @@
 
 ## [Unreleased]
 
+## [1.3.10] — 2026-11-14
+
+- **หนึ่งเหตุ = หนึ่งบรรทัด** — `oneLine()` ยุบ error หลายบรรทัดของ Prisma ให้เหลือบรรทัดเดียว (หัวบอก worker, ท้ายบอกตาราง) หลังวัดได้ว่า 1.3.9 ยังเขียน 180 บรรทัดใน 80 วิ · `log-once` 8/8 · `verify` 6/6
+
+- **error หนึ่งครั้ง = log หนึ่งบรรทัด** — `oneLine()` ยุบข้อความ Prisma หลายบรรทัด (หัวบอก worker, ท้ายบอกตารางที่หาย) ทำให้ 1.3.9 ที่ยังได้ 180 บรรทัด/80 วิ ลดเหลือหนึ่งบรรทัดต่อชนิดข้อผิดพลาด · `log-once` 8/8
+
+## [1.3.9] — 2026-11-14
+
+- **log ตอน DB ล่มเงียบจริงแล้ว** — `installErrorDedupe()` ครอบ `console.error` ทั้งโปรเซส: 1.3.8 ยังสร้าง 315 บรรทัดใน 75 วิ จาก worker ~15 ตัว ตอนนี้เหลือบรรทัดเดียวต่อชนิดข้อผิดพลาดต่อ 5 นาที · `log-once` 6/6 · `verify` 6/6
+
+- **กัน log ซ้ำครอบทั้งโปรเซส** — `installErrorDedupe()` ครอบ `console.error` ทำให้ worker ทุกตัวที่ยิง error เดียวกันตอน DB ล่มถูกกลืนเหลือบรรทัดเดียวต่อ 5 นาที (หลักฐาน: 1.3.8 ยังได้ 315 บรรทัด/75 วิ จากการแก้ 2 จุดแรก) · `log-once` 6/6
+
+## [1.3.8] — 2026-11-14
+
+- **ตอน DB ใช้ไม่ได้ log ไม่สแปมแล้ว** — `createLogOnce` พิมพ์เหตุเต็มครั้งแรก ครั้งต่อไปนับเงียบ แล้วสรุปทุก 5 นาที (`ซ้ำ N ครั้งใน … วิ`) ใช้กับ `threat-detection.recordAnomaly` และ `relay.ensureDefaultRelays` · รอบทดสอบบน 1.3.7 ได้ stderr 830 บรรทัดในไม่กี่วินาที ตอนนี้เหลือไม่กี่บรรทัด · เทสต์ใหม่ `log-once` 4/4 · `verify` 6/6
+
+- **stderr ของ sidecar ขึ้น log ทันที** — เดิมเก็บเป็นก้อนแล้วพิมพ์ตอน exit ⇒ migrate ที่ล้มแต่โปรเซสยังเสิร์ฟต่อ (schema drift/ไม่มีสิทธิ์) ไม่เหลือร่องรอยใน `desktop-shell.log` เลย · ตอนนี้ทุกบรรทัดที่ sidecar เขียนลง stderr ถูก log ทันที (`backend stderr: …`) · เทสต์ `desktop-backend-secret` 9/9
+_(ยังไม่มีรายการ)_
+
 ---
+
+## [v1.3.6] — 2026-11-13 (released)
+
+### 🧹 ล้าง `sovereign-api-url` ค้างในแอปเดสก์ท็อป (DESKTOP-004)
+
+- **ค่า api-url ที่ค้างถูกล้างทิ้งจริง** — เดิมแอปเขียน key `sovereign-api-url` ใน localStorage เฉพาะตอนหันไปพอร์ตสำรอง (เช่น `http://localhost:3011`) แล้วไม่เคยล้าง ⇒ รอบเปิดถัดไปที่กลับมาใช้ 3001 หรือไม่ spawn sidecar เลย renderer ยังชี้ไปพอร์ตที่ตาย (โหลดไม่รู้จบทั้งแอป) · ตอนนี้ `apiUrlFor()`/`applyApiUrl()` ใน `backend-port.cjs` คำนวณค่าจากพอร์ตที่ใช้จริงและ **`removeItem('sovereign-api-url')` เมื่อกลับมาที่ 3001** · `main.js` เรียกทั้งตอนเลือกพอร์ต (`onPort`) และหลัง supervisor สรุปผล · เทสต์ `desktop-backend-port` 5/5 (เคสใหม่แดงก่อนแก้: module ไม่มี `apiUrlFor`)
+
+### 🛡️ คำขอที่ล้มใน backend ตอบ 500 ไม่ค้าง (SEC-030)
+
+- **handler async ที่โยน error ไม่แขวนคำขออีกต่อไป** — Express 4 ไม่ดัก promise ที่ reject ⇒ handler ที่ `await` DB/executor แล้วโยน error จะไม่ตอบ 500 แต่ปล่อยคำขอค้างจน client timeout (connection ถูกจับไว้) · สแกนด้วย TypeScript AST พบ **60 handler ใน 15 ไฟล์ routes** ที่ `await` โดยไม่มี `try`/`.catch` (เคยเกิดจริงที่ SEC-023/026/029) · แก้: `src/lib/async-handler.ts` `asyncRoute()` (rejection → 500 JSON + `detail` ≤200 ตัวอักษร, `headersSent` → `next(err)` ไม่เขียนทับ) ห่อครบ 60 handler · เพิ่มด่าน `tests/routeAsyncSafety.test.ts` สแกน AST ทุก `*.routes.ts` — handler ใหม่ที่ลืมห่อ = CI แดง · กติกาใน `docs/ARCHITECTURE.md`
+
+---
+
+## [v1.3.5] — 2026-11-13 (released)
+
+### 🗄️ ฐานข้อมูลของ sidecar
+
+- **sidecar migrate DB ก่อนเสิร์ฟ + health บอกความจริงเรื่อง DB** — `MIGRATE_ON_START=1` รัน `migrate-deploy` ก่อน `listen()` (worker เริ่มหลัง migrate); `file:` (SQLite) ถูกปฏิเสธพร้อมเหตุผลเพราะ Prisma เป็น postgresql; `/api/health` เพิ่ม `db.state` + `db.reason` แทน `migrationHead: null` ที่แยกไม่ออกว่า "ยังไม่มี migration" หรือ "ต่อ DB ไม่ได้"; แอปไม่ spawn sidecar เลยถ้าเครื่องไม่มี `DATABASE_URL` (เดิมแต่ง `file:` ให้แล้วตายเงียบ) · เทสต์ `startupMigration` 6/6, `desktop-backend-secret` 8/8, `migrate-baseline` 7/7
+- **`migrate-deploy` เรียก `npx` ได้บน Windows** — `spawnSync('npx', …, shell:false)` บน Windows ได้ ENOENT แล้วถูกอ่านผิดเป็น "migrate ล้มและ baseline ไม่ปลอดภัย" ทั้งที่ DB ปกติ · ตอนนี้ใช้ shell เฉพาะ win32 (`npxSpawnOptions()`) และ health รายงาน head จริงหลัง migrate · เทสต์ `migrate-baseline` 7/7
+
+---
+
+## [v1.3.4] — 2026-11-13 (released)
+
+### 🔧 แอปเดสก์ท็อปใช้ API ของตัวเองได้จริง
+
+- **sidecar มี `JWT_SECRET` ของเครื่องเอง** — `core-api` โยน `JWT_SECRET is not set` ทันทีถ้าไม่มีค่า แต่แอปที่แพ็กไม่ได้เตรียมอะไรให้ พอร์ตสำรองที่เลือกไว้จึงว่างเปล่าและ frontend ชี้ไปที่ API ที่ไม่มีอยู่ · ตอนนี้ `loadOrCreateJwtSecret()` สร้าง hex 32 ไบต์ใน `userData` (โหมด 0600, เขียนผ่านไฟล์ชั่วคราว + rename) ใช้ค่าเดิมทุกครั้งที่เปิดแอป, ค่าที่ผู้ปฏิบัติการตั้งใน env ชนะเสมอ, ไฟล์ที่สั้น/ว่างถูกสร้างใหม่ · เทสต์ `desktop-backend-secret` 6/6
+- **sidecar ตายแล้วต้องมีร่องรอย** — เดิม spawn ด้วย `stdio:'ignore'` ⇒ ตายเงียบไม่มี log · ตอนนี้เก็บ stderr ท้ายสุด 12 บรรทัดและ log `backend exit code=<n> signal=<s> port=<p>` เมื่อโปรเซสจบ · ค่า secret ไม่ถูก log · เทสต์ `desktop-backend-port` 3/3 + `desktop-backend-secret` 6/6
+
+---
+
+## [v1.3.3] — 2026-11-12 (released)
+
+### 🔒 ความถูกต้องของข้อมูลความปลอดภัย (patch)
+
+- **`PUT /api/actuation/occupancy` ไม่เดาค่าที่พิมพ์ผิด** — เดิมใช้ `!!v` ⇒ สตริง `"false"` กลายเป็น "มีคน" และ `0` กลายเป็น "ไม่มีคน" เงียบ ๆ ทั้งที่กฎ OCCUPANCY ใช้ค่านี้กัน AI ปิดน้ำ/เน็ต · ตอนนี้ `parseOccupancyInput()` แปลเฉพาะ `true/false/1/0/"true"/"false"/"unknown"/null` และตอบ 400 เมื่อค่าไม่รู้จัก · เทสต์ `actuationOccupancyInput` 2/2
+- **เดสก์ท็อปไม่แอบใช้ API ของคนอื่น** — sidecar เดิมยึด `PORT=3001` ตายตัวและกลืน stderr ⇒ ถ้าพอร์ตถูกคอนเทนเนอร์/บริการอื่นยึด แอปจะคุยกับเซิร์ฟเวอร์รุ่นเก่าโดยไม่มีสัญญาณ (endpoint ใหม่ตอบ 404) · ตอนนี้ตรวจ `/api/health` เทียบ `build.version` กับบิลด์ในตัวก่อน spawn: เป็นของเรา = ใช้ต่อ, ว่าง = spawn 3001, ของคนอื่น = log `backend-port-conflict` + spawn พอร์ตสำรองและบอก renderer ผ่าน `sovereign-api-url` · เทสต์ `desktop-backend-port` 3/3
+
+---
+
+## [v1.3.2] — 2026-11-11 (released)
+
+### 🔧 แก้ของที่ปล่อย v1.3.1
+
+- **`SHA256SUMS.txt` ตรวจไฟล์ที่ปล่อยได้จริง** — เดิม manifest เขียนชื่อ `Sovereign OS-<ver>-win.zip` (เว้นวรรค) แต่ GitHub เก็บ asset เป็น `Sovereign.OS-<ver>-win.zip` ทำให้ `sha256sum -c` ล้มทั้งที่เนื้อไฟล์ถูก (hash ตรง) · ตอนนี้ตั้งชื่อด้วย `githubAssetName()` ก่อนคัดลอก/เขียน manifest ⇒ ชื่อไฟล์ที่ stage = ชื่อ asset ที่ปล่อย = ชื่อใน checksum · เทสต์ `release-asset-names` 2/2 และ `release-build` 11/11
+
+## [v1.3.1] — 2026-11-11 (released)
+
+### 🔒 ความปลอดภัยและความถูกต้องของข้อมูล (patch)
+
+- **ด่านพร้อมปล่อยแพทช์** — `npm run release:check` ตรวจ version ตรงกันทุก package (root/core-api/frontend), มีหัวข้อ CHANGELOG ของรุ่นพร้อมวันที่, และ `[Unreleased]` ว่าง ก่อน push tag — เดิมรู้ตัวตอน workflow ปล่อยรุ่นหยุดกลาง build · เทสต์ `release-check` 4/4
+- **OTA: รายงานว่าใครยังใช้ `?token=`** — เพิ่มตัวนับในหน่วยความจำ (ไม่เก็บค่า token, จำกัด 200 รายการ) และ `GET /api/ota/legacy-clients` (SUPERADMIN) ที่บอก `readyToDisable` จากหน้าต่าง 24 ชม. เพื่อให้รู้ว่าเมื่อไรลบ `OTA_ALLOW_QUERY_TOKEN` ได้ · เทสต์ `otaLegacyClients` ผ่าน
+- **OTA: ค่าเริ่มต้นไม่รับ token จาก URL** — เพิ่ม `OTA_ALLOW_QUERY_TOKEN` เป็นสวิตช์ชั่วคราวสำหรับอุปกรณ์ที่แฟลชด้วยสัญญาเดิม (เปิดเฉพาะค่า `1/true/yes/on`); ไม่ตั้ง = รับเฉพาะ header `x-ota-token` และตอบ 401 พร้อม hint · เทสต์ `otaQueryTokenSwitch` ผ่าน
+- **OTA: token ออกจาก URL + ประวัติเฉพาะ SUPERADMIN** — `/deploy` ไม่ฝัง `?token=` ใน URL แล้ว (ส่ง `x-ota-token` ทาง header ใน payload), endpoint ดาวน์โหลดรับ token ทาง header ก่อนโดยยังรับ query ให้อุปกรณ์รุ่นเดิม, และ `GET /ota/events` จำกัดที่ SUPERADMIN (frontend ไม่ยิงเมื่อ role อื่น) · เทสต์ `otaDeployToken` ผ่าน
+- **ปิดการดึงงานซ้ำ (double dispatch)** — `pullJobs()` เดิมเปลี่ยนสถานะงานเป็น `running` ด้วย `update` ที่ไม่มีเงื่อนไขสถานะ สองคำขอที่ดึงพร้อมกันจึงได้งานเดียวกันไปรันซ้ำ · ตอนนี้จองด้วย `updateMany` แบบมีเงื่อนไข `status=queued` และทิ้งงานที่มีคนคว้าไปก่อน · เทสต์ `jobPullClaim` ผ่าน
+- **ปิดช่อง upload สองจุด** — `verifyUploadedContent()` เดิมจับแค่ MZ/ELF ทำให้ไฟล์ Mach-O, Java class และ WebAssembly ผ่านด่านได้ · และ knowledge upload (disk mode) ทิ้งไฟล์ค้างเมื่อบันทึก DB ล้ม · ตอนนี้ปฏิเสธ magic ของโค้ดที่รันได้ครบขึ้นและลบไฟล์ทิ้งเมื่อบันทึกไม่สำเร็จ · เทสต์ `uploadMagicCleanup` ผ่าน
+- **จำกัดรายการเครื่อง/คิวงานตามเจ้าของ** — `GET /api/agent-machines` และ `/queue` เคยคืนทุกเครื่อง (พร้อม IP) และทุกงานของทั้งฟลีตให้ทุก role ที่ล็อกอิน · ตอนนี้ role ที่ไม่ใช่ SUPERADMIN เห็นเฉพาะเครื่องที่ผูกกับตัวเองและงานบนเครื่องนั้น (SUPERADMIN ยังเห็นทั้งฟลีตเพื่อผูก/ลงทะเบียนเครื่องใหม่) · เทสต์ `agentMachinesFleetScope` ผ่าน
+- **ปิด SSRF ที่ตัวนำเข้าเว็บของ Knowledge** — `POST /api/knowledge/import` ยิง URL ที่ผู้ใช้ส่งไปตรง ๆ ทำให้สั่งเซิร์ฟเวอร์อ่าน API ภายใน/metadata ได้ · ตอนนี้ใช้ `outbound-url-guard` ตัวเดียวกับ vision: ปฏิเสธ loopback/link-local/URL ที่ฝังรหัสผ่าน, ตรวจ IP ที่ resolve จริง (กัน DNS rebinding), ไม่ตาม redirect, จำกัดขนาด 8 MB · เทสต์ `knowledgeImportSsrf` ผ่าน
+- **ปิดการเปิดภาพหน้าจอข้ามเครื่อง** — `GET /api/agent-machines/screenshots/:file` ตรวจแค่ว่าล็อกอิน ทำให้ผู้ใช้ที่ไม่ได้ผูกเครื่องเปิดภาพจบงานของเครื่องคนอื่นได้ · ตอนนี้ดึง jobId จากชื่อไฟล์ → ตรวจเจ้าของเครื่องด้วย `userCanControl()` (ไม่ตรงรูปแบบ/ไม่พบงาน/ไม่ได้ผูก = 403) · เทสต์ `agentMachinesRoutes` ผ่านครบ
+- **ปิดประตู OTA ที่เปิดโล่ง** — `GET /api/ota/firmwares/:file` เดิมเปิดให้ใครก็ได้เมื่อไม่ได้ตั้ง `OTA_TOKEN` และเทียบ token ด้วย `!==`; ตอนนี้เทียบแบบคงเวลา และถ้าไม่ตั้ง token จะเปิดเฉพาะ peer ในวง LAN/loopback · `POST /api/ota/deploy` ปฏิเสธ `OTA_BASE_URL` ที่เป็น http ไปยัง host สาธารณะ (อุปกรณ์ตรวจลายเซ็นไม่ได้ ⇒ บนเส้นทางสลับไฟล์ได้) · เทสต์ `tests/otaAccess.test.ts` 4/4
+- **ปิดการปลอมผลข้ามเครื่อง** — `POST /api/machine-control/result` รับผลตาม `commandId` โดยไม่เทียบว่าเครื่องที่ส่งคือเครื่องที่ได้รับคำสั่ง ทำให้ runner ที่ถือ token ของเครื่องหนึ่งปลอมผล (หรือเนื้อหาไฟล์) ของคำสั่งที่ออกให้อีกเครื่อง และปิดคำสั่งนั้นทิ้งได้ · ตอนนี้ตรวจเจ้าของคำสั่งก่อนรับผล เครื่องอื่นได้ 403 และคำสั่งยังอยู่ในคิวของเครื่องจริง
+- **ปิดช่องควบคุมเครื่องข้ามเจ้าของ (Socket.IO)** — `control:join` ตรวจแค่ role ทำให้ SUPERADMIN ที่ไม่ได้ผูกเครื่องเข้าห้อง รับภาพจอ และสั่งเมาส์/คีย์บอร์ด/ไฟล์ได้ (HTTP counterparts ตรวจ `userCanControl()` อยู่แล้ว) · ตอนนี้ join ต้องผ่าน `userCanControl()` และ `control:fs`/`control:snapshot`/`control:fps` บังคับให้ join ก่อน · เทสต์ socket 17/17
 
 ## [v1.3.0] — 2026-11-10 (released)
 

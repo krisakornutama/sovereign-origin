@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, authenticatePartial, requireRole } from '../../middleware/auth.middleware';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { AuthService, prisma } from '../../services/auth.service';
@@ -251,7 +252,7 @@ router.get('/rate-limit-status', authenticate, requireRole('SUPERADMIN'), (req, 
 // (โจมตีได้: login → clear → เดารหัส OTP ต่อไม่จำกัด) · recovery ของเจ้าของที่ล็อกจริง
 // ต้องทำที่เครื่อง/คอนเทนเนอร์ ไม่ใช่ผ่าน API ระยะไกล
 // body: { ip?: string, username?: string } — ไม่ส่งอะไรเลย = ล้างทั้งหมด
-router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const { ip, username } = req.body || {};
   let cleared = 0;
   let scope: string = 'all';
@@ -272,6 +273,6 @@ router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole('SUPERA
     payload: { scope, ip: typeof ip === 'string' ? ip : undefined, username: typeof username === 'string' ? username : undefined, cleared, requestIp: req.ip },
   });
   res.json({ cleared });
-});
+}));
 
 export default router;

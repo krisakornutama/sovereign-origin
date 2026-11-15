@@ -117,16 +117,17 @@ describe('GET /api/sensors/devices', () => {
     const res = await authed(server.baseUrl + '/api/sensors/devices');
     assert.strictEqual(res.status, 200);
     const body: any = await res.json();
-    assert.strictEqual(body.length, 2, 'ไม่ควรมีอุปกรณ์ is_active=false');
-    assert.strictEqual(body[0].name, 'SENSOR-SHOP-1');
-    assert.strictEqual(body[0].online, true, 'heartbeat 30 วิ = ออนไลน์');
-    assert.strictEqual(body[1].online, false, 'heartbeat 30 นาที = ออฟไลน์');
+    assert.strictEqual(body.degraded, false);
+    assert.strictEqual(body.devices.length, 2, 'ไม่ควรมีอุปกรณ์ is_active=false');
+    assert.strictEqual(body.devices[0].type, 'ESP32');
+    assert.strictEqual(body.devices[0].online, true, 'heartbeat 30 วิ = ออนไลน์');
+    assert.strictEqual(body.devices[1].online, false, 'heartbeat 30 นาที = ออฟไลน์');
   });
 
   test('แนบค่าล่าสุดต่อ metric ของอุปกรณ์นั้น', async () => {
     const res = await authed(server.baseUrl + '/api/sensors/devices');
     const body: any = await res.json();
-    assert.deepStrictEqual(body[0].sensors, [
+    assert.deepStrictEqual(body.devices[0].sensors, [
       { metric: 'temperature', value: 31.4 },
       { metric: 'humidity', value: 68 },
     ]);
@@ -136,14 +137,17 @@ describe('GET /api/sensors/devices', () => {
     assert.strictEqual(deviceQuery.params[0], 'aaaaaaaa-0000-4000-8000-000000000001');
   });
 
-  test('DB ล้ม = 500 กับ array ว่าง (หน้าเว็บจะเห็น 0 อุปกรณ์ ไม่ใช่ error ดิบ)', async () => {
+  test('DB ล้ม = degraded: true + เหตุผล (ไม่ใช่ "0 อุปกรณ์" ที่อ่านว่าบ้านไม่มีอุปกรณ์)', async () => {
     const saved = (prisma as any).device.findMany;
     (prisma as any).device.findMany = async () => {
       throw new Error('db down');
     };
     const res = await authed(server.baseUrl + '/api/sensors/devices');
-    assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(await res.json(), []);
+    assert.strictEqual(res.status, 200);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.devices, []);
+    assert.strictEqual(body.degraded, true);
+    assert.ok(String(body.reason).length > 0);
     (prisma as any).device.findMany = saved;
   });
 });
@@ -183,14 +187,18 @@ describe('POST /api/sensors/devices', () => {
 // ────────────────────────────────────────────────────────────────────────────
 describe('DELETE /api/sensors/devices/:id', () => {
   test('ลบสำเร็จคืน { success: true }', async () => {
-    devices.push({ id: 'temp-del', name: 'TEMP', is_active: true, last_heartbeat: null });
-    const res = await fetch(server.baseUrl + '/api/sensors/devices/temp-del', { method: 'DELETE', headers: AUTH });
+    const id = 'aaaaaaaa-0000-4000-8000-0000000000aa';
+    devices.push({ id, name: 'TEMP', is_active: true, last_heartbeat: null });
+    const res = await fetch(server.baseUrl + `/api/sensors/devices/${id}`, { method: 'DELETE', headers: AUTH });
     assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(await res.json(), { success: true });
   });
 
   test('ลบ id ที่ไม่มี = 500 (ไม่เงียบว่าสำเร็จ)', async () => {
-    const res = await fetch(server.baseUrl + '/api/sensors/devices/nope', { method: 'DELETE', headers: AUTH });
+    const res = await fetch(
+      server.baseUrl + '/api/sensors/devices/aaaaaaaa-0000-4000-8000-0000000000ff',
+      { method: 'DELETE', headers: AUTH }
+    );
     assert.strictEqual(res.status, 500);
     assert.ok((await res.json()).error);
   });
@@ -247,6 +255,64 @@ describe('POST /api/sensors/generate-code', () => {
     });
     const { code }: any = await res.json();
     assert.match(code, /not yet available/);
+  });
+
+  // ── ของที่ผู้ใช้พิมพ์ต้องไม่กลายเป็นโค้ดหรือทำให้คำขอค้าง ──────────────────
+  // Express 4 ไม่ดัก async throw: handler ที่โยน error จะ "ค้างไม่ตอบ" ไม่ใช่ 500
+  // ⇒ `sensors` ที่ไม่ใช่ array เคยทำให้ request แขวนจน timeout
+  test('sensors ไม่ใช่ array = 400 ทันที ไม่ค้าง', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: 'temperature' }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+    assert.match((await res.json()).error, /sensors/);
+  });
+
+  test('ไม่ส่ง sensors มาเลย = 400 ไม่ใช่ค้าง', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32' }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('รายการ sensor ยาวผิดปกติ = 400 (ไม่สร้างโค้ดเป็นพันบรรทัด)', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: Array.from({ length: 500 }, () => 'temperature') }),
+      signal: AbortSignal.timeout(4000),
+    });
+    assert.strictEqual(res.status, 400);
+  });
+
+  test('รหัส WiFi ที่มี " หรือ \\ ต้องถูก escape ไม่หลุดออกจากสตริง C', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: ['temperature'], wifiSSID: 'a"b', wifiPass: 'p"w\\d' }),
+    });
+    const { code }: any = await res.json();
+    assert.strictEqual(res.status, 200);
+    // ค่าที่มี quote ต้องกลายเป็น \" เท่านั้น ไม่งั้นสเก็ตช์คอมไพล์ไม่ผ่าน (หรือแย่กว่า: หลุดเป็นโค้ด)
+    assert.ok(code.includes('const char* ssid = "a\\"b";'), 'ssid ต้องถูก escape');
+    assert.ok(code.includes('const char* password = "p\\"w\\\\d";'), 'password ต้อง escape ทั้ง " และ \\');
+  });
+
+  test('ค่าใหม่ในสตริงต้องไม่สร้างบรรทัดโค้ดใหม่', async () => {
+    const res = await fetch(server.baseUrl + '/api/sensors/generate-code', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESP32', sensors: [], wifiSSID: 'x";\nvoid evil() {}\n//' }),
+    });
+    const { code }: any = await res.json();
+    assert.doesNotMatch(code, /\nvoid evil\(\)/, 'ต้องไม่มีฟังก์ชันที่ผู้ใช้แอบใส่เข้ามา');
+    assert.ok(code.includes('\\nvoid evil()'), 'ขึ้นบรรทัดใหม่ต้องกลายเป็น \\n ในสตริง');
   });
 });
 
@@ -337,17 +403,22 @@ describe('GET /api/sensors/metrics + /all', () => {
   test('/metrics คืนรายชื่อ metric เป็น array ของ string', async () => {
     const res = await authed(dataServer.baseUrl + '/api/sensors/metrics');
     assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), ['temperature', 'humidity']);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.metrics, ['temperature', 'humidity']);
+    assert.strictEqual(body.degraded, false);
   });
 
-  test('/metrics ที่ DB ล้ม = 200 กับ array ว่าง (ไม่ throw)', async () => {
+  test('/metrics ที่ DB ล้ม = 500 + degraded (ไม่ใช่ 200 [] ที่อ่านว่า "ไม่มี metric")', async () => {
     const saved = (prisma as any).$queryRawUnsafe;
     (prisma as any).$queryRawUnsafe = async () => {
       throw new Error('db down');
     };
     const res = await authed(dataServer.baseUrl + '/api/sensors/metrics');
-    assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), []);
+    assert.strictEqual(res.status, 500);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.metrics, []);
+    assert.strictEqual(body.degraded, true);
+    assert.ok(String(body.error).length > 0);
     (prisma as any).$queryRawUnsafe = saved;
   });
 
@@ -374,15 +445,41 @@ describe('GET /api/sensors/metrics + /all', () => {
     assert.doesNotMatch(rawCalls[0].sql, /AND metric/);
   });
 
-  test('/all ที่ DB ล้ม = 500 กับ array ว่าง', async () => {
+  test('/all ที่ DB ล้ม = 500 + records: [] + error (ไม่ใช่ array ว่าง)', async () => {
     const saved = (prisma as any).$queryRawUnsafe;
     (prisma as any).$queryRawUnsafe = async () => {
       throw new Error('db down');
     };
     const res = await authed(dataServer.baseUrl + '/api/sensors/all');
     assert.strictEqual(res.status, 500);
-    assert.deepStrictEqual(await res.json(), []);
+    const body: any = await res.json();
+    assert.deepStrictEqual(body.records, []);
+    assert.ok(String(body.error).length > 0);
     (prisma as any).$queryRawUnsafe = saved;
+  });
+
+  // ── เพดาน limit: sensor_telemetry โตไม่จำกัด "ดึงทั้งตาราง" ต้องไม่ใช่คำขอเดียว ──
+  test('/all?limit เกินเพดาน = 400 และไม่ยิง SQL', async () => {
+    rawCalls.length = 0;
+    const res = await authed(dataServer.baseUrl + '/api/sensors/all?limit=100000');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(rawCalls.length, 0, 'ห้ามดึงแถวออกมาก่อนจะรู้ว่าเกิน');
+  });
+
+  test('/all?limit ที่ไม่ใช่จำนวนเต็มบวก = 400 (ไม่ใช่ 500 แล้วคืน array ว่าง)', async () => {
+    for (const bad of ['abc', '0', '-5', '2.5']) {
+      rawCalls.length = 0;
+      const res = await authed(dataServer.baseUrl + `/api/sensors/all?limit=${bad}`);
+      assert.strictEqual(res.status, 400, `limit=${bad} ควรเป็น 400`);
+      assert.strictEqual(rawCalls.length, 0, `limit=${bad} ห้ามแตะ DB`);
+    }
+  });
+
+  test('/all?limit ที่เพดานพอดี = ผ่าน', async () => {
+    rawCalls.length = 0;
+    const res = await authed(dataServer.baseUrl + '/api/sensors/all?limit=5000');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(rawCalls[0].params, [5000]);
   });
 });
 
@@ -425,6 +522,42 @@ describe('DELETE /api/sensors/:metric', () => {
     const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature', { method: 'DELETE', headers: AUTH });
     assert.strictEqual(res.status, 500);
     (prisma as any).$queryRawUnsafe = saved;
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ลบข้อมูลเทเลเมตรี = ทำลายหลักฐานย้อนหลัง (กู้ไม่ได้) — ต้องมีสิทธิ์ระดับผู้ดูแล
+describe('สิทธิ์การลบข้อมูลเทเลเมตรี', () => {
+  const kidAuth = { Authorization: `Bearer ${makeToken('KID')}` };
+
+  test('KID ลบ record เดียว = 403 และไม่แตะ DB', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature', {
+      method: 'DELETE',
+      headers: kidAuth,
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(rawCalls.length, 0, 'คำขอที่ไม่มีสิทธิ์ต้องไม่ถึง DB');
+  });
+
+  test('KID ลบทั้ง metric = 403 และไม่แตะ DB', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature/all', {
+      method: 'DELETE',
+      headers: kidAuth,
+    });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(rawCalls.length, 0);
+  });
+
+  test('OPERATOR ยังลบได้ — ไม่เข้มเกินจนงานประจำทำไม่ได้', async () => {
+    rawCalls.length = 0;
+    const res = await fetch(dataServer.baseUrl + '/api/sensors/temperature/all', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${makeToken('OPERATOR')}` },
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(rawCalls.length, 1);
   });
 });
 

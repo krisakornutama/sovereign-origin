@@ -68,22 +68,28 @@ export default function OtaPage() {
 
   const load = useCallback(async () => {
     try {
-      const [fwRes, devRes, evRes] = await Promise.all([
+      const [fwRes, devRes] = await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ota/firmwares`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`),
-        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ota/events`),
       ]);
       // กัน .map พัง: backend ตอบ 500/403 กลับมาเป็น {error:...} — ยัดเข้า state ตรงๆ
       // แล้วหน้าจอระเบิดตอน render (firmwares.map is not a function)
-      const [fw, dev, ev] = await Promise.all([fwRes.json(), devRes.json(), evRes.json()]);
+      const [fw, dev] = await Promise.all([fwRes.json(), devRes.json()]);
       setFirmwares(Array.isArray(fw) ? fw : []);
       setDevices(Array.isArray(dev) ? dev : []);
-      setEvents(Array.isArray(ev) ? ev : []);
+      // ประวัติ OTA ทั้งฟลีตเป็นของ SUPERADMIN — role อื่นไม่ต้องยิง (API ตอบ 403)
+      if (isSuperAdmin) {
+        const evRes = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ota/events`);
+        const ev = await evRes.json();
+        setEvents(Array.isArray(ev) ? ev : []);
+      } else {
+        setEvents([]);
+      }
     } catch (err) {
       console.error(err);
       setError(t('ota.loadingFail', 'โหลดข้อมูลไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
     }
-  }, [t]);
+  }, [t, isSuperAdmin]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -191,7 +197,7 @@ export default function OtaPage() {
       <main className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
         {!isSuperAdmin && (
           <div className="card px-4 py-3 text-sm text-amber-400">
-            {t('ota.adminOnly', 'อัปโหลด/Deploy ใช้งานได้เฉพาะ SUPERADMIN (ดูรายการได้ทุก role)')}
+            {t('ota.adminOnly', 'อัปโหลด/Deploy และประวัติ OTA ใช้ได้เฉพาะ SUPERADMIN (ดูรายการเฟิร์มแวร์ได้ทุก role)')}
           </div>
         )}
 

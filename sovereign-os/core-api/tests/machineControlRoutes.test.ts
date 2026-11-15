@@ -292,4 +292,35 @@ describe('machine-control: ฝั่งผู้ใช้ (JWT + SUPERADMIN เ�
     const afterPoll = controlState().find((c) => c.machineId === MACHINE_ID);
     assert.equal(afterPoll?.queued, 0, 'เมื่อ runner รับไปแล้ว ต้องไม่ค้างในคิว');
   });
+  test('เครื่องอื่นรายงานผลของคำสั่งที่ไม่ได้ส่งให้ตัวเอง → 403 (ห้ามปลอมผลข้ามเครื่อง)', async () => {
+    // ผู้ใช้สั่งงานเครื่องทดสอบ
+    const dispatched = await asUser('/api/machine-control/command', {
+      method: 'POST',
+      body: JSON.stringify({ machineId: MACHINE_ID, type: 'fs.read', payload: { path: 'E:\secret.txt' } }),
+    });
+    assert.equal(dispatched.status, 200);
+    const commandId = ((await dispatched.json()) as any).command.id as string;
+
+    // เครื่องอื่น (token คนละใบ แต่ authenticateToken ในเทสต์คืนแถวที่ mock ไว้)
+    mockModel(prisma as any, 'agentMachine', {
+      findFirst: async () => ({
+        id: 'other-machine',
+        name: 'runner-other',
+        status: 'online',
+        executors: ['opencode'],
+        role: 'USER',
+        owner_user_id: null,
+        lan_confirmed_at: new Date(),
+        pair_code_hash: null,
+        pair_code_at: null,
+      }),
+    });
+    const forged = await postAsMachine('/result', { commandId, ok: true, result: 'root:x:0:0' });
+    assert.equal(forged.status, 403, 'เครื่องอื่นต้องรายงานผลของคำสั่งนี้ไม่ได้');
+
+    // คำสั่งต้องยังอยู่ให้เครื่องเจ้าของทำต่อ (ไม่ถูกกลืนหาย)
+    const still = await awaitCommand(MACHINE_ID, 300);
+    assert.ok(still, 'คำสั่งต้องไม่ถูกปิดด้วยผลปลอม');
+    assert.equal(still!.id, commandId);
+  });
 });

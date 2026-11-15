@@ -259,13 +259,14 @@ describe('agent machines — dispatch', () => {
         { id: 'j-1', executor: 'opencode', prompt: 'งานที่ทำได้', workspace: null, executor_model: null, executor_agent: null, priority: 0 },
         { id: 'j-2', executor: 'freebuff', prompt: 'งานที่ทำไม่ได้', workspace: null, executor_model: null, executor_agent: null, priority: 0 },
       ],
-      update: async (args: any) => { updates.push(args); return { ...args.data, id: args.where.id }; },
+      updateMany: async (args: any) => { updates.push(args); return { count: 1 }; },
     });
     const jobs = await pullJobs(machine, 5);
     assert.equal(jobs.length, 1, 'ต้องกรองงานที่เครื่องนี้ทำไม่ได้ออก');
     assert.equal(jobs[0].id, 'j-1');
     assert.ok(updates.length > 0, 'ต้อง mark ว่า dispatched กันสองเครื่องมาหยิบงานเดียวกัน');
     assert.equal(updates[0].data.status, 'running');
+    assert.equal(updates[0].where.status, 'queued', 'ต้องจองแบบมีเงื่อนไขสถานะ เพื่อไม่ให้ดึงงานเดียวกันซ้ำ');
   });
 
   test('pullJobs returns empty array when nothing queued', async () => {
@@ -273,7 +274,7 @@ describe('agent machines — dispatch', () => {
     mockModel(prismaRef() as any, 'agentJob', {
       create: async (args: any) => ({ id: 'j-1', ...args.data }),
       findMany: async () => [],
-      update: async () => { assert.fail('ไม่ควรมี update'); return {} as any; },
+      updateMany: async () => { assert.fail('ไม่ควรมี update'); return { count: 0 }; },
     });
     const jobs = await pullJobs(machine, 5);
     assert.deepEqual(jobs, []);

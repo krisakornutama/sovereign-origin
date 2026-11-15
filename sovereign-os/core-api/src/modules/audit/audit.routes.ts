@@ -12,6 +12,28 @@ const router = Router();
 
 /** เพดานแถวของไฟล์ export — กันการดึงทั้งตารางโดยไม่ตั้งใจ (ไม่ใช่ทาง backup) */
 const EXPORT_MAX_ROWS = 10000;
+/** เพดานแถวของหน้ารายการ — เกินกว่านี้ให้ใช้ export ไม่ใช่เลื่อนดู */
+const LIST_MAX_ROWS = 500;
+/** เพดาน offset — กัน deep pagination ที่กิน CPU/IO โดยไม่มีใครได้ประโยชน์ */
+const LIST_MAX_OFFSET = 100000;
+
+/**
+ * เพดานจำนวน id ที่ raw search (`q`) ยอมดึงขึ้นหน่วยความจำต่อคำขอ
+ * audit_logs โตได้ไม่จำกัด (ไม่มี retention) — คำค้นกว้าง ๆ เช่น "a" วันหนึ่งจะดึง id
+ * แสนรายการทำ `IN (...)` ต่อหนึ่งคำขอ = กิน RAM/DB จนบริการล้มได้ด้วยคำขอเดียว
+ */
+export const AUDIT_SEARCH_MAX_HITS = 20000;
+
+/** คำค้นกว้างเกินจนต้องปฏิเสธ — ต้องตอบ 400 ไม่ใช่ตัดผลเงียบ ๆ */
+export class AuditSearchTooBroadError extends Error {
+  constructor() {
+    super(
+      `คำค้นกว้างเกินไป — พบเกิน ${AUDIT_SEARCH_MAX_HITS.toLocaleString('en-US')} รายการ ` +
+        'ให้ใส่คำที่เฉพาะเจาะจงขึ้น หรือระบุช่วงวันที่/actionPrefix เพื่อแคบผลลัพธ์'
+    );
+    this.name = 'AuditSearchTooBroadError';
+  }
+}
 
 interface AuditFilters {
   q: string;
@@ -44,8 +66,11 @@ async function buildWhere(filters: AuditFilters): Promise<Prisma.AuditLogWhereIn
   if (filters.q) {
     // payload เป็น JSONB (Prisma filter ยังครอบไม่หมด) → ค้นด้วย ILIKE บน text dump ตรง ๆ
     const hits = await prisma.$queryRaw<Array<{ id: string }>>(
-      Prisma.sql`SELECT id FROM "audit_logs" WHERE action_type ILIKE ${`%${filters.q}%`} OR payload::text ILIKE ${`%${filters.q}%`}`,
+      Prisma.sql`SELECT id FROM "audit_logs" WHERE action_type ILIKE ${`%${filters.q}%`} OR payload::text ILIKE ${`%${filters.q}%`} LIMIT ${AUDIT_SEARCH_MAX_HITS + 1}`,
     );
+    // ดึงเกินมา 1 แถวเพื่อรู้ว่า "เกินเพดาน" — ปฏิเสธพร้อมบอกทางแคบคำค้น
+    // (ตัดเงียบแล้วคืนผลบางส่วน = หลักฐานที่ดูครบแต่ไม่ครบ ซึ่งแย่กว่าปฏิเสธ)
+    if (hits.length > AUDIT_SEARCH_MAX_HITS) throw new AuditSearchTooBroadError();
     // ชื่อผู้ใช้อยู่ในตาราง users ไม่ได้อยู่ใน payload (payload เก็บ ip/method/path/body)
     // ถ้าไม่กรองที่ relation นี้ ผู้ใช้จะพิมพ์ชื่อคนในช่องค้นหาแล้วได้ผลว่างเสมอ
     // ทั้งที่ placeholder ของหน้า /audit บอกว่าค้นชื่อได้ — ต้องเป็น OR กับผลของ raw search
@@ -77,18 +102,39 @@ function payloadField(payload: any, key: string): string {
   return value === null || value === undefined ? '' : String(value);
 }
 
-// GET /api/audit — รายการล่าสุด (ตัวกรองเดิม: q, actionPrefix, limit)
+// GET /api/audit — รายการล่าสุด (ตัวกรองเดิม: q, actionPrefix, limit) + offset สำหรับแบ่งหน้า
+//
+// หัวใจของการ "ตรวจย้อนได้": ถ้าเห็นได้แค่ N แถวล่าสุด ผู้ตรวจถามไม่ได้ว่าเมื่อวานเกิดอะไร
+// (ต้อง export ทั้งช่วงแทนซึ่งหนักและไม่ตอบคำถาม "ขอดูหน้าถัดไป") ⇒ รองรับ offset/skip
+// แต่ไม่นับทั้งตาราง (audit_logs โตไม่จำกัด): ดึง `limit+1` แถวแล้วใช้แถวเกินเป็นสัญญาณ
+// "มีต่อ" ที่เชื่อถือได้ ไม่ต้องเดาจากจำนวนที่ได้พอดี
 router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
-    const logs = await prisma.auditLog.findMany({
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const limit = Math.max(1, Math.min(Number.isFinite(rawLimit) ? rawLimit : 100, LIST_MAX_ROWS));
+    const rawOffset = parseInt(req.query.offset as string, 10);
+    if (Number.isFinite(rawOffset) && rawOffset > LIST_MAX_OFFSET) {
+      // เงียบ ๆ คืนลิสต์ว่างจะอ่านว่า "ไม่มีข้อมูลแล้ว" — ซึ่งเป็นการโกหกอีกแบบ
+      return res.status(400).json({ error: `offset เกินเพดาน ${LIST_MAX_OFFSET} — ใช้ export CSV สำหรับช่วงใหญ่` });
+    }
+    const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+
+    const fetched = await prisma.auditLog.findMany({
       where: await buildWhere(readFilters(req)),
       orderBy: { timestamp: 'desc' },
-      take: limit,
+      skip: offset,
+      take: limit + 1,
       include: { user: { select: { username: true } } },
     });
+    const hasMore = fetched.length > limit;
+    const logs = hasMore ? fetched.slice(0, limit) : fetched;
+
+    res.setHeader('X-Audit-List-Has-More', hasMore ? 'true' : 'false');
+    res.setHeader('X-Audit-List-Offset', String(offset));
+    res.setHeader('X-Audit-List-Limit', String(limit));
     res.json(logs);
   } catch (err) {
+    if (err instanceof AuditSearchTooBroadError) return res.status(400).json({ error: err.message });
     console.error('Audit API error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -96,18 +142,29 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
 
 // GET /api/audit/export — ดาวน์โหลด CSV ตามตัวกรองเดียวกับหน้า audit
 // ตัว export เองถูกบันทึกเป็น AUDIT_EXPORT (ใครดึงไป จำนวนเท่าไร ตรวจย้อนได้)
+//
+// ไฟล์ที่ถูกตัดเงียบ ๆ คือหลักฐานที่โกหก: ผู้ตรวจได้ CSV ไปแล้วเชื่อว่าเป็นทั้งช่วง
+// ที่ขอ ทั้งที่เพดาน 10,000 แถวตัดไปแล้ว ⇒ ต้องบอกจำนวนที่ได้จริง เทียบกับจำนวน
+// ทั้งหมดที่ตรงตัวกรอง (คำถามเดียวกัน) แล้วส่งธง "ถูกตัด" ให้ UI เตือนก่อน/หลังโหลด
 router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const filters = readFilters(req);
     const requested = parseInt(req.query.limit as string) || EXPORT_MAX_ROWS;
     const take = Math.max(1, Math.min(requested, EXPORT_MAX_ROWS));
 
-    const logs = await prisma.auditLog.findMany({
-      where: await buildWhere(filters),
-      orderBy: { timestamp: 'desc' },
-      take,
-      include: { user: { select: { username: true } } },
-    });
+    // where ก้อนเดียวใช้ทั้งสองคำถาม — นับด้วยตัวกรองอื่นไม่ครบเมื่อไร ตัวเลข "ทั้งหมด"
+    // จะเกินความจริงทันที (เช่นลืม q ที่เป็น OR ระหว่าง id กับ username)
+    const where = await buildWhere(filters);
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take,
+        include: { user: { select: { username: true } } },
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+    const truncated = total > logs.length;
 
     const lines = [csvRow(['timestamp', 'user', 'action', 'ip', 'method', 'path', 'payload'])];
     for (const log of logs as any[]) {
@@ -127,6 +184,10 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="audit-export-${stamp}.csv"`);
+    // ตัวเลขจริงของไฟล์นี้ — UI อ่านเพื่อเตือนว่า "ไม่ครบทั้งช่วง" (CORS ต้อง expose header)
+    res.setHeader('X-Audit-Export-Rows', String(logs.length));
+    res.setHeader('X-Audit-Export-Total', String(total));
+    res.setHeader('X-Audit-Export-Truncated', truncated ? 'true' : 'false');
     res.send('\ufeff' + lines.join('\n') + '\n');
 
     await AuditService.logAction({
@@ -134,6 +195,8 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
       actionType: 'AUDIT_EXPORT',
       payload: {
         rows: logs.length,
+        total,
+        truncated,
         q: filters.q || undefined,
         actionPrefix: filters.actionPrefix || undefined,
         from: filters.from?.toISOString(),
@@ -142,6 +205,9 @@ router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) 
       },
     });
   } catch (err) {
+    if (err instanceof AuditSearchTooBroadError) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error('Audit export error:', err);
     if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
   }

@@ -2,8 +2,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import EventEmitter from 'events';
 import { prisma } from '../lib/prisma';
+import { normalizeSingleIp } from '../lib/ip-address';
 import { threatIntel } from './threat-intel.service';
 import { securityStream } from './security-stream.service';
+import { createLogOnce } from '../lib/log-once';
 
 export { prisma };
 export const threatEmitter = new EventEmitter();
@@ -166,12 +168,13 @@ export class ThreatDetectionService {
       });
       // Auto-block (opt-in) — เฉพาะ IP ใหม่ภายนอก
       let blocked = false;
-      if (FIREWALL_BLOCK_CMD && ip && severity === 'warning') {
+      const blockTarget = normalizeSingleIp(ip);
+      if (FIREWALL_BLOCK_CMD && blockTarget && severity === 'warning') {
         try {
-          const cmd = FIREWALL_BLOCK_CMD.replace(/\{ip\}/g, ip);
+          const cmd = FIREWALL_BLOCK_CMD.replace(/\{ip\}/g, blockTarget);
           await execAsync(cmd, { timeout: 15000 });
           blocked = true;
-          console.warn(`🚫 Auto-blocked ${ip}`);
+          console.warn(`🚫 Auto-blocked ${blockTarget}`);
         } catch (err) {
           console.error('Firewall block failed:', err instanceof Error ? err.message : err);
         }
@@ -180,10 +183,16 @@ export class ThreatDetectionService {
       securityStream.push('THREAT', { ...event, blocked });
       return { ...event, blocked };
     } catch (err) {
-      console.error('Failed to record anomaly:', err instanceof Error ? err.message : err);
+      // DB ล่ม/ตารางหาย = ทุกคำขอ error เหมือนกัน ⇒ บอกครั้งเดียวแล้วสรุปเป็นรอบ
+      logAnomalyFailure(
+        'threat.recordAnomaly',
+        `Failed to record anomaly: ${err instanceof Error ? err.message : err}`
+      );
       return null;
     }
   }
 }
 
 export const threatDetector = new ThreatDetectionService();
+
+const logAnomalyFailure = createLogOnce();

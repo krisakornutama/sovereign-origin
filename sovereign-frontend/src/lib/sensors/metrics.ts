@@ -1,0 +1,42 @@
+// รายชื่อ metric ของหน้า Sensors — ป้ายจริงมาจาก i18n (`sensorsHub.metric.*`) ค่าที่นี่เป็น fallback
+// แยกออกจาก SensorsHub.tsx เพราะไฟล์ component ต้องอยู่ในเพดานบรรทัด (frontend-gate: components ≤ 400)
+export const METRIC_OPTIONS = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'battery_soc', label: 'แบตเตอรี่' },
+  { value: 'water_level_cm', label: 'ระดับน้ำ' },
+  { value: 'power_kw', label: 'กำลังไฟฟ้า' },
+  { value: 'temperature', label: 'อุณหภูมิ' },
+  { value: 'humidity', label: 'ความชื้นอากาศ' },
+  { value: 'soil_moisture', label: 'ความชื้นดิน' },
+  { value: 'ec_value', label: 'ค่า EC' },
+  { value: 'ph', label: 'pH ดิน' },
+  { value: 'solar_radiation', label: 'แสงอาทิตย์' },
+  { value: 'wind_speed', label: 'ความเร็วลม' },
+  { value: 'rainfall', label: 'ปริมาณน้ำฝน' },
+  { value: 'ultrasonic_distance', label: 'Ultrasonic' },
+  { value: 'pir_motion', label: 'PIR Motion' },
+  { value: 'rain_detect', label: 'ตรวจจับฝน' },
+  { value: 'smoke', label: 'Smoke' },
+  { value: 'gas_leak', label: 'Gas Leak' },
+  { value: 'door_state', label: 'Door' },
+];
+
+export const METRIC_LABEL: Record<string, string> = {
+  battery_soc: 'แบตเตอรี่',
+  water_level_cm: 'ระดับน้ำ',
+  power_kw: 'กำลังไฟฟ้า',
+  temperature: 'อุณหภูมิ',
+  humidity: 'ความชื้นอากาศ',
+  soil_moisture: 'ความชื้นดิน',
+  ec_value: 'ค่า EC',
+  ph: 'pH ดิน',
+  solar_radiation: 'แสงอาทิตย์',
+  wind_speed: 'ความเร็วลม',
+  rainfall: 'ปริมาณน้ำฝน',
+  ultrasonic_distance: 'Ultrasonic',
+  pir_motion: 'PIR Motion',
+  rain_detect: 'ตรวจจับฝน',
+  smoke: 'Smoke',
+  gas_leak: 'Gas Leak',
+  door_state: 'Door',
+};

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   listModels,
@@ -82,7 +83,7 @@ router.get('/models', authenticate, async (_req: Request, res: Response) => {
 });
 
 // ── POST /models/pull {model} — stream progress NDJSON ทันที ──
-router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
   const model = String(req.body?.model || '').trim();
   if (!model) return res.status(400).json({ error: 'ต้องระบุ model' });
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -99,7 +100,7 @@ router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), async (req:
   if (result.ok) writeNdjson(res, { status: 'done', percent: 100, ok: true });
   else { res.status(502); writeNdjson(res, { status: 'error', error: result.error, ok: false }); }
   res.end();
-});
+}));
 
 // ── POST /models/import-gguf {modelName, ggufUrl, systemPrompt?} — เริ่ม job ──
 router.post('/models/import-gguf', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
@@ -145,22 +146,22 @@ router.get('/jobs/:id', authenticate, (req: Request, res: Response) => {
 });
 
 // ── POST /models/route {taskType, model} — ตั้ง task→model ──
-router.post('/models/route', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/models/route', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
   const taskType = String(req.body?.taskType || '');
   const model = String(req.body?.model || '');
   const r = await setModelForTask(taskType, model);
   if (!r.ok) return res.status(400).json(r);
   res.json({ ok: true, taskType, model, effective: await getModelForTask(taskType) });
-});
+}));
 
 // ── DELETE /models/:name — ลบโมเดลออกจากพื้นที่จัดเก็บ ──
-router.delete('/models/:name', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.delete('/models/:name', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
   const name = decodeURIComponent(req.params.name || '');
   if (!name) return res.status(400).json({ error: 'ต้องระบุชื่อโมเดล' });
   const r = await deleteModel(name);
   if (!r.ok) return res.status(502).json(r);
   res.json({ ok: true, name });
-});
+}));
 
 // ── POST /models/:name/unload — ปล่อย VRAM ทันที ──
 router.post('/models/:name/unload', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {

@@ -4,6 +4,8 @@ import path from 'path';
 import mqtt from 'mqtt';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
+import { legacyClientReport, recordLegacyTokenUse } from './ota.legacy';
 
 export { prisma };
 
@@ -82,7 +84,43 @@ router.post(
 router.get('/firmwares/:file', (req, res) => {
   const file = req.params.file;
   if (!isSafeFileName(file)) return res.status(400).json({ error: 'Invalid file name' });
-  if (OTA_TOKEN && req.query.token !== OTA_TOKEN) return res.status(401).json({ error: 'Invalid token' });
+
+  // ด่านที่แท้จริงอยู่ที่ ota.access.ts: ตั้ง token → ต้องส่งให้ตรง (เทียบแบบคงเวลา);
+  // ไม่ตั้ง token → เปิดเฉพาะ peer ในวงภายใน เพื่อไม่ให้ทั้งอินเทอร์เน็ตดึงเฟิร์มแวร์ได้
+  // token ทาง header เท่านั้น (ค่าเริ่มต้น) — ?token= ต้องเปิดสวิตช์ชั่วคราวก่อน
+  // เพราะ token ใน URL ติดไปใน access log ของ proxy และค้างในประวัติ
+  const providedToken = resolveDownloadToken({
+    headerToken: req.get('x-ota-token'),
+    queryToken: req.query.token,
+    allowQueryToken: parseAllowQueryToken(process.env.OTA_ALLOW_QUERY_TOKEN),
+  });
+  const usedQueryToken =
+    !String(req.get('x-ota-token') ?? '').trim() && typeof req.query.token === 'string' && req.query.token.length > 0;
+  const allowed = isDownloadAllowed({
+    peer: req.socket?.remoteAddress,
+    configuredToken: OTA_TOKEN,
+    providedToken,
+  });
+
+  // ตัวนับสำหรับวางแผนปิดสวิตช์: ใครยังพยายามใช้ ?token= (ไม่บันทึกค่าของ token)
+  if (usedQueryToken) {
+    recordLegacyTokenUse({
+      ip: String(req.socket?.remoteAddress ?? 'unknown'),
+      userAgent: req.get('user-agent') ?? null,
+      accepted: allowed,
+    });
+  }
+  if (!allowed) {
+    return OTA_TOKEN
+      ? res.status(401).json({
+          error: 'Invalid token',
+          hint: 'ส่ง token ทาง header x-ota-token (อุปกรณ์รุ่นเดิมที่ส่ง ?token= ต้องเปิด OTA_ALLOW_QUERY_TOKEN=1 ชั่วคราว)',
+        })
+      : res.status(403).json({
+          error: 'Downloads are limited to the local network',
+          hint: 'ตั้ง OTA_TOKEN ถ้าอุปกรณ์ต้องโหลดจากนอกวง หรือเรียกผ่าน host ในวง LAN',
+        });
+  }
 
   const filePath = path.join(OTA_DIR, file);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
@@ -108,9 +146,19 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
     const filePath = path.join(OTA_DIR, String(file));
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Firmware not found' });
 
-    const url = `${OTA_BASE_URL}/api/ota/firmwares/${encodeURIComponent(file)}${OTA_TOKEN ? `?token=${OTA_TOKEN}` : ''}`;
+    // อุปกรณ์ไม่มีทางตรวจลายเซ็น ⇒ ห้ามให้มันโหลดผ่าน http สาธารณะ (ใครบนเส้นทางก็สลับไฟล์ได้)
+    const urlCheck = checkDeployBaseUrl(OTA_BASE_URL);
+    if (!urlCheck.ok) return res.status(400).json({ error: urlCheck.reason, hint: 'ตั้ง OTA_BASE_URL เป็น https หรือ host ในวง LAN' });
+
+    // URL ไม่ฝัง token แล้ว — token เดินทางใน header ที่แนบมากับ payload แทน
+    const url = `${OTA_BASE_URL}/api/ota/firmwares/${encodeURIComponent(file)}`;
     const topic = `sovereign/${nodeId}/ota/command`;
-    const payload = JSON.stringify({ url, file, version: String(file).replace(/\.bin$/, '') });
+    const payload = JSON.stringify({
+      url,
+      file,
+      version: String(file).replace(/.bin$/, ''),
+      headers: OTA_TOKEN ? { 'x-ota-token': OTA_TOKEN } : {},
+    });
 
     mqttClient.publish(topic, payload);
 
@@ -133,8 +181,15 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
   }
 });
 
+// GET /api/ota/legacy-clients — ใครยังดาวน์โหลดด้วย ?token= (ใช้ตัดสินใจปิดสวิตช์)
+// ตัวเลขนี้บอก "ถึงเวลาเลิกใช้ query token หรือยัง" — ไม่คืนค่า token ใด ๆ
+router.get('/legacy-clients', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(legacyClientReport());
+});
+
 // GET /api/ota/events?limit=50 – ประวัติ OTA ทั้งหมด (คำสั่ง + ผลจากอุปกรณ์)
-router.get('/events', authenticate, async (req, res) => {
+router.get('/events', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const events = await prisma.otaEvent.findMany({

@@ -16,6 +16,7 @@ import {
   type QueuedAction,
 } from '../../lib/offlineQueue';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { syncOutcomeMessage } from '../../lib/offline/sync-summary';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 import Icon from '../ui/Icon';
 import QueueRetentionNote from './QueueRetentionNote';
@@ -39,6 +40,7 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
     const items = await listQueued(currentQueueUserId());
     setQueuedItems(items);
     setSelectedIds((prev) => new Set([...prev].filter((id) => items.some((q) => q.id === id))));
+    return items;
   };
 
   useEffect(() => {
@@ -97,7 +99,7 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
     <section className="panel panel-cyan p-5 space-y-4">
       <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('settings.queue.title', 'คิว Offline ({n})', { n: queuedItems.length })}</h2>
       <p className="text-xs text-gray-500">
-        {t('settings.queue.desc', 'action ที่ค้างไว้ตอนออฟไลน์ (POST/PUT/PATCH/DELETE) — จะ sync อัตโนมัติเมื่อกลับ online หรือเลือกจัดการด้านล่าง')}
+        {t('settings.queue.desc', 'action ที่ค้างไว้ตอนออฟไลน์ (POST/PUT/PATCH/DELETE) — จะ sync อัตโนมัติเมื่อกลับ online หรือเลือกจัดการด้านล่าง · รายการที่ถูก server ปฏิเสธถาวร (4xx) จะถูกพักไว้ ไม่ลบ และไม่ถูกส่งซ้ำเอง')}
       </p>
       <QueueRetentionNote />
       {queuedItems.length === 0 ? (
@@ -148,7 +150,21 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
                         {item.method}
                       </span>
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs text-gray-300 break-all">{item.url}</td>
+                    <td className="py-2 pr-3 font-mono text-xs text-gray-300 break-all">
+                      {item.url}
+                      {item.lastRejection && (
+                        <div className="mt-1 text-[11px] text-amber-400 font-sans">
+                          {t(
+                            'settings.queue.rejected',
+                            'ถูกปฏิเสธ ({status}) เมื่อ {when} — จะไม่ส่งซ้ำอัตโนมัติ (เลือกแล้วกด Sync เพื่อลองใหม่ หรือลบถ้าไม่ต้องการแล้ว)',
+                            {
+                              status: item.lastRejection.status,
+                              when: new Date(item.lastRejection.at).toLocaleString(fmtLocale()),
+                            }
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-xs text-gray-500">{new Date(item.queuedAt).toLocaleString(fmtLocale())}</td>
                     <td className="py-2 pr-3">
                       <button
@@ -184,10 +200,22 @@ export default function OfflineQueuePanel({ onMessage, onError }: Props) {
             <button
               onClick={async () => {
                 setQueueBusy(true);
-                const flushed = await syncNow();
-                onMessage(t('settings.queue.syncAllDone', 'sync ทั้งหมดสำเร็จ {n} รายการ', { n: flushed }));
-                await reloadQueue();
-                setQueueBusy(false);
+                onError('');
+                try {
+                  const flushed = await syncNow();
+                  // ต้องดู "ของที่เหลือ" จริงหลัง sync — รายการที่ถูกพักไว้ (4xx) ไม่ถูกส่งซ้ำ
+                  // แต่ยังอยู่ในคิว ⇒ ประกาศ "สำเร็จทั้งหมด" ตามจำนวนที่ส่งได้คือโกหกผู้ใช้
+                  const remaining = (await reloadQueue()).length;
+                  const outcome = syncOutcomeMessage(flushed, remaining);
+                  const text = t(outcome.key, undefined, outcome.vars);
+                  if (outcome.tone === 'ok') onMessage(text);
+                  else onError(text);
+                } catch (err) {
+                  console.error(err);
+                  onError(t('settings.queue.syncFailed', 'sync ไม่สำเร็จ'));
+                } finally {
+                  setQueueBusy(false);
+                }
               }}
               disabled={queueBusy || queuedItems.length === 0}
               className="btn-primary"

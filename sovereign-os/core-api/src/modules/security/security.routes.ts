@@ -3,35 +3,29 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
+import { normalizeSingleIp } from '../../lib/ip-address';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
+import { hostConnections } from '../../services/host-connections.service';
 
 const router = Router();
 const execAsync = promisify(exec);
 
 // GET /api/security/connections - ดึงการเชื่อมต่อปัจจุบัน (netstat)
-router.get('/connections', authenticate, async (req, res) => {
+// อ่านไม่ได้ = คืน connections ว่าง + degraded: true + เหตุผล — **ห้ามคืนแถวจำลอง**
+// (หน้าความปลอดภัยที่โชว์ "การเชื่อมต่อ" ที่ไม่มีจริง = หลักฐานเท็จ)
+router.get('/connections', authenticate, async (_req, res) => {
   try {
-    // สำหรับ Windows ใช้ netstat, Linux ใช้ ss
-    const { stdout } = await execAsync('netstat -ano | findstr ESTABLISHED');
-    const lines = stdout.trim().split('\n').filter(line => line);
-    const connections = lines.map(line => {
-      const parts = line.trim().split(/\s+/);
-      return {
-        protocol: parts[0] || 'TCP',
-        local_address: parts[1] || '0.0.0.0:0',
-        foreign_address: parts[2] || '0.0.0.0:0',
-        state: parts[3] || 'ESTABLISHED',
-        pid: parts[4] || 'N/A'
-      };
-    });
-    res.json(connections);
+    const connections = await hostConnections.read();
+    res.json({ connections, degraded: false, source: 'netstat' });
   } catch (error) {
-    // fallback: ส่งข้อมูลจำลอง
-    res.json([
-      { protocol: 'TCP', local_address: '192.168.1.100:3001', foreign_address: '10.12.55.5:54321', state: 'ESTABLISHED', pid: '1234' },
-      { protocol: 'TCP', local_address: '127.0.0.1:5432', foreign_address: '127.0.0.1:54321', state: 'ESTABLISHED', pid: '5678' }
-    ]);
+    res.json({
+      connections: [],
+      degraded: true,
+      source: 'unavailable',
+      reason: 'อ่าน netstat ของโฮสต์ไม่ได้จากสภาพแวดล้อมนี้ (คอนเทนเนอร์/host)',
+      detail: String((error as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
@@ -66,67 +60,135 @@ router.get('/firewall/blocks', authenticate, (req, res) => {
 
 // POST /api/security/firewall/block - block IP ผ่าน guard + autonomy เดียวกับ AI agent
 // 200 = ดำเนินการแล้ว, 202 = ส่งคำขออนุมัติ (โหมด suggest), 403 = ถูกปฏิเสธ (โหมด view / guard)
+// รับเฉพาะ IP เดี่ยว — `0.0.0.0/0` = บล็อกทุกทราฟฟิกขาเข้า (ล็อกตัวเองออกจากระบบ)
+const SINGLE_IP_ERROR = 'ip ต้องเป็น IP เดี่ยว (IPv4/IPv6) เท่านั้น — ไม่รับ CIDR/ช่วง IP/ชื่อโฮสต์';
+
 router.post('/firewall/block', authenticate, async (req, res) => {
-  const { ip } = req.body;
-  if (typeof ip !== 'string' || !ip.trim()) {
-    return res.status(400).json({ error: 'ip is required' });
+  const ip = normalizeSingleIp(req.body?.ip);
+  if (!ip) return res.status(400).json({ error: SINGLE_IP_ERROR });
+  try {
+    const result = await agentActions.executeAction(
+      'blockIP',
+      { ip },
+      { actor: req.user?.id, source: 'security-ui', ip: req.ip }
+    );
+    if (result.status === 'denied') return res.status(403).json(result);
+    if (result.status === 'requires_approval') return res.status(202).json(result);
+    return res.json(result);
+  } catch (err) {
+    // Express 4 ไม่ดัก async throw — ถ้าไม่จับ คำขอจะค้างจน client timeout
+    return res.status(500).json({
+      error: 'สั่ง block ไม่สำเร็จ (executor ล้ม)',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
-  const result = await agentActions.executeAction(
-    'blockIP',
-    { ip: ip.trim() },
-    { actor: req.user?.id, source: 'security-ui', ip: req.ip }
-  );
-  if (result.status === 'denied') return res.status(403).json(result);
-  if (result.status === 'requires_approval') return res.status(202).json(result);
-  return res.json(result);
 });
 
 // POST /api/security/firewall/unblock - ยกเลิกการ block IP
 router.post('/firewall/unblock', authenticate, async (req, res) => {
-  const { ip } = req.body;
-  if (typeof ip !== 'string' || !ip.trim()) {
-    return res.status(400).json({ error: 'ip is required' });
+  const ip = normalizeSingleIp(req.body?.ip);
+  if (!ip) return res.status(400).json({ error: SINGLE_IP_ERROR });
+  try {
+    const result = await agentActions.executeAction(
+      'unblockIP',
+      { ip },
+      { actor: req.user?.id, source: 'security-ui', ip: req.ip }
+    );
+    if (result.status === 'denied') return res.status(403).json(result);
+    if (result.status === 'requires_approval') return res.status(202).json(result);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      error: 'สั่ง unblock ไม่สำเร็จ (executor ล้ม)',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
-  const result = await agentActions.executeAction(
-    'unblockIP',
-    { ip: ip.trim() },
-    { actor: req.user?.id, source: 'security-ui', ip: req.ip }
-  );
-  if (result.status === 'denied') return res.status(403).json(result);
-  if (result.status === 'requires_approval') return res.status(202).json(result);
-  return res.json(result);
 });
 
 // GET /api/security/events - ดึง security events ล่าสุด
-router.get('/events', authenticate, async (req, res) => {
+// อ่าน DB ไม่ได้ ≠ ไม่มีเหตุการณ์ — ต้องมี degraded flag (หลักฐานความปลอดภัยต้องไม่โกหก)
+router.get('/events', authenticate, async (_req, res) => {
   try {
     const events = await prisma.securityEvent.findMany({
       orderBy: { timestamp: 'desc' },
       take: 50,
     });
-    res.json(events);
+    res.json({ events, degraded: false, source: 'db' });
   } catch (err) {
-    res.json([]);
+    res.json({
+      events: [],
+      degraded: true,
+      source: 'unavailable',
+      reason: 'อ่านเหตุการณ์ความปลอดภัยจากฐานข้อมูลไม่ได้',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 
 // POST /api/security/events - บันทึก security event ใหม่
-router.post('/events', authenticate, async (req, res) => {
+// เขียนได้เฉพาะ role ที่เชื่อถือได้ (KID/SYSTEM_AI = ไม่) และค่าต้องถูกตรวจก่อนเก็บ:
+// event log ที่ใครก็เขียนได้ = หลักฐานที่ปลอมได้ (และถล่ม 50 แถวล่าสุดจนของจริงหลุดสายตา)
+const EVENT_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
+const EVENT_TYPE_PATTERN = /^[A-Za-z0-9_]{2,40}$/;
+const EVENT_SEVERITIES = new Set(['info', 'warning', 'critical']);
+const MAX_EVENT_DESCRIPTION = 500;
+const MAX_IP_LENGTH = 45; // IPv6 สูงสุด 45 ตัวอักษร
+
+function normalizeIp(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === undefined || value === null || value === '') return { ok: true, value: null };
+  if (typeof value !== 'string') return { ok: false };
+  const trimmed = value.trim();
+  if (trimmed.length > MAX_IP_LENGTH) return { ok: false };
+  if (!/^[0-9a-fA-F:.]+$/.test(trimmed)) return { ok: false };
+  return { ok: true, value: trimmed };
+}
+
+router.post('/events', authenticate, requireRole(...EVENT_WRITE_ROLES), async (req, res) => {
+  const body = req.body || {};
+  const eventType = typeof body.event_type === 'string' ? body.event_type.trim().toUpperCase() : '';
+  if (!EVENT_TYPE_PATTERN.test(eventType)) {
+    return res.status(400).json({
+      error: 'event_type ต้องเป็นตัวอักษร/ตัวเลข/underscore 2-40 ตัว (เช่น INTRUSION, PORT_SCAN)',
+    });
+  }
+  const severity = String(body.severity ?? 'info').trim().toLowerCase();
+  if (!EVENT_SEVERITIES.has(severity)) {
+    return res.status(400).json({ error: 'severity ต้องเป็น info, warning หรือ critical' });
+  }
+  const description = typeof body.description === 'string' ? body.description.trim() : '';
+  if (!description) {
+    return res.status(400).json({ error: 'description ต้องไม่ว่าง' });
+  }
+  if (description.length > MAX_EVENT_DESCRIPTION) {
+    return res.status(400).json({ error: `description ยาวเกิน ${MAX_EVENT_DESCRIPTION} ตัวอักษร` });
+  }
+  const sourceIp = normalizeIp(body.source_ip);
+  const destIp = normalizeIp(body.dest_ip);
+  if (!sourceIp.ok || !destIp.ok) {
+    return res.status(400).json({ error: `source_ip/dest_ip ต้องเป็น IP ที่ถูกต้อง (ยาวไม่เกิน ${MAX_IP_LENGTH})` });
+  }
+  const rawData = body.raw_data;
+  if (rawData !== undefined && rawData !== null && (typeof rawData !== 'object' || Array.isArray(rawData))) {
+    return res.status(400).json({ error: 'raw_data ต้องเป็น object' });
+  }
+
   try {
-    const { event_type, severity, source_ip, dest_ip, description, raw_data } = req.body;
     const event = await prisma.securityEvent.create({
       data: {
-        event_type,
-        severity: severity || 'info',
-        source_ip,
-        dest_ip,
+        event_type: eventType,
+        severity,
+        source_ip: sourceIp.value,
+        dest_ip: destIp.value,
         description,
-        raw_data: raw_data || {},
+        raw_data: rawData ?? {},
       },
     });
     res.status(201).json(event);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create event' });
+    res.status(500).json({
+      error: 'บันทึกเหตุการณ์ไม่สำเร็จ',
+      detail: String((err as Error)?.message || '').slice(0, 200),
+    });
   }
 });
 

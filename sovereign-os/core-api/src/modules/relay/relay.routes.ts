@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
+import { createLogOnce } from '../../lib/log-once';
 import mqtt from 'mqtt';
 import { relayGuard } from '../../services/relay-guard.service';
 import { config } from '../../config';
@@ -25,6 +26,8 @@ const DEFAULT_RELAYS = [
   { id: 'relay3', label: 'พัดลม' },
 ];
 
+const logSeedFailure = createLogOnce();
+
 // สร้าง relay เริ่มต้นเมื่อรันครั้งแรก (ถ้ายังไม่มีใน DB)
 async function ensureDefaultRelays() {
   try {
@@ -37,9 +40,10 @@ async function ensureDefaultRelays() {
     }
     console.log(`⚙️ Created ${DEFAULT_RELAYS.length} default relays`);
   } catch (err) {
-    console.error(
-      'Failed to seed default relays (relays table missing? run `npx prisma migrate dev`):',
-      err
+    logSeedFailure(
+      'relay.seedDefaults',
+      'Failed to seed default relays (relays table missing? run `npx prisma migrate dev`): ' +
+        (err instanceof Error ? err.message : String(err))
     );
   }
 }

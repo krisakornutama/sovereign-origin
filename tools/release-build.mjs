@@ -60,6 +60,14 @@ export function collectDesktopArtifacts(names, version) {
   };
 }
 
+/**
+ * ชื่อ asset ที่ GitHub ยอมรับ — อักขระที่ใช้ไม่ได้ (เว้นวรรค ฯลฯ) ถูกแทนด้วย '.'
+ * ถ้าชื่อในเครื่องกับชื่อที่ปล่อยไม่ตรงกัน SHA256SUMS จะตรวจไฟล์ที่ดาวน์โหลดไม่ได้เลย
+ */
+export function githubAssetName(name) {
+  return String(name).replace(/[^A-Za-z0-9._-]/g, '.');
+}
+
 /** คืนเนื้อหา SHA256SUMS.txt (เรียงตามชื่อ, ลงท้าย newline เสมอ) */
 export function buildChecksumManifest(entries) {
   if (!Array.isArray(entries) || entries.length === 0) {
@@ -160,9 +168,10 @@ export async function stageReleaseArtifacts({ distDir, outDir, version }) {
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(OUT, { recursive: true });
 
-  const names = [...portable, ...zips];
-  for (const name of names) {
-    fs.copyFileSync(path.join(DIST, name), path.join(OUT, name));
+  const sourceNames = [...portable, ...zips];
+  const names = sourceNames.map((name) => githubAssetName(name));
+  for (let i = 0; i < sourceNames.length; i++) {
+    fs.copyFileSync(path.join(DIST, sourceNames[i]), path.join(OUT, names[i]));
   }
 
   const { entries } = await writeChecksumFile(OUT, names);

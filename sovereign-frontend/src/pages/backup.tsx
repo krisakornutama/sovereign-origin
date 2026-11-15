@@ -22,6 +22,20 @@ interface Schedule {
 }
 
 /**
+ * ประวัติการกู้คืน — เก็บเป็นไฟล์ journal ข้าง backup (ไม่ใช่ DB) เพราะการกู้คืน
+ * แทนที่ฐานข้อมูลทั้งก้อน: audit row ที่เพิ่งเขียนมีสิทธิ์ถูก dump รุ่นเก่าทับหายไป
+ */
+interface RestoreRecord {
+  at: string;
+  file: string;
+  ok: boolean;
+  status: number;
+  error?: string;
+  userId?: string | null;
+  ip?: string | null;
+}
+
+/**
  * ความสดของ backup ล่าสุด — ตัดสินที่ฝั่ง server เท่านั้น
  * (เกณฑ์ 26 ชม. อยู่ที่ backup.service; ฝั่ง UI ห้ามคำนวณซ้ำเพื่อไม่ให้สองที่เพี้ยนจากกัน)
  */
@@ -46,6 +60,7 @@ export default function BackupPage() {
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [schedule, setSchedule] = useState<Schedule>({ enabled: false, time: '02:00' });
   const [status, setStatus] = useState<BackupStatus | null>(null);
+  const [restores, setRestores] = useState<RestoreRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -65,9 +80,10 @@ export default function BackupPage() {
     try {
       // สถานะความสดเป็นคนละคำถามกับรายการไฟล์ — ยิงพร้อมกัน แต่ถ้าตัว status ล้ม
       // ต้องไม่ทำให้รายการที่โหลดได้หายไป (แค่ไม่มีแบนเนอร์)
-      const [listRes, statusRes] = await Promise.all([
+      const [listRes, statusRes, historyRes] = await Promise.all([
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup`),
         authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup/status`).catch(() => null),
+        authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup/restore-history?limit=5`).catch(() => null),
       ]);
       if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
       const data = await listRes.json();
@@ -75,6 +91,12 @@ export default function BackupPage() {
       setSchedule(data.schedule || { enabled: false, time: '02:00' });
       if (statusRes && statusRes.ok) setStatus(await statusRes.json());
       else setStatus(null);
+      if (historyRes && historyRes.ok) {
+        const history = await historyRes.json().catch(() => ({}));
+        setRestores(Array.isArray(history.restores) ? history.restores : []);
+      } else {
+        setRestores([]);
+      }
     } catch (err) {
       console.error(err);
       setError(t('backup.loadingFail', 'โหลดข้อมูล backup ไม่สำเร็จ — ตรวจว่า backend เปิดอยู่'));
@@ -128,14 +150,29 @@ export default function BackupPage() {
   };
 
   const restore = async (file: string) => {
-    if (!window.confirm(t('backup.restoreConfirm', 'ต้องการกู้คืนฐานข้อมูลจาก "{file}" หรือไม่?\nข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลในไฟล์ backup นี้', { file }))) return;
+    const warning = t(
+      'backup.restoreConfirm',
+      'ต้องการกู้คืนฐานข้อมูลจาก "{file}" หรือไม่?\nข้อมูลปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลในไฟล์ backup นี้',
+      { file }
+    );
+    if (!window.confirm(warning)) return;
+    // พิมพ์ชื่อไฟล์ซ้ำเพื่อยืนยัน — การกู้คืนผิดไฟล์คือข้อมูลหายถาวร (server บังคับกฎเดียวกัน)
+    const typed = window.prompt(
+      t('backup.restoreTypeName', 'พิมพ์ชื่อไฟล์ต่อไปนี้ให้ตรงเพื่อยืนยัน:\n{file}', { file }),
+      ''
+    );
+    if (typed === null) return;
+    if (typed.trim() !== file) {
+      setError(t('backup.restoreConfirmMismatch', 'ชื่อไฟล์ที่พิมพ์ไม่ตรง — ยกเลิกการกู้คืนแล้ว'));
+      return;
+    }
     setBusy(true);
     setError('');
     try {
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/backup/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file }),
+        body: JSON.stringify({ file, confirm: typed.trim() }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -322,6 +359,43 @@ export default function BackupPage() {
             </table>
           </div>
         </div>
+
+        {/* ประวัติการกู้คืน — ร่องรอยที่ "รอดจากการกู้คืน" เพราะเก็บเป็นไฟล์ข้าง backup ไม่ใช่ใน DB */}
+        {isSuperAdmin && restores.length > 0 && (
+          <div className="panel p-5">
+            <h2 className="text-sm font-semibold text-gray-200 glow-text mb-3">
+              {t('backup.historyTitle', 'ประวัติการกู้คืนล่าสุด')}
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b border-gray-700">
+                    <th className="py-2 pr-4">{t('backup.thWhen', 'เมื่อไร')}</th>
+                    <th className="py-2 pr-4">{t('backup.thFile', 'ไฟล์')}</th>
+                    <th className="py-2 pr-4">{t('common.status', 'สถานะ')}</th>
+                    <th className="py-2">{t('backup.thDetail', 'รายละเอียด')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/50">
+                  {restores.map((r, i) => (
+                    <tr key={`${r.at}-${i}`} className="border-b border-gray-800">
+                      <td className="py-2 pr-4 text-gray-400 whitespace-nowrap">{fmtDate(r.at)}</td>
+                      <td className="py-2 pr-4 font-mono text-xs text-gray-300">{r.file}</td>
+                      <td className={`py-2 pr-4 ${r.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {r.ok
+                          ? t('backup.restoreOk', 'สำเร็จ')
+                          : t('backup.restoreFail', 'ไม่สำเร็จ ({status})', { status: r.status })}
+                      </td>
+                      <td className="py-2 text-gray-500 text-xs">
+                        {r.error || r.ip || ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
     </div>
       </div>

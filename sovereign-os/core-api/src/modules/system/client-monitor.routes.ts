@@ -7,6 +7,8 @@
 import express, { Router } from 'express';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { clientMonitor, syntheticStreak, type ClientErrorPayload } from '../../services/client-monitor.service';
+import { isLoopbackClient } from '../../lib/net';
+import { config } from '../../config';
 
 const router = Router();
 
@@ -39,8 +41,9 @@ router.post('/error', errorLimiter, textParser, (req, res) => {
 // ไว้ให้ streak tracker นับ consecutive FAIL → critical Telegram ทันทีที่ครบ threshold
 // อนุญาต: loopback เสมอ (dev) · request อื่นต้องมี SYNTHETIC_ROUND_TOKEN ใน header
 // (บน prod จริง request ผ่าน Docker port mapping จะไม่ใช่ loopback อีกต่อไป — จึงต้องใช้ token)
+// ตัดสินจาก peer ของ TCP ไม่ใช่ req.ip — เมื่อเปิด TRUST_PROXY แล้วจะไม่ถือว่า loopback เลย
 router.post('/synthetic-round', (req, res) => {
-  const isLoopback = !!req.ip && /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.ip);
+  const isLoopback = isLoopbackClient(req, config.trustProxy);
   const token = process.env.SYNTHETIC_ROUND_TOKEN || '';
   const hasToken = token.length >= 16 && req.headers['x-synthetic-token'] === token;
   if (!isLoopback && !hasToken) {

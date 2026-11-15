@@ -9,6 +9,7 @@
 // ความปลอดภัยของทั้งระบบ — งานควบคุมเครื่องควรอยู่ไฟล์ของตัวเอง อ่าน/ตรวจง่ายกว่า
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import { AuditService } from '../services/audit.service';
+import { userCanControl } from '../services/agent-machine-hub.service';
 import {
   dispatchCommand,
   getViewers,
@@ -17,6 +18,16 @@ import {
   setRequestedFps,
   setViewers,
 } from '../services/machine-control.service';
+
+/**
+ * ด่าน "ผู้ใช้คนนี้คุมเครื่องนี้ได้จริงไหม" — ค่าเริ่มต้นคือ userCanControl ของ HUB
+ * (ตรวจการผูกเครื่อง + การยืนยันในวง LAN) และเปิดช่องให้เทสต์แทนที่ได้โดยไม่ต้องมี DB
+ */
+export type ControlAuthz = (userId: string, machineId: string) => Promise<boolean>;
+let canControlMachine: ControlAuthz = userCanControl;
+export function __setControlAuthz(fn: ControlAuthz | null): void {
+  canControlMachine = fn ?? userCanControl;
+}
 
 /** fps เริ่มต้นตอนเปิดดูจอ — สูงพอให้ควบคุมได้ แต่ไม่กินแบนด์วิดท์ LAN เกินจำเป็น */
 export const DEFAULT_SCREEN_FPS = 5;
@@ -94,7 +105,7 @@ export function registerMachineControl(io: SocketIOServer): void {
       return remaining;
     };
 
-    socket.on('control:join', (msg: unknown, ack: unknown) => {
+    socket.on('control:join', async (msg: unknown, ack: unknown) => {
       const user = controlUser(socket);
       if (!user) {
         reply(ack, { ok: false, error: 'not authenticated' });
@@ -108,6 +119,20 @@ export function registerMachineControl(io: SocketIOServer): void {
       const machineId = readMachineId(msg);
       if (!machineId) {
         reply(ack, { ok: false, error: 'machineId required' });
+        return;
+      }
+
+      // role อย่างเดียวไม่พอ: SUPERADMIN คนหนึ่งต้องไม่เห็น/คุมเครื่องที่ไม่ได้ผูกกับตัวเอง
+      // (HTTP counterparts ใช้ userCanControl อยู่แล้ว — socket ต้องเป็นด่านเดียวกัน)
+      let allowed = false;
+      try {
+        allowed = await canControlMachine(user.id, machineId);
+      } catch (err) {
+        console.error('[machine-control] ownership check failed:', err instanceof Error ? err.message : err);
+        allowed = false;
+      }
+      if (!allowed) {
+        reply(ack, { ok: false, error: 'machine not linked to this user' });
         return;
       }
 
@@ -197,6 +222,10 @@ export function registerMachineControl(io: SocketIOServer): void {
         reply(ack, { ok: false, error: `machineId and op (${ALLOWED.join('|')}) required` });
         return;
       }
+      if (!joined.has(machineId)) {
+        reply(ack, { ok: false, error: 'join the machine first' });
+        return;
+      }
 
       const payload = ((msg as { payload?: unknown }).payload || {}) as Record<string, unknown>;
       const type = `fs.${op}`;
@@ -224,6 +253,10 @@ export function registerMachineControl(io: SocketIOServer): void {
         reply(ack, { ok: false, error: 'machineId required' });
         return;
       }
+      if (!joined.has(machineId)) {
+        reply(ack, { ok: false, error: 'join the machine first' });
+        return;
+      }
       const fps = normalizeFps((msg as { fps?: unknown } | undefined)?.fps);
       setRequestedFps(machineId, fps);
       dispatchCommand(machineId, 'screen.fps', { fps }, 15_000);
@@ -240,6 +273,10 @@ export function registerMachineControl(io: SocketIOServer): void {
       const machineId = readMachineId(msg);
       if (!machineId) {
         reply(ack, { ok: false, error: 'machineId required' });
+        return;
+      }
+      if (!joined.has(machineId)) {
+        reply(ack, { ok: false, error: 'join the machine first' });
         return;
       }
       const command = dispatchCommand(machineId, 'screen.snapshot', {}, 15_000);

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { getDayPlan } from '../../services/chaos-windows.service';
 import { livingMode } from '../../services/living-mode.service';
@@ -12,9 +13,9 @@ import { maintenanceRadar } from '../../services/maintenance-radar.service';
 export const lifestyleRoutes = Router();
 
 // ── F. Chaos Windows — แผนจังหวะธรรมชาติของวันนี้ (advisory — มนุษย์คือ actuator) ──
-lifestyleRoutes.get('/chaos-windows', authenticate, async (_req, res) => {
+lifestyleRoutes.get('/chaos-windows', authenticate, asyncRoute(async (_req, res) => {
   res.json(await getDayPlan());
-});
+}));
 
 // ── G. Living Mode (Anti-Goodhart) — ระบบห้ามเตือนรบกวนการใช้ชีวิต ──
 lifestyleRoutes.get('/living-mode', authenticate, async (_req, res) => {
@@ -31,10 +32,10 @@ lifestyleRoutes.get('/manual-day', authenticate, async (_req, res) => {
   res.json(manualDay.status());
 });
 
-lifestyleRoutes.put('/manual-day', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), async (req, res) => {
+lifestyleRoutes.put('/manual-day', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
   const { active, note, hours } = req.body || {};
   res.json(await manualDay.set(Boolean(active), req.user?.id || 'unknown', typeof note === 'string' ? note : '', typeof hours === 'number' ? hours : undefined));
-});
+}));
 
 // ── H. Maintenance Radar (Sovereignty Tax) ──
 lifestyleRoutes.get('/maintenance', authenticate, async (_req, res) => {
@@ -49,7 +50,7 @@ lifestyleRoutes.post('/maintenance/:id/done', authenticate, requireRole('SUPERAD
   res.json(maintenanceRadar.markDone(id, req.user?.id || 'unknown'));
 });
 
-lifestyleRoutes.post('/maintenance/drift-check', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+lifestyleRoutes.post('/maintenance/drift-check', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
   const flags = await maintenanceRadar.driftCheck();
   res.json({ flags, ...maintenanceRadar.status() });
-});
+}));

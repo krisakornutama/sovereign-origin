@@ -91,6 +91,21 @@ export function verifyUploadedContent(file: UploadedFileLike): void {
     throw new Error('เนื้อหาไฟล์เป็น executable (magic bytes) — ปฏิเสธ');
   }
 
+  /* ยังเป็น "โค้ดที่รันได้" เหมือนกัน แต่เดิมหลุดด่าน: Mach-O (macOS/iOS, thin + fat),
+     Java class (0xCAFEBABE ซ้ำกับ fat Mach-O) และ WebAssembly ⇒ ปฏิเสธที่ชั้นเดียวกัน */
+  const CODE_MAGICS: Array<{ label: string; bytes: number[] }> = [
+    { label: 'Mach-O (64-bit)', bytes: [0xcf, 0xfa, 0xed, 0xfe] },
+    { label: 'Mach-O (32-bit)', bytes: [0xce, 0xfa, 0xed, 0xfe] },
+    { label: 'Mach-O (fat/Java class)', bytes: [0xca, 0xfe, 0xba, 0xbe] },
+    { label: 'Mach-O (reverse)', bytes: [0xfe, 0xed, 0xfa, 0xcf] },
+    { label: 'Mach-O (reverse 32)', bytes: [0xfe, 0xed, 0xfa, 0xce] },
+    { label: 'WebAssembly', bytes: [0x00, 0x61, 0x73, 0x6d] },
+  ];
+  const codeHit = CODE_MAGICS.find((m) => startsWithBytes(head, m.bytes));
+  if (codeHit) {
+    throw new Error(`เนื้อหาไฟล์เป็นโค้ดที่รันได้ (${codeHit.label}) — ปฏิเสธ`);
+  }
+
   const ext = path.extname(String(file.originalname || '')).toLowerCase();
   const mismatch = () => {
     throw new Error(`เนื้อหาไฟล์ไม่ตรงกับนามสกุล ${ext || '(ไม่มี)'} (magic bytes ไม่ตรง) — ปฏิเสธ`);

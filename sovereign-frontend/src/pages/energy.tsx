@@ -52,8 +52,12 @@ export default function EnergyPage() {
       if (!sumRes.ok) throw new Error(`HTTP ${sumRes.status}`);
       setSummary(await sumRes.json());
       const hist = await histRes.json();
+      if (!histRes.ok) {
+        // อ่านประวัติไม่ได้ ≠ ไม่มีข้อมูล — ใช้ข้อความจาก server (เดิม hist.map บน object = TypeError กลาง ๆ)
+        throw new Error((hist && !Array.isArray(hist) && hist.error) || `HTTP ${histRes.status}`);
+      }
       setPoints(
-        hist.map((r: any) => ({
+        (Array.isArray(hist) ? hist : []).map((r: any) => ({
           time: new Date(r.bucket).getTime(),
           value: r.avg_value,
         }))

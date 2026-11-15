@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import os from 'os';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { agentActions } from '../../services/agent-actions.service';
@@ -71,7 +72,7 @@ router.get('/processes', authenticate, async (_req, res) => {
 // POST /api/system/processes/kill - kill ผ่าน guard + autonomy เดียวกับ AI agent
 // 200 = สำเร็จ, 202 = รออนุมัติ (โหมด suggest), 403 = ถูกปฏิเสธ (view / guard)
 // SUPERADMIN เท่านั้น: การฆ่า process ของ host เป็นการกระทำระดับเครื่อง ไม่ใช่ระดับผู้ใช้ทั่วไป
-router.post('/processes/kill', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/processes/kill', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const { pid, name } = req.body || {};
   const args: any = {};
   if (pid !== undefined && pid !== null && pid !== '') {
@@ -90,7 +91,7 @@ router.post('/processes/kill', authenticate, requireRole('SUPERADMIN'), async (r
   if (result.status === 'denied') return res.status(403).json(result);
   if (result.status === 'requires_approval') return res.status(202).json(result);
   return res.json(result);
-});
+}));
 
 // ── Client Health — สรุป error ที่เก็บจาก browser ผู้ใช้ (SecurityEvent event_type=CLIENT_ERROR) ──
 // GET /api/system/client-health?days=7 — แผง Client Health ในหน้า /system
@@ -168,10 +169,10 @@ router.put('/wan/admin-password', authenticate, requireRole('SUPERADMIN'), async
 });
 
 // POST /api/system/wan/reboot — รีบูต router (SUPERADMIN, ต้องตั้ง ROUTER_REBOOT_CMD ก่อน)
-router.post('/wan/reboot', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/wan/reboot', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
   const result = await rebootRouter();
   if (!result.ok) return res.status(400).json({ error: result.error });
   res.json({ success: true });
-});
+}));
 
 export default router;

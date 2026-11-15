@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { agentPolicy, AGENT_TOOLS } from '../../services/agent-policy.service';
 import { agentActions } from '../../services/agent-actions.service';
@@ -152,19 +153,19 @@ function parseVoiceCommandHeuristic(text: string): any {
 }
 
 // GET /api/ai/local-status — สวิตช์ AI ในเครื่อง (default ปิด — ต้องกดเปิดในแอป)
-router.get('/local-status', authenticate, async (_req, res) => {
+router.get('/local-status', authenticate, asyncRoute(async (_req, res) => {
   const { getAiEnabled } = await import('../../services/local-llm.service');
   const s = await getAiEnabled();
   res.json(s);
-});
+}));
 
 // PUT /api/ai/enabled {enabled: bool} — เปิด/ปิด AI ในเครื่อง (SUPERADMIN)
-router.put('/enabled', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/enabled', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const { setAiEnabled } = await import('../../services/local-llm.service');
   const enabled = !!req.body?.enabled;
   const r = await setAiEnabled(enabled);
   res.json(r);
-});
+}));
 
 // PUT /api/ai/model {model: string} — เลือกโมเดล (SUPERADMIN)
 router.put('/model', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
@@ -249,13 +250,13 @@ router.get('/approvals', authenticate, requireRole('SUPERADMIN'), (req, res) => 
 });
 
 // POST /api/ai/approvals/:id/approve — อนุมัติและสั่งให้ดำเนินการ
-router.post('/approvals/:id/approve', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/approvals/:id/approve', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const result = await agentActions.approveApproval(req.params.id, req.user?.id);
   if (result.status === 'denied') {
     return res.status(400).json(result);
   }
   res.json(result);
-});
+}));
 
 // POST /api/ai/approvals/:id/reject — ปฏิเสธคำขอ
 router.post('/approvals/:id/reject', authenticate, requireRole('SUPERADMIN'), (req, res) => {
@@ -288,17 +289,17 @@ router.get('/history', authenticate, async (req, res) => {
 });
 
 // DELETE /api/ai/history — ล้างประวัติทั้งหมด (ทุกคนในบ้านใช้ร่วม?)
-router.delete('/history', authenticate, async (req, res) => {
+router.delete('/history', authenticate, asyncRoute(async (req, res) => {
   const count = await chatMemory.clearHistory(String(req.user?.id));
   res.json({ success: true, deleted: count });
-});
+}));
 
 // DELETE /api/ai/history/:id — ลบข้อความเดียว
-router.delete('/history/:id', authenticate, async (req, res) => {
+router.delete('/history/:id', authenticate, asyncRoute(async (req, res) => {
   const ok = await chatMemory.deleteMessage(req.params.id, String(req.user?.id));
   if (!ok) return res.status(404).json({ error: 'Message not found' });
   res.json({ success: true });
-});
+}));
 
 // ── P2: Decision Support AI — ถาม "ควรทำอะไรดี" จากข้อมูลจริง ──
 

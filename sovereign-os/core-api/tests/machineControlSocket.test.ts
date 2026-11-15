@@ -7,7 +7,7 @@ import WebSocket from 'ws';
 import { makeToken } from './helpers';
 import { createSocketServer } from '../src/realtime/socket';
 import { resetIo } from '../src/realtime/io-registry';
-import { normalizeFps, MAX_SCREEN_FPS } from '../src/realtime/machine-control.socket';
+import { normalizeFps, MAX_SCREEN_FPS, __setControlAuthz } from '../src/realtime/machine-control.socket';
 import { awaitCommand, getViewers, resetMachineControl } from '../src/services/machine-control.service';
 
 // ── ช่องควบคุมเครื่องระยะไกล — สัญญาระหว่าง browser กับ HUB ──────────────────
@@ -105,6 +105,8 @@ describe('machine-control socket — เส้นทาง browser → HUB → r
   };
 
   before(async () => {
+    // เจ้าของเครื่องในเคสปกติ: อนุญาตให้คุมเครื่องทดสอบได้ (ด่านจริงคือ userCanControl)
+    __setControlAuthz(async () => true);
     const app = express();
     httpServer = http.createServer(app);
     io = createSocketServer(httpServer);
@@ -115,6 +117,7 @@ describe('machine-control socket — เส้นทาง browser → HUB → r
   });
 
   after(async () => {
+    __setControlAuthz(null);
     for (const s of sessions) s.close();
     resetMachineControl();
     io.close();
@@ -242,6 +245,10 @@ describe('machine-control socket — เส้นทาง browser → HUB → r
 
   test('สั่งไฟล์ → runner ได้ fs.<op> พร้อม path', async () => {
     const s = await open();
+    // ต้องเปิดดูจอก่อน (ด่านเดียวกับอินพุต) — ไม่ใช่ยิง fs เข้าเครื่องที่ไม่มีใครเห็นหน้าจอ
+    s.emit(0, 'control:join', { machineId: MACHINE });
+    await ack(s, 0);
+    await awaitCommand(MACHINE, 500);
     s.emit(1, 'control:fs', { machineId: MACHINE, op: 'write', payload: { path: 'E:\\a.txt', data: 'aGk=' } });
 
     const res = await ack(s, 1);
@@ -305,6 +312,31 @@ describe('machine-control socket — เส้นทาง browser → HUB → r
     assert.equal(left.ok, true);
 
     assert.equal((await awaitCommand(MACHINE, 500))!.type, 'screen.stop');
+  });
+
+  test('SUPERADMIN ที่ไม่ได้ผูกเครื่องนี้ → เข้าห้องไม่ได้ และไม่มีคำสั่งหลุดถึงเครื่อง', async () => {
+    // HTTP counterparts ตรวจ userCanControl ทุกเส้น — socket ต้องไม่ใช่ทางลัด
+    __setControlAuthz(async () => false);
+    try {
+      const s = await open();
+      s.emit(1, 'control:join', { machineId: MACHINE });
+      const joined = await ack(s, 1);
+      assert.equal(joined.ok, false);
+      assert.match(String(joined.error), /control|link/i);
+      assert.equal(await awaitCommand(MACHINE, 100), null, 'ห้ามมี screen.start หลุดไปถึงเครื่องที่ไม่ได้ผูก');
+      assert.equal(getViewers(MACHINE), 0);
+    } finally {
+      __setControlAuthz(async () => true);
+    }
+  });
+
+  test('ยังไม่เปิดดูจอ → สั่งงานไฟล์ (control:fs) ไม่ได้', async () => {
+    const s = await open();
+    s.emit(1, 'control:fs', { machineId: MACHINE, op: 'list', payload: { path: '/' } });
+    const out = await ack(s, 1);
+    assert.equal(out.ok, false);
+    assert.match(String(out.error), /join/i);
+    assert.equal(await awaitCommand(MACHINE, 80), null, 'ห้ามมีคำสั่ง fs หลุดก่อนเปิดดูจอ');
   });
 
   test('normalizeFps ตัดค่าที่ผิดรูปทุกทาง', () => {

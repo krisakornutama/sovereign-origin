@@ -8,6 +8,7 @@
 // POST   /api/governor/proposals/:id/approve — มนุษย์อนุมัติเรื่องใหญ่
 // POST   /api/governor/proposals/:id/reject  — มนุษย์ปฏิเสธ (พร้อมเหตุผล)
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import {
   governorStatus, setDirection, setAutonomy, setEnabled, setFocusScenario,
@@ -43,11 +44,11 @@ router.put('/focus', authenticate, requireRole('SUPERADMIN'), (req, res) => {
   res.json(governorStatus());
 });
 
-router.post('/cycle', authenticate, async (_req, res) => {
+router.post('/cycle', authenticate, asyncRoute(async (_req, res) => {
   const r = await runGovernorCycle({ force: true });
   if (!r.ok) return res.status(400).json({ error: r.reason || 'cycle failed' });
   res.json(governorStatus());
-});
+}));
 
 router.post('/proposals/:id/approve', authenticate, requireRole('SUPERADMIN'), (req, res) => {
   const r = approveProposal(req.params.id);

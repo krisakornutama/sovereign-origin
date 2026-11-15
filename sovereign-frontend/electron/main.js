@@ -11,6 +11,8 @@ const { spawn } = require('child_process');
 const http = require('http');
 const { verifyAsset, sha256File } = require('./verify-asset');
 const { downloadFile } = require('./download');
+const { superviseBackend } = require('./backend-supervisor.cjs');
+const { applyApiUrl } = require('./backend-port.cjs');
 const yt = require('./youtube');
 const { registerYouTubeIpc } = require('./youtube-ipc');
 
@@ -489,25 +491,13 @@ async function checkForUpdates(interactive) {
   return res;
 }
 
-// ── sidecar backend (เฉพาะตอนมี dist จริง — เช่นรันจากซอร์ส) ──
+// ── sidecar backend — เลือกพอร์ต/ตรวจว่าเป็น API ของเราหรือของคนอื่น อยู่ใน backend-supervisor.cjs
 function startBackend() {
-  try {
-    const coreApiPath = app.isPackaged
-      ? path.join(process.resourcesPath, 'core-api/dist/server.js')
-      : path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
-    if (!fs.existsSync(coreApiPath)) return; // ไม่มี backend ในตัว → ใช้ระบบหลัก (Docker/autostart) แทน
-    const cwd = path.dirname(path.dirname(coreApiPath));
-    backend = spawn('node', [coreApiPath], {
-      env: {
-        ...process.env,
-        PORT: '3001',
-        // ถ้าเครื่องแม่มี DATABASE_URL อยู่แล้ว อย่าทับ
-        ...(process.env.DATABASE_URL ? {} : { DATABASE_URL: 'file:' + path.join(app.getPath('userData'), 'data.db') }),
-      },
-      stdio: 'ignore', cwd, detached: false,
-    });
-    backend.on('error', (e) => console.error('backend spawn error', e.message));
-  } catch (e) { console.error('startBackend failed', e.message); }
+  // พอร์ตสำรอง: บอก renderer ผ่านค่าที่ config.ts อ่านอยู่แล้ว (localStorage)
+  // 3001 = ค่าเริ่มต้น ⇒ ต้องล้าง key ที่ค้างจากการหันไปพอร์ตสำรองรอบก่อน
+  superviseBackend({ app, http, spawn, dlog, onPort: (port) => applyApiUrl(win && win.webContents, port) })
+    .then((res) => { if (res.child) backend = res.child; applyApiUrl(win && win.webContents, res.port); })
+    .catch((e) => console.error('startBackend failed', e.message));
 }
 
 // single instance — startup folder + HKCU\Run ยิง exe ซ้ำสองตัวแข่ง startSystem กันเอง

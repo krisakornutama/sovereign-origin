@@ -179,27 +179,41 @@ describe('DELETE /api/backup/:file — กันหลุดออกนอก�
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-describe('POST /api/backup/restore — validate ชื่อไฟล์ก่อนแตะ psql', () => {
-  test('ชื่อไฟล์ผ่าน path traversal = 500 และไม่ไปถึง psql', async () => {
-    const res = await post(server.baseUrl + '/api/backup/restore', { file: '../../etc/passwd' });
-    assert.strictEqual(res.status, 500);
+describe('POST /api/backup/restore — validate ชื่อไฟล์ + ยืนยันเจตนาก่อนแตะ psql', () => {
+  test('ชื่อไฟล์ผ่าน path traversal = 400 และไม่ไปถึง psql', async () => {
+    const res = await post(server.baseUrl + '/api/backup/restore', { file: '../../etc/passwd', confirm: '../../etc/passwd' });
+    assert.strictEqual(res.status, 400);
     assert.match((await res.json()).error, /Invalid backup file name/);
   });
 
-  test('ไฟล์ที่ไม่มีอยู่จริง = 500 พร้อมบอกว่าไม่เจอ (ไม่ใช่ psql error)', async () => {
-    const res = await post(server.baseUrl + '/api/backup/restore', { file: 'no-such-backup.sql.gz' });
-    assert.strictEqual(res.status, 500);
+  test('ไฟล์ที่ไม่มีอยู่จริง = 404 พร้อมบอกว่าไม่เจอ (ไม่ใช่ psql error)', async () => {
+    const res = await post(server.baseUrl + '/api/backup/restore', { file: 'no-such-backup.sql.gz', confirm: 'no-such-backup.sql.gz' });
+    assert.strictEqual(res.status, 404);
     assert.match((await res.json()).error, /not found/);
   });
 
-  test('ไม่ส่งชื่อไฟล์ = ถูกปฏิเสธ', async () => {
+  test('ไม่ส่งชื่อไฟล์ = ถูกปฏิเสธ (400)', async () => {
     const res = await post(server.baseUrl + '/api/backup/restore', {});
-    assert.strictEqual(res.status, 500);
-    assert.match((await res.json()).error, /Invalid backup file name/);
+    assert.strictEqual(res.status, 400);
+    assert.match((await res.json()).error, /ชื่อไฟล์/);
+  });
+
+  test('ไม่ส่ง confirm (หรือ confirm ไม่ตรง) = 400 ก่อนตรวจไฟล์ด้วยซ้ำ', async () => {
+    const file = 'sovereign_backup_20261001_020000.sql.gz';
+    const missing = await post(server.baseUrl + '/api/backup/restore', { file });
+    assert.strictEqual(missing.status, 400);
+    assert.match((await missing.json()).error, /ยืนยัน/);
+
+    const mismatch = await post(server.baseUrl + '/api/backup/restore', { file, confirm: 'sovereign_backup_20261002_020000.sql.gz' });
+    assert.strictEqual(mismatch.status, 400);
   });
 
   test('role ต่ำกว่า SUPERADMIN = 403 (restore มีผลกับทั้งฐานข้อมูล)', async () => {
-    const res = await post(server.baseUrl + '/api/backup/restore', { file: 'sovereign_backup_20261001_020000.sql.gz' }, { Authorization: `Bearer ${VIEWER}` });
+    const res = await post(
+      server.baseUrl + '/api/backup/restore',
+      { file: 'sovereign_backup_20261001_020000.sql.gz', confirm: 'sovereign_backup_20261001_020000.sql.gz' },
+      { Authorization: `Bearer ${VIEWER}` }
+    );
     assert.strictEqual(res.status, 403);
   });
 });

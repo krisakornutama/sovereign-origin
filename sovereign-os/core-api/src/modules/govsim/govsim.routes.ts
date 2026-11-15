@@ -1,6 +1,7 @@
 // ── Governance Simulation Routes ──
 // War Room API: สร้าง/โหลด scenario, tick, levers, narrative, history
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { authenticate } from '../../middleware/auth.middleware';
 import {
   createScenario, listScenarios, loadScenario, deleteScenario,
@@ -59,7 +60,7 @@ router.put('/scenarios/:id/levers', authenticate, (req, res) => {
 });
 
 // สร้าง narrative (LLM)
-router.post('/scenarios/:id/narrative', authenticate, async (req, res) => {
+router.post('/scenarios/:id/narrative', authenticate, asyncRoute(async (req, res) => {
   const kind = req.body?.kind || 'analysis';
   if (!['newspaper', 'threat_letter', 'analysis'].includes(kind)) {
     return res.status(400).json({ error: 'kind ต้องเป็น newspaper | threat_letter | analysis' });
@@ -67,7 +68,7 @@ router.post('/scenarios/:id/narrative', authenticate, async (req, res) => {
   const result = await generateNarrative(req.params.id, kind);
   addNarrative(req.params.id, result);
   res.json(result);
-});
+}));
 
 // ประวัติ narrative
 router.get('/scenarios/:id/narrative', authenticate, (req, res) => {

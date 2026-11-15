@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fs from 'fs';
 import { config } from './config';
+import { runStartupMigrations } from './services/startup-migration.service';
 import { auditStateChange } from './middleware/auth.middleware';
 import { errorHandler } from './middleware/error.middleware';
 import { applyJsonBodyParsers } from './lib/http-body';
@@ -12,6 +13,10 @@ import { mountRoutes } from './routes';
 import { getObservability } from './middleware/observability.middleware';
 import { createSocketServer } from './realtime/socket';
 import { startWorkers } from './workers/start';
+import { installErrorDedupe } from './lib/log-once';
+
+// DB ล่มทีเดียว worker หลายตัวยิง error ซ้ำทุกวินาที — กลืนที่ประตูเดียวของโปรเซส
+installErrorDedupe();
 import { initFleetPolicyCache } from './services/fleet-policy.service';
 import './services/livestock-cron.service'; // ปลดล็อก withdrawal + เตือนวัคซีน รายวัน
 
@@ -50,7 +55,9 @@ app.use((_req, res, next) => {
   next();
 });
 // อยู่หลัง proxy (nginx/caddy) → rate-limit นับ IP จริงได้
-app.set('trust proxy', 1);
+// ค่าเริ่มต้นคือ "ไม่เชื่อ" (TRUST_PROXY ไม่ตั้ง = false): ถ้า API เปิดตรง ผู้เรียกจะใส่
+// X-Forwarded-For เองแล้วกลายเป็น IP อะไรก็ได้ (หลบ rate limit / ปลอม audit / อ้างเป็น loopback)
+app.set('trust proxy', config.trustProxy);
 // request-id + access log (JSON) + ตัวนับ/metrics — ต้องอยู่ต้น stack เพื่อให้ครอบทุกคำขอ
 // (รวมคำขอที่ถูกปฏิเสธด้วย 401/413/429 ซึ่งเป็นคำขอที่อยากเห็นที่สุดเวลามีปัญหา)
 app.use(getObservability().requestContext);
@@ -58,7 +65,18 @@ app.use(cors({
   origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(','),
   // เปิดให้ browser อ่าน Retry-After ได้ (ใช้แสดง countdown ตอนโดน rate limit)
   // x-request-id: ผู้ใช้แจ้งเลขนี้มา = ไล่ log ได้ทันทีว่าคำขอนั้นเกิดอะไรขึ้น
-  exposedHeaders: ['Retry-After', 'x-request-id'],
+  // X-Audit-Export-*: หน้า /audit ต้องรู้ว่าไฟล์ CSV ถูกตัดแถวหรือไม่ (ถ้าไม่ expose
+  // browser จะซ่อน header ⇒ UI เตือน "ไม่ครบ" ไม่ได้เลย และไฟล์ที่ขาดจะเงียบสนิท)
+  exposedHeaders: [
+    'Retry-After',
+    'x-request-id',
+    'X-Audit-Export-Rows',
+    'X-Audit-Export-Total',
+    'X-Audit-Export-Truncated',
+    'X-Audit-List-Has-More',
+    'X-Audit-List-Offset',
+    'X-Audit-List-Limit',
+  ],
 }));
 // Stripe webhook — ลายเซ็นคำนวณจาก BYTE ต้นฉบับ จึงต้องได้ body ก่อนที่
 // express.json() ทั้งแอปจะ parse ทิ้ง (แบบเดียวกับ client-monitor ที่ใช้ parser เฉพาะ route)
@@ -68,7 +86,8 @@ app.use(auditStateChange);
 
 mountRoutes(app);
 
-startWorkers(app, io);
+// worker เริ่มหลัง migrate: cron/timer ของ worker ไม่ควรคิวรี DB ก่อนตารางพร้อม
+// (seed ของ route module ยังทำงานตอน import — คนละจุดกัน)
 
 // ── HTTPS (production): ถ้าตั้ง TLS_CERT + TLS_KEY จะรันผ่าน TLS ──
 function startListener() {
@@ -89,8 +108,22 @@ function startListener() {
   });
 }
 
-void initFleetPolicyCache().finally(() => {
+/** migrate ก่อนเริ่มรับ request — ล้มเหลวก็ยังเสิร์ฟต่อ แต่ต้องมีร่องรอยและ health บอกความจริง */
+function startAfterMigrations() {
+  const migration = runStartupMigrations({ env: process.env });
+  if (!migration.ran) {
+    console.log(`🗄️ migrate: ข้าม (${migration.reason}) — ${migration.detail}`);
+  } else if (migration.ok) {
+    console.log('🗄️ migrate: เรียบร้อย (' + migration.detail.split('\n').slice(-1)[0] + ')');
+  } else {
+    console.error('🗄️ migrate: ล้มเหลว — ' + migration.detail);
+  }
+  startWorkers(app, io);
   startListener();
+}
+
+void initFleetPolicyCache().finally(() => {
+  startAfterMigrations();
   console.log(`📡 WebSocket server ready (${config.isProduction ? 'production' : 'development'})`);
 });
 

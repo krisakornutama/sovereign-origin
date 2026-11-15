@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import axios from 'axios';
 import { verifyJwt } from '../../lib/jwt-verify';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
@@ -79,9 +80,9 @@ router.get('/intel', authenticate, async (req, res) => {
   }
 });
 
-router.get('/intel/stats', authenticate, async (req, res) => {
+router.get('/intel/stats', authenticate, asyncRoute(async (req, res) => {
   res.json(await threatIntel.stats());
-});
+}));
 
 router.post('/intel', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
   try {
@@ -113,19 +114,19 @@ router.delete('/intel/:id', authenticate, requireRole('SUPERADMIN'), async (req,
   }
 });
 
-router.post('/intel/update-feeds', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/intel/update-feeds', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const result = await threatIntel.updateFromFeeds();
   res.json(result);
-});
+}));
 
-router.post('/intel/check', authenticate, async (req, res) => {
+router.post('/intel/check', authenticate, asyncRoute(async (req, res) => {
   const { domains = [], ips = [] } = req.body || {};
   const [matchedDomains, matchedIps] = await Promise.all([
     threatIntel.matchDomains(Array.isArray(domains) ? domains : []),
     threatIntel.matchIps(Array.isArray(ips) ? ips : []),
   ]);
   res.json({ matchedDomains, matchedIps, total: matchedDomains.length + matchedIps.length });
-});
+}));
 
 // ═══ 2. PI-HOLE (DNS Filter) ═══
 router.get('/dns/stats', authenticate, async (req, res) => {
@@ -133,19 +134,19 @@ router.get('/dns/stats', authenticate, async (req, res) => {
   res.json(status);
 });
 
-router.get('/dns/top-blocked', authenticate, async (req, res) => {
+router.get('/dns/top-blocked', authenticate, asyncRoute(async (req, res) => {
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
   res.json(await piHole.topBlocked(limit));
-});
+}));
 
-router.get('/dns/clients', authenticate, async (req, res) => {
+router.get('/dns/clients', authenticate, asyncRoute(async (req, res) => {
   res.json(await piHole.topClients(15));
-});
+}));
 
-router.get('/dns/queries', authenticate, async (req, res) => {
+router.get('/dns/queries', authenticate, asyncRoute(async (req, res) => {
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 30;
   res.json(await piHole.recentQueries(limit));
-});
+}));
 
 // block: ไป Pi-hole blacklist + ลง Threat DB ด้วย
 router.post('/dns/block', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
@@ -160,30 +161,30 @@ router.post('/dns/block', authenticate, requireRole('SUPERADMIN'), async (req, r
   if (dns.ok) securityStream.push('DNS_BLOCK', { domain, intel: intelItem });
 });
 
-router.post('/dns/allow', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/dns/allow', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const domain = String(req.body?.domain || '').trim().toLowerCase();
   if (!domain) return res.status(400).json({ error: 'โดเมนไม่ถูกต้อง' });
   const dns = await piHole.removeBlacklist(domain);
   res.json({ ok: dns.ok, error: dns.error });
   if (dns.ok) securityStream.push('DNS_ALLOW', { domain });
-});
+}));
 
 // ═══ 3. IDS (Suricata) ═══
-router.get('/ids/alerts', authenticate, async (req, res) => {
+router.get('/ids/alerts', authenticate, asyncRoute(async (req, res) => {
   const take = req.query.take ? parseInt(String(req.query.take), 10) : 40;
   res.json({ alerts: await idsReader.recentAlerts(take), stats: await idsReader.stats() });
-});
+}));
 
 // ═══ 4. LITE AV (SHA-256 Checksum Engine — แทน ClamAV daemon) ═══
 router.get('/av/status', authenticate, async (_req, res) => {
   res.json(hashEngine.status());
 });
 
-router.post('/av/scan', authenticate, requireRole('SUPERADMIN'), uploadLimiter, upload.single('file'), async (req, res) => {
+router.post('/av/scan', authenticate, requireRole('SUPERADMIN'), uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์ (multipart field: file)' });
   const result = await hashEngine.scanBuffer(req.file.buffer, { originalName: req.file.originalname });
   res.json({ fileName: req.file.originalname, ...result });
-});
+}));
 
 // ═══ 5. APP CONTROL (DPI/Application Blocking) ═══
 router.get('/apps', authenticate, async (req, res) => {
@@ -221,7 +222,7 @@ router.get('/apps/blocklist', authenticate, async (req, res) => {
 });
 
 // ส่ง blocklist ทั้งหมดเข้า Pi-hole blacklist แบบ batch
-router.post('/apps/sync-pihole', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/apps/sync-pihole', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const domains = appControl.blockedDomains();
   let okCount = 0;
   const errors: string[] = [];
@@ -231,7 +232,7 @@ router.post('/apps/sync-pihole', authenticate, requireRole('SUPERADMIN'), async 
     else errors.push(`${d}: ${r.error}`);
   }
   res.json({ okCount, total: domains.length, errors: errors.slice(0, 10) });
-});
+}));
 
 // ═══ 6. NETWORK VISIBILITY ═══
 router.get('/network/devices', authenticate, async (req, res) => {
@@ -243,18 +244,18 @@ router.get('/network/devices', authenticate, async (req, res) => {
 });
 
 // ═══ 7. AI ANALYST ═══
-router.get('/ai/last', authenticate, async (req, res) => {
+router.get('/ai/last', authenticate, asyncRoute(async (req, res) => {
   res.json({ report: await aiAnalyst.last(), error: aiAnalyst.lastError, lastRunAt: aiAnalyst.lastRunAt });
-});
+}));
 
-router.post('/ai/analyze', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/ai/analyze', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const report = await aiAnalyst.analyzeNow();
   securityStream.push('AI_ANALYSIS', {
     summary: report?.summary?.slice(0, 200) || null,
     stats: report?.stats || null,
   });
   res.json(report);
-});
+}));
 
 // ═══ 8. EMERGENCY KILL-SWITCH (AI Agent Global Override) ═══
 router.get('/kill-switch', authenticate, async (_req, res) => {
@@ -276,18 +277,18 @@ router.get('/first-responder', authenticate, async (_req, res) => {
   res.json(firstResponder.status());
 });
 
-router.put('/first-responder', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/first-responder', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
   const { active, note } = req.body || {};
   const state = await firstResponder.set(Boolean(active), req.user?.id || 'unknown', typeof note === 'string' ? note : '');
   res.json(state);
-});
+}));
 
 // ═══ 11. REALITY-CHECK / PARANOIA INDEX ═══
-router.get('/reality', authenticate, async (_req, res) => {
+router.get('/reality', authenticate, asyncRoute(async (_req, res) => {
   res.json(await realityCheck.stats());
-});
+}));
 
-router.post('/reality/correct', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), async (req, res) => {
+router.post('/reality/correct', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
   const { kind, note, source_type, source_event_id } = req.body || {};
   if (!kind || !['false_positive', 'false_negative', 'context'].includes(kind)) {
     return res.status(400).json({ error: 'kind ต้องเป็น false_positive / false_negative / context' });
@@ -297,20 +298,20 @@ router.post('/reality/correct', authenticate, requireRole('SUPERADMIN', 'NODE_AD
     eventId: source_event_id ? String(source_event_id) : undefined,
   });
   res.status(201).json(stats);
-});
+}));
 
 // ═══ 12. CHAOS DRILL (ซ้อมรับวิกฤต) ═══
 router.get('/drill', authenticate, async (_req, res) => {
   res.json({ report: lastDrillReport() });
 });
 
-router.post('/drill', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/drill', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
   const report = await runChaosDrill();
   res.json(report);
-});
+}));
 
 // ═══ 12b. TIME-CONSENSUS (Phase 6 — Byzantine Time Drift & NTP Poisoning) ═══
-router.get('/time-consensus', authenticate, async (_req, res) => {
+router.get('/time-consensus', authenticate, asyncRoute(async (_req, res) => {
   const status = timeConsensus.status();
   if (status.lastCheckAt === null) {
     const found = await timeConsensus.check();
@@ -318,12 +319,12 @@ router.get('/time-consensus', authenticate, async (_req, res) => {
     return;
   }
   res.json(status);
-});
+}));
 
-router.post('/time-consensus/check', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/time-consensus/check', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
   const found = await timeConsensus.check();
   res.json({ ...timeConsensus.status(), found });
-});
+}));
 
 // ═══ 9. REAL-TIME EVENT STREAM (SSE) ═══
 // EventSource ไม่สามารถตั้ง header ได้ → รับ JWT ผ่าน query param `?token=...`

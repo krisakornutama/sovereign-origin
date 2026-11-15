@@ -35,23 +35,55 @@ export default function AuditPage() {
   const t = useLanguageStore((s) => s.t);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [limit, setLimit] = useState(100);
+  // แบ่งหน้าแบบ offset: เห็นแค่ N แถวล่าสุดไม่พอสำหรับ "ตรวจย้อนได้"
+  // — API บอก "มีต่อไหม" ทาง header (ดึงเกินมา 1 แถว) ไม่ต้องนับทั้งตาราง
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [passwordOnly, setPasswordOnly] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // ช่วงวันเวลา — ต้องเป็นเวลาสัมบูรณ์ (ISO) ไม่ใช่สตริง datetime-local ดิบ ๆ
+  // เพราะ browser กับ server อยู่คนละ timezone ได้: แปลงที่ browser แล้วส่ง ISO
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  // ผลของการส่งออก — ไฟล์ที่ถูกตัดเพดานต้องบอกให้รู้ ไม่ใช่เงียบ
+  const [exportNote, setExportNote] = useState<{ rows: number; total: number; truncated: boolean } | null>(null);
+
+  const rangeParams = (params: URLSearchParams) => {
+    if (from) {
+      const d = new Date(from);
+      if (!Number.isNaN(d.getTime())) params.set('from', d.toISOString());
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!Number.isNaN(d.getTime())) params.set('to', d.toISOString());
+    }
+    return params;
+  };
 
   // ดาวน์โหลด CSV ตามตัวกรองปัจจุบัน — ใช้เป็นหลักฐานส่งผู้ตรวจได้โดยไม่ต้องเปิด DB
   const exportCsv = async () => {
     setExporting(true);
     setError('');
+    setExportNote(null);
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set('q', query.trim());
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit/export?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
       const blob = await res.blob();
+      // server บอกจำนวนจริงของไฟล์นี้ (header ถูก expose ใน CORS แล้ว) — ถ้าอ่านไม่ได้
+      // ให้ถือว่า "ไม่รู้" ไม่ใช่ "ครบ" เพื่อไม่ให้ผู้ใช้เชื่อไฟล์ที่อาจถูกตัด
+      const rows = Number(res.headers.get('X-Audit-Export-Rows'));
+      const total = Number(res.headers.get('X-Audit-Export-Total'));
+      const truncated = res.headers.get('X-Audit-Export-Truncated') === 'true';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -60,6 +92,7 @@ export default function AuditPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      if (Number.isFinite(rows) && Number.isFinite(total)) setExportNote({ rows, total, truncated });
     } catch (err: any) {
       setError(t('audit.exportError', 'ส่งออกไม่สำเร็จ: {msg}', { msg: err.message || '' }));
     } finally {
@@ -72,12 +105,19 @@ export default function AuditPage() {
     setError('');
     try {
       const params = new URLSearchParams({ limit: String(limit) });
+      if (offset > 0) params.set('offset', String(offset));
       if (query.trim()) params.set('q', query.trim());
       if (passwordOnly) params.set('actionPrefix', PASSWORD_PREFIX);
+      rangeParams(params);
       const res = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audit?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // 400 จากเพดานผลค้นหามีข้อความบอกทางแก้ — ต้องแสดงข้อความนั้น ไม่ใช่ "HTTP 400"
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
       setLogs(data);
+      setHasMore(res.headers.get('X-Audit-List-Has-More') === 'true');
     } catch (err: any) {
       setError(`${err.message || t('audit.loadError', 'ไม่สามารถดึง audit log ได้')}`);
       setLogs([]);
@@ -89,7 +129,7 @@ export default function AuditPage() {
   useEffect(() => {
     if (!isHydrated || !isAuthenticated) return;
     loadLogs();
-  }, [isHydrated, isAuthenticated, limit, passwordOnly]);
+  }, [isHydrated, isAuthenticated, limit, passwordOnly, offset]);
 
   if (!isHydrated) {
     return <div className="text-white p-8">{t('common.loading', 'กำลังโหลด...')}</div>;
@@ -133,7 +173,13 @@ export default function AuditPage() {
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan">{t('audit.title', 'ประวัติการกระทำ (Audit Log)')}</h2>
           <div className="flex gap-3 items-center">
             <form
-              onSubmit={(e) => { e.preventDefault(); loadLogs(); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // เปลี่ยนตัวกรองแล้วต้องกลับหน้าแรก ไม่งั้นจะค้างอยู่ offset เก่า
+                // แล้วเห็น "ว่าง" ทั้งที่มีข้อมูล (อ่านผิดว่าไม่มีเหตุการณ์)
+                if (offset !== 0) setOffset(0);
+                else loadLogs();
+              }}
               className="flex gap-2 items-center"
             >
               <input
@@ -147,7 +193,10 @@ export default function AuditPage() {
               </button>
             </form>
             <button
-              onClick={() => setPasswordOnly((v) => !v)}
+              onClick={() => {
+                setPasswordOnly((v) => !v);
+                if (offset !== 0) setOffset(0);
+              }}
               className={passwordOnly ? 'btn-primary' : 'btn-secondary'}
             >
               🔑 {t('audit.passwordOnly', 'เรื่องรหัสผ่าน')}
@@ -157,7 +206,10 @@ export default function AuditPage() {
             </button>
             <select
               value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                if (offset !== 0) setOffset(0);
+              }}
               className="input text-sm"
             >
               {LIMIT_OPTIONS.map((n) => (
@@ -167,7 +219,49 @@ export default function AuditPage() {
           </div>
         </div>
 
+        {/* ช่วงเวลา — ตัวกรองใช้ทั้งรายการและไฟล์ export (กด "ค้นหา" เพื่อใช้กับรายการ) */}
+        <div className="flex flex-wrap gap-2 items-center text-sm">
+          <span className="text-gray-500">{t('audit.rangeLabel', 'ช่วงเวลา')}</span>
+          <input
+            type="datetime-local"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="input text-sm"
+            aria-label={t('audit.fromLabel', 'ตั้งแต่')}
+          />
+          <span className="text-gray-500">–</span>
+          <input
+            type="datetime-local"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="input text-sm"
+            aria-label={t('audit.toLabel', 'ถึง')}
+          />
+          {(from || to) && (
+            <button
+              type="button"
+              onClick={() => { setFrom(''); setTo(''); }}
+              className="btn-secondary"
+            >
+              {t('audit.clearRange', 'ล้างช่วง')}
+            </button>
+          )}
+          <span className="text-xs text-gray-500">{t('audit.rangeHint', 'ใช้กับทั้งรายการและไฟล์ที่ส่งออก')}</span>
+        </div>
+
         {error && <div className="card p-3 text-sm text-rose-400">{error}</div>}
+
+        {exportNote && (
+          <div className={`card p-3 text-sm ${exportNote.truncated ? 'text-amber-300 border border-amber-700/60' : 'text-emerald-300'}`}>
+            {exportNote.truncated
+              ? t(
+                  'audit.exportTruncated',
+                  'ไฟล์ที่ได้มี {rows} จากทั้งหมด {total} รายการ — ถูกตัดเพราะถึงเพดานต่อไฟล์ อย่าส่งต่อว่าเป็นข้อมูลครบทั้งช่วง ให้แบ่งช่วงวันที่แล้วส่งออกหลายไฟล์',
+                  { rows: exportNote.rows, total: exportNote.total }
+                )
+              : t('audit.exportComplete', 'ส่งออกครบทั้งช่วงแล้ว: {rows} รายการ', { rows: exportNote.rows })}
+          </div>
+        )}
 
         <div className="card panel-cyan overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/30 to-transparent" />
@@ -228,7 +322,33 @@ export default function AuditPage() {
           </div>
         </div>
 
-        <div className="text-xs text-gray-500">{t('audit.countLabel', 'แสดง {n} รายการ (ล่าสุดก่อน)', { n: logs.length })}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+          <span>
+            {logs.length > 0
+              ? t('audit.rangeShown', 'รายการที่ {from}–{to} (ใหม่สุดก่อน)', { from: offset + 1, to: offset + logs.length })
+              : offset > 0
+                ? t('audit.emptyPage', 'ไม่พบรายการในหน้านี้ — กลับไปหน้าแรก')
+                : t('audit.noLogsShort', 'ยังไม่มีรายการ')}
+          </span>
+          <div className="flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+              disabled={offset === 0 || loading}
+              className="btn-secondary"
+            >
+              {t('audit.prevPage', '← ก่อนหน้า')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOffset(offset + limit)}
+              disabled={!hasMore || loading}
+              className="btn-secondary"
+            >
+              {t('audit.nextPage', 'ถัดไป →')}
+            </button>
+          </div>
+        </div>
       </main>
     </div>
       </div>

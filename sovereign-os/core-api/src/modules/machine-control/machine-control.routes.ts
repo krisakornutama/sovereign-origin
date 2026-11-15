@@ -30,6 +30,7 @@ import {
   getLatestFrame,
   isAuditableCommandType,
   machineRoom,
+  peekCommandMachine,
   submitFrame,
   submitResult,
 } from '../../services/machine-control.service';
@@ -154,11 +155,19 @@ router.post('/frame', requireMachineToken, async (req: Request, res: Response) =
 
 // POST /api/machine-control/result — runner รายงานผลของคำสั่ง
 router.post('/result', requireMachineToken, async (req: Request, res: Response) => {
+  const machine = (req as Request & { machine?: MachineRow }).machine!;
   try {
     const body = (req.body || {}) as { commandId?: unknown; ok?: unknown; result?: unknown; error?: unknown };
     const commandId = typeof body.commandId === 'string' ? body.commandId : '';
     if (!commandId) {
       res.status(400).json({ error: 'commandId required' });
+      return;
+    }
+
+    // เครื่องที่รายงานผลต้องเป็นเครื่องที่ได้รับคำสั่งนั้น — ไม่ใช่เครื่องอื่นที่ถือ token ถูกต้อง
+    const owner = peekCommandMachine(commandId);
+    if (owner && owner !== machine.id) {
+      res.status(403).json({ error: 'command does not belong to this machine' });
       return;
     }
 

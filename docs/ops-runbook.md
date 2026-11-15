@@ -373,7 +373,7 @@ npm run coverage:core -- --no-floor          # วัดเฉย ๆ ไม่�
 
 **ขั้นเจ้าของทำเอง (~15 นาที — สมัครแทนไม่ได้):**
 
-> **สถานะจริง 29/9/69:** บัญชี DigitalPlat สร้าง+ยืนยันเมลแล้ว (`krisakornutama` / owteenhoper@gmail.com · Account ID 1790697100 · Free slots: 1) · Cloudflare มีอยู่แล้ว (ล็อกอิน GitHub) และ zone `sovereign-shop.dpdns.org` ถูกเพิ่มเรียบร้อย — **NS ของบัญชีนี้: `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com`**
+> **สถานะจริง 29/9/69:** บัญชี DigitalPlat สร้าง+ยืนยันเมลแล้ว (`krisakornutama` / owner@example.com · Account ID 1790697100 · Free slots: 1) · Cloudflare มีอยู่แล้ว (ล็อกอิน GitHub) และ zone `sovereign-shop.dpdns.org` ถูกเพิ่มเรียบร้อย — **NS ของบัญชีนี้: `delilah.ns.cloudflare.com` และ `vin.ns.cloudflare.com`**
 > ⚠️ ตัวตรวจ availability ตอบ "unavailable" ให้ทุกชื่อเมื่อควบคุมผ่านระบบอัตโนมัติ (ตัวตรวจมนุษย์บล็อกเงียบ) — **ขั้นจดจริงต้องทำในเบราว์เซอร์ปกติของเจ้าของเอง** (แชท AI จะจดให้ไม่ได้ ไม่ใช่เพราะเทคนิค แต่เพื่อกันบัญชีโดนแฟล็ก)
 > **สถานะจริง 2/10/69 — จดจริง 1 ชื่อ, อีกชื่อเป็นแค่ zone ใน Cloudflare:** `sovereignoriginshop.dpdns.org` (30/9 — ACTIVE ใช้งานจริง NS archer+kallie) · `sovereign-shop.dpdns.org` — **มีตัวตนแค่ในบัญชี Cloudflare** (zone ทดสอบ 29/9) — **ยังไม่ได้จดจริงที่ DigitalPlat** (ตรวจ 2/10: parent ทั้ง 4 NS + ns1/ns2.dpdns.org ตอบ NXDOMAIN เทียบเท่าชื่อปลอม) — ยังไม่ต้องใช้ tunnel คู่ (แผนต่อใน "### โซนที่สอง" ท้าย §นี้)
 1. สมัครบัญชีฟรี https://dash.cloudflare.com/sign-up (อีเมล + รหัส — ไม่ต้องใส่บัตร)

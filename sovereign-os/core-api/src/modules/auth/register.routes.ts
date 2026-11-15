@@ -1,6 +1,7 @@
 // src/modules/auth/register.routes.ts
 // ทางเข้าเดียวสำหรับสมัครสมาชิกเอง: ต้องมีรหัสเชิญจาก SUPERADMIN เท่านั้น
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { checkInvite, registerWithInvite, InviteError } from '../../services/invite.service';
 
@@ -15,11 +16,11 @@ export const registerLimiter = rateLimit({
 });
 
 // POST /api/auth/register/check — ตรวจรหัสเชิญก่อนกรอกฟอร์ม (ไม่กินสิทธิ์)
-router.post('/register/check', registerLimiter, async (req, res) => {
+router.post('/register/check', registerLimiter, asyncRoute(async (req, res) => {
   const result = await checkInvite(req.body?.code);
   if (!result.valid) return res.status(400).json({ valid: false, reason: result.reason });
   res.json({ valid: true, role: result.role, usesLeft: result.usesLeft, expiresAt: result.expiresAt });
-});
+}));
 
 // POST /api/auth/register — สมัครด้วยรหัสเชิญ + บันทึกความยินยอมขั้นจำเป็น
 router.post('/register', registerLimiter, async (req, res) => {

@@ -116,10 +116,13 @@ describe('Security routes (firewall engine CRUD + events)', () => {
     assert.equal(body.defaultPolicy, 'DENY');
   });
 
-  test('GET/POST /events — list + create', async () => {
+  test('GET/POST /events — list (รูปแบบ {events,degraded}) + create', async () => {
     const list = await fetch(`${s.baseUrl}/api/security/events`, { headers: auth });
     assert.equal(list.status, 200);
-    assert.equal(((await list.json()) as any[]).length, 1);
+    const listBody: any = await list.json();
+    // รูปแบบใหม่: ต้องแยกได้ว่า "ไม่มีเหตุการณ์" กับ "อ่านไม่ได้"
+    assert.equal(listBody.degraded, false);
+    assert.equal(listBody.events.length, 1);
     const created = await fetch(`${s.baseUrl}/api/security/events`, {
       method: 'POST', headers: auth,
       body: JSON.stringify({ event_type: 'PORT_SCAN', severity: 'warning', source_ip: '203.0.113.5', description: 'สแกนพอร์ตผิดปกติ' }),

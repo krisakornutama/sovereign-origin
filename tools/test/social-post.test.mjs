@@ -450,7 +450,12 @@ function loadShell(opts = {}) {
       if (id === 'electron') return electron;
       // โมดูลในเครื่องของ shell (./x) ทุกตัว resolve จากโฟลเดอร์ electron เสมอ
       // ⚠ อย่ากลับไปไล่ชื่อทีละตัว — เพิ่มโมดูลใหม่แล้วเทสต์ทั้งไฟล์จะล้มโดยไม่เกี่ยวกับบั๊กจริง
-      if (typeof id === 'string' && id.startsWith('./')) return require(path.join(ELECTRON_DIR, `${id.slice(2)}.js`));
+      if (typeof id === 'string' && id.startsWith('./')) {
+        const rel = id.slice(2);
+        // main.js อาจ require ไฟล์ที่มีนามสกุลอยู่แล้ว (เช่น ./backend-supervisor.cjs) — อย่าเติม .js ทับ
+        const file = path.extname(rel) ? path.join(ELECTRON_DIR, rel) : path.join(ELECTRON_DIR, rel + '.js');
+        return require(file);
+      }
       return require(id);
     },
     console: { log() {}, error() {}, warn() {} },

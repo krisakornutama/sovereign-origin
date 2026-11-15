@@ -1,11 +1,12 @@
 import { Router } from 'express';
+import { asyncRoute } from '../../lib/async-handler';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 
 const router = Router();
 
 // GET /api/devices
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, asyncRoute(async (req, res) => {
   const user = req.user!;
   let where = {};
   if (user.role === 'NODE_ADMIN') {
@@ -13,7 +14,7 @@ router.get('/', authenticate, async (req, res) => {
   }
   const devices = await prisma.device.findMany({ where });
   res.json(devices);
-});
+}));
 
 // ตรวจสอบพิกัด GPS (คืน null ถ้าไม่ได้ส่ง) — กันค่าผิดช่วง
 function parseLocation(body: any): { latitude?: number; longitude?: number } | { error: string } {
@@ -32,7 +33,7 @@ function parseLocation(body: any): { latitude?: number; longitude?: number } | {
 }
 
 // POST /api/devices
-router.post('/', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.post('/', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), asyncRoute(async (req, res) => {
   const { node_id, type, mqtt_topic, is_active } = req.body;
   const loc = parseLocation(req.body);
   if ('error' in loc) return res.status(400).json({ error: loc.error });
@@ -40,7 +41,7 @@ router.post('/', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (r
     data: { node_id, type, mqtt_topic, is_active: is_active ?? true, ...loc },
   });
   res.status(201).json(device);
-});
+}));
 
 // ⚠️ ต้องวาง route ที่เป็น static path ไว้ก่อน dynamic path
 // GET /api/devices/status

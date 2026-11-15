@@ -47,3 +47,20 @@ export function decideMigrateAction({
   if (!isUnmanagedSchemaError(deployOutput)) return 'fail';
   return driftOk === true ? 'baseline' : 'fail';
 }
+
+/**
+ * ชื่อคำสั่ง npx ที่เรียกได้จริงบนแพลตฟอร์มนั้น — Windows มีแค่ `npx.cmd`
+ * ถ้าเรียก `npx` ตรง ๆ ด้วย shell:false จะได้ ENOENT ซึ่งถูกอ่านผิดเป็น
+ * "migrate ล้ม" ทั้งที่ยังไม่เคยลอง deploy (เคสจริง 13/11/69 บนเครื่องเดสก์ท็อป)
+ */
+export function npxBin(platform: string = process.platform): string {
+  return platform === 'win32' ? 'npx.cmd' : 'npx';
+}
+
+/**
+ * ตัวเลือก spawn สำหรับ npx — Windows ต้องผ่าน shell เพราะ `npx.cmd` ไม่ใช่ executable
+ * ที่ spawn ตรงได้ (shell:false ⇒ ENOENT ซึ่งอ่านผิดเป็น "migrate ล้ม")
+ */
+export function npxSpawnOptions(platform: string = process.platform): { shell: boolean } {
+  return { shell: platform === 'win32' };
+}
