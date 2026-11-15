@@ -74,3 +74,49 @@ const body = openReceipt(receiptFromARegistry, { publicKey: pinnedReleaseKey });
 - **artifact เก็บใน vault เฉพาะเมื่อสั่ง** — ไฟล์ใหญ่ควรอ้างด้วย digest เท่านั้น
 - **ยังไม่มีพิธี rotation ที่เซ็นรับรอง** — เปิดด้วย `keyId` ใหม่ได้และ `trustedKeys` รับหลายกุญแจ แต่ยังไม่มี signed rotation statement
 - **ยังไม่มีการ gate การโหลด module** — M1 ครอบ provenance ของ artifact; ด่านโหลด module/TPM ตาม `ROADMAP_2036.md` §5.2 ยังเป็นงานถัดไป
+
+## Provenance ของ release จริง (ATTEST-002)
+
+`release.yml` แนบ `SHA256SUMS.txt` ไปกับไฟล์ติดตั้งบนหน้า Release เดียวกัน — ถ้าบัญชี GitHub
+ถูกยึด ผู้โจมตีเปลี่ยนทั้งไฟล์และ checksum พร้อมกันได้ checksum จึงกันได้แค่ไฟล์เสีย ไม่กันการปลอม
+`tools/attest-release.mjs` ปิดช่องนั้นด้วยใบรับรองที่เซ็นด้วยกุญแจใน vault และ **ผู้ใช้ตรวจได้เองแบบ offline**
+
+### เซ็น (เครื่องเจ้าของ หรือ CI ที่เปิดสวิตช์แล้ว)
+
+```bash
+# กุญแจ master 32 ไบต์ (base64) — ห้าม commit; state dir เก็บ vault + anchor log
+ATTEST_MASTER_KEY=<base64> node tools/attest-release.mjs --sign   --dir=release-assets --tag=v1.3.11   --previous=<attestation ของรุ่นก่อน>        # ไม่ใส่ก็ได้ = เริ่ม chain ใหม่
+node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
+```
+
+ผลลัพธ์คือ `release-assets/sovereign-attest.json`: receipt ต่อไฟล์ (name/sha256/size), chain `prev`,
+fingerprint ของกุญแจ, vault root และ anchor entry ของรอบนั้น ไฟล์นี้ขึ้น Release ไปพร้อม artifact
+เพราะ workflow อัปโหลด `release-assets/*`
+
+### ตรวจ (ผู้ใช้ปลายทาง)
+
+```bash
+node tools/attest-release.mjs --verify sovereign-attest.json   --fingerprint=<fingerprint ที่ประกาศไว้ในหน้า release/README>
+```
+
+ตัวตรวจใช้ `node:crypto` ล้วน ไม่ต้องติดตั้งอะไรและไม่ต้องต่อเน็ต: ตรวจ hash ของ body, ลายเซ็น Ed25519,
+การ chain ต่อ artifact, digest ของไฟล์ที่อ้าง และ fingerprint ที่ pin — แก้ digest ในเอกสาร
+หรือสลับใบใน chain จะได้ exit 1 พร้อมเหตุผล (พิสูจน์ใน `tools/test/attest-release.test.mjs`)
+
+### เปิดใช้บน CI
+
+release workflow มีขั้นเซ็นอยู่แล้วแต่ **ปิดโดยปริยาย** — ต้องตั้ง:
+- repo variable `ATTEST_ENABLED=true`
+- secret `ATTEST_MASTER_KEY` (base64 ของ 32 ไบต์)
+
+ขั้นนี้จะ clone + build `sovereign-vault`/`sovereign-attest` เป็น sibling, ดึง `sovereign-attest.json`
+ของ release ล่าสุดมาเป็น `--previous` (ต่อ chain ข้ามรุ่น) แล้วเซ็น + ตรวจซ้ำก่อนอัปโหลด
+ไม่ตั้ง variable = ไม่มีใบรับรอง (ดีกว่าใบรับรองที่เซ็นด้วยกุญแจปลอม)
+
+### ข้อจำกัดที่ต้องรู้
+
+- **กุญแจเปลี่ยน = chain ขาด** — ตัวตรวจจะบอกว่า receipt ถูกเซ็นด้วยกุญแจคนละตัวกับ fingerprint ของรุ่นนั้น;
+  การ rotate ต้องมี signed rotation statement (ยังไม่มี — อยู่ในข้อจำกัด M1 ด้านบน)
+- **fingerprint ต้องประกาศนอกช่องทางเดียวกัน** — ถ้าประกาศไว้ในหน้า Release เดียวกับไฟล์ ผู้โจมตีที่ยึดบัญชีก็แก้ได้
+  (ทางที่ถูกคือ README เว็บไซต์ หรือกระดาษในตู้เซฟ)
+- **ยังไม่มี revocation** และยังไม่ผูกกับ transparency log — anchor root ในเอกสารพิสูจน์เฉพาะสถานะของรอบนั้น
