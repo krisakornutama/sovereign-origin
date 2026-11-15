@@ -57,6 +57,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 | ID        | รายการ                                                                 | ที่มา        | สถานะ | หลักฐาน |
 | --------- | ---------------------------------------------------------------------- | ------------ | ----- | ------- |
 | ATTEST-001 | `sovereign-attest`: signed receipt + artifact provenance (ใช้ vault เก็บ key) | ROADMAP §6   | done 2026-11-15 | repo `sovereign-attest` `19aa9e5` · CI [43725517456](https://github.com/krisakornutama/sovereign-attest/actions/runs/43725517456) success (Node 20+22) · 47 tests cov 96.01/92.77/98.18/95.85 · [`SOVEREIGN-ATTEST.md`](./SOVEREIGN-ATTEST.md) |
+| ATTEST-002 | เซ็น release artifact ด้วย attest + ให้ผู้ใช้ตรวจ offline ได้ (แทนการเชื่อ SHA256SUMS ที่อยู่หน้าเดียวกับไฟล์) | ต่อจาก ATTEST-001 · ช่องว่างของ `release.yml` | done 2026-11-15 | `tools/attest-release.mjs` (sign/verify, node:crypto ล้วน) + `tools/test/attest-release.test.mjs` 15 tests · สโมกจริง: เซ็น 2 artifact → verify ผ่าน → แก้ digest แล้ว exit 1 · release.yml มีขั้นเซ็นแบบปิดสวิตช์ (`vars.ATTEST_ENABLED` + secret `ATTEST_MASTER_KEY`) |
 | AGENT-001  | `sovereign-agents`: agent action ทุกตัวมี signed receipt ก่อนแตะข้อมูล  | ROADMAP §6   | queued | —       |
 | FABRIC-001 | `sovereign-fabric`: 2-peer sync แบบไม่พึ่ง cloud บน CRDT + anchor log   | ROADMAP §6   | queued | —       |
 | ENERGY-001 | `sovereign-energy`: พยากรณ์/ตัดสินใจจากข้อมูล local ที่เข้ารหัส         | ROADMAP §6   | queued | —       |
@@ -263,6 +264,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-15 — ปิด `SEC-034` (แทนอีเมล gmail 7 จุดด้วย `owner@example.com`; สแกนเบอร์มือถือไทย = 0 match) และตั้ง+ปิด `SEC-035` (pin GitHub Actions 36/36 เป็น commit SHA + เปิด Dependabot alerts อีก 10 repo) ในสาขา `ai/sec-035-exposure-hardening`
 - 2026-11-15 — ตั้ง+ปิด `SEC-036` ฝั่ง repo: `taskboard-api` เคย track `.env.production` ที่มี `JWT_SECRET`/`SEED_ADMIN_PASSWORD` จริง → ลบออกจาก HEAD + ใส่ใน `.gitignore` (ยังต้อง rotate ค่า)
 - 2026-11-15 — ปิด `ATTEST-001` (`sovereign-attest` M1): receipt เซ็น Ed25519 ต่อ artifact + chain `prev` + ตรวจ offline ด้วยกุญแจที่ pin; กุญแจเซ็นถูกสร้างและเก็บ **ใน vault** (เข้ารหัส at rest, อยู่ใน root ที่ anchor ครอบ, index อ้างถึง ⇒ `pruneOrphans` ไม่แตะ) — ต่อยอดจาก `VAULT-008` streaming และ `VAULT-009` GC โดยตรง · repo ใหม่ `sovereign-attest`, CI success, หลักฐานใน [`SOVEREIGN-ATTEST.md`](./SOVEREIGN-ATTEST.md)
+- 2026-11-15 — ตั้ง+ปิด `ATTEST-002` (release provenance): `tools/attest-release.mjs` เซ็น artifact ใน `release-assets` ด้วยกุญแจใน vault, ต่อ chain ข้ามรุ่นด้วย `--previous`, เขียน `sovereign-attest.json` ที่ผู้ใช้ตรวจได้ด้วย `node:crypto` ล้วน และผูกเข้า `release.yml` แบบปิดสวิตช์ — เหตุผล: `SHA256SUMS.txt` ที่อยู่หน้าเดียวกับไฟล์กันได้แค่ corruption ไม่กันบัญชี GitHub ถูกยึด
 
 ## 6. บันทึกการวินิจฉัย (append-only)
 
@@ -321,3 +323,7 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   เหตุผล: ยังไม่ publish ขึ้น npm และ git dependency (`github:#sha`) พังบน Windows เพราะ path มีช่องว่าง (npm พยายาม chdir เข้า `node_modules/sovereign-vault` ที่ยังไม่ถูกแตก) ⇒ CI โคลน vault เป็น sibling แล้ว build ก่อน `npm ci` ส่วนผู้ใช้จริงติดตั้งทั้งสองแพ็กเกจ
   บทเรียน: ถ้าต้องพึ่งอีก repo ให้ผูกด้วย path ตอนพัฒนาและประกาศเป็น peer — อย่าใช้ git dependency เป็นสะพานหลัก
 - 2026-11-15 — `sovereign-vault` เพิ่ม `prepare: npm run build` (`035e840`, PR #5) เพื่อให้ผู้ที่ติดตั้งจาก git ได้ `dist/` — จำเป็นแม้ตอนนี้จะใช้ `file:` แล้ว เพราะเป็น behavioral contract ของแพ็กเกจที่ยังไม่อยู่บน npm
+
+- 2026-11-15 — `ATTEST-002`: ตัวตรวจใน `tools/attest-release.mjs` ถูกเขียนใหม่ด้วย `node:crypto` แทนการ import `sovereign-attest` เพราะผู้ใช้ปลายทางต้องตรวจได้โดยไม่ต้องติดตั้งแพ็กเกจหรือมี vault
+  ความเสี่ยงคือรูปแบบสองที่อาจเพี้ยนจากกัน ⇒ เทสต์ integration เซ็นด้วย `sovereign-attest` ตัวจริงแล้วตรวจกลับด้วยตัวตรวจของ tool (ข้ามอัตโนมัติเมื่อ sibling ยังไม่ถูก build) และเอกสารระบุว่า `sovereign-attest` เป็นเจ้าของรูปแบบ
+- 2026-11-15 — `ATTEST-002`: ขั้นเซ็นใน `release.yml` ผูกกับ **repo variable** `ATTEST_ENABLED` ไม่ใช่ `if: secrets.X != ''` เพราะ GitHub ไม่อนุญาตให้ใช้ secrets ในเงื่อนไข `if:`; ไม่ตั้ง variable = ข้ามทั้งบล็อก (ไม่มีใบรับรองปลอม)

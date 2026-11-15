@@ -152,6 +152,8 @@ tools/*
 !tools/status-doc.mjs
 !tools/stage-release.mjs
 !tools/release-build.mjs
+# release provenance (ATTEST-002) — release.yml เรียกไฟล์นี้ ต้องมีบน clone สด
+!tools/attest-release.mjs
 !tools/release-check.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md
