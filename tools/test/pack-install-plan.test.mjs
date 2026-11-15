@@ -5,7 +5,7 @@
    2) เขียน install-plan.json ที่ **ไม่มี token** และมีฟังก์ชั่น/เจ้าของครบ
    3) เจ้าของที่ไม่มีสิทธิ์ = หยุดก่อนสร้างชุด (ไม่ปล่อยชุดที่คุมไม่ได้ออกไป)
 */
-import { test, describe } from 'node:test';
+import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,11 +15,28 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const TMP_ROOT = path.join(ROOT, '.freebuff', 'tmp');
 const pack = await import('../agent-pack/pack.mjs');
 
+/**
+ * โฟลเดอร์ทดสอบแยกตามโปรเซส
+ *
+ * เดิมใช้ path เดียวกันทุกครั้ง (`pack-plan-real` …) ⇒ ถ้ามีเทสต์รันซ้อนกัน
+ * (สองคำสั่งในเครื่องเดียวกัน หรือรันซ้ำระหว่าง CI) `rmSync` จะชนกันจนได้ EPERM
+ */
+const RUN_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+const created = [];
+
 function sandbox(name) {
-  const dir = path.join(TMP_ROOT, `pack-plan-${name}`);
+  const dir = path.join(TMP_ROOT, `pack-plan-${name}-${RUN_ID}`);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
+  created.push(dir);
   return dir;
+}
+
+// เก็บกว้างานของโปรเซสนี้เท่านั้น ไม่แตะของรอบอื่นที่อาจรันอยู่
+if (typeof after === 'function') {
+  after(() => {
+    for (const dir of created) fs.rmSync(dir, { recursive: true, force: true });
+  });
 }
 
 /** สคริปต์ออก token ปลอม — พิมพ์ JSON บรรทัดเดียวเหมือนของจริง */
