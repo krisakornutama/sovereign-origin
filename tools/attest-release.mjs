@@ -31,6 +31,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ATTESTATION_FILE = 'sovereign-attest.json';
 export const DOC_VERSION = 1;
 const SIGNABLE_ACTION = 'artifact.shipped';
+const REVOKED_ACTION = 'artifact.revoked';
+const RESTORED_ACTION = 'artifact.restored';
 const SHA256_RE = /^[0-9a-f]{64}$/;
 // ไฟล์ที่ไม่ได้เป็นของที่ผู้ใช้ดาวน์โหลด — ไม่ต้องเซ็น
 const NOT_ARTIFACTS = new Set([ATTESTATION_FILE, 'SHA256SUMS.txt']);
@@ -233,6 +235,8 @@ export function verifyDocument(doc, options = {}) {
     // เดินย้อน chain: prev ต้องเป็น receipt ของ digest เดียวกัน และต้องมีอยู่จริงในเอกสาร
     let cursor = head;
     let steps = 0;
+    let revokedBy = null;
+    let stateSeen = false;
     const seen = new Set();
     while (cursor) {
       if (seen.has(cursor.id)) {
@@ -246,6 +250,11 @@ export function verifyDocument(doc, options = {}) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
         break;
       }
+      // เดินจากใหม่ไปเก่า ⇒ ใบแรกที่บอกสถานะคือสถานะปัจจุบัน (restore ใหม่สุดชนะ revoke เก่า)
+      if (!stateSeen && (body.action === REVOKED_ACTION || body.action === RESTORED_ACTION)) {
+        stateSeen = true;
+        if (body.action === REVOKED_ACTION) revokedBy = cursor.id;
+      }
       if (!body.prev) break;
       const prev = byId.get(body.prev);
       if (!prev) {
@@ -257,6 +266,11 @@ export function verifyDocument(doc, options = {}) {
         pushed(`chain ของ ${artifact.name} ยาวผิดปกติ`);
         break;
       }
+    }
+    if (revokedBy && !options.allowRevoked) {
+      pushed(
+        `artifact ${artifact.name} ถูกเพิกถอน (receipt ${revokedBy.slice(0, 12)}) — อย่าใช้งานนอกจากสั่ง --allow-revoked`
+      );
     }
   }
 
@@ -555,7 +569,10 @@ async function main(argv) {
   const file = argOf(argv, 'file', target);
   if (!file) throw fail('E_ARGS', 'ต้องระบุไฟล์ attestation');
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const report = verifyDocument(doc, { fingerprint: argOf(argv, 'fingerprint', undefined) });
+  const report = verifyDocument(doc, {
+    fingerprint: argOf(argv, 'fingerprint', undefined),
+    allowRevoked: flagOf(argv, 'allow-revoked'),
+  });
   if (!report.ok) {
     console.error(`ตรวจไม่ผ่าน (${report.problems.length} ข้อ):`);
     for (const problem of report.problems) console.error(`  - ${problem}`);
