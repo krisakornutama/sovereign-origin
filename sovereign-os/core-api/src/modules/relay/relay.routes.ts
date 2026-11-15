@@ -8,6 +8,11 @@ import { config } from '../../config';
 
 const router = Router();
 
+// SEC-045: การสั่งงานรีเลย์ = งานฮาร์ดแวร์จริง ⇒ จำกัด role ให้ตรงกับ actuation/energy
+// เดิมล็อกแค่ `authenticate` ⇒ บัญชีอ่านอย่างเดียว (SITE_ADMIN ประกาศว่า read-only),
+// SYSTEM_AI และ KID สลับรีเลย์จริงในบ้านได้ และตั้งตารางเวลาที่ทำงานเองได้
+const RELAY_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'] as const;
+
 const mqttClient = mqtt.connect({
   host: process.env.MQTT_HOST || 'localhost',
   port: Number(process.env.MQTT_PORT) || 1883,
@@ -72,7 +77,7 @@ router.post('/unlock/:relayId', authenticate, requireRole('SUPERADMIN'), async (
 });
 
 // POST /api/relay/control – อัปเดตสถานะใน DB แล้วส่งคำสั่งผ่าน MQTT
-router.post('/control', authenticate, async (req, res) => {
+router.post('/control', authenticate, requireRole(...RELAY_WRITE_ROLES), async (req, res) => {
   try {
     const { nodeId, relayId, state } = req.body;
     if (state !== 0 && state !== 1) {
@@ -141,7 +146,7 @@ router.get('/schedules', authenticate, async (req, res) => {
 });
 
 // POST /api/relay/schedules – สร้างตารางเวลาใหม่
-router.post('/schedules', authenticate, async (req, res) => {
+router.post('/schedules', authenticate, requireRole(...RELAY_WRITE_ROLES), async (req, res) => {
   try {
     const { relayId, time, state, days, enabled } = req.body;
     if (!relayId) return res.status(400).json({ error: 'relayId required' });
@@ -176,7 +181,7 @@ router.post('/schedules', authenticate, async (req, res) => {
 });
 
 // PUT /api/relay/schedules/:id – เปิด/ปิดตารางเวลา
-router.put('/schedules/:id', authenticate, async (req, res) => {
+router.put('/schedules/:id', authenticate, requireRole(...RELAY_WRITE_ROLES), async (req, res) => {
   try {
     const { enabled } = req.body;
     if (typeof enabled !== 'boolean') {
@@ -191,7 +196,7 @@ router.put('/schedules/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/relay/schedules/:id – ลบตารางเวลา
-router.delete('/schedules/:id', authenticate, async (req, res) => {
+router.delete('/schedules/:id', authenticate, requireRole(...RELAY_WRITE_ROLES), async (req, res) => {
   try {
     await prisma.relaySchedule.delete({ where: { id: req.params.id } });
     res.json({ success: true });

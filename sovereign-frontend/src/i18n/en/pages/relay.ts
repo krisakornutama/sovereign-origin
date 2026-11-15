@@ -6,6 +6,8 @@ export default {
   dashboardLink: 'Dashboard',
   controlTitle: 'Control electrical devices',
   controlDesc: 'Send commands via MQTT to the relay (requires a real device on the network)',
+  readOnlyNotice: 'This account is read-only — only SUPERADMIN / NODE_ADMIN / OPERATOR can switch relays or edit schedules',
+  readOnlyTitle: 'Requires SUPERADMIN / NODE_ADMIN / OPERATOR',
   sending: 'Sending command...',
   noRelays: 'No relays in the system',
   loadingStatus: 'Loading status...',
