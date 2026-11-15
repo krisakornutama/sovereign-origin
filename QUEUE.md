@@ -118,3 +118,6 @@ done; done
 - `VAULT-001`–`VAULT-004`: `sovereign-vault` M1 (envelope + index + snapshots) และ M2 (anchor log + pinned root)
   → <https://github.com/krisakornutama/sovereign-vault> (`609d006`, `8be1fbb`)
 - เอกสารประกอบ: [`docs/SOVEREIGN-VAULT.md`](./docs/SOVEREIGN-VAULT.md)
+- `ATTEST-001`: `sovereign-attest` M1 (signed receipt + artifact provenance; กุญแจเซ็นเก็บใน vault)
+  → <https://github.com/krisakornutama/sovereign-attest> (`19aa9e5`)
+- เอกสารประกอบ: [`docs/SOVEREIGN-ATTEST.md`](./docs/SOVEREIGN-ATTEST.md)
