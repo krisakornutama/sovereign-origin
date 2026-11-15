@@ -93,8 +93,10 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/devices/:id
-router.put('/:id', authenticate, async (req, res) => {
+// PUT /api/devices/:id — SEC-047: เดิมล็อกแค่ authenticate ⇒ role อ่านอย่างเดียวแก้
+// `mqtt_topic` ของอุปกรณ์ได้ (= เปลี่ยนทางไปของคำสั่งสั่งงานฮาร์ดแวร์)
+// ใช้ชุดเดียวกับงานสั่งการ (SUPERADMIN / NODE_ADMIN / OPERATOR)
+router.put('/:id', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), async (req, res) => {
   const { id } = req.params;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {

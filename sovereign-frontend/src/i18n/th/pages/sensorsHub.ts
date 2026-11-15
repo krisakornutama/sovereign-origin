@@ -33,6 +33,8 @@ export default {
   locationBtn: 'พิกัด',
   noSensorData: 'ยังไม่มีข้อมูลเซ็นเซอร์ — ดูข้อมูลที่แท็บ "ข้อมูลเซ็นเซอร์"',
   noDevices: 'ยังไม่มีอุปกรณ์ — เพิ่มอุปกรณ์แรกของคุณ',
+  readOnlyNotice: 'บัญชีนี้อ่านอย่างเดียว — แก้พิกัด/ลบอุปกรณ์ได้เฉพาะ SUPERADMIN / NODE_ADMIN / OPERATOR',
+  readOnlyTitle: 'ต้องเป็น SUPERADMIN / NODE_ADMIN / OPERATOR จึงจะแก้ค่าอุปกรณ์ได้',
   modalTitle: 'Generate Arduino Code for {type}',
   statShowing: 'ข้อมูลที่แสดง',
   statBattery: 'แบตเตอรี่ล่าสุด',
