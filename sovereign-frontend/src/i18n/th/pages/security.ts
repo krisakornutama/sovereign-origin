@@ -56,6 +56,7 @@ export default {
   connectionsUnknown: 'ไม่ทราบ',
   connectionsUnavailable: 'อ่านรายการเชื่อมต่อจริงไม่ได้ ({reason}) — ตารางว่างเพราะ "ไม่รู้" ไม่ใช่ "ไม่มี"',
   connectionsUnavailableShort: 'อ่านรายการเชื่อมต่อไม่ได้ — ไม่ใช่ว่าไม่มี',
+  connectionsUnavailableHint: 'ระบบอ่าน netstat ของเครื่องไม่ได้ จึงไม่รู้ว่ามีอะไรเชื่อมต่ออยู่ — กดรีเฟรชหรือตรวจสิทธิ์ของ process ที่รัน API',
   eventsUnknown: 'ไม่ทราบ',
   eventsUnavailable: 'อ่านเหตุการณ์ความปลอดภัยจากฐานข้อมูลไม่ได้ ({reason}) — ตารางว่างเพราะ "ไม่รู้" ไม่ใช่ "ไม่มี"',
   eventsUnavailableShort: 'อ่านเหตุการณ์ไม่ได้ — ไม่ใช่ว่าไม่มีเหตุการณ์',
