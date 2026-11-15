@@ -2,6 +2,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authFetch } from '../../lib/apiFetch';
 import Icon from '../ui/Icon';
+import StatusDot from '../ui/StatusDot';
+import PageState from '../ui/PageState';
+import ErrorNotice from '../ui/ErrorNotice';
+import Field from '../ui/Field';
 import { useLanguageStore } from '../../stores/useLanguageStore';
 
 export interface FwRule {
@@ -22,13 +26,23 @@ export default function FirewallEnginePanel() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const r = await authFetch(`${process.env.NEXT_PUBLIC_API_URL}/api/security/firewall/rules`);
       const d = await r.json();
-      if (r.ok) { setRules(d.rules || []); setDefaultPolicy(d.defaultPolicy || 'ALLOW'); }
-    } catch { /* เงียบ */ }
+      if (!r.ok) throw new Error(d?.error || 'โหลดกฎไฟร์วอลล์ไม่สำเร็จ');
+      setRules(d.rules || []);
+      setDefaultPolicy(d.defaultPolicy || 'ALLOW');
+      setErr('');
+    } catch (e: any) {
+      // เดิมกลืน error เงียบ ๆ ⇒ ผู้ใช้เห็น "ยังไม่มีกฎ" ทั้งที่จริงคือ API ไม่ตอบ
+      setErr(e?.message || 'โหลดกฎไฟร์วอลล์ไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -106,7 +120,11 @@ export default function FirewallEnginePanel() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-gray-200 glow-text">Firewall Engine <span className="text-[10px] text-gray-500 font-normal">{t('securityComponents.firewall.headerSub', '— จำแนก unknown + กฎ allow/deny + บังคับใช้จริงผ่าน Windows Firewall (สคริปต์ netsh)')}</span></h2>
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-400">{t('securityComponents.firewall.defaultPolicy', 'นโยบายเริ่มต้น:')}</span>
+          <StatusDot
+            size="sm"
+            variant={defaultPolicy === 'DENY' ? 'err' : 'ok'}
+            label={`${t('securityComponents.firewall.defaultPolicy', 'นโยบายเริ่มต้น:')} ${defaultPolicy}`}
+          />
           <button onClick={() => setPolicy('ALLOW')} className={`px-2 py-1 rounded border bg-gray-800 ${defaultPolicy === 'ALLOW' ? 'border-emerald-600 text-emerald-300' : 'border-gray-700 text-gray-400'}`}>{t('securityComponents.firewall.allowPolicy', 'อนุญาต')}</button>
           <button onClick={() => setPolicy('DENY')} className={`px-2 py-1 rounded border bg-gray-800 ${defaultPolicy === 'DENY' ? 'border-red-600 text-red-300' : 'border-gray-700 text-gray-400'}`}>{t('securityComponents.firewall.denyPolicy', 'บล็อกทั้งหมด')}</button>
           <button onClick={scan} disabled={scanning} className="btn-primary text-xs px-3 py-1.5">{scanning ? t('common.loading', 'กำลังโหลด...') : <><Icon name="search" size={12} /> {t('securityComponents.firewall.scanBtn', 'สแกนการเชื่อมต่อ')}</>}</button>
@@ -114,14 +132,26 @@ export default function FirewallEnginePanel() {
         </div>
       </div>
       {msg && <div className="text-xs text-emerald-400">{msg}</div>}
-      {err && <div className="text-xs text-red-400">{err}</div>}
+      {err && rules.length > 0 && <ErrorNotice error={new Error(err)} onRetry={load} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* กฎ */}
         <div className="space-y-2">
           <div className="text-sm font-semibold text-gray-300 glow-text-cyan">{t('securityComponents.firewall.rulesTitle', 'กฎไฟร์วอลล์ ({n}) — เลข priority สูงตรวจก่อน', { n: rules.length })}</div>
           <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-            {rules.length === 0 && <div className="text-xs text-gray-600">{t('securityComponents.firewall.noRules', 'ยังไม่มีกฎ — เพิ่มกฎด้านล่าง (เช่น block IP ที่ไม่รู้จัก, allow เฉพาะ Telegram)')}</div>}
+            {rules.length === 0 && (
+              <PageState
+                mode={loading ? 'loading' : err ? 'error' : 'empty'}
+                error={err ? new Error(err) : undefined}
+                onRetry={load}
+                loadingLines={2}
+                emptyTitle={t('securityComponents.firewall.noRules', 'ยังไม่มีกฎ — เพิ่มกฎด้านล่าง (เช่น block IP ที่ไม่รู้จัก, allow เฉพาะ Telegram)')}
+                emptyDescription={t(
+                  'securityComponents.firewall.noRulesHint',
+                  'เลือก action / direction / protocol แล้วกด “เพิ่มกฎ” — กฎที่ priority สูงจะถูกตรวจก่อน'
+                )}
+              />
+            )}
             {rules.map((r) => (
               <div key={r.id} className={`inset flex items-center gap-2 text-xs px-2 py-1.5 ${r.enabled ? '' : 'opacity-50'}`}>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.action === 'DENY' ? 'bg-red-900/60 text-red-300' : 'bg-emerald-900/60 text-emerald-300'}`}>{r.action}</span>
@@ -134,7 +164,22 @@ export default function FirewallEnginePanel() {
           </div>
           <div className="space-y-1.5 border-t border-gray-800 pt-2">
             <div className="flex gap-1.5">
-              <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder={t('securityComponents.firewall.namePlaceholder', 'ชื่อกฎ เช่น block-unknown-scanner')} className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs" />
+              <Field
+                label={t('securityComponents.firewall.nameLabel', 'ชื่อกฎ')}
+                hint={t('securityComponents.firewall.nameHint', 'ตั้งชื่อให้สื่อความหมาย เช่น block-unknown-scanner')}
+                required
+                className="flex-1"
+              >
+                {(p) => (
+                  <input
+                    {...p}
+                    value={ruleForm.name}
+                    onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
+                    placeholder={t('securityComponents.firewall.namePlaceholder', 'ชื่อกฎ เช่น block-unknown-scanner')}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs"
+                  />
+                )}
+              </Field>
               <select value={ruleForm.action} onChange={(e) => setRuleForm({ ...ruleForm, action: e.target.value })} className="bg-gray-800 border border-gray-600 rounded px-1.5 py-1.5 text-xs">
                 <option value="ALLOW">{t('securityComponents.firewall.allowOpt', 'อนุญาต')}</option><option value="DENY">{t('securityComponents.firewall.denyOpt', 'บล็อก')}</option>
               </select>

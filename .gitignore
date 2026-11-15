@@ -120,6 +120,7 @@ tools/*
 #   แต่ไม่เคยถูก track → clone ใหม่จะไม่มี แล้วเทสต์/เครื่องมือที่แก้ .cmd จะรันไม่ได้
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
+!tools/host-smoke.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
