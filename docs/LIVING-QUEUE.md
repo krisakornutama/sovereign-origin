@@ -6,7 +6,7 @@
 > ถ้าต้องการเล่าใหม่ทั้งย่อหน้า ให้เพิ่ม entry ใหม่ที่อ้าง entry เก่า — อย่าแก้ข้อความเดิม
 > ประวัติคิวรุ่นก่อนหน้า (Reddit launch ฯลฯ) อยู่ใน `QUEUE.md` และ `QUEUE-ARCHIVE.md` และต้องคงอยู่เช่นกัน
 
-อัปเดตล่าสุด: 2026-11-10 · เจ้าของ: krisakornutama · ใช้ร่วมกับ `AGENTS.md` ข้อ 9
+อัปเดตล่าสุด: 2026-11-15 · เจ้าของ: krisakornutama · ใช้ร่วมกับ `AGENTS.md` ข้อ 9
 
 ---
 
@@ -19,6 +19,8 @@
 5. **ก่อนปิดงานต้องมีเทสต์ที่ commit ไว้** (ตาม `AGENTS.md` ข้อ 8) — entry ที่ไม่มีหลักฐานให้คงสถานะ `in-progress`
 6. **คิวเป็นแหล่งความจริงเดียวของลำดับงาน**: ถ้า entry ไม่อยู่ในไฟล์นี้ ให้ถือว่ายังไม่ได้รับอนุมัติให้ทำ
 7. **ห้ามลบไฟล์นี้หรือเปลี่ยนชื่อ** แม้จะย้าย repo — ถ้าย้าย ให้เหลือไฟล์ stub ที่ชี้ไปที่ใหม่
+8. **HOST-SAFE (บังคับทุกงาน)**: ทุกการแก้ต้อง **ไม่กระทบการใช้งานปกติของเครื่อง** — เปิดเครื่อง/เปิดแอปแล้วต้องใช้งานได้ปกติ ไม่ทำให้เครื่องเกิดปัญหา (เน็ตหลุด, แอปอื่นพัง, บูตช้า, ต้องแก้ค่ากลับเอง) · **ห้ามแตะค่า Network/Proxy/Firewall/autorun ระดับ OS** (`HKCU\...\Internet Settings`, `ProxyEnable`/`ProxyServer`, `netsh winhttp`, `netsh interface …disabled`, นโยบายไฟร์วอลล์ทั้งเครื่อง, Run key / Startup / Scheduled Task ที่ไม่ได้สั่งโดยเจ้าของ) · ถ้างานไหนหลีกเลี่ยงไม่ได้จริง: ต้องทำใน scope ของโปรเจ็กก่อน (middleware/env) มี `try…finally` หรือ graceful shutdown คืนค่าเมื่อปิด และต้องมีตัวคืนค่าให้กดครั้งเดียว (`tools/security/repair-host-network.cmd`) · ด่านอัตโนมัติ: `tools/security/host-network-guard.mjs` + `tools/test/host-network-guard.test.mjs` (แดง = ห้าม merge) · เกณฑ์ปิดงานทุก entry: ผ่านด่านนี้ + ระบุใน `หลักฐาน` ว่าเปิดแอปแล้วใช้งานได้ปกติ
+9. **แกนงานหลักของโปรเจ็ก (ห้ามหลุด)**: (ก) พัฒนาโปรเจ็กต่อเนื่อง (ข) วางแผน/ออกแบบสถาปัตยกรรมและ UX/UI (ค) ระบบความปลอดภัจาการบุกรุกของแฮกเกอร์ — งานใหม่ทุก entry ต้องระบุได้ว่าอยู่ในแกนไหน · สำหรับ UX/UI อนุญาตให้ **นำ repo จาก GitHub ที่ได้รับความนิยมมาเป็นต้นแบบ** ได้ (ตรวจ license ก่อน — เลี่ยง NC/ND, บันทึกที่มาใน entry) โดยใช้เป็น layout/component reference ไม่ยกทั้งแอป และต้องไม่ลดความสามารถเดิมหรือทำให้ระบบเดิมพัง
 
 ### รูปแบบ entry
 
@@ -176,6 +178,16 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 ---
 
+### 2.4 หลักประกัน "ไม่กระทบการใช้งานปกติ" + แกนงานหลัก (เพิ่ม 2026-11-15 ตามคำสั่งเจ้าของ)
+
+| ID | รายการ | ที่มา | สถานะ | หลักฐาน |
+|----|--------|-------|-------|---------|
+| HOST-001 | **กติกา HOST-SAFE**: งานทุกชิ้นต้องไม่แตะ Network/Proxy/Firewall/autorun ระดับ OS และต้องเปิดแอปแล้วใช้งานได้ปกติ — เหตุเกิดจาก `ProxyServer=127.0.0.1:54939` ค้างใน `HKCU\...\Internet Settings` ทำให้เครื่องหลักขาดเน็ตหลังรีบูต (ทุกแอปวิ่งผ่านพร็อกซีที่ตายแล้ว) | คำสั่งเจ้าของ 2026-11-15 (ดู `SEC-044`) | done 2026-11-15 (กติกา + ด่าน) | ด่าน: `tools/security/host-network-guard.mjs` + `tools/test/host-network-guard.test.mjs` (8/8) · ตัวคืนค่า: `tools/security/repair-host-network.ps1`/`.cmd` · ถอด `-BlockOutbound` (`harden-host.ps1`) และ `allprofiles firewallpolicy blockoutbound` (`firewall-engine.service.ts`) · รันจริง: ลบ `ProxyServer`, `ProxyEnable=0`, winhttp=direct, ลบ Startup `sovereign-autostart.vbs`, เน็ตกลับมา `google=200` `api.github.com=200` |
+| HOST-002 | **Smoke test หลังทุกงาน (no-impact proof)**: เปิดแอปแล้วใช้งานได้ปกติจริง — `docker compose ps` healthy ครบ, `:3001/healthz` + `/api/health` 200 (`db.state` ไม่ใช่ `unavailable`), `:3000` login gate เรนเดอร์, dashboard โหลดข้อมูลได้, งานประจำ (backup/nightly) ยัง `Ready`, และเครื่องอื่นบน LAN ยังใช้งานได้ | คำสั่งเจ้าของ 2026-11-15 (ต่อจาก `HOST-001`) | queued | — ต้องรันที่ MAIN (worktree ไม่มี root/core-api `node_modules`) · ผลลัพธ์ต้องเขียนกลับ entry นี้ก่อนปิดงาน |
+| UX-001 | **ยกเครื่อง UX/UI เป็นระบบ**: จัดระเบียบ layout/navigation/ตาราง/i18n ให้สม่ำเสมอทุกหน้า โดยนำ repo GitHub ยอดนิยมมาเป็นต้นแบบ component (shadcn/ui, Tailwind UI patterns, dashboard kit ที่ license อนุญาต) — ใช้เป็น reference แล้วเขียนใหม่ให้เข้ากับ design token เดิม (`globals.css`) | คำสั่งเจ้าของ 2026-11-15 (แกนงาน UX/UI) | queued | ข้อบังคับ: ทุกหน้าใน `src/pages/` ต้องคง `<Sidebar />` + เพดานบรรทัด (pages ≤800 / components ≤400) + `t('key','fallback')` ทุกข้อความ · เริ่มจาก 3 หน้าที่ใช้บ่อยสุด (dashboard, security, farm) · บันทึก license + ที่มาของ repo ที่ใช้เป็นต้นแบบใน entry ก่อนเริ่ม · หลีกเลี่ยง repo ที่เป็น NC/ND |
+| SEC-045 | **ระบบป้องกันการบุกรุกแบบครบชั้น (ongoing)**: ต่อยอด `SEC-026/031/032/037/040/044` — ยืนยันตัวตนทุก endpoint ที่สั่ง actuator, จำกัด outbound (SSRF guard ครบทุกทาง), ตรวจ integrity ของสคริปต์ host, และมี dashboard ที่แสดง posture จริงของเครื่อง (ไม่ใช่ค่าหลอก) | คำสั่งเจ้าของ 2026-11-15 (แกนงานความปลอดภัย) | queued | ต่อจาก `SEC-041` (หน้า Security Center) — ทำพร้อมกันได้ · ทุกข้อต้องมีเทสต์ใน `sovereign-os/core-api/tests/` แบบ red-first |
+| PLAN-001 | **วางแผน/ออกแบบสถาปัตยกรรมรอบใหม่**: อัปเดต `docs/ARCHITECTURE.md` + `docs/ROADMAP_2036.md` §10 ให้สะท้อนสถานะจริงหลังงาน security/HOST-SAFE รอบนี้ (รวมข้อห้ามแตะเน็ตระดับ OS เป็นข้อกำหนดสถาปัตยกรรม) | คำสั่งเจ้าของ 2026-11-15 (แกนงานวางแผน/ออกแบบ) | queued | เกณฑ์ปิดงาน: เอกสารตรงกับโค้ดจริง (`node tools/gen-module-docs.mjs` ไม่มี diff ค้าง) + `npm run verify` ผ่านที่ MAIN |
+
 ## 3. แนวคิดที่จองไว้ (ยังไม่เริ่ม — ห้ามลบ)
 
 ไอเดียที่อาจได้ใช้ทั้งตอนนี้และในอนาคต บันทึกไว้เพื่อไม่ให้หล่นหาย; การมี entry ที่นี่ไม่ถือว่าอนุมัติให้ทำทันที
@@ -276,6 +288,8 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-15 — ตั้ง `SEC-032` (Windows baseline: Defender ถูกปิดโดยนโยบาย + firewall + process node ที่ยังไม่ทราบที่มา — blocked รอ elevated), `SEC-033` (rotate ความลับทั้งชุด + purge session DB — blocked รอ Cold Soak) และ `SEC-034` (PII ใน docs public — queued, ต้องเป็น branch + PR)
 - 2026-11-15 — ปิด `SEC-034` (แทนอีเมล gmail 7 จุดด้วย `owner@example.com`; สแกนเบอร์มือถือไทย = 0 match) และตั้ง+ปิด `SEC-035` (pin GitHub Actions 36/36 เป็น commit SHA + เปิด Dependabot alerts อีก 10 repo) ในสาขา `ai/sec-035-exposure-hardening`
 - 2026-11-15 — ตั้ง+ปิด `SEC-036` ฝั่ง repo: `taskboard-api` เคย track `.env.production` ที่มี `JWT_SECRET`/`SEED_ADMIN_PASSWORD` จริง → ลบออกจาก HEAD + ใส่ใน `.gitignore` (ยังต้อง rotate ค่า)
+- 2026-11-15 — ตั้ง+ปิด `SEC-044` (เครื่องหลักขาดเน็ตหลังรีบูตจาก `ProxyServer=127.0.0.1:54939` ค้างใน `HKCU\...\Internet Settings`) → เพิ่มด่าน `host-network-guard` + ตัวคืนค่า `repair-host-network`, ถอด `-BlockOutbound` และ `allprofiles firewallpolicy blockoutbound`
+- 2026-11-15 — เพิ่มกฎบังคับ `§1 ข้อ 8 (HOST-SAFE)` และ `§1 ข้อ 9 (แกนงานหลัก)` + คิวใหม่ `§2.4`: `HOST-001` (done), `HOST-002` (smoke test หลังทุกงาน), `UX-001` (ยกเครื่อง UX/UI ด้วยต้นแบบจาก GitHub), `SEC-045` (ป้องกันการบุกรุกครบชั้น), `PLAN-001` (อัปเดตสถาปัตยกรรม/roadmap) — ตามคำสั่งเจ้าของ: "เปิดมาแล้วต้องใช้งานได้ปกติ ไม่ทำให้เครื่องเกิดปัญหา"
 - 2026-11-15 — ปิด `ATTEST-001` (`sovereign-attest` M1): receipt เซ็น Ed25519 ต่อ artifact + chain `prev` + ตรวจ offline ด้วยกุญแจที่ pin; กุญแจเซ็นถูกสร้างและเก็บ **ใน vault** (เข้ารหัส at rest, อยู่ใน root ที่ anchor ครอบ, index อ้างถึง ⇒ `pruneOrphans` ไม่แตะ) — ต่อยอดจาก `VAULT-008` streaming และ `VAULT-009` GC โดยตรง · repo ใหม่ `sovereign-attest`, CI success, หลักฐานใน [`SOVEREIGN-ATTEST.md`](./SOVEREIGN-ATTEST.md)
 - 2026-11-15 — ตั้ง+ปิด `ATTEST-002` (release provenance): `tools/attest-release.mjs` เซ็น artifact ใน `release-assets` ด้วยกุญแจใน vault, ต่อ chain ข้ามรุ่นด้วย `--previous`, เขียน `sovereign-attest.json` ที่ผู้ใช้ตรวจได้ด้วย `node:crypto` ล้วน และผูกเข้า `release.yml` แบบปิดสวิตช์ — เหตุผล: `SHA256SUMS.txt` ที่อยู่หน้าเดียวกับไฟล์กันได้แค่ corruption ไม่กันบัญชี GitHub ถูกยึด
 
