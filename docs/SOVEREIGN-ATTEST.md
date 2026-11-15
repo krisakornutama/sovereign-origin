@@ -149,6 +149,18 @@ node tools/attest-release.mjs --sign --dir=release-assets --tag=v1.4.0   --signi
 โดยเริ่มจาก fingerprint ที่ pin ไว้แล้วเดินถอยหลังตามใบ endorsement — กุญแจแปลกปลอมไม่สามารถ
 bootstrap ตัวเองเข้า set ได้ เพราะใบต้องเซ็นด้วยกุญแจที่เชื่ออยู่แล้วเท่านั้น
 
+### เพิกถอน artifact (revoked / restored)
+
+```ts
+await attest.revoke({ artifact: { name: 'app.exe', bytes }, actor: 'security', reason: 'กุญแจบิลด์รั่ว' });
+await attest.revocation(sha256);   // { revoked: true, receipt }
+await attest.restore({ artifact: { name: 'app.exe', bytes }, actor: 'owner' });
+```
+
+การเพิกถอนเป็น receipt ปกติ ⇒ เซ็น, ต่อ chain, อยู่ใน anchor และตรวจได้ offline; ตัวตรวจ release
+ปฏิเสธเอกสารที่ chain มีการเพิกถอน (`artifact.revoked`) เว้นแต่สั่ง `--allow-revoked` โดยเจตนา
+และ restore ใหม่กว่าจะยกเลิกให้เองโดยอัตโนมัติ (สถานะล่าสุดชนะ)
+
 ### ข้อจำกัดที่ต้องรู้
 
 - **กุญแจเปลี่ยน = chain ขาด** — ตัวตรวจจะบอกว่า receipt ถูกเซ็นด้วยกุญแจคนละตัวกับ fingerprint ของรุ่นนั้น;

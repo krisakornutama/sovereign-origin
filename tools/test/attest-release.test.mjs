@@ -272,6 +272,61 @@ test('ใบ rotation ที่ลายเซ็นไม่ผ่านถู�
   expectProblem(doc, /ลายเซ็นไม่ผ่าน/);
 });
 
+
+test('artifact ที่มี receipt เพิกถอนใน chain ถูกปฏิเสธ (และผ่านเมื่อสั่ง allowRevoked)', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: shipped.id, action: 'artifact.revoked', at: 1_700_000_002_000 })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_003_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, false);
+  assert.match(report.problems.join(String.fromCharCode(10)), /ถูกเพิกถอน/);
+
+  const allowed = verifyDocument(doc, { allowRevoked: true });
+  assert.equal(allowed.ok, true, allowed.problems.join('; '));
+});
+
+test('restore หลัง revoke ทำให้ตรวจผ่านได้ตามปกติ', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: shipped.id, action: 'artifact.revoked', at: 1_700_000_002_000 })
+  );
+  const restored = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: revoked.id, action: 'artifact.restored', at: 1_700_000_004_000 })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_005_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: restored.id }],
+    receipts: [shipped, revoked, restored],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, true, report.problems.join('; '));
+});
+
 // ── กุญแจแบบพกพา (CI: secret → import เข้า vault ของรอบนั้น) ──
 test(
   'signing key ที่ import ให้ fingerprint เดิมทุกครั้ง แม้ state dir ใหม่',
