@@ -104,6 +104,8 @@ tools/*
 !tools/security/host-audit.ps1
 !tools/security/repair-defender.ps1
 !tools/security/repair-defender.cmd
+!tools/security/harden-host.ps1
+!tools/security/harden-host.cmd
 !tools/run-hidden.vbs
 !tools/set-tasks-hidden.ps1
 !tools/hidden-tasks/
