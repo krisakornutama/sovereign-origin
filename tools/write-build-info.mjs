@@ -119,5 +119,6 @@ export function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(main());
+  // ตั้ง exitCode แทน process.exit() — เลี่ยง libuv assertion บน Windows (ดู deploy-core-api.mjs)
+  process.exitCode = main();
 }
