@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
 import { createLogOnce } from '../../lib/log-once';
-import mqtt from 'mqtt';
+import { createMqttClient } from '../../lib/mqtt-client';
 import { relayGuard } from '../../services/relay-guard.service';
 import { config } from '../../config';
 
@@ -13,15 +13,8 @@ const router = Router();
 // SYSTEM_AI และ KID สลับรีเลย์จริงในบ้านได้ และตั้งตารางเวลาที่ทำงานเองได้
 const RELAY_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'] as const;
 
-const mqttClient = mqtt.connect({
-  host: process.env.MQTT_HOST || 'localhost',
-  port: Number(process.env.MQTT_PORT) || 1883,
-  protocol: 'mqtt',
-});
-
-// กัน process ตายเมื่อ EMQX ถูกหยุดในโหมดที่ไม่มีชั้น IoT
-mqttClient.on('error', (err) => console.error('Relay MQTT error:', err instanceof Error ? err.message : err));
-mqttClient.on('connect', () => console.log('Relay MQTT connected'));
+// client กลาง: ปิดได้ด้วย MQTT_DISABLED=1 (ชุดเทสต์) — กัน socket/reconnect ค้างขวาง process
+const mqttClient = createMqttClient('Relay');
 
 const DEFAULT_NODE_ID = config.defaults.telemetryNodeId;
 
