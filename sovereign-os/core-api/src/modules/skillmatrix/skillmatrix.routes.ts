@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 // GET /api/skill-matrix/summary — aggregate by skill, avg level, count
 // Must be before /:id route

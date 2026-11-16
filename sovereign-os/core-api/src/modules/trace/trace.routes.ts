@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { getPublicTrace, listLots, createLotFromHarvest, lotQrDataUrl, listLotEvents, addLotEvent, traceUrlForLot, getPublicProductTrace, getPublicProductTraceBatch } from '../../services/trace.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 export { prisma }; // ให้เทส mock delegate ผ่านตัวเดียวกับ production
 
@@ -35,7 +36,7 @@ router.get('/:lotCode/qr', authenticate, async (req, res) => {
 });
 
 // POST /api/trace/:lotCode/events — เพิ่มเหตุการณ์มือ (login + WRITE_ROLES) — NOTE/PROCESSED/TESTED ฯลฯ
-router.post('/:lotCode/events', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), writeLimiter, async (req, res) => {
+router.post('/:lotCode/events', authenticate, requireRole(...WRITE_ROLES), writeLimiter, async (req, res) => {
   try {
     const type = String(req.body?.type || 'NOTE');
     const detail = String(req.body?.detail || '');
@@ -92,7 +93,7 @@ router.get('/', authenticate, async (_req, res) => {
 });
 
 // POST /api/trace — สร้างล็อตเอง (login + WRITE_ROLES) — สำหรับของที่ไม่ได้มาจากแปลง เช่น ของซื้อมาแปรรูป
-router.post('/', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), writeLimiter, async (req, res) => {
+router.post('/', authenticate, requireRole(...WRITE_ROLES), writeLimiter, async (req, res) => {
   try {
     const inventoryItemId = String(req.body?.inventoryItemId || '').trim();
     if (!inventoryItemId) return res.status(400).json({ error: 'inventoryItemId is required' });

@@ -6,6 +6,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
 import { legacyClientReport, recordLegacyTokenUse } from './ota.legacy';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 export { prisma };
 
@@ -50,7 +51,7 @@ router.get('/firmwares', authenticate, (req, res) => {
 router.post(
   '/firmwares',
   authenticate,
-  requireRole('SUPERADMIN'),
+  requireRole(...SUPERADMIN_ONLY),
   raw({ type: ['application/octet-stream', 'application/x-msdownload', 'application/zip', '*/*'], limit: '16mb' }),
   (req, res) => {
     try {
@@ -120,7 +121,7 @@ router.get('/firmwares/:file', (req, res) => {
 });
 
 // DELETE /api/ota/firmwares/:file (SUPERADMIN)
-router.delete('/firmwares/:file', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.delete('/firmwares/:file', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const file = req.params.file;
   if (!isSafeFileName(file)) return res.status(400).json({ error: 'Invalid file name' });
   const filePath = path.join(OTA_DIR, file);
@@ -130,7 +131,7 @@ router.delete('/firmwares/:file', authenticate, requireRole('SUPERADMIN'), (req,
 });
 
 // POST /api/ota/deploy { nodeId, file } – สั่ง ESP ผ่าน MQTT ให้ OTA (SUPERADMIN)
-router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/deploy', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { nodeId, file } = req.body || {};
     if (!nodeId || typeof nodeId !== 'string') return res.status(400).json({ error: 'nodeId required' });
@@ -175,13 +176,13 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
 
 // GET /api/ota/legacy-clients — ใครยังดาวน์โหลดด้วย ?token= (ใช้ตัดสินใจปิดสวิตช์)
 // ตัวเลขนี้บอก "ถึงเวลาเลิกใช้ query token หรือยัง" — ไม่คืนค่า token ใด ๆ
-router.get('/legacy-clients', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+router.get('/legacy-clients', authenticate, requireRole(...SUPERADMIN_ONLY), (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(legacyClientReport());
 });
 
 // GET /api/ota/events?limit=50 – ประวัติ OTA ทั้งหมด (คำสั่ง + ผลจากอุปกรณ์)
-router.get('/events', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/events', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const events = await prisma.otaEvent.findMany({

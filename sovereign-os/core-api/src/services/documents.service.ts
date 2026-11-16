@@ -2,9 +2,12 @@ import { prisma } from '../lib/prisma';
 import { callVision, VISION_MODEL, type CallVisionDeps } from './vision.service';
 import { computeExpiryDate, isCategoryValid } from './inventory.service';
 
+// คง export เดิมไว้ (มีโมดูล/เทสต์อ้างถึง) แต่ชี้ไปแหล่งความจริงเดียว — ไม่ประกาศซ้ำ
+// ประกาศซ้ำ; ย้ายมา src/lib/roles (RBAC single source)
+export { WRITE_ROLES } from '../lib/roles';
+
 export { prisma };
 
-export const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 export interface ProductLabel {
   name: string;

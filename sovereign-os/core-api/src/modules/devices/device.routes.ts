@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncRoute } from '../../lib/async-handler';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { ADMIN_ROLES, SUPERADMIN_ONLY, WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ function parseLocation(body: any): { latitude?: number; longitude?: number } | {
 }
 
 // POST /api/devices
-router.post('/', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), asyncRoute(async (req, res) => {
+router.post('/', authenticate, requireRole(...ADMIN_ROLES), asyncRoute(async (req, res) => {
   const { node_id, type, mqtt_topic, is_active } = req.body;
   const loc = parseLocation(req.body);
   if ('error' in loc) return res.status(400).json({ error: loc.error });
@@ -96,7 +97,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // PUT /api/devices/:id — SEC-047: เดิมล็อกแค่ authenticate ⇒ role อ่านอย่างเดียวแก้
 // `mqtt_topic` ของอุปกรณ์ได้ (= เปลี่ยนทางไปของคำสั่งสั่งงานฮาร์ดแวร์)
 // ใช้ชุดเดียวกับงานสั่งการ (SUPERADMIN / NODE_ADMIN / OPERATOR)
-router.put('/:id', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), async (req, res) => {
+router.put('/:id', authenticate, requireRole(...WRITE_ROLES), async (req, res) => {
   const { id } = req.params;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {
@@ -124,7 +125,7 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERAT
 });
 
 // DELETE /api/devices/:id
-router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const { id } = req.params;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {

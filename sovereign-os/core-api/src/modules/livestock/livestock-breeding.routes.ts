@@ -3,7 +3,8 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { computeHatchability } from '../../services/livestock-vet-ai.service';
-import { WRITE_ROLES, DAY_MS, BREED_STATUSES, parseDate } from './livestock-shared';
+import { DAY_MS, BREED_STATUSES, parseDate } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

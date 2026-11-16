@@ -5,7 +5,8 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { parseLivestockVisionResponse, LIVESTOCK_VISION_PROMPT } from '../../services/livestock-vet-ai.service';
 import { callVision, VISION_ENABLED, VISION_MODEL } from '../../services/vision.service';
 import { getModelForTask } from '../../services/ai-router.service';
-import { WRITE_ROLES, notify } from './livestock-shared';
+import { notify } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

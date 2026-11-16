@@ -8,11 +8,11 @@ import {
   isCategoryValid,
   type ExpiryStatus,
 } from '../../services/inventory.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 export { prisma };
 
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 interface InventoryRow {
   id: string;

@@ -10,6 +10,7 @@ import {
   runSkill,
   runSkillQueue,
 } from '../../services/skill-queue.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get('/skills', authenticate, async (_req, res) => {
 });
 
 // POST /api/coding/skills { title, content, autonomy, model, reasoningEffort } — เพิ่มทักษะ
-router.post('/skills', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/skills', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { id } = await addSkill(req.body);
     res.status(201).json({ success: true, id });
@@ -33,7 +34,7 @@ router.post('/skills', authenticate, requireRole('SUPERADMIN'), async (req, res)
 });
 
 // POST /api/coding/skills/:id/run — รันทักษะเดียว
-router.post('/skills/:id/run', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/skills/:id/run', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await runSkill(req.params.id);
     res.json({ success: true });
@@ -43,7 +44,7 @@ router.post('/skills/:id/run', authenticate, requireRole('SUPERADMIN'), async (r
 });
 
 // POST /api/coding/skills/run-queue — รันคิวทั้งหมด (เรียงตามลำดับ)
-router.post('/skills/run-queue', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/skills/run-queue', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const { ran } = await runSkillQueue();
     res.json({ success: true, ran });
@@ -53,7 +54,7 @@ router.post('/skills/run-queue', authenticate, requireRole('SUPERADMIN'), async 
 });
 
 // DELETE /api/coding/skills/:id
-router.delete('/skills/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/skills/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await deleteSkill(req.params.id);
     res.json({ success: true });

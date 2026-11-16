@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { deductStock } from '../../services/inventory.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const VALID_REASONS = ['trim', 'spoiled', 'expired', 'plate_waste', 'prep_error'];
 
 // POST /api/inventory/:id/move-to-waste {qtyKg?, reason?, note?}

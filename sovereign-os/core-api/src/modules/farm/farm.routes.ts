@@ -4,11 +4,11 @@ import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { buildFarmMapSvg } from '../../services/farm-map.service';
 import { deductStock } from '../../services/inventory.service';
 import { createLotFromHarvest } from '../../services/trace.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 export { prisma };
 
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const VALID_STATUSES = ['active', 'growing', 'harvested', 'fallow'];
 const DAY_MS = 86_400_000;
 

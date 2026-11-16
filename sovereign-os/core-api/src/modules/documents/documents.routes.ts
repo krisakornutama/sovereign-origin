@@ -8,11 +8,11 @@ import {
   createInventoryItem,
   extractExpiry,
   parseLabelResponse,
-  WRITE_ROLES,
   type ProductLabel,
 } from '../../services/documents.service';
 import { isCategoryValid } from '../../services/inventory.service';
 import type { CallVisionDeps } from '../../services/vision.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

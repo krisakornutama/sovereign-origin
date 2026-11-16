@@ -20,6 +20,7 @@ import { config } from '../../config';
 import { warRoomSessionClosed, warRoomSessionOpened } from '../../services/war-room.service';
 import { hardenUpload } from '../../lib/harden-upload';
 import { uploadLimiter } from '../../middleware/upload-rate-limit';
+import { ADMIN_ROLES, SUPERADMIN_ONLY, WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 // harden: memory mode (ไม่ลงดิสก์) + whitelist .pdf/.txt/.md + จำกัด 25MB
@@ -84,7 +85,7 @@ router.get('/intel/stats', authenticate, asyncRoute(async (req, res) => {
   res.json(await threatIntel.stats());
 }));
 
-router.post('/intel', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/intel', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { type, value, category, note, source } = req.body || {};
     if (!type || !['IP', 'DOMAIN'].includes(type)) return res.status(400).json({ error: 'type ต้องเป็น IP หรือ DOMAIN' });
@@ -96,7 +97,7 @@ router.post('/intel', authenticate, requireRole('SUPERADMIN'), async (req, res) 
   }
 });
 
-router.put('/intel/:id/toggle', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.put('/intel/:id/toggle', authenticate, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     const item = await threatIntel.setActive(req.params.id, req.body?.active !== false);
     res.json(item);
@@ -105,7 +106,7 @@ router.put('/intel/:id/toggle', authenticate, requireRole('SUPERADMIN', 'NODE_AD
   }
 });
 
-router.delete('/intel/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/intel/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await threatIntel.remove(req.params.id);
     res.json({ success: true });
@@ -114,7 +115,7 @@ router.delete('/intel/:id', authenticate, requireRole('SUPERADMIN'), async (req,
   }
 });
 
-router.post('/intel/update-feeds', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/intel/update-feeds', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const result = await threatIntel.updateFromFeeds();
   res.json(result);
 }));
@@ -149,7 +150,7 @@ router.get('/dns/queries', authenticate, asyncRoute(async (req, res) => {
 }));
 
 // block: ไป Pi-hole blacklist + ลง Threat DB ด้วย
-router.post('/dns/block', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/dns/block', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const domain = String(req.body?.domain || '').trim().toLowerCase();
   if (!domain || !domain.includes('.')) return res.status(400).json({ error: 'โดเมนไม่ถูกต้อง' });
   const dns = await piHole.addBlacklist(domain);
@@ -161,7 +162,7 @@ router.post('/dns/block', authenticate, requireRole('SUPERADMIN'), async (req, r
   if (dns.ok) securityStream.push('DNS_BLOCK', { domain, intel: intelItem });
 });
 
-router.post('/dns/allow', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/dns/allow', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const domain = String(req.body?.domain || '').trim().toLowerCase();
   if (!domain) return res.status(400).json({ error: 'โดเมนไม่ถูกต้อง' });
   const dns = await piHole.removeBlacklist(domain);
@@ -180,7 +181,7 @@ router.get('/av/status', authenticate, async (_req, res) => {
   res.json(hashEngine.status());
 });
 
-router.post('/av/scan', authenticate, requireRole('SUPERADMIN'), uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
+router.post('/av/scan', authenticate, requireRole(...SUPERADMIN_ONLY), uploadLimiter, upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์ (multipart field: file)' });
   const result = await hashEngine.scanBuffer(req.file.buffer, { originalName: req.file.originalname });
   res.json({ fileName: req.file.originalname, ...result });
@@ -191,7 +192,7 @@ router.get('/apps', authenticate, async (req, res) => {
   res.json({ apps: appControl.allApps(), customDomains: appControl.customDomains, blockedCount: appControl.blockedCount() });
 });
 
-router.put('/apps/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/apps/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const blocked = Boolean(req.body?.blocked);
   const ok = appControl.setBlocked(req.params.id, blocked);
   if (!ok) return res.status(404).json({ error: 'ไม่พบแอป' });
@@ -199,19 +200,19 @@ router.put('/apps/:id', authenticate, requireRole('SUPERADMIN'), async (req, res
   res.json({ ok: true, blocked, blockedCount: appControl.blockedCount() });
 });
 
-router.put('/apps/category/:category', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/apps/category/:category', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const blocked = Boolean(req.body?.blocked);
   const n = appControl.setCategoryBlocked(req.params.category, blocked);
   res.json({ ok: true, count: n, blockedCount: appControl.blockedCount() });
 });
 
-router.post('/apps/custom', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/apps/custom', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const ok = appControl.addCustomDomain(String(req.body?.domain || ''));
   if (!ok) return res.status(400).json({ error: 'โดเมนซ้ำ/ไม่ถูกต้อง' });
   res.json({ ok: true, customDomains: appControl.customDomains });
 });
 
-router.delete('/apps/custom', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/apps/custom', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const ok = appControl.removeCustomDomain(String(req.body?.domain || ''));
   if (!ok) return res.status(404).json({ error: 'ไม่พบโดเมน' });
   res.json({ ok: true, customDomains: appControl.customDomains });
@@ -222,7 +223,7 @@ router.get('/apps/blocklist', authenticate, async (req, res) => {
 });
 
 // ส่ง blocklist ทั้งหมดเข้า Pi-hole blacklist แบบ batch
-router.post('/apps/sync-pihole', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/apps/sync-pihole', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const domains = appControl.blockedDomains();
   let okCount = 0;
   const errors: string[] = [];
@@ -248,7 +249,7 @@ router.get('/ai/last', authenticate, asyncRoute(async (req, res) => {
   res.json({ report: await aiAnalyst.last(), error: aiAnalyst.lastError, lastRunAt: aiAnalyst.lastRunAt });
 }));
 
-router.post('/ai/analyze', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/ai/analyze', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const report = await aiAnalyst.analyzeNow();
   securityStream.push('AI_ANALYSIS', {
     summary: report?.summary?.slice(0, 200) || null,
@@ -262,7 +263,7 @@ router.get('/kill-switch', authenticate, async (_req, res) => {
   res.json(aiKillSwitch.status());
 });
 
-router.put('/kill-switch', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/kill-switch', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const { active, reason } = req.body || {};
   const state = aiKillSwitch.set(
     Boolean(active),
@@ -277,7 +278,7 @@ router.get('/first-responder', authenticate, async (_req, res) => {
   res.json(firstResponder.status());
 });
 
-router.put('/first-responder', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.put('/first-responder', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const { active, note } = req.body || {};
   const state = await firstResponder.set(Boolean(active), req.user?.id || 'unknown', typeof note === 'string' ? note : '');
   res.json(state);
@@ -288,7 +289,7 @@ router.get('/reality', authenticate, asyncRoute(async (_req, res) => {
   res.json(await realityCheck.stats());
 }));
 
-router.post('/reality/correct', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
+router.post('/reality/correct', authenticate, requireRole(...WRITE_ROLES), asyncRoute(async (req, res) => {
   const { kind, note, source_type, source_event_id } = req.body || {};
   if (!kind || !['false_positive', 'false_negative', 'context'].includes(kind)) {
     return res.status(400).json({ error: 'kind ต้องเป็น false_positive / false_negative / context' });
@@ -305,7 +306,7 @@ router.get('/drill', authenticate, async (_req, res) => {
   res.json({ report: lastDrillReport() });
 });
 
-router.post('/drill', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
+router.post('/drill', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (_req, res) => {
   const report = await runChaosDrill();
   res.json(report);
 }));
@@ -321,7 +322,7 @@ router.get('/time-consensus', authenticate, asyncRoute(async (_req, res) => {
   res.json(status);
 }));
 
-router.post('/time-consensus/check', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
+router.post('/time-consensus/check', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (_req, res) => {
   const found = await timeConsensus.check();
   res.json({ ...timeConsensus.status(), found });
 }));

@@ -16,7 +16,8 @@ import {
   type VetAction,
 } from '../../services/livestock-vet-ai.service';
 import { deductStock, addStock } from '../../services/inventory.service';
-import { WRITE_ROLES, DAY_MS, QUARANTINE_DAYS, ROS, notify, parseDate } from './livestock-shared';
+import { DAY_MS, QUARANTINE_DAYS, ROS, notify, parseDate } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

@@ -5,6 +5,7 @@ import { rateLimit } from '../../middleware/rateLimit.middleware';
 import { AuthService, prisma } from '../../services/auth.service';
 import { AuditService } from '../../services/audit.service';
 import { disconnectUserSockets } from '../../realtime/io-registry';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -224,7 +225,7 @@ router.get('/mfa/status', authenticate, async (req, res) => {
 
 // GET /api/auth/rate-limit-status — ดูสถานะ MFA rate limit (per-IP + per-account)
 // (ต้อง SUPERADMIN + ผ่าน MFA แล้ว)
-router.get('/rate-limit-status', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/rate-limit-status', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const now = Date.now();
   const toClient = (key: string, state: { count: number; windowResetAt: number; blockedUntil: number; blockLevel: number }) => ({
     key,
@@ -252,7 +253,7 @@ router.get('/rate-limit-status', authenticate, requireRole('SUPERADMIN'), (req, 
 // (โจมตีได้: login → clear → เดารหัส OTP ต่อไม่จำกัด) · recovery ของเจ้าของที่ล็อกจริง
 // ต้องทำที่เครื่อง/คอนเทนเนอร์ ไม่ใช่ผ่าน API ระยะไกล
 // body: { ip?: string, username?: string } — ไม่ส่งอะไรเลย = ล้างทั้งหมด
-router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/rate-limit/clear', clearLimiter, authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const { ip, username } = req.body || {};
   let cleared = 0;
   let scope: string = 'all';

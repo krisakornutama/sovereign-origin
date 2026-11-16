@@ -23,6 +23,7 @@ import { listAlertEvents, alertStats24h } from '../../services/alert-store.servi
 import { synthesizeWav } from '../../services/tts.service'; // ระดับที่ 2: ส่งเสียงพูดไทย
 
 const router = Router();
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 // ไฟล์ที่ให้ส่งผ่าน Telegram ได้ — จำกัดอยู่ในโฟลเดอร์ที่ระบบสร้างเองเท่านั้น
 // (กัน path traversal: เดิมอ่านไฟล์ใดก็ได้บนเครื่องแล้ว exfil ผ่าน Telegram)
@@ -162,7 +163,7 @@ router.get('/config', authenticate, asyncRoute(async (_req, res) => {
 
 // GET /api/telegram/alerts?limit=100&severity=warn — ประวัติ alert ทั้งหมดที่ระบบจดไว้
 // (ช่องทางที่ 2 นอกจาก Telegram — ย้อนดูได้ว่า watchdog/dispatcher เคยแจ้งอะไรเมื่อไร ส่งสำเร็จหรือถูกยับ)
-router.get('/alerts', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/alerts', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit ?? '100'), 10) || 100, 500);
     const severity = typeof req.query.severity === 'string' ? req.query.severity : undefined;
@@ -189,7 +190,7 @@ router.get('/alerts', authenticate, requireRole('SUPERADMIN'), async (req, res) 
 
 // PUT /api/telegram/config { botToken?, chatId? } — บันทึก override ลง DB (SUPERADMIN)
 // ส่งเฉพาะฟิลด์ที่ต้องการเปลี่ยน; ฟิลด์ที่ไม่ได้ส่งคงค่าเดิมไว้
-router.put('/config', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.put('/config', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const { botToken, chatId } = req.body || {};
   const nextToken = typeof botToken === 'string' ? botToken.trim() : undefined;
   const nextChatId = typeof chatId === 'string' ? chatId.trim() : undefined;
@@ -221,7 +222,7 @@ router.put('/config', authenticate, requireRole('SUPERADMIN'), asyncRoute(async 
 }));
 
 // DELETE /api/telegram/config — ลบ override กลับไปใช้ .env (SUPERADMIN)
-router.delete('/config', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.delete('/config', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   await clearTelegramCredentials();
   const creds = await getTelegramCredentials();
   res.json({
@@ -233,7 +234,7 @@ router.delete('/config', authenticate, requireRole('SUPERADMIN'), asyncRoute(asy
 }));
 
 // GET /api/telegram/updates — ดึง chat ID อัตโนมัติจาก getUpdates (SUPERADMIN) — ช่วยกรอก Chat ID ไม่ต้องพิมพ์เอง
-router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/updates', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const creds = await getTelegramCredentials();
   if (!creds.botToken) return res.status(400).json({ error: 'ตั้ง Bot Token ก่อน' });
 
@@ -284,7 +285,7 @@ router.get('/updates', authenticate, requireRole('SUPERADMIN'), async (req, res)
 });
 
 // POST /api/telegram/test — ส่งข้อความทดสอบด้วย credential ปัจจุบัน (SUPERADMIN)
-router.post('/test', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/test', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const creds = await getTelegramCredentials();
   if (!creds.botToken || !creds.chatId) {
     return res.status(400).json({ success: false, error: 'Telegram not configured' });
@@ -295,7 +296,7 @@ router.post('/test', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (
 
 // CE3 (04/11/69): ทดสอบทุกช่องทางที่ตั้งไว้ (Telegram + Discord + LINE) — คืนผลแยกช่อง
 // ใช้ก่อนพึ่งระบบจริง: รู้ทันทีว่าช่องไหนตั้งผิด โดยไม่ต้องรอ alert จริง
-router.post('/channels/test', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/channels/test', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const creds = await getTelegramCredentials();
     const targets = resolveExternalAlertTargets();
@@ -342,7 +343,7 @@ router.get('/biz', authenticate, async (_req, res) => {
 });
 
 // PUT /api/telegram/biz — ตั้ง/เปลี่ยนห้องธุรกิจ (เขียนทับห้องเดิม)
-router.put('/biz', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/biz', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const { chatId } = req.body || {};
   const bad = validateTelegramChatId(String(chatId ?? ''));
   if (bad) return res.status(400).json({ success: false, error: bad });
@@ -355,7 +356,7 @@ router.put('/biz', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
 });
 
 // DELETE /api/telegram/biz — ล้างห้องธุรกิจ (ห้องของระบบไม่กระทบ)
-router.delete('/biz', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.delete('/biz', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     await clearBusinessChatId();
     res.json({ success: true });

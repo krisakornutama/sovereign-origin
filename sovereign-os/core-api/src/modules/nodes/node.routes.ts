@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole, ensureNodeAccess } from '../../middleware/auth.middleware';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/nodes
-router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { name, gis_location } = req.body;
     const node = await prisma.node.create({ data: { name, gis_location } });
@@ -61,7 +62,7 @@ router.put('/:id', authenticate, ensureNodeAccess(), async (req, res) => {
 });
 
 // DELETE /api/nodes/:id
-router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await prisma.node.delete({ where: { id: req.params.id } });
     res.json({ success: true });

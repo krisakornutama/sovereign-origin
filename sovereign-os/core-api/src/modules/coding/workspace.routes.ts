@@ -11,6 +11,7 @@ import {
   readProjectFile,
   runTerminal,
 } from '../../services/agent-workspace.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ export const codingLimiter = rateLimit({
 });
 
 // GET /api/coding/workspace — ตำแหน่งโปรเจ็กปัจจุบัน (SUPERADMIN เท่านั้น — ไม่เปิดเผย path ให้ user ทั่วไป)
-router.get('/workspace', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+router.get('/workspace', authenticate, requireRole(...SUPERADMIN_ONLY), (_req, res) => {
   try {
     res.json({ projectPath: getProjectPath() });
   } catch (err: any) {
@@ -32,7 +33,7 @@ router.get('/workspace', authenticate, requireRole('SUPERADMIN'), (_req, res) =>
 });
 
 // PUT /api/coding/workspace { projectPath } — เปลี่ยนตำแหน่งโปรเจ็ก (SUPERADMIN)
-router.put('/workspace', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/workspace', authenticate, codingLimiter, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   try {
     const saved = saveSettings({ projectPath: String(req.body?.projectPath || '') });
     res.json({ success: true, projectPath: saved.projectPath });
@@ -42,7 +43,7 @@ router.put('/workspace', authenticate, codingLimiter, requireRole('SUPERADMIN'),
 });
 
 // GET /api/coding/files?path=... — รายการไฟล์ในโปรเจ็ก
-router.get('/files', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/files', authenticate, codingLimiter, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   try {
     res.json({ entries: listFiles(String(req.query?.path || '')) });
   } catch (err: any) {
@@ -51,7 +52,7 @@ router.get('/files', authenticate, codingLimiter, requireRole('SUPERADMIN'), (re
 });
 
 // GET /api/coding/file?path=... — เนื้อหาไฟล์ (preview)
-router.get('/file', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/file', authenticate, codingLimiter, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   try {
     const result = readProjectFile(String(req.query?.path || ''));
     res.json(result);
@@ -61,7 +62,7 @@ router.get('/file', authenticate, codingLimiter, requireRole('SUPERADMIN'), (req
 });
 
 // POST /api/coding/terminal { command } — รันคำสั่งในเครื่อง (cwd = โปรเจ็ก)
-router.post('/terminal', authenticate, codingLimiter, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/terminal', authenticate, codingLimiter, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const result = await runTerminal(String(req.body?.command || ''));
     res.json(result);

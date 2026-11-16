@@ -2,12 +2,12 @@ import { Router, type Request, type Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+import { SITE_WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 
 // อุปกรณ์ = config จริงของบ้าน (ลบแล้วประวัติ/ค่า sensor ของอุปกรณ์นั้นหายตาม)
 // ⇒ เขียนได้เฉพาะ role ที่ดูแลระบบ ไม่ใช่ทุกบัญชีที่ล็อกอินแล้ว (KID/SYSTEM_AI ไม่ได้)
-const DEVICE_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
 const DEVICE_TYPE_PATTERN = /^[A-Za-z0-9 _.-]{1,32}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,7 +82,7 @@ router.get('/devices', authenticate, async (req, res) => {
 });
 
 // POST /api/sensors/devices
-router.post('/devices', authenticate, requireRole(...DEVICE_WRITE_ROLES), async (req, res) => {
+router.post('/devices', authenticate, requireRole(...SITE_WRITE_ROLES), async (req, res) => {
   const type = typeof req.body?.type === 'string' ? req.body.type.trim() : '';
   if (!DEVICE_TYPE_PATTERN.test(type)) {
     return res.status(400).json({
@@ -121,7 +121,7 @@ router.post('/devices', authenticate, requireRole(...DEVICE_WRITE_ROLES), async 
 });
 
 // DELETE /api/sensors/devices/:id
-router.delete('/devices/:id', authenticate, requireRole(...DEVICE_WRITE_ROLES), async (req, res) => {
+router.delete('/devices/:id', authenticate, requireRole(...SITE_WRITE_ROLES), async (req, res) => {
   const id = req.params.id;
   // @db.Uuid: id ผิดรูปแบบทำให้ Prisma โยน P2023 — ต้องบอกก่อนถึง DB
   if (!UUID_PATTERN.test(id)) {

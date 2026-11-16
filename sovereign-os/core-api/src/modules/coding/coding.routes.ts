@@ -10,6 +10,7 @@ import {
   suggestNext,
   applyFilesToProject,
 } from '../../services/coding-agent.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.delete('/jobs/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/coding/jobs/:id/apply — เขียนไฟล์จากงานที่เสร็จ ลงโปรเจ็กจริง (path ในแผน)
-router.post('/jobs/:id/apply', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/jobs/:id/apply', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const result = await applyFilesToProject(req.params.id);
     res.json({ success: true, ...result });

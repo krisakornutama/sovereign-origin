@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { meshLiteService } from '../../services/mesh-lite.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 // Sovereign Mesh Lite — สำรองข้อมูลนอกสถานที่แบบเข้ารหัส
 // GET  /api/mesh/status     — สถานะ + key fingerprint + bundle list
@@ -21,13 +22,13 @@ router.get('/manifest', authenticate, (_req, res) => {
   res.json({ latest: info });
 });
 
-router.get('/latest', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+router.get('/latest', authenticate, requireRole(...SUPERADMIN_ONLY), (_req, res) => {
   const latest = meshLiteService.readLatestBundle();
   if (!latest) return res.status(404).json({ error: 'ยังไม่มี bundle' });
   res.json({ file: latest.file, bundle: latest.bundle });
 });
 
-router.post('/replicate', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
+router.post('/replicate', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (_req, res) => {
   const result = await meshLiteService.replicate();
   if (!result.ok) return res.status(400).json(result);
   res.json(result);
