@@ -90,6 +90,41 @@ jobs:
           test -f release-assets/SHA256SUMS.txt
           cat release-assets/SHA256SUMS.txt
 
+      # ── Provenance: เซ็น artifact ด้วยกุญแจที่อยู่ใน sovereign-vault ──
+      # ปิดไว้โดยปริยาย: ต้องตั้ง repo variable ATTEST_ENABLED=true และ secret
+      # ATTEST_MASTER_KEY (base64 32 ไบต์) ก่อน — ไม่มีกุญแจก็ไม่ควรมีใบรับรองปลอม
+      - name: Build sovereign-attest + vault (siblings)
+        if: ${{ vars.ATTEST_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/krisakornutama/sovereign-vault.git ../sovereign-vault
+          git clone --depth 1 https://github.com/krisakornutama/sovereign-attest.git ../sovereign-attest
+          (cd ../sovereign-vault && npm ci && npm run build)
+          (cd ../sovereign-attest && npm ci && npm run build)
+
+      - name: ดึง attestation ของรุ่นก่อน (ถ้ามี) เพื่อต่อ chain
+        if: ${{ vars.ATTEST_ENABLED == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prev="$(gh release list --limit 1 --json tagName -q '.[0].tagName' || true)"
+          if [ -n "$prev" ]; then
+            gh release download "$prev" -p sovereign-attest.json -D .attest-prev || true
+          fi
+          ls -la .attest-prev 2>/dev/null || echo "ไม่มี attestation ของรุ่นก่อน — เริ่ม chain ใหม่"
+
+      - name: เซ็น release ด้วย sovereign-attest
+        if: ${{ vars.ATTEST_ENABLED == 'true' }}
+        shell: bash
+        env:
+          ATTEST_MASTER_KEY: ${{ secrets.ATTEST_MASTER_KEY }}
+        run: |
+          prev_arg=""
+          [ -f .attest-prev/sovereign-attest.json ] && prev_arg="--previous=.attest-prev/sovereign-attest.json"
+          node tools/attest-release.mjs --sign --dir=release-assets --tag="${{ inputs.tag || github.ref_name }}" $prev_arg
+          node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

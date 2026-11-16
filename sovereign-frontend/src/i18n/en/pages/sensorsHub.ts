@@ -33,6 +33,8 @@ export default {
   locationBtn: 'Coordinates',
   noSensorData: 'No sensor data yet — see the "Sensor Data" tab',
   noDevices: 'No devices yet — add your first device',
+  readOnlyNotice: 'This account is read-only — only SUPERADMIN / NODE_ADMIN / OPERATOR can change device settings',
+  readOnlyTitle: 'Requires SUPERADMIN / NODE_ADMIN / OPERATOR',
   modalTitle: 'Generate Arduino Code for {type}',
   statShowing: 'Records shown',
   statBattery: 'Latest battery',

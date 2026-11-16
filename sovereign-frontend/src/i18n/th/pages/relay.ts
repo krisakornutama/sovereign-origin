@@ -6,6 +6,8 @@ export default {
   dashboardLink: 'Dashboard',
   controlTitle: 'ควบคุมอุปกรณ์ไฟฟ้า',
   controlDesc: 'ส่งคำสั่งผ่าน MQTT ไปยัง relay (ต้องมีอุปกรณ์รับคำสั่งจริงในเครือข่าย)',
+  readOnlyNotice: 'บัญชีนี้เป็นแบบอ่านอย่างเดียว — สั่งเปิด/ปิดรีเลย์และแก้ตารางเวลาได้เฉพาะ SUPERADMIN / NODE_ADMIN / OPERATOR',
+  readOnlyTitle: 'ต้องเป็น SUPERADMIN / NODE_ADMIN / OPERATOR จึงจะสั่งงานได้',
   sending: 'ส่งคำสั่ง...',
   noRelays: 'ไม่มี relay ในระบบ',
   loadingStatus: 'กำลังโหลดสถานะ...',

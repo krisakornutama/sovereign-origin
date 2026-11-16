@@ -8,6 +8,7 @@ import Sidebar from '../components/layout/Sidebar';
 import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import { useLanguageStore } from '../stores/useLanguageStore';
+import { useCanWriteModules } from '../lib/roles';
 
 interface Relay {
   relayId: string;
@@ -30,6 +31,9 @@ const DAY_NAMES = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา']; // in
 export default function RelayPage() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
+  // SEC-045: backend ล็อกการสั่งรีเลย์ไว้ที่ SUPERADMIN/NODE_ADMIN/OPERATOR —
+  // หน้าเว็บต้องสะท้อนกฎเดียวกัน ไม่ใช่ให้กดแล้วได้ 403
+  const canWrite = useCanWriteModules();
 
   const daysToLabel = (days: string): string => {
     if (days === '*') return t('relay.everyDay', 'ทุกวัน');
@@ -217,6 +221,11 @@ export default function RelayPage() {
 
         {message && <div className="inset p-3 rounded text-sm text-emerald-400">{message}</div>}
         {error && <div className="inset p-3 rounded text-sm text-red-400">{error}</div>}
+        {!canWrite && (
+          <div className="inset p-3 rounded text-xs text-amber-300 border border-amber-800/50">
+            {t('relay.readOnlyNotice', 'บัญชีนี้เป็นแบบอ่านอย่างเดียว — สั่งเปิด/ปิดรีเลย์และแก้ตารางเวลาได้เฉพาะ SUPERADMIN / NODE_ADMIN / OPERATOR')}
+          </div>
+        )}
 
         {/* Relay cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,8 +256,9 @@ export default function RelayPage() {
 
                 <button
                   onClick={() => toggleRelay(relay, isOn ? 0 : 1)}
-                  disabled={isSending}
-                  className={`w-full ${isOn ? 'btn-danger' : 'btn-primary'}`}
+                  disabled={isSending || !canWrite}
+                  title={!canWrite ? t('relay.readOnlyTitle', 'ต้องเป็น SUPERADMIN / NODE_ADMIN / OPERATOR จึงจะสั่งงานได้') : undefined}
+                  className={`w-full ${isOn ? 'btn-danger' : 'btn-primary'} ${!canWrite ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {isSending ? t('relay.sending', 'ส่งคำสั่ง...') : isOn ? t('common.off', 'ปิด') : t('common.on', 'เปิด')}
                 </button>
@@ -339,8 +349,8 @@ export default function RelayPage() {
 
             <button
               onClick={addSchedule}
-              disabled={!formRelay || formDays.length === 0}
-              className="btn-primary"
+              disabled={!formRelay || formDays.length === 0 || !canWrite}
+              className={`btn-primary ${!canWrite ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Icon name="plus" size={14} />
               {t('relay.addSchedule', 'เพิ่มตารางเวลา')}
@@ -372,11 +382,12 @@ export default function RelayPage() {
                     <td className="px-4 py-2">
                       <button
                         onClick={() => toggleSchedule(sched)}
+                        disabled={!canWrite}
                         className={`px-3 py-1 rounded-full text-xs font-bold transition ${
                           sched.enabled
                             ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40'
                             : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                        }`}
+                        } ${!canWrite ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {sched.enabled ? t('common.on', 'เปิด') : t('common.off', 'ปิด')}
                       </button>
@@ -384,7 +395,8 @@ export default function RelayPage() {
                     <td className="px-4 py-2">
                       <button
                         onClick={() => deleteSchedule(sched)}
-                        className="text-red-400 hover:text-red-300 text-xs"
+                        disabled={!canWrite}
+                        className={`text-red-400 hover:text-red-300 text-xs ${!canWrite ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <Icon name="trash" size={14} />
                       </button>

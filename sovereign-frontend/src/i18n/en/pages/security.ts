@@ -56,6 +56,7 @@ export default {
   connectionsUnknown: 'Unknown',
   connectionsUnavailable: 'Could not read real connections ({reason}) — the table is empty because we do not know, not because there are none',
   connectionsUnavailableShort: 'Could not read connections — this is not the same as none',
+  connectionsUnavailableHint: 'netstat could not be read on the host, so we do not know what is connected — refresh or check the permissions of the API process',
   eventsUnknown: 'Unknown',
   eventsUnavailable: 'Could not read security events from the database ({reason}) — the table is empty because we do not know, not because there are none',
   eventsUnavailableShort: 'Could not read events — this is not the same as no events',

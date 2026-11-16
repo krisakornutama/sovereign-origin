@@ -18,6 +18,8 @@
     "preview:stack": "node tools/preview-stack.mjs",
     "preview:check": "node tools/preview-stack.mjs --check",
     "stage:release": "node tools/stage-release.mjs",
-    "release:check": "node tools/release-check.mjs"
+    "release:check": "node tools/release-check.mjs",
+    "release:attest": "node tools/attest-release.mjs --sign",
+    "release:attest:verify": "node tools/attest-release.mjs --verify"
   }
 }

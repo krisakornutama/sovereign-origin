@@ -10,6 +10,9 @@ import PageHeader from '../components/ui/PageHeader';
 import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
 import StatusPill from '../components/ui/StatusPill';
+import StatusDot from '../components/ui/StatusDot';
+import DataTable from '../components/ui/DataTable';
+import SkeletonCard, { SkeletonGrid } from '../components/ui/SkeletonCard';
 import NextGenPanel from '../components/security/NextGenPanel';
 import FirewallEnginePanel from '../components/security/FirewallEnginePanel';
 import KillSwitchCard, { type KillSwitchState } from '../components/security/KillSwitchCard';
@@ -306,7 +309,15 @@ export default function SecurityPage() {
     s === 'critical' ? 'text-red-400' : s === 'warning' ? 'text-amber-400' : 'text-blue-400';
 
   if (!isHydrated) {
-    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">{t('common.loading', 'กำลังโหลด...')}</div>;
+    // เดิมเป็นข้อความ "กำลังโหลด..." ลอย ๆ — ตอนนี้เป็นโครงหน้าร่างให้เห็นว่าจะมีอะไรขึ้น
+    return (
+      <div className="min-h-screen bg-gray-950 p-6">
+        <div className="mx-auto max-w-7xl space-y-4">
+          <SkeletonCard lines={2} />
+          <SkeletonGrid count={3} />
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !user) {
@@ -547,53 +558,82 @@ export default function SecurityPage() {
             </div>
           )}
           <h2 className="text-sm font-semibold text-gray-200 glow-text-cyan p-4 border-b border-gray-800/60">{t('security.activeConnections', 'Active Connections')} <span className="text-xs text-gray-500 font-normal">{t('security.connectionsNote', '— การเชื่อมต่อเครือข่ายที่กำลังใช้งาน (ตรวจสอบ + block IP แปลกปลอม)')}</span></h2>
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-950/40 backdrop-blur-sm">
-              <tr className="text-left text-emerald-400/70 border-b border-gray-800 text-[11px] uppercase tracking-widest">
-                <th className="px-4 py-3 font-semibold">{t('security.colProtocol', 'Protocol')}</th>
-                <th className="px-4 py-3 font-semibold">{t('security.colLocal', 'Local Address')}</th>
-                <th className="px-4 py-3 font-semibold">{t('security.colForeign', 'Foreign Address')}</th>
-                <th className="px-4 py-3 font-semibold">{t('security.colState', 'State')}</th>
-                <th className="px-4 py-3 font-semibold">{t('security.colPid', 'PID')}</th>
-                <th className="px-4 py-3 font-semibold">{t('security.colAction', 'Action')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/50">
-              {connections.map((c, i) => {
-                const ip = extractIp(c.foreign_address);
-                const isBlocked = blockedIps.includes(ip.toLowerCase());
-                return (
-                  <tr key={i} className="hover:bg-gray-800/50 transition-colors">
-                    <td className="px-4 py-2">{c.protocol}</td>
-                    <td className="px-4 py-2 text-xs">{c.local_address}</td>
-                    <td className="px-4 py-2 text-xs text-yellow-300">{c.foreign_address}</td>
-                    <td className="px-4 py-2">{c.state}</td>
-                    <td className="px-4 py-2">{c.pid}</td>
-                    <td className="px-4 py-2">
-                      {isBlocked ? (
-                        <span className="text-[10px] px-2 py-1 rounded bg-red-900/40 border border-red-800 text-red-300">
-                          {t('security.blocked', 'Blocked')}
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => sendBlockAction('block', ip)}
-                          disabled={busyIp === ip || !ip}
-                          title={t('security.blockTitle', 'Block {ip} ที่ไฟร์วอลล์', { ip })}
-                          className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-amber-900/40 border border-amber-700 text-amber-300 hover:bg-amber-900/60 transition disabled:opacity-50"
-                        >
-                          {busyIp === ip ? t('security.working', 'กำลัง...') : (<><Icon name="shield" size={10} /> {t('security.block', 'Block')}</>)}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {connections.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{connectionsDegraded ? t('security.connectionsUnavailableShort', 'อ่านรายการเชื่อมต่อไม่ได้ — ไม่ใช่ว่าไม่มี') : t('security.noConnections', 'ยังไม่มีการเชื่อมต่อที่ใช้งานอยู่')}</td></tr>
-              )}
-            </tbody>
-          </table>
+          <div className="p-4">
+            <DataTable<Connection>
+              caption={t('security.activeConnections', 'Active Connections')}
+              rows={connections}
+              getRowKey={(c, i) => `${c.protocol}-${c.local_address}-${c.foreign_address}-${i}`}
+              initialSortKey="foreign_address"
+              emptyTitle={
+                connectionsDegraded
+                  ? t('security.connectionsUnavailableShort', 'อ่านรายการเชื่อมต่อไม่ได้ — ไม่ใช่ว่าไม่มี')
+                  : t('security.noConnections', 'ยังไม่มีการเชื่อมต่อที่ใช้งานอยู่')
+              }
+              emptyDescription={
+                connectionsDegraded
+                  ? t('security.connectionsUnavailableHint', 'ระบบอ่าน netstat ของเครื่องไม่ได้ จึงไม่รู้ว่ามีอะไรเชื่อมต่ออยู่ — กดรีเฟรชหรือตรวจสิทธิ์ของ process ที่รัน API')
+                  : undefined
+              }
+              columns={[
+                {
+                  key: 'protocol',
+                  header: t('security.colProtocol', 'Protocol'),
+                  sortValue: (c) => c.protocol,
+                },
+                {
+                  key: 'local_address',
+                  header: t('security.colLocal', 'Local Address'),
+                  render: (c) => <span className="text-xs">{c.local_address}</span>,
+                  sortValue: (c) => c.local_address,
+                },
+                {
+                  key: 'foreign_address',
+                  header: t('security.colForeign', 'Foreign Address'),
+                  render: (c) => <span className="text-xs text-yellow-300">{c.foreign_address}</span>,
+                  sortValue: (c) => c.foreign_address,
+                },
+                {
+                  key: 'state',
+                  header: t('security.colState', 'State'),
+                  render: (c) => (
+                    <StatusDot
+                      size="sm"
+                      variant={c.state === 'ESTABLISHED' ? 'ok' : c.state === 'LISTENING' ? 'info' : 'off'}
+                      label={c.state}
+                    />
+                  ),
+                  sortValue: (c) => c.state,
+                },
+                {
+                  key: 'pid',
+                  header: t('security.colPid', 'PID'),
+                  align: 'right',
+                  sortValue: (c) => Number(c.pid) || 0,
+                },
+                {
+                  key: 'action',
+                  header: t('security.colAction', 'Action'),
+                  render: (c) => {
+                    const ip = extractIp(c.foreign_address);
+                    const isBlocked = blockedIps.includes(ip.toLowerCase());
+                    return isBlocked ? (
+                      <span className="text-[10px] px-2 py-1 rounded bg-red-900/40 border border-red-800 text-red-300">
+                        {t('security.blocked', 'Blocked')}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => sendBlockAction('block', ip)}
+                        disabled={busyIp === ip || !ip}
+                        title={t('security.blockTitle', 'Block {ip} ที่ไฟร์วอลล์', { ip })}
+                        className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-amber-900/40 border border-amber-700 text-amber-300 hover:bg-amber-900/60 transition disabled:opacity-50"
+                      >
+                        {busyIp === ip ? t('security.working', 'กำลัง...') : (<><Icon name="shield" size={10} /> {t('security.block', 'Block')}</>)}
+                      </button>
+                    );
+                  },
+                },
+              ]}
+            />
           </div>
         </div>
 

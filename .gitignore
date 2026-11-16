@@ -120,6 +120,7 @@ tools/*
 #   แต่ไม่เคยถูก track → clone ใหม่จะไม่มี แล้วเทสต์/เครื่องมือที่แก้ .cmd จะรันไม่ได้
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
+!tools/host-smoke.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
@@ -158,6 +159,8 @@ tools/*
 !tools/status-doc.mjs
 !tools/stage-release.mjs
 !tools/release-build.mjs
+# release provenance (ATTEST-002) — release.yml เรียกไฟล์นี้ ต้องมีบน clone สด
+!tools/attest-release.mjs
 !tools/release-check.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md

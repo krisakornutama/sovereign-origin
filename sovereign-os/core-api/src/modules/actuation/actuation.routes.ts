@@ -23,8 +23,9 @@ router.get('/rules', authenticate, (_req, res) => {
 });
 
 // มนุษย์สั่ง actuator — SYSTEM_AI สั่งผ่าน HTTP ไม่ได้ (Strict AI/Actuator Separation)
-// role อื่นที่เหลือยังใช้ได้ตามเดิม: SUPERADMIN / NODE_ADMIN / SITE_ADMIN / OPERATOR
-router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
+// SEC-048: SITE_ADMIN ถูกถอดออก — docs/modules/fleet.md ประกาศว่า SITE_ADMIN อ่านอย่างเดียว
+// และเส้นนี้ไม่ตรวจขอบเขตสาขา ⇒ SITE_ADMIN สั่ง actuator ข้ามสาขาได้ (ชุดเดียวกับ relay/devices)
+router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
   const { actuatorId, state, reason } = req.body || {};
   if (!actuatorId || !state) return res.status(400).json({ error: 'ต้องระบุ actuatorId + state' });
   const r = await actuationService.executeCommand({
