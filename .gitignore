@@ -128,6 +128,8 @@ tools/*
 !tools/promote-web.mjs
 # ด่านในเครื่องเทียบเท่า CI ก่อน push (CI-002) — เทสต์อ้างถึง ต้อง track
 !tools/preflight.mjs
+# ตราประทับ build สำหรับคอนเทนเนอร์ที่ไม่มี .git (CI-003)
+!tools/write-build-info.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs

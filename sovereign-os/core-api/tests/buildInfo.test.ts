@@ -96,6 +96,21 @@ test('commit: env ชนะ git, ไม่มี env และไม่มี .g
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('commit: ไม่มี env/git แต่มี data/build-info.json = ใช้ค่าที่ประทับไว้ (ทางของคอนเทนเนอร์)', async () => {
+  const dir = makeDir({ 'index.js': 'x', 'data/build-info.json': JSON.stringify({ commit: 'stamp1234567' }) });
+  assert.equal(await readGitCommit(dir, {}), 'stamp1234567');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('commit: ไฟล์ประทับที่เสียหาย/ว่าง ต้องไม่ทำให้ health ล้ม', async () => {
+  const dir = makeDir({ 'index.js': 'x', 'data/build-info.json': '{ not json' });
+  assert.equal(await readGitCommit(dir, {}), null);
+  const empty = makeDir({ 'index.js': 'x', 'data/build-info.json': JSON.stringify({ commit: '  ' }) });
+  assert.equal(await readGitCommit(empty, {}), null);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(empty, { recursive: true, force: true });
+});
+
 test('commit: อ่านจาก git จริงใน repo นี้ได้ (ตัวที่รันอยู่คือ HEAD)', async () => {
   const repoRoot = path.resolve(process.cwd(), '..', '..');
   if (!fs.existsSync(path.join(repoRoot, '.git'))) {
