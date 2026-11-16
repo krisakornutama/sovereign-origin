@@ -147,8 +147,12 @@ describe('agent-machines routes — กัน SITE_ADMIN หลุดขอบ�
 describe('users.routes — ผูกสาขาได้อย่างปลอดภัย', () => {
   const src = read(USERS);
 
-  test('ยอมรับ role SITE_ADMIN', () => {
-    assert.match(src, /VALID_ROLES = \[[^\]]*'SITE_ADMIN'/);
+  test('ยอมรับ role SITE_ADMIN (ชุด role มาจากแหล่งความจริงเดียว)', () => {
+    // เดิมเทสต์บังคับให้ users.routes ประกาศ VALID_ROLES เอง — ตั้งแต่ SEC-049
+    // ชุดนี้มาจาก src/lib/roles เท่านั้น จึงตรวจที่ปลายทาง + ที่ค่ากลาง
+    assert.match(src, /import \{[^}]*\bASSIGNABLE_ROLES\b[^}]*\} from '\.\.\/\.\.\/lib\/roles';/);
+    const roles = read(`${BACKEND}/src/lib/roles.ts`);
+    assert.match(roles, /ASSIGNABLE_ROLES[^=]*=\s*\[[^\]]*'SITE_ADMIN'/);
   });
 
   test('ตรวจสาขาผ่าน service ของ fleet (ไม่ query ตาราง fleet_* เอง)', () => {
