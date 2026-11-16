@@ -44,6 +44,8 @@ export default function SettingsPage() {
     status?: number;
     ms?: number;
     detail?: string;
+    // "ที่รันอยู่คือ commit ไหน" — ค่าเดียวกับที่ /api/health ตอบ (กัน prod รัน build เก่าเงียบ ๆ)
+    build?: { version?: string | null; commit?: string | null; builtAt?: string | null; loadedDir?: string };
   } | null>(null);
   // ── PWA state ──
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -212,6 +214,7 @@ export default function SettingsPage() {
           data.status === 'ok'
             ? t('settings.test.ok', 'Core API ตอบสนองปกติ')
             : res.statusText || `HTTP ${res.status}`,
+        build: data?.build ?? undefined,
       });
     } catch (err: any) {
       setTestResult({
@@ -424,6 +427,18 @@ export default function SettingsPage() {
               {testResult.detail || t('settings.test.failed', 'ไม่สามารถเชื่อมต่อได้')}
               {testResult.status !== undefined && ` (HTTP ${testResult.status})`}
               {testResult.ms !== undefined && ` — ${testResult.ms} ms`}
+              {testResult.build && (
+                <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                  <dt>{t('settings.test.version', 'รุ่น')}</dt>
+                  <dd className="font-mono">{testResult.build.version || '—'}</dd>
+                  <dt>{t('settings.test.commit', 'commit')}</dt>
+                  <dd className="font-mono">{testResult.build.commit || t('settings.test.unknown', 'ไม่ทราบ')}</dd>
+                  <dt>{t('settings.test.builtAt', 'build เมื่อ')}</dt>
+                  <dd className="font-mono">
+                    {testResult.build.builtAt ? new Date(testResult.build.builtAt).toLocaleString() : t('settings.test.unknown', 'ไม่ทราบ')}
+                  </dd>
+                </dl>
+              )}
             </div>
           )}
         </section>
