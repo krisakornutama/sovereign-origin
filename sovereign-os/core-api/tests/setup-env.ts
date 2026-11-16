@@ -8,6 +8,10 @@ process.env.JWT_SECRET = 'test-secret-0123456789abcdef';
 process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:5432/test';
 process.env.MQTT_HOST = '127.0.0.1';
 process.env.MQTT_PORT = '1883';
+// ชุด mock: ห้ามเปิด socket MQTT เลย — mqtt.js จะ reconnect ทุก 1 วิตลอดไปเมื่อไม่มี broker
+// แล้ว socket นั้นขวาง process ไม่ให้จบ (เคสจริง: CI matrix ค้างชน timeout 25 นาที)
+// ชุด real-DB (RUN_DB_TESTS=1) ไม่ถูกแตะ
+if (process.env.RUN_DB_TESTS !== '1') process.env.MQTT_DISABLED = '1';
 process.env.PORT = '3999';
 process.env.OTA_BASE_URL = 'http://127.0.0.1:3999';
 // Telegram — test จะ mock axios ไม่ได้ส่งจริง

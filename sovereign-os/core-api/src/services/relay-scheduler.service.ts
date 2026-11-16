@@ -1,18 +1,10 @@
 import cron from 'node-cron';
-import mqtt from 'mqtt';
+import { createMqttClient } from '../lib/mqtt-client';
 import { prisma } from '../lib/prisma';
 import { interlockStatus } from './actuation.service';
 
 
-const mqttClient = mqtt.connect({
-  host: process.env.MQTT_HOST || 'localhost',
-  port: Number(process.env.MQTT_PORT) || 1883,
-  protocol: 'mqtt',
-});
-
-// กัน process ตายเมื่อ EMQX ถูกหยุดในโหมดที่ไม่มีชั้น IoT
-mqttClient.on('error', (err) => console.error('Relay scheduler MQTT error:', err instanceof Error ? err.message : err));
-mqttClient.on('connect', () => console.log('⏰ Relay Scheduler MQTT connected'));
+const mqttClient = createMqttClient('Relay scheduler');
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');

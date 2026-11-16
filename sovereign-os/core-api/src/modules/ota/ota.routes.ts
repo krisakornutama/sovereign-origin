@@ -1,7 +1,7 @@
 import { Router, raw } from 'express';
 import fs from 'fs';
 import path from 'path';
-import mqtt from 'mqtt';
+import { createMqttClient } from '../../lib/mqtt-client';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
@@ -20,17 +20,9 @@ const OTA_BASE_URL = process.env.OTA_BASE_URL || 'http://localhost:3001';
 // ถ้าตั้ง OTA_TOKEN → endpoint download ต้องส่ง ?token= มาตรงกัน (กันคนนอกดาวน์โหลด)
 const OTA_TOKEN = process.env.OTA_TOKEN || '';
 
-export const mqttClient = mqtt.connect({
-  host: process.env.MQTT_HOST || 'localhost',
-  port: Number(process.env.MQTT_PORT) || 1883,
-  protocol: 'mqtt',
-});
-mqttClient.on('connect', () => console.log('🚀 OTA MQTT connected'));
-// ต้องมี listener 'error' เสมอ: mqtt client เชื่อมต่อตอน module load (localhost:1883) —
-// ถ้า broker ไม่พร้อมแล้ว error event ไม่มีใครรับ = uncaught exception ล้มทั้ง process
-// (เคยทำให้ test runner ล้มทั้งไฟล์ด้วย "Unable to deserialize cloned data" แบบสุ่ม)
-// client ยัง reconnect เองตามปกติ — เราแค่ไม่ให้ error พุ่งทะลุ
-mqttClient.on('error', (err) => console.error('OTA MQTT error:', err instanceof Error ? err.message : err));
+// client กลาง: ปิดได้ด้วย MQTT_DISABLED=1 (ชุดเทสต์) — export ไว้ให้เทสต์ mock `publish` ได้เหมือนเดิม
+export const mqttClient = createMqttClient('OTA');
+// listener 'error' ถูกผูกใน createMqttClient แล้ว (กัน uncaught exception เมื่อไม่มี broker)
 
 function isSafeFileName(name: string): boolean {
   return !!name && path.basename(name) === name && name.endsWith('.bin') && !name.includes('..') && !name.includes('/') && !name.includes('\\');
