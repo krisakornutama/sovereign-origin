@@ -12,6 +12,7 @@ import {
   type PullProgress,
 } from '../../services/ai-model-manager.service';
 import { TASK_TYPES, getAllRoutes, setModelForTask, getModelForTask } from '../../services/ai-router.service';
+import { assertPublicHttpUrl } from '../../lib/ssrf-guard';
 import { config } from '../../config';
 // legacy env constants ของแต่ละโดเมน — ใช้แสดง effective default ใน UI (DB > env > spec)
 import { CODING_MODEL } from '../../services/coding-agent.service';
@@ -108,7 +109,9 @@ router.post('/models/import-gguf', authenticate, requireRole('SUPERADMIN'), asyn
   const ggufUrl = String(req.body?.ggufUrl || '').trim();
   const systemPrompt = req.body?.systemPrompt ? String(req.body.systemPrompt) : undefined;
   if (!modelName || !ggufUrl) return res.status(400).json({ error: 'ต้องระบุ modelName และ ggufUrl' });
-  if (!/^https?:\/\//i.test(ggufUrl)) return res.status(400).json({ error: 'ggufUrl ต้องเป็น http(s) URL' });
+  // SEC-045: ด่าน SSRF — เซิร์ฟเวอร์เป็นคน fetch URL นี้เอง ต้องกันไม่ให้ชี้เข้าเครือข่ายภายใน
+  const verdict = await assertPublicHttpUrl(ggufUrl);
+  if (!verdict.ok) return res.status(400).json({ error: `ggufUrl ไม่ผ่านด่านความปลอดภัย: ${verdict.error}` });
 
   pruneJobs();
   const id = `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

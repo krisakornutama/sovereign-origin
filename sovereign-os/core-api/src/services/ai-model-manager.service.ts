@@ -139,7 +139,11 @@ export async function pullModel(modelName: string, onProgress: ProgressCb): Prom
 /** ดาวน์โหลดไฟล์ .gguf จาก URL ลงดิสก์ พร้อมรายงาน byte progress — คืน path ปลายทาง */
 export async function downloadGguf(ggufUrl: string, destDir: string, onProgress: (downloaded: number, total: number | null) => void): Promise<{ ok: boolean; filePath?: string; error?: string }> {
   try {
-    const res = await fetch(ggufUrl, { redirect: 'follow' });
+    // SEC-045: ไม่ตาม redirect — ปลายทางอาจ 302 ไป loopback หลังผ่านด่าน URL แรกแล้ว
+    const res = await fetch(ggufUrl, { redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      return { ok: false, error: 'ปลายทางตอบ redirect — ไม่อนุญาตให้ดาวน์โหลดผ่าน redirect' };
+    }
     if (!res.ok || !res.body) return { ok: false, error: `ดาวน์โหลด GGUF ไม่สำเร็จ: HTTP ${res.status}` };
     const totalHeader = res.headers.get('content-length');
     const total = totalHeader ? parseInt(totalHeader, 10) : null;
