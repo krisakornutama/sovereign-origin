@@ -5,6 +5,7 @@ import { readFile as readFileCb } from 'node:fs';
 import { config } from './config';
 import { appVersion } from './lib/app-version';
 import { getSelfFingerprint, getLoadedCodeDirLabel } from './lib/runtime-fingerprint';
+import { buildInfo } from './lib/build-info';
 import { buildOpsSummary } from './services/ops-summary.service';
 import { prisma } from './lib/prisma';
 import { getObservability } from './middleware/observability.middleware';
@@ -195,13 +196,16 @@ export function mountRoutes(app: Express): void {
   const healthExtrasLazy = () => {
     if (!healthExtras) {
       healthExtras = (async () => {
-        const [fp, dbInfo] = await Promise.all([getSelfFingerprint(), readMigrationHead()]);
+        // commit + builtAt มาจาก buildInfo() — "ที่รันอยู่คือ build ไหน" ต้องตอบได้จาก health
+        const [info, dbInfo] = await Promise.all([buildInfo(), readMigrationHead()]);
         return {
           build: {
             version: appVersion(),
-            fingerprint: fp.fingerprint,
-            files: fp.files,
-            loadedDir: getLoadedCodeDirLabel(),
+            commit: info.commit,
+            builtAt: info.builtAt,
+            fingerprint: info.fingerprint,
+            files: info.files,
+            loadedDir: info.loadedDir,
           },
           db: dbInfo,
         };

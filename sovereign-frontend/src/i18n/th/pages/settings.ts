@@ -62,6 +62,10 @@ export default {
     timeout: 'หมดเวลา (5 วิ) — ตรวจสอบว่า server เปิดอยู่',
     unreachable: 'เชื่อมต่อไม่ได้',
     failed: 'ไม่สามารถเชื่อมต่อได้',
+    version: 'รุ่น',
+    commit: 'commit',
+    builtAt: 'build เมื่อ',
+    unknown: 'ไม่ทราบ',
   },
   theme: {
     title: 'ธีม',

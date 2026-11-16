@@ -62,6 +62,10 @@ export default {
     timeout: 'Timed out (5s) — check that the server is running',
     unreachable: 'Cannot connect',
     failed: 'Unable to connect',
+    version: 'Version',
+    commit: 'Commit',
+    builtAt: 'Built at',
+    unknown: 'unknown',
   },
   theme: {
     title: 'Theme',
