@@ -26,6 +26,7 @@ export default {
     dragHint: 'ลากบล็อกเพื่อสลับตำแหน่ง · กดซ่อนเพื่อซ่อน',
     resetLayout: 'รีเซ็ตเลย์เอาต์',
   },
+  partialData: 'ข้อมูลบางส่วนโหลดไม่ได้ — ตัวเลขที่เห็นอาจไม่ครบ',
 
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {

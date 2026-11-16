@@ -26,6 +26,7 @@ export default {
     dragHint: 'Drag blocks to reorder · click hide to hide',
     resetLayout: 'Reset layout',
   },
+  partialData: 'Some data could not be loaded — the numbers above may be incomplete',
 
   // ── dashboard.tsx: status / stats / actions widgets ──
   status: {

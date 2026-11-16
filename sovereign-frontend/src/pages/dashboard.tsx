@@ -18,6 +18,7 @@ import { SensorCategory, TREND_RANGES, TrendRange } from '../components/dashboar
 import { WidgetShell } from '../components/dashboard/DashboardChrome';
 import { Header } from '../components/dashboard/HeaderBar';
 import PageHeader from '../components/ui/PageHeader';
+import ErrorNotice from '../components/ui/ErrorNotice';
 import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
 import SectionCard from '../components/ui/SectionCard';
@@ -175,6 +176,11 @@ export default function Dashboard() {
     } catch {}
   }, [order, hidden]);
 
+  // UX slice 2: เดิม stats/devices ที่โหลดไม่สำเร็จถูกกลืนหาย (catch(() => {})) — ผู้ใช้เห็น 0
+  // โดยไม่รู้ว่าเป็น "ไม่มีข้อมูล" หรือ "โหลดไม่ได้" ตอนนี้แยกให้เห็นและกดลองใหม่ได้
+  const [statsError, setStatsError] = useState<unknown>(null);
+  const [dataReloadKey, setDataReloadKey] = useState(0);
+
   const threat = useRiskStore((s) => s.threat);
   const defconLevel = useRiskStore((s) => s.defconLevel);
   const wealthSummary = useWealthStore((s) => s.summary);
@@ -183,8 +189,12 @@ export default function Dashboard() {
     if (!isHydrated || !isAuthenticated || !token) return;
     const fetchData = () => {
       // เรียก /api/automation/check เฉพาะที่ AlertsPanel (จุดเดียว ทุก 60 วิ) — ที่นี่โหลด stats เพื่อแสดงผลเท่านั้น
-      api.getObject<any>('/api/dashboard/stats').then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); } }).catch(()=>{});
-      api.getObject<any>('/api/devices/status').then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); }).catch(()=>{});
+      api.getObject<any>('/api/dashboard/stats')
+        .then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); } setStatsError(null); })
+        .catch((e)=> setStatsError(e));
+      api.getObject<any>('/api/devices/status')
+        .then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); })
+        .catch((e)=> setStatsError(e));
       api.getObject<any>('/api/inventory/status').then((data:any)=> data && setInventoryStatus(data.totals)).catch(()=> setInventoryStatus(null));
       api.getObject<any>('/api/farm/plots/overview').then((data:any)=> data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null)).catch(()=> setFarmOverview(null));
       api.getObject<any>('/api/knowledge/teach/dashboard').then((data:any)=> data && setKidsSummary(data.kids||[])).catch(()=> setKidsSummary(null));
@@ -197,7 +207,7 @@ export default function Dashboard() {
       clearInterval(interval);
       window.removeEventListener(API_RECONNECTED_EVENT, onReconnected);
     };
-  }, [isHydrated, isAuthenticated, token]);
+  }, [isHydrated, isAuthenticated, token, dataReloadKey]);
 
   if (!isHydrated) {
     // C6: skeleton แดชบอร์ดแทนข้อความเฉย ๆ — ให้รู้สึกว่าโครงหน้ามาแล้ว ข้อมูลกำลังตามมา
@@ -658,6 +668,14 @@ export default function Dashboard() {
             </div>
           </div>
           {editMode && <div className="text-[10px] font-mono text-gray-500 mb-2">ลากบล็อกเพื่อสลับตำแหน่ง · กดซ่อนเพื่อซ่อน — {visibleOrder.length}/{order.length} แสดง</div>}
+          {statsError ? (
+            <div className="mb-3">
+              <p className="text-[11px] text-amber-400/90 mb-1">
+                {t('dashboard.partialData', 'ข้อมูลบางส่วนโหลดไม่ได้ — ตัวเลขที่เห็นอาจไม่ครบ')}
+              </p>
+              <ErrorNotice error={statsError} onRetry={() => setDataReloadKey((k) => k + 1)} />
+            </div>
+          ) : null}
 
           {/* ทางลัดงานประจำ — อยู่บนสุดเสมอ ไม่ขึ้นกับเลย์เอาต์ที่ผู้ใช้จัด */}
           <QuickDeck />
