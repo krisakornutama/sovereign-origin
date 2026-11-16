@@ -12,6 +12,7 @@ node tools/preflight.mjs --only copy,secrets
 node tools/preflight.mjs --skip frontend-gate
 node tools/preflight.mjs --range origin/main..HEAD
 node tools/preflight.mjs --no-prod         # ไม่แตะ production เลย
+node tools/preflight.mjs --strict-prod     # prod รัน build เก่ากว่า HEAD = ล้มการรัน
 node tools/preflight.mjs --quiet           # เอาไว้ใช้กับ hook/สคริปต์
 ```
 
@@ -26,6 +27,7 @@ node tools/preflight.mjs --quiet           # เอาไว้ใช้กั�
 | `arch-gate` | `node tools/arch-gate.mjs` | file-budget · env-truth · module-boundary · tool-files-tracked |
 | `frontend-gate` | `node tools/frontend-gate.mjs` | import-layers · เพดานบรรทัด · ทุกหน้าต้องมี Sidebar |
 | `host-smoke` | `node tools/host-smoke.mjs` | API/DB/เว็บ/docker/scheduled tasks (READ-ONLY, ไม่แก้เครื่อง) |
+| `prod-build` | `node tools/prod-build-check.mjs --warn` | prod รัน build รุ่นเดียวกับ HEAD ไหม (`health.build.commit` vs `git rev-parse HEAD`) — **เตือน** เป็นค่าเริ่มต้น, ใส่ `--strict-prod` เพื่อให้ **ล้ม** |
 | `promote-web` | `node tools/promote-web.mjs --check` | chunk 404 บน prod `:3000` — **ข้ามอัตโนมัติ** ถ้าเครื่องนี้ไม่มี prod ตอบ |
 
 ## หมายเหตุที่เจอจริง

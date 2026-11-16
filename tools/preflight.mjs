@@ -19,6 +19,7 @@
 //   node tools/preflight.mjs --skip frontend-gate
 //   node tools/preflight.mjs --range origin/main..HEAD
 //   node tools/preflight.mjs --no-prod       # ไม่แตะ prod เลย
+//   node tools/preflight.mjs --strict-prod   # prod รัน build เก่ากว่า HEAD = ล้ม (ไม่งั้นเตือน)
 //   node tools/preflight.mjs --quiet
 //
 // exit code เดียว: 0 = ผ่านทุกขั้น · 1 = มีขั้นล้ม · 2 = ใช้คำสั่งผิด
@@ -126,7 +127,7 @@ export function countSecretsInGitLog(range, { cwd = ROOT } = {}) {
 }
 
 /** สเต็ปทั้งหมด — แต่ละตัวคืน { ok, note } */
-export function buildSteps(range, { prod = true } = {}) {
+export function buildSteps(range, { prod = true, strictProd = false } = {}) {
   return [
     {
       name: 'copy',
@@ -170,6 +171,19 @@ export function buildSteps(range, { prod = true } = {}) {
       },
     },
     {
+      // prod รัน build รุ่นเดียวกับ HEAD ไหม — "ล้ม" เมื่อขอ (--strict-prod) ไม่งั้นเตือน
+      // (คนละเรื่องกับ promote-web: อันนั้นห้าม chunk 404, อันนี้กัน "prod ค้างรุ่นเก่า")
+      name: 'prod-build',
+      async run() {
+        if (!prod) return { ok: true, skipped: 'ข้ามตาม --no-prod' };
+        const args = ['tools/prod-build-check.mjs'];
+        if (!strictProd) args.push('--warn');
+        const r = run(process.execPath, args);
+        if (r.code === 2) return { ok: true, skipped: 'prod ไม่ตอบ — ข้ามขั้นนี้' };
+        return { ok: r.code === 0, note: lastLine(r) };
+      },
+    },
+    {
       name: 'promote-web',
       async run() {
         if (!prod) return { ok: true, skipped: 'ข้ามตาม --no-prod' };
@@ -193,13 +207,14 @@ function lastLine(r) {
 }
 
 function parseArgs(argv) {
-  const opts = { only: null, skip: [], range: null, prod: true, quiet: false };
+  const opts = { only: null, skip: [], range: null, prod: true, quiet: false, strictProd: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--only') opts.only = String(argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--skip') opts.skip = String(argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--range') opts.range = String(argv[++i] || '');
     else if (a === '--no-prod') opts.prod = false;
+    else if (a === '--strict-prod') opts.strictProd = true;
     else if (a === '--quiet') opts.quiet = true;
     else if (a === '--help' || a === '-h') opts.help = true;
     else return { error: `ไม่รู้จัก argument: ${a}` };
@@ -217,16 +232,16 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.error) {
     console.error(`✗ ${opts.error}`);
-    console.error('ใช้: node tools/preflight.mjs [--only a,b] [--skip a,b] [--range X..Y] [--no-prod] [--quiet]');
+    console.error('ใช้: node tools/preflight.mjs [--only a,b] [--skip a,b] [--range X..Y] [--no-prod] [--strict-prod] [--quiet]');
     process.exit(2);
   }
   if (opts.help) {
-    console.log('ใช้: node tools/preflight.mjs [--only a,b] [--skip a,b] [--range X..Y] [--no-prod] [--quiet]');
+    console.log('ใช้: node tools/preflight.mjs [--only a,b] [--skip a,b] [--range X..Y] [--no-prod] [--strict-prod] [--quiet]');
     process.exit(0);
   }
 
   const range = opts.range || defaultRange();
-  let steps = buildSteps(range, { prod: opts.prod });
+  let steps = buildSteps(range, { prod: opts.prod, strictProd: opts.strictProd });
   if (opts.only) steps = steps.filter((s) => opts.only.includes(s.name));
   if (opts.skip.length) steps = steps.filter((s) => !opts.skip.includes(s.name));
   if (steps.length === 0) {

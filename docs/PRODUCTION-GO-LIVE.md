@@ -67,6 +67,7 @@ node tools/deploy-core-api.mjs --dry-run  # เขียน stamp + พิมพ
 - `deploy-core-api.mjs` **ไม่ปล่อยให้ลืม** — เขียน stamp จาก `git rev-parse HEAD` ให้ทุกครั้งก่อน `docker restart` แล้ววนเช็ค `/api/health` (ค่าเริ่มต้น 180 วิ) จน `build.commit` ตรง HEAD; ไม่ตรง = **exit 1** พร้อมบอกค่าล่าสุดที่เห็น
 - ถ้ารัน `docker restart` เองโดยไม่ผ่าน wrapper: health จะรายงาน commit เก่า (หรือ `null`) **โดยไม่มี error** — เช็คด้วย `node tools/write-build-info.mjs --check` และเทียบ `build.commit` กับ `git rev-parse --short=12 HEAD`
 - `build.builtAt` = mtime ใหม่สุดของไฟล์ในโฟลเดอร์ที่โปรเซสโหลด (`dist`) ไม่ใช่ mtime ของ directory (tsc เขียนทับไฟล์เดิม ⇒ mtime โฟลเดอร์ไม่ขยับบน NTFS)
+- **ด่านกันลืม (อัตโนมัติ)**: `node tools/prod-build-check.mjs` เทียบ `health.build.commit` กับ HEAD — exit 1 พร้อมบอก commit ที่ prod รัน vs HEAD + เวลา build; โหมด `--warn` = เตือนอย่างเดียว (exit 0) ใช้ใน `node tools/preflight.mjs` (ขั้น `prod-build`) และ `tools/host-smoke.mjs` (ข้อเตือน `Prod build` — ไม่บล็อกเพื่อไม่ให้ขัดช่วง merge→restart) · ใช้ `--strict-prod` กับ preflight เมื่อต้องการให้ล้มจริง (เช่นใน CI/host automation)
 - **rollback**: `docker restart` กลับ build เดิมแล้วรัน `write-build-info.mjs` ซ้ำ (ให้ stamp ตรงกับรุ่นที่รันจริง) — อย่าปล่อย stamp ค้างที่รุ่นที่ถูกถอยออกไป
 
 ## 4) ความปลอดภัยขั้นต่ำก่อนเปิดให้คนนอก

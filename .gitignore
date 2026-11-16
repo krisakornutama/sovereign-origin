@@ -132,6 +132,8 @@ tools/*
 !tools/write-build-info.mjs
 # deploy wrapper: เขียน stamp + restart + ยืนยัน health ตรง HEAD (CI-003)
 !tools/deploy-core-api.mjs
+# ด่านเทียบ health.build.commit กับ HEAD — prod ค้างรุ่นเก่า (CI-004)
+!tools/prod-build-check.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
