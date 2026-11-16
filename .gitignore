@@ -12,6 +12,7 @@ node_modules/
 # (ทางแก้ครั้งนั้นคือ filter-repo; กลับมาอีก = เจ็บกว่าเดิมหลายเท่า — ต้องกันตั้งแต่ commit เดียว)
 .next/
 .next-verify/
+.next-prev-*/
 .next.broken-*/
 out/
 dist/
@@ -121,6 +122,8 @@ tools/*
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
 !tools/host-smoke.mjs
+# ตัวตรวจ "ไม่มี chunk 404" หลังสลับ build (UX-006) — เทสต์อ้างถึง ต้อง track
+!tools/promote-web.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
