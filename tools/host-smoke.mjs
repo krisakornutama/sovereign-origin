@@ -18,7 +18,12 @@
      node tools/host-smoke.mjs --skip=docker  # ข้ามหมวด (docker|tasks)
    ───────────────────────────────────────────────────────────────────────────── */
 import { execFile } from 'node:child_process';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { compareBuildCommit } from './prod-build-check.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const DEFAULTS = {
   api: process.env.SMOKE_API || 'http://127.0.0.1:3001',
@@ -57,6 +62,28 @@ export function judgeWeb(res) {
   if (!/<html[\s>]/i.test(text)) return check('Web :3000', false, 'ได้ 200 แต่ไม่ใช่ HTML ของแอป');
   if (/__NEXT_ERROR|Internal Server Error/i.test(text)) return check('Web :3000', false, 'หน้าเว็บมี error ของ Next');
   return check('Web :3000', true, `200 · ${Math.round(text.length / 1024)} KB`);
+}
+
+/**
+ * prod build ตรงกับ HEAD ไหม — เป็น "ข้อเตือน" (soft) ไม่ใช่ critical
+ * ทำไม soft: การ push โค้ดใหม่แล้วยังไม่ deploy เป็นเรื่องปกติชั่วคราว ถ้าทำเป็น critical
+ * host-smoke จะแดงตลอดช่วง time ระหว่าง "merge แล้ว" ถึง "restart เสร็จ"
+ */
+export function judgeProdBuild(healthBody, head) {
+  const prodCommit = healthBody?.build?.commit ?? null;
+  const status = compareBuildCommit(prodCommit, head);
+  if (status === 'match') {
+    return check('Prod build', true, `ตรงกับ HEAD (${String(prodCommit).slice(0, 12)})`, false);
+  }
+  if (status === 'stale') {
+    return check(
+      'Prod build',
+      false,
+      `prod รัน ${String(prodCommit).slice(0, 12)} แต่ HEAD ${String(head).slice(0, 12)} — รัน node tools/deploy-core-api.mjs`,
+      false,
+    );
+  }
+  return check('Prod build', false, 'health ไม่มี build.commit — ตรวจไม่ได้ว่า prod ตามหลังไหม', false);
 }
 
 /** `docker ps` — ต้องมี container ขึ้น และห้ามมีตัว unhealthy/restarting */
@@ -120,6 +147,11 @@ function run(file, args, timeoutMs = 15000) {
   });
 }
 
+async function readHeadCommit() {
+  const out = await run('git', ['-C', ROOT, 'rev-parse', 'HEAD'], 8000);
+  return out ? out.trim() : '';
+}
+
 async function readContainers() {
   const out = await run('docker', ['ps', '--format', '{{.Names}}\t{{.Status}}']);
   if (out === null) return null; // docker ไม่มี/ไม่รัน = ข้าม ไม่ใช่ fail
@@ -163,7 +195,11 @@ export async function runSmoke(options = {}) {
   const checks = [];
 
   checks.push(judgeLiveness(await getJson(`${api}/healthz`, timeoutMs)));
-  checks.push(judgeAppHealth(await getJson(`${api}/api/health`, timeoutMs)));
+  const appHealth = await getJson(`${api}/api/health`, timeoutMs);
+  checks.push(judgeAppHealth(appHealth));
+  // prod รัน build รุ่นเดียวกับ checkout ไหม — ข้อเตือน (soft) เพื่อไม่ให้ขัดจังหวะ deploy ปกติ
+  const head = await readHeadCommit();
+  if (head) checks.push(judgeProdBuild(appHealth.body, head));
   checks.push(judgeWeb(await getText(`${web}/`, timeoutMs)));
 
   if (!skip.has('docker')) {

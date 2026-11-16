@@ -126,7 +126,7 @@ describe('preflight — ประกอบขั้นและคืน exit co
   test('มีขั้นครบตามที่ประกาศ', async () => {
     const { buildSteps } = await import('../preflight.mjs');
     const names = buildSteps('HEAD', { prod: false }).map((s) => s.name);
-    assert.deepEqual(names, ['copy', 'secrets', 'arch-gate', 'frontend-gate', 'host-smoke', 'promote-web']);
+    assert.deepEqual(names, ['copy', 'secrets', 'arch-gate', 'frontend-gate', 'host-smoke', 'prod-build', 'promote-web']);
   });
 
   test('--only ที่ไม่มีขั้นจริง = exit 2 (กันสั่งผิดแล้วเข้าใจว่าผ่าน)', () => {
