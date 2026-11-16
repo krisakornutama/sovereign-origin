@@ -114,6 +114,17 @@ describe('deploy-core-api', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  test('ห้ามใช้ process.exit() — บน Node 24/Windows ทำให้เกิด libuv assertion ตอนจบ', () => {
+    for (const file of [DEPLOY, TOOL]) {
+      // คอมเมนต์อธิบายว่า "อย่าใช้ process.exit()" ได้ — ตัดคอมเมนต์ก่อนตรวจ
+      const src = fs
+        .readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      assert.equal(/process\.exit\s*\(/.test(src), false, `${path.basename(file)} ต้องตั้ง process.exitCode แทน`);
+    }
+  });
+
   test('ไฟล์ tool มีอยู่จริงและอ้างถึง health (ยืนยันหลัง restart)', () => {
     const src = fs.readFileSync(DEPLOY, 'utf8');
     assert.match(src, /\/api\/health/);

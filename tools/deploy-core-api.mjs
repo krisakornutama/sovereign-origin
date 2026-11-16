@@ -94,5 +94,10 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().then((code) => process.exit(code));
+  // อย่าใช้ process.exit(): บน Node 24/Windows การฆ่าโปรเซสตอน undici ยังมี handle
+  // ทำให้เกิด `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` (กับดักเดียวกับ
+  // `--test-force-exit`) — ตั้ง exitCode แล้วปล่อยให้ event loop ปิดเอง
+  main().then((code) => {
+    process.exitCode = code;
+  });
 }
