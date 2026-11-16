@@ -45,7 +45,13 @@ export default function DeviceCard({ device, onGenerate, onLocation, onDelete, c
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => onGenerate(device)} className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"><Icon name="code" size={12} /> Generate Code</button>
+          <button
+            onClick={() => onGenerate(device)}
+            aria-label={t('sensorsHub.generateCodeFor', 'สร้างโค้ด Arduino สำหรับ {type}', { type: device.type })}
+            className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+          >
+            <Icon name="code" size={12} /> {t('sensorsHub.generateCode', 'Generate Code')}
+          </button>
           <button
             onClick={() => onLocation(device)}
             disabled={locked}
@@ -57,6 +63,7 @@ export default function DeviceCard({ device, onGenerate, onLocation, onDelete, c
           <button
             onClick={() => onDelete(device.id)}
             disabled={locked}
+            aria-label={t('sensorsHub.deleteDeviceFor', 'ลบอุปกรณ์ {type}', { type: device.type })}
             className={`text-red-400 hover:text-red-300 text-sm ${locked ? 'opacity-40 cursor-not-allowed' : ''}`}
             title={locked ? lockedTitle : undefined}
           >

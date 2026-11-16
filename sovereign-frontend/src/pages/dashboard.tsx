@@ -355,7 +355,7 @@ export default function Dashboard() {
                 <div className="bg-gray-950/40 border border-gray-800 rounded-xl p-1">
                   <SankeyAlluvial wealth={s} inventory={inventoryStatus} farm={farmOverview} />
                 </div>
-                <div className="mt-1.5 text-[9px] font-mono text-gray-600 flex justify-between">
+                <div className="mt-1.5 text-[9px] font-mono text-gray-400 flex justify-between">
                   <span>Cash ${(s.cashUsd ?? 0).toLocaleString()} · Burn ${(s.runway?.monthlyBurnUsd ?? 0).toLocaleString()}/mo</span>
                   <span className="text-emerald-400/70">GRAND ${(s.grandTotalUsd ?? 0).toLocaleString()}</span>
                 </div>
@@ -494,7 +494,7 @@ export default function Dashboard() {
           <div className="card p-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-[11px] font-bold tracking-widest text-gray-200 flex items-center gap-1.5"><Icon name="alerts" size={12} className="text-amber-400" /> SECURITY LOGS</h3>
-              <span className="text-[9px] font-mono tracking-widest text-gray-600">LIVE</span>
+              <span className="text-[9px] font-mono tracking-widest text-gray-400">LIVE</span>
             </div>
             <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
               <AlertsPanel />
@@ -598,10 +598,10 @@ export default function Dashboard() {
                         {k.lastQuiz ? (
                           <div className="mt-1.5 text-[9px] text-gray-500 border-t border-gray-700/50 pt-1.5 leading-relaxed">
                             ล่าสุด: <span className="text-gray-400">{k.lastQuiz.lesson_title}</span> — <b className={k.lastQuiz.pct >= 70 ? 'text-emerald-400' : k.lastQuiz.pct >= 50 ? 'text-amber-300' : 'text-rose-400'}>{k.lastQuiz.score}/{k.lastQuiz.total}</b>
-                            <span className="block text-gray-600">{new Date(k.lastQuiz.completed_at).toLocaleString(fmtLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="block text-gray-400">{new Date(k.lastQuiz.completed_at).toLocaleString(fmtLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         ) : (
-                          <div className="mt-1.5 text-[9px] text-gray-600 border-t border-gray-700/50 pt-1.5">{t('dashboard.kids.noQuizYet', 'ยังไม่เคยทำแบบทดสอบ')}</div>
+                          <div className="mt-1.5 text-[9px] text-gray-400 border-t border-gray-700/50 pt-1.5">{t('dashboard.kids.noQuizYet', 'ยังไม่เคยทำแบบทดสอบ')}</div>
                         )}
                       </div>
                     );
@@ -655,7 +655,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <span className="hidden lg:flex items-center gap-1.5 text-[10px] font-mono text-gray-500 bg-gray-800/40 border border-gray-700/40 px-2 py-1 rounded-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE
-                <span className="text-gray-600">|</span> {Object.keys(metrics).length} signals
+                <span className="text-gray-400">|</span> {Object.keys(metrics).length} signals
               </span>
               <button
                 onClick={() => setEditMode(!editMode)}
@@ -672,7 +672,7 @@ export default function Dashboard() {
           </div>
           {editMode && <div className="text-[10px] font-mono text-gray-500 mb-2">ลากบล็อกเพื่อสลับตำแหน่ง · กดซ่อนเพื่อซ่อน — {visibleOrder.length}/{order.length} แสดง</div>}
           {degraded.length > 0 ? (
-            <div className="mb-3">
+            <div className="mb-3" role="status" aria-live="polite">
               <p className="text-[11px] text-amber-400/90 mb-1">
                 {t('dashboard.partialData', 'ข้อมูลบางส่วนโหลดไม่ได้ — ตัวเลขที่เห็นอาจไม่ครบ')}
               </p>
@@ -710,9 +710,9 @@ export default function Dashboard() {
               <span className="text-rose-400">● {deviceStatus?.offline ?? 0} OFFLINE</span>
               <span className="w-px h-3 bg-gray-700" />
               <span className="text-gray-400">BAT {metrics.battery_soc != null ? metrics.battery_soc.toFixed(0) + '%' : '—'}</span>
-              <span className="text-gray-600">·</span>
+              <span className="text-gray-400">·</span>
               <span className="text-gray-400">TMP {metrics.temperature != null ? metrics.temperature.toFixed(1) + '°C' : '—'}</span>
-              <span className="text-gray-600">·</span>
+              <span className="text-gray-400">·</span>
               <span className="text-gray-400">HUM {metrics.humidity != null ? metrics.humidity.toFixed(0) + '%' : '—'}</span>
               <span className="ml-auto flex items-center gap-2">
                 <span className={`px-1.5 py-0.5 rounded border text-[9px] tracking-widest ${defconLevel <= 3 && defconLevel > 0 ? 'bg-amber-950/40 border-amber-800/60 text-amber-300' : 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'}`}>{defconLabel}</span>
@@ -763,7 +763,7 @@ export default function Dashboard() {
 
           {/* water reflection + bottom glow */}
           <div className="mt-4 h-14 rounded-xl border border-gray-800/60 bg-gradient-to-t from-emerald-500/[0.04] via-cyan-500/[0.02] to-transparent backdrop-blur flex items-center justify-center">
-            <span className="text-[9px] tracking-[0.22em] font-mono text-gray-600">SOVEREIGN OS · gunmetal + emerald/cyan neon · dense telemetry · {new Date().toLocaleDateString(fmtLocale())}</span>
+            <span className="text-[9px] tracking-[0.22em] font-mono text-gray-400">SOVEREIGN OS · gunmetal + emerald/cyan neon · dense telemetry · {new Date().toLocaleDateString(fmtLocale())}</span>
           </div>
           <div className="h-6 bg-gradient-to-b from-gray-950 to-transparent opacity-40 blur-[1px] -mt-2 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(52,211,153,0.06), transparent 70%)' }} />
         </div>
