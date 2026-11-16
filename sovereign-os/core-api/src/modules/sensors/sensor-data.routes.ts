@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { config } from '../../config';
+import { SITE_WRITE_ROLES } from '../../lib/roles';
 
 /**
  * บทบาทที่ลบข้อมูลเทเลเมตรีได้ — ลบแล้วกู้ไม่ได้ (ไม่มี retention ที่กู้คืนได้)
  * KID/SYSTEM_AI ต้องไม่ถึงมือ: ข้อมูลจริงใน hypertable คือหลักฐานย้อนหลังของทั้งระบบ
  */
-const DELETE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
 
 /** เพดานจำนวนแถวต่อคำขอ — `sensor_telemetry` โตไม่จำกัด, `limit` จาก query คือทางดึงทั้งตาราง */
 const MAX_LIST_ROWS = 5000;
@@ -104,7 +104,7 @@ router.get('/all', authenticate, async (req, res) => {
 });
 
 // Delete sensor record
-router.delete('/:metric', authenticate, requireRole(...DELETE_ROLES), async (req, res) => {
+router.delete('/:metric', authenticate, requireRole(...SITE_WRITE_ROLES), async (req, res) => {
   try {
     const { metric } = req.params;
     const { device_id } = req.query;
@@ -120,7 +120,7 @@ router.delete('/:metric', authenticate, requireRole(...DELETE_ROLES), async (req
 });
 
 // Delete all records of a metric
-router.delete('/:metric/all', authenticate, requireRole(...DELETE_ROLES), async (req, res) => {
+router.delete('/:metric/all', authenticate, requireRole(...SITE_WRITE_ROLES), async (req, res) => {
   try {
     await prisma.$queryRawUnsafe(`DELETE FROM sensor_telemetry WHERE metric = $1`, req.params.metric);
     res.json({ success: true, message: `ลบ ${req.params.metric} ทั้งหมดสำเร็จ` });

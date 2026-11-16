@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { AuthService } from './auth.service';
 import { setConsent } from './consent.service';
+import { ASSIGNABLE_ROLES } from '../lib/roles';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ตัด 0/O/1/I ออก — พิมพ์ผิดยาก
 const CODE_PREFIX = 'SG';
@@ -58,11 +59,10 @@ export interface CreateInviteInput {
   createdBy?: string | null;
 }
 
-const VALID_INVITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI', 'SITE_ADMIN'];
 
 export async function createInvite(input: CreateInviteInput = {}) {
   const role = input.role ?? 'OPERATOR';
-  if (!VALID_INVITE_ROLES.includes(role)) throw new Error('บทบาทไม่ถูกต้อง');
+  if (!ASSIGNABLE_ROLES.includes(role)) throw new Error('บทบาทไม่ถูกต้อง');
   const maxUses = Math.min(Math.max(Number(input.maxUses ?? 1) || 1, 1), 100);
   const hours = Number(input.expiresInHours ?? 0);
   const expires_at = hours > 0 ? new Date(Date.now() + Math.min(hours, 24 * 365) * 3600_000) : null;

@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
-import { WRITE_ROLES, parseDate } from './livestock-shared';
+import { parseDate } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

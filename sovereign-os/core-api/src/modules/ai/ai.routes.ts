@@ -9,6 +9,7 @@ import axios from 'axios';
 import os from 'os';
 import { getModelForTask } from '../../services/ai-router.service';
 import { prisma } from '../../lib/prisma';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 const CURRENT_MODEL = process.env.AI_MODEL || 'gemma3:4b';
@@ -160,7 +161,7 @@ router.get('/local-status', authenticate, asyncRoute(async (_req, res) => {
 }));
 
 // PUT /api/ai/enabled {enabled: bool} — เปิด/ปิด AI ในเครื่อง (SUPERADMIN)
-router.put('/enabled', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.put('/enabled', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const { setAiEnabled } = await import('../../services/local-llm.service');
   const enabled = !!req.body?.enabled;
   const r = await setAiEnabled(enabled);
@@ -168,7 +169,7 @@ router.put('/enabled', authenticate, requireRole('SUPERADMIN'), asyncRoute(async
 }));
 
 // PUT /api/ai/model {model: string} — เลือกโมเดล (SUPERADMIN)
-router.put('/model', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/model', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { setAiModel } = await import('../../services/local-llm.service');
     await setAiModel(String(req.body?.model || ''));
@@ -233,7 +234,7 @@ router.get('/policy', authenticate, (req, res) => {
 });
 
 // PUT /api/ai/policy — เปลี่ยนระดับ autonomy (Superadmin เท่านั้น)
-router.put('/policy', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/policy', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const { autonomy } = req.body;
   if (!autonomy) return res.status(400).json({ error: 'autonomy is required' });
   try {
@@ -245,12 +246,12 @@ router.put('/policy', authenticate, requireRole('SUPERADMIN'), (req, res) => {
 });
 
 // GET /api/ai/approvals — รายการคำขออนุมัติ (pending + ประวัติล่าสุด)
-router.get('/approvals', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.get('/approvals', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   res.json(agentActions.listApprovals());
 });
 
 // POST /api/ai/approvals/:id/approve — อนุมัติและสั่งให้ดำเนินการ
-router.post('/approvals/:id/approve', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/approvals/:id/approve', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const result = await agentActions.approveApproval(req.params.id, req.user?.id);
   if (result.status === 'denied') {
     return res.status(400).json(result);
@@ -259,7 +260,7 @@ router.post('/approvals/:id/approve', authenticate, requireRole('SUPERADMIN'), a
 }));
 
 // POST /api/ai/approvals/:id/reject — ปฏิเสธคำขอ
-router.post('/approvals/:id/reject', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.post('/approvals/:id/reject', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const result = agentActions.rejectApproval(req.params.id, req.user?.id);
   if (!result) {
     return res.status(404).json({ error: 'Approval not found or already decided' });

@@ -16,10 +16,10 @@ import {
   applyPackage,
   findUnknownModuleKeys,
 } from '../../services/export-clone.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
-export const CLONE_ROLES = ['SUPERADMIN'] as const;
 
 const CLONE_ROLE_MESSAGE =
   'การถอดแบบ/ติดตั้งทั้งระบบทำได้เฉพาะ SUPERADMIN — export อ่านข้อมูลทุกตารางของโมดูลที่เลือก และ import จะ TRUNCATE ตารางจริงบนเครื่องนี้';
@@ -27,10 +27,10 @@ const CLONE_ROLE_MESSAGE =
 function requireCloneAdmin(req: Request, res: Response, next: NextFunction) {
   const role = req.user?.role;
   if (!role) return res.status(401).json({ error: 'Not authenticated' });
-  if (!CLONE_ROLES.includes(role as (typeof CLONE_ROLES)[number])) {
+  if (!SUPERADMIN_ONLY.includes(role as (typeof SUPERADMIN_ONLY)[number])) {
     return res.status(403).json({
       error: CLONE_ROLE_MESSAGE,
-      requiredRoles: [...CLONE_ROLES],
+      requiredRoles: [...SUPERADMIN_ONLY],
       role,
     });
   }

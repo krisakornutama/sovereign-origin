@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { deductStock } from '../../services/inventory.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 const DAY_MS = 86_400_000;
 
 const METHOD_DAYS: Record<string, number> = {

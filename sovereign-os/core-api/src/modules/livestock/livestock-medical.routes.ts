@@ -4,7 +4,8 @@ import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { computeDrugTotalL, validateDosage } from '../../services/livestock-vet-ai.service';
 import { deductStock } from '../../services/inventory.service';
-import { WRITE_ROLES, DAY_MS, notify, parseDate } from './livestock-shared';
+import { DAY_MS, notify, parseDate } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

@@ -7,9 +7,9 @@ import {
   scoreStrategicPoints,
   suggestStrategicPoints,
 } from '../../services/property-strategy.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 const ZONE_TYPES = ['บ้าน', 'สวน', 'รั้ว', 'ประตู', 'ที่จอดรถ', 'โรงเก็บ', 'ที่โล่ง', 'ทางเข้า', 'อื่น'];
 const POINT_TYPES = ['กล้อง', 'เซ็นเซอร์ตรวจจับ', 'กับดัก', 'ไฟ'];

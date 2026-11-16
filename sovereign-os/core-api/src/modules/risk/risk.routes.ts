@@ -9,6 +9,7 @@ import {
   latestForecast,
   FORECAST_FOCUSES,
 } from '../../services/scenario-forecast.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -97,7 +98,7 @@ router.post('/refresh', authenticate, async (req, res) => {
 // POST /api/risk-monitor/defcon/drill { index } — จำลอง Threat Index 0-100 → engine ทำงานจริง
 // (hysteresis + ยิง actions ตาม level — มาตรการทางกายภาพไป actuation sandbox เมื่อ DEFCON_DRY_RUN=true)
 // ใช้ index=0 หลังจบ drill เพื่อลดระดับ (de-escalation ต้องผ่าน hysteresis)
-router.post('/defcon/drill', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/defcon/drill', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const engine = (req.app.locals as { defconEngine?: { check: (n: number) => Promise<{ level: number; actionsRun: { id: string }[] }> } }).defconEngine;
     if (!engine) return res.status(503).json({ error: 'DEFCON engine ไม่พร้อม' });

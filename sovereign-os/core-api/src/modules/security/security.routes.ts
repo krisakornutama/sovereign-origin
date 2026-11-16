@@ -7,6 +7,7 @@ import { normalizeSingleIp } from '../../lib/ip-address';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
 import { hostConnections } from '../../services/host-connections.service';
+import { ADMIN_ROLES, SITE_WRITE_ROLES, SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 const execAsync = promisify(exec);
@@ -128,7 +129,6 @@ router.get('/events', authenticate, async (_req, res) => {
 // POST /api/security/events - บันทึก security event ใหม่
 // เขียนได้เฉพาะ role ที่เชื่อถือได้ (KID/SYSTEM_AI = ไม่) และค่าต้องถูกตรวจก่อนเก็บ:
 // event log ที่ใครก็เขียนได้ = หลักฐานที่ปลอมได้ (และถล่ม 50 แถวล่าสุดจนของจริงหลุดสายตา)
-const EVENT_WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'] as const;
 const EVENT_TYPE_PATTERN = /^[A-Za-z0-9_]{2,40}$/;
 const EVENT_SEVERITIES = new Set(['info', 'warning', 'critical']);
 const MAX_EVENT_DESCRIPTION = 500;
@@ -143,7 +143,7 @@ function normalizeIp(value: unknown): { ok: true; value: string | null } | { ok:
   return { ok: true, value: trimmed };
 }
 
-router.post('/events', authenticate, requireRole(...EVENT_WRITE_ROLES), async (req, res) => {
+router.post('/events', authenticate, requireRole(...SITE_WRITE_ROLES), async (req, res) => {
   const body = req.body || {};
   const eventType = typeof body.event_type === 'string' ? body.event_type.trim().toUpperCase() : '';
   if (!EVENT_TYPE_PATTERN.test(eventType)) {
@@ -193,7 +193,7 @@ router.post('/events', authenticate, requireRole(...EVENT_WRITE_ROLES), async (r
 });
 
 // POST /api/security/threats/scan - ตรวจหาภัยคุกคามทันที (ใช้กับปุ่ม "สแกนเลย")
-router.post('/threats/scan', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/threats/scan', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const events = await threatDetector.scanNow();
     res.json({ success: true, found: events.length, events });
@@ -230,7 +230,7 @@ router.get('/firewall/rules', authenticate, async (_req, res) => {
 });
 
 // POST /api/security/firewall/rules — เพิ่มกฎ
-router.post('/firewall/rules', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.post('/firewall/rules', authenticate, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     const b = req.body || {};
     if (!String(b.name ?? '').trim()) return res.status(400).json({ error: 'name is required' });
@@ -255,7 +255,7 @@ router.post('/firewall/rules', authenticate, requireRole('SUPERADMIN', 'NODE_ADM
 });
 
 // PUT /api/security/firewall/rules/:id — แก้ไข/เปิดปิดกฎ
-router.put('/firewall/rules/:id', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.put('/firewall/rules/:id', authenticate, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     const b = req.body || {};
     const data: Record<string, unknown> = {};
@@ -277,7 +277,7 @@ router.put('/firewall/rules/:id', authenticate, requireRole('SUPERADMIN', 'NODE_
 });
 
 // DELETE /api/security/firewall/rules/:id — ลบกฎ
-router.delete('/firewall/rules/:id', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.delete('/firewall/rules/:id', authenticate, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     await prisma.firewallRule.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -287,7 +287,7 @@ router.delete('/firewall/rules/:id', authenticate, requireRole('SUPERADMIN', 'NO
 });
 
 // PUT /api/security/firewall/policy — ตั้งนโยบายเริ่มต้น (ALLOW | DENY)
-router.put('/firewall/policy', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN'), async (req, res) => {
+router.put('/firewall/policy', authenticate, requireRole(...ADMIN_ROLES), async (req, res) => {
   try {
     const policy = String(req.body?.default_policy || 'ALLOW').toUpperCase();
     if (policy !== 'ALLOW' && policy !== 'DENY') return res.status(400).json({ error: 'policy ต้องเป็น ALLOW หรือ DENY' });

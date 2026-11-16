@@ -9,6 +9,7 @@ import { getClientHealthSummary } from '../../services/client-monitor.service';
 import { getWanState, checkWanNow, rebootRouter, checkRouterNow, scanLanDevices, runSpeedtest } from '../../services/wan-monitor.service';
 import { fetchRouterSimData, setAdminPassword } from '../../services/tplink-mr505.service';
 import { probeSystemServices } from '../../services/system-services.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 // ────────────────────────────────────────────────────────────────────────────
 // System — ย้ายมาจาก inline routes ใน server.ts
@@ -72,7 +73,7 @@ router.get('/processes', authenticate, async (_req, res) => {
 // POST /api/system/processes/kill - kill ผ่าน guard + autonomy เดียวกับ AI agent
 // 200 = สำเร็จ, 202 = รออนุมัติ (โหมด suggest), 403 = ถูกปฏิเสธ (view / guard)
 // SUPERADMIN เท่านั้น: การฆ่า process ของ host เป็นการกระทำระดับเครื่อง ไม่ใช่ระดับผู้ใช้ทั่วไป
-router.post('/processes/kill', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/processes/kill', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const { pid, name } = req.body || {};
   const args: any = {};
   if (pid !== undefined && pid !== null && pid !== '') {
@@ -157,7 +158,7 @@ router.get('/wan/sim', authenticate, async (_req, res) => {
 });
 
 // PUT /api/system/wan/admin-password {password} — ตั้งรหัส admin ของ router (SUPERADMIN)
-router.put('/wan/admin-password', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/wan/admin-password', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const pw = String(req.body?.password || '');
     if (!pw) return res.status(400).json({ error: 'password required' });
@@ -169,7 +170,7 @@ router.put('/wan/admin-password', authenticate, requireRole('SUPERADMIN'), async
 });
 
 // POST /api/system/wan/reboot — รีบูต router (SUPERADMIN, ต้องตั้ง ROUTER_REBOOT_CMD ก่อน)
-router.post('/wan/reboot', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (_req, res) => {
+router.post('/wan/reboot', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (_req, res) => {
   const result = await rebootRouter();
   if (!result.ok) return res.status(400).json({ error: result.error });
   res.json({ success: true });

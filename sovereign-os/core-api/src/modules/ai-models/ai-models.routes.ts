@@ -19,6 +19,7 @@ import { CODING_MODEL } from '../../services/coding-agent.service';
 import { VISION_MODEL } from '../../services/vision.service';
 import { MODEL as GOVERNOR_MODEL } from '../../services/governor.service';
 import { MODEL as ADVISOR_MODEL } from '../../services/advisor.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const LEGACY_DEFAULTS = {
   CODING_AGENT: CODING_MODEL,
@@ -38,7 +39,7 @@ const LEGACY_DEFAULTS = {
 // ────────────────────────────────────────────────────────────────────────────
 
 const router = Router();
-router.use(authenticate, requireRole('SUPERADMIN'));
+router.use(authenticate, requireRole(...SUPERADMIN_ONLY));
 
 // ── import jobs (in-memory — รื้อ server แล้วหาย ไม่เป็นไร เพราะ Ollama เก็บผลจริง) ──
 interface ImportJob {
@@ -84,7 +85,7 @@ router.get('/models', authenticate, async (_req: Request, res: Response) => {
 });
 
 // ── POST /models/pull {model} — stream progress NDJSON ทันที ──
-router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
+router.post('/models/pull', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req: Request, res: Response) => {
   const model = String(req.body?.model || '').trim();
   if (!model) return res.status(400).json({ error: 'ต้องระบุ model' });
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -104,7 +105,7 @@ router.post('/models/pull', authenticate, requireRole('SUPERADMIN'), asyncRoute(
 }));
 
 // ── POST /models/import-gguf {modelName, ggufUrl, systemPrompt?} — เริ่ม job ──
-router.post('/models/import-gguf', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/models/import-gguf', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   const modelName = String(req.body?.modelName || '').trim();
   const ggufUrl = String(req.body?.ggufUrl || '').trim();
   const systemPrompt = req.body?.systemPrompt ? String(req.body.systemPrompt) : undefined;
@@ -149,7 +150,7 @@ router.get('/jobs/:id', authenticate, (req: Request, res: Response) => {
 });
 
 // ── POST /models/route {taskType, model} — ตั้ง task→model ──
-router.post('/models/route', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
+router.post('/models/route', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req: Request, res: Response) => {
   const taskType = String(req.body?.taskType || '');
   const model = String(req.body?.model || '');
   const r = await setModelForTask(taskType, model);
@@ -158,7 +159,7 @@ router.post('/models/route', authenticate, requireRole('SUPERADMIN'), asyncRoute
 }));
 
 // ── DELETE /models/:name — ลบโมเดลออกจากพื้นที่จัดเก็บ ──
-router.delete('/models/:name', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req: Request, res: Response) => {
+router.delete('/models/:name', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req: Request, res: Response) => {
   const name = decodeURIComponent(req.params.name || '');
   if (!name) return res.status(400).json({ error: 'ต้องระบุชื่อโมเดล' });
   const r = await deleteModel(name);
@@ -167,7 +168,7 @@ router.delete('/models/:name', authenticate, requireRole('SUPERADMIN'), asyncRou
 }));
 
 // ── POST /models/:name/unload — ปล่อย VRAM ทันที ──
-router.post('/models/:name/unload', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/models/:name/unload', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   const name = decodeURIComponent(req.params.name || '');
   if (!name) return res.status(400).json({ error: 'ต้องระบุชื่อโมเดล' });
   const r = await unloadModelFromVram(name);

@@ -13,6 +13,7 @@ import {
   deleteAgentJob,
   processAgentQueue,
 } from '../../services/agent-team.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/roles', authenticate, async (_req, res) => {
 });
 
 // POST /api/agent/roles/seed — คืนค่าเริ่มต้น (เฉพาะเมื่อตารางว่าง)
-router.post('/roles/seed', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.post('/roles/seed', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const count = await seedDefaultRoles();
     res.json({ success: true, seeded: count });
@@ -37,7 +38,7 @@ router.post('/roles/seed', authenticate, requireRole('SUPERADMIN'), async (_req,
 });
 
 // POST /api/agent/roles — สร้างบทบาทใหม่
-router.post('/roles', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/roles', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const item = await createAgentRole(req.body || {});
     res.status(201).json({ success: true, role: item });
@@ -47,7 +48,7 @@ router.post('/roles', authenticate, requireRole('SUPERADMIN'), async (req, res) 
 });
 
 // PUT /api/agent/roles/:id — แก้ไขบทบาท (จำนวน agent, เปิด/ปิด)
-router.put('/roles/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/roles/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await updateAgentRole(req.params.id, req.body || {});
     res.json({ success: true });
@@ -57,7 +58,7 @@ router.put('/roles/:id', authenticate, requireRole('SUPERADMIN'), async (req, re
 });
 
 // DELETE /api/agent/roles/:id — ลบบทบาท
-router.delete('/roles/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/roles/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await deleteAgentRole(req.params.id);
     res.json({ success: true });
@@ -67,7 +68,7 @@ router.delete('/roles/:id', authenticate, requireRole('SUPERADMIN'), async (req,
 });
 
 // POST /api/agent/roles/:id/run — สั่งงานบทบาท → รันเบื้องหลัง (ไม่บล็อก) + kick runner
-router.post('/roles/:id/run', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/roles/:id/run', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const job = await runAgentJob(req.params.id, String((req.body || {}).prompt ?? ''));
     void processAgentQueue().catch((err) => console.error('agent queue error:', err));
@@ -99,7 +100,7 @@ router.get('/jobs/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/agent/jobs/:id/cancel — ยกเลิกงาน (เฉพาะ queued/running)
-router.post('/jobs/:id/cancel', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/jobs/:id/cancel', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const job = await cancelAgentJob(req.params.id);
     res.json({ success: true, job });
@@ -109,7 +110,7 @@ router.post('/jobs/:id/cancel', authenticate, requireRole('SUPERADMIN'), async (
 });
 
 // DELETE /api/agent/jobs/:id — ลบงานออกจากประวัติ
-router.delete('/jobs/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/jobs/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await deleteAgentJob(req.params.id);
     res.json({ success: true });
