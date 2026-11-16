@@ -31,6 +31,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ATTESTATION_FILE = 'sovereign-attest.json';
 export const DOC_VERSION = 1;
 const SIGNABLE_ACTION = 'artifact.shipped';
+const REVOKED_ACTION = 'artifact.revoked';
+const RESTORED_ACTION = 'artifact.restored';
 const SHA256_RE = /^[0-9a-f]{64}$/;
 // ไฟล์ที่ไม่ได้เป็นของที่ผู้ใช้ดาวน์โหลด — ไม่ต้องเซ็น
 const NOT_ARTIFACTS = new Set([ATTESTATION_FILE, 'SHA256SUMS.txt']);
@@ -119,18 +121,67 @@ export function verifyDocument(doc, options = {}) {
   }
   if (problems.length > 0) return { ok: false, problems };
 
-  let docFingerprint = null;
+  // กุญแจที่เชื่อถือได้ของเอกสารนี้: เริ่มจากรุ่นปัจจุบัน + ใบ rotation ที่กุญแจนั้น endorse
+  const trusted = new Map();
   if (typeof doc.fingerprint === 'string') {
+    const newest = [...doc.receipts].sort((a, b) => (bodyOf(b).at ?? 0) - (bodyOf(a).at ?? 0))[0];
     try {
-      docFingerprint = doc.receipts.length > 0 ? publicKeyFingerprint(doc.receipts[0].publicKey) : null;
+      const fingerprint = publicKeyFingerprint(newest.publicKey);
+      if (fingerprint !== doc.fingerprint) {
+        pushed('fingerprint ในเอกสารไม่ตรงกับ public key ของ receipt ใหม่สุด');
+      } else {
+        if (typeof doc.keyId === 'string' && newest.keyId !== doc.keyId) {
+          pushed(`receipt ใหม่สุดเซ็นด้วยกุญแจ "${newest.keyId}" ไม่ใช่ "${doc.keyId}"`);
+        }
+        trusted.set(newest.keyId, newest.publicKey);
+      }
     } catch (error) {
-      pushed(`fingerprint ตรวจไม่ได้: ${error.message}`);
-    }
-    if (docFingerprint !== null && docFingerprint !== doc.fingerprint) {
-      pushed('fingerprint ในเอกสารไม่ตรงกับ public key ของ receipt');
+      pushed(`fingerprint ตรวไม่ได้: ${error.message}`);
     }
   } else {
     pushed('เอกสารไม่มี fingerprint ของกุญแจ — pin ไม่ได้');
+  }
+
+  const rotations = Array.isArray(doc.rotations) ? doc.rotations : [];
+  let expanded = true;
+  while (expanded && rotations.length > 0) {
+    expanded = false;
+    for (const statement of rotations) {
+      if (!statement || typeof statement !== 'object') continue;
+      // เดินถอยหลัง: เอกสาร pin กุญแจ "รุ่นนี้" ไว้ ⇒ ใบที่รุ่นนี้รับรองย้อนหลัง
+      // ทำให้ receipt ของกุญแจก่อนหน้ายังเชื่อได้ (ทิศเดียวกับเวลาที่ผู้ตรวจ pin กุญแจเก่า)
+      if (trusted.get(statement.to?.keyId) !== statement.to?.publicKey) continue;
+      const endorser = statement.from?.publicKey;
+      if (typeof endorser !== 'string' || trusted.has(statement.from?.keyId)) continue;
+      if (statement.v !== 1 || typeof statement.at !== 'number' || typeof statement.sig !== 'string') {
+        pushed('rotation statement มีรูปแบบไม่ถูกต้อง');
+        continue;
+      }
+      const body = {
+        v: 1,
+        from: { keyId: statement.from.keyId, publicKey: statement.from.publicKey },
+        to: { keyId: statement.to?.keyId, publicKey: statement.to?.publicKey },
+        at: statement.at,
+      };
+      let endorsed = false;
+      try {
+        const key = crypto.createPublicKey({ key: endorser, format: 'pem' });
+        endorsed = crypto.verify(
+          null,
+          Buffer.from(canonicalJson(body), 'utf8'),
+          key,
+          Buffer.from(statement.sig, 'base64')
+        );
+      } catch (error) {
+        pushed(`rotation ตรวจไม่ได้: ${error.message}`);
+      }
+      if (!endorsed) {
+        pushed(`rotation ${statement.from.keyId} → ${statement.to?.keyId} ลายเซ็นไม่ผ่าน`);
+        continue;
+      }
+      trusted.set(statement.from.keyId, statement.from.publicKey);
+      expanded = true;
+    }
   }
 
   const byId = new Map();
@@ -146,8 +197,13 @@ export function verifyDocument(doc, options = {}) {
       pushed(`receipt ${String(receipt.id).slice(0, 12)} ไม่ตรง hash ของ body (${id.slice(0, 12)})`);
       continue;
     }
-    if (receipt.keyId !== doc.keyId) {
-      pushed(`receipt ${id.slice(0, 12)} เซ็นด้วยกุญแจ "${receipt.keyId}" ไม่ใช่ "${doc.keyId}"`);
+    const pinned = trusted.get(receipt.keyId);
+    if (pinned === undefined) {
+      pushed(
+        `receipt ${id.slice(0, 12)} เซ็นด้วยกุญแจ "${receipt.keyId}" ที่ไม่ได้อยู่ในความเชื่อของเอกสาร (ต้องมี rotation ที่ endorse)`
+      );
+    } else if (pinned !== receipt.publicKey) {
+      pushed(`receipt ${id.slice(0, 12)} public key ไม่ตรงกับกุญแจ "${receipt.keyId}" ที่ endorse ไว้`);
     }
     let valid = false;
     try {
@@ -162,15 +218,6 @@ export function verifyDocument(doc, options = {}) {
       pushed(`receipt ${id.slice(0, 12)} ตรวจลายเซ็นไม่ได้: ${error.message}`);
     }
     if (!valid) pushed(`receipt ${id.slice(0, 12)} ลายเซ็นไม่ผ่าน`);
-    if (docFingerprint !== null) {
-      try {
-        if (publicKeyFingerprint(receipt.publicKey) !== docFingerprint) {
-          pushed(`receipt ${id.slice(0, 12)} เซ็นด้วยกุญแจคนละตัวกับรุ่นนี้ (key rotation?)`);
-        }
-      } catch (error) {
-        pushed(`receipt ${id.slice(0, 12)} public key อ่านไม่ได้: ${error.message}`);
-      }
-    }
     byId.set(id, receipt);
   }
 
@@ -188,6 +235,8 @@ export function verifyDocument(doc, options = {}) {
     // เดินย้อน chain: prev ต้องเป็น receipt ของ digest เดียวกัน และต้องมีอยู่จริงในเอกสาร
     let cursor = head;
     let steps = 0;
+    let revokedBy = null;
+    let stateSeen = false;
     const seen = new Set();
     while (cursor) {
       if (seen.has(cursor.id)) {
@@ -201,6 +250,11 @@ export function verifyDocument(doc, options = {}) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
         break;
       }
+      // เดินจากใหม่ไปเก่า ⇒ ใบแรกที่บอกสถานะคือสถานะปัจจุบัน (restore ใหม่สุดชนะ revoke เก่า)
+      if (!stateSeen && (body.action === REVOKED_ACTION || body.action === RESTORED_ACTION)) {
+        stateSeen = true;
+        if (body.action === REVOKED_ACTION) revokedBy = cursor.id;
+      }
       if (!body.prev) break;
       const prev = byId.get(body.prev);
       if (!prev) {
@@ -212,6 +266,11 @@ export function verifyDocument(doc, options = {}) {
         pushed(`chain ของ ${artifact.name} ยาวผิดปกติ`);
         break;
       }
+    }
+    if (revokedBy && !options.allowRevoked) {
+      pushed(
+        `artifact ${artifact.name} ถูกเพิกถอน (receipt ${revokedBy.slice(0, 12)}) — อย่าใช้งานนอกจากสั่ง --allow-revoked`
+      );
     }
   }
 
@@ -261,6 +320,30 @@ async function loadAttestModules() {
   return { attest, vault };
 }
 
+/**
+ * กุญแจเซ็นแบบพกพา: CI ไม่มี state ของ vault ข้ามรอบ จึงต้องมีตัวตนกุญแจที่คงที่
+ * — ส่ง PEM ผ่าน secret แล้ว import เข้า vault ของรอบนั้น (vault ยังผูก/enctypt ตามปกติ)
+ */
+export function readSigningKeyPem(argv) {
+  const env = process.env.ATTEST_SIGNING_KEY;
+  const file = argOf(argv, 'signing-key-file', process.env.ATTEST_SIGNING_KEY_FILE);
+  if (env) {
+    const pem = Buffer.from(env, 'base64').toString('utf8');
+    if (!pem.includes('PRIVATE KEY')) throw new Error('ATTEST_SIGNING_KEY ต้องเป็น base64 ของ PEM private key');
+    return pem;
+  }
+  if (file) return fs.readFileSync(file, 'utf8');
+  return null;
+}
+
+/** public key ที่คู่กับ private key — ใช้ทั้งตอน import และตอนประกาศ fingerprint */
+export function publicKeyFromPrivate(privatePem) {
+  return crypto.createPublicKey({ key: privatePem, format: 'pem' }).export({
+    type: 'spki',
+    format: 'pem',
+  }).toString();
+}
+
 export function readMasterKey(argv) {
   const inline = process.env.ATTEST_MASTER_KEY;
   const file = argOf(argv, 'master-key-file', process.env.ATTEST_MASTER_KEY_FILE);
@@ -277,18 +360,44 @@ export function readMasterKey(argv) {
   throw fail('E_KEY', 'ต้องมี ATTEST_MASTER_KEY (base64 32 ไบต์) หรือ --master-key-file');
 }
 
-function previousReceipts(file) {
-  if (!file) return [];
+function resolveMasterKey(argv, hasSigningKey) {
+  try {
+    return readMasterKey(argv);
+  } catch (error) {
+    if (!hasSigningKey) throw error;
+    // CI: vault เป็นของชั่วคราวของรอบนั้น กุญแจถาวรอยู่ใน secret
+    return new Uint8Array(crypto.randomBytes(32));
+  }
+}
+
+function previousDoc(file) {
+  if (!file) return null;
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (!Array.isArray(doc.receipts)) throw fail('E_PREVIOUS', `${file} ไม่มี receipts`);
-  return doc.receipts;
+  return doc;
+}
+
+function previousReceipts(file) {
+  return previousDoc(file)?.receipts ?? [];
+}
+
+/** ใบ rotation ที่ผู้เรียกส่งมา — ฟอร์แมตเป็นของ sovereign-attest (sealRotation) */
+function readRotations(files) {
+  return files.map((file) => {
+    const statement = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!statement || typeof statement !== 'object' || !statement.from || !statement.to) {
+      throw fail('E_ROTATION', `${file} ไม่ใช่ rotation statement`);
+    }
+    return statement;
+  });
 }
 
 /** เซ็น artifact ทุกไฟล์ในโฟลเดอร์ แล้วเขียนเอกสารที่ผู้ใช้ตรวจเองได้ */
 export async function signRelease(options) {
-  const { dir, tag, out, keyId, stateDir, masterKey, previousFile, now } = options;
+  const { dir, tag, out, keyId, stateDir, now, previousFile, signingKeyPem } = options;
+  const masterKey = options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem));
   const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
-  const { Attest } = attestModule;
+  const { Attest, loadSigningKey, saveSigningKey } = attestModule;
   const { BlobAnchorLog, FileBlobStore, Vault } = vaultModule;
 
   const files = collectArtifacts(dir);
@@ -300,6 +409,19 @@ export async function signRelease(options) {
   fs.mkdirSync(anchorDir, { recursive: true });
 
   const vault = await Vault.open({ store: new FileBlobStore(vaultDir), masterKey });
+  if (signingKeyPem) {
+    const existing = await loadSigningKey(vault, keyId);
+    if (!existing) {
+      await saveSigningKey(vault, {
+        keyId,
+        privateKey: signingKeyPem,
+        publicKey: publicKeyFromPrivate(signingKeyPem),
+        createdAt: now(),
+      });
+    } else if (existing.publicKey !== publicKeyFromPrivate(signingKeyPem)) {
+      throw fail('E_KEY', `vault มีกุญแจ "${keyId}" ที่ไม่ใช่กุญแจที่ให้มา — อย่าเซ็นด้วยตัวตนสลับกัน`);
+    }
+  }
   const attest = await Attest.open({ vault, keyId });
   const anchors = new BlobAnchorLog(new FileBlobStore(anchorDir));
 
@@ -349,13 +471,71 @@ export async function signRelease(options) {
     ),
   };
 
+  const inherited = Array.isArray(previousDoc(previousFile)?.rotations)
+    ? previousDoc(previousFile).rotations
+    : [];
+  const supplied = readRotations(options.rotationFiles ?? []);
+  const rotations = [...inherited, ...supplied].filter(
+    (statement, index, all) =>
+      all.findIndex((item) => item.to?.keyId === statement.to?.keyId) === index
+  );
+  if (rotations.length > 0) doc.rotations = rotations;
+
   const outFile = path.join(out ?? dir, ATTESTATION_FILE);
   fs.writeFileSync(outFile, `${JSON.stringify(doc, null, 2)}\n`);
   return { file: outFile, doc, signer: { keyId: attest.keyId, fingerprint: doc.fingerprint } };
 }
 
+/** แสดง public key + fingerprint ของกุญแจใน state dir (หรือกุญแจที่ import) */
+export async function keyInfo(options) {
+  const { keyId, stateDir, signingKeyPem, now } = options;
+  const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
+  const { Attest, loadSigningKey, saveSigningKey } = attestModule;
+  const { FileBlobStore, Vault } = vaultModule;
+  fs.mkdirSync(path.join(stateDir, 'vault'), { recursive: true });
+  const vault = await Vault.open({
+    store: new FileBlobStore(path.join(stateDir, 'vault')),
+    masterKey: options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem)),
+  });
+  if (signingKeyPem && !(await loadSigningKey(vault, keyId))) {
+    await saveSigningKey(vault, {
+      keyId,
+      privateKey: signingKeyPem,
+      publicKey: publicKeyFromPrivate(signingKeyPem),
+      createdAt: now(),
+    });
+  }
+  const attest = await Attest.open({ vault, keyId });
+  return {
+    keyId: attest.keyId,
+    publicKey: attest.publicKey,
+    fingerprint: attestModule.publicKeyFingerprint(attest.publicKey),
+  };
+}
+
 async function main(argv) {
-  const mode = flagOf(argv, 'sign') ? 'sign' : flagOf(argv, 'verify') ? 'verify' : null;
+  const mode = flagOf(argv, 'sign')
+    ? 'sign'
+    : flagOf(argv, 'verify')
+      ? 'verify'
+      : flagOf(argv, 'key-info')
+        ? 'key-info'
+        : null;
+  if (mode === 'key-info') {
+    const info = await keyInfo({
+      keyId: argOf(argv, 'key-id', 'release'),
+      stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
+      signingKeyPem: readSigningKeyPem(argv),
+      masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
+      now: () => Date.now(),
+    });
+    console.log(`keyId:       ${info.keyId}`);
+    console.log(`fingerprint: ${info.fingerprint}`);
+    console.log('public key:');
+    console.log(info.publicKey.trim());
+    return 0;
+  }
+
   if (mode === 'sign') {
     const dir = argOf(argv, 'dir', 'release-assets');
     const tag = argOf(argv, 'tag', process.env.GITHUB_REF_NAME);
@@ -366,8 +546,12 @@ async function main(argv) {
       out: argOf(argv, 'out', dir),
       keyId: argOf(argv, 'key-id', 'release'),
       stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
-      masterKey: readMasterKey(argv),
+      masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
+      signingKeyPem: readSigningKeyPem(argv),
       previousFile: argOf(argv, 'previous', undefined),
+      rotationFiles: argv
+        .filter((arg) => arg.startsWith('--rotation='))
+        .map((arg) => arg.slice('--rotation='.length)),
       now: () => Date.now(),
     });
     const flat = result.doc.artifacts
@@ -385,7 +569,10 @@ async function main(argv) {
   const file = argOf(argv, 'file', target);
   if (!file) throw fail('E_ARGS', 'ต้องระบุไฟล์ attestation');
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const report = verifyDocument(doc, { fingerprint: argOf(argv, 'fingerprint', undefined) });
+  const report = verifyDocument(doc, {
+    fingerprint: argOf(argv, 'fingerprint', undefined),
+    allowRevoked: flagOf(argv, 'allow-revoked'),
+  });
   if (!report.ok) {
     console.error(`ตรวจไม่ผ่าน (${report.problems.length} ข้อ):`);
     for (const problem of report.problems) console.error(`  - ${problem}`);

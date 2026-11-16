@@ -52,6 +52,8 @@ lerna-debug.log*
 # ── Keys & certificates ──────────────────────
 *.key
 *.pem
+# public key ของ release attestation ต้องอยู่ใน repo (private key ยังถูก ignore)
+!docs/keys/*.pub.pem
 *.p12
 *.pfx
 *.crt

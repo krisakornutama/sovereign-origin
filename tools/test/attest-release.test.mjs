@@ -114,6 +114,74 @@ test('publicKeyFingerprint ปฏิเสธกุญแจที่ไม่�
   );
 });
 
+
+// ── rotation: ใบที่กุญแจเก่า endorse กุญแจใหม่ ──
+function rotationStatement(oldPair, newPair, at = 1_700_000_050_000) {
+  const body = {
+    v: 1,
+    from: { keyId: 'release', publicKey: oldPair.publicKey },
+    to: { keyId: 'release-2', publicKey: newPair.publicKey },
+    at,
+  };
+  return {
+    ...body,
+    sig: crypto.sign(null, Buffer.from(canonicalJson(body), 'utf8'), oldPair.privateKey).toString('base64'),
+  };
+}
+
+function makeDocWithRotation({ withRotation = true, forged = false } = {}) {
+  const oldPair = crypto.generateKeyPairSync('ed25519');
+  const newPair = crypto.generateKeyPairSync('ed25519');
+  const oldPem = oldPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const newPem = newPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+
+  const oldKey = {
+    publicKey: oldPem,
+    signBody: (body) =>
+      crypto.sign(null, Buffer.from(canonicalJson(body), 'utf8'), oldPair.privateKey).toString('base64'),
+  };
+  const newKey = {
+    publicKey: newPem,
+    signBody: (body) =>
+      crypto.sign(null, Buffer.from(canonicalJson(body), 'utf8'), newPair.privateKey).toString('base64'),
+  };
+
+  const first = { ...makeReceipt(oldKey, bodyFor({ name: 'app.exe', digest })), keyId: 'release' };
+  const second = {
+    ...makeReceipt(newKey, bodyFor({ name: 'app.exe', digest, prev: first.id, at: 1_700_000_100_000 })),
+    keyId: 'release-2',
+  };
+  const statement = rotationStatement(
+    { publicKey: oldPem, privateKey: oldPair.privateKey },
+    { publicKey: newPem, privateKey: newPair.privateKey }
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release-2',
+    fingerprint: publicKeyFingerprint(newPem),
+    at: 1_700_000_200_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: second.id }],
+    receipts: [first, second],
+  };
+  if (withRotation) {
+    doc.rotations = [
+      forged
+        ? {
+            ...statement,
+            sig: crypto
+              .sign(null, Buffer.from(canonicalJson({ ...statement, sig: undefined }).replace(/,?"sig":null/, ''), 'utf8'), crypto.generateKeyPairSync('ed25519').privateKey)
+              .toString('base64'),
+          }
+        : statement,
+    ];
+  }
+  return doc;
+}
+
 // ── ตัวตรวจ ──
 test('เอกสารที่เซ็นถูกต้องผ่าน และรายงานจำนวน artifact/receipt', () => {
   const { doc } = makeDoc({ chain: true });
@@ -153,7 +221,7 @@ test('ลายเซ็นของกุญแจอื่นถูกปฏ�
   expectProblem(doc, /ลายเซ็นไม่ผ่าน/);
 });
 
-test('receipt ที่เซ็นด้วย keyId อื่นถูกปฏิเสธ', () => {
+test('receipt ที่เซ็นด้วย keyId อื่นถูกปฏิเสธเมื่อไม่มี rotation รองรับ', () => {
   const { doc } = makeDoc();
   doc.receipts[0].keyId = 'other';
   expectProblem(doc, /ไม่ใช่ "release"/);
@@ -184,6 +252,101 @@ test('เอกสารว่างหรือผิดเวอร์ชั�
   expectProblem({ v: 1, artifacts: [], receipts: [] }, /ไม่มี artifact/);
   assert.throws(() => verifyDocument(null), /อ่านไม่ได้/);
 });
+
+
+test('เอกสารข้ามรอยต่อกุญแจผ่านได้เมื่อมี rotation ที่กุญแจเก่า endorse', () => {
+  const doc = makeDocWithRotation();
+  const report = verifyDocument(doc, { fingerprint: doc.fingerprint });
+  assert.equal(report.ok, true, report.problems.join('; '));
+  assert.equal(report.receipts, 2);
+});
+
+test('ไม่มีใบ rotation ⇒ receipt ของกุญแจใหม่ถูกปฏิเสธ', () => {
+  const doc = makeDocWithRotation({ withRotation: false });
+  expectProblem(doc, /ไม่ได้อยู่ในความเชื่อของเอกสาร/);
+});
+
+test('ใบ rotation ที่ลายเซ็นไม่ผ่านถูกปฏิเสธ', () => {
+  const doc = makeDocWithRotation();
+  doc.rotations[0].at = doc.rotations[0].at + 1;
+  expectProblem(doc, /ลายเซ็นไม่ผ่าน/);
+});
+
+
+test('artifact ที่มี receipt เพิกถอนใน chain ถูกปฏิเสธ (และผ่านเมื่อสั่ง allowRevoked)', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: shipped.id, action: 'artifact.revoked', at: 1_700_000_002_000 })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_003_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, false);
+  assert.match(report.problems.join(String.fromCharCode(10)), /ถูกเพิกถอน/);
+
+  const allowed = verifyDocument(doc, { allowRevoked: true });
+  assert.equal(allowed.ok, true, allowed.problems.join('; '));
+});
+
+test('restore หลัง revoke ทำให้ตรวจผ่านได้ตามปกติ', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: shipped.id, action: 'artifact.revoked', at: 1_700_000_002_000 })
+  );
+  const restored = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: revoked.id, action: 'artifact.restored', at: 1_700_000_004_000 })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_005_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: restored.id }],
+    receipts: [shipped, revoked, restored],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, true, report.problems.join('; '));
+});
+
+// ── กุญแจแบบพกพา (CI: secret → import เข้า vault ของรอบนั้น) ──
+test(
+  'signing key ที่ import ให้ fingerprint เดิมทุกครั้ง แม้ state dir ใหม่',
+  { skip: hasSiblings ? false : 'sibling repos ยังไม่ถูก build' },
+  async () => {
+    const { keyInfo } = await import('../attest-release.mjs');
+    const { privateKey } = crypto.generateKeyPairSync('ed25519');
+    const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const dirs = [fs.mkdtempSync(path.join(os.tmpdir(), 'attest-k1-'))];
+    dirs.push(fs.mkdtempSync(path.join(os.tmpdir(), 'attest-k2-')));
+    try {
+      const first = await keyInfo({ keyId: 'release', stateDir: dirs[0], signingKeyPem: pem, now: () => 1 });
+      const second = await keyInfo({ keyId: 'release', stateDir: dirs[1], signingKeyPem: pem, now: () => 2 });
+      assert.equal(first.fingerprint, second.fingerprint);
+      assert.equal(first.publicKey, second.publicKey);
+    } finally {
+      for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 // ── integration กับของจริง (ข้ามเมื่อ sibling repo ยังไม่ถูก build) ──
 test(
