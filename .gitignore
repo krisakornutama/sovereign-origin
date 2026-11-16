@@ -130,6 +130,8 @@ tools/*
 !tools/preflight.mjs
 # ตราประทับ build สำหรับคอนเทนเนอร์ที่ไม่มี .git (CI-003)
 !tools/write-build-info.mjs
+# deploy wrapper: เขียน stamp + restart + ยืนยัน health ตรง HEAD (CI-003)
+!tools/deploy-core-api.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
