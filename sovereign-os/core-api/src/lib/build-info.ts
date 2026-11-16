@@ -49,11 +49,13 @@ export function findRepoRoot(startDir: string, maxDepth = 6): string | null {
 
 function readBuildInfoFile(startDir: string): { commit?: unknown } | null {
   const root = findRepoRoot(startDir);
+  // ลำดับสำคัญ: **ห้ามใช้ process.cwd() เป็น candidate** — dev ที่รันจาก core-api
+  // จะเจอ stamp ของ repo ตัวเองทุกครั้ง ทำให้ฟังก์ชันที่ควรตอบ "ไดเรกทอรีนี้ไม่มี stamp"
+  // ตอบผิด (เจอจริง 16/11/69: เทสต์ที่ใช้ temp dir แดงหลังมี stamp จริงใน repo)
   const candidates = [
     path.join(startDir, 'data', 'build-info.json'),
     // dist → /app/data/build-info.json (คอนเทนเนอร์เมานต์ `core-api/data` เป็น /app/data)
     path.join(path.dirname(path.resolve(startDir)), 'data', 'build-info.json'),
-    path.join(process.cwd(), 'data', 'build-info.json'),
   ];
   if (root) candidates.push(path.join(root, 'data', 'build-info.json'));
   for (const file of candidates) {
