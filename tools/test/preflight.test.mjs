@@ -17,6 +17,7 @@ import {
   formatSecretReport,
   SECRET_PATTERNS,
   countSecretsInGitLog,
+  countSecretsInDiffText,
   ROOT,
 } from '../preflight.mjs';
 
@@ -61,6 +62,25 @@ describe('secret scan — นับอย่างเดียว ไม่ร�
     for (const k of ['stripe_live', 'stripe_test', 'github_pat', 'slack_bot', 'aws_key_id', 'private_key']) {
       assert.ok(SECRET_PATTERNS[k], `ขาด pattern ${k}`);
     }
+  });
+});
+
+describe('secret scan — นับเฉพาะบรรทัดที่เพิ่ม', () => {
+  test('บรรทัดที่ถุก "ลบ" (ขึ้นด้วย -) ต้องไม่ทำให้ gate ล้ม', () => {
+    const key = 'ghp_' + 'w'.repeat(36);
+    const patch = [`-const t = '${key}';`, '+const t = process.env.TOKEN;'].join('\n');
+    assert.equal(totalSecrets(countSecretsInDiffText(patch)), 0);
+  });
+
+  test('บรรทัดที่เพิ่ม (+) ต้องถูกนับ', () => {
+    const key = 'ghp_' + 'w'.repeat(36);
+    const patch = [`+const t = '${key}';`, '-const t = null;'].join('\n');
+    assert.equal(countSecretsInDiffText(patch).github_pat, 1);
+  });
+
+  test('หัวไฟล์ +++/--- ของ diff ไม่ถูกนับเป็นความลับ', () => {
+    const patch = ['+++ b/app.js', '--- a/app.js'].join('\n');
+    assert.equal(totalSecrets(countSecretsInDiffText(patch)), 0);
   });
 });
 

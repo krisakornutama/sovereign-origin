@@ -77,34 +77,51 @@ function run(cmd, args, opts = {}) {
 }
 
 /**
+ * นับความลับใน "บรรทัดที่เพิ่มเข้ามา" ของ diff (ขึ้นต้นด้วย + แต่ไม่ใช่ +++) เท่านั้น
+ * — บรรทัดที่ถูกลบไม่ควรทำให้ gate ล้ม (คีย์ถูกลบออกไปแล้ว) แต่ยังเห็นใน log ของ commit นั้น
+ * ทำไมต้องเป็น line-based: pattern อย่าง private_key ถูกแบ่งได้ถ้าอ่านทีละ chunk
+ */
+export function countSecretsInDiffText(text) {
+  const counts = Object.fromEntries(Object.keys(SECRET_PATTERNS).map((k) => [k, 0]));
+  for (const rawLine of String(text).split('\n')) {
+    if (!rawLine.startsWith('+') || rawLine.startsWith('+++')) continue;
+    for (const [name, re] of Object.entries(SECRET_PATTERNS)) {
+      const m = rawLine.match(re);
+      if (m) counts[name] += m.length;
+    }
+  }
+  return counts;
+}
+
+/**
  * นับความลับใน git log แบบ stream — จำเป็นเพราะ `git log -p HEAD` ทั้ง repo ใหญ่เกิน
  * maxBuffer ของ spawnSync (เจอจริง 16/11/69: 124 MB → ENOBUFS → อ่าน range ไม่ได้)
- * นับเฉพาะ match ที่ "จบ" ในก้อนใหม่ เพื่อไม่นับซ้ำส่วนที่ overlap
  */
 export function countSecretsInGitLog(range, { cwd = ROOT } = {}) {
   return new Promise((resolve) => {
     const child = spawn('git', ['log', '-p', '--no-color', range], { cwd });
     const counts = Object.fromEntries(Object.keys(SECRET_PATTERNS).map((k) => [k, 0]));
-    let tail = '';
+    let pending = '';
     let stderr = '';
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
-      const buf = tail + chunk;
-      const prevLen = tail.length;
-      for (const [name, re] of Object.entries(SECRET_PATTERNS)) {
-        const rx = new RegExp(re.source, 'g');
-        let m;
-        while ((m = rx.exec(buf)) !== null) {
-          if (m.index + m[0].length > prevLen) counts[name] += 1;
-        }
-      }
-      tail = buf.slice(-8192); // เก็บท้ายไว้จับ pattern ที่ถูกตัดกลางก้อน
+      const buf = pending + chunk;
+      const lines = buf.split('\n');
+      pending = lines.pop() ?? ''; // เก็บบรรทัดที่ยังไม่จบไว้รอ chunk ถัดไป
+      const part = countSecretsInDiffText(lines.join('\n'));
+      for (const [k, n] of Object.entries(part)) counts[k] += n;
     });
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (c) => { stderr += c; });
     child.on('error', (e) => resolve({ counts, code: 1, error: e.message }));
-    child.on('close', (code) => resolve({ counts, code: code ?? 1, error: stderr.trim().slice(0, 200) }));
+    child.on('close', (code) => {
+      if (pending) {
+        const part = countSecretsInDiffText(pending);
+        for (const [k, n] of Object.entries(part)) counts[k] += n;
+      }
+      resolve({ counts, code: code ?? 1, error: stderr.trim().slice(0, 200) });
+    });
   });
 }
 
