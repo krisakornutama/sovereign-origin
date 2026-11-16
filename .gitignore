@@ -126,6 +126,8 @@ tools/*
 !tools/host-smoke.mjs
 # ตัวตรวจ "ไม่มี chunk 404" หลังสลับ build (UX-006) — เทสต์อ้างถึง ต้อง track
 !tools/promote-web.mjs
+# ด่านในเครื่องเทียบเท่า CI ก่อน push (CI-002) — เทสต์อ้างถึง ต้อง track
+!tools/preflight.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
