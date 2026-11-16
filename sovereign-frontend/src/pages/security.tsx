@@ -388,7 +388,7 @@ export default function SecurityPage() {
         {/* Status Cards — ภาพรวมสถานะ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="card panel-glow p-4">
-            <div className="text-sm text-gray-400 flex items-center gap-1.5"><Icon name="shield" size={14} className="text-emerald-400" /> {t('security.firewall', 'Firewall')} <span className="text-gray-600">{t('security.firewallHint', '(ไฟร์วอลล์)')}</span></div>
+            <div className="text-sm text-gray-400 flex items-center gap-1.5"><Icon name="shield" size={14} className="text-emerald-400" /> {t('security.firewall', 'Firewall')} <span className="text-gray-400">{t('security.firewallHint', '(ไฟร์วอลล์)')}</span></div>
             <div className="mt-2"><StatusPill variant={firewallStatus === 'active' ? 'ok' : 'err'} label={firewallStatus.toUpperCase()} pulse={firewallStatus === 'active'} /></div>
           </div>
           <StatCard label={t('security.activeConnections', 'Active Connections')} value={connectionsDegraded ? t('security.connectionsUnknown', 'ไม่ทราบ') : connections.length} icon={<Icon name="relay" size={14} />} />
@@ -446,7 +446,7 @@ export default function SecurityPage() {
                           <span className="font-bold text-amber-300">{a.tool}</span>
                           <span className="text-xs text-gray-500">{fmtTime(a.createdAt)}</span>
                         </div>
-                        <span className="text-[10px] text-gray-600 break-all">ID: {a.id}</span>
+                        <span className="text-[10px] text-gray-400 break-all">ID: {a.id}</span>
                       </div>
                       <pre className="text-xs text-gray-300 bg-gray-950/60 border border-cyan-800/50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
                         {fmtArgs(a.args)}
@@ -521,7 +521,7 @@ export default function SecurityPage() {
         <div className="card panel-cyan p-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-sm font-semibold text-gray-200 glow-text">{t('security.blockedIps', 'IP ที่ถูก Block ({n})', { n: blockedIps.length })} <span className="text-xs text-gray-500 font-normal">{t('security.blockedIpsNote', '— รายการที่ระบบสั่ง block ไว้')}</span></h2>
-            <span className="text-[10px] text-gray-600">{t('security.memoryNote', 'รายการจำในหน่วยความจำของระบบ — กด ✕ เพื่อ unblock')}</span>
+            <span className="text-[10px] text-gray-400">{t('security.memoryNote', 'รายการจำในหน่วยความจำของระบบ — กด ✕ เพื่อ unblock')}</span>
           </div>
           {blockedIps.length === 0 ? (
             <div className="text-gray-500 text-sm text-center py-4 border border-dashed border-gray-700 rounded-lg mt-3">
@@ -538,6 +538,7 @@ export default function SecurityPage() {
                   <button
                     onClick={() => sendBlockAction('unblock', ip)}
                     disabled={busyIp === ip}
+                    aria-label={t('security.unblockTitle', 'ยกเลิกการ block {ip}', { ip })}
                     title={t('security.unblockTitle', 'ยกเลิกการ block {ip}', { ip })}
                     className="text-xs hover:text-white disabled:opacity-50 flex items-center"
                   >
