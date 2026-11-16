@@ -19,6 +19,7 @@ import { WidgetShell } from '../components/dashboard/DashboardChrome';
 import { Header } from '../components/dashboard/HeaderBar';
 import PageHeader from '../components/ui/PageHeader';
 import ErrorNotice from '../components/ui/ErrorNotice';
+import { type EndpointHealth, initialHealth, degradedKeys, recordFailure, recordSuccess } from '../lib/data-health';
 import Icon from '../components/ui/Icon';
 import StatCard from '../components/ui/StatCard';
 import SectionCard from '../components/ui/SectionCard';
@@ -176,9 +177,10 @@ export default function Dashboard() {
     } catch {}
   }, [order, hidden]);
 
-  // UX slice 2: เดิม stats/devices ที่โหลดไม่สำเร็จถูกกลืนหาย (catch(() => {})) — ผู้ใช้เห็น 0
-  // โดยไม่รู้ว่าเป็น "ไม่มีข้อมูล" หรือ "โหลดไม่ได้" ตอนนี้แยกให้เห็นและกดลองใหม่ได้
-  const [statsError, setStatsError] = useState<unknown>(null);
+  // UX slice 2 / UX-004: เดิม stats/devices ที่โหลดไม่สำเร็จถูกกลืนหาย (catch(() => {}))
+  // ตอนนี้ติดตามแยกต่อ endpoint (คำขอที่สำเร็จตัวหนึ่งไม่ล้าง error ของอีกตัว) และแจ้ง
+  // เฉพาะเมื่อล้มติดกัน >= 2 รอบ ⇒ ไม่กะพริบทุก 5 วิ ตอนเน็ตขาด — ดู lib/data-health.ts
+  const [health, setHealth] = useState<EndpointHealth>(initialHealth);
   const [dataReloadKey, setDataReloadKey] = useState(0);
 
   const threat = useRiskStore((s) => s.threat);
@@ -190,11 +192,11 @@ export default function Dashboard() {
     const fetchData = () => {
       // เรียก /api/automation/check เฉพาะที่ AlertsPanel (จุดเดียว ทุก 60 วิ) — ที่นี่โหลด stats เพื่อแสดงผลเท่านั้น
       api.getObject<any>('/api/dashboard/stats')
-        .then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); } setStatsError(null); })
-        .catch((e)=> setStatsError(e));
+        .then((data:any)=>{ if(data){ setMetrics(data.metrics||{}); } setHealth((h) => recordSuccess(h, 'stats')); })
+        .catch((e)=> setHealth((h) => recordFailure(h, 'stats', e)));
       api.getObject<any>('/api/devices/status')
-        .then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); })
-        .catch((e)=> setStatsError(e));
+        .then((data:any)=> { if(data && typeof data.online==='number') setDeviceStatus(data); setHealth((h) => recordSuccess(h, 'devices')); })
+        .catch((e)=> setHealth((h) => recordFailure(h, 'devices', e)));
       api.getObject<any>('/api/inventory/status').then((data:any)=> data && setInventoryStatus(data.totals)).catch(()=> setInventoryStatus(null));
       api.getObject<any>('/api/farm/plots/overview').then((data:any)=> data && setFarmOverview(data.totals && data.upcomingHarvests ? { ...data.totals, upcomingHarvests: data.upcomingHarvests } : null)).catch(()=> setFarmOverview(null));
       api.getObject<any>('/api/knowledge/teach/dashboard').then((data:any)=> data && setKidsSummary(data.kids||[])).catch(()=> setKidsSummary(null));
@@ -251,6 +253,7 @@ export default function Dashboard() {
     return true;
   };
   const visibleOrder = order.filter((k) => isVisibleForUser(k) && (editMode || !hidden[k]));
+  const degraded = degradedKeys(health);
 
   // C5 มือถือ: ลำดับที่เหมาะกับจอเล็ก (ตัวเลข/เตือนบน กราฟิกหนักลงล่าง) —
   // ใช้เฉพาะเมื่อผู้ใช้ยังไม่เคยจัดเรียงเอง (order ยังเป็นค่า default) ไม่งั้นเคารพของที่จัดไว้
@@ -668,12 +671,15 @@ export default function Dashboard() {
             </div>
           </div>
           {editMode && <div className="text-[10px] font-mono text-gray-500 mb-2">ลากบล็อกเพื่อสลับตำแหน่ง · กดซ่อนเพื่อซ่อน — {visibleOrder.length}/{order.length} แสดง</div>}
-          {statsError ? (
+          {degraded.length > 0 ? (
             <div className="mb-3">
               <p className="text-[11px] text-amber-400/90 mb-1">
                 {t('dashboard.partialData', 'ข้อมูลบางส่วนโหลดไม่ได้ — ตัวเลขที่เห็นอาจไม่ครบ')}
               </p>
-              <ErrorNotice error={statsError} onRetry={() => setDataReloadKey((k) => k + 1)} />
+              <ErrorNotice
+                error={health.errors[degraded[0]]}
+                onRetry={() => { setHealth(initialHealth()); setDataReloadKey((k) => k + 1); }}
+              />
             </div>
           ) : null}
 
