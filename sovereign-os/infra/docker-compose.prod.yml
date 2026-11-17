@@ -35,8 +35,11 @@ services:
       EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_USERNAME:-admin}
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_PASSWORD:?EMQX_PASSWORD is required}
     ports:
+      # 1883 = MQTT ของอุปกรณ์ภาคสนาม — ต้องต่อได้จากวง LAN (เจตนา; อย่าลืมจำกัดด้วย firewall)
       - "0.0.0.0:1883:1883"
-      - "0.0.0.0:18083:18083"
+      # dashboard (หน้า admin ของ EMQX) ไม่มีเหตุต้องเปิดให้เครื่องอื่นเข้าถึง — ใช้จากเครื่องนี้
+      # หรือ SSH tunnel เท่านั้น (เดิมผูก 0.0.0.0 = ทั้งวง LAN เข้าหน้า admin ได้)
+      - "127.0.0.1:18083:18083"
     networks: [internal]
 
   core-api:
@@ -109,7 +112,10 @@ services:
       TLS_CERT: ${TLS_CERT:-}
       TLS_KEY: ${TLS_KEY:-}
     ports:
-      - "${CORE_API_PORT:-3001}:3001"
+      # backend ไม่ต้องรับ connexion ตรงจาก LAN — เส้นสาธารณะคือ domain → cloudflared → :3000
+      # → rewrite /api/* → :3001 (backend ผูก loopback อยู่แล้วใน compose ตัว dev)
+      # เดิมไม่ระบุ host IP = ผูก 0.0.0.0 โดยปริยาย ⇒ API เปิดให้ทั้งวง LAN
+      - "127.0.0.1:${CORE_API_PORT:-3001}:3001"
     volumes:
       - ../core-api/src:/app/src
       - ../core-api/dist:/app/dist
