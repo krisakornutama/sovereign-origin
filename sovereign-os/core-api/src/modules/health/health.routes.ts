@@ -480,6 +480,26 @@ router.get('/herbal-recommendations', authenticate, async (req, res) => {
 
 // ── Module 6: Clinical Export (30 วัน) — CSV หรือ HTML (print → PDF) ──
 
+// escape ค่าก่อนต่อเข้า HTML — `detail`/`source` มาจากผู้ใช้ (POST /observations)
+// เดิมต่อดิบ ๆ ⇒ stored XSS: บันทึกอาการด้วย <img onerror=...> แล้วสคริปต์รันใน origin
+// ของแอปเมื่อมีคนเปิด/พิมพ์/แชร์รายงาน (CSV escape quote อยู่แล้ว แต่ HTML ไม่เคย escape)
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      default:
+        return '&#39;';
+    }
+  });
+}
+
 // GET /api/health/export?format=csv|html&days=30
 router.get('/export', authenticate, async (req, res) => {
   try {
@@ -512,7 +532,7 @@ router.get('/export', authenticate, async (req, res) => {
 
     const categoryRows = counts
       .filter((c) => c.count > 0)
-      .map((c) => `<tr><td>${CATEGORY_LABELS[c.category]}</td><td>${c.count}</td><td>${c.triggered ? '⚠️ ถึงเกณฑ์' : 'ปกติ'}</td><td>${c.herb}${c.blocked ? ' (ห้ามใช้: ' + c.reasons.join(', ') + ')' : ''}</td></tr>`)
+      .map((c) => `<tr><td>${CATEGORY_LABELS[c.category]}</td><td>${c.count}</td><td>${c.triggered ? '⚠️ ถึงเกณฑ์' : 'ปกติ'}</td><td>${escapeHtml(c.herb)}${c.blocked ? ' (ห้ามใช้: ' + escapeHtml(c.reasons.join(', ')) + ')' : ''}</td></tr>`)
       .join('');
     const html = `<!DOCTYPE html>
 <html lang="th">
@@ -534,7 +554,7 @@ router.get('/export', authenticate, async (req, res) => {
   ${observations
     .map(
       (o) =>
-        `<tr><td>${new Date(o.observed_at).toLocaleString('th-TH')}</td><td>${CATEGORY_LABELS[o.category]}</td><td>${o.severity}/5</td><td>${o.source}</td><td>${o.detail || ''}</td></tr>`
+        `<tr><td>${new Date(o.observed_at).toLocaleString('th-TH')}</td><td>${CATEGORY_LABELS[o.category]}</td><td>${o.severity}/5</td><td>${escapeHtml(o.source)}</td><td>${escapeHtml(o.detail)}</td></tr>`
     )
     .join('')}
   </table>
