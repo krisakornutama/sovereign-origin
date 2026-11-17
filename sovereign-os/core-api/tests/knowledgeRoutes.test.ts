@@ -360,3 +360,62 @@ describe('ไฟล์บนดิสก์ — กัน path traversal', () =>
     assert.strictEqual(res.status, 404);
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// stored XSS ผ่านไฟล์ที่ knowledge เขียนลงดิสก์
+//
+// ช่องทางจริง: `POST /api/knowledge/file/:file` รับ "ชื่อไฟล์อะไรก็ได้" ที่อยู่ใต้ root
+// (รวม `uploads/evil.html` เมื่อส่ง `%2F` ซึ่ง Express ถอดรหัสให้ก่อน) แล้วเขียน
+// `req.body.content` ลงดิสก์ตรง ๆ ⇒ ต่อด้วย `GET /api/knowledge/uploads/evil.html`
+// ที่ใช้ `res.sendFile` (ตั้ง Content-Type ตามนามสกุล = `text/html`) ⇒ สคริปต์รันใน
+// origin ของแอป เพราะเส้นสาธารณะคือ domain → :3000 → rewrite /api/* → :3001
+// = origin เดียวกับที่เก็บ JWT ใน localStorage ⇒ ขโมย session ได้
+//
+// เอกสารของโมดูลนี้คือ .txt/.md (ดูหัวไฟล์ knowledge-files.routes.ts) ⇒ จำกัดนามสกุล
+// และห้ามเขียนข้ามโฟลเดอร์ (uploads/ เป็นของ route อัปโหลดที่ตรวจ magic bytes แล้ว)
+describe('knowledge ต้องไม่เป็นทางวางไฟล์ HTML (stored XSS)', () => {
+  test('เขียนไฟล์ .html ผ่าน POST /file/:file ต้องถูกปฏิเสธ (ทั้ง top-level และใน uploads/)', async () => {
+    for (const name of ['evil.html', 'uploads/evil.html', 'note.txt.html']) {
+      const res = await fetch(`${filesServer.baseUrl}/api/knowledge/file/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { ...AUTH, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: '<script>alert(1)</script>' }),
+      });
+      assert.strictEqual(res.status, 400, `นามสกุล .html ต้องไม่ถูกเขียนลงดิสก์ (${name})`);
+    }
+    assert.ok(!fs.existsSync(path.join(knowledgeDir, 'evil.html')), 'ต้องไม่มี .html ที่ top-level');
+    assert.ok(!fs.existsSync(path.join(knowledgeDir, 'uploads', 'evil.html')), 'ต้องไม่มี .html ใน uploads/');
+  });
+
+  test('ยังเขียน/อ่าน .txt ได้ตามปกติ (ของที่ควรทำต้องไม่พัง)', async () => {
+    const write = await fetch(`${filesServer.baseUrl}/api/knowledge/file/note2.txt`, {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'โน้ตใหม่' }),
+    });
+    assert.strictEqual(write.status, 200);
+    const read = await fetch(filesServer.baseUrl + '/api/knowledge/file/note2.txt', { headers: AUTH });
+    assert.deepStrictEqual(await read.json(), { content: 'โน้ตใหม่' });
+  });
+
+  test('GET /uploads/:file ต้องไม่เสิร์ฟ HTML แม้ไฟล์มีอยู่บนดิสก์แล้ว', async () => {
+    // ไฟล์อาจมาจากช่องทางอื่น (ไฟล์ค้างจากเวอร์ชันเก่า/ก๊อปมาจากภายนอก) — route ต้องไม่ render
+    const evil = path.join(knowledgeDir, 'uploads', 'preexisting.html');
+    fs.writeFileSync(evil, '<script>alert(document.domain)</script>');
+    try {
+      const res = await fetch(`${server.baseUrl}/api/knowledge/uploads/preexisting.html`, { headers: AUTH });
+      assert.ok(res.status === 400 || res.status === 404, `ต้องไม่เสิร์ฟ HTML (ได้ ${res.status})`);
+      const ct = res.headers.get('content-type') || '';
+      assert.ok(!ct.includes('text/html'), `Content-Type ต้องไม่ใช่ text/html (ได้ ${ct})`);
+    } finally {
+      fs.rmSync(evil, { force: true });
+    }
+  });
+
+  test('PDF ใน uploads/ ยังเปิดได้ (ของที่ควรทำต้องไม่พัง)', async () => {
+    fs.writeFileSync(path.join(knowledgeDir, 'uploads', 'doc.pdf'), '%PDF-1.4\n%%EOF\n');
+    const res = await fetch(`${server.baseUrl}/api/knowledge/uploads/doc.pdf`, { headers: AUTH });
+    assert.strictEqual(res.status, 200);
+    assert.match(res.headers.get('content-type') || '', /application\/pdf/);
+  });
+});
