@@ -421,3 +421,25 @@ test('GET /export (html) มี disclaimer + ห้าม days เกิน 90',
   assert.ok(html.includes('รายงานสุขภาพย้อนหลัง 90 วัน'), 'days=999 ถูก clamp เหลือ 90');
   assert.ok(html.includes('ไม่ใช่การวินิจฉัย'));
 });
+
+// stored XSS: detail/source มาจากผู้ใช้ (POST /observations) แล้วถูกต่อเข้า HTML ดิบ ๆ
+// ⇒ ใครบันทึกอาการด้วย <img onerror=...> ก็รันสคริปต์ใน origin ของแอปได้เมื่อมีคนเปิดรายงาน
+// (CSV escape quote อยู่แล้ว แต่ HTML ไม่เคย escape อะไรเลย)
+test('GET /export (html) ต้อง escape HTML ใน detail/source — กัน stored XSS', async () => {
+  await fetch(`${ts.baseUrl}/api/health/observations`, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      category: 'APPETITE',
+      detail: '<img src=x onerror=alert(1)>',
+      source: '<b>sensor</b>',
+    }),
+  });
+  const res = await fetch(`${ts.baseUrl}/api/health/export?format=html&days=30`, { headers: H });
+  const html = await res.text();
+
+  assert.ok(!html.includes('<img src=x onerror=alert(1)>'), 'detail ต้องไม่ถูกส่งออกเป็นแท็กดิบ');
+  assert.ok(!html.includes('<b>sensor</b>'), 'source ต้องไม่ถูกส่งออกเป็นแท็กดิบ');
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'detail ต้องถูก escape เป็น entity');
+  assert.ok(html.includes('&lt;b&gt;sensor&lt;/b&gt;'), 'source ต้องถูก escape เป็น entity');
+});
