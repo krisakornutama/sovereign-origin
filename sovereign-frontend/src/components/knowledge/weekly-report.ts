@@ -59,7 +59,7 @@ export function buildWeeklyReportHtml(kids: WeeklyReportKid[], generatedAt: stri
     const billsUnpaid = k.bills.filter((b) => b.status === 'unpaid').length;
     const allow = k.allowance_amount != null ? `<p class="muted">${t('knowledge.report.allowance', 'ค่าขนม: ทุกวัน{day} {amount}฿/สัปดาห์', { day: t(`knowledge.weekday.${k.allowance_day ?? 0}`, WEEKDAY_LABELS[k.allowance_day ?? 0]), amount: k.allowance_amount })}</p>` : '';
     return `<section class="kid">
-<h2>${k.emoji || '🧒'} ${esc(k.name)}${k.age != null ? ` <span class="muted">(${t('knowledge.home.age', '{n} ปี', { n: k.age })})</span>` : ''}</h2>
+<h2>${esc(k.emoji) || '🧒'} ${esc(k.name)}${k.age != null ? ` <span class="muted">(${t('knowledge.home.age', '{n} ปี', { n: k.age })})</span>` : ''}</h2>
 <div class="chips">
 <span>${t('knowledge.report.lessonsDone', 'เรียนจบ 7 วัน:')} <b>${k.progress.length}</b> ${t('knowledge.report.lessons', 'บทเรียน')}</span>
 <span>${t('knowledge.report.avg', 'เฉลี่ย:')} <b>${st.avg ?? 0}%</b></span>
@@ -75,9 +75,9 @@ ${k.progress.length ? `<ul class="tight">${k.progress.slice(-10).map((p) => `<li
 <h3>${t('knowledge.report.txsTitle', 'รายรับ-รายจ่าย (7 วัน)')}</h3>
 ${txs(k)}
 <h3>${t('knowledge.report.chores', 'งานบ้าน')}</h3>
-${k.chores.length ? `<ul class="tight">${k.chores.slice(0, 10).map((c) => `<li>${c.emoji || '📋'} ${esc(c.title)} — <b>${c.reward}฿</b> ${c.status === 'done' ? '<span style="color:#16a34a">${t("knowledge.home.done", "✓ เสร็จ")}</span>' : '<span style="color:#d97706">${t("knowledge.report.pending", "ค้าง")}</span>'}</li>`).join('')}</ul>` : `<p class="muted">${t('knowledge.report.noChores', 'ไม่มีงานบ้าน')}</p>`}
+${k.chores.length ? `<ul class="tight">${k.chores.slice(0, 10).map((c) => `<li>${esc(c.emoji) || '📋'} ${esc(c.title)} — <b>${c.reward}฿</b> ${c.status === 'done' ? '<span style="color:#16a34a">${t("knowledge.home.done", "✓ เสร็จ")}</span>' : '<span style="color:#d97706">${t("knowledge.report.pending", "ค้าง")}</span>'}</li>`).join('')}</ul>` : `<p class="muted">${t('knowledge.report.noChores', 'ไม่มีงานบ้าน')}</p>`}
 <h3>${t('knowledge.report.bills', 'บิล')}</h3>
-${k.bills.length ? `<ul class="tight">${k.bills.slice(0, 10).map((b) => `<li>${b.emoji || '🧾'} ${esc(b.title)} — <b>${b.amount.toLocaleString()}฿</b> ${b.period === 'monthly' ? '<span class="muted">(${t("knowledge.home.monthly", "รายเดือน")})</span> ' : ''}${b.status === 'paid' ? '<span style="color:#16a34a">${t("knowledge.home.paid", "✓ จ่ายแล้ว")}</span>' : '<span style="color:#dc2626">${t("knowledge.report.billUnpaid", "ยังไม่จ่าย")}</span>'}</li>`).join('')}</ul>` : `<p class="muted">${t('knowledge.report.noBills', 'ไม่มีบิล')}</p>`}
+${k.bills.length ? `<ul class="tight">${k.bills.slice(0, 10).map((b) => `<li>${esc(b.emoji) || '🧾'} ${esc(b.title)} — <b>${b.amount.toLocaleString()}฿</b> ${b.period === 'monthly' ? '<span class="muted">(${t("knowledge.home.monthly", "รายเดือน")})</span> ' : ''}${b.status === 'paid' ? '<span style="color:#16a34a">${t("knowledge.home.paid", "✓ จ่ายแล้ว")}</span>' : '<span style="color:#dc2626">${t("knowledge.report.billUnpaid", "ยังไม่จ่าย")}</span>'}</li>`).join('')}</ul>` : `<p class="muted">${t('knowledge.report.noBills', 'ไม่มีบิล')}</p>`}
 </section>`;
   }).join('');
 
