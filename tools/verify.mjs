@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeSystemTruth as writeTruthFile } from './verify-truth.mjs';
 import { shouldIsolateProdBuild } from './verify-plan.mjs';
+import { dumpVerifyFailure } from './verify-fail-log.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 // โฟลเดอร์ที่ “deploy จริง” = รากโปรเจกตหลัก เสมอ (docker mount core-api จากที่นี่ ไม่ใช่จาก worktree)
@@ -273,21 +274,55 @@ async function runStep(step) {
   // shell ต่อสเต็ป: shell:false เมื่อ arg มีช่องว่าง (path มี "My work") — Windows shell จะตัดคำผิด
   const run = () => spawnSync(step.cmd, step.args, { windowsHide: true, cwd: step.cwd, shell: step.shell !== false, stdio: 'pipe', encoding: 'utf8' });
   let r = run();
+  // ขั้นที่พังต้องทิ้งร่องรอยไว้เสมอ — เดิม stdout/stderr ถูกกลืน ⇒ รายงานได้แค่ "พัง (exit 1)"
+  // (เคสจริง 17/11/69: tools ล้มครั้งแรกติด 3 รอบโดยไม่มีหลักฐานว่าไฟล์ไหน/ทำไม)
+  // เก็บ "ครั้งแรกที่พัง" เท่านั้น — ถ้า flake guard รันซ้ำแล้วผ่าน ก็ยังมี log ของรอบที่พังให้ตรวจ
+  let dumped = false;
+  const dumpOnce = () => {
+    if (dumped) return;
+    dumped = true;
+    const meta = [
+      `# step: ${step.name}`,
+      `# cmd: ${step.cmd} ${(step.args ?? []).join(' ')}`,
+      `# cwd: ${step.cwd}`,
+      `# status=${r.status} signal=${r.signal ?? '-'} error=${r.error ? r.error.code || r.error.message : '-'}`,
+      `# output: stdout=${(r.stdout ?? '').length}B stderr=${(r.stderr ?? '').length}B`,
+    ].join('\n');
+    dumpVerifyFailure(
+      { name: step.name, meta, stdout: r.stdout, stderr: r.stderr },
+      { dir: join(MAIN_ROOT, '.freebuff', 'verify-logs') }
+    );
+  };
   // exit 134 = build worker ตายแบบ native OOM (Zone Allocation) — พบจริงเมื่อแรม/commit charge ของเครื่อง
   // ต่ำ (prod server + docker รันคู่กัน) · ไม่ใช่บั๊กโค้ด (CI บน GitHub แรมโล่งผ่านเสมอ) → พักแล้วลองใหม่ 2 ครั้ง
   for (let retry = 1; r.status === 134 && retry <= 2; retry++) {
+    dumpOnce();
     console.log(`   ${step.name}: พังชั่วคราว (exit 134 — OOM) → พัก 20 วิ แล้วลองใหม่ (${retry}/2)`);
     await new Promise((res) => setTimeout(res, 20_000));
+    r = run();
+  }
+  // Spawn guard: ขั้นล้ม "โดยไม่มี output เลย" ≠ เทสต์พัง — เทสต์ที่ assertion ไม่ผ่านต้องพิมพ์อะไรเสมอ
+  // เคสจริง 17/11/69: tools ล้มซ้ำทุก verify run แต่ stdout+stderr = 0 ไบต์ทั้งคู่ แล้วผ่านทันทีเมื่อรันซ้ำ
+  // (ตรงกับบันทึก AGENTS.md: `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` ตอนปิด handle)
+  if (r.status !== 0 && !r.stdout && !r.stderr) {
+    dumpOnce();
+    console.log(
+      `   ${step.name}: ล้มโดยไม่มี output เลย (status=${r.status}${r.signal ? `, signal=${r.signal}` : ''}` +
+        `${r.error ? `, ${r.error.code || r.error.message}` : ''}) → spawn guard: พัก 15 วิ รันใหม่`
+    );
+    await new Promise((res) => setTimeout(res, 15_000));
     r = run();
   }
   // Flake guard: เทสชุดใหญ่ (1249 เคส) บางครั้งโหลดชนกับ build อีกสาย → fail แบบไม่มี message
   // (เคสจริง: featureGrants 23/9, treasuryApi 24/9 — รันซ้ำเดี่ยวผ่านทั้งคู่ · ตอน nightly โหลดหนักพิเศษ)
   // กติกา: ขั้น test พัง → พัก 15 วิ รันใหม่ 1 ครั้ง — เทสจริงพัง = ล้ม 2 ครั้งติด ไม่ใช่การโกงเกต
   if (r.status !== 0 && /test/.test(step.name)) {
+    dumpOnce();
     console.log(`   ${step.name}: พัง (exit ${r.status}) → flake guard: พัก 15 วิ รันใหม่ 1 ครั้ง (เทสจริงพังต้องล้ม 2 ครั้งติด)`);
     await new Promise((res) => setTimeout(res, 15_000));
     r = run();
   }
+  if (r.status !== 0) dumpOnce();
   return r;
 }
 

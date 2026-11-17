@@ -142,6 +142,8 @@ tools/*
 # helper เขียน JSON + sidecar .sha256 (verify/nightly/ops-status อ้าง) — ต้อง track ด้วยเหตุผลเดียวกับ verify.mjs
 !tools/json-checksum.mjs
 !tools/verify-truth.mjs
+# เขียน log ของขั้นที่พังใน verify — ต้อง track เพราะ verify.mjs เรียกใช้ (ด่าน tool-files-tracked บังคับ)
+!tools/verify-fail-log.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
 !tools/indexnow-shop-notify.mjs
