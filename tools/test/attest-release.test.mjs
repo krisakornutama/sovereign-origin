@@ -16,6 +16,7 @@ import {
   describeArtifacts,
   publicKeyFingerprint,
   receiptId,
+  verifyArtifacts,
   verifyDocument,
 } from '../attest-release.mjs';
 
@@ -43,7 +44,7 @@ function makeReceipt(key, body) {
   };
 }
 
-function bodyFor({ action = 'artifact.shipped', name, digest, prev = null, at = 1_700_000_000_000 }) {
+function bodyFor({ action = 'artifact.shipped', name, digest, prev = null, at = 1_700_000_000_000, meta }) {
   return {
     v: 1,
     action,
@@ -51,7 +52,7 @@ function bodyFor({ action = 'artifact.shipped', name, digest, prev = null, at = 
     artifact: { name, sha256: digest, size: 3 },
     at,
     prev,
-    meta: { tag: 'v9.9.9' },
+    meta: meta ?? { tag: 'v9.9.9' },
   };
 }
 
@@ -475,3 +476,126 @@ test(
     }
   }
 );
+
+test('verifyArtifacts แฮชไฟล์จริงเทียบเอกสาร: ผ่าน / ไฟล์ถูกแก้ / ไฟล์หาย', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attest-files-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'app.exe'), 'portable');
+    fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt'), 'sums');
+    const doc = {
+      artifacts: [
+        {
+          name: 'app.exe',
+          sha256: crypto.createHash('sha256').update('portable').digest('hex'),
+          size: 8,
+        },
+      ],
+    };
+    const ok = verifyArtifacts(doc, dir);
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.unlisted, []);
+
+    fs.writeFileSync(path.join(dir, 'extra.zip'), 'unexpected');
+    const withExtra = verifyArtifacts(doc, dir);
+    assert.equal(withExtra.ok, true);
+    assert.deepEqual(withExtra.unlisted, ['extra.zip']);
+
+    fs.writeFileSync(path.join(dir, 'app.exe'), 'tampered');
+    const tampered = verifyArtifacts(doc, dir);
+    assert.equal(tampered.ok, false);
+    assert.match(tampered.problems.join(' '), /แฮชไม่ตรง|ขนาดไม่ตรง/);
+
+    fs.rmSync(path.join(dir, 'app.exe'));
+    const missing = verifyArtifacts(doc, dir);
+    assert.equal(missing.ok, false);
+    assert.match(missing.problems.join(' '), /ไม่พบไฟล์/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('revokedAt: receipt ที่เซ็นก่อนวันที่มีผลถูกปฏิเสธ และบอกวันที่ในข้อความ', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest, at: 1_700_000_000_000 }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({
+      name: 'app.exe',
+      digest,
+      prev: shipped.id,
+      action: 'artifact.revoked',
+      at: 1_700_000_900_000,
+      meta: { reason: 'พบของปลอมตั้งแต่ต้นเดือน', revokedAt: 1_700_000_500_000 },
+    })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_001_000_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, false);
+  const text = report.problems.join(String.fromCharCode(10));
+  assert.match(text, /ถูกเพิกถอน/);
+  assert.match(text, /2023-11-14T22:21:40.000Z/); // วันที่มีผลจาก meta.revokedAt
+});
+
+test('revokedAt: receipt ที่เซ็นหลังวันที่มีผลไม่ถูกเพิกถอน (เพิกถอนย้อนหลังแค่ถึงวันที่มีผล)', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest, at: 1_700_000_900_000 }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({
+      name: 'app.exe',
+      digest,
+      prev: shipped.id,
+      action: 'artifact.revoked',
+      at: 1_700_001_000_000,
+      // เหตุการณ์เกิดเมื่อ 1_700_000_400_000 ⇒ ของที่ปล่อยทีหลังไม่ใช่ของที่ถูกเพิกถอน
+      meta: { reason: 'เฉพาะของก่อนวันที่เกิดเหตุ', revokedAt: 1_700_000_400_000 },
+    })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_001_100_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+  };
+  const report = verifyDocument(doc);
+  assert.equal(report.ok, true, report.problems.join('; '));
+});
+
+test('revokedAt: ไม่ระบุวันที่มีผล ⇒ เพิกถอนทันที (ครอบทุก receipt ก่อนหน้านั้น)', () => {
+  const key = signer();
+  const digest = crypto.createHash('sha256').update('abc').digest('hex');
+  const shipped = makeReceipt(key, bodyFor({ name: 'app.exe', digest, at: 1_700_000_000_000 }));
+  const revoked = makeReceipt(
+    key,
+    bodyFor({ name: 'app.exe', digest, prev: shipped.id, action: 'artifact.revoked', at: 1_700_000_300_000 })
+  );
+  const doc = {
+    v: 1,
+    tag: 'v9.9.9',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_400_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: digest, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+  };
+  assert.equal(verifyDocument(doc).ok, false);
+});

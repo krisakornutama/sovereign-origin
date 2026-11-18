@@ -154,7 +154,12 @@ bootstrap ตัวเองเข้า set ได้ เพราะใบต�
 ### เพิกถอน artifact (revoked / restored)
 
 ```ts
-await attest.revoke({ artifact: { name: 'app.exe', bytes }, actor: 'security', reason: 'กุญแจบิลด์รั่ว' });
+await attest.revoke({
+  artifact: { name: 'app.exe', bytes },
+  actor: 'security',
+  reason: 'กุญแจบิลด์รั่ว',
+  revokedAt: Date.parse('2026-11-01T00:00:00Z'), // มีผลย้อนหลังตั้งแต่เมื่อไร (ไม่ระบุ = ทันที)
+});
 await attest.revocation(sha256);   // { revoked: true, receipt }
 await attest.restore({ artifact: { name: 'app.exe', bytes }, actor: 'owner' });
 ```
@@ -163,17 +168,37 @@ await attest.restore({ artifact: { name: 'app.exe', bytes }, actor: 'owner' });
 ปฏิเสธเอกสารที่ chain มีการเพิกถอน (`artifact.revoked`) เว้นแต่สั่ง `--allow-revoked` โดยเจตนา
 และ restore ใหม่กว่าจะยกเลิกให้เองโดยอัตโนมัติ (สถานะล่าสุดชนะ)
 
+`revokedAt` คือวันที่มีผล: เพิกถอนจะครอบเฉพาะ receipt ที่เซ็น**ก่อนหรือเท่ากับ**วันนั้น
+(ของที่ปล่อยหลังจากนั้นคือบิลด์ใหม่ ไม่ใช่ของที่ถูกเพิกถอน) — ตัวตรวจอ่าน `meta.revokedAt`
+แล้วเทียบกับ `at` ของ receipt ที่เซ็น artifact นั้น และพิมพ์วันที่ทั้งสองฝั่งในข้อความที่ปฏิเสธ
+
 ฝั่ง CLI (ใช้กุญแจเดียวกับตอนเซ็น และต้องอ้างเอกสารรุ่นเดิม):
 
 ```bash
 # เพิกถอน: ใบใหม่ต่อจาก chain เดิม ⇒ ตัวตรวจทุกรุ่นปฏิเสธบิลด์นี้
 node tools/attest-release.mjs --revoke --dir=release-assets --tag=v1.3.11 
-  --reason="กุญแจบิลด์รั่ว" --previous=release-assets/sovereign-attest.json
+  --reason="กุญแจบิลด์รั่ว" --previous=release-assets/sovereign-attest.json \
+  --revoked-at=2026-11-01T00:00:00Z   # ไม่ระบุ = มีผลทันที
 
 # คืนสถานะ (เมื่อตรวจแล้วไม่พบปัญหา) — ไม่ต้องเขียนประวัติทับ
 node tools/attest-release.mjs --restore --dir=release-assets --tag=v1.3.11 
   --previous=release-assets/sovereign-attest.json
 ```
+
+### ตรวจไฟล์ที่ดาวน์โหลดมา (ไม่ใช่แค่อ่านเอกสาร)
+
+```bash
+# --dir  ⇒ แฮชไฟล์จริงในโฟลเดอร์เทียบกับที่เซ็นไว้ (ขนาด + sha256)
+# --pin-key ⇒ เทียบกับ public key ที่ commit ไว้ แทนการพิมพ์ fingerprint เอง
+node tools/attest-release.mjs --verify sovereign-attest.json \
+  --pin-key=docs/keys/attest-release.pub.pem --dir=.
+```
+
+ไฟล์ที่อยู่ในโฟลเดอร์แต่ไม่ได้ถูกเซ็นจะถูกรายงานแยก (`ไม่ถูกเซ็น`) — ไม่ทำให้ตรวจไม่ผ่าน
+แต่ควรถามว่ามันมาจากไหน; ไฟล์ที่หาย/ถูกแก้/ขนาดเปลี่ยน ถือว่าไม่ผ่านทันที
+
+CI ตรวจซ้ำเองทุกครั้งที่ปล่อย release (`.github/workflows/attest-verify.yml`):
+ดาวน์โหลดไฟล์ที่แจกจริง แล้วรันคำสั่งข้างบน ⇒ ถ้าไบต์ที่ผู้ใช้โหลดไม่ตรงกับที่เซ็น งานจะแดง
 
 ### ข้อจำกัดที่ต้องรู้
 
