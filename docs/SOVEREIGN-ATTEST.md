@@ -119,6 +119,27 @@ CI ไม่มี state ของ vault ข้ามรอบ จึงส่�
 ของ release ล่าสุดมาเป็น `--previous` (ต่อ chain ข้ามรุ่น) แล้วเซ็น + ตรวจซ้ำก่อนอัปโหลด
 ไม่ตั้ง variable = ไม่มีใบรับรอง (ดีกว่าใบรับรองที่เซ็นด้วยกุญแจปลอม)
 
+### ปล่อย release: แนบใบรับรอง + ประกาศ fingerprint อัตโนมัติ
+
+- `sovereign-attest.json` ถูกเขียนลง `release-assets/` และขึ้น Release ไปพร้อมไฟล์ติดตั้ง
+  (workflow ยืนยันด้วย `test -f` ไม่พึ่ง glob เงียบ ๆ)
+- หลังเซ็นมีขั้นตรวจเพิ่ม: `--pin-key=docs/keys/attest-release.pub.pem --dir=release-assets`
+  ⇒ ถ้า fingerprint ไม่ตรงกุญแจที่ pin ไว้ หรือไบต์ไม่ตรงเอกสาร งานจะแดงก่อน publish
+- `tools/attest/release-notes.mjs` เขียนประกาศ fingerprint + คำสั่งตรวจ แล้ว workflow
+  ต่อท้ายใน release notes ด้วย `gh release edit --notes-file` **หลัง** publish
+  (ไม่พึ่งว่าตัว publish จะ merge body กับ notes ที่ GitHub สร้างให้อย่างไร)
+- ถ้าสวิตช์ปิดอยู่ notes จะบอกตรง ๆ ว่า "ไม่มีใบรับรอง" — ไม่ปล่อยให้คนอ่านเดาว่ามี
+
+ซ้อมก่อนปล่อยจริง (ไม่แตะ secret ไม่ปล่อยอะไร):
+
+```bash
+npm run release:dry-run
+# หรือสั่งจาก GitHub: Actions → Release Desktop → Run workflow → dry_run = true
+```
+
+dry-run ใช้กุญแจชั่วคราวเดินเส้นทางเดียวกับ CI (เซ็น → ตรวจ → ประกาศ fingerprint),
+ตรวจว่าใบรับรองอยู่ในชุดที่จะแนบ, คำสั่งใน notes รันได้จริง, และข้อความตอนปิดสวิตช์ถูกต้อง
+
 ### กุญแจ release ที่ประกาศแล้ว
 
 ```
