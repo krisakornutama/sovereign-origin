@@ -17,6 +17,7 @@
 // ใช้:
 //   node tools/attest-release.mjs --revoke --dir=... --tag=v1.3.11 --reason="..." --previous=<เอกสารเดิม>
 //   node tools/attest-release.mjs --restore --dir=... --tag=v1.3.11 --previous=<เอกสารที่เพิ่งเพิกถอน>
+//   node tools/attest-release.mjs --verify <เอกสาร> --pin-key=docs/keys/attest-release.pub.pem --dir=<โฟลเดอร์ไฟล์ที่ดาวน์โหลด>
 //   ATTEST_MASTER_KEY=<base64 32 ไบต์> node tools/attest-release.mjs --sign \
 //     --dir=release-assets --tag=v1.3.10 --out=release-assets [--previous=old.json]
 //   node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
@@ -95,6 +96,35 @@ export function publicKeyFingerprint(publicKeyPem) {
 
 export function receiptId(body) {
   return sha256Hex(Buffer.from(canonicalJson(body), 'utf8'));
+}
+
+/**
+ * ตรวจไฟล์จริงในโฟลเดอร์กับเอกสาร — เอกสารบอกว่า "ไบต์ชุดนี้คือของจริง"
+ * ถ้าไม่แฮชไฟล์ที่เพิ่งดาวน์โหลดมาเทียบ การตรวจก็เป็นเพียงการอ่าน JSON ที่เขาเขียนเอง
+ */
+export function verifyArtifacts(doc, dir) {
+  const problems = [];
+  const present = new Set(fs.readdirSync(dir));
+  const wanted = new Set(doc.artifacts.map((artifact) => artifact.name));
+  for (const artifact of doc.artifacts) {
+    const file = path.join(dir, artifact.name);
+    if (!present.has(artifact.name)) {
+      problems.push(`ไม่พบไฟล์ ${artifact.name} ใน ${dir}`);
+      continue;
+    }
+    const bytes = fs.readFileSync(file);
+    if (bytes.length !== artifact.size) {
+      problems.push(`${artifact.name} ขนาดไม่ตรง (ได้ ${bytes.length} ไบต์ คาด ${artifact.size})`);
+      continue;
+    }
+    if (sha256Hex(bytes) !== artifact.sha256) {
+      problems.push(`${artifact.name} แฮชไม่ตรงกับที่เซ็นไว้`);
+    }
+  }
+  const unlisted = [...present].filter(
+    (name) => !wanted.has(name) && !NOT_ARTIFACTS.has(name) && !name.startsWith('.')
+  );
+  return { ok: problems.length === 0, problems, unlisted: unlisted.sort() };
 }
 
 function bodyOf(receipt) {
@@ -240,6 +270,8 @@ export function verifyDocument(doc, options = {}) {
     let revokedBy = null;
     let stateSeen = false;
     const seen = new Set();
+    let revokedAt = null;
+    let condemned = false;
     while (cursor) {
       if (seen.has(cursor.id)) {
         pushed(`chain ของ ${artifact.name} วนซ้ำที่ ${cursor.id.slice(0, 12)}`);
@@ -255,7 +287,22 @@ export function verifyDocument(doc, options = {}) {
       // เดินจากใหม่ไปเก่า ⇒ ใบแรกที่บอกสถานะคือสถานะปัจจุบัน (restore ใหม่สุดชนะ revoke เก่า)
       if (!stateSeen && (body.action === REVOKED_ACTION || body.action === RESTORED_ACTION)) {
         stateSeen = true;
-        if (body.action === REVOKED_ACTION) revokedBy = cursor.id;
+        if (body.action === REVOKED_ACTION) {
+          revokedBy = cursor.id;
+          // มีผลตั้งแต่ meta.revokedAt ถ้าระบุมา ไม่งั้นถือว่ามีผล ณ เวลาที่เพิกถอน
+          const declared = body.meta && typeof body.meta === 'object' ? body.meta.revokedAt : undefined;
+          revokedAt =
+            typeof declared === 'number' ? declared : typeof body.at === 'number' ? body.at : null;
+        }
+      }
+      // ไบต์ชุดเดียวกันที่เคยถูกปล่อยก่อนวันที่มีผล = บิลด์ที่ถูกเพิกถอน
+      if (
+        revokedAt !== null &&
+        body.action === SIGNABLE_ACTION &&
+        typeof body.at === 'number' &&
+        body.at <= revokedAt
+      ) {
+        condemned = true;
       }
       if (!body.prev) break;
       const prev = byId.get(body.prev);
@@ -270,9 +317,14 @@ export function verifyDocument(doc, options = {}) {
       }
     }
     if (revokedBy && !options.allowRevoked) {
-      pushed(
-        `artifact ${artifact.name} ถูกเพิกถอน (receipt ${revokedBy.slice(0, 12)}) — อย่าใช้งานนอกจากสั่ง --allow-revoked`
-      );
+      // เพิกถอนมีผลย้อนหลังถึง revokedAt: เฉพาะ receipt ที่เซ็นก่อน/เท่ากับวันที่มีผล
+      if (revokedAt === null || condemned) {
+        const since = revokedAt === null ? 'ไม่ระบุเวลา' : new Date(revokedAt).toISOString();
+        pushed(
+          `artifact ${artifact.name} ถูกเพิกถอน (receipt ${revokedBy.slice(0, 12)}) มีผลตั้งแต่ ${since} ` +
+            `และมี receipt ที่เซ็นก่อนเวลานั้น — อย่าใช้งานนอกจากสั่ง --allow-revoked`
+        );
+      }
     }
   }
 
@@ -295,6 +347,15 @@ export function verifyDocument(doc, options = {}) {
 function argOf(argv, name, fallback) {
   const found = argv.find((arg) => arg.startsWith(`--${name}=`));
   return found ? found.slice(name.length + 3) : fallback;
+}
+
+/** รับได้ทั้ง ms (ตัวเลข) และ ISO-8601 เช่น 2026-11-01T00:00:00Z */
+function parseTimeArg(value) {
+  if (value === undefined) return undefined;
+  if (/^[0-9]+$/.test(value)) return Number(value);
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) throw fail('E_ARGS', `--revoked-at ไม่ใช่วันที่: ${value}`);
+  return parsed;
 }
 
 function flagOf(argv, name) {
@@ -494,7 +555,8 @@ export async function signRelease(options) {
  * ผลลัพธ์คือเอกสารใบใหม่ที่ตัวตรวจจะปฏิเสธ เว้นแต่สั่ง --allow-revoked
  */
 export async function revokeRelease(options) {
-  const { dir, out, keyId, stateDir, now, previousFile, signingKeyPem, action, reason } = options;
+  const { dir, out, keyId, stateDir, now, previousFile, signingKeyPem, action, reason, revokedAt } =
+    options;
   const { tag, actor } = options;
   if (!previousFile) {
     throw fail('E_ARGS', 'ต้องระบุ --previous=<เอกสารรุ่นที่เคยเซ็น> เพื่ออ้าง chain เดิม');
@@ -551,7 +613,12 @@ export async function revokeRelease(options) {
     const receipt =
       action === RESTORED_ACTION
         ? await attest.restore({ actor, artifact: subject, ...(reason ? { reason } : {}) })
-        : await attest.revoke({ actor, reason, artifact: subject });
+        : await attest.revoke({
+            actor,
+            reason,
+            artifact: subject,
+            ...(revokedAt === undefined ? {} : { revokedAt }),
+          });
     artifacts.push({ ...artifact, receiptId: receipt.id });
     receipts.push(receipt);
   }
@@ -672,6 +739,7 @@ async function main(argv) {
       tag,
       out: argOf(argv, 'out', dir),
       reason: argOf(argv, 'reason', undefined),
+      revokedAt: parseTimeArg(argOf(argv, 'revoked-at', undefined)),
       actor: argOf(argv, 'actor', `release:${tag}`),
       keyId: argOf(argv, 'key-id', 'release'),
       stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
@@ -696,14 +764,30 @@ async function main(argv) {
     fingerprint: argOf(argv, 'fingerprint', undefined),
     allowRevoked: flagOf(argv, 'allow-revoked'),
   });
-  if (!report.ok) {
-    console.error(`ตรวจไม่ผ่าน (${report.problems.length} ข้อ):`);
-    for (const problem of report.problems) console.error(`  - ${problem}`);
+  // --dir=<โฟลเดอร์> ⇒ แฮชไฟล์จริงเทียบกับเอกสาร (ใช้ตอนผู้ใช้ตรวจไฟล์ที่ดาวน์โหลด)
+  const checkedDir = argOf(argv, 'dir', undefined);
+  const fileReport = checkedDir ? verifyArtifacts(doc, checkedDir) : null;
+  const pinFile = argOf(argv, 'pin-key', undefined);
+  const pinned = pinFile ? publicKeyFingerprint(fs.readFileSync(pinFile, 'utf8')) : null;
+  const problems = report.problems.slice();
+  if (fileReport) problems.push(...fileReport.problems);
+  if (pinned && pinned !== doc.fingerprint) {
+    problems.push(`กุญแจที่ pin ไว้ (${pinned}) ไม่ใช่กุญแจที่เซ็นเอกสาร (${doc.fingerprint})`);
+  }
+  if (problems.length > 0) {
+    console.error(`ตรวจไม่ผ่าน (${problems.length} ข้อ):`);
+    for (const problem of problems) console.error(`  - ${problem}`);
     return 1;
   }
   console.log(
     `ผ่าน: ${report.artifacts} artifact · ${report.receipts} receipt · กุญแจ ${report.fingerprint}`
   );
+  if (fileReport) {
+    console.log(`ไฟล์ที่แฮชตรงกับเอกสาร: ${doc.artifacts.length} ไฟล์ (${checkedDir})`);
+    if (fileReport.unlisted.length > 0) {
+      console.log(`ไม่ถูกเซ็น (ไม่นับรวม): ${fileReport.unlisted.join(', ')}`);
+    }
+  }
   if (report.unusedReceipts > 0) {
     console.log(`  (มี ${report.unusedReceipts} receipt เก่าใน chain ที่ไม่ได้ผูกกับไฟล์รุ่นนี้)`);
   }

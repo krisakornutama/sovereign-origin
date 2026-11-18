@@ -1,0 +1,55 @@
+name: Attest verification
+
+# ตรวจซ้ำหลังปล่อย release: ดาวน์โหลดไฟล์ที่แจกจ่ายจริงแล้วแฮชเทียบกับ attestation
+# ทำไมต้องมี: ตอนเซ็นเราเซ็นไบต์ที่อยู่ในเครื่อง build แต่ผู้ใช้ได้ไบต์จาก release
+# ถ้าไม่มีขั้นนี้ "provenance" จะพิสูจน์แค่ไฟล์ JSON ที่เราเขียนเอง ไม่ใช่ของที่เขาดาวน์โหลด
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'แท็กที่ต้องการตรวจ (ว่าง = release ล่าสุด)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: attest-verify-${{ github.event.release.tag_name || inputs.tag || 'latest' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # ถ้าปิดสวิตช์เซ็นไว้ ก็ไม่มีเอกสารให้ตรวจ
+    if: ${{ vars.ATTEST_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: ดาวน์โหลดไฟล์ที่ปล่อยจริง
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          target="${TAG:-$(gh release list --limit 1 --json tagName -q '.[0].tagName')}"
+          echo "ตรวจ release: $target"
+          mkdir -p assets
+          gh release download "$target" --dir assets
+          ls -la assets
+
+      - name: ตรวจเอกสาร + แฮชไฟล์จริง + กุญแจที่ pin ไว้
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/attest-release.mjs --verify assets/sovereign-attest.json \
+            --pin-key docs/keys/attest-release.pub.pem \
+            --dir assets
