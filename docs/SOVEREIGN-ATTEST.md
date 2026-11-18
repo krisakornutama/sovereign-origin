@@ -161,6 +161,18 @@ await attest.restore({ artifact: { name: 'app.exe', bytes }, actor: 'owner' });
 ปฏิเสธเอกสารที่ chain มีการเพิกถอน (`artifact.revoked`) เว้นแต่สั่ง `--allow-revoked` โดยเจตนา
 และ restore ใหม่กว่าจะยกเลิกให้เองโดยอัตโนมัติ (สถานะล่าสุดชนะ)
 
+ฝั่ง CLI (ใช้กุญแจเดียวกับตอนเซ็น และต้องอ้างเอกสารรุ่นเดิม):
+
+```bash
+# เพิกถอน: ใบใหม่ต่อจาก chain เดิม ⇒ ตัวตรวจทุกรุ่นปฏิเสธบิลด์นี้
+node tools/attest-release.mjs --revoke --dir=release-assets --tag=v1.3.11 
+  --reason="กุญแจบิลด์รั่ว" --previous=release-assets/sovereign-attest.json
+
+# คืนสถานะ (เมื่อตรวจแล้วไม่พบปัญหา) — ไม่ต้องเขียนประวัติทับ
+node tools/attest-release.mjs --restore --dir=release-assets --tag=v1.3.11 
+  --previous=release-assets/sovereign-attest.json
+```
+
 ### ข้อจำกัดที่ต้องรู้
 
 - **กุญแจเปลี่ยน = chain ขาด** — ตัวตรวจจะบอกว่า receipt ถูกเซ็นด้วยกุญแจคนละตัวกับ fingerprint ของรุ่นนั้น;

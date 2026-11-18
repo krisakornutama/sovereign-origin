@@ -15,6 +15,8 @@
 //   chain ข้ามรุ่นได้ด้วย --previous <attestation ของรุ่นก่อน>
 //
 // ใช้:
+//   node tools/attest-release.mjs --revoke --dir=... --tag=v1.3.11 --reason="..." --previous=<เอกสารเดิม>
+//   node tools/attest-release.mjs --restore --dir=... --tag=v1.3.11 --previous=<เอกสารที่เพิ่งเพิกถอน>
 //   ATTEST_MASTER_KEY=<base64 32 ไบต์> node tools/attest-release.mjs --sign \
 //     --dir=release-assets --tag=v1.3.10 --out=release-assets [--previous=old.json]
 //   node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
@@ -486,6 +488,96 @@ export async function signRelease(options) {
   return { file: outFile, doc, signer: { keyId: attest.keyId, fingerprint: doc.fingerprint } };
 }
 
+/**
+ * เพิกถอน (หรือคืนสถานะ) artifact ที่เคยเซ็นไว้ — ต้องมีเอกสารรุ่นก่อนหน้าเพื่ออ้าง chain
+ * การเพิกถอนเป็น receipt ปกติ ⇒ เซ็นด้วยกุญแจเดิม ต่อจากหัว chain ของ digest นั้น และอยู่ใน anchor
+ * ผลลัพธ์คือเอกสารใบใหม่ที่ตัวตรวจจะปฏิเสธ เว้นแต่สั่ง --allow-revoked
+ */
+export async function revokeRelease(options) {
+  const { dir, out, keyId, stateDir, now, previousFile, signingKeyPem, action, reason } = options;
+  const { tag, actor } = options;
+  if (!previousFile) {
+    throw fail('E_ARGS', 'ต้องระบุ --previous=<เอกสารรุ่นที่เคยเซ็น> เพื่ออ้าง chain เดิม');
+  }
+  if (action === REVOKED_ACTION && !reason) throw fail('E_ARGS', 'ต้องระบุ --reason=<เหตุผล>');
+  const masterKey = options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem));
+  const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
+  const { Attest, loadSigningKey, saveSigningKey } = attestModule;
+  const { BlobAnchorLog, FileBlobStore, Vault } = vaultModule;
+
+  const files = collectArtifacts(dir);
+  if (files.length === 0) throw fail('E_NO_ARTIFACTS', `ไม่พบ artifact ใน ${dir}`);
+
+  const vaultDir = path.join(stateDir, 'vault');
+  const anchorDir = path.join(stateDir, 'anchors');
+  fs.mkdirSync(vaultDir, { recursive: true });
+  fs.mkdirSync(anchorDir, { recursive: true });
+
+  const vault = await Vault.open({ store: new FileBlobStore(vaultDir), masterKey });
+  if (signingKeyPem) {
+    const existing = await loadSigningKey(vault, keyId);
+    if (!existing) {
+      await saveSigningKey(vault, {
+        keyId,
+        privateKey: signingKeyPem,
+        publicKey: publicKeyFromPrivate(signingKeyPem),
+        createdAt: now(),
+      });
+    } else if (existing.publicKey !== publicKeyFromPrivate(signingKeyPem)) {
+      throw fail('E_KEY', `vault มีกุญแจ "${keyId}" ที่ไม่ใช่กุญแจที่ให้มา — อย่าเซ็นด้วยตัวตนสลับกัน`);
+    }
+  }
+  const attest = await Attest.open({ vault, keyId });
+  const anchors = new BlobAnchorLog(new FileBlobStore(anchorDir));
+
+  // ตั้ง head ของ digest ให้ชี้ใบล่าสุดจากเอกสารรุ่นก่อน เพื่อให้ใบใหม่ต่อท้าย chain เดิมจริง
+  const prior = previousReceipts(previousFile);
+  const priorHeadByDigest = new Map();
+  for (const receipt of prior) {
+    const body = bodyOf(receipt);
+    if (!priorHeadByDigest.has(body.artifact?.sha256)) {
+      priorHeadByDigest.set(body.artifact?.sha256, receipt.id);
+    }
+  }
+  for (const [digest, headId] of priorHeadByDigest) {
+    const bytes = Buffer.from(JSON.stringify({ head: headId }), 'utf8');
+    await vault.put(`attest/heads/${digest}.json`, new Uint8Array(bytes));
+  }
+
+  const artifacts = [];
+  const receipts = [];
+  for (const artifact of describeArtifacts(dir, files)) {
+    const subject = { name: artifact.name, sha256: artifact.sha256, size: artifact.size };
+    const receipt =
+      action === RESTORED_ACTION
+        ? await attest.restore({ actor, artifact: subject, ...(reason ? { reason } : {}) })
+        : await attest.revoke({ actor, reason, artifact: subject });
+    artifacts.push({ ...artifact, receiptId: receipt.id });
+    receipts.push(receipt);
+  }
+
+  const anchorEntry = await attest.anchor(anchors);
+  const doc = {
+    v: DOC_VERSION,
+    tag,
+    keyId: attest.keyId,
+    fingerprint: attestModule.publicKeyFingerprint(attest.publicKey),
+    at: anchorEntry.entry?.at ?? now(),
+    root: anchorEntry.root,
+    anchor: anchorEntry.entry,
+    artifacts,
+    receipts: [...prior, ...receipts].filter(
+      (receipt, index, all) => all.findIndex((item) => item.id === receipt.id) === index
+    ),
+  };
+  const priorRotations = previousDoc(previousFile)?.rotations;
+  if (Array.isArray(priorRotations)) doc.rotations = priorRotations;
+
+  const outFile = path.join(out ?? dir, ATTESTATION_FILE);
+  fs.writeFileSync(outFile, `${JSON.stringify(doc, null, 2)}\n`);
+  return { file: outFile, doc, signer: { keyId: attest.keyId, fingerprint: doc.fingerprint } };
+}
+
 /** แสดง public key + fingerprint ของกุญแจใน state dir (หรือกุญแจที่ import) */
 export async function keyInfo(options) {
   const { keyId, stateDir, signingKeyPem, now } = options;
@@ -516,11 +608,15 @@ export async function keyInfo(options) {
 async function main(argv) {
   const mode = flagOf(argv, 'sign')
     ? 'sign'
-    : flagOf(argv, 'verify')
-      ? 'verify'
-      : flagOf(argv, 'key-info')
-        ? 'key-info'
-        : null;
+    : flagOf(argv, 'revoke')
+      ? 'revoke'
+      : flagOf(argv, 'restore')
+        ? 'restore'
+        : flagOf(argv, 'verify')
+          ? 'verify'
+          : flagOf(argv, 'key-info')
+            ? 'key-info'
+            : null;
   if (mode === 'key-info') {
     const info = await keyInfo({
       keyId: argOf(argv, 'key-id', 'release'),
@@ -561,6 +657,33 @@ async function main(argv) {
     console.log(flat);
     console.log(`fingerprint: ${result.signer.fingerprint}`);
     console.log(`vault root:  ${result.doc.root}`);
+    console.log('ตรวจ: node tools/attest-release.mjs --verify <ไฟล์นี้> --fingerprint <fingerprint>');
+    return 0;
+  }
+
+  if (mode === 'revoke' || mode === 'restore') {
+    const dir = argOf(argv, 'dir', 'release-assets');
+    const tag = argOf(argv, 'tag', process.env.GITHUB_REF_NAME);
+    if (!tag) throw fail('E_ARGS', 'ต้องระบุ --tag (หรือรันใน GitHub Actions)');
+    const action = mode === 'revoke' ? REVOKED_ACTION : RESTORED_ACTION;
+    const result = await revokeRelease({
+      action,
+      dir,
+      tag,
+      out: argOf(argv, 'out', dir),
+      reason: argOf(argv, 'reason', undefined),
+      actor: argOf(argv, 'actor', `release:${tag}`),
+      keyId: argOf(argv, 'key-id', 'release'),
+      stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
+      masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
+      signingKeyPem: readSigningKeyPem(argv),
+      previousFile: argOf(argv, 'previous', undefined),
+      now: () => Date.now(),
+    });
+    console.log(
+      `${mode === 'revoke' ? 'เพิกถอน' : 'คืนสถานะ'} ${result.doc.artifacts.length} artifact ของ ${tag} → ${result.file}`
+    );
+    console.log(`fingerprint: ${result.signer.fingerprint}`);
     console.log('ตรวจ: node tools/attest-release.mjs --verify <ไฟล์นี้> --fingerprint <fingerprint>');
     return 0;
   }
