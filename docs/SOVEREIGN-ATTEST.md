@@ -72,7 +72,9 @@ const body = openReceipt(receiptFromARegistry, { publicKey: pinnedReleaseKey });
 - **ไม่มี revocation list** — `action: 'artifact.revoked'` chain ได้ แต่ไม่มีอะไรบังคับว่า "ใบก่อนหน้า revocation ใช้ไม่ได้"
 - **anchor ยังเป็น checkpoint ที่เรียกเอง** — การเผยแพร่ root ไปยังพยานที่ผู้โจมตีแก้ไม่ได้เป็นงานของผู้ปฏิบัติการ
 - **artifact เก็บใน vault เฉพาะเมื่อสั่ง** — ไฟล์ใหญ่ควรอ้างด้วย digest เท่านั้น
-- **ยังไม่มีพิธี rotation ที่เซ็นรับรอง** — เปิดด้วย `keyId` ใหม่ได้และ `trustedKeys` รับหลายกุญแจ แต่ยังไม่มี signed rotation statement
+- **rotation statement ยังต้องส่งต่อเอง** — `attest.rotate()` เซ็นใบรับรองกุญแจใหม่แล้ว (ตั้งแต่ v0.2.0 · ATTEST-003)
+  แต่ผู้ตรวจจะยอมรับ receipt ของกุญแจใหม่ก็ต่อเมื่อได้ใบนั้นไปด้วย (`provenance({ rotations })` / `--rotation`);
+  ยังไม่มีช่องทางเผยแพร่ใบรับรองอัตโนมัติ
 - **ยังไม่มีการ gate การโหลด module** — M1 ครอบ provenance ของ artifact; ด่านโหลด module/TPM ตาม `ROADMAP_2036.md` §5.2 ยังเป็นงานถัดไป
 
 ## Provenance ของ release จริง (ATTEST-002)
