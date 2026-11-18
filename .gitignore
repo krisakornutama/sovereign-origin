@@ -178,6 +178,8 @@ tools/*
 !tools/attest-release.mjs
 !tools/attest/
 !tools/attest/document.mjs
+!tools/attest/release-notes.mjs
+!tools/release-dry-run.mjs
 !tools/release-check.mjs
 !tools/register-nightly-task.ps1
 !tools/release-notes-v1.1.1.md

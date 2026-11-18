@@ -18,7 +18,11 @@ on:
     inputs:
       tag:
         description: 'tag ที่ต้องการปล่อย (ต้องมีอยู่แล้ว เช่น v1.2.1)'
-        required: true
+        required: false
+      dry_run:
+        description: 'ซ้อมเฉพาะขั้นตอน provenance (ใช้กุญแจชั่วคราว ไม่ปล่อย release)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,6 +34,8 @@ concurrency:
 jobs:
   release:
     name: build + publish Windows desktop
+    # dry_run = ซ้อมอย่างเดียว: ห้าม build/ปล่อย release จริง
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run != true }}
     runs-on: windows-latest
     timeout-minutes: 75
 
@@ -125,6 +131,33 @@ jobs:
           node tools/attest-release.mjs --sign --dir=release-assets --tag="${{ inputs.tag || github.ref_name }}" $prev_arg
           node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
 
+      # ตรวจใบรับรองด้วยกุญแจที่ commit ไว้ + แฮชไฟล์จริงในชุดที่จะอัปโหลด
+      # (ถ้าใบรับรองพูดถึงไฟล์ที่ไม่ตรงกับที่แนบจริง ต้องรู้ตรงนี้ ไม่ใช่ให้ผู้ใช้ไปเจอเอาเอง)
+      - name: ตรวจใบรับรองกับกุญแจที่ pin ไว้ + ไฟล์จริง
+        if: ${{ vars.ATTEST_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          node tools/attest-release.mjs --verify release-assets/sovereign-attest.json \
+            --pin-key=docs/keys/attest-release.pub.pem --dir=release-assets
+
+      # เขียนประกาศ fingerprint ที่จะต่อท้าย release notes (สวิตช์ปิด = เขียนว่าไม่มีใบรับรอง)
+      - name: เขียนประกาศ fingerprint สำหรับ release notes
+        shell: bash
+        run: |
+          node tools/attest/release-notes.mjs \
+            --doc=release-assets/sovereign-attest.json \
+            --tag="${{ inputs.tag || github.ref_name }}" \
+            --out=release-notes.md
+          cat release-notes.md
+
+      # ยืนยันว่าไฟล์ใบรับรองอยู่ในชุดที่จะแนบ (ไม่พึ่ง glob เงียบ ๆ)
+      - name: ยืนยัน sovereign-attest.json อยู่ในชุดที่จะแนบ
+        if: ${{ vars.ATTEST_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          test -f release-assets/sovereign-attest.json
+          node -e "const d=require('./release-assets/sovereign-attest.json');console.log('fingerprint:',d.fingerprint);console.log('artifacts:',d.artifacts.length);"
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -145,3 +178,42 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ต่อท้าย notes ที่ GitHub สร้างให้ ด้วยประกาศ fingerprint
+      # ทำหลัง publish เพื่อไม่ต้องพึ่งว่า action จะ merge body กับ generated notes อย่างไร
+      - name: ประกาศ fingerprint ใน release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          gh release view "$tag" --json body --jq .body > existing-notes.md || true
+          { cat existing-notes.md; echo; cat release-notes.md; } > merged-notes.md
+          gh release edit "$tag" --notes-file merged-notes.md
+          echo "เพิ่มประกาศ provenance แล้วใน release $tag"
+
+  # ── Dry-run: ซ้อมขั้นตอน provenance โดยไม่ปล่อยอะไรจริง ──
+  # ปิดสวิตช์อยู่ก็รันได้: ใช้กุญแจชั่วคราวและตรวจว่า notes ประกาศ "ไม่มีใบรับรอง" ถูกต้อง
+  dry-run:
+    name: dry-run provenance
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+
+      - name: Build sovereign-attest + vault (siblings) สำหรับเส้นทางเซ็นจริง
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/krisakornutama/sovereign-vault.git ../sovereign-vault
+          git clone --depth 1 https://github.com/krisakornutama/sovereign-attest.git ../sovereign-attest
+          (cd ../sovereign-vault && npm ci && npm run build)
+          (cd ../sovereign-attest && npm ci && npm run build)
+
+      - name: ซ้อมเซ็น → ตรวจ → ประกาศ fingerprint (กุญแจชั่วคราว ไม่ใช้ secret)
+        shell: bash
+        run: node tools/release-dry-run.mjs

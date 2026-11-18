@@ -21,6 +21,7 @@
     "release:check": "node tools/release-check.mjs",
     "release:attest": "node tools/attest-release.mjs --sign",
     "release:attest:verify": "node tools/attest-release.mjs --verify",
+    "release:dry-run": "node tools/release-dry-run.mjs",
     "release:attest:revoke": "node tools/attest-release.mjs --revoke",
     "release:attest:restore": "node tools/attest-release.mjs --restore"
   }
