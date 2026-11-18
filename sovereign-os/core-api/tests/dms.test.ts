@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import {
   DMS_KEY_ROTATION_SEC,
   rollingKey,
@@ -60,11 +61,25 @@ function makeDeps(overrides: Record<string, any> = {}) {
       prisma: recorder.prisma,
       sendWol: async (mac: string, bc: string) => { calls.push({ kind: 'wol', mac, bc }); return true; },
       sendTelegram: async (p: any) => { calls.push({ kind: 'telegram', ...p }); return { sent: true, reason: 'test' }; },
-      stateFile: path.join(os.tmpdir(), `dms-test-${Date.now()}.json`),
+      stateFile: path.join(os.tmpdir(), `dms-test-${process.pid}-${crypto.randomUUID()}.json`),
       ...overrides,
     },
   };
 }
+
+describe('test fixture', () => {
+  test('stateFile ไม่ชนกันแม้ makeDeps ถูกเรียกในมิลลิวินาทีเดียวกัน', () => {
+    // เคยทำให้ CI ล้มแบบสุ่ม: สองเทสต์ได้ path เดียวกัน ⇒ service ที่สองโหลด lastSeq=1
+    // ของเทสต์ก่อนหน้า แล้วตอบ 'replay' แทน 'bad_signature'
+    const realNow = Date.now;
+    Date.now = () => 1_800_000_000_000;
+    try {
+      assert.notEqual(makeDeps().deps.stateFile, makeDeps().deps.stateFile);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+});
 
 describe('rolling key + HMAC', () => {
   test('rollingKey หมุนทุก 5 นาที — ค่าเดียวกันใน window, ต่างกันข้าม window', () => {
@@ -135,8 +150,26 @@ describe('verifyDmsPing (pure)', () => {
       { ok: false, reason: 'replay' }
     );
     assert.deepEqual(
-      verifyDmsPing({ deviceId: DEVICE, ts, seq: 4, sig }, SECRET, now, { ...opts, lastSeq: 7 }),
+      verifyDmsPing({ deviceId: DEVICE, ts, seq: 4, sig: signDmsPing(SECRET, DEVICE, ts, 4) }, SECRET, now, {
+        ...opts,
+        lastSeq: 7,
+      }),
       { ok: false, reason: 'replay' }
+    );
+  });
+
+  test('seq ที่เคยใช้ + sig ผิด → bad_signature (ตรวจ sig ก่อน ไม่ให้ replay ปิดบังการแจ้งเตือน)', () => {
+    // ถ้าเช็ค replay ก่อน HMAC ผู้โจมตีที่รู้ seq ล่าสุดของ device (sniff ได้จาก ping ปกติ)
+    // จะยิง packet ขยะด้วย seq นั้นแล้วได้ reason='replay' ซึ่งไม่ทริกเกอร์ DMS_SIGNATURE_FAIL
+    // ⇒ การแจ้งเตือน "มีคนพยายามปลอม" ถูกกดได้โดยไม่ต้องมีกุญแจ
+    assert.deepEqual(
+      verifyDmsPing(
+        { deviceId: DEVICE, ts, seq: 5, sig: '0'.repeat(64) },
+        SECRET,
+        now,
+        { ...opts, lastSeq: 9 }
+      ),
+      { ok: false, reason: 'bad_signature' }
     );
   });
 

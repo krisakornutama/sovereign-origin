@@ -76,15 +76,12 @@ export function verifyDmsPing(
   if (!Number.isFinite(input.ts) || Math.abs(Math.floor(now / 1000) - input.ts) > tolerance / 1000) {
     return { ok: false, reason: 'bad_timestamp' };
   }
-  if (opts.lastSeq != null && input.seq <= opts.lastSeq) {
-    return { ok: false, reason: 'replay' };
-  }
   if (!/^[0-9a-f]{64}$/i.test(input.sig)) {
     return { ok: false, reason: 'bad_signature' };
   }
-  const expected = Buffer.from(signDmsPing(secret, input.deviceId, input.ts, input.seq), 'hex');
   const actual = Buffer.from(input.sig, 'hex');
   // ยอมรับ key ของ window ตัวเอง + ทั้ง 2 ข้าง (กันนาฬิกา drift 1 window — blueprint §3.1/§8)
+  let signatureOk = false;
   for (const offset of [-DMS_KEY_ROTATION_SEC, 0, DMS_KEY_ROTATION_SEC]) {
     const key = rollingKey(secret, input.ts + offset);
     const candidate = crypto
@@ -92,10 +89,20 @@ export function verifyDmsPing(
       .update(`${input.ts}|${input.deviceId}|${input.seq}`)
       .digest();
     if (crypto.timingSafeEqual(candidate, actual)) {
-      return { ok: true, reason: 'signature_ok' };
+      signatureOk = true;
+      break;
     }
   }
-  return { ok: false, reason: 'bad_signature' };
+  if (!signatureOk) {
+    return { ok: false, reason: 'bad_signature' };
+  }
+  // ตรวจ HMAC ก่อน replay เสมอ: ถ้าเช็ค seq ก่อน ผู้โจมตีที่รู้ seq ล่าสุดของ device
+  // (sniff จาก ping ปกติ) จะยิง packet ขยะด้วย seq นั้นแล้วได้ 'replay' ซึ่งไม่ทริกเกอร์
+  // DMS_SIGNATURE_FAIL ⇒ กดการแจ้งเตือน "มีคนพยายามปลอม" ได้โดยไม่ต้องมีกุญแจ
+  if (opts.lastSeq != null && input.seq <= opts.lastSeq) {
+    return { ok: false, reason: 'replay' };
+  }
+  return { ok: true, reason: 'signature_ok' };
 }
 
 // ── Wake-on-LAN (blueprint §7.4) ── FF×6 + MAC×16 → UDP:9 broadcast ──
