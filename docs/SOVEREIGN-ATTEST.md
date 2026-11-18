@@ -137,7 +137,7 @@ npm run release:dry-run
 # หรือสั่งจาก GitHub: Actions → Release Desktop → Run workflow → dry_run = true
 ```
 
-dry-run ใช้กุญแจชั่วคราวเดินเส้นทางเดียวกับ CI (เซ็น → ตรวจ → ประกาศ fingerprint),
+dry-run อยู่ใน `.github/workflows/release-dry-run.yml` (ไฟล์แยก เพราะ `release.yml` เรียกด้วย
 ตรวจว่าใบรับรองอยู่ในชุดที่จะแนบ, คำสั่งใน notes รันได้จริง, และข้อความตอนปิดสวิตช์ถูกต้อง
 
 ### กุญแจ release ที่ประกาศแล้ว
