@@ -19,6 +19,7 @@ import KillSwitchCard, { type KillSwitchState } from '../components/security/Kil
 import LiveEventStreamPanel from '../components/security/LiveEventStreamPanel';
 import FirstResponderCard, { type FirstResponderState } from '../components/security/FirstResponderCard';
 import RealityCard, { type RealityStats, type RealityCorrection } from '../components/security/RealityCard';
+import PosturePanel from '../components/security/PosturePanel';
 import { useLanguageStore } from '../stores/useLanguageStore';
 import { fmtLocale } from '../lib/formatDate';
 import { extractIp, fmtTime, fmtArgs, ACTION_STYLES } from '../components/security/security-ui';
@@ -417,6 +418,9 @@ export default function SecurityPage() {
           busy={busyReality}
           onCorrect={submitCorrection}
         />
+
+        {/* Security Posture — ภาพรวม 6 แหล่งจริงใน DB (อ่านไม่ได้ ≠ ปกติ) */}
+        <PosturePanel />
 
         {/* คำขออนุมัติ action (block/unblock) — จัดการที่นี่ ครบในหน้าเดียว */}
         <div className="card panel-cyan p-4 space-y-3">
