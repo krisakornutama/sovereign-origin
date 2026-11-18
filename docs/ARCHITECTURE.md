@@ -25,7 +25,7 @@
 
 | กติกา | ทำไม (เคสจริง) | ด่านที่บังคับ |
 |---|---|---|
-| **ห้ามโค้ดโปรเจ็กแตะเน็ต/พร็อกซี/ไฟร์วอลล์/autorun ระดับ OS** | ตั้ง `ProxyServer` ค้างใน `HKCU\...\Internet Settings` ทำให้เครื่องทั้งเครื่องขาดเน็ตหลังรีบูต (SEC-044) | `tools/security/host-network-guard.mjs` (0 hit) |
+| **ห้ามโค้ดโปรเจ็กต์แตะเน็ต/พร็อกซี/ไฟร์วอลล์/autorun ระดับ OS** | ตั้ง `ProxyServer` ค้างใน `HKCU\...\Internet Settings` ทำให้เครื่องทั้งเครื่องขาดเน็ตหลังรีบูต (SEC-044) | `tools/security/host-network-guard.mjs` (0 hit) |
 | **สคริปต์ host ต้องมี sha256 ใน manifest** | malware เขียน scheduled task เอง + นโยบาย Defender ถูกเขียนกลับหลังบูต (SEC-037/032) | `tools/security/host-integrity.mjs` + `tools/test/host-integrity.test.mjs` |
 | **ค่าจากผู้ใช้ห้ามถึง sink ดิบ** (HTML/CSV) | stored XSS ในรายงานสุขภาพและเกียรติบัตร · CSV formula injection (SEC-052/056/057) | `tests/health.routes.test.ts` · `tools/test/certificate-html-escape.test.mjs` · `tools/test/csv-formula-guard.test.mjs` |
 | **ไฟล์ที่ผู้ใช้วางได้ ต้องเสิร์ฟด้วย Content-Type ปลอดภัย** | เขียน `.html` ลง `uploads/` แล้วเสิร์ฟเป็น `text/html` = XSS บน origin เดียวกับ JWT (SEC-053) | `tools/test/file-serve-extension-gate.test.mjs` (ทุก `sendFile` ต้องมี allowlist นามสกุล · ห้าม `express.static`) |
