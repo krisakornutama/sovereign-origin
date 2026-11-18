@@ -149,6 +149,7 @@
     "farm-soil.service": "farm",
     "auth.service": "auth",
     "audit.service": "auth",
+    "account-posture.service": "auth",
     "ecosystem.service": "ecosystem",
     "social-history.service": "ecosystem",
     "feature-grant.service": "auth",

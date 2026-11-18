@@ -7,10 +7,23 @@ import { normalizeSingleIp } from '../../lib/ip-address';
 import { threatDetector } from '../../services/threat-detection.service';
 import { agentActions } from '../../services/agent-actions.service';
 import { hostConnections } from '../../services/host-connections.service';
+import { collectSecurityPosture } from './security-posture.service';
+import { asyncRoute } from '../../lib/async-handler';
 import { ADMIN_ROLES, SITE_WRITE_ROLES, SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 const execAsync = promisify(exec);
+
+// GET /api/security/posture — ภาพรวมความปลอดภัยจากของจริง (6 แหล่งใน DB)
+// กติกา: แต่ละแหล่งล้มแยกกันได้ → `unavailable` + เหตุผล และห้ามถูกรายงานเป็น "ปกติ"
+// overall = ok (ครบ) | degraded (บางแหล่งล้ม) | unavailable (ไม่มีแหล่งไหนอ่านได้)
+router.get(
+  '/posture',
+  authenticate,
+  asyncRoute(async (_req, res) => {
+    res.json(await collectSecurityPosture());
+  })
+);
 
 // GET /api/security/connections - ดึงการเชื่อมต่อปัจจุบัน (netstat)
 // อ่านไม่ได้ = คืน connections ว่าง + degraded: true + เหตุผล — **ห้ามคืนแถวจำลอง**
