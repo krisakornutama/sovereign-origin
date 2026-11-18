@@ -32,11 +32,12 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `audit/audit.routes.ts` (40 บรรทัด)
+- `audit/audit.routes.ts` (218 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 GET /
+GET /export
 ```
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)

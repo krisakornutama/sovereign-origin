@@ -36,7 +36,8 @@
 `audit_logs` · `feature_grants` · `nodes` · `user_feature_grants` · `users`
 
 ### Routes
-- `auth/auth.routes.ts` (255 บรรทัด)
+- `auth/auth.routes.ts` (279 บรรทัด)
+- `auth/register.routes.ts` (40 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -51,6 +52,8 @@ POST /mfa/backup-codes
 GET /mfa/status
 GET /rate-limit-status
 POST /rate-limit/clear
+POST /register/check
+POST /register
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้

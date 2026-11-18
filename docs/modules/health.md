@@ -20,7 +20,7 @@
 
 ### Routes
 - `health/health-readings.routes.ts` (99 บรรทัด)
-- `health/health.routes.ts` (505 บรรทัด)
+- `health/health.routes.ts` (584 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `lifestyle/lifestyle.routes.ts` (55 บรรทัด)
+- `lifestyle/lifestyle.routes.ts` (57 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

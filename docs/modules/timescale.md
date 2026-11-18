@@ -23,7 +23,7 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `timescale/timescale.routes.ts` (79 บรรทัด)
+- `timescale/timescale.routes.ts` (157 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

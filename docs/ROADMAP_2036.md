@@ -221,3 +221,23 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
   ยังแยก backup เก่าออกจาก store ที่ถูกล้างไม่ได้ · group key/rotation = M3 (`VAULT-006`)
 - **งานถัดไปที่ผูกไว้แล้ว**: `VAULT-005` ต่อ `saveSnapshot` เข้า `sovereign-rule-engine`,
   `VAULT-007` anchor checkpoint อัตโนมัติ (nightly)
+
+### 2026-11-18 — security batch ปิดครบ + เอกสาร/ด่านตรงกับโค้ดจริง (PLAN-001)
+
+- **สถานะจริงของสาย vault (แก้บันทึก 2026-11-10 ข้างบน)**: `VAULT-005` (snapshot → rule-engine),
+  `VAULT-006` (group key/rotation), `VAULT-007` (nightly anchor), `VAULT-008` (CHUNK >64 MiB) **ปิดแล้ว**
+  ทั้งสี่ตัว และ `ATTEST-001` (signed receipt + provenance) ปิด 2026-11-15 — 47 tests · CI `43725517456`
+- **ช่องโหว่ที่ยืนยันด้วยการยิงจริงแล้วปิด 5 ตัว (SEC-052/053/056/057/050)**:
+  stored XSS ในรายงานสุขภาพ HTML · เขียน `.html` ลง `uploads/` แล้วเสิร์ฟเป็น `text/html` ·
+  XSS ตอนพิมพ์เกียรติบัตร (popup สืบทอด origin ⇒ ขโมย JWT) · CSV formula injection ·
+  `docker-compose.prod.yml` เผยพอร์ต admin/API ออกทุก interface
+- **ด่านถาวรใหม่ 4 ตัว**: `file-serve-extension-gate` · `csv-formula-guard` ·
+  `certificate-html-escape` · `compose-publish-bind` + `host-integrity` (sha256 ของสคริปต์ host 28 ไฟล์)
+- **คุณภาพของด่านเอง**: ถอด `--test-force-exit` และให้ `verify` เก็บ log ขั้นที่พัง (`CI-005/006`)
+  ⇒ `npm run verify` 6/6 โดยไม่มี flake จาก `desktop-backend-secret`
+- **สถาปัตยกรรมที่บังคับแล้ว** (ดู `docs/ARCHITECTURE.md` §HOST-SAFE): ห้ามแตะเน็ต/พร็อกซี/autorun ระดับ OS ·
+  ค่าจากผู้ใช้ห้ามถึง sink ดิบ · ไฟล์ที่ผู้ใช้วางได้ต้องเสิร์ฟด้วย Content-Type ปลอดภัย · role จาก `src/lib/roles.ts` เท่านั้น
+- **หนี้ที่รู้ตัวและยังไม่แก้**: CSP ยังเปิด `'unsafe-inline' 'unsafe-eval'` (`SEC-055` — ต้องแยก CSP
+  สำหรับ `output: 'export'` + มีหน้าต่างทดสอบที่เจ้าของอนุมัติ) · Defender ถูกปิดโดยนโยบาย (`SEC-032/037/038`
+  — ต้อง UAC) · ความลับชุดเดิมยังไม่ rotate (`SEC-033` — ต้อง restart หลัง Cold Soak) ·
+  dangling CNAME `api.` (`SEC-051`) · backup นอกเครื่อง (`QA-002`)

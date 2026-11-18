@@ -16,7 +16,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 
 ### Routes
 - `ai/ai-chat.routes.ts` (35 บรรทัด)
-- `ai/ai.routes.ts` (707 บรรทัด)
+- `ai/ai.routes.ts` (709 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -42,7 +42,7 @@ GET /voice-history
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้
-`ai-analyst.service` · `ai-kill-switch.service` · `ai-model-manager.service` · `ai-router.service` · `AiAgentService` · `chat-memory.service` · `local-llm.service`
+`ai-analyst.service` · `ai-chat.service` · `ai-kill-switch.service` · `ai-model-manager.service` · `ai-router.service` · `AiAgentService` · `chat-memory.service` · `local-llm.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - ai → farm(farm_plots)
