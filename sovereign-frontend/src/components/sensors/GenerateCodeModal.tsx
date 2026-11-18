@@ -42,8 +42,13 @@ export default function GenerateCodeModal({ device, onClose }: { device: Device;
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="card p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
-        <h3 className="text-lg font-bold mb-4">{t('sensorsHub.modalTitle', 'Generate Arduino Code for {type}', { type: device.type })}</h3>
+      <div
+        className="card p-6 max-w-2xl w-full max-h-screen overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sensors-code-title"
+      >
+        <h3 id="sensors-code-title" className="text-lg font-bold mb-4">{t('sensorsHub.modalTitle', 'Generate Arduino Code for {type}', { type: device.type })}</h3>
         <div className="mb-4">
           <label htmlFor="wifiSSID" className="label">WiFi SSID</label>
           <input id="wifiSSID" className="input w-full" value={ssid} onChange={(e) => setSsid(e.target.value)} />
@@ -52,12 +57,18 @@ export default function GenerateCodeModal({ device, onClose }: { device: Device;
           <label htmlFor="wifiPass" className="label">WiFi Password</label>
           <input id="wifiPass" type="password" className="input w-full" value={pass} onChange={(e) => setPass(e.target.value)} />
         </div>
-        <button onClick={generate} className="px-4 py-2 btn-primary mb-4">Generate</button>
-        {error && <div className="mb-3 p-2 rounded text-xs bg-red-900/30 text-red-400">{error}</div>}
+        <button onClick={generate} className="px-4 py-2 btn-primary mb-4">
+          {t('sensorsHub.generateNow', 'สร้างโค้ด')}
+        </button>
+        {error && (
+          <div role="alert" className="mb-3 p-2 rounded text-xs bg-red-900/30 text-red-400">{error}</div>
+        )}
         {code && (
           <textarea readOnly className="w-full h-64 bg-gray-800 text-emerald-400 text-xs p-2 rounded" value={code} />
         )}
-        <button onClick={onClose} className="mt-4 px-4 py-2 btn-secondary rounded">Close</button>
+        <button onClick={onClose} className="mt-4 px-4 py-2 btn-secondary rounded">
+          {t('common.close', 'ปิด')}
+        </button>
       </div>
     </div>
   );

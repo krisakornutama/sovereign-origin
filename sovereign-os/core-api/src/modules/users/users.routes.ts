@@ -7,6 +7,7 @@ import { AuditService } from '../../services/audit.service';
 import { getFleetSiteById } from '../../services/fleet-persistence.service';
 import { disconnectUserSockets } from '../../realtime/io-registry';
 import { createInvite } from '../../services/invite.service';
+import { ASSIGNABLE_ROLES, SUPERADMIN_ONLY } from '../../lib/roles';
 
 // ────────────────────────────────────────────────────────────────────────────
 // User Management (SUPERADMIN) — ย้ายมาจาก inline routes ใน server.ts
@@ -15,10 +16,9 @@ const router = Router();
 
 // role ที่ระบบรองรับ — ที่เดียว (POST และ PUT ต้องตรวจชุดเดียวกัน ไม่งั้นสร้างบัญชี
 // ด้วย role ที่ระบบไม่รู้จักได้ แล้ว middleware จะปิดประตูทุกบานให้ user คนนั้น)
-const VALID_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR', 'SYSTEM_AI', 'SITE_ADMIN'];
 const MAX_USERNAME_LENGTH = 64;
 
-router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.get('/', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, username: true, role: true, assigned_node_id: true, assigned_site_id: true, must_change_password: true, mfa_secret: true },
@@ -38,7 +38,7 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
 // ไม่ส่ง error ออกจาก async handler ⇒ อะไรที่ throw จะกลายเป็น request ที่ **ค้าง**
 // ไม่ใช่ 500 (เจอจริง: ไม่ส่ง password → bcrypt.hash(undefined) throw = admin รอไม่จบ;
 // username ซ้ำ → Prisma P2002 = ค้างเช่นกัน)
-router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const body = req.body ?? {};
     const username = typeof body.username === 'string' ? body.username.trim() : '';
@@ -51,7 +51,7 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
     if (username.length > MAX_USERNAME_LENGTH) {
       return res.status(400).json({ error: `ชื่อผู้ใช้ยาวเกินไป (สูงสุด ${MAX_USERNAME_LENGTH} ตัวอักษร)` });
     }
-    if (!VALID_ROLES.includes(role)) {
+    if (!ASSIGNABLE_ROLES.includes(role)) {
       return res.status(400).json({ error: 'สิทธิ์ (role) ไม่ถูกต้อง' });
     }
     try {
@@ -87,7 +87,7 @@ router.post('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
 // ต้องกันสามเรื่องก่อนลบจริง ไม่งั้นระบบไม่มีผู้ดูแลเหลือและกู้ได้ด้วย DB console เท่านั้น:
 //   1) ลบตัวเอง            2) ลบ SUPERADMIN คนสุดท้าย            3) FK ที่ยังผูกข้อมูลอยู่
 // UI ปิดปุ่มของแถวตัวเองไว้แล้ว แต่ API ต้องกันเอง (ปุ่มเป็นแค่ความสะดวก ไม่ใช่ด่าน)
-router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   const targetId = req.params.id;
   if (targetId === req.user!.id) {
     return res.status(400).json({ error: 'ลบบัญชีของตัวเองไม่ได้ — ให้ผู้ดูแลคนอื่นเป็นผู้ลบ' });
@@ -122,7 +122,7 @@ router.delete('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) 
 // POST /api/users/:id/reset-password — กู้ลืมรหัส / สงสัยรั่ว (SUPERADMIN)
 // server สุ่มรหัสชั่วคราวให้ (admin ไม่ตั้งเอง → ไม่รู้รหัสจริงของ user) + บังคับเปลี่ยนตอน login ครั้งหน้า
 // + bump token_version → token เดิมทุกอุปกรณ์ตายทันที และลง audit log ทุกครั้ง
-router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/:id/reset-password', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { temporaryPassword, targetUsername } = await AuthService.adminResetPassword(req.params.id);
     await AuditService.logAction({
@@ -142,7 +142,7 @@ router.post('/:id/reset-password', authenticate, requireRole('SUPERADMIN'), asyn
 // POST /api/users/:id/reset-mfa — กู้สมาชิกที่โทรศัพท์ (authenticator) หาย (SUPERADMIN)
 // รีเซ็ต 2FA = ลดความแข็งแรงของบัญชี ⇒ audit ทุกครั้ง + token เดิมตายทั้งหมด (bump token_version)
 // บัญชีตัวเองต้องใช้หน้า Settings (บังคับยืนยันรหัสผ่าน) — endpoint นี้ไม่ให้ข้ามขั้นนั้น
-router.post('/:id/reset-mfa', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/:id/reset-mfa', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   if (req.params.id === req.user!.id) {
     return res.status(400).json({ error: 'รีเซ็ต 2FA ของตัวเองผ่านหน้านี้ไม่ได้ — ใช้หน้าตั้งค่าที่ต้องยืนยันรหัสผ่าน' });
   }
@@ -161,10 +161,10 @@ router.post('/:id/reset-mfa', authenticate, requireRole('SUPERADMIN'), async (re
     return res.status(500).json({ error: 'Reset MFA failed' });
   }
 });
-router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { role, assigned_node_id, assigned_site_id, must_change_password } = req.body;
-    if (role !== undefined && !VALID_ROLES.includes(role)) {
+    if (role !== undefined && !ASSIGNABLE_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
     const targetId = req.params.id;
@@ -227,7 +227,7 @@ router.put('/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => 
 
 // ── รหัสเชิญสมัครสมาชิก (self-hosted) ──────────────────────────────────────
 // SUPERADMIN เท่านั้น: สร้าง/ดู/เพิกถอน — plaintext ของรหัสเห็นครั้งเดียวตอนสร้าง
-router.get('/invites', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.get('/invites', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const invites = await prisma.inviteCode.findMany({
       orderBy: { created_at: 'desc' },
@@ -244,7 +244,7 @@ router.get('/invites', authenticate, requireRole('SUPERADMIN'), async (_req, res
   }
 });
 
-router.post('/invites', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/invites', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { role, label, maxUses, expiresInHours } = req.body ?? {};
     const invite = await createInvite({ role, label, maxUses, expiresInHours, createdBy: req.user!.id });
@@ -259,7 +259,7 @@ router.post('/invites', authenticate, requireRole('SUPERADMIN'), async (req, res
   }
 });
 
-router.delete('/invites/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.delete('/invites/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     await prisma.inviteCode.update({ where: { id: req.params.id }, data: { revoked_at: new Date() } });
     await AuditService.logAction({

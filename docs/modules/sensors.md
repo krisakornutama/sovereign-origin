@@ -26,8 +26,8 @@
 `sensor_telemetry`
 
 ### Routes
-- `sensors/sensor-data.routes.ts` (108 บรรทัด)
-- `sensors/sensor.routes.ts` (128 บรรทัด)
+- `sensors/sensor-data.routes.ts` (133 บรรทัด)
+- `sensors/sensor.routes.ts` (233 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -41,6 +41,9 @@ POST /devices
 DELETE /devices/:id
 POST /generate-code
 ```
+
+### Services ที่ทำงานให้โมดูลนี้
+`telemetry-buffer.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - sensors → devices(devices)

@@ -1,11 +1,12 @@
 import { Router, raw } from 'express';
 import fs from 'fs';
 import path from 'path';
-import mqtt from 'mqtt';
+import { createMqttClient } from '../../lib/mqtt-client';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { checkDeployBaseUrl, isDownloadAllowed, parseAllowQueryToken, resolveDownloadToken } from './ota.access';
 import { legacyClientReport, recordLegacyTokenUse } from './ota.legacy';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 export { prisma };
 
@@ -20,17 +21,9 @@ const OTA_BASE_URL = process.env.OTA_BASE_URL || 'http://localhost:3001';
 // ถ้าตั้ง OTA_TOKEN → endpoint download ต้องส่ง ?token= มาตรงกัน (กันคนนอกดาวน์โหลด)
 const OTA_TOKEN = process.env.OTA_TOKEN || '';
 
-export const mqttClient = mqtt.connect({
-  host: process.env.MQTT_HOST || 'localhost',
-  port: Number(process.env.MQTT_PORT) || 1883,
-  protocol: 'mqtt',
-});
-mqttClient.on('connect', () => console.log('🚀 OTA MQTT connected'));
-// ต้องมี listener 'error' เสมอ: mqtt client เชื่อมต่อตอน module load (localhost:1883) —
-// ถ้า broker ไม่พร้อมแล้ว error event ไม่มีใครรับ = uncaught exception ล้มทั้ง process
-// (เคยทำให้ test runner ล้มทั้งไฟล์ด้วย "Unable to deserialize cloned data" แบบสุ่ม)
-// client ยัง reconnect เองตามปกติ — เราแค่ไม่ให้ error พุ่งทะลุ
-mqttClient.on('error', (err) => console.error('OTA MQTT error:', err instanceof Error ? err.message : err));
+// client กลาง: ปิดได้ด้วย MQTT_DISABLED=1 (ชุดเทสต์) — export ไว้ให้เทสต์ mock `publish` ได้เหมือนเดิม
+export const mqttClient = createMqttClient('OTA');
+// listener 'error' ถูกผูกใน createMqttClient แล้ว (กัน uncaught exception เมื่อไม่มี broker)
 
 function isSafeFileName(name: string): boolean {
   return !!name && path.basename(name) === name && name.endsWith('.bin') && !name.includes('..') && !name.includes('/') && !name.includes('\\');
@@ -58,7 +51,7 @@ router.get('/firmwares', authenticate, (req, res) => {
 router.post(
   '/firmwares',
   authenticate,
-  requireRole('SUPERADMIN'),
+  requireRole(...SUPERADMIN_ONLY),
   raw({ type: ['application/octet-stream', 'application/x-msdownload', 'application/zip', '*/*'], limit: '16mb' }),
   (req, res) => {
     try {
@@ -128,7 +121,7 @@ router.get('/firmwares/:file', (req, res) => {
 });
 
 // DELETE /api/ota/firmwares/:file (SUPERADMIN)
-router.delete('/firmwares/:file', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.delete('/firmwares/:file', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const file = req.params.file;
   if (!isSafeFileName(file)) return res.status(400).json({ error: 'Invalid file name' });
   const filePath = path.join(OTA_DIR, file);
@@ -138,7 +131,7 @@ router.delete('/firmwares/:file', authenticate, requireRole('SUPERADMIN'), (req,
 });
 
 // POST /api/ota/deploy { nodeId, file } – สั่ง ESP ผ่าน MQTT ให้ OTA (SUPERADMIN)
-router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/deploy', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const { nodeId, file } = req.body || {};
     if (!nodeId || typeof nodeId !== 'string') return res.status(400).json({ error: 'nodeId required' });
@@ -183,13 +176,13 @@ router.post('/deploy', authenticate, requireRole('SUPERADMIN'), async (req, res)
 
 // GET /api/ota/legacy-clients — ใครยังดาวน์โหลดด้วย ?token= (ใช้ตัดสินใจปิดสวิตช์)
 // ตัวเลขนี้บอก "ถึงเวลาเลิกใช้ query token หรือยัง" — ไม่คืนค่า token ใด ๆ
-router.get('/legacy-clients', authenticate, requireRole('SUPERADMIN'), (_req, res) => {
+router.get('/legacy-clients', authenticate, requireRole(...SUPERADMIN_ONLY), (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(legacyClientReport());
 });
 
 // GET /api/ota/events?limit=50 – ประวัติ OTA ทั้งหมด (คำสั่ง + ผลจากอุปกรณ์)
-router.get('/events', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/events', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const events = await prisma.otaEvent.findMany({

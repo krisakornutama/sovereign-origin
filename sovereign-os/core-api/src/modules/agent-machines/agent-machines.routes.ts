@@ -97,6 +97,7 @@ import {
   machineScopeFor,
 } from './agent-machines.shared';
 import updatesRouter from './agent-machines-updates.routes';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 // ── ฝั่งผู้ใช้ (JWT) ──
@@ -139,7 +140,7 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /api/agent-machines/register — สร้างเครื่อง + คืน token ครั้งเดียว
-router.post('/register', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/register', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const { name, os, capabilities, executors, note, version } = req.body || {};
     const out = await registerMachine({ name, os, capabilities, executors, note, version });
@@ -153,7 +154,7 @@ router.post('/register', authenticate, requireRole('SUPERADMIN'), async (req: Re
 });
 
 // POST /api/agent-machines/:id/status — เปิด/ปิดเครื่อง (SUPERADMIN)
-router.post('/:id/status', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/status', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const status = String(req.body?.status ?? '');
     if (!['online', 'offline', 'disabled'].includes(status)) {
@@ -169,7 +170,7 @@ router.post('/:id/status', authenticate, requireRole('SUPERADMIN'), async (req: 
 
 // POST /api/agent-machines/jobs — สั่งงานให้เครื่องที่ระบุ
 // งานเสี่ยงจะถูกพักสถานะ awaiting_approval และส่งปุ่ม ✅/🚫 ไป Telegram
-router.post('/jobs', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/jobs', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
     const job = await enqueueRemoteJob(body);
@@ -239,7 +240,7 @@ router.get('/call-status', authenticate, async (_req: Request, res: Response) =>
 
 // PUT /api/agent-machines/call-phone { phone } — ตั้งเบอร์ที่ระบบโทรจะใช้ (SUPERADMIN)
 // validate E.164 ตอนบันทึก (service) ไม่ใช่ตอนโทร — ผิดที่ตั้งครั้งเดียว ไม่ต้องรอวันโทรจริง
-router.put('/call-phone', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.put('/call-phone', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const phone = await setAlertPhone(req.body?.phone);
     res.json({ ok: true, hasPhone: true, phoneMasked: maskPhone(phone) });
@@ -252,7 +253,7 @@ router.put('/call-phone', authenticate, requireRole('SUPERADMIN'), async (req: R
 });
 
 // DELETE /api/agent-machines/call-phone — ลบเบอร์ กลับไปใช้ค่าจาก env (SUPERADMIN)
-router.delete('/call-phone', authenticate, requireRole('SUPERADMIN'), async (_req: Request, res: Response) => {
+router.delete('/call-phone', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req: Request, res: Response) => {
   try {
     await clearAlertPhone();
     const phone = await getAlertPhone();
@@ -267,7 +268,7 @@ router.delete('/call-phone', authenticate, requireRole('SUPERADMIN'), async (_re
 // ปิดช่องสุดท้ายของ "เปิดสวิตช์โทรแล้วกดทดสอบแต่ไม่มีอะไรเกิดขึ้น":
 // เดิมไม่มีที่กรอกเบอร์ ไม่มี endpoint ทดสอบ ⇒ ผู้ใช้ไม่มีทางรู้ว่าระบบโทรใช้ได้จริงหรือยัง
 // ไม่ throw เด็ดขาด: provider ปิด/ไม่มี key = skipped ตั้งใจ ไม่ใช่ error ให้ UI ตกใจ
-router.post('/call-test', authenticate, requireRole('SUPERADMIN'), async (_req: Request, res: Response) => {
+router.post('/call-test', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req: Request, res: Response) => {
   try {
     const phone = await getAlertPhone();
     if (!phone) {
@@ -312,7 +313,7 @@ router.get('/screenshots/:file', authenticate, async (req: Request, res: Respons
 });
 
 // POST /api/agent-machines/queue/:id/cancel
-router.post('/queue/:id/cancel', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/queue/:id/cancel', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const out = await cancelJob(req.params.id, String(req.body?.actor ?? '') || undefined);
     if (!out.ok) return res.status(409).json({ error: out.reason || 'cancel failed' });
@@ -341,11 +342,11 @@ const decide = (decideFn: (jobId: string, actor?: string) => Promise<{ ok: boole
     }
   };
 
-router.post('/queue/:id/approve', authenticate, requireRole('SUPERADMIN'), decide(approveJob, 'approve'));
-router.post('/queue/:id/reject', authenticate, requireRole('SUPERADMIN'), decide(rejectJob, 'reject'));
+router.post('/queue/:id/approve', authenticate, requireRole(...SUPERADMIN_ONLY), decide(approveJob, 'approve'));
+router.post('/queue/:id/reject', authenticate, requireRole(...SUPERADMIN_ONLY), decide(rejectJob, 'reject'));
 
 // POST /api/agent-machines/queue/:id/repeat — ทำซ้ำงานเดิมลงคิวใหม่
-router.post('/queue/:id/repeat', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/queue/:id/repeat', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const out = await repeatJob(req.params.id);
     if (!out.ok) return res.status(404).json({ error: out.reason || 'repeat failed' });
@@ -568,7 +569,7 @@ router.post(
 // ═════════════════════════════════════════════════════════════
 
 /** เครื่องที่ผู้เรียก (SUPERADMIN) คุมได้จริง พร้อมฟิลด์สิทธิ์ */
-router.get('/mine', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.get('/mine', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const machines = await listMachinesForUser(req.user!.id);
     res.json({
@@ -585,7 +586,7 @@ router.get('/mine', authenticate, requireRole('SUPERADMIN'), async (req: Request
 });
 
 /** ผูกเครื่องไว้ใต้ผู้เรียก (ทำซ้ำได้) — ข้อ 2: หลายคนผูกเครื่องเดียวกันได้ */
-router.post('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/link', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     await linkMachineToUser(req.params.id, req.user!.id);
     res.json({ ok: true, linked: req.user!.id });
@@ -596,7 +597,7 @@ router.post('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Re
 });
 
 /** ถอดเครื่องออกจากผู้เรียก (คนอื่นที่ผูกไว้ยังคุมได้อยู่) */
-router.delete('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id/link', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const removed = await unlinkMachineFromUser(req.params.id, req.user!.id);
     res.json({ ok: true, removed });
@@ -607,7 +608,7 @@ router.delete('/:id/link', authenticate, requireRole('SUPERADMIN'), async (req: 
 });
 
 /** ตั้งบทบาทของเครื่อง: HUB = คุมเครื่องอื่นได้ · USER = รับคำสั่ง + สั่งงาน AI ได้ */
-router.put('/:id/role', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.put('/:id/role', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const role = String((req.body as { role?: unknown })?.role ?? '');
     const machine = await setMachineRole(req.params.id, role);
@@ -623,7 +624,7 @@ router.put('/:id/role', authenticate, requireRole('SUPERADMIN'), async (req: Req
  * ไปแสดงบนหน้าจอเครื่องนั้น ให้เจ้าของเครื่องพิมพ์กลับมา
  * ยัง "คุมไม่ได้" จนกว่าจะยืนยันเสร็จ
  */
-router.post('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/pair', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const { code, machine } = await requestPairing(req.params.id, req.user!.id);
     res.json({ ok: true, code, machine, lanVerified: machine.lanVerified });
@@ -634,7 +635,7 @@ router.post('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Re
 });
 
 /** ถอนการยืนยัน LAN (กดผิดไป) — คุมไม่ได้ทันที */
-router.delete('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.delete('/:id/pair', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     await revokeLanPairing(req.params.id);
     res.json({ ok: true });
@@ -648,7 +649,7 @@ router.delete('/:id/pair', authenticate, requireRole('SUPERADMIN'), async (req: 
  * ข้อ 3 รอบที่ 2: เครื่องเป้าหมายยืนยันด้วยรหัส
  * ยืนยันได้เฉพาะผู้ที่ผูกเครื่องนี้ไว้ (ไม่ใช่ SUPERADMIN คนไหนก็ได้)
  */
-router.post('/:id/pair/confirm', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/:id/pair/confirm', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const allowed = await userCanControl(req.user!.id, req.params.id);
     const linked = await listUserIdsForMachine(req.params.id);

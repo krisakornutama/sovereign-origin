@@ -5,9 +5,9 @@ import {
   buildAutonomyOverview, getSettings, saveSettings,
   type SelfRelianceSettings,
 } from '../../services/selfreliance.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 // GET /api/selfreliance/overview — วันรอดทุกทรัพยากร + จุดอ่อนของบ้าน
 router.get('/overview', authenticate, async (req, res) => {

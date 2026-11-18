@@ -31,7 +31,7 @@ core-api/data/fleet/enrollment-tokens.json
 | `src/services/fleet-enrollment.service.ts` | รหัสเชิญแบบ hash + expiry/โควตา + use log + เพิกถอน |
 | `src/services/fleet-overview.service.ts` | ประกอบภาพรวมสำหรับหน้า `/fleet` จาก DB + agent machines |
 | `src/services/fleet-store.service.ts` | legacy JSON atomic store — ใช้โดย tests/backfill |
-| `src/modules/fleet/fleet.routes.ts` | API `/api/fleet/*` — SUPERADMIN เท่านั้น |
+| `src/modules/fleet/fleet.routes.ts` | API `/api/fleet/*` — SUPERADMIN เท่านั้น · ⚠️ 2026-11-05 ย้ายไป private repo แล้ว (ไม่มีไฟล์นี้ในเรโพ) |
 | `scripts/fleet-backfill.mjs` | backfill JSON → DB (idempotent, dry-run เป็นค่าเริ่มต้น) |
 | `sovereign-frontend/src/pages/fleet.tsx` | หน้า Fleet Console |
 | `sovereign-frontend/src/components/fleet/*` | แผงนโยบาย/รหัสเชิญ/ตารางเครื่อง |
@@ -409,25 +409,7 @@ node tools\agent-pack\pack-machine.mjs --name="เครื่องที่-4"
 ### ตารางที่เป็นเจ้าของ
 `fleet_channels` · `fleet_enrollment_tokens` · `fleet_enrollment_uses` · `fleet_groups` · `fleet_machine_overrides` · `fleet_rollouts` · `fleet_settings` · `fleet_sites`
 
-### Routes
-- `fleet/fleet.routes.ts` (248 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /overview
-GET /policy
-PUT /policy
-GET /sites
-GET /groups
-GET /audit
-GET /enroll-tokens
-POST /enroll-tokens
-POST /enroll-tokens/:id/revoke
-PUT /machines/:id
-POST /machines/:id/rotate-token
-```
-
 ### Services ที่ทำงานให้โมดูลนี้
-`fleet-enrollment.service` · `fleet-overview.service` · `fleet-persistence.service` · `fleet-policy.service`
+`fleet-enrollment.service` · `fleet-persistence.service` · `fleet-policy.service`
 
 <!-- auto:end -->

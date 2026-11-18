@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'] as const;
 
 const VALID_MODES = ['flood', 'blackout', 'security'] as const;
 type CrisisModeKey = (typeof VALID_MODES)[number];

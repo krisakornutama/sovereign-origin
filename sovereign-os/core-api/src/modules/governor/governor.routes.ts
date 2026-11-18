@@ -14,6 +14,7 @@ import {
   governorStatus, setDirection, setAutonomy, setEnabled, setFocusScenario,
   runGovernorCycle, approveProposal, rejectProposal,
 } from '../../services/governor.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -21,24 +22,24 @@ router.get('/status', authenticate, (_req, res) => {
   res.json(governorStatus());
 });
 
-router.put('/direction', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/direction', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = setDirection(req.body?.direction);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(governorStatus());
 });
 
-router.put('/autonomy', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/autonomy', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = setAutonomy(req.body?.autonomy);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(governorStatus());
 });
 
-router.put('/enabled', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/enabled', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = setEnabled(!!req.body?.enabled);
   res.json(governorStatus());
 });
 
-router.put('/focus', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/focus', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = setFocusScenario(req.body?.scenarioId ?? null);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(governorStatus());
@@ -50,13 +51,13 @@ router.post('/cycle', authenticate, asyncRoute(async (_req, res) => {
   res.json(governorStatus());
 }));
 
-router.post('/proposals/:id/approve', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.post('/proposals/:id/approve', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = approveProposal(req.params.id);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(governorStatus());
 });
 
-router.post('/proposals/:id/reject', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.post('/proposals/:id/reject', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = rejectProposal(req.params.id, 'human', req.body?.reason);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(governorStatus());

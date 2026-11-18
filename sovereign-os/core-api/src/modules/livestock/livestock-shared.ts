@@ -3,8 +3,11 @@
 // ของ Sovereign Livestock Engine (แยกมาจาก livestock.routes.ts เดิม)
 // ═════════════════════════════════════════════════════════════
 import { sendTelegramAlert } from '../../services/telegram-alert.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
-export const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
+// คง export เดิมไว้เพื่อความเข้ากันได้ แต่ค่าจริงมาจาก src/lib/roles (ที่เดียว)
+export { WRITE_ROLES };
+
 export const DAY_MS = 86_400_000;
 // ระยะกักกันอัตโนมัติ (วัน) — นับจากวันที่เข้ากักกัน → cron ปลดเอง
 export const QUARANTINE_DAYS = parseInt(process.env.LIVESTOCK_QUARANTINE_DAYS || '14', 10);

@@ -29,7 +29,7 @@
 `product_lots` · `trace_events`
 
 ### Routes
-- `trace/trace.routes.ts` (118 บรรทัด)
+- `trace/trace.routes.ts` (119 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

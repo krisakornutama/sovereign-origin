@@ -34,6 +34,7 @@ import {
   submitFrame,
   submitResult,
 } from '../../services/machine-control.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -198,7 +199,7 @@ router.post('/result', requireMachineToken, async (req: Request, res: Response) 
 
 // GET /api/machine-control/state — สถานะช่องของทุกเครื่อง
 // เหลือได้เฉพาะช่องของเครื่องที่ "ผู้ใช้คนนี้คุมได้" — SUPERADMIN คนหนึ่งไม่เห็นช่องของคนอื่น
-router.get('/state', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.get('/state', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const channels = await controlStateForUser(req.user!.id, controlState());
     res.json({ channels });
@@ -211,7 +212,7 @@ router.get('/state', authenticate, requireRole('SUPERADMIN'), async (req: Reques
 // GET /api/machine-control/frame/:machineId — ภาพล่าสุดเป็น binary
 // ใช้ตอนผู้ใช้เพิ่งเปิดหน้า (ยังไม่ได้รับเฟรมจาก socket) — ได้ภาพทันทีไม่ต้องรอรอบถัดไป
 // ด่านชั้นที่ 2: ดูจอเครื่องอื่น = ขั้นสูงสุด ต้องผ่านการยืนยัน LAN เหมือนกัน
-router.get('/frame/:machineId', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.get('/frame/:machineId', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const machineId = String(req.params.machineId);
     if (!(await userCanControl(req.user!.id, machineId))) {
@@ -241,7 +242,7 @@ router.get('/frame/:machineId', authenticate, requireRole('SUPERADMIN'), async (
 //   ชั้น 1 (เดิม) = คนที่ล็อกอินต้องเป็น SUPERADMIN
 //   ชั้น 2 (ใหม่) = เครื่องเป้าหมายต้อง "อยู่ใต้ผู้ใช้คนนี้" และ "ยืนยัน LAN แล้ว"
 //   ⇒ SUPERADMIN คนหนึ่งคุมได้เฉพาะเครื่องที่เขาผูกไว้ ไม่ใช่ทุกเครื่องในระบบ
-router.post('/command', authenticate, requireRole('SUPERADMIN'), async (req: Request, res: Response) => {
+router.post('/command', authenticate, requireRole(...SUPERADMIN_ONLY), async (req: Request, res: Response) => {
   try {
     const body = (req.body || {}) as {
       machineId?: unknown;

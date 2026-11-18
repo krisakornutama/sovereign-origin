@@ -9,6 +9,7 @@ import PageHeader from '../ui/PageHeader';
 import StatCard from '../ui/StatCard';
 import EmptyState from '../ui/EmptyState';
 import { useLanguageStore } from '../../stores/useLanguageStore';
+import { useCanWriteModules } from '../../lib/roles';
 import { fmtLocale } from '../../lib/formatDate';
 import { useTelemetryDelete } from '../../lib/sensors/use-telemetry-delete';
 import { METRIC_OPTIONS, METRIC_LABEL } from '../../lib/sensors/metrics';
@@ -29,6 +30,7 @@ interface SensorRecord {
 export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Tab }) {
   const { user, isAuthenticated, token, isHydrated } = useAuthStore();
   const t = useLanguageStore((s) => s.t);
+  const canWrite = useCanWriteModules(); // SEC-047: ตรงกับ role gate ของ backend
   const [tab, setTab] = useState<Tab>(initialTab);
 
   // รองรับ /sensors?tab=data — ลิงก์จาก Dashboard เข้ามาที่แท็บข้อมูลเซ็นเซอร์
@@ -155,6 +157,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
   };
 
   const setDeviceLocation = async (device: Device) => {
+    if (!canWrite) return setMessage(t('sensorsHub.readOnlyNotice', 'บัญชีนี้อ่านอย่างเดียว — แก้พิกัด/ลบอุปกรณ์ได้เฉพาะ SUPERADMIN / NODE_ADMIN / OPERATOR'));
     const current = device.latitude != null && device.longitude != null
       ? `${device.latitude}, ${device.longitude}`
       : '';
@@ -283,6 +286,7 @@ export default function SensorsHub({ initialTab = 'devices' }: { initialTab?: Ta
                     onGenerate={setSelectedDevice}
                     onLocation={setDeviceLocation}
                     onDelete={deleteDevice}
+                    canWrite={canWrite}
                   />
                 ))}
                 {devices.length === 0 && !devicesDegraded && <div className="card"><EmptyState icon={<Icon name="sensors" size={20} />} title={t('sensorsHub.noDevices', 'ยังไม่มีอุปกรณ์')} description={t('sensorsHub.noDevicesDesc', 'เพิ่มอุปกรณ์แรกของคุณ')} /></div>}

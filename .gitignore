@@ -12,6 +12,7 @@ node_modules/
 # (ทางแก้ครั้งนั้นคือ filter-repo; กลับมาอีก = เจ็บกว่าเดิมหลายเท่า — ต้องกันตั้งแต่ commit เดียว)
 .next/
 .next-verify/
+.next-prev-*/
 .next.broken-*/
 out/
 dist/
@@ -122,6 +123,17 @@ tools/*
 #   แต่ไม่เคยถูก track → clone ใหม่จะไม่มี แล้วเทสต์/เครื่องมือที่แก้ .cmd จะรันไม่ได้
 !tools/batch-codepage.mjs
 !tools/safe-remove.mjs
+!tools/host-smoke.mjs
+# ตัวตรวจ "ไม่มี chunk 404" หลังสลับ build (UX-006) — เทสต์อ้างถึง ต้อง track
+!tools/promote-web.mjs
+# ด่านในเครื่องเทียบเท่า CI ก่อน push (CI-002) — เทสต์อ้างถึง ต้อง track
+!tools/preflight.mjs
+# ตราประทับ build สำหรับคอนเทนเนอร์ที่ไม่มี .git (CI-003)
+!tools/write-build-info.mjs
+# deploy wrapper: เขียน stamp + restart + ยืนยัน health ตรง HEAD (CI-003)
+!tools/deploy-core-api.mjs
+# ด่านเทียบ health.build.commit กับ HEAD — prod ค้างรุ่นเก่า (CI-004)
+!tools/prod-build-check.mjs
 !tools/verify.mjs
 !tools/verify-plan.mjs
 !tools/runtime-layers.mjs
@@ -130,6 +142,8 @@ tools/*
 # helper เขียน JSON + sidecar .sha256 (verify/nightly/ops-status อ้าง) — ต้อง track ด้วยเหตุผลเดียวกับ verify.mjs
 !tools/json-checksum.mjs
 !tools/verify-truth.mjs
+# เขียน log ของขั้นที่พังใน verify — ต้อง track เพราะ verify.mjs เรียกใช้ (ด่าน tool-files-tracked บังคับ)
+!tools/verify-fail-log.mjs
 !tools/publish-portfolio.mjs
 !tools/indexnow-notify.mjs
 !tools/indexnow-shop-notify.mjs

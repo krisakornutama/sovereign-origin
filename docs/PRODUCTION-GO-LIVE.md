@@ -39,18 +39,36 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\backup-db.ps1 -Keep 14
 # 2) ตรวจว่าโค้ดผ่านด่าน
 cd sovereign-os/core-api && npx tsc --noEmit && npm test
 
-# 3) migrate + build + restart
+# 3) migrate + build + restart (ผ่าน wrapper — เขียน build-info ให้เองก่อน restart)
 npx prisma migrate deploy && npm run build
-docker restart sovereign-core-api
+cd "E:/My work/Project Sovereign Origin"
+node tools/deploy-core-api.mjs        # = write-build-info.mjs → docker restart sovereign-core-api → รอ health
 
 # 4) ยืนยันสุขภาพจริง (ไม่ใช่แค่ container ขึ้น)
 curl -s http://localhost:3001/api/health      # ต้อง 200 + migrationHead ตรงรุ่นล่าสุด
+#   + build.commit ต้องตรงกับ `git rev-parse --short=12 HEAD` และ build.builtAt เป็นเวลารอบนี้
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/   # 200
 
 # 5) smoke เส้นสำคัญ: login → /machine-console → /ecosystem → งาน runner 1 งาน
 ```
 
 กฎเหล็ก: **ไม่มี backup = ไม่ deploy** · **health ไม่ขึ้น = ย้อนรุ่นทันที ไม่ไล่แก้บน production**
+
+### 3.1) ตราประทับ build — กัน "prod รัน build เก่าโดยไม่มีใครรู้"
+
+คอนเทนเนอร์ `sovereign-core-api` เมานต์แค่ `core-api/src` + `core-api/data` (**ไม่มี `.git`**) ⇒ โปรเซสในคอนเทนเนอร์ตอบ commit เองไม่ได้ `/api/health` จึงอ่าน `core-api/data/build-info.json` (ไฟล์ generated, gitignore)
+
+```bash
+node tools/write-build-info.mjs --check   # exit 1 + บอกว่า stamp เก่ากว่า HEAD
+node tools/deploy-core-api.mjs            # ทางที่ควรใช้: เขียน stamp → restart → รอ health ตรง HEAD
+node tools/deploy-core-api.mjs --dry-run  # เขียน stamp + พิมพ์คำสั่ง แต่ไม่ restart
+```
+
+- `deploy-core-api.mjs` **ไม่ปล่อยให้ลืม** — เขียน stamp จาก `git rev-parse HEAD` ให้ทุกครั้งก่อน `docker restart` แล้ววนเช็ค `/api/health` (ค่าเริ่มต้น 180 วิ) จน `build.commit` ตรง HEAD; ไม่ตรง = **exit 1** พร้อมบอกค่าล่าสุดที่เห็น
+- ถ้ารัน `docker restart` เองโดยไม่ผ่าน wrapper: health จะรายงาน commit เก่า (หรือ `null`) **โดยไม่มี error** — เช็คด้วย `node tools/write-build-info.mjs --check` และเทียบ `build.commit` กับ `git rev-parse --short=12 HEAD`
+- `build.builtAt` = mtime ใหม่สุดของไฟล์ในโฟลเดอร์ที่โปรเซสโหลด (`dist`) ไม่ใช่ mtime ของ directory (tsc เขียนทับไฟล์เดิม ⇒ mtime โฟลเดอร์ไม่ขยับบน NTFS)
+- **ด่านกันลืม (อัตโนมัติ)**: `node tools/prod-build-check.mjs` เทียบ `health.build.commit` กับ HEAD — exit 1 พร้อมบอก commit ที่ prod รัน vs HEAD + เวลา build; โหมด `--warn` = เตือนอย่างเดียว (exit 0) ใช้ใน `node tools/preflight.mjs` (ขั้น `prod-build`) และ `tools/host-smoke.mjs` (ข้อเตือน `Prod build` — ไม่บล็อกเพื่อไม่ให้ขัดช่วง merge→restart) · ใช้ `--strict-prod` กับ preflight เมื่อต้องการให้ล้มจริง (เช่นใน CI/host automation)
+- **rollback**: `docker restart` กลับ build เดิมแล้วรัน `write-build-info.mjs` ซ้ำ (ให้ stamp ตรงกับรุ่นที่รันจริง) — อย่าปล่อย stamp ค้างที่รุ่นที่ถูกถอยออกไป
 
 ## 4) ความปลอดภัยขั้นต่ำก่อนเปิดให้คนนอก
 

@@ -27,7 +27,7 @@ _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
 - `agent-machines/agent-machines-updates.routes.ts` (228 บรรทัด)
-- `agent-machines/agent-machines.routes.ts` (646 บรรทัด)
+- `agent-machines/agent-machines.routes.ts` (676 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

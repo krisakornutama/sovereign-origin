@@ -5,6 +5,7 @@
 import { Router, type RequestHandler } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { dmsService, type DmsService } from '../../services/dms.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 // POST /ping — heartbeat จากอุปกรณ์ DMS (public, ตรวจ HMAC แทน Bearer)
 // Headers: X-DMS-Device, X-DMS-Timestamp (unix วินาที), X-DMS-Signature (hex hmac_sha256)
@@ -38,7 +39,7 @@ function statusHandler(service: DmsService): RequestHandler {
 export function createDmsRouter(service: DmsService): Router {
   const router = Router();
   router.post('/ping', pingHandler(service));
-  router.get('/status', authenticate, requireRole('SUPERADMIN'), statusHandler(service));
+  router.get('/status', authenticate, requireRole(...SUPERADMIN_ONLY), statusHandler(service));
   return router;
 }
 

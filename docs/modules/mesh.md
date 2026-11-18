@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `mesh/mesh.routes.ts` (35 บรรทัด)
+- `mesh/mesh.routes.ts` (37 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

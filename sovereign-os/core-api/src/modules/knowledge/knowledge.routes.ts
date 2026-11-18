@@ -367,6 +367,12 @@ router.post('/upload', authenticate, uploadLimiter, handledUpload(upload, 'file'
 });
 
 // GET /api/knowledge/uploads/:file — เปิดไฟล์ที่อัปโหลด (PDF view ในเบราว์เซอร์)
+// 17/11/69 (stored XSS): `res.sendFile` ตั้ง Content-Type ตามนามสกุล ⇒ ไฟล์ .html/.svg
+// ที่มีอยู่บนดิสก์ (เช่นค้างจากเวอร์ชันก่อน/ก๊อปมาจากภายนอก) จะถูก render เป็น HTML
+// ใน origin ของแอป (เส้นสาธารณะ domain → :3000 → rewrite /api/* → :3001 = origin
+// เดียวกับ JWT ใน localStorage) ⇒ ต้องเสิร์ฟเฉพาะนามสกุลที่ route อัปโหลดยอมรับ
+const SERVABLE_UPLOAD_EXT = new Set(['.pdf', '.txt', '.md', '.markdown']);
+
 router.get('/uploads/:file', authenticate, (req, res) => {
   let resolved: string;
   try {
@@ -375,6 +381,9 @@ router.get('/uploads/:file', authenticate, (req, res) => {
     // แก้ 3/10/69: เดิม resolveInsideRoot throw ถูกจับรวมกับ sendFile → path traversal
     // ตอบ 500 (log รบกวนเวลามีคนสแกน) · ตอนนี้แยกออกมาตอบ 400 ตรง ๆ
     return res.status(400).json({ error: 'Invalid file path' });
+  }
+  if (!SERVABLE_UPLOAD_EXT.has(path.extname(resolved).toLowerCase())) {
+    return res.status(400).json({ error: 'Unsupported file type' });
   }
   try {
     if (!fs.existsSync(resolved)) {

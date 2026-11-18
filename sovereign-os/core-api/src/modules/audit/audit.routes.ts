@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { AuditService } from '../../services/audit.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Audit log viewer (SUPERADMIN only) — ย้ายมาจาก inline routes ใน server.ts
@@ -108,7 +109,7 @@ function payloadField(payload: any, key: string): string {
 // (ต้อง export ทั้งช่วงแทนซึ่งหนักและไม่ตอบคำถาม "ขอดูหน้าถัดไป") ⇒ รองรับ offset/skip
 // แต่ไม่นับทั้งตาราง (audit_logs โตไม่จำกัด): ดึง `limit+1` แถวแล้วใช้แถวเกินเป็นสัญญาณ
 // "มีต่อ" ที่เชื่อถือได้ ไม่ต้องเดาจากจำนวนที่ได้พอดี
-router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const rawLimit = parseInt(req.query.limit as string, 10);
     const limit = Math.max(1, Math.min(Number.isFinite(rawLimit) ? rawLimit : 100, LIST_MAX_ROWS));
@@ -146,7 +147,7 @@ router.get('/', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
 // ไฟล์ที่ถูกตัดเงียบ ๆ คือหลักฐานที่โกหก: ผู้ตรวจได้ CSV ไปแล้วเชื่อว่าเป็นทั้งช่วง
 // ที่ขอ ทั้งที่เพดาน 10,000 แถวตัดไปแล้ว ⇒ ต้องบอกจำนวนที่ได้จริง เทียบกับจำนวน
 // ทั้งหมดที่ตรงตัวกรอง (คำถามเดียวกัน) แล้วส่งธง "ถูกตัด" ให้ UI เตือนก่อน/หลังโหลด
-router.get('/export', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/export', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const filters = readFilters(req);
     const requested = parseInt(req.query.limit as string) || EXPORT_MAX_ROWS;

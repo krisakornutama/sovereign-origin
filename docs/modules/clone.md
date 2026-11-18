@@ -20,7 +20,7 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `clone/clone.routes.ts` (46 บรรทัด)
+- `clone/clone.routes.ts` (81 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

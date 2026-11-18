@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { FEATURE_CATALOG, grantedFeaturesFor, setFeatureGrants, prisma } from '../../services/feature-grant.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/me', authenticate, async (req, res) => {
 
 // GET /api/features/summary — สรุปสิทธิ์ทั้งครอบครัว มองทีเดียวจบ (SUPERADMIN)
 // คืนสมาชิกทุกคน + feature ที่แต่ละคนเห็น (SUPERADMIN = เห็นทั้งหมด)
-router.get('/summary', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.get('/summary', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, username: true, role: true },
@@ -60,7 +61,7 @@ router.get('/summary', authenticate, requireRole('SUPERADMIN'), async (_req, res
 });
 
 // GET /api/features/users/:id — สิทธิ์ของสมาชิกคนหนึ่ง (ดูจากหน้า Users)
-router.get('/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.get('/users/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, role: true } });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -73,7 +74,7 @@ router.get('/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, re
 });
 
 // PUT /api/features/users/:id — ตั้งสิทธิ์ใหม่ (แทนที่ของเดิม) — เฉพาะ SUPERADMIN
-router.put('/users/:id', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.put('/users/:id', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, role: true } });
     if (!target) return res.status(404).json({ error: 'User not found' });

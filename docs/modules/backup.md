@@ -23,12 +23,14 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `backup/backup.routes.ts` (64 บรรทัด)
+- `backup/backup.routes.ts` (114 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 GET /
+GET /status
 POST /
+GET /restore-history
 POST /restore
 POST /schedule
 DELETE /:file

@@ -8,11 +8,11 @@ import {
   getSummary,
   isEnergyMetric,
 } from '../../services/energy.service';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 
 // บทบาทที่แก้ระบบพลังงานได้ (ingest ค่าวัด / ตั้งเพดาน) — เดียวกับโมดูลอื่น
-const WRITE_ROLES = ['SUPERADMIN', 'NODE_ADMIN', 'OPERATOR'];
 
 // ────────────────────────────────────────────────────────────────────────────
 // ENERGY เต็มรูป — ระบบวัดพลังงานโรงงาน/บ้านเล็ก

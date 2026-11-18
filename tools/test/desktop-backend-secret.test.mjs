@@ -21,6 +21,17 @@ function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'sovereign-secret-'));
 }
 
+// entry ปลอมที่มีอยู่จริงใน temp — เทสต์ต้องไม่พึ่ง `core-api/dist`
+// เคสจริง 17/11/69: `npm run verify` รัน `backend: clean dist` พร้อมกับขั้น tools
+// ⇒ `dist/server.js` หายระหว่างเทสต์ → verdict กลายเป็น 'no-sidecar' แล้ว 3 เทสต์ล้ม
+// ทั้งที่โค้ดไม่ผิด (รันซ้ำเดี่ยวผ่านทุกครั้ง) — ตอนนี้กำหนด entry เองได้ = ไม่แข่งกับใคร
+function fakeEntry(dir) {
+  const entry = path.join(dir, 'core-api', 'dist', 'server.js');
+  fs.mkdirSync(path.dirname(entry), { recursive: true });
+  fs.writeFileSync(entry, '// stub entry — เทสต์ไม่ต้องมี build จริง\n');
+  return entry;
+}
+
 test('isValidSecret: รับเฉพาะค่าที่ใช้เป็น secret ได้จริง', () => {
   assert.equal(isValidSecret('a'.repeat(64)), true);
   assert.equal(isValidSecret('a'.repeat(32)), true);
@@ -85,10 +96,11 @@ test('superviseBackend: ส่ง JWT_SECRET ให้ sidecar และไม�
     isPackaged: false,
     getPath: () => dir,
   };
-  // ให้ supervisor เห็น core-api ที่มีอยู่จริงในรีโป
+  // ให้ supervisor เห็น entry ที่มีอยู่จริง (temp) — ไม่พึ่ง build artifact ในรีโป
   const res = await superviseBackend({
     app, http: { get: () => ({ on() {}, destroy() {} }) }, spawn,
     dlog: (m) => logs.push(String(m)),
+    coreApiPath: fakeEntry(dir),
     probe: async () => ({ listening: false, version: null }),
     env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });
@@ -115,6 +127,7 @@ test('superviseBackend: sidecar ตายต้องทิ้งร่องร
     http: { get: () => ({ on() {}, destroy() {} }) },
     spawn,
     dlog: (m) => logs.push(String(m)),
+    coreApiPath: fakeEntry(dir),
     probe: async () => ({ listening: false, version: null }),
     env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });
@@ -145,6 +158,7 @@ test('superviseBackend: ไม่มี DATABASE_URL = ไม่ spawn (ไม�
     http: { get: () => ({ on() {}, destroy() {} }) },
     spawn,
     dlog: (m) => logs.push(String(m)),
+    coreApiPath: fakeEntry(dir),
     probe: async () => ({ listening: false, version: null }),
     env: {}, // เครื่องที่ไม่มี Postgres
   });
@@ -168,6 +182,7 @@ test('superviseBackend: มี DATABASE_URL จริง = เปิด migrate 
     http: { get: () => ({ on() {}, destroy() {} }) },
     spawn,
     dlog: () => {},
+    coreApiPath: fakeEntry(dir),
     probe: async () => ({ listening: false, version: null }),
     env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });
@@ -190,6 +205,7 @@ test('superviseBackend: sidecar พ่น stderr แล้วยังไม่�
     http: { get: () => ({ on() {}, destroy() {} }) },
     spawn,
     dlog: (m) => logs.push(String(m)),
+    coreApiPath: fakeEntry(dir),
     probe: async () => ({ listening: false, version: null }),
     env: { DATABASE_URL: 'postgresql://u:p@127.0.0.1:5432/sovereign' },
   });

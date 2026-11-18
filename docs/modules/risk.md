@@ -15,7 +15,7 @@
 `defcon_events` · `risk_headlines`
 
 ### Routes
-- `risk/risk.routes.ts` (217 บรรทัด)
+- `risk/risk.routes.ts` (218 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

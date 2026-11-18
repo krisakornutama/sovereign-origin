@@ -11,6 +11,7 @@ import { asyncRoute } from '../../lib/async-handler';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { actuationService } from '../../services/actuation.service';
 import { parseOccupancyInput } from '../../services/actuation-occupancy';
+import { SUPERADMIN_ONLY, WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 
@@ -23,8 +24,9 @@ router.get('/rules', authenticate, (_req, res) => {
 });
 
 // มนุษย์สั่ง actuator — SYSTEM_AI สั่งผ่าน HTTP ไม่ได้ (Strict AI/Actuator Separation)
-// role อื่นที่เหลือยังใช้ได้ตามเดิม: SUPERADMIN / NODE_ADMIN / SITE_ADMIN / OPERATOR
-router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'SITE_ADMIN', 'OPERATOR'), asyncRoute(async (req, res) => {
+// SEC-048: SITE_ADMIN ถูกถอดออก — docs/modules/fleet.md ประกาศว่า SITE_ADMIN อ่านอย่างเดียว
+// และเส้นนี้ไม่ตรวจขอบเขตสาขา ⇒ SITE_ADMIN สั่ง actuator ข้ามสาขาได้ (ชุดเดียวกับ relay/devices)
+router.post('/execute', authenticate, requireRole(...WRITE_ROLES), asyncRoute(async (req, res) => {
   const { actuatorId, state, reason } = req.body || {};
   if (!actuatorId || !state) return res.status(400).json({ error: 'ต้องระบุ actuatorId + state' });
   const r = await actuationService.executeCommand({
@@ -36,7 +38,7 @@ router.post('/execute', authenticate, requireRole('SUPERADMIN', 'NODE_ADMIN', 'S
   res.status(r.ok ? 200 : 403).json(r);
 }));
 
-router.post('/sync-levers', authenticate, requireRole('SUPERADMIN'), asyncRoute(async (req, res) => {
+router.post('/sync-levers', authenticate, requireRole(...SUPERADMIN_ONLY), asyncRoute(async (req, res) => {
   const levers = req.body?.levers;
   if (!levers || typeof levers !== 'object') return res.status(400).json({ error: 'ต้องส่ง levers object' });
   const actor = req.body?.actor === 'governor' ? 'governor' : 'human';
@@ -44,13 +46,13 @@ router.post('/sync-levers', authenticate, requireRole('SUPERADMIN'), asyncRoute(
   res.json({ actor, results });
 }));
 
-router.put('/mode', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/mode', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const r = actuationService.setMode(String(req.body?.mode || 'sandbox') as any);
   if (!r.ok) return res.status(400).json({ error: r.error });
   res.json(actuationService.status());
 });
 
-router.put('/occupancy', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.put('/occupancy', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   // แปลเฉพาะค่าที่ชัดเจน: true/false/1/0/'true'/'false'/'unknown'/null — ค่าอื่น = 400
   const parsed = parseOccupancyInput(req.body?.occupied);
   if (!parsed.ok) {
@@ -59,7 +61,7 @@ router.put('/occupancy', authenticate, requireRole('SUPERADMIN'), (req, res) => 
   res.json(actuationService.setOccupancy(parsed.value));
 });
 
-router.post('/simulate-failure', authenticate, requireRole('SUPERADMIN'), (req, res) => {
+router.post('/simulate-failure', authenticate, requireRole(...SUPERADMIN_ONLY), (req, res) => {
   const actuatorId = String(req.body?.actuatorId || '');
   if (!actuatorId) return res.status(400).json({ error: 'ต้องระบุ actuatorId' });
   res.json(actuationService.toggleSimFailure(actuatorId));

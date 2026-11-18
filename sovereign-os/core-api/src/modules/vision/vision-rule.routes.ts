@@ -9,6 +9,7 @@ import {
   updateVisionRule,
   runVisionCheck,
 } from '../../services/vision-rule.service';
+import { SUPERADMIN_ONLY } from '../../lib/roles';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.get('/alerts', authenticate, async (_req, res) => {
 
 // GET /api/vision/honeypot — บันทึกเงียบระหว่าง First-Responder Mode (SUPERADMIN เท่านั้น)
 // ใช้วิเคราะห์ย้อนหลังว่าเหตุฉุกเฉินถูกจัดฉากหรือไม่ (Emergency Exploitation)
-router.get('/honeypot', authenticate, requireRole('SUPERADMIN'), async (_req, res) => {
+router.get('/honeypot', authenticate, requireRole(...SUPERADMIN_ONLY), async (_req, res) => {
   try {
     const alerts = await prisma.visionAlert.findMany({
       where: { kind: 'honeypot' },

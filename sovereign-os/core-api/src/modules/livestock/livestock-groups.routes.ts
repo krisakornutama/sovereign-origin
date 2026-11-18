@@ -3,7 +3,8 @@ import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate, requireRole } from '../../middleware/auth.middleware';
 import { withdrawalStatus, quarantineStatus } from '../../services/livestock-vet-ai.service';
-import { WRITE_ROLES, DAY_MS, QUARANTINE_DAYS, SPECIES, GROUP_STATUSES, parseDate } from './livestock-shared';
+import { DAY_MS, QUARANTINE_DAYS, SPECIES, GROUP_STATUSES, parseDate } from './livestock-shared';
+import { WRITE_ROLES } from '../../lib/roles';
 
 const router = Router();
 

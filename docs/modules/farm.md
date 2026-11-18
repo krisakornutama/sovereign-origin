@@ -32,6 +32,7 @@
 
 ### Routes
 - `farm/crop-recommend.routes.ts` (50 บรรทัด)
+- `farm/farm-executive.routes.ts` (69 บรรทัด)
 - `farm/farm.routes.ts` (461 บรรทัด)
 
 ### Endpoints (จาก router)

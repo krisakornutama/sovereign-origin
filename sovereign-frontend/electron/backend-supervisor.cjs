@@ -95,9 +95,13 @@ async function superviseBackend(options) {
   const log = typeof dlog === 'function' ? dlog : () => {};
   const result = { child: null, port: PREFERRED_PORT, verdict: 'unknown', bundledVersion: null, jwtSecret: null };
 
-  const coreApiPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'core-api/dist/server.js')
-    : path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
+  // เทสต์ต้องกำหนด entry เองได้ — ไม่พึ่ง `core-api/dist` ที่ `verify` ลบระหว่างขั้น
+  // `backend: clean dist` (spawn/ลบพร้อมกัน) ⇒ default ยังเหมือนเดิมสำหรับแอปจริง
+  const coreApiPath = options && options.coreApiPath
+    ? options.coreApiPath
+    : app.isPackaged
+      ? path.join(process.resourcesPath, 'core-api/dist/server.js')
+      : path.join(__dirname, '../../sovereign-os/core-api/dist/server.js');
 
   if (!fs.existsSync(coreApiPath)) {
     log('backend: ไม่มี dist ในตัว → ใช้ระบบหลัก (Docker/autostart)');

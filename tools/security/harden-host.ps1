@@ -10,7 +10,6 @@
 
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-  [switch]$BlockOutbound,
   [switch]$EnableVbs
 )
 
@@ -58,15 +57,13 @@ try {
   Step 'EnableSecuritySignature' ([string]$smb.EnableSecuritySignature) 'True' { Set-SmbServerConfiguration -EnableSecuritySignature $true -Force | Out-Null }
 } catch { Write-Output ('  SMB: ' + $_.Exception.Message) }
 
-Write-Output '== 4) Firewall outbound =='
-if ($BlockOutbound) {
-  foreach ($profile in 'Domain', 'Private', 'Public') {
-    $cur = (Get-NetFirewallProfile -Name $profile).DefaultOutboundAction
-    Step ('Firewall outbound ' + $profile) ([string]$cur) 'Block' { Set-NetFirewallProfile -Name $profile -DefaultOutboundAction Block }
-  }
-} else {
-  Write-Output '  skipped (pass -BlockOutbound only after allow rules exist, otherwise network and Docker break)'
-}
+Write-Output '== 4) Firewall outbound (refused by design) =='
+# 2026-11-15: switching DefaultOutboundAction to Block for every profile cuts the
+# whole machine off the internet - the same class of damage as writing a dead
+# system proxy. This project never changes machine-wide network policy; only the
+# narrow per-port inbound block rules above are allowed (see
+# tools/test/host-network-guard.test.mjs).
+Write-Output '  refused: system-wide outbound policy is never changed by this project'
 
 Write-Output '== 5) Defender preferences (only when the service runs) =='
 $svc = (Get-Service WinDefend -ErrorAction SilentlyContinue).Status

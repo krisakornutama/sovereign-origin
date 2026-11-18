@@ -19,11 +19,15 @@ interface Props {
   onGenerate: (device: Device) => void;
   onLocation: (device: Device) => void;
   onDelete: (id: string) => void;
+  /** SEC-047: ปุ่มที่เขียนค่าอุปกรณ์ (พิกัด/ลบ) ใช้ได้เฉพาะ role ที่มีสิทธิ์สั่งงาน */
+  canWrite?: boolean;
 }
 
 // การ์ดอุปกรณ์หนึ่งตัว — แยกไฟล์เพื่อให้ SensorsHub อยู่ในเพดานบรรทัด (components ≤ 400)
-export default function DeviceCard({ device, onGenerate, onLocation, onDelete }: Props) {
+export default function DeviceCard({ device, onGenerate, onLocation, onDelete, canWrite = true }: Props) {
   const t = useLanguageStore((s) => s.t);
+  const locked = !canWrite;
+  const lockedTitle = t('sensorsHub.readOnlyTitle', 'ต้องเป็น SUPERADMIN / NODE_ADMIN / OPERATOR จึงจะแก้ค่าอุปกรณ์ได้');
 
   return (
     <div className="card p-4 card-hover">
@@ -41,9 +45,30 @@ export default function DeviceCard({ device, onGenerate, onLocation, onDelete }:
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => onGenerate(device)} className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"><Icon name="code" size={12} /> Generate Code</button>
-          <button onClick={() => onLocation(device)} className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1" title={t('sensorsHub.setLocationTitle', 'ตั้งพิกัด GPS สำหรับแผนที่')}><Icon name="map-pin" size={12} /> {t('sensorsHub.locationBtn', 'พิกัด')}</button>
-          <button onClick={() => onDelete(device.id)} className="text-red-400 hover:text-red-300 text-sm"><Icon name="trash" size={13} /></button>
+          <button
+            onClick={() => onGenerate(device)}
+            aria-label={t('sensorsHub.generateCodeFor', 'สร้างโค้ด Arduino สำหรับ {type}', { type: device.type })}
+            className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+          >
+            <Icon name="code" size={12} /> {t('sensorsHub.generateCode', 'Generate Code')}
+          </button>
+          <button
+            onClick={() => onLocation(device)}
+            disabled={locked}
+            className={`text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1 ${locked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={locked ? lockedTitle : t('sensorsHub.setLocationTitle', 'ตั้งพิกัด GPS สำหรับแผนที่')}
+          >
+            <Icon name="map-pin" size={12} /> {t('sensorsHub.locationBtn', 'พิกัด')}
+          </button>
+          <button
+            onClick={() => onDelete(device.id)}
+            disabled={locked}
+            aria-label={t('sensorsHub.deleteDeviceFor', 'ลบอุปกรณ์ {type}', { type: device.type })}
+            className={`text-red-400 hover:text-red-300 text-sm ${locked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={locked ? lockedTitle : undefined}
+          >
+            <Icon name="trash" size={13} />
+          </button>
         </div>
       </div>
 
