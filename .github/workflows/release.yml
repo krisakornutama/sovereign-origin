@@ -18,6 +18,7 @@ on:
     inputs:
       tag:
         description: 'tag ที่ต้องการปล่อย (ต้องมีอยู่แล้ว เช่น v1.2.1)'
+        type: string
         required: false
       dry_run:
         description: 'ซ้อมเฉพาะขั้นตอน provenance (ใช้กุญแจชั่วคราว ไม่ปล่อย release)'
