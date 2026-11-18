@@ -57,7 +57,7 @@ export function fingerprintOfFile(file) {
   return typeof doc.fingerprint === 'string' ? doc.fingerprint : null;
 }
 
-const DEFAULT_VERIFIER = 'https://krisakornutama.github.io/project-sovereign/release-verify.html';
+const DEFAULT_VERIFIER = 'https://sovereignoriginshop.dpdns.org/release-verify.html';
 
 function argOf(argv, name, fallback) {
   const found = argv.find((arg) => arg.startsWith(`--${name}=`));
