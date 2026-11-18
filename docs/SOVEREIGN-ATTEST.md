@@ -98,7 +98,7 @@ fingerprint ของกุญแจ, vault root และ anchor entry ขอ�
 ### ตรวจ (ผู้ใช้ปลายทาง)
 
 ```bash
-node tools/attest-release.mjs --verify sovereign-attest.json   --fingerprint=<fingerprint ที่ประกาศไว้ในหน้า release/README>
+node tools/attest-release.mjs --verify sovereign-attest.json   --fingerprint=<fingerprint ที่ประกาศไว้ที่ portfolio/verify.html>
 ```
 
 ตัวตรวจใช้ `node:crypto` ล้วน ไม่ต้องติดตั้งอะไรและไม่ต้องต่อเน็ต: ตรวจ hash ของ body, ลายเซ็น Ed25519,
@@ -128,7 +128,12 @@ fingerprint: 1afcc7d951d822a7dfe384d89209aed2
 
 public key อยู่ใน repo นี้ที่ [`docs/keys/attest-release.pub.pem`](./keys/attest-release.pub.pem)
 (private key ไม่เคยเข้า repo: เก็บที่ `.secrets/` ของเครื่องเจ้าของ + GitHub secret)
-ตัวตรวจต้องเทียบ fingerprint นี้จากช่องทางที่ผู้โจมตีแก้ไม่ได้ — ประกาศซ้ำใน README เว็บ/กระดาษในตู้เซฟด้วย
+
+**ประกาศสาธารณะ (ช่องทางที่สอง):** <https://krisakornutama.github.io/project-sovereign/verify.html>
+— หน้านั้นอยู่นอก GitHub เก็บโค้ด มี fingerprint เดียวกันและคำสั่งตรวจที่ผู้ใช้คัดลอกไปรันได้เลย
+(เป็นช่องทางที่ผู้ใช้ทั่วไปเปิดดูได้; ถ้าจะให้กันได้จริงระดับกายภาพ ควรมีสำเนาบนกระดาษในตู้เซฟด้วย)
+ผู้ใช้ที่ไม่มี repo ให้โหลดตัวตรวจสองไฟล์ (`tools/attest-release.mjs` + `tools/attest/document.mjs`)
+ตามที่หน้าเว็บบอก แล้วรันตรวจไฟล์ที่ดาวน์โหลดได้ทันที
 
 ### Rotation: เปลี่ยนกุญแจโดยไม่ทำให้ประวัติขาด
 
@@ -204,6 +209,6 @@ CI ตรวจซ้ำเองทุกครั้งที่ปล่อ�
 
 - **กุญแจเปลี่ยน = chain ขาด** — ตัวตรวจจะบอกว่า receipt ถูกเซ็นด้วยกุญแจคนละตัวกับ fingerprint ของรุ่นนั้น;
   การ rotate ต้องมี signed rotation statement (ยังไม่มี — อยู่ในข้อจำกัด M1 ด้านบน)
-- **fingerprint ต้องประกาศนอกช่องทางเดียวกัน** — ถ้าประกาศไว้ในหน้า Release เดียวกับไฟล์ ผู้โจมตีที่ยึดบัญชีก็แก้ได้
+- **fingerprint ต้องประกาศนอกช่องทางเดียวกัน** — ถ้าประกาศไว้ในหน้า Release เดียวกับไฟล์ ผู้โจมตีที่ยึดบัญชีก็แก้ได้ ตอนนี้ประกาศไว้ที่ <https://krisakornutama.github.io/project-sovereign/verify.html> (คนละที่เก็บโค้ด) แต่ทั้งสองที่ยังเป็นบัญชีเดียวกัน — สำเนาบนกระดาษ/ช่องทางที่สามยังคงจำเป็น
   (ทางที่ถูกคือ README เว็บไซต์ หรือกระดาษในตู้เซฟ)
 - **ยังไม่มี revocation** และยังไม่ผูกกับ transparency log — anchor root ในเอกสารพิสูจน์เฉพาะสถานะของรอบนั้น
