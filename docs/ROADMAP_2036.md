@@ -255,3 +255,20 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
   delegation/expiry) · gate เป็น *หลักฐาน* ไม่ใช่ *การป้องกัน* — module ที่แตะข้อมูลต้องเข้าถึงได้ทาง gate เท่านั้น
   หลักประกันจึงจะจริง · กันย้อนศรต้องมี anchor ที่เก็บนอก vault
 - **งานถัดไป**: `FABRIC-001` (2-peer sync บน CRDT + anchor log) — ปลดล็อกข้อจำกัด multi-writer
+
+
+### 2026-11-18 — `sovereign-fabric` M1 (FABRIC-001)
+
+- **Milestone แรกของ §5.4 ปิดแล้ว**: 2-peer sneakernet sync บน signed op log — ไม่มีเซิร์ฟเวอร์ ไม่มีเครือข่าย ไม่เชื่อใจ transport
+  - OpLog: append-only per-peer seq, hash chain ใน head → ตรวจจับ tamper/rollback ตอน open()
+  - Bundle: canonical JSON + Ed25519 receipt (sovereign-attest) → verify กับ pinned key, ไม่ใช่ key ใน bundle
+  - Ingest: dry-run ทั้ง bundle กับ virtual heads → reject gap/fork/rollback/relay/wrong-recipient ก่อนเขียน op ตัวแรก
+  - LWW: เรียง (at, peer, seq) → deterministic convergence
+  - Delta export: cursor `fabric/have/<peer>` เขียนตอน import สำเร็จ → receiver ตอบกลับ ≥1 ครั้งถึงมี delta
+  - ขีดจำกัด: 8 MiB / 5 000 ops / 64 KiB value / 64 peers per head map
+  → repo <https://github.com/krisakornutama/sovereign-fabric> commit `ccfa954` · CI `44318012298` เขียว (Node 20/22)
+  → 51 tests, coverage 98.18/95.27/100/98.87 · red-first พิสูจน์ด้วย mutant (verify ด้วย carried key → impostor test แดง)
+- **เอกสาร**: [`SOVEREIGN-FABRIC.md`](./SOVEREIGN-FABRIC.md)
+- **ปลดล็อก**: multi-writer สำหรับ `sovereign-agents` (writer เดียวต่อ vault → หลาย peer เขียน vault เดียวกันได้)
+- **งานถัดไป**: `ENERGY-001` (`sovereign-energy`) — พยากรณ์/ตัดสินใจจากข้อมูล local ที่เข้ารหัส
+
