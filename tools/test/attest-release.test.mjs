@@ -402,3 +402,76 @@ test(
     }
   }
 );
+
+test(
+  'เพิกถอนด้วยกุญแจจริงแล้วตัวตรวจปฏิเสธ และ restore คืนสถานะได้',
+  { skip: hasSiblings ? false : 'sibling repos ยังไม่ถูก build' },
+  async () => {
+    const { signRelease, revokeRelease } = await import('../attest-release.mjs');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attest-rev-'));
+    const revokedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'attest-rev2-'));
+    const restoredDir = fs.mkdtempSync(path.join(os.tmpdir(), 'attest-rev3-'));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'attest-revstate-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'app-1.3.10.exe'), 'portable');
+      const masterKey = new Uint8Array(32).fill(9);
+      const signed = await signRelease({
+        dir,
+        tag: 'v1.3.10',
+        out: dir,
+        keyId: 'release',
+        stateDir,
+        masterKey,
+        now: () => 1_700_000_000_000,
+      });
+
+      for (const sub of [revokedDir, restoredDir]) {
+        fs.writeFileSync(path.join(sub, 'app-1.3.10.exe'), 'portable');
+      }
+
+      const revoked = await revokeRelease({
+        action: 'artifact.revoked',
+        dir: revokedDir,
+        tag: 'v1.3.10',
+        out: revokedDir,
+        reason: 'บิลด์นี้ถูกลบออกจากช่องทางดาวน์โหลด',
+        actor: 'security:release',
+        keyId: 'release',
+        stateDir,
+        masterKey,
+        previousFile: signed.file,
+        now: () => 1_700_000_100_000,
+      });
+      // ใบเพิกถอนต้องต่อจากใบที่เซ็นไปแล้ว ไม่ใช่เริ่ม chain ใหม่
+      assert.equal(revoked.doc.receipts.find((r) => r.id === revoked.doc.artifacts[0].receiptId).body.prev,
+        signed.doc.artifacts[0].receiptId);
+      const rejected = verifyDocument(revoked.doc, { fingerprint: signed.doc.fingerprint });
+      assert.equal(rejected.ok, false);
+      assert.match(rejected.problems.join(String.fromCharCode(10)), /ถูกเพิกถอน/);
+      assert.equal(
+        verifyDocument(revoked.doc, { fingerprint: signed.doc.fingerprint, allowRevoked: true }).ok,
+        true
+      );
+
+      const restored = await revokeRelease({
+        action: 'artifact.restored',
+        dir: restoredDir,
+        tag: 'v1.3.10',
+        out: restoredDir,
+        reason: 'ตรวจแล้วปล่อยใช้งานต่อ',
+        actor: 'security:release',
+        keyId: 'release',
+        stateDir,
+        masterKey,
+        previousFile: revoked.file,
+        now: () => 1_700_000_200_000,
+      });
+      const backToNormal = verifyDocument(restored.doc, { fingerprint: signed.doc.fingerprint });
+      assert.equal(backToNormal.ok, true, backToNormal.problems.join('; '));
+    } finally {
+      for (const target of [dir, revokedDir, restoredDir, stateDir]) {
+        fs.rmSync(target, { recursive: true, force: true });
+      }
+    }
+  }
+);
