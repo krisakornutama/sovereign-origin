@@ -241,3 +241,17 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
   สำหรับ `output: 'export'` + มีหน้าต่างทดสอบที่เจ้าของอนุมัติ) · Defender ถูกปิดโดยนโยบาย (`SEC-032/037/038`
   — ต้อง UAC) · ความลับชุดเดิมยังไม่ rotate (`SEC-033` — ต้อง restart หลัง Cold Soak) ·
   dangling CNAME `api.` (`SEC-051`) · backup นอกเครื่อง (`QA-002`)
+
+### 2026-11-18 — `sovereign-agents` M1 (AGENT-001)
+
+- **Milestone แรกของ §5.3 ปิดแล้ว**: action นอก scope ถูกปฏิเสธ *พร้อมหลักฐาน* — `AgentGate`
+  ผนึก `agent.action.requested` ลง vault ให้สำเร็จก่อนเรียก handler (fail closed), denial มี receipt
+  `agent.action.denied` ของตัวเอง, args/ผลลัพธ์เก็บเฉพาะ SHA-256 digest, หนึ่ง hash chain ต่อ actor
+  และ chain ถูก serialize ต่อ actor ⇒ เรียกพร้อมกันไม่ทำให้ประวัติแตก
+  → repo <https://github.com/krisakornutama/sovereign-agents> commit `882196c` · CI `44302049237` เขียว (Node 20/22)
+  → 41 tests, coverage 99.31/94.84/96.96/99.28 · red-first พิสูจน์ด้วย mutant (ย้าย handler ไปก่อน receipt → แดง 4 ใบ)
+- **เอกสาร**: [`SOVEREIGN-AGENTS.md`](./SOVEREIGN-AGENTS.md)
+- **ข้อจำกัดที่ยังเปิด**: writer เดียวต่อ vault (multi-writer = `FABRIC-001`) · policy คงที่ (ยังไม่มี
+  delegation/expiry) · gate เป็น *หลักฐาน* ไม่ใช่ *การป้องกัน* — module ที่แตะข้อมูลต้องเข้าถึงได้ทาง gate เท่านั้น
+  หลักประกันจึงจะจริง · กันย้อนศรต้องมี anchor ที่เก็บนอก vault
+- **งานถัดไป**: `FABRIC-001` (2-peer sync บน CRDT + anchor log) — ปลดล็อกข้อจำกัด multi-writer
