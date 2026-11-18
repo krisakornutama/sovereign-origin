@@ -18,7 +18,7 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `telemetry/telemetry.routes.ts` (52 บรรทัด)
+- `telemetry/telemetry.routes.ts` (69 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `devices`
 
 ### Routes
-- `devices/device.routes.ts` (140 บรรทัด)
+- `devices/device.routes.ts` (144 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

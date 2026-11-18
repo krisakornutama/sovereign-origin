@@ -7,6 +7,8 @@
 - `treasury_accounts` · `treasury_transactions` · `treasury_transfers` · `treasury_events`
 
 ## Endpoints หลัก (mounted ที่ `/api/treasury`)
+
+> ⚠️ **2026-11-05: routes ของโมดูลนี้ย้ายไป private repo แล้ว** (`sovereign-os/core-api/src/routes.ts:146`) — รายการด้านล่างเก็บไว้เป็นประวัติ ไม่มีไฟล์ route ในเรโพนี้ · คงเหลือเฉพาะ `treasury.service.ts`
 - ภาพรวม: `GET /overview` · `PATCH /balance-sheet` · `GET /events`
 - Runway: `POST /runway/snapshot` · `GET /runway/history`
 - พอร์ต: `POST /positions` · `PATCH|DELETE /positions/:id` · `POST /positions/:id/sell` · `POST /positions/:id/dividend`
@@ -27,34 +29,8 @@
 ### ตารางที่เป็นเจ้าของ
 `asset_positions` · `personal_balance_sheets` · `survival_runways` · `transfer_orders` · `treasury_accounts` · `treasury_events` · `treasury_transactions` · `treasury_transfers`
 
-### Routes
-- `treasury/treasury.routes.ts` (664 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /overview
-PATCH /balance-sheet
-POST /runway/snapshot
-GET /runway/history
-POST /positions
-PATCH /positions/:id
-DELETE /positions/:id
-POST /positions/:id/sell
-POST /positions/:id/dividend
-GET /events
-GET /transfers
-POST /transfers
-POST /transfers/:id/confirm
-POST /transfers/:id/cancel
-GET /signals
-POST /signals/reset
-PUT /signals/:symbol
-POST /signals/check
-POST /signals/preview/:symbol
-```
-
 ### Services ที่ทำงานให้โมดูลนี้
-`transfer.service` · `treasury.service`
+`treasury.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - treasury → dime(asset_prices)

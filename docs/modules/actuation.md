@@ -18,7 +18,7 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `actuation/actuation.routes.ts` (61 บรรทัด)
+- `actuation/actuation.routes.ts` (70 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

@@ -15,8 +15,8 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `known_faces` · `vision_alerts` · `vision_rules`
 
 ### Routes
-- `vision/vision-rule.routes.ts` (112 บรรทัด)
-- `vision/vision.routes.ts` (99 บรรทัด)
+- `vision/vision-rule.routes.ts` (113 บรรทัด)
+- `vision/vision.routes.ts` (120 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

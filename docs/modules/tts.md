@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `tts/tts.routes.ts` (233 บรรทัด)
+- `tts/tts.routes.ts` (234 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

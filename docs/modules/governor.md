@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `governor/governor.routes.ts` (64 บรรทัด)
+- `governor/governor.routes.ts` (66 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

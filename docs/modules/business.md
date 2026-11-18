@@ -10,6 +10,8 @@
 - `business_installations` · `business_ledger_entries` · `business_agents`
 
 ## Endpoints หลัก (mounted ที่ `/api/business`)
+
+> ⚠️ **2026-11-05: routes ของโมดูลนี้ย้ายไป private repo แล้ว** (`sovereign-os/core-api/src/routes.ts:146`) — รายการด้านล่างเก็บไว้เป็นประวัติ ไม่มีไฟล์ route ในเรโพนี้ · service (`business.service.ts`, `business-shop.service.ts`) ยังอยู่และถูกใช้จากที่อื่น
 - หน้าร้านของตัวเอง: `GET /:businessId/shop` · `PUT /:businessId/shop`
 - ออเดอร์: `POST /:businessId/orders` · `GET /:businessId/orders` · `/:id/transition` · `/:id/payments` · `/:id/shipping` · `/:id/lots`
 - สินค้า/ลูกค้า: `GET|POST /:businessId/products` · `PUT /products/:id` · `GET|POST /:businessId/customers`
@@ -43,54 +45,8 @@
 ### ตารางที่เป็นเจ้าของ
 `business_agents` · `business_customers` · `business_installations` · `business_ledger_entries` · `business_members` · `business_order_lines` · `business_orders` · `business_payments` · `business_products` · `business_purchase_orders` · `business_suppliers` · `businesses`
 
-### Routes
-- `business/business.routes.ts` (468 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /
-POST /
-POST /:businessId/agents/seed
-GET /:businessId/members
-POST /:businessId/members
-DELETE /:businessId/members/:memberId
-GET /:businessId/products
-POST /:businessId/products
-PUT /:businessId/products/:id
-GET /:businessId/customers
-POST /:businessId/customers
-GET /:businessId/orders
-GET /:businessId/orders/:id
-GET /:businessId/orders/:id/lots
-POST /:businessId/orders
-POST /:businessId/orders/:id/shipping
-POST /:businessId/orders/:id/transition
-POST /:businessId/orders/:id/payments
-GET /:businessId/installations
-POST /:businessId/installations
-POST /:businessId/installations/:id/transition
-GET /:businessId/ledger
-POST /:businessId/ledger
-PATCH /:businessId/ledger/:id
-DELETE /:businessId/ledger/:id
-GET /:businessId/summary
-GET /:businessId/tax
-GET /:businessId/suppliers
-POST /:businessId/suppliers
-GET /:businessId/purchase-orders
-POST /:businessId/purchase-orders
-POST /:businessId/purchase-orders/:id/receive
-GET /:businessId/agents
-POST /:businessId/agents/:agentId/run
-POST /:businessId/agents/:agentId/enabled
-GET /:businessId/agent-jobs
-GET /:businessId/shop
-PUT /:businessId/shop
-GET /user-lookup
-```
-
 ### Services ที่ทำงานให้โมดูลนี้
-`business-shop.service` · `business.service`
+`business-software.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - business → agent(agent_jobs)

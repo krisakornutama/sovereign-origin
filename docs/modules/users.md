@@ -31,7 +31,7 @@
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `users/users.routes.ts` (100 บรรทัด)
+- `users/users.routes.ts` (278 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -39,7 +39,11 @@ GET /
 POST /
 DELETE /:id
 POST /:id/reset-password
+POST /:id/reset-mfa
 PUT /:id
+GET /invites
+POST /invites
+DELETE /invites/:id
 ```
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)

@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `selfreliance/selfreliance.routes.ts` (46 บรรทัด)
+- `selfreliance/selfreliance.routes.ts` (47 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

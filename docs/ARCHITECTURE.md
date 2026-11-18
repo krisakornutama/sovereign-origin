@@ -21,6 +21,19 @@
    - ⚠️ blind spot ที่รู้ตัว: เกตจับเฉพาะ `prisma.<delegate>` — การเขียนผ่าน **raw SQL** (`INSERT INTO sensor_telemetry` จาก mqttIngest/wan-monitor/ups-monitor ฯลฯ) มองไม่เห็น ถ้าจะเพิ่มการเขียนตารางโมดูลอื่นด้วย raw SQL ให้ระบุใน PR และ baseline เอง
 4. **prod ต้องรันโค้ดชุดเดียวกับดิสก์** — `/api/health` รายงาน `build.fingerprint` (hash เนื้อหาไฟล์ dist ที่โปรเซสโหลด) → เทียบกับดิสก์โดย **prod-truth gate** เมื่อรัน `verify:full` · parity ของอัลกอริทึมสองฝั่งถูกตรวจบน CI (`tools/check-parity.mjs`) · เห็นผลได้ทันทีที่หน้า **/system-health**
 
+## กติกา HOST-SAFE + ความปลอดภัยที่มีด่านจริง (เพิ่ม 2026-11-17)
+
+| กติกา | ทำไม (เคสจริง) | ด่านที่บังคับ |
+|---|---|---|
+| **ห้ามโค้ดโปรเจ็กแตะเน็ต/พร็อกซี/ไฟร์วอลล์/autorun ระดับ OS** | ตั้ง `ProxyServer` ค้างใน `HKCU\...\Internet Settings` ทำให้เครื่องทั้งเครื่องขาดเน็ตหลังรีบูต (SEC-044) | `tools/security/host-network-guard.mjs` (0 hit) |
+| **สคริปต์ host ต้องมี sha256 ใน manifest** | malware เขียน scheduled task เอง + นโยบาย Defender ถูกเขียนกลับหลังบูต (SEC-037/032) | `tools/security/host-integrity.mjs` + `tools/test/host-integrity.test.mjs` |
+| **ค่าจากผู้ใช้ห้ามถึง sink ดิบ** (HTML/CSV) | stored XSS ในรายงานสุขภาพและเกียรติบัตร · CSV formula injection (SEC-052/056/057) | `tests/health.routes.test.ts` · `tools/test/certificate-html-escape.test.mjs` · `tools/test/csv-formula-guard.test.mjs` |
+| **ไฟล์ที่ผู้ใช้วางได้ ต้องเสิร์ฟด้วย Content-Type ปลอดภัย** | เขียน `.html` ลง `uploads/` แล้วเสิร์ฟเป็น `text/html` = XSS บน origin เดียวกับ JWT (SEC-053) | `tools/test/file-serve-extension-gate.test.mjs` (ทุก `sendFile` ต้องมี allowlist นามสกุล · ห้าม `express.static`) |
+| **URL จากผู้ใช้ต้องผ่าน SSRF guard** | `import-gguf` เคยยิง loopback/docker/metadata ได้ (SEC-045) | `src/lib/ssrf-guard.ts` + `tests/ssrfGuard.test.ts` |
+| **role มาจาก `src/lib/roles.ts` เท่านั้น** | ชุด role กระจาย 14 ที่ + `requireRole` เขียนสด 128 จุด ⇒ สิทธิ์หลุดเป็นรายโมดูล (SEC-046/047/048/049) | `tests/roleSourceOfTruth.test.ts` |
+
+**หนี้ที่รู้ตัว (ยังไม่แก้ — ห้ามลืม):** CSP ของเว็บยังมี `script-src 'unsafe-inline' 'unsafe-eval'` (`SEC-055`) เพราะ nonce ต้องออกจาก middleware ซึ่งใช้ไม่ได้กับ `output: 'export'` ของแอปเดสก์ท็อป ⇒ ต้องแยก CSP สองชุด + มีหน้าต่างทดสอบที่เจ้าของอนุมัติ · ระหว่างนี้ถือว่า **XSS ครั้งเดียว = ยึดบัญชีได้** (JWT อยู่ใน `localStorage`)
+
 ## ด่านคุณภาพ (npm run verify ที่ root)
 
 ```
@@ -79,6 +92,10 @@ sovereign-os/core-api/src/
 | `gen-module-docs.mjs` | gen เอกสารโมดูลจากโค้ดจริง (ไม่ทับส่วนเขียนมือ) |
 | `deploy-guard.mjs` | ด่าน backup ก่อน deploy/migrate (ไม่มี dump / dump เก่ากว่า migration / เก่าเกิน 24 ชม. = หยุด) |
 | `deploy-db.mjs` | ทาง deploy เดียวของ core-api: ด่าน backup → build → migrate deploy → restart → poll `/healthz` |
+| `security/host-network-guard.mjs` | ห้ามโค้ดแตะเน็ต/พร็อกซี/autorun ระดับ OS (ด่าน HOST-SAFE) |
+| `security/host-integrity.mjs` + `.json` | sha256 ของสคริปต์ host 28 ไฟล์ — ตรวจอัตโนมัติ, `--write` อัปเดต (ต้อง commit สคริปต์ก่อน) |
+| `host-smoke.mjs` | พิสูจน์ว่า "ยังใช้งานได้จริง" หลังงาน: API/DB/เว็บ/container/scheduled task (READ-ONLY) |
+| `preflight.mjs` | ด่านในเครื่องก่อน push: copy · secrets · arch-gate · frontend-gate · host-smoke · promote-web |
 
 ## Deployment จริง (สิ่งที่ต้องรู้ก่อนแตะ prod)
 

@@ -15,7 +15,7 @@
 `agent_jobs` · `agent_machine_hubs` · `agent_machines` · `agent_roles`
 
 ### Routes
-- `agent/agent.routes.ts` (122 บรรทัด)
+- `agent/agent.routes.ts` (123 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
@@ -32,7 +32,7 @@ DELETE /jobs/:id
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้
-`agent-actions.service` · `agent-policy.service` · `agent-team.service` · `agent-workspace.service` · `business-agent-executor.service`
+`agent-actions.service` · `agent-policy.service` · `agent-team.service` · `agent-workspace.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - agent → devices(devices)

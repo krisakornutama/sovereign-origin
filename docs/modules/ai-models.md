@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `ai-models/ai-models.routes.ts` (181 บรรทัด)
+- `ai-models/ai-models.routes.ts` (186 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

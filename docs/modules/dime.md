@@ -14,19 +14,8 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 ### ตารางที่เป็นเจ้าของ
 `asset_prices`
 
-### Routes
-- `dime/dime.routes.ts` (126 บรรทัด)
-
-### Endpoints (จาก router)
-```
-GET /status
-POST /fetch
-POST /import
-GET /statements
-```
-
 ### Services ที่ทำงานให้โมดูลนี้
-`dime-imap.service` · `dime-parser.service` · `dime.service`
+`dime-parser.service`
 
 ### เส้นข้ามที่ยอมรับแล้ว (boundary-baseline)
 - dime → auth(users)

@@ -15,14 +15,17 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `ota_events`
 
 ### Routes
-- `ota/ota.routes.ts` (152 บรรทัด)
+- `ota/ota.routes.ts` (200 บรรทัด)
 
 ### Endpoints (จาก router)
 ```
 GET /firmwares
 GET /firmwares/:file
+GET x-ota-token
+GET user-agent
 DELETE /firmwares/:file
 POST /deploy
+GET /legacy-clients
 GET /events
 ```
 

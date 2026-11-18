@@ -15,7 +15,7 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 _(ยังไม่มีตารางใน owners map)_
 
 ### Routes
-- `machine-control/machine-control.routes.ts` (287 บรรทัด)
+- `machine-control/machine-control.routes.ts` (297 บรรทัด)
 
 ### Endpoints (จาก router)
 ```

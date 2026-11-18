@@ -15,15 +15,15 @@ _(เจ้าของโมดูลเติม — อะไรที่ห�
 `livestock_batch_financials` · `livestock_biosecurity_logs` · `livestock_breeding_records` · `livestock_climate_logs` · `livestock_daily_logs` · `livestock_feed_silos` · `livestock_groups` · `livestock_medical_records` · `livestock_utility_alerts` · `livestock_vaccine_schedules` · `livestock_vision_reports`
 
 ### Routes
-- `livestock/livestock-batches.routes.ts` (86 บรรทัด)
-- `livestock/livestock-biosecurity.routes.ts` (73 บรรทัด)
-- `livestock/livestock-breeding.routes.ts` (64 บรรทัด)
+- `livestock/livestock-batches.routes.ts` (87 บรรทัด)
+- `livestock/livestock-biosecurity.routes.ts` (74 บรรทัด)
+- `livestock/livestock-breeding.routes.ts` (65 บรรทัด)
 - `livestock/livestock-climate.routes.ts` (143 บรรทัด)
 - `livestock/livestock-dashboard.routes.ts` (78 บรรทัด)
-- `livestock/livestock-groups.routes.ts` (140 บรรทัด)
-- `livestock/livestock-medical.routes.ts` (137 บรรทัด)
-- `livestock/livestock-production.routes.ts` (315 บรรทัด)
-- `livestock/livestock-vision.routes.ts` (70 บรรทัด)
+- `livestock/livestock-groups.routes.ts` (141 บรรทัด)
+- `livestock/livestock-medical.routes.ts` (138 บรรทัด)
+- `livestock/livestock-production.routes.ts` (316 บรรทัด)
+- `livestock/livestock-vision.routes.ts` (71 บรรทัด)
 - `livestock/livestock.routes.ts` (38 บรรทัด)
 
 ### Endpoints (จาก router)
@@ -58,7 +58,7 @@ GET /groups/:id/vision
 ```
 
 ### Services ที่ทำงานให้โมดูลนี้
-`livestock-cron.service` · `livestock-vet-ai.service`
+`livestock-cron.service` · `livestock-executive.service` · `livestock-vet-ai.service`
 
 <!-- auto:end -->
 
