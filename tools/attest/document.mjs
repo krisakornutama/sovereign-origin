@@ -99,6 +99,38 @@ export function describeBuild(build) {
   );
 }
 
+/**
+ * เวอร์ชันแบบ MAJOR.MINOR.PATCH (รับ tag ที่มี v นำหน้า) — ใช้ตัดสินว่า "เก่ากว่า" จริง
+ * ไม่ใช่เทียบสตริง (1.3.9 < 1.3.11 แต่ '1.3.9' > '1.3.11' แบบสตริง)
+ */
+export const VERSION_RE = /^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z.-]+))?$/;
+
+export function parseVersion(value) {
+  const match = VERSION_RE.exec(String(value ?? '').trim());
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    pre: match[4] ?? null,
+  };
+}
+
+/** -1 = a เก่ากว่า, 0 = เท่ากัน, 1 = a ใหม่กว่า, null = เทียบไม่ได้ (รูปแบบไม่ใช่เวอร์ชัน) */
+export function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (!left || !right) return null;
+  for (const key of ['major', 'minor', 'patch']) {
+    if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1;
+  }
+  if (left.pre === right.pre) return 0;
+  // prerelease มาก่อนรุ่นจริงของเลขเดียวกัน (1.3.11-rc.1 < 1.3.11)
+  if (left.pre === null) return 1;
+  if (right.pre === null) return -1;
+  return left.pre < right.pre ? -1 : 1;
+}
+
 export function receiptId(body) {
   return sha256Hex(Buffer.from(canonicalJson(body), 'utf8'));
 }
@@ -262,6 +294,9 @@ export function verifyDocument(doc, options = {}) {
   // digest ของ build manifest ที่ "อยู่ในลายเซ็น" ของใบที่ลงนามว่าปล่อยไบต์ชุดนี้
   const sealedBuilds = new Set();
   const sealedCommits = new Set();
+  // เกณฑ์กัน downgrade ที่ "อยู่ในลายเซ็น" และเวอร์ชันของไบต์ (จาก tag ในใบที่เซ็น ไม่ใช่ doc.tag)
+  const sealedMinVersions = [];
+  const sealedTags = new Set();
   for (const artifact of doc.artifacts) {
     if (!SHA256_RE.test(String(artifact.sha256))) {
       pushed(`artifact ${artifact.name} มี digest ผิดรูป`);
@@ -294,6 +329,10 @@ export function verifyDocument(doc, options = {}) {
         sealedBuilds.add(sealedMeta.buildDigest);
         if (typeof sealedMeta.buildCommit === 'string') sealedCommits.add(sealedMeta.buildCommit);
       }
+      if (sealedMeta && typeof sealedMeta.minVersion === 'string') {
+        sealedMinVersions.push(sealedMeta.minVersion);
+      }
+      if (sealedMeta && typeof sealedMeta.tag === 'string') sealedTags.add(sealedMeta.tag);
       if (body.artifact?.sha256 !== artifact.sha256) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
         break;
@@ -366,6 +405,61 @@ export function verifyDocument(doc, options = {}) {
     pushed('ใบที่เซ็นผนึก build manifest ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.build)');
   }
 
+  // ── กัน downgrade: ไบต์ที่เซ็นถูกต้องแต่เป็นรุ่นเก่าก็ต้องถูกปฏิเสธเมื่อเกณฑ์ถูก pin ไว้
+  const signedVersion = sealedTags.size === 1 ? [...sealedTags][0] : null;
+  let declaredMinVersion = null;
+  if (doc.minVersion !== undefined) {
+    if (typeof doc.minVersion !== 'string' || !parseVersion(doc.minVersion)) {
+      pushed(`minVersion ในเอกสารผิดรูป: ${String(doc.minVersion)}`);
+    } else {
+      declaredMinVersion = doc.minVersion;
+      const sealedMax = sealedMinVersions.reduce(
+        (best, candidate) => (best === null || compareVersions(candidate, best) > 0 ? candidate : best),
+        null
+      );
+      if (sealedMinVersions.length === 0) {
+        pushed('เอกสารอ้าง minVersion แต่ไม่มีใบที่เซ็นแล้วประกาศมัน');
+      } else if (sealedMax !== null && compareVersions(declaredMinVersion, sealedMax) < 0) {
+        pushed(
+          `minVersion ในเอกสาร (${declaredMinVersion}) ต่ำกว่าที่ผนึกไว้ในใบที่เซ็น (${sealedMax}) — ลดเกณฑ์กัน downgrade ไม่ได้`
+        );
+      }
+    }
+  } else if (sealedMinVersions.length > 0) {
+    pushed('ใบที่เซ็นประกาศ minVersion ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.minVersion)');
+  }
+
+  if (declaredMinVersion && signedVersion) {
+    const cmp = compareVersions(signedVersion, declaredMinVersion);
+    if (cmp !== null && cmp < 0) {
+      pushed(
+        `ไบต์นี้เป็นเวอร์ชัน ${signedVersion} เก่ากว่า minVersion ที่ใบรับรองประกาศ (${declaredMinVersion}) — ถือเป็นการ rollback`
+      );
+    }
+  }
+
+  if (options.minVersion) {
+    if (!parseVersion(options.minVersion)) {
+      pushed(`เกณฑ์ minVersion ที่ให้มาผิดรูป: ${String(options.minVersion)}`);
+    } else if (!signedVersion) {
+      pushed('สั่งกัน downgrade ไว้ แต่เอกสารไม่มี tag ที่เซ็นแล้วให้เทียบเวอร์ชัน');
+    } else {
+      const cmp = compareVersions(signedVersion, options.minVersion);
+      if (cmp !== null && cmp < 0) {
+        pushed(
+          `บิลด์นี้เป็นเวอร์ชัน ${signedVersion} เก่ากว่าเกณฑ์ที่ pin ไว้ ${options.minVersion} — ปฏิเสธการ rollback`
+        );
+      } else if (
+        declaredMinVersion &&
+        compareVersions(declaredMinVersion, options.minVersion) < 0
+      ) {
+        pushed(
+          `ใบรับรองประกาศ minVersion ${declaredMinVersion} ต่ำกว่าที่ผู้ตรวจ pin ไว้ ${options.minVersion}`
+        );
+      }
+    }
+  }
+
   if (options.fingerprint) {
     if (doc.fingerprint !== options.fingerprint) {
       pushed(`fingerprint ไม่ตรงกับที่ pin ไว้ (${options.fingerprint})`);
@@ -379,6 +473,8 @@ export function verifyDocument(doc, options = {}) {
     artifacts: doc.artifacts.length,
     receipts: doc.receipts.length,
     unusedReceipts: doc.receipts.filter((receipt) => !used.has(receipt.id)).length,
+    version: signedVersion,
+    minVersion: declaredMinVersion,
     build:
       declaredBuild && typeof declaredBuild === 'object'
         ? {

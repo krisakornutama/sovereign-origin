@@ -108,6 +108,27 @@ async function main() {
       'สรุป build provenance อ่านออกว่าไบต์มาจาก commit ไหน'
     );
 
+    // anti-downgrade: ใบที่เซ็นถูกต้องแต่เก่ากว่าเกณฑ์ ต้องถูกปฏิเสธ
+    expect(
+      signed.doc.minVersion === '0.0.0-dry-run',
+      'ใบรับรองประกาศ minVersion ตามเวอร์ชันของรอบนี้',
+      signed.doc.minVersion
+    );
+    expect(
+      verifyDocument(signed.doc, { minVersion: '0.0.0-dry-run' }).ok,
+      'เกณฑ์เท่ากับเวอร์ชันที่เซ็น ⇒ ผ่าน'
+    );
+    const rollback = verifyDocument(signed.doc, { minVersion: '0.0.1' });
+    expect(!rollback.ok, 'เกณฑ์สูงกว่าเวอร์ชันที่เซ็น ⇒ ปฏิเสธ rollback', rollback.problems?.join('; '));
+    expect(
+      rollback.problems.join('; ').includes('rollback'),
+      'ข้อความปฏิเสธบอกชัดว่าเป็นการ rollback',
+      rollback.problems.join('; ')
+    );
+    const forgedMin = JSON.parse(JSON.stringify(signed.doc));
+    forgedMin.minVersion = '9.9.9';
+    expect(!verifyDocument(forgedMin, {}).ok, 'แก้ minVersion ในเอกสารหลังเซ็น ⇒ ปฏิเสธ');
+
     const tamperedBuild = JSON.parse(JSON.stringify(signed.doc));
     tamperedBuild.build = {
       ...tamperedBuild.build,
