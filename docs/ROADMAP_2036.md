@@ -272,3 +272,18 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
 - **ปลดล็อก**: multi-writer สำหรับ `sovereign-agents` (writer เดียวต่อ vault → หลาย peer เขียน vault เดียวกันได้)
 - **งานถัดไป**: `ENERGY-001` (`sovereign-energy`) — พยากรณ์/ตัดสินใจจากข้อมูล local ที่เข้ารหัส
 
+### 2026-11-19 — `sovereign-energy` M1 (ENERGY-001)
+
+- **Milestone แรกของ §5.5 ปิดแล้ว**: charge session ที่คิดเงินด้วยมิเตอร์ ไม่ใช่ตัวเลขที่เครื่องชาร์จอ้าง
+  - Session: canonical header → id = SHA-256; หนึ่ง record ต่อ session; `start()` ผนึก receipt **ก่อน** เขียน record
+  - Meter trust: pin Ed25519 ต่อ `meterId`; unsigned ถูกปฏิเสธแม้มิเตอร์ถูก pin แล้ว (ไม่ fallback), signature ผิด = `signature-invalid`
+  - Settlement: `|chargerWh − meterWh| > toleranceWh` → `meter-mismatch` พร้อม `details`, session คง `active` ให้แก้ reading แล้ว retry; ผ่านแล้วจึงผนึก receipt
+  - Offline audit: `Energy.verifySettlement()` คำนวณ drift/tolerance/ช่วงเวลาใหม่เองจาก signed body
+  - OCPP 2.0.1: parse `TransactionEvent` subset (Started/Updated/Ended), เลือก `Energy.Active.Import.Register` ใหม่สุด, แปลง kWh→Wh
+  - Fail closed: receipt เขียนไม่ได้ = `receipt-required`; session/index/meter file เพี้ยนตอน `open()` = `rollback`
+  → repo <https://github.com/krisakornutama/sovereign-energy> commit `c5faa38` · CI [44547087595](https://github.com/krisakornutama/sovereign-energy/actions/runs/44547087595) เขียว (Node 20/22)
+  → 115 tests, coverage 98.97/97.39/100/99.35 · red-first พิสูจน์ด้วย mutant (ปิด tolerance guard ใน `stop()` → แดง 3 → คืนไฟล์ → เขียว 115/115)
+- **เอกสาร**: [`SOVEREIGN-ENERGY.md`](./SOVEREIGN-ENERGY.md)
+- **ข้อจำกัดที่ยังเปิด**: V2G dispatch และ solar forecast = `ENERGY-002`/`ENERGY-003`
+- **งานถัดไป**: `SUCC-001` (`sovereign-succession`) — heir key + policy ให้ระบบอยู่ต่อหลังเจ้าของหาย
+
