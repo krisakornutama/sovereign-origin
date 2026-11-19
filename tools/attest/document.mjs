@@ -261,7 +261,6 @@ export function verifyDocument(doc, options = {}) {
   const used = new Set();
   // digest ของ build manifest ที่ "อยู่ในลายเซ็น" ของใบที่ลงนามว่าปล่อยไบต์ชุดนี้
   const sealedBuilds = new Set();
-  const sealedCommits = new Set();
   for (const artifact of doc.artifacts) {
     if (!SHA256_RE.test(String(artifact.sha256))) {
       pushed(`artifact ${artifact.name} มี digest ผิดรูป`);
@@ -292,7 +291,6 @@ export function verifyDocument(doc, options = {}) {
       const sealedMeta = body.action === SIGNABLE_ACTION ? body.meta : undefined;
       if (sealedMeta && typeof sealedMeta.buildDigest === 'string') {
         sealedBuilds.add(sealedMeta.buildDigest);
-        if (typeof sealedMeta.buildCommit === 'string') sealedCommits.add(sealedMeta.buildCommit);
       }
       if (body.artifact?.sha256 !== artifact.sha256) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
@@ -355,8 +353,6 @@ export function verifyDocument(doc, options = {}) {
       pushed('เอกสารอ้าง build manifest แต่ไม่มีใบที่เซ็นแล้วผนึกมันไว้');
     } else if (!sealedBuilds.has(declaredBuild.digest)) {
       pushed('build manifest ในเอกสารไม่ตรงกับที่ผนึกไว้ในใบที่เซ็น');
-    } else if (sealedCommits.size > 0 && !sealedCommits.has(String(declaredBuild.commit?.sha ?? ''))) {
-      pushed('commit ใน build manifest ไม่ตรงกับ commit ที่ผนึกไว้ในใบที่เซ็น');
     }
     const sha = declaredBuild?.commit?.sha;
     if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) {
