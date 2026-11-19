@@ -121,6 +121,39 @@ curl -fsSL --create-dirs -o verifier/tools/attest/document.mjs \
   <p class="note">ต้องมี Node 20 ขึ้นไป คำสั่งนี้ตรวจสามชั้น: ลายเซ็นของทุก receipt,
     การต่อ chain ของแต่ละไฟล์ และแฮชของไบต์จริงในโฟลเดอร์ (ขนาดกับ sha256)</p>
 
+  <h2>4. ตรวจให้ลึกขึ้น: ไบต์นี้มาจาก commit ไหน และเก่ากว่าที่ควรหรือไม่</h2>
+  <p class="note">ใบรับรองรุ่นใหม่ผนึกเพิ่มสองอย่าง: <strong>build manifest</strong>
+    (commit, toolchain และแฮชของไฟล์ที่ใช้สร้าง) กับ <strong>minVersion</strong> (เกณฑ์ขั้นต่ำที่ใบนั้นประกาศ)
+    สองธงนี้ใช้เมื่อคุณต้องการกันให้แน่นกว่าการตรวจลายเซ็นตามปกติ</p>
+
+  <div class="card">
+    <p class="label">ธงที่เพิ่ม</p>
+    <ul>
+      <li><code>--build-commit=&lt;sha&gt;</code> — ยืนยันว่าไบต์นี้สร้างจาก commit ที่คุณโหลดมาตรวจพอดี
+        ตัวตรวจจะปฏิเสธถ้า manifest มาจาก commit อื่น หรือมาจาก working tree ที่ไม่สะอาด</li>
+      <li><code>--min-version=&lt;เวอร์ชัน&gt;</code> — เกณฑ์กันการย้อนรุ่น: บิลด์ที่ลายเซ็นถูกต้องแต่เก่ากว่า
+        จะถูกปฏิเสธ (rollback) แม้ลายเซ็นจะไม่ผิด</li>
+    </ul>
+  </div>
+
+<pre>node verifier/tools/attest-release.mjs --verify sov-attest/sovereign-attest.json \
+  --fingerprint=1afcc7d951d822a7dfe384d89209aed2 --dir=sov-attest \
+  --build-commit=&lt;commit ที่ประกาศไว้&gt; --min-version=1.3.11</pre>
+
+  <p class="note">ผลลัพธ์เมื่อผ่าน — สองบรรทัดท้ายบอกว่าไบต์มาจากไหนและเป็นเวอร์ชันใด:</p>
+<pre>ผ่าน: 2 artifact · 2 receipt · กุญแจ 1afcc7d951d822a7dfe384d89209aed2
+ไฟล์ที่แฮชตรงกับเอกสาร: 2 ไฟล์ (sov-attest)
+สร้างจาก commit c60773a00bf7 (clean) · node v24.19.0 / npm 11.17.0 · linux-x64 · input 10 ไฟล์ · manifest 7d426c9bb327
+เวอร์ชันที่เซ็น: v1.3.11 · minVersion ที่ประกาศ: 1.3.11</pre>
+
+  <p class="warn">ถ้าเป็นรุ่นเก่าที่ลายเซ็นถูกต้องจริง แต่ต่ำกว่าเกณฑ์ ตัวตรวจจะไม่ผ่านแบบนี้:</p>
+<pre>ตรวจไม่ผ่าน (1 ข้อ):
+  - บิลด์นี้เป็นเวอร์ชัน v1.3.10 เก่ากว่าเกณฑ์ที่ pin ไว้ 1.3.11 — ปฏิเสธการ rollback</pre>
+
+  <p class="note">ใบรับรองที่ยังไม่มีสองอย่างนี้ (release เก่า) ยังตรวจผ่านด้วยคำสั่งในข้อ 3
+    และตัวตรวจจะบอกตรง ๆ ว่า "ไม่มี build manifest ในใบนี้" กับ "ไม่ได้ประกาศ minVersion"
+    ไม่ใช่ปล่อยให้คุณเดา</p>
+
   <h2>อ่านผลลัพธ์อย่างไร</h2>
   <ul>
     <li><strong>ผ่าน</strong> — ไฟล์ที่คุณถืออยู่คือไบต์เดียวกับที่เซ็นไว้ และลายเซ็นมาจากกุญแจด้านบน</li>
