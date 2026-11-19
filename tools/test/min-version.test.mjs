@@ -161,3 +161,79 @@ test('เกณฑ์ถอยหลังใน chain: ใบก่อนหน
 test('pin ที่ผิดรูป / เอกสารไม่มี tag ที่เซ็นแล้ว ⇒ บอกตรง ๆ ไม่ผ่านแบบเงียบ', () => {
   assert.match(problemsOf(docFor({ tag: 'v1.3.11', signedMin: '1.3.11' }), { minVersion: 'latest' }), /ผิดรูป/);
 });
+
+// ── ไบต์เดิมถูกปล่อยซ้ำใต้ tag ใหม่ (chain มีหลาย tag) ──
+function chainedDoc({ entries, declaredMin }) {
+  const key = signer();
+  const receipts = [];
+  for (const entry of entries) {
+    const previous = receipts.at(-1);
+    receipts.push(makeReceipt(key, shippedBody({ ...entry, prev: previous?.id ?? null })));
+  }
+  const doc = {
+    v: 1,
+    tag: entries.at(-1).tag,
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_002_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: DIGEST, size: 3, receiptId: receipts.at(-1).id }],
+    receipts,
+  };
+  if (declaredMin !== undefined) doc.minVersion = declaredMin;
+  return doc;
+}
+
+test('ไบต์เดิมปล่อยซ้ำใต้ tag ใหม่: ใช้ tag ของใบที่ใหม่ที่สุดเป็นเวอร์ชัน', () => {
+  const doc = chainedDoc({
+    entries: [
+      { tag: 'v1.3.11', signedMin: '1.3.11', at: 1_700_000_000_000 },
+      { tag: 'v1.3.12', signedMin: '1.3.12', at: 1_700_000_100_000 },
+    ],
+    declaredMin: '1.3.12',
+  });
+
+  // ไม่ใช่ "ไม่มี tag ให้เทียบ" อีกต่อไป — ต้องรู้ว่าไบต์นี้คือ v1.3.12
+  const report = verifyDocument(doc, { minVersion: '1.3.12' });
+  assert.equal(report.ok, true, report.problems?.join('; '));
+  assert.equal(report.version, 'v1.3.12');
+
+  // เกณฑ์สูงกว่า tag ใหม่สุด ⇒ ปฏิเสธ และต้องอ้าง v1.3.12 (ไม่ใช่ v1.3.11/ค่าว่าง)
+  const pinned = verifyDocument(doc, { minVersion: '1.3.13' });
+  assert.equal(pinned.ok, false);
+  assert.match(pinned.problems.join('\n'), /เวอร์ชัน v1\.3\.12 เก่ากว่าเกณฑ์ที่ pin ไว้ 1\.3\.13/);
+  assert.doesNotMatch(pinned.problems.join('\n'), /ไม่มี tag ที่เซ็นแล้ว/);
+});
+
+test('chain ที่หัวเป็นใบเพิกถอน: ยังใช้ tag จากใบปล่อยล่าสุด ไม่ใช่หัว chain', () => {
+  const key = signer();
+  const shipped = makeReceipt(key, shippedBody({ tag: 'v1.3.12', signedMin: '1.3.12' }));
+  const revoked = makeReceipt(key, {
+    v: 1,
+    action: 'artifact.revoked',
+    actor: 'release:v1.3.12',
+    artifact: { name: 'app.exe', sha256: DIGEST, size: 3 },
+    at: 1_700_000_100_000,
+    prev: shipped.id,
+    meta: { revokedAt: 1_700_000_100_000 },
+  });
+  const doc = {
+    v: 1,
+    tag: 'v1.3.12',
+    keyId: 'release',
+    fingerprint: publicKeyFingerprint(key.publicKey),
+    at: 1_700_000_200_000,
+    root: 'a'.repeat(64),
+    anchor: { seq: 1 },
+    artifacts: [{ name: 'app.exe', sha256: DIGEST, size: 3, receiptId: revoked.id }],
+    receipts: [shipped, revoked],
+    minVersion: '1.3.12',
+  };
+  const report = verifyDocument(doc, { minVersion: '1.3.12', allowRevoked: true });
+  assert.equal(report.ok, true, report.problems?.join('; '));
+  assert.equal(report.version, 'v1.3.12');
+  // ใบที่เพิกถอนไม่ได้พา tag มาด้วย และต้องไม่กลบเวอร์ชันของใบปล่อย
+  const rollback = verifyDocument(doc, { minVersion: '1.3.13', allowRevoked: true });
+  assert.match(rollback.problems.join('\n'), /เวอร์ชัน v1\.3\.12 เก่ากว่าเกณฑ์ที่ pin ไว้/);
+});

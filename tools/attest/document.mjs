@@ -296,7 +296,9 @@ export function verifyDocument(doc, options = {}) {
   const sealedCommits = new Set();
   // เกณฑ์กัน downgrade ที่ "อยู่ในลายเซ็น" และเวอร์ชันของไบต์ (จาก tag ในใบที่เซ็น ไม่ใช่ doc.tag)
   const sealedMinVersions = [];
-  const sealedTags = new Set();
+  // ไบต์เดียวกันอาจถูกปล่อยหลาย tag (ปล่อยซ้ำ/re-release) ⇒ ต้องเลือกใบที่ใหม่ที่สุด
+  // ตามเวลาที่เซ็นในใบ (body.at) ไม่ใช่สมมติว่า chain มี tag เดียว
+  let newestShipped = null;
   for (const artifact of doc.artifacts) {
     if (!SHA256_RE.test(String(artifact.sha256))) {
       pushed(`artifact ${artifact.name} มี digest ผิดรูป`);
@@ -332,7 +334,13 @@ export function verifyDocument(doc, options = {}) {
       if (sealedMeta && typeof sealedMeta.minVersion === 'string') {
         sealedMinVersions.push(sealedMeta.minVersion);
       }
-      if (sealedMeta && typeof sealedMeta.tag === 'string') sealedTags.add(sealedMeta.tag);
+      if (sealedMeta && typeof sealedMeta.tag === 'string') {
+        const at = typeof body.at === 'number' ? body.at : Number.NEGATIVE_INFINITY;
+        // เดินจากใหม่→เก่า ⇒ ใช้ > ไม่ใช่ >= เพื่อให้ใบที่อยู่ใกล้หัว chain กินเสมอกัน
+        if (!newestShipped || at > newestShipped.at) {
+          newestShipped = { tag: sealedMeta.tag, at };
+        }
+      }
       if (body.artifact?.sha256 !== artifact.sha256) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
         break;
@@ -406,7 +414,7 @@ export function verifyDocument(doc, options = {}) {
   }
 
   // ── กัน downgrade: ไบต์ที่เซ็นถูกต้องแต่เป็นรุ่นเก่าก็ต้องถูกปฏิเสธเมื่อเกณฑ์ถูก pin ไว้
-  const signedVersion = sealedTags.size === 1 ? [...sealedTags][0] : null;
+  const signedVersion = newestShipped?.tag ?? null;
   let declaredMinVersion = null;
   if (doc.minVersion !== undefined) {
     if (typeof doc.minVersion !== 'string' || !parseVersion(doc.minVersion)) {
