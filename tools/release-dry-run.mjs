@@ -79,6 +79,8 @@ async function main() {
       masterKey: new Uint8Array(32).fill(7),
       signingKeyPem: pem,
       buildManifest: provenance,
+      // ค่าที่ CLI จะเติมให้เองจาก tag — ส่งตรง ๆ เพื่อซ้อมเส้นเดียวกับ CI
+      minVersion: '0.0.0-dry-run',
       now: () => Date.now(),
     });
     ok('เซ็น artifact ด้วยเส้นทางเดียวกับ CI (signRelease)');

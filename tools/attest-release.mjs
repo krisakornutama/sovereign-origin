@@ -178,11 +178,7 @@ function previousReceipts(file) {
   return previousDoc(file)?.receipts ?? [];
 }
 
-/**
- * เกณฑ์กัน downgrade ที่จะประกาศในใบรับรอง: --min-version=<v> หรือค่าจาก tag ของรอบนี้
- * (แต่ละ release จึงยกพื้นขึ้นเอง — ปล่อย 1.3.11 ⇒ 1.3.10 ถูกปฏิเสธเมื่อผู้ตรวจใช้ใบนี้)
- */
-/** ค่าเริ่มต้น = เวอร์ชันของ tag เอง (คง prerelease ไว้ เช่น 1.4.0-rc.1 ต้องไม่ต่ำกว่าตัวเอง) */
+/** ปรับรูปเวอร์ชันเป็น MAJOR.MINOR.PATCH[-pre] (คง prerelease ไว้: 1.4.0-rc.1 ต้องไม่ต่ำกว่าตัวเอง) */
 function normalizedVersion(value) {
   const parsed = parseVersion(value);
   if (!parsed) return null;
@@ -190,14 +186,12 @@ function normalizedVersion(value) {
   return parsed.pre ? `${core}-${parsed.pre}` : core;
 }
 
+/**
+ * เกณฑ์กัน downgrade ที่จะประกาศ: --min-version=<v> หรือค่าตั้งต้นของ CLI = เวอร์ชันของ tag
+ * (signRelease ไม่เดาค่าเอง — เรียกแบบโปรแกรมต้องส่งมา; การตรวจ/ปรับรูปอยู่ที่ signRelease)
+ */
 function minVersionFor(argv, tag) {
-  const given = argOf(argv, 'min-version', undefined);
-  if (given !== undefined) {
-    const normalized = normalizedVersion(given);
-    if (!normalized) throw fail('E_ARGS', `--min-version ไม่ใช่เวอร์ชัน: ${given}`);
-    return normalized;
-  }
-  return normalizedVersion(tag) ?? undefined;
+  return argOf(argv, 'min-version', undefined) ?? (parseVersion(tag) ? tag : undefined);
 }
 
 /**
@@ -229,13 +223,10 @@ function readRotations(files) {
 export async function signRelease(options) {
   const { dir, tag, out, keyId, stateDir, now, previousFile, signingKeyPem } = options;
   // เกณฑ์กัน downgrade: ผนึกใน meta ทุกใบ ⇒ ใครแก้ตัวเลขนี้ในเอกสาร ลายเซ็นจะไม่ผ่าน
-  // ค่าเริ่มต้น = เวอร์ชันของ tag (ทุกใบที่เซ็นจึงยกพื้นเอง); ส่ง null มาเพื่อไม่ประกาศเลย
-  let minVersion =
-    options.minVersion === null ? null : (options.minVersion ?? normalizedVersion(tag) ?? null);
-  if (minVersion !== null) {
-    const normalized = normalizedVersion(minVersion);
-    if (!normalized) throw fail('E_ARGS', `minVersion ไม่ใช่เวอร์ชัน: ${minVersion}`);
-    minVersion = normalized;
+  let minVersion = null;
+  if (options.minVersion != null) {
+    minVersion = normalizedVersion(options.minVersion);
+    if (!minVersion) throw fail('E_ARGS', `minVersion ไม่ใช่เวอร์ชัน: ${options.minVersion}`);
   }
   // build provenance: ถ้าผู้เรียกส่งมา ต้องผนึกได้และผ่านการตรวจรูปก่อนเซ็น
   // (manifest ที่ผิดรูปเมื่อเซ็นแล้วจะตรวจไม่ผ่านตลอดไป — ดักที่ต้นทางดีกว่า)

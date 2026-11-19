@@ -162,6 +162,26 @@ test('pin ที่ผิดรูป / เอกสารไม่มี tag �
   assert.match(problemsOf(docFor({ tag: 'v1.3.11', signedMin: '1.3.11' }), { minVersion: 'latest' }), /ผิดรูป/);
 });
 
+test('ใบที่เซ็นประกาศ minVersion ที่อ่านไม่เป็นเวอร์ชัน ⇒ รายงานแยก ไม่ปนกับปัญหา downgrade', () => {
+  const doc = docFor({ tag: 'v1.3.11', signedMin: 'release-please' });
+  const problems = problemsOf(doc);
+  assert.match(problems, /minVersion ที่ใช้ไม่ได้: release-please/);
+  assert.doesNotMatch(problems, /rollback/);
+});
+
+test('tag ที่อ่านเป็นเวอร์ชันไม่ได้ ⇒ ไม่ผ่านเงียบ ๆ เมื่อมีเกณฑ์ (pin หรือ floor) ให้เทียบ', () => {
+  const doc = docFor({ tag: 'nightly-2026-11-19', signedMin: undefined });
+  assert.doesNotMatch(problemsOf(doc), /อ่านเป็นเวอร์ชันไม่ได้/); // ไม่มีเกณฑ์ = ไม่ใช่เรื่อง downgrade
+  assert.match(problemsOf(doc, { minVersion: '1.3.11' }), /อ่านเป็นเวอร์ชันไม่ได้/);
+});
+
+test('ผู้ตรวจ pin เกณฑ์ต่ำกว่า floor ที่ใบประกาศ ⇒ ผ่านถ้าเวอร์ชันไบต์ไม่ต่ำกว่า pin (pin คือด่านจริง)', () => {
+  const doc = docFor({ tag: 'v1.3.11', signedMin: '1.3.11' });
+  const report = verifyDocument(doc, { minVersion: '1.3.10' });
+  assert.equal(report.ok, true, report.problems?.join('; '));
+  assert.equal(report.minVersion, '1.3.11');
+});
+
 // ── ไบต์เดิมถูกปล่อยซ้ำใต้ tag ใหม่ (chain มีหลาย tag) ──
 function chainedDoc({ entries, declaredMin }) {
   const key = signer();
