@@ -255,3 +255,35 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
   delegation/expiry) · gate เป็น *หลักฐาน* ไม่ใช่ *การป้องกัน* — module ที่แตะข้อมูลต้องเข้าถึงได้ทาง gate เท่านั้น
   หลักประกันจึงจะจริง · กันย้อนศรต้องมี anchor ที่เก็บนอก vault
 - **งานถัดไป**: `FABRIC-001` (2-peer sync บน CRDT + anchor log) — ปลดล็อกข้อจำกัด multi-writer
+
+
+### 2026-11-18 — `sovereign-fabric` M1 (FABRIC-001)
+
+- **Milestone แรกของ §5.4 ปิดแล้ว**: 2-peer sneakernet sync บน signed op log — ไม่มีเซิร์ฟเวอร์ ไม่มีเครือข่าย ไม่เชื่อใจ transport
+  - OpLog: append-only per-peer seq, hash chain ใน head → ตรวจจับ tamper/rollback ตอน open()
+  - Bundle: canonical JSON + Ed25519 receipt (sovereign-attest) → verify กับ pinned key, ไม่ใช่ key ใน bundle
+  - Ingest: dry-run ทั้ง bundle กับ virtual heads → reject gap/fork/rollback/relay/wrong-recipient ก่อนเขียน op ตัวแรก
+  - LWW: เรียง (at, peer, seq) → deterministic convergence
+  - Delta export: cursor `fabric/have/<peer>` เขียนตอน import สำเร็จ → receiver ตอบกลับ ≥1 ครั้งถึงมี delta
+  - ขีดจำกัด: 8 MiB / 5 000 ops / 64 KiB value / 64 peers per head map
+  → repo <https://github.com/krisakornutama/sovereign-fabric> commit `ccfa954` · CI `44318012298` เขียว (Node 20/22)
+  → 51 tests, coverage 98.18/95.27/100/98.87 · red-first พิสูจน์ด้วย mutant (verify ด้วย carried key → impostor test แดง)
+- **เอกสาร**: [`SOVEREIGN-FABRIC.md`](./SOVEREIGN-FABRIC.md)
+- **ปลดล็อก**: multi-writer สำหรับ `sovereign-agents` (writer เดียวต่อ vault → หลาย peer เขียน vault เดียวกันได้)
+- **งานถัดไป**: `ENERGY-001` (`sovereign-energy`) — พยากรณ์/ตัดสินใจจากข้อมูล local ที่เข้ารหัส
+
+### 2026-11-19 — `sovereign-energy` M1 (ENERGY-001)
+
+- **Milestone แรกของ §5.5 ปิดแล้ว**: charge session ที่คิดเงินด้วยมิเตอร์ ไม่ใช่ตัวเลขที่เครื่องชาร์จอ้าง
+  - Session: canonical header → id = SHA-256; หนึ่ง record ต่อ session; `start()` ผนึก receipt **ก่อน** เขียน record
+  - Meter trust: pin Ed25519 ต่อ `meterId`; unsigned ถูกปฏิเสธแม้มิเตอร์ถูก pin แล้ว (ไม่ fallback), signature ผิด = `signature-invalid`
+  - Settlement: `|chargerWh − meterWh| > toleranceWh` → `meter-mismatch` พร้อม `details`, session คง `active` ให้แก้ reading แล้ว retry; ผ่านแล้วจึงผนึก receipt
+  - Offline audit: `Energy.verifySettlement()` คำนวณ drift/tolerance/ช่วงเวลาใหม่เองจาก signed body
+  - OCPP 2.0.1: parse `TransactionEvent` subset (Started/Updated/Ended), เลือก `Energy.Active.Import.Register` ใหม่สุด, แปลง kWh→Wh
+  - Fail closed: receipt เขียนไม่ได้ = `receipt-required`; session/index/meter file เพี้ยนตอน `open()` = `rollback`
+  → repo <https://github.com/krisakornutama/sovereign-energy> commit `c5faa38` · CI [44547087595](https://github.com/krisakornutama/sovereign-energy/actions/runs/44547087595) เขียว (Node 20/22)
+  → 115 tests, coverage 98.97/97.39/100/99.35 · red-first พิสูจน์ด้วย mutant (ปิด tolerance guard ใน `stop()` → แดง 3 → คืนไฟล์ → เขียว 115/115)
+- **เอกสาร**: [`SOVEREIGN-ENERGY.md`](./SOVEREIGN-ENERGY.md)
+- **ข้อจำกัดที่ยังเปิด**: V2G dispatch และ solar forecast = `ENERGY-002`/`ENERGY-003`
+- **งานถัดไป**: `SUCC-001` (`sovereign-succession`) — heir key + policy ให้ระบบอยู่ต่อหลังเจ้าของหาย
+
