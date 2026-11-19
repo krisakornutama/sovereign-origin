@@ -35,9 +35,11 @@ import {
   bodyOf,
   canonicalJson,
   collectArtifacts,
+  compareVersions,
   describeArtifacts,
   describeBuild,
   manifestDigest,
+  parseVersion,
   publicKeyFingerprint,
   receiptId,
   sha256Hex,
@@ -55,9 +57,11 @@ export {
   bodyOf,
   canonicalJson,
   collectArtifacts,
+  compareVersions,
   describeArtifacts,
   describeBuild,
   manifestDigest,
+  parseVersion,
   publicKeyFingerprint,
   receiptId,
   sha256Hex,
@@ -175,6 +179,28 @@ function previousReceipts(file) {
 }
 
 /**
+ * เกณฑ์กัน downgrade ที่จะประกาศในใบรับรอง: --min-version=<v> หรือค่าจาก tag ของรอบนี้
+ * (แต่ละ release จึงยกพื้นขึ้นเอง — ปล่อย 1.3.11 ⇒ 1.3.10 ถูกปฏิเสธเมื่อผู้ตรวจใช้ใบนี้)
+ */
+/** ค่าเริ่มต้น = เวอร์ชันของ tag เอง (คง prerelease ไว้ เช่น 1.4.0-rc.1 ต้องไม่ต่ำกว่าตัวเอง) */
+function normalizedVersion(value) {
+  const parsed = parseVersion(value);
+  if (!parsed) return null;
+  const core = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+  return parsed.pre ? `${core}-${parsed.pre}` : core;
+}
+
+function minVersionFor(argv, tag) {
+  const given = argOf(argv, 'min-version', undefined);
+  if (given !== undefined) {
+    const normalized = normalizedVersion(given);
+    if (!normalized) throw fail('E_ARGS', `--min-version ไม่ใช่เวอร์ชัน: ${given}`);
+    return normalized;
+  }
+  return normalizedVersion(tag) ?? undefined;
+}
+
+/**
  * build manifest ที่จะผนึกในใบรับรอง: --build-manifest=<ไฟล์> (ตัวที่ตรวจได้ล่วงหน้า)
  * หรือ --provenance (เก็บสดจาก repo ที่กำลังรัน — ใช้ใน CI ที่ checkout ครบ)
  */
@@ -202,6 +228,15 @@ function readRotations(files) {
 /** เซ็น artifact ทุกไฟล์ในโฟลเดอร์ แล้วเขียนเอกสารที่ผู้ใช้ตรวจเองได้ */
 export async function signRelease(options) {
   const { dir, tag, out, keyId, stateDir, now, previousFile, signingKeyPem } = options;
+  // เกณฑ์กัน downgrade: ผนึกใน meta ทุกใบ ⇒ ใครแก้ตัวเลขนี้ในเอกสาร ลายเซ็นจะไม่ผ่าน
+  // ค่าเริ่มต้น = เวอร์ชันของ tag (ทุกใบที่เซ็นจึงยกพื้นเอง); ส่ง null มาเพื่อไม่ประกาศเลย
+  let minVersion =
+    options.minVersion === null ? null : (options.minVersion ?? normalizedVersion(tag) ?? null);
+  if (minVersion !== null) {
+    const normalized = normalizedVersion(minVersion);
+    if (!normalized) throw fail('E_ARGS', `minVersion ไม่ใช่เวอร์ชัน: ${minVersion}`);
+    minVersion = normalized;
+  }
   // build provenance: ถ้าผู้เรียกส่งมา ต้องผนึกได้และผ่านการตรวจรูปก่อนเซ็น
   // (manifest ที่ผิดรูปเมื่อเซ็นแล้วจะตรวจไม่ผ่านตลอดไป — ดักที่ต้นทางดีกว่า)
   // โหลดแบบ dynamic: ตัวตรวจ (--verify) ต้องใช้แค่ 2 ไฟล์เดิม ไม่ต้องโหลดโมดูลนี้
@@ -271,9 +306,13 @@ export async function signRelease(options) {
       // meta อยู่ใน body ที่ถูกเซ็น ⇒ provenance ผูกกับ artifact ด้วยลายเซ็นเดียวกัน
       // เก็บเป็น string ล้วน (sovereign-attest รับ meta เฉพาะ string/ตัวเลข) — digest ผูกเนื้อหา
       // ทั้งก้อนของ manifest ส่วนตัว manifest ที่อ่านได้อยู่ใน doc.build
-      meta: buildManifest
-        ? { tag, buildDigest: buildManifest.digest, buildCommit: buildManifest.commit.sha }
-        : { tag },
+      meta: {
+        tag,
+        ...(buildManifest
+          ? { buildDigest: buildManifest.digest, buildCommit: buildManifest.commit.sha }
+          : {}),
+        ...(minVersion ? { minVersion } : {}),
+      },
     });
     artifacts.push({ ...artifact, receiptId: receipt.id });
     receipts.push(receipt);
@@ -291,6 +330,7 @@ export async function signRelease(options) {
     artifacts,
     // สำเนาที่อ่านได้ของผู้ใช้ — ตรวจซ้ำกับที่ผนึกใน receipt ทุกครั้ง (verifyDocument)
     ...(buildManifest ? { build: buildManifest } : {}),
+    ...(minVersion ? { minVersion } : {}),
     receipts: [...prior, ...receipts].filter(
       (receipt, index, all) => all.findIndex((item) => item.id === receipt.id) === index
     ),
@@ -404,6 +444,9 @@ export async function revokeRelease(options) {
   // ไบต์ไม่ได้เปลี่ยนเพราะการเพิกถอน ⇒ provenance ของไบต์เดิมยังจริงและต้องตามมาด้วย
   const priorBuild = previousDoc(previousFile)?.build;
   if (priorBuild && typeof priorBuild === 'object') doc.build = priorBuild;
+  // เกณฑ์กัน downgrade ต้องไม่ถอยหลังเพราะการเพิกถอน
+  const priorMinVersion = previousDoc(previousFile)?.minVersion;
+  if (typeof priorMinVersion === 'string') doc.minVersion = priorMinVersion;
 
   const outFile = path.join(out ?? dir, ATTESTATION_FILE);
   fs.writeFileSync(outFile, `${JSON.stringify(doc, null, 2)}\n`);
@@ -477,6 +520,7 @@ async function main(argv) {
       masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
       signingKeyPem: readSigningKeyPem(argv),
       buildManifest: await readBuildManifestArg(argv, tag),
+      minVersion: minVersionFor(argv, tag),
       previousFile: argOf(argv, 'previous', undefined),
       rotationFiles: argv
         .filter((arg) => arg.startsWith('--rotation='))
@@ -530,6 +574,7 @@ async function main(argv) {
   const report = verifyDocument(doc, {
     fingerprint: argOf(argv, 'fingerprint', undefined),
     allowRevoked: flagOf(argv, 'allow-revoked'),
+    minVersion: argOf(argv, 'min-version', undefined),
   });
   // --dir=<โฟลเดอร์> ⇒ แฮชไฟล์จริงเทียบกับเอกสาร (ใช้ตอนผู้ใช้ตรวจไฟล์ที่ดาวน์โหลด)
   const checkedDir = argOf(argv, 'dir', undefined);
@@ -570,6 +615,12 @@ async function main(argv) {
     }
   }
   console.log(report.build ? describeBuild(report.build) : 'ไม่มี build manifest ในใบนี้ (เซ็นก่อนมี provenance)');
+  if (report.version) {
+    console.log(
+      `เวอร์ชันที่เซ็น: ${report.version}` +
+        (report.minVersion ? ` · minVersion ที่ประกาศ: ${report.minVersion}` : ' · ไม่ได้ประกาศ minVersion')
+    );
+  }
   if (report.unusedReceipts > 0) {
     console.log(`  (มี ${report.unusedReceipts} receipt เก่าใน chain ที่ไม่ได้ผูกกับไฟล์รุ่นนี้)`);
   }
