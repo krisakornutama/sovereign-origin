@@ -156,6 +156,41 @@ public key อยู่ใน repo นี้ที่ [`docs/keys/attest-release
 ผู้ใช้ที่ไม่มี repo ให้โหลดตัวตรวจสองไฟล์ (`tools/attest-release.mjs` + `tools/attest/document.mjs`)
 ตามที่หน้าเว็บบอก แล้วรันตรวจไฟล์ที่ดาวน์โหลดได้ทันที
 
+### Build provenance: ไบต์ที่เซ็นสร้างมาจาก commit ไหน
+
+ใบรับรองบอกได้ว่า "ไบต์ชุดนี้เซ็นด้วยกุญแจของเจ้าของ" แต่ไม่ได้บอกว่าไบต์นั้นมาจากโค้ดชุดไหน
+รอบที่ปล่อยจึงผนึก digest ของ `build manifest` ไว้ใน `meta.buildDigest` (พร้อม commit ใน
+`meta.buildCommit`) ของ receipt ทุกใบ — sovereign-attest รับ meta เฉพาะ string/ตัวเลข จึงเก็บ
+เป็น digest ไม่ใช่ก้อน JSON (อยู่ใน body ที่ถูกเซ็น ⇒ แก้ไม่ได้โดยไม่ทำให้ลายเซ็นขาด) และเขียน
+manifest ที่อ่านได้ไว้ที่ `doc.build` ซึ่งตัวตรวจจะคำนวณ digest ซ้ำแล้วเทียบกับที่ผนึกไว้ทุกครั้ง
+
+manifest บรรจุ: commit SHA + ref + dirty · toolchain (node/npm/platform) · sha256 และขนาดของ
+ไฟล์ที่ใช้สร้าง (lockfile ของ frontend/core-api, `package.json` ทั้งสอง, `tools/build-desktop.mjs`,
+`tools/stage-release.mjs`, `tools/release-build.mjs`, `tools/attest-release.mjs`,
+`tools/attest/document.mjs`, `.github/workflows/release.yml`) — ไฟล์ที่ควรมีแต่หายไปถูกบันทึกใน
+`missing` ไม่ใช่หายเงียบ · digest = sha256 ของ canonical JSON ของ manifest เอง
+
+```bash
+# ดู manifest ของ repo ที่กำลังยืนอยู่ (ไม่ต้องมีกุญแจ)
+node tools/attest/build-manifest.mjs --tag=v1.3.11 --out=build-manifest.json
+
+# เซ็นพร้อมผนึก provenance (CI ใช้ไฟล์ที่เขียนไว้; หรือ --provenance เพื่อเก็บสด)
+node tools/attest-release.mjs --sign --dir=release-assets --tag=v1.3.11 \
+  --build-manifest=build-manifest.json
+
+# ตรวจ: ต้องมั่นใจว่าไบต์มาจาก commit ที่โหลดมาตรวจพอดี
+node tools/attest-release.mjs --verify sovereign-attest.json \
+  --fingerprint=1afcc7d951d822a7dfe384d89209aed2 --dir=. --build-commit=<sha>
+```
+
+ตัวตรวจปฏิเสธเมื่อ: digest ของ manifest ไม่ตรงกับเนื้อหา (ถูกแก้หลังเซ็น) · manifest ในเอกสาร
+ไม่ใช่ใบเดียวกับที่ผนึกไว้ในใบที่เซ็น · เอกสารอ้าง manifest แต่ไม่มีใบที่เซ็นแล้วผนึกมัน (หรือกลับกัน) ·
+`--build-commit` ไม่ตรงกับ commit ใน manifest · manifest มาจาก working tree ที่สะกปรก (dirty)
+
+**ขอบเขตที่ยังไม่ครอบ:** ยังไม่พิสูจน์ว่า build ซ้ำได้ 100% (reproducible build) — manifest คือ
+บันทึกที่ตรวจย้อนได้ว่าเครื่องปล่อยใช้ input อะไร ผู้ตรวจที่อยากพิสูจน์ต่อให้ checkout commit นั้น
+แล้วเทียบแฮชของ input กับ manifest
+
 ### Rotation: เปลี่ยนกุญแจโดยไม่ทำให้ประวัติขาด
 
 กุญแจเก่าเซ็นใบรับรองกุญแจใหม่ (`sealRotation`) — ใบนี้คือหลักฐานว่า "การเปลี่ยนกุญแจเป็นเจตนาของเจ้าของ"

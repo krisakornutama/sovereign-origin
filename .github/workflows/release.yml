@@ -55,6 +55,15 @@ jobs:
         shell: bash
         run: node tools/release-build.mjs --check-tag="${{ inputs.tag || github.ref_name }}"
 
+      # ผนึก "ไบต์นี้สร้างมาจากอะไร" ก่อนเซ็น: commit + toolchain + แฮชของ lockfile/build script
+      # manifest ถูกฝังใน meta ของ receipt ⇒ อยู่ในลายเซ็นเดียวกับ artifact (ไม่ใช่ประกาศลอย ๆ)
+      - name: ผนึก build manifest (commit + toolchain + แฮชของ input)
+        shell: bash
+        run: |
+          NPM_VERSION="$(npm --version)" node tools/attest/build-manifest.mjs \
+            --tag="${{ inputs.tag || github.ref_name }}" --out=build-manifest.json
+          cat build-manifest.json
+
       - name: ติดตั้ง dependencies + build core-api (sidecar)
         working-directory: sovereign-os/core-api
         run: |
@@ -123,7 +132,8 @@ jobs:
         run: |
           prev_arg=""
           [ -f .attest-prev/sovereign-attest.json ] && prev_arg="--previous=.attest-prev/sovereign-attest.json"
-          node tools/attest-release.mjs --sign --dir=release-assets --tag="${{ inputs.tag || github.ref_name }}" $prev_arg
+          node tools/attest-release.mjs --sign --dir=release-assets --tag="${{ inputs.tag || github.ref_name }}" \
+            --build-manifest=build-manifest.json $prev_arg
           node tools/attest-release.mjs --verify release-assets/sovereign-attest.json
 
       # ตรวจใบรับรองด้วยกุญแจที่ commit ไว้ + แฮชไฟล์จริงในชุดที่จะอัปโหลด
@@ -133,7 +143,8 @@ jobs:
         shell: bash
         run: |
           node tools/attest-release.mjs --verify release-assets/sovereign-attest.json \
-            --pin-key=docs/keys/attest-release.pub.pem --dir=release-assets
+            --pin-key=docs/keys/attest-release.pub.pem --dir=release-assets \
+            --build-commit="$(git rev-parse HEAD)"
 
       # เขียนประกาศ fingerprint ที่จะต่อท้าย release notes (สวิตช์ปิด = เขียนว่าไม่มีใบรับรอง)
       - name: เขียนประกาศ fingerprint สำหรับ release notes

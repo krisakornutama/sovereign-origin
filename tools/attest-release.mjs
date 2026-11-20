@@ -36,6 +36,8 @@ import {
   canonicalJson,
   collectArtifacts,
   describeArtifacts,
+  describeBuild,
+  manifestDigest,
   publicKeyFingerprint,
   receiptId,
   sha256Hex,
@@ -46,6 +48,7 @@ import {
   SIGNABLE_ACTION,
 } from './attest/document.mjs';
 
+
 export {
   ATTESTATION_FILE,
   DOC_VERSION,
@@ -53,6 +56,8 @@ export {
   canonicalJson,
   collectArtifacts,
   describeArtifacts,
+  describeBuild,
+  manifestDigest,
   publicKeyFingerprint,
   receiptId,
   sha256Hex,
@@ -61,6 +66,14 @@ export {
 };
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** error ที่มีรหัสอ่านออก — CLI พิมพ์ "✖ E_XXX: ..." ให้ผู้ใช้รู้ว่าพังขั้นไหน */
+function fail(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function argOf(argv, name, fallback) {
   const found = argv.find((arg) => arg.startsWith(`--${name}=`));
   return found ? found.slice(name.length + 3) : fallback;
@@ -161,6 +174,20 @@ function previousReceipts(file) {
   return previousDoc(file)?.receipts ?? [];
 }
 
+/**
+ * build manifest ที่จะผนึกในใบรับรอง: --build-manifest=<ไฟล์> (ตัวที่ตรวจได้ล่วงหน้า)
+ * หรือ --provenance (เก็บสดจาก repo ที่กำลังรัน — ใช้ใน CI ที่ checkout ครบ)
+ */
+async function readBuildManifestArg(argv, tag) {
+  const file = argOf(argv, 'build-manifest', undefined);
+  if (file) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (flagOf(argv, 'provenance')) {
+    const { collectBuildManifest } = await import('./attest/build-manifest.mjs');
+    return collectBuildManifest({ tag });
+  }
+  return undefined;
+}
+
 /** ใบ rotation ที่ผู้เรียกส่งมา — ฟอร์แมตเป็นของ sovereign-attest (sealRotation) */
 function readRotations(files) {
   return files.map((file) => {
@@ -175,6 +202,17 @@ function readRotations(files) {
 /** เซ็น artifact ทุกไฟล์ในโฟลเดอร์ แล้วเขียนเอกสารที่ผู้ใช้ตรวจเองได้ */
 export async function signRelease(options) {
   const { dir, tag, out, keyId, stateDir, now, previousFile, signingKeyPem } = options;
+  // build provenance: ถ้าผู้เรียกส่งมา ต้องผนึกได้และผ่านการตรวจรูปก่อนเซ็น
+  // (manifest ที่ผิดรูปเมื่อเซ็นแล้วจะตรวจไม่ผ่านตลอดไป — ดักที่ต้นทางดีกว่า)
+  // โหลดแบบ dynamic: ตัวตรวจ (--verify) ต้องใช้แค่ 2 ไฟล์เดิม ไม่ต้องโหลดโมดูลนี้
+  let buildManifest = null;
+  if (options.buildManifest) {
+    const { sealBuildManifest, verifyBuildManifest } = await import('./attest/build-manifest.mjs');
+    buildManifest = sealBuildManifest(options.buildManifest);
+    // dirty ไม่ใช่ "ผิดรูป" — เครื่องนักพัฒนาสกปรกได้ แต่ปลายทางจะเห็นเป็นสัญญาณเตือน
+    const check = verifyBuildManifest(buildManifest, { allowDirty: true });
+    if (!check.ok) throw fail('E_BUILD', `build manifest ใช้ไม่ได้: ${check.problems.join('; ')}`);
+  }
   const masterKey = options.masterKey ?? resolveMasterKey(process.argv.slice(2), Boolean(signingKeyPem));
   const { attest: attestModule, vault: vaultModule } = await loadAttestModules();
   const { Attest, loadSigningKey, saveSigningKey } = attestModule;
@@ -230,7 +268,12 @@ export async function signRelease(options) {
       action: SIGNABLE_ACTION,
       actor: `release:${tag}`,
       artifact: { name: artifact.name, sha256: artifact.sha256, size: artifact.size },
-      meta: { tag },
+      // meta อยู่ใน body ที่ถูกเซ็น ⇒ provenance ผูกกับ artifact ด้วยลายเซ็นเดียวกัน
+      // เก็บเป็น string ล้วน (sovereign-attest รับ meta เฉพาะ string/ตัวเลข) — digest ผูกเนื้อหา
+      // ทั้งก้อนของ manifest ส่วนตัว manifest ที่อ่านได้อยู่ใน doc.build
+      meta: buildManifest
+        ? { tag, buildDigest: buildManifest.digest, buildCommit: buildManifest.commit.sha }
+        : { tag },
     });
     artifacts.push({ ...artifact, receiptId: receipt.id });
     receipts.push(receipt);
@@ -246,6 +289,8 @@ export async function signRelease(options) {
     root: anchorEntry.root,
     anchor: anchorEntry.entry,
     artifacts,
+    // สำเนาที่อ่านได้ของผู้ใช้ — ตรวจซ้ำกับที่ผนึกใน receipt ทุกครั้ง (verifyDocument)
+    ...(buildManifest ? { build: buildManifest } : {}),
     receipts: [...prior, ...receipts].filter(
       (receipt, index, all) => all.findIndex((item) => item.id === receipt.id) === index
     ),
@@ -356,6 +401,9 @@ export async function revokeRelease(options) {
   };
   const priorRotations = previousDoc(previousFile)?.rotations;
   if (Array.isArray(priorRotations)) doc.rotations = priorRotations;
+  // ไบต์ไม่ได้เปลี่ยนเพราะการเพิกถอน ⇒ provenance ของไบต์เดิมยังจริงและต้องตามมาด้วย
+  const priorBuild = previousDoc(previousFile)?.build;
+  if (priorBuild && typeof priorBuild === 'object') doc.build = priorBuild;
 
   const outFile = path.join(out ?? dir, ATTESTATION_FILE);
   fs.writeFileSync(outFile, `${JSON.stringify(doc, null, 2)}\n`);
@@ -428,6 +476,7 @@ async function main(argv) {
       stateDir: argOf(argv, 'state-dir', path.join(ROOT, 'data', 'attest')),
       masterKey: process.env.ATTEST_MASTER_KEY ? readMasterKey(argv) : undefined,
       signingKeyPem: readSigningKeyPem(argv),
+      buildManifest: await readBuildManifestArg(argv, tag),
       previousFile: argOf(argv, 'previous', undefined),
       rotationFiles: argv
         .filter((arg) => arg.startsWith('--rotation='))
@@ -441,6 +490,7 @@ async function main(argv) {
     console.log(flat);
     console.log(`fingerprint: ${result.signer.fingerprint}`);
     console.log(`vault root:  ${result.doc.root}`);
+    if (result.doc.build) console.log(describeBuild(result.doc.build));
     console.log('ตรวจ: node tools/attest-release.mjs --verify <ไฟล์นี้> --fingerprint <fingerprint>');
     return 0;
   }
@@ -487,6 +537,20 @@ async function main(argv) {
   const pinFile = argOf(argv, 'pin-key', undefined);
   const pinned = pinFile ? publicKeyFingerprint(fs.readFileSync(pinFile, 'utf8')) : null;
   const problems = report.problems.slice();
+  // --build-commit=<sha> ⇒ ยืนยันว่าไบต์ที่เซ็นสร้างจาก commit ที่โหลดมา ไม่ใช่แค่ "มี manifest"
+  const expectedCommit = argOf(argv, 'build-commit', undefined);
+  if (expectedCommit) {
+    if (!report.build) {
+      problems.push('สั่ง --build-commit ไว้ แต่เอกสารนี้ไม่มี build manifest ให้เทียบ');
+    } else if (report.build.commit.sha !== expectedCommit) {
+      problems.push(
+        `build manifest มาจาก commit ${String(report.build.commit.sha).slice(0, 12)} ไม่ใช่ ${expectedCommit.slice(0, 12)}`
+      );
+    }
+    if (report.build?.commit.dirty) {
+      problems.push('build manifest มาจาก working tree ที่ไม่สะอาด (dirty) — ไบต์อาจไม่ตรงกับ commit นั้น');
+    }
+  }
   if (fileReport) problems.push(...fileReport.problems);
   if (pinned && pinned !== doc.fingerprint) {
     problems.push(`กุญแจที่ pin ไว้ (${pinned}) ไม่ใช่กุญแจที่เซ็นเอกสาร (${doc.fingerprint})`);
@@ -505,6 +569,7 @@ async function main(argv) {
       console.log(`ไม่ถูกเซ็น (ไม่นับรวม): ${fileReport.unlisted.join(', ')}`);
     }
   }
+  console.log(report.build ? describeBuild(report.build) : 'ไม่มี build manifest ในใบนี้ (เซ็นก่อนมี provenance)');
   if (report.unusedReceipts > 0) {
     console.log(`  (มี ${report.unusedReceipts} receipt เก่าใน chain ที่ไม่ได้ผูกกับไฟล์รุ่นนี้)`);
   }
