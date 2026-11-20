@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://krisakornutama.github.io/project-sovereign/sitemap.xml
+Sitemap: https://sovereignoriginshop.dpdns.org/sitemap.xml
