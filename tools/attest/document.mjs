@@ -99,6 +99,38 @@ export function describeBuild(build) {
   );
 }
 
+/**
+ * เวอร์ชันแบบ MAJOR.MINOR.PATCH (รับ tag ที่มี v นำหน้า) — ใช้ตัดสินว่า "เก่ากว่า" จริง
+ * ไม่ใช่เทียบสตริง (1.3.9 < 1.3.11 แต่ '1.3.9' > '1.3.11' แบบสตริง)
+ */
+export const VERSION_RE = /^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z.-]+))?$/;
+
+export function parseVersion(value) {
+  const match = VERSION_RE.exec(String(value ?? '').trim());
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    pre: match[4] ?? null,
+  };
+}
+
+/** -1 = a เก่ากว่า, 0 = เท่ากัน, 1 = a ใหม่กว่า, null = เทียบไม่ได้ (รูปแบบไม่ใช่เวอร์ชัน) */
+export function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (!left || !right) return null;
+  for (const key of ['major', 'minor', 'patch']) {
+    if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1;
+  }
+  if (left.pre === right.pre) return 0;
+  // prerelease มาก่อนรุ่นจริงของเลขเดียวกัน (1.3.11-rc.1 < 1.3.11)
+  if (left.pre === null) return 1;
+  if (right.pre === null) return -1;
+  return left.pre < right.pre ? -1 : 1;
+}
+
 export function receiptId(body) {
   return sha256Hex(Buffer.from(canonicalJson(body), 'utf8'));
 }
@@ -144,6 +176,93 @@ export function bodyOf(receipt) {
  * digest ของไฟล์ที่อ้างถึง และ fingerprint ที่ pin (ถ้ามี)
  * ไม่พึ่ง vault หรือเน็ต — นี่คือด่านที่ผู้ใช้ดาวน์โหลดปลายทางรันได้จริง
  */
+/**
+ * build provenance: สำเนาที่อ่านได้ในเอกสารต้องเป็นใบเดียวกับที่ผนึกไว้ในลายเซ็น
+ * digest ครอบทุกฟิลด์ของ manifest (รวม commit) ⇒ เทียบ digest ตัวเดียวพอ
+ */
+function checkBuildProvenance(declaredBuild, sealedBuilds, push) {
+  if (declaredBuild === undefined) {
+    if (sealedBuilds.size > 0) {
+      push('ใบที่เซ็นผนึก build manifest ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.build)');
+    }
+    return;
+  }
+  if (!declaredBuild || typeof declaredBuild !== 'object' || Array.isArray(declaredBuild)) {
+    push('build manifest ในเอกสารผิดรูป');
+    return;
+  }
+  const sha = declaredBuild.commit?.sha;
+  if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) {
+    push('build manifest ไม่ระบุ commit sha ที่ใช้ได้');
+  }
+  const digest = typeof declaredBuild.digest === 'string' ? declaredBuild.digest : null;
+  if (!digest || !SHA256_RE.test(digest)) {
+    push('build manifest ในเอกสารไม่มี digest ที่ใช้ได้');
+    return;
+  }
+  if (manifestDigest(declaredBuild) !== digest) {
+    push('build manifest ในเอกสารถูกแก้หลังเซ็น (digest ไม่ตรงกับเนื้อหา)');
+    return;
+  }
+  if (sealedBuilds.size === 0) {
+    push('เอกสารอ้าง build manifest แต่ไม่มีใบที่เซ็นแล้วผนึกมันไว้');
+  } else if (!sealedBuilds.has(digest)) {
+    push('build manifest ในเอกสารไม่ตรงกับที่ผนึกไว้ในใบที่เซ็น');
+  }
+}
+
+/**
+ * กัน downgrade: ไบต์ที่ลายเซ็นถูกต้องแต่เป็นรุ่นเก่าก็ต้องถูกปฏิเสธ
+ * เกณฑ์มาจากสองที่ — ใบรับรองประกาศเอง (ต้องไม่ต่ำกว่าที่ผนึกไว้) และผู้ตรวจ pin เอง
+ * คืนค่า minVersion ที่ประกาศได้ เพื่อเอาไปรายงาน
+ */
+function checkMinVersion({ declared, sealed, signedVersion, pin, push }) {
+  let declaredMin = null;
+  if (declared === undefined) {
+    if (sealed.length > 0) {
+      push('ใบที่เซ็นประกาศ minVersion ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.minVersion)');
+    }
+  } else if (typeof declared !== 'string' || !parseVersion(declared)) {
+    push(`minVersion ในเอกสารผิดรูป: ${String(declared)}`);
+  } else {
+    declaredMin = declared;
+    if (sealed.length === 0) {
+      push('เอกสารอ้าง minVersion แต่ไม่มีใบที่เซ็นแล้วประกาศมัน');
+    } else {
+      const highest = sealed.reduce((best, value) => (compareVersions(value, best) > 0 ? value : best));
+      if (compareVersions(declaredMin, highest) < 0) {
+        push(
+          `minVersion ในเอกสาร (${declaredMin}) ต่ำกว่าที่ผนึกไว้ในใบที่เซ็น (${highest}) — ลดเกณฑ์กัน downgrade ไม่ได้`
+        );
+      }
+    }
+  }
+
+  // tag ที่อ่านเป็นเวอร์ชันไม่ได้ = เทียบเกณฑ์ไม่ได้ ⇒ ห้ามผ่านเงียบ ๆ เมื่อมีเกณฑ์อยู่ในมือ
+  if ((declaredMin || pin) && signedVersion && !parseVersion(signedVersion)) {
+    push(`tag ของไบต์ (${signedVersion}) อ่านเป็นเวอร์ชันไม่ได้ — เทียบเกณฑ์กัน downgrade ไม่ได้`);
+  }
+
+  if (declaredMin && signedVersion && compareVersions(signedVersion, declaredMin) < 0) {
+    push(
+      `ไบต์นี้เป็นเวอร์ชัน ${signedVersion} เก่ากว่า minVersion ที่ใบรับรองประกาศ (${declaredMin}) — ถือเป็นการ rollback`
+    );
+  }
+
+  if (pin) {
+    if (!parseVersion(pin)) {
+      push(`เกณฑ์ minVersion ที่ให้มาผิดรูป: ${String(pin)}`);
+    } else if (!signedVersion) {
+      push('สั่งกัน downgrade ไว้ แต่เอกสารไม่มี tag ที่เซ็นแล้วให้เทียบเวอร์ชัน');
+    } else if (compareVersions(signedVersion, pin) < 0) {
+      push(
+        `บิลด์นี้เป็นเวอร์ชัน ${signedVersion} เก่ากว่าเกณฑ์ที่ pin ไว้ ${pin} — ปฏิเสธการ rollback`
+      );
+    }
+  }
+  return declaredMin;
+}
+
 export function verifyDocument(doc, options = {}) {
   const problems = [];
   const pushed = (message) => problems.push(message);
@@ -261,6 +380,12 @@ export function verifyDocument(doc, options = {}) {
   const used = new Set();
   // digest ของ build manifest ที่ "อยู่ในลายเซ็น" ของใบที่ลงนามว่าปล่อยไบต์ชุดนี้
   const sealedBuilds = new Set();
+  // เกณฑ์กัน downgrade ที่ "อยู่ในลายเซ็น" และเวอร์ชันของไบต์ (จาก tag ในใบที่เซ็น ไม่ใช่ doc.tag)
+  const sealedMinVersions = [];
+  const invalidMinVersions = new Set();
+  // ไบต์เดียวกันอาจถูกปล่อยหลาย tag (ปล่อยซ้ำ/re-release) ⇒ ต้องเลือกใบที่ใหม่ที่สุด
+  // ตามเวลาที่เซ็นในใบ (body.at) ไม่ใช่สมมติว่า chain มี tag เดียว
+  let newestShipped = null;
   for (const artifact of doc.artifacts) {
     if (!SHA256_RE.test(String(artifact.sha256))) {
       pushed(`artifact ${artifact.name} มี digest ผิดรูป`);
@@ -291,6 +416,18 @@ export function verifyDocument(doc, options = {}) {
       const sealedMeta = body.action === SIGNABLE_ACTION ? body.meta : undefined;
       if (sealedMeta && typeof sealedMeta.buildDigest === 'string') {
         sealedBuilds.add(sealedMeta.buildDigest);
+      }
+      if (sealedMeta && typeof sealedMeta.minVersion === 'string') {
+        // ค่าที่เอาไปเทียบต้องเป็นเวอร์ชันที่อ่านออก — ที่เหลือรายงานแยก ไม่ปนกับปัญหา downgrade
+        if (parseVersion(sealedMeta.minVersion)) sealedMinVersions.push(sealedMeta.minVersion);
+        else invalidMinVersions.add(sealedMeta.minVersion);
+      }
+      if (sealedMeta && typeof sealedMeta.tag === 'string') {
+        const at = typeof body.at === 'number' ? body.at : 0;
+        // เดินจากใหม่→เก่า ⇒ ใช้ > ไม่ใช่ >= เพื่อให้ใบที่อยู่ใกล้หัว chain กินเสมอกัน
+        if (!newestShipped || at > newestShipped.at) {
+          newestShipped = { tag: sealedMeta.tag, at };
+        }
       }
       if (body.artifact?.sha256 !== artifact.sha256) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
@@ -340,27 +477,20 @@ export function verifyDocument(doc, options = {}) {
     }
   }
 
-  // build provenance: สำเนาที่อ่านได้ในเอกสารต้องเป็นตัวเดียวกับที่ผนึกไว้ในลายเซ็น
   const declaredBuild = doc.build;
-  if (declaredBuild !== undefined) {
-    if (!declaredBuild || typeof declaredBuild !== 'object' || Array.isArray(declaredBuild)) {
-      pushed('build manifest ในเอกสารผิดรูป');
-    } else if (typeof declaredBuild.digest !== 'string' || !SHA256_RE.test(declaredBuild.digest)) {
-      pushed('build manifest ในเอกสารไม่มี digest ที่ใช้ได้');
-    } else if (manifestDigest(declaredBuild) !== declaredBuild.digest) {
-      pushed('build manifest ในเอกสารถูกแก้หลังเซ็น (digest ไม่ตรงกับเนื้อหา)');
-    } else if (sealedBuilds.size === 0) {
-      pushed('เอกสารอ้าง build manifest แต่ไม่มีใบที่เซ็นแล้วผนึกมันไว้');
-    } else if (!sealedBuilds.has(declaredBuild.digest)) {
-      pushed('build manifest ในเอกสารไม่ตรงกับที่ผนึกไว้ในใบที่เซ็น');
-    }
-    const sha = declaredBuild?.commit?.sha;
-    if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) {
-      pushed('build manifest ไม่ระบุ commit sha ที่ใช้ได้');
-    }
-  } else if (sealedBuilds.size > 0) {
-    pushed('ใบที่เซ็นผนึก build manifest ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.build)');
+  checkBuildProvenance(declaredBuild, sealedBuilds, pushed);
+
+  for (const bad of invalidMinVersions) {
+    pushed(`ใบที่เซ็นประกาศ minVersion ที่ใช้ไม่ได้: ${bad}`);
   }
+  const signedVersion = newestShipped?.tag ?? null;
+  const declaredMinVersion = checkMinVersion({
+    declared: doc.minVersion,
+    sealed: sealedMinVersions,
+    signedVersion,
+    pin: options.minVersion,
+    push: pushed,
+  });
 
   if (options.fingerprint) {
     if (doc.fingerprint !== options.fingerprint) {
@@ -375,10 +505,11 @@ export function verifyDocument(doc, options = {}) {
     artifacts: doc.artifacts.length,
     receipts: doc.receipts.length,
     unusedReceipts: doc.receipts.filter((receipt) => !used.has(receipt.id)).length,
+    version: signedVersion,
+    minVersion: declaredMinVersion,
     build:
       declaredBuild && typeof declaredBuild === 'object'
         ? {
-            v: declaredBuild.v ?? null,
             tag: declaredBuild.tag ?? null,
             commit: {
               sha: declaredBuild.commit?.sha ?? null,
