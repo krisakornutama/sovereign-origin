@@ -1,7 +1,7 @@
 {
   "generatedFrom": "CHANGELOG.md",
   "generatedBy": "tools/gen-changelog-data.mjs",
-  "currentVersion": "1.3.10",
+  "currentVersion": "1.3.11",
   "versions": [
     {
       "version": "Unreleased",
@@ -11,6 +11,62 @@
       "ref": "",
       "summary": [],
       "sections": []
+    },
+    {
+      "version": "v1.3.11",
+      "dateISO": "2026-11-18",
+      "dateLabel": "18 พ.ย. 2026",
+      "released": true,
+      "ref": "",
+      "summary": [
+        {
+          "type": "paragraph",
+          "text": "รอบนี้ทำให้คำว่า \"ตรวจสอบได้\" เป็นจริงกับไฟล์ที่ผู้ใช้โหลดไป: ใบรับรองถูกแนบไปกับ Release, fingerprint ถูกประกาศที่เดียวกับที่ดาวน์โหลด, และผู้ใช้ตรวจไบต์จริงได้ด้วยกุญแจที่ pin ไว้ในรีโป — โดยกุญแจ release อยู่ใน vault และเซ็นบน CI"
+        }
+      ],
+      "sections": [
+        {
+          "title": "🔏 Provenance ของ release (ATTEST-002…009)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "แนบใบรับรองไปกับ release จริง — sovereign-attest.json ถูกเขียนลง release-assets/ และขึ้น GitHub Release พร้อมไฟล์ติดตั้ง และ workflow ยืนยันว่ามีไฟล์นั้นจริงก่อนอัปโหลด (ไม่พึ่ง glob ที่เงียบเมื่อไม่พบ)",
+                "ตรวจใบรับรองด้วยกุญแจที่ pin ไว้ ก่อนปล่อย — หลังเซ็น workflow รัน --verify --pin-key=docs/keys/attest-release.pub.pem --dir=release-assets ⇒ ทั้ง fingerprint และไบต์ต้องตรงกับกุญแจที่ commit ไว้ ถ้าไม่ตรงงานแดงก่อน publish",
+                "ประกาศ fingerprint ใน release notes อัตโนมัติ — tools/attest/release-notes.mjs เขียน fingerprint + คำสั่งตรวจที่คัดลอกได้ แล้วต่อท้าย notes ด้วย gh release edit หลัง publish (ไม่ทับ auto notes) · ถ้าสวิตช์ปิด notes จะบอกตรง ๆ ว่าไม่มีใบรับรอง · เทสต์ 3 ใบ",
+                "เพิกถอนบิลด์ที่ปล่อยแล้วได้จาก CLI — release:attest:revoke / :restore พร้อม revokedAt (เพิกถอนย้อนหลังได้) และตัวตรวจใช้ coverage ของวันที่มีผล (ATTEST-004/005/007)",
+                "ตรวจไฟล์ที่ดาวน์โหลดมา ไม่ใช่แค่เอกสาร — --dir แฮชไบต์จริงเทียบใบรับรอง (ไฟล์ถูกแก้ = \"ขนาดไม่ตรง\") และ --pin-key ปฏิเสธกุญแจที่ไม่ใช่ของเรา (ATTEST-006)",
+                "rotation ที่เซ็นรับรอง — เปลี่ยนกุญแจเซ็นโดย provenance ไม่ขาด และ release ของรุ่นก่อนยังตรวจได้ด้วยกุญแจเก่า (ATTEST-003)",
+                "หน้า fingerprint นอกโค้ดรีโป — portfolio/release-verify.html (ชื่อนี้เพราะ mirror มี verify.html ของ pq receipt verifier อยู่แล้ว) พร้อมคำสั่งตรวจและลิงก์จาก index/projects/me/sitemap (ATTEST-008)",
+                "dry-run ที่กดรันได้จริง — npm run release:dry-run และ workflow Release dry-run (dispatch ได้ + รันเมื่อ PR แตะ tools/**) เดินเส้นทางเซ็น → ตรวจ → ประกาศ fingerprint ด้วยกุญแจชั่วคราว โดยไม่แตะ secret และไม่ปล่อยอะไร (16 ข้อผ่านบน runner จริง)"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🤖 Agent ที่ต้องมีใบรับรองก่อนแตะข้อมูล (AGENT-001/002)",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "receipt-first gate — sovereign-agents ผนึก agent.action.requested ลง vault ก่อนเรียก handler (fail closed), args/ผลลัพธ์เก็บเฉพาะ SHA-256 digest, หนึ่ง hash chain ต่อ actor",
+                "capability token — สิทธิ์มาจาก agent.capability.issued ที่เซ็นแล้ว (subject + scopes + actions + expiresAt บังคับ) ตรวจ issuer ที่ pin → ช่วงเวลา → revocation → allow-list → scopes; ปฏิเสธทุกแบบมี agent.action.denied ของตัวเอง · 62 เทสต์ coverage 97.04/93.23/96.42/98.03"
+              ]
+            }
+          ]
+        },
+        {
+          "title": "🧰 งานซ่อม/คุณภาพที่ติดมากับรอบนี้",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "workflow ปล่อยจริงประกาศตัวเลือก tag ให้มี type ถูกต้อง และแยกการซ้อม provenance ออกเป็น workflow Release dry-run เพราะการ dispatch ของ workflow ปล่อยจริงล้มมาก่อนหน้านี้ (startup_failure — บันทึกไว้ในคิว ไม่ใช่ของรอบนี้)"
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "version": "1.3.10",

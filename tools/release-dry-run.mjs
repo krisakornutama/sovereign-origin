@@ -27,6 +27,12 @@ import {
   verifyDocument,
 } from './attest/document.mjs';
 import { renderReleaseNotes } from './attest/release-notes.mjs';
+import {
+  collectBuildManifest,
+  describeBuild,
+  sealBuildManifest,
+  verifyBuildManifest,
+} from './attest/build-manifest.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TAG = 'v0.0.0-dry-run';
@@ -52,6 +58,16 @@ async function main() {
     fs.writeFileSync(path.join(dir, 'Sovereign-OS-0.0.0-win-x64.zip'), 'zip-bytes');
     fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt'), 'sums');
 
+    // build provenance ของรอบซ้อม: ข้อมูลสังเคราะห์ (ไม่ใช่ commit จริง) เพื่อให้ผลคงที่
+    const provenance = sealBuildManifest({
+      v: 1,
+      tag: TAG,
+      commit: { sha: 'a'.repeat(40), ref: 'main', dirty: false },
+      toolchain: { node: process.version, npm: '10.0.0', platform: 'linux-x64' },
+      inputs: [{ path: 'sovereign-frontend/package-lock.json', sha256: 'b'.repeat(64), size: 3 }],
+      missing: [],
+    });
+
     const pem = ephemeralKey();
     const { publicKeyFromPrivate, signRelease } = await import('./attest-release.mjs');
     const signed = await signRelease({
@@ -62,6 +78,7 @@ async function main() {
       stateDir,
       masterKey: new Uint8Array(32).fill(7),
       signingKeyPem: pem,
+      buildManifest: provenance,
       now: () => Date.now(),
     });
     ok('เซ็น artifact ด้วยเส้นทางเดียวกับ CI (signRelease)');
@@ -78,6 +95,38 @@ async function main() {
 
     const files = verifyArtifacts(signed.doc, dir);
     expect(files.ok, 'แฮชไฟล์จริงตรงกับใบรับรอง', files.problems?.join('; '));
+
+    // build provenance: ตัวตรวจต้องบอกได้ว่าไบต์ที่เซ็นมาจาก commit ไหน
+    expect(
+      report.build?.commit.sha === provenance.commit.sha,
+      'ตัวตรวจรายงาน commit ที่ผนึกไว้ในใบที่เซ็น',
+      JSON.stringify(report.build)
+    );
+    expect(report.build?.digest === provenance.digest, 'manifest ในเอกสารเป็นใบเดียวกับที่ผนึก');
+    expect(
+      describeBuild(report.build).includes(provenance.commit.sha.slice(0, 12)),
+      'สรุป build provenance อ่านออกว่าไบต์มาจาก commit ไหน'
+    );
+
+    const tamperedBuild = JSON.parse(JSON.stringify(signed.doc));
+    tamperedBuild.build = {
+      ...tamperedBuild.build,
+      commit: { ...tamperedBuild.build.commit, sha: 'f'.repeat(40) },
+    };
+    expect(!verifyDocument(tamperedBuild, {}).ok, 'แก้ commit ใน build manifest หลังเซ็น ⇒ ตัวตรวจปฏิเสธ');
+
+    const liveManifest = collectBuildManifest({ root: ROOT, tag: TAG });
+    expect(
+      /^[0-9a-f]{40}$/.test(liveManifest.commit.sha),
+      'เก็บ manifest จาก repo จริงได้ commit SHA',
+      liveManifest.commit.sha
+    );
+    expect(
+      liveManifest.inputs.length >= 5,
+      `manifest จาก repo จริงมี input ที่แฮชแล้ว ≥ 5 ไฟล์ (ได้ ${liveManifest.inputs.length})`
+    );
+    const liveCheck = verifyBuildManifest(liveManifest, { allowDirty: true });
+    expect(liveCheck.ok, 'manifest จาก repo จริงตรวจรูปผ่าน', liveCheck.problems.join('; '));
     expect(
       !collectArtifacts(dir).includes(ATTESTATION_FILE),
       'ใบรับรองไม่ถูกนับเป็น artifact ที่ต้องเซ็น (กันการเซ็นใบของตัวเอง)'
@@ -110,6 +159,9 @@ async function main() {
       workflow.includes("files: release-assets/*"),
       'release.yml แนบทุกไฟล์ใน release-assets (รวมใบรับรอง)'
     );
+    expect(workflow.includes('build-manifest'), 'release.yml ผนึก build manifest ก่อนเซ็น');
+    expect(/--build-manifest=|--provenance/.test(workflow), 'release.yml ส่ง manifest ให้ขั้นเซ็น');
+    expect(workflow.includes('--build-commit'), 'release.yml ยืนยันว่าไบต์มาจาก commit ที่โหลดมา');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(stateDir, { recursive: true, force: true });

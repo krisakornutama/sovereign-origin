@@ -46,6 +46,15 @@ export function sha256Hex(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
+/**
+ * digest ของ build manifest = sha256 ของ canonical JSON ที่ไม่นับฟิลด์ digest เอง
+ * อยู่ที่นี่ (ไม่ใช่ build-manifest.mjs) เพื่อให้ตัวตรวจคำนวณซ้ำได้โดยไม่ต้องโหลดตัวเก็บ
+ */
+export function manifestDigest(manifest) {
+  const { digest: _dropped, ...rest } = manifest ?? {};
+  return sha256Hex(Buffer.from(canonicalJson(rest), 'utf8'));
+}
+
 /** ไฟล์ที่ต้องเซ็นในโฟลเดอร์ release (เรียงชื่อเพื่อให้ผลซ้ำได้) */
 export function collectArtifacts(dir) {
   return fs
@@ -70,6 +79,24 @@ export function publicKeyFingerprint(publicKeyPem) {
     throw fail('E_KEY', `กุญแจต้องเป็น ed25519 ไม่ใช่ ${key.asymmetricKeyType}`);
   }
   return sha256Hex(new Uint8Array(key.export({ type: 'spki', format: 'der' }))).slice(0, 32);
+}
+
+/** ข้อความบรรทัดเดียวสำหรับรายงาน/โน้ต — อ่านแล้วรู้ว่าไบต์มาจากไหน */
+export function describeBuild(build) {
+  if (!build || typeof build !== 'object') return 'ไม่มี build manifest ในใบนี้';
+  const sha = String(build.commit?.sha ?? '');
+  const short = /^[0-9a-f]{40}$/.test(sha) ? sha.slice(0, 12) : 'ไม่ทราบ';
+  const state = build.commit?.dirty ? 'dirty' : 'clean';
+  // รับได้ทั้ง manifest ดิบ (array) และสรุปจากผลตรวจ (จำนวน)
+  const count = (value) => (Array.isArray(value) ? value.length : typeof value === 'number' ? value : 0);
+  const node = build.toolchain?.node ?? '?';
+  const npm = build.toolchain?.npm ?? '?';
+  const platform = build.toolchain?.platform ?? '?';
+  return (
+    `สร้างจาก commit ${short} (${state}) · node ${node} / npm ${npm} · ${platform} · ` +
+    `input ${count(build.inputs)} ไฟล์${count(build.missing) > 0 ? ` (ขาด ${count(build.missing)})` : ''} · ` +
+    `manifest ${String(build.digest).slice(0, 12)}`
+  );
 }
 
 export function receiptId(body) {
@@ -232,6 +259,8 @@ export function verifyDocument(doc, options = {}) {
   }
 
   const used = new Set();
+  // digest ของ build manifest ที่ "อยู่ในลายเซ็น" ของใบที่ลงนามว่าปล่อยไบต์ชุดนี้
+  const sealedBuilds = new Set();
   for (const artifact of doc.artifacts) {
     if (!SHA256_RE.test(String(artifact.sha256))) {
       pushed(`artifact ${artifact.name} มี digest ผิดรูป`);
@@ -258,6 +287,11 @@ export function verifyDocument(doc, options = {}) {
       seen.add(cursor.id);
       used.add(cursor.id);
       const body = bodyOf(cursor);
+      // ใบ revoke/restore พูดถึงไบต์เดียวกันแต่ไม่ได้ผนึก provenance — เอาเฉพาะใบที่ปล่อย
+      const sealedMeta = body.action === SIGNABLE_ACTION ? body.meta : undefined;
+      if (sealedMeta && typeof sealedMeta.buildDigest === 'string') {
+        sealedBuilds.add(sealedMeta.buildDigest);
+      }
       if (body.artifact?.sha256 !== artifact.sha256) {
         pushed(`receipt ${cursor.id.slice(0, 12)} ไม่ได้พูดถึง digest ของ ${artifact.name}`);
         break;
@@ -306,6 +340,28 @@ export function verifyDocument(doc, options = {}) {
     }
   }
 
+  // build provenance: สำเนาที่อ่านได้ในเอกสารต้องเป็นตัวเดียวกับที่ผนึกไว้ในลายเซ็น
+  const declaredBuild = doc.build;
+  if (declaredBuild !== undefined) {
+    if (!declaredBuild || typeof declaredBuild !== 'object' || Array.isArray(declaredBuild)) {
+      pushed('build manifest ในเอกสารผิดรูป');
+    } else if (typeof declaredBuild.digest !== 'string' || !SHA256_RE.test(declaredBuild.digest)) {
+      pushed('build manifest ในเอกสารไม่มี digest ที่ใช้ได้');
+    } else if (manifestDigest(declaredBuild) !== declaredBuild.digest) {
+      pushed('build manifest ในเอกสารถูกแก้หลังเซ็น (digest ไม่ตรงกับเนื้อหา)');
+    } else if (sealedBuilds.size === 0) {
+      pushed('เอกสารอ้าง build manifest แต่ไม่มีใบที่เซ็นแล้วผนึกมันไว้');
+    } else if (!sealedBuilds.has(declaredBuild.digest)) {
+      pushed('build manifest ในเอกสารไม่ตรงกับที่ผนึกไว้ในใบที่เซ็น');
+    }
+    const sha = declaredBuild?.commit?.sha;
+    if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) {
+      pushed('build manifest ไม่ระบุ commit sha ที่ใช้ได้');
+    }
+  } else if (sealedBuilds.size > 0) {
+    pushed('ใบที่เซ็นผนึก build manifest ไว้ แต่เอกสารไม่มีสำเนาให้อ่าน (doc.build)');
+  }
+
   if (options.fingerprint) {
     if (doc.fingerprint !== options.fingerprint) {
       pushed(`fingerprint ไม่ตรงกับที่ pin ไว้ (${options.fingerprint})`);
@@ -319,6 +375,22 @@ export function verifyDocument(doc, options = {}) {
     artifacts: doc.artifacts.length,
     receipts: doc.receipts.length,
     unusedReceipts: doc.receipts.filter((receipt) => !used.has(receipt.id)).length,
+    build:
+      declaredBuild && typeof declaredBuild === 'object'
+        ? {
+            v: declaredBuild.v ?? null,
+            tag: declaredBuild.tag ?? null,
+            commit: {
+              sha: declaredBuild.commit?.sha ?? null,
+              ref: declaredBuild.commit?.ref ?? null,
+              dirty: declaredBuild.commit?.dirty === true,
+            },
+            toolchain: declaredBuild.toolchain ?? null,
+            digest: declaredBuild.digest ?? null,
+            inputs: Array.isArray(declaredBuild.inputs) ? declaredBuild.inputs.length : 0,
+            missing: Array.isArray(declaredBuild.missing) ? declaredBuild.missing.length : 0,
+          }
+        : null,
   };
 }
 
