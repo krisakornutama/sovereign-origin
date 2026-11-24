@@ -227,9 +227,10 @@ footer a{color:rgba(216,211,202,.6)}
 </main>
 
 <script>
-/* ลิงก์สินค้า Gumroad — ใส่ URL จากหน้าร้านจริงตรงนี้ (ค่าว่าง = ซ่อนบล็อกซื้อทันที หน้าเว็บใช้ทางอีเมลเหมือนเดิม)
-   ตัวอย่าง: const GUMROAD_URL = 'https://krisakorn.gumroad.com/l/sovereign-os'; */
-var GUMROAD_URL = '';
+/* ลิงก์สินค้า Gumroad — หน้าร้านจริง (ค่าว่าง = ซ่อนบล็อกซื้อทันที หน้าเว็บใช้ทางอีเมลเหมือนเดิม)
+   currency=USD บังคับให้หน้าร้านแสดงราคาเป็นดอลลาร์ตรงกับราคาบนหน้านี้ ($59/$199/$599)
+   ไม่ใส่ ?currency=USD แล้ว Gumroad จะแปลงเป็นสกุลเงินของประเทศผู้เข้าชม (ไทย = บาท) */
+var GUMROAD_URL = 'https://oweenhoper.gumroad.com/l/sovereign-os?currency=USD';
 document.addEventListener('DOMContentLoaded', function () {
   if (!GUMROAD_URL) return;
   var section = document.getElementById('instant-checkout');
