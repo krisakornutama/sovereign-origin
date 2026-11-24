@@ -1,6 +1,6 @@
 # Posts — copy, paste, submit (Gumroad checkout live)
 
-Replace `<GUMROAD_LINK>` with your product URL before posting. One link per post. No payment details,
+Replace `https://oweenhoper.gumroad.com/l/sovereign-os` with your product URL before posting. One link per post. No payment details,
 ever — Gumroad handles the money, so there is nothing to send by DM.
 
 Submit pages, so you do not hunt for them:
@@ -51,7 +51,7 @@ release against a published key fingerprint.
 $59 Home (1 machine) · $199 Business (3 machines) · $599 Pro (perpetual). Card checkout is on Gumroad, and
 the signed license file follows by email within 24 hours. 7-day refund if it does not run on your machine.
 
-Link: <GUMROAD_LINK>
+Link: https://oweenhoper.gumroad.com/l/sovereign-os
 
 I am the developer — happy to answer anything technical in the comments, including the parts that are rough.
 ```
@@ -65,7 +65,7 @@ encrypted backups, offline queue, local AI. One Windows build, no cloud, no tele
 The license is an Ed25519 token verified locally with node:crypto, so there is no activation server and
 nothing the developer can revoke remotely. One-time price, open-core, verify the release yourself.
 
-$59 / $199 / $599, 7-day refund, instant download: <GUMROAD_LINK>
+$59 / $199 / $599, 7-day refund, instant download: https://oweenhoper.gumroad.com/l/sovereign-os
 I built it, so ask me the hard questions here.
 ```
 
@@ -77,7 +77,7 @@ Title:
 Show HN: Self-hosted ops suite for small business, offline license, one-time price
 ```
 
-Body (URL field: `<GUMROAD_LINK>`):
+Body (URL field: `https://oweenhoper.gumroad.com/l/sovereign-os`):
 
 ```
 I am a solo developer in Thailand. I built a local-first operations suite for small businesses:
@@ -123,7 +123,7 @@ buy it for the operations side and leave those modules unused.
 ```
 5/ $59 Home · $199 Business · $599 Pro perpetual. Card checkout, instant download, license by email
 within 24 hours. 7-day refund if it does not run on your machine.
-<GUMROAD_LINK>
+https://oweenhoper.gumroad.com/l/sovereign-os
 ```
 
 ## 5. LinkedIn
@@ -140,7 +140,7 @@ one machine, $199 for three, $599 for a perpetual license with a setup session.
 
 Two things I will not oversell: the tax and shop modules follow Thai rules (PromptPay QR, 7% VAT), and I am
 the developer selling this directly, not a company with a support team. Card checkout, instant download,
-7-day refund: <GUMROAD_LINK>
+7-day refund: https://oweenhoper.gumroad.com/l/sovereign-os
 ```
 
 ## 6. Indie Hackers — product post
@@ -156,13 +156,13 @@ whole product thesis: software that keeps working after the vendor loses interes
 What I am learning: whether small businesses will pay once for tools they can hold, instead of renting.
 Rough edges are documented on the page rather than hidden: Thai-only fiscal modules, email support, no cloud sync.
 
-<GUMROAD_LINK>
+https://oweenhoper.gumroad.com/l/sovereign-os
 ```
 
 ## 7. One-line bio link (GitHub profile, YouTube description, email signature)
 
 ```
-Sovereign OS — self-hosted operations suite, one-time license, offline activation: <GUMROAD_LINK>
+Sovereign OS — self-hosted operations suite, one-time license, offline activation: https://oweenhoper.gumroad.com/l/sovereign-os
 ```
 
 ## Replies to keep open while a post is live
