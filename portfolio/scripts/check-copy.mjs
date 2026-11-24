@@ -161,6 +161,13 @@ export function collectTargets(site = SITE) {
         if (f.endsWith('.md')) targets.push({ file: path.join(marketing, f), markdown: true });
       }
     }
+    // ชุดข้อความตลาดต่างประเทศ (อังกฤษ) — ต้องผ่านด่านเดียวกับหน้าเว็บ
+    const marketingEn = path.join(parent, 'marketing-en');
+    if (fs.existsSync(marketingEn)) {
+      for (const f of fs.readdirSync(marketingEn)) {
+        if (f.endsWith('.md')) targets.push({ file: path.join(marketingEn, f), markdown: true });
+      }
+    }
   }
   return targets;
 }
