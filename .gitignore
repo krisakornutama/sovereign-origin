@@ -49,6 +49,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ── ข้อมูลผู้ซื้อ/ยอดขาย (มีชื่อลูกค้า — ห้ามเข้า git) ──
+sales/
+
 # ── Keys & certificates ──────────────────────
 *.key
 *.pem
