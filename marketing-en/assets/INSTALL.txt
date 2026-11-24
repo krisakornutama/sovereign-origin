@@ -1,0 +1,75 @@
+SOVEREIGN OS — INSTALL IN 10 MINUTES
+Windows 10 or 11, 64-bit. No cloud account, no internet needed after the download.
+
+------------------------------------------------------------
+1. WHAT IS IN YOUR DOWNLOAD
+------------------------------------------------------------
+  Sovereign-OS-<version>-portable.exe   the application (no installer)
+  Sovereign.OS-<version>-win.zip       the same build as a folder, for machines that block a bare .exe
+  INSTALL.txt                          this file
+  attest-release.pub.pem               the public key that verifies your license
+  license.txt                          sent separately by email, personal to you
+
+Verify what you downloaded before you run it:
+  - compare the SHA256 of your file against SHA256SUMS.txt on the release page
+  - or open https://sovereignoriginshop.dpdns.org/release-verify.html and follow it there
+Windows PowerShell:  Get-FileHash .\Sovereign-OS-<version>-portable.exe -Algorithm SHA256
+
+------------------------------------------------------------
+2. START IT
+------------------------------------------------------------
+  Double-click Sovereign-OS-<version>-portable.exe.
+  First start takes 20-40 seconds. Windows may warn about an unsigned publisher:
+  choose "More info" then "Run anyway" only if the hash above matched.
+
+  The interface opens on http://localhost:3000 (launcher on http://localhost:4100).
+  Everything runs on this machine. If a port is already used, the launcher tells you which one and
+  picks the next free port instead of failing silently.
+
+------------------------------------------------------------
+3. ACTIVATE YOUR LICENSE
+------------------------------------------------------------
+The license is a signed text token. Your machine verifies it locally with the public key above;
+the app never calls a server, so activation works with the network cable out.
+
+  a. Put your license.txt next to the application, or open the app's .env file
+     (sovereign-os/core-api/.env — copy .env.example if .env does not exist yet).
+  b. Add these two lines, replacing the placeholders:
+
+       SOVEREIGN_LICENSE=<the single long line inside license.txt>
+       SOVEREIGN_LICENSE_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+
+     The public key is the content of attest-release.pub.pem with real line breaks written as \n.
+  c. Restart the app. Open the /system page: the license card must show your tier and the days left.
+
+If the card says the license is not valid, the usual causes are, in this order:
+  - the token was pasted with a line break in the middle (it must stay one line)
+  - the public key still has real newlines instead of \n
+  - the license is bound to a different machine ID
+Send me the exact message on the card and I fix it the same day.
+
+An invalid or expired license never locks your data: the app drops back to the Community Edition
+and keeps running.
+
+------------------------------------------------------------
+4. FIRST HOUR, THE USEFUL PART
+------------------------------------------------------------
+  /system      license, machine ID, version
+  dashboard    live figures and history
+  sensors      add a device, write one rule, one alert — this is the part that earns its keep
+  security     event stream and the kill switch
+  backups      set the encrypted backup target first, before you enter real data
+
+------------------------------------------------------------
+5. UPDATES, SUPPORT, REFUND
+------------------------------------------------------------
+  Home and Business include one year of updates from the purchase date. After that the version you
+  have keeps working; nothing stops and nothing is deleted. Pro is perpetual.
+
+  Support is email, in English or Thai. Include the version from /system and the exact error text.
+
+  Refund: 7 days, full amount, if it does not run on your machine. Reply to your Gumroad receipt
+  within 7 days and it is refunded, no argument.
+
+  Built by Krisakorn Utama. Only the email address on your receipt is mine — if anyone sends you
+  different payment details claiming to be me, stop and ask first.
