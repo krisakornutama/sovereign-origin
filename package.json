@@ -7,6 +7,7 @@
     "queue": "node tools/queue/queue.mjs",
     "license": "node tools/license/issue.mjs",
     "license:sell": "node tools/license/sell.mjs",
+    "check:copy": "node portfolio/scripts/check-copy.mjs",
     "verify": "node tools/verify.mjs",
     "verify:full": "node tools/verify.mjs --e2e",
     "build:desktop": "node tools/build-desktop.mjs",
