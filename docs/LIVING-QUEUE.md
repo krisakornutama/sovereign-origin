@@ -443,3 +443,11 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-25 — `SEAL-006`: หน้า `support-en.html` (อังกฤษ) + ลิงก์สลับภาษาไทย/อังกฤษทั้งสองคู่ (`seal.html` ↔ `seal-en.html`, `support.html` ↔ `support-en.html`)
   และอัปเดต `release-verify.html` ให้ชี้ชุดดาวน์โหลดที่เซ็นแล้ว; `check:copy` PASS 85 ไฟล์ · `audit` AUDIT CLEAN
+
+- 2026-11-25 — `SEAL-007`: เปิดรับเงินสนับสนุนจากต่างประเทศด้วยสินค้า Gumroad ชนิด **Coffee (tips)** ชื่อ “Support Sovereign Seal” — https://oweenhoper.gumroad.com/coffee (ขั้นต่ำ 3 USD, เลือกจำนวนเอง, CTA = Donate)
+  เหตุผล: การโอนเข้าบัญชีกรุงไทยใช้ได้เฉพาะคนที่มีแอปธนาคารไทย → คนนอกจ่ายไม่ได้เลย; Gumroad จ่ายเข้าบัญชีเดิมผ่าน payout ไม่ต้องเพิ่มบัญชีใหม่
+  หมายเหตุการทำงาน: สร้างไม่ผ่านเมื่อชื่อมีอักขระ “—” (slug สร้างไม่ได้และปุ่ม Next ไม่ตอบอะไรเลย — ไม่มี error) เปลี่ยนเป็นชื่อ ASCII แล้วผ่าน; `support.html`/`support-en.html` เปลี่ยนคำว่า “ช่องทางเดียว” เป็น “บัญชีเดียวที่รับเงินโอน” เพื่อไม่ให้ขัดกับความเป็นจริง
+  ตรวจแบบไม่ล็อกอิน: `GET /coffee` = 200 (21,072 B) มีชื่อสินค้าและปุ่ม Donate · `?wanted=true` = 200
+
+- 2026-11-25 — `SEAL-008`: เพิ่มส่วน “ของฟรีที่ใช้ได้เดี๋ยวนี้” ใน `launch.html`, คอมเมนต์ใหม่ใน Issue #8 ([7176437333](https://github.com/krisakornutama/project-sovereign/issues/8#issuecomment-7176437333)) และเตรียมข้อความพร้อมวาง LinkedIn/X/ไทย ใน `marketing/seal-launch.md`
+  พร้อมระบุสถานะ Reddit ตามจริง (ปุ่ม Post/Save Draft disabled ทั้งสองซับ = ข้อจำกัดบัญชี) และขั้นตอนปลดล็อก 3 ข้อที่เจ้าของต้องทำจากอีเมล — ไม่ยิง API ซ้ำเพราะรู้แล้วว่า `BAD_CAPTCHA`/401
