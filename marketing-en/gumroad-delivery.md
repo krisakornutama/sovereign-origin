@@ -10,7 +10,8 @@ From the release https://github.com/krisakornutama/sovereign-origin/releases/tag
 | File | Size | Why |
 |---|---|---|
 | `Sovereign-OS-1.3.10-portable.exe` | 188 MB | the build most buyers run |
-| `Sovereign.OS-1.3.10-win.zip` | 340 MB | only if Gumroad accepts the upload; otherwise link it |
+| `SHA256SUMS.txt` | 193 B | attach as a product file — buyers verify without leaving the page |
+| `Sovereign.OS-1.3.10-win.zip` | 340 MB | **not attached** (too large for this flow) — the content copy says it is on the release page |
 | `INSTALL.txt` | small | `marketing-en/assets/INSTALL.txt` |
 | `attest-release.pub.pem` | small | copy of `docs/keys/attest-release.pub.pem` |
 

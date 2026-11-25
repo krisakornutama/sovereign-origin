@@ -53,9 +53,10 @@ OPEN-CORE
 You can read the code before buying and verify every release yourself against a published key fingerprint: https://sovereignoriginshop.dpdns.org/release-verify.html
 
 WHAT YOU GET ONCE YOU PAY
-- the Windows build (portable exe, and a zip for older machines)
+- the Windows build: one portable .exe, no installer (Windows 10/11, 64-bit)
 - a one-page install guide
 - the public key to verify the license yourself
+- SHA256SUMS.txt, so you can confirm the download without trusting me
 Your signed license.txt follows by email within 24 hours of purchase, because it carries your name and machine ID.
 
 PLANS (choose at checkout)
@@ -95,9 +96,11 @@ Upload these from `marketing-en/assets/` and the release page
 (https://github.com/krisakornutama/sovereign-origin/releases/tag/v1.3.10):
 
 - `Sovereign-OS-1.3.10-portable.exe` (188 MB) — the main file
-- `Sovereign.OS-1.3.10-win.zip` (340 MB) — keep it on GitHub, upload only if Gumroad accepts the size
 - `INSTALL.txt` — `marketing-en/assets/INSTALL.txt`
+- `SHA256SUMS.txt` (193 B) — download from the release, attach as a product file (not a link)
 - `attest-release.pub.pem` — copy of `docs/keys/attest-release.pub.pem`
+- `Sovereign.OS-1.3.10-win.zip` (340 MB) — **do not promise it in the listing**: Gumroad upload was not
+  attempted at this size, so the .zip stays on the public release page and the content copy says so
 
 Leave **"Generate a unique license key per sale" OFF**: the app verifies my Ed25519 token, not a
 Gumroad key, and a second key format would only confuse the buyer. The real license is emailed within 24 hours.

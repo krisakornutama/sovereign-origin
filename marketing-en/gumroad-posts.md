@@ -1,7 +1,16 @@
 # Posts — copy, paste, submit (Gumroad checkout live)
 
-Replace `https://oweenhoper.gumroad.com/l/sovereign-os` with your product URL before posting. One link per post. No payment details,
-ever — Gumroad handles the money, so there is nothing to send by DM.
+The link is already the live product URL: https://oweenhoper.gumroad.com/l/sovereign-os — paste it as-is. One link per post.
+No payment details, ever — Gumroad handles the money, so there is nothing to send by DM.
+
+Where each post may go (rules checked):
+
+- **r/selfhosted** — standalone posts only for projects older than about three months; younger projects go in
+the weekly **New Project Megathread**. Use §2b there. Promotion in moderation, project must be production-ready
+and documented.
+- **r/Thailand and r/thai** — self-promotion is **banned**. Do not post the product there.
+- **Hacker News** — Show HN is fine; never ask for upvotes.
+- **X** — post the 5-post thread (§4) or the single post (§4b), not both on the same day.
 
 Submit pages, so you do not hunt for them:
 
@@ -69,6 +78,31 @@ $59 / $199 / $599, 7-day refund, instant download: https://oweenhoper.gumroad.co
 I built it, so ask me the hard questions here.
 ```
 
+## 2b. Reddit — r/selfhosted weekly "New Project Megathread" (post here while the project is young)
+
+Comment body:
+
+```
+Sovereign OS — a local-first operations suite for small business (Windows, single .exe, no cloud account)
+
+What it does: dashboards with history, energy monitoring, device sensors with rules and alerts, a security
+panel with a kill switch, encrypted backups, an offline queue that survives disconnects, a local AI assistant
+scoped to the owner's own data, and multi-user roles.
+
+What makes it interesting for this sub: the license is an Ed25519-signed token the app verifies locally with
+node:crypto. No activation server, no callbacks, nothing to phone home. Machine-bound, one free transfer a year.
+
+Honest limits: the shop/POS/tax modules are Thai-only (PromptPay QR, 7% VAT). Outside Thailand, ignore them.
+It is open-core, so you can read the code and verify every release against a published key fingerprint before
+paying anything: https://sovereignoriginshop.dpdns.org/release-verify.html
+
+Pricing: $59 Home (1 machine, 1 year of updates), $199 Business (3 machines), $599 Pro (perpetual).
+Card checkout through Gumroad, instant download, signed license by email within 24 hours, 7-day refund if it
+does not run on your machine: https://oweenhoper.gumroad.com/l/sovereign-os
+
+I am the developer — ask me anything technical here and I will answer in the thread.
+```
+
 ## 3. Hacker News — Show HN
 
 Title:
@@ -125,6 +159,16 @@ buy it for the operations side and leave those modules unused.
 within 24 hours. 7-day refund if it does not run on your machine.
 https://oweenhoper.gumroad.com/l/sovereign-os
 ```
+
+## 4b. X — one standalone post (if you only want a single tweet)
+
+```
+One Windows machine. No cloud account. No subscription. Sovereign OS: dashboards, energy, sensors,
+security, encrypted backups, offline queue, local AI over your own data. The license verifies offline —
+nothing I can switch off later. $59/199/599 → https://oweenhoper.gumroad.com/l/sovereign-os
+```
+
+Length check: 286 characters with the link counted as 23 — trim the last sentence if X complains.
 
 ## 5. LinkedIn
 
