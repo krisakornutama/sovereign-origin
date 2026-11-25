@@ -422,3 +422,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 - 2026-11-18 — `ATTEST-009`: ต่อท้าย notes ด้วย `gh release edit` หลัง publish แทนการส่ง `body` ให้ action เพราะไม่ชัดว่า action จะ merge body กับ notes ที่ generate ให้หรือแทนที่ — ถ้าแทนที่ ผู้ใช้จะเสีย auto notes; และ `workflow_dispatch` ต้องมี `dry_run` แยก job ไม่ใช่ตัวแปรใน job เดียว ไม่งั้นซ้อมแล้วจะ build+ปล่อย release จริง
 - 2026-11-18 — `release.yml` เรียกด้วย `workflow_dispatch` ไม่ได้มาตั้งแต่ก่อนงานนี้: dispatch แล้วได้ `startup_failure` ก่อนมี job แม้แต่เวอร์ชันก่อนเพิ่มขั้น attest (ทดสอบด้วย `gh workflow run --ref` บนไฟล์ยุค `c091fd3`) ⇒ ย้าย dry-run ไป `release-dry-run.yml` ที่ dispatch ได้จริง + ผูกกับ PR; `release.yml` เหลือเส้นทาง tag push อย่างเดียว และเพิ่ม `type: string` ให้ input `tag` (ยังไม่ทราบสาเหตุรากของ dispatch ที่พัง ไม่ใช่ขอบเขตงานนี้)
 - 2026-11-18 — `AGENT-002`: token คือ receipt เดิม ไม่ได้ประดิษฐ์ format ใหม่ (ตรวจซ้ำได้ด้วย `openCapability(receipt, { publicKey })` โดยไม่ต้องมี gate) และรายการ issuer เป็นการ pin ไม่ใช่การเชื่อม delegations; ข้อจำกัดที่ยอมรับ: revocation เห็นเฉพาะใน vault ที่มี receipt นั้น (ต้อง replicate/anchor เอง) และ token เป็น bearer credential
+
+- 2026-11-25 — `SEAL-001`: เปิดตัวเครื่องมือฟรี `Sovereign Seal` (`portfolio/seal.html`) — เซ็น/ตรวจไฟล์ออฟไลน์ด้วย SHA-256 + Ed25519, ไฟล์เดียวจบ เปิดจาก `file://` ได้ ไม่เรียกเน็ต ไม่มีบัญชี
+  ฟอร์แมตตรา v1 (canonical JSON เรียงคีย์ + Ed25519 + public key แบบ JWK) ใช้ร่วมกับ CLI `portfolio/seal-cli.mjs` (zero dependency) ⇒ ตราที่เซ็นฝั่งเว็บตรวจผ่าน CLI และกลับกันได้
+  ข้อจำกัดที่ประกาศบนหน้าเว็บเอง: ไม่ได้ยืนยันความจริงของเนื้อหา, เวลาเป็นคำอ้างของผู้เซ็น, ตัวตนต้อง pin fingerprint เอง; เอกสารเต็มที่ `docs/SEAL.md`
+
+- 2026-11-25 — `SEAL-002`: เปิดช่องบริจาค `portfolio/support.html` ชี้บัญชีเดียว กรุงไทย 4440626505 ชื่อ กฤษกรณ์ อุตมะ
+  และลิงก์สินค้าจริง (`buy.html` → Gumroad) — เครื่องมือฟรีไม่มี paywall และไม่ผูกกับการขาย
+
+- 2026-11-25 — `SEAL-003`: เพิ่มจุดค้นพบ: `release-verify.html` (บริบทตรวจไฟล์), เมนูเครื่องมือใน `projects.html`, บรรทัด "ลองของฟรีก่อน" ใน `buy.html`
+  บทเรียนเดียวกับ `ATTEST-008`: หน้าใหม่ต้องมีทางเข้าจากหน้าที่คนอ่านอยู่จริง ไม่งั้นเท่ากับเผยแพร่แล้วไม่มีใครเจอ
