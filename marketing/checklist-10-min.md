@@ -1,9 +1,14 @@
 # เช็กลิสต์ 10 นาที — จาก "ยังไม่เคยได้สักบาท" ถึง "มีคนทักมาถามราคา"
 
+> ⚠️ **ชุดเก่า — ยกเลิกแล้ว (25 พ.ย. 2026)** ขั้นตอนในไฟล์นี้อ้างราคาบาท 1,490/4,900/14,900 และการโอนเงินเข้าบัญชี ซึ่งเลิกใช้แล้ว
+> ใช้แทนด้วย `marketing/facebook-posts.md` (ไทย) และ `marketing-en/gumroad-posts.md` (อังกฤษ)
+> ราคาปัจจุบัน: Home $59 · Business $199 · Pro $599 · ลิงก์เดียว: https://oweenhoper.gumroad.com/l/sovereign-os
+> เก็บเนื้อหาไว้เป็นประวัติเท่านั้น
+
 ทำตามลำดับ ไม่ต้องคิดเพิ่ม ทุกข้อมีไฟล์ที่คัดลอกได้อยู่แล้ว
 
 - [ ] **0–1 นาที — เปิดหน้าเว็บของตัวเองก่อน**
-      เปิด https://sovereignoriginshop.dpdns.org/buy.html ดูว่าราคา Home 1,490 · Business 4,900 · Pro 14,900
+      เปิด https://sovereignoriginshop.dpdns.org/buy.html และ https://oweenhoper.gumroad.com/l/sovereign-os ดูราคาจริงก่อน (ปัจจุปัน Home $59 · Business $199 · Pro $599)
       และนโยบายคืนเงิน 7 วันขึ้นครบ (ถ้าจะเปลี่ยนราคา ให้แก้ `portfolio/buy.html` ก่อน แล้วรอ deploy)
       เหตุผล: ข้อความที่คุณจะโพสต์อ้างราคาพวกนี้ ถ้าหน้าเว็บไม่ตรง คนจะไม่เชื่อทั้งโพสต์
 
@@ -19,7 +24,7 @@
 
 - [ ] **7–8 นาที — Fastwork**
       สร้าง gig ใหม่ ใช้ชื่อ gig และคำอธิบายจาก `marketing/fastwork-gig.md`
-      ใส่ 3 ระดับราคาให้ตรง: 1,490 / 4,900 / 14,900 บาท และ FAQ 5 ข้อ
+      ใส่ 3 ระดับราคาให้ตรงกับร้านที่เปิดอยู่จริง ($59 / $199 / $599) และ FAQ 5 ข้อ
 
 - [ ] **8–9 นาที — ฝากลิงก์ไว้ที่เดิมที่มีคนผ่าน**
       ใส่ https://sovereignoriginshop.dpdns.org/buy.html ใน bio/profil ของ YouTube และเพจ Facebook
@@ -43,8 +48,7 @@
 
 ```
 node portfolio/scripts/check-copy.mjs
-grep -o "1,490\|4,900\|14,900" portfolio/buy.html | sort -u
-grep -o "1,490\|4,900\|14,900" marketing/*.md | sort | uniq -c
+grep -c "oweenhoper.gumroad.com/l/sovereign-os" portfolio/buy.html portfolio/launch.html
 grep -c "sovereignoriginshop.dpdns.org/buy.html" portfolio/buy.html marketing/*.md
 ```
 
