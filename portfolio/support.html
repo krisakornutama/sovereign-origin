@@ -8,16 +8,21 @@
 <meta name="author" content="กฤษกรณ์ อุตมะ (Krisakorn Utama)">
 <meta name="theme-color" content="#030712">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='8' cy='8' r='4.6' fill='none' stroke='%2334d399' stroke-width='1.4'/%3E%3Ccircle cx='8' cy='8' r='1.4' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#030712; --green:#34d399; --cyan:#22d3ee;
   --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
   --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
+  --body:'Noto Sans Thai Looped','IBM Plex Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
   --mono:'Cascadia Code','Consolas','Courier New',monospace;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.7;
   -webkit-font-smoothing:antialiased}
+p,li{font-family:var(--body)}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
   radial-gradient(900px 560px at 14% -10%,rgba(52,211,153,.13),transparent 62%),
   radial-gradient(820px 520px at 92% 0%,rgba(34,211,238,.09),transparent 64%)}
@@ -55,16 +60,18 @@ li{margin:0 0 6px}
   border-radius:7px;padding:10px 16px;margin:4px 6px 4px 0}
 .cta.ghost{background:none;color:var(--txt);border:1px solid rgba(255,255,255,.18);font-weight:400}
 
-table{width:100%;border-collapse:collapse;font-size:.88rem;margin:0 0 12px}
-th,td{text-align:left;padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
-th{color:var(--faint);font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase}
-td.money{font-family:var(--mono);white-space:nowrap;color:#d7f5e9}
+ul.uses{list-style:none;padding:0;margin:0 0 12px}
+ul.uses li{display:flex;flex-wrap:wrap;gap:2px 12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+ul.uses b{flex:0 0 auto;color:#eef7f2;font-weight:600}
+ul.uses span{flex:1 1 220px;min-width:0;color:var(--dim);font-size:.86rem;overflow-wrap:anywhere}
 
 footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:center;
   color:var(--faint);font-size:.8rem}
 </style>
 </head>
 <body>
+<!-- ฟอนต์ไทยของ IBM Plex โหลดเฉพาะเมื่อมีข้อความไทยใช้จริง — ข้อความนี้อยู่นอกจอเพื่อบังคับให้ subset ไทยโหลด -->
+<span aria-hidden="true" style="position:absolute;left:-9999px;top:0;white-space:nowrap;font-family:'IBM Plex Sans Thai Looped'">ฎ ฏ ฐ ฒ ณ ต สนับสนุน</span>
 
 <header class="bar">
   <a class="brand" href="index.html">SOVEREIGN<span>·</span>SHOP</a>
@@ -91,12 +98,11 @@ footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:ce
   </div>
 
   <h2>เงินที่ได้ไปทำอะไร</h2>
-  <table>
-    <tr><th>รายการ</th><th>ใช้ทำอะไร</th></tr>
-    <tr><td>ค่าโดเมนและโฮสต์</td><td class="money">หน้าเว็บและไฟล์ดาวน์โหลดเปิดให้ทุกคนใช้ฟรี</td></tr>
-    <tr><td>เวลาเขียนโค้ด</td><td class="money">ชิ้นถัดไป: เครื่องมือตรวจและเซ็นไฟล์เวอร์ชันเดสก์ท็อป</td></tr>
-    <tr><td>ค่าอุปกรณ์ทดสอบ</td><td class="money">เครื่องวินโดวส์เก่าไว้ทดสอบว่ายังรันได้จริง</td></tr>
-  </table>
+  <ul class="uses">
+    <li><b>ค่าโดเมนและโฮสต์</b><span>หน้าเว็บและไฟล์ดาวน์โหลดเปิดให้ทุกคนใช้ฟรี</span></li>
+    <li><b>เวลาเขียนโค้ด</b><span>ชิ้นถัดไป: เครื่องมือตรวจและเซ็นไฟล์เวอร์ชันเดสก์ท็อป</span></li>
+    <li><b>ค่าอุปกรณ์ทดสอบ</b><span>เครื่องวินโดวส์เก่าไว้ทดสอบว่ายังรันได้จริง</span></li>
+  </ul>
 
   <h2>เครื่องมือฟรี ไม่มีเงื่อนไข</h2>
   <ul>

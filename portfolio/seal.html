@@ -11,18 +11,23 @@
 <meta property="og:description" content="พิสูจน์ว่าไฟล์ไม่ถูกแก้ ใครก็ตรวจได้แบบออฟไลน์ ฟรี ไม่มีบัญชี ไม่มีเซิร์ฟเวอร์">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='8' cy='8' r='4.6' fill='none' stroke='%2334d399' stroke-width='1.4'/%3E%3Ccircle cx='8' cy='8' r='1.4' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#030712; --panel:#0b1220; --line:rgba(52,211,153,.16);
   --green:#34d399; --cyan:#22d3ee; --red:#f87171;
   --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
   --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
+  --body:'Noto Sans Thai Looped','IBM Plex Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
   --mono:'Cascadia Code','Consolas','Courier New',monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.7;
   -webkit-font-smoothing:antialiased}
+p,li{font-family:var(--body)}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
   radial-gradient(900px 560px at 12% -10%,rgba(52,211,153,.12),transparent 62%),
   radial-gradient(820px 520px at 92% 0%,rgba(34,211,238,.09),transparent 64%)}
