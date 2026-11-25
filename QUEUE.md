@@ -3,7 +3,8 @@
 ส่งต่อให้ agent ตัวถัดไป — สถานะทั้งหมดในไฟล์นี้ยืนยันจาก GitHub API และ GHCR แล้วเมื่อ 2026-11-07
 งานที่ต้องทำบนเว็บ GitHub UI (ถ้ามี) จะระบุว่า "เจ้าของทำ" ให้แยกจากงานที่ agent ทำเองได้
 
-> อัปเดตล่าสุด 2026-11-10: **ปล่อย `v1.3.0` แล้ว** — GH Release เป็น Latest พร้อม 3 asset (portable exe · win zip · SHA256SUMS) และ image `api`/`web` tag `1.3.0`/`1.3`/`latest` ขึ้น GHCR แล้ว (multi-arch, digest ตรงกัน)
+> อัปเดตล่าสุด 2026-11-25: **รุ่นล่าสุดคือ `v1.3.10`** (14 พ.ย. 2026) — portable exe 188 MB + `SHA256SUMS.txt` + zip ครบ 3 ไฟล์ · หน้า `/buy.html` ระบุแล้วว่าส่งมอบรุ่นไหน · CI ของ repo นี้เขียวทั้ง 4 workflow หลังถอดสเต็ป Pages ที่ซ้ำซ้อนออกจาก mirror
+> อัปเดต 2026-11-10: **ปล่อย `v1.3.0` แล้ว** — GH Release เป็น Latest พร้อม 3 asset (portable exe · win zip · SHA256SUMS) และ image `api`/`web` tag `1.3.0`/`1.3`/`latest` ขึ้น GHCR แล้ว (multi-arch, digest ตรงกัน)
 > · required checks **8 ตัว** (เพิ่ม `settings-e2e` เป็นด่านบังคับแล้ว · พิสูจน์ด้วย PR #58 ว่า merge ถูกบล็อกจริง)
 > · restore drill รายงานผลใน `machine-health` · E2E settings บันทึก 2FA จริง และ Telegram บันทึก–คืนค่า config เดิม
 > · version `1.3.0` (tag ปล่อยแล้ว) · `npm run verify` ผ่าน 6/6 (2026-11-10, 4.8 นาที)
