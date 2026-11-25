@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File seal — Sovereign Seal (free, offline)</title>
+<meta name="description" content="Seal and verify files offline: drop any file, get its SHA-256 plus a signed seal, and anyone can check whether it was altered — no account, no network, no server">
+<meta name="author" content="Krisakorn Utama">
+<meta name="theme-color" content="#030712">
+<meta property="og:title" content="Sovereign Seal — file seal">
+<meta property="og:description" content="Prove a file was not altered. Anyone can verify it offline. Free, no account, no server.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23030712'/%3E%3Ccircle cx='8' cy='8' r='4.6' fill='none' stroke='%2334d399' stroke-width='1.4'/%3E%3Ccircle cx='8' cy='8' r='1.4' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030712; --panel:#0b1220; --line:rgba(52,211,153,.16);
+  --green:#34d399; --cyan:#22d3ee; --red:#f87171;
+  --txt:#e5e7eb; --dim:#9ca3af; --faint:#6b7280;
+  --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
+  --body:'Noto Sans Thai Looped','IBM Plex Sans Thai Looped','Leelawadee UI','Segoe UI',sans-serif;
+  --mono:'Cascadia Code','Consolas','Courier New',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--thai);line-height:1.7;
+  -webkit-font-smoothing:antialiased}
+p,li{font-family:var(--body)}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(900px 560px at 12% -10%,rgba(52,211,153,.12),transparent 62%),
+  radial-gradient(820px 520px at 92% 0%,rgba(34,211,238,.09),transparent 64%)}
+a{color:var(--cyan)}
+::selection{background:rgba(52,211,153,.32);color:#ecfdf5}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:12px;
+  justify-content:space-between;align-items:center;padding:12px 20px;
+  border-bottom:1px solid var(--line);background:rgba(3,7,18,.9);backdrop-filter:blur(8px)}
+.brand{font-family:var(--mono);font-weight:700;font-size:.78rem;letter-spacing:.18em;
+  color:#eaf7f1;text-decoration:none}
+.brand span{color:var(--green)}
+.bar nav{display:flex;gap:14px;font-family:var(--mono);font-size:.72rem;flex-wrap:wrap}
+.bar nav a{color:var(--dim);text-decoration:none}
+.bar nav a:hover{color:var(--txt)}
+.bar nav a.dl{color:var(--green)}
+
+main{max-width:820px;margin:0 auto;padding:26px 20px 70px}
+.eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.24em;color:var(--faint);
+  text-transform:uppercase;margin:0 0 10px}
+h1{font-size:clamp(1.6rem,5vw,2.3rem);line-height:1.3;margin:0 0 10px;color:#f3fbf7;font-weight:600}
+.lede{color:rgba(229,231,235,.82);margin:0 0 16px}
+.badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.7rem;
+  color:var(--green);border:1px solid rgba(52,211,153,.3);background:rgba(52,211,153,.07);
+  border-radius:999px;padding:5px 12px;margin:0 0 22px}
+.badge i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:0 0 18px}
+.tabs button{font-family:var(--thai);font-size:.95rem;background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--dim);padding:10px 14px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:#f3fbf7;border-bottom-color:var(--green)}
+
+.card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:16px 16px 14px;margin:0 0 16px}
+.card h2{font-size:.95rem;margin:0 0 8px;color:#eef7f2;font-weight:600}
+.hint{font-size:.82rem;color:var(--dim);margin:0 0 10px}
+.fp{font-family:var(--mono);font-size:.95rem;color:#f3fbf7;word-break:break-all;
+  background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px 10px;margin:0 0 8px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+button,label.btn{font-family:var(--thai);font-size:.86rem;border-radius:7px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:var(--txt);
+  padding:8px 13px}
+button:hover,label.btn:hover{background:rgba(255,255,255,.1)}
+button.primary{background:var(--green);border-color:var(--green);color:#04211a;font-weight:600}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+button.danger{color:#fecaca;border-color:rgba(248,113,113,.4)}
+
+.drop{border:1.5px dashed rgba(52,211,153,.32);border-radius:10px;padding:26px 16px;text-align:center;
+  color:var(--dim);background:rgba(52,211,153,.03);cursor:pointer;margin:0 0 12px}
+.drop.over{border-color:var(--green);background:rgba(52,211,153,.09);color:#eaf7f1}
+.drop strong{display:block;color:#eaf7f1;font-weight:600;margin-bottom:4px}
+.drop small{font-size:.78rem}
+
+ul.files{list-style:none;padding:0;margin:0 0 12px;font-size:.86rem}
+ul.files li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;
+  border-bottom:1px dashed rgba(255,255,255,.08);font-family:var(--mono);font-size:.78rem;color:var(--dim)}
+ul.files li b{font-family:var(--thai);font-weight:500;color:var(--txt);overflow-wrap:anywhere}
+
+.result{border-left:3px solid var(--faint);padding:10px 0 10px 12px;margin:0 0 12px}
+.result.ok{border-left-color:var(--green)}
+.result.bad{border-left-color:var(--red)}
+.result h3{margin:0 0 4px;font-size:.95rem;color:#eef7f2}
+.result p{margin:0;font-size:.82rem;color:var(--dim);word-break:break-word}
+.result .hash{font-family:var(--mono);font-size:.74rem;color:var(--dim)}
+
+pre{font-family:var(--mono);font-size:.74rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.09);
+  border-radius:8px;padding:12px;overflow:auto;max-height:280px;color:#d7f5e9;margin:0}
+
+.limits{margin:26px 0 0;padding:14px 16px;border:1px solid rgba(34,211,238,.22);
+  border-radius:10px;background:rgba(34,211,238,.05);font-size:.85rem;color:rgba(229,231,235,.85)}
+.limits b{color:#bdf3ff}
+.limits ul{margin:8px 0 0;padding-left:18px}
+.limits li{margin:0 0 4px}
+
+footer{border-top:1px solid var(--line);padding:18px 20px;text-align:center;color:var(--faint);font-size:.8rem}
+footer a{color:var(--dim)}
+.warn{color:#fecaca;font-size:.85rem;margin:8px 0 0}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<!-- the Thai faces only download when Thai text uses them; these off-screen lines keep both loaded -->
+<span aria-hidden="true" style="position:absolute;left:-9999px;top:0;white-space:nowrap;font-family:'IBM Plex Sans Thai Looped'">ฎ ฏ ฐ ฒ ณ ต</span>
+<span aria-hidden="true" style="position:absolute;left:-9999px;top:0;white-space:nowrap;font-family:'Noto Sans Thai Looped'">ฎ ฏ ฐ ฒ ณ ต</span>
+
+<header class="bar">
+  <a class="brand" href="index.html">SOVEREIGN<span>·</span>SEAL</a>
+  <nav>
+    <a href="en.html">Home</a>
+    <a href="buy-intl.html">Back-office suite</a>
+    <a href="support-en.html">Support</a>
+    <a href="seal.html" hreflang="th" lang="th">ไทย</a>
+    <a class="dl" href="seal-en.html" download="sovereign-seal.html">Download this page</a>
+  </nav>
+</header>
+
+<main>
+  <p class="eyebrow">Free · No install · No account</p>
+  <h1>File seal</h1>
+  <p class="lede">Anyone can change a file you sent — but they cannot do it without you finding out.
+    Drop any file (a photo, a video, a PDF, a receipt, a backup, an installer) to get its
+    <b>SHA-256</b> and a digitally signed seal. Send the file with the seal, and whoever
+    receives it can check that these are the exact bytes you signed, unchanged.</p>
+
+  <p class="badge"><i></i> Nothing is uploaded from this machine — it works with no network</p>
+
+  <p class="hint">Latest release <b>1.0.0</b> ·
+    <a href="https://github.com/krisakornutama/sovereign-origin/releases/tag/seal-v1.0.0">download the files and see download counts</a>
+    · the download set is signed by this very tool; signer key <b>b0ae40d0e74ea8a70f4d74887d3213d5</b></p>
+
+  <div class="tabs" role="tablist">
+    <button id="tabSign" role="tab" aria-selected="true" aria-controls="panelSign">Seal a file</button>
+    <button id="tabVerify" role="tab" aria-selected="false" aria-controls="panelVerify">Verify a seal</button>
+  </div>
+
+  <section id="panelSign" role="tabpanel" aria-labelledby="tabSign">
+    <div class="card">
+      <h2>Your signing key</h2>
+      <p class="hint">The key is generated inside this browser and stays on your machine.
+        Nobody sees it; no server receives it.</p>
+      <p class="fp" id="fp">No key yet</p>
+      <p class="hint" id="algNote"></p>
+      <div class="row">
+        <button class="primary" id="btnGen">Create a key</button>
+        <button id="btnExport">Download key (backup)</button>
+        <label class="btn" for="importKey">Import existing key</label>
+        <input id="importKey" type="file" accept="application/json,.json" hidden>
+        <button class="danger" id="btnForget">Delete the key on this machine</button>
+      </div>
+      <p class="warn" id="keyWarn" hidden>If the key is lost you cannot sign as the same identity again — keep a downloaded backup</p>
+    </div>
+
+    <div class="card">
+      <h2>Files to seal</h2>
+      <div class="drop" id="dropSign" tabindex="0" role="button">
+        <strong>Drop files here</strong>
+        <small>or click to choose files — several files can share one seal</small>
+      </div>
+      <input id="inputSign" type="file" multiple hidden>
+      <ul class="files" id="listSign"></ul>
+      <div class="row">
+        <button class="primary" id="btnSign" disabled>Seal and download</button>
+        <button id="btnClearSign">Clear list</button>
+      </div>
+      <p class="hint" id="signState" style="margin-top:10px"></p>
+      <pre id="signOut" hidden></pre>
+    </div>
+  </section>
+
+  <section id="panelVerify" role="tabpanel" aria-labelledby="tabVerify" hidden>
+    <div class="card">
+      <h2>Check whether a file was altered</h2>
+      <p class="hint">Drop the files you received and the seal file (its name ends with .seal.json)
+        into the same box; names inside the seal are matched for you.</p>
+      <div class="drop" id="dropVerify" tabindex="0" role="button">
+        <strong>Drop the files and the seal here</strong>
+        <small>or click to choose both at once</small>
+      </div>
+      <input id="inputVerify" type="file" multiple hidden>
+      <div id="verifyOut"></div>
+      <div class="row">
+        <button id="btnClearVerify">Clear results</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="limits">
+    <b>Read this before you rely on a seal for anything that matters</b>
+    <ul>
+      <li>A seal only says the <b>bytes did not change</b> and <b>which key signed them</b> — it says nothing about whether the content is true, honest or lawful</li>
+      <li>The time inside a seal is the signer's own claim; no authority attests it</li>
+      <li>To believe a specific person signed it, compare the key fingerprint with a channel you already trust (their main site, their signed email) — not because the file says so</li>
+      <li>The key lives only in this browser; clearing site data or switching machines means importing your backup</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <p>Made by Krisakorn Utama · free forever, no paywall ·
+    <a href="support-en.html">Support this work</a> ·
+    <a href="seal-cli.mjs" download>Download the command-line version</a></p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY_STORE = 'sovereign.seal.key.v1';
+  var enc = new TextEncoder();
+  var signFiles = [];
+  var verifyFiles = [];
+
+  /* ── อัลกอริทึม: Ed25519 ก่อน ถ้าเบราว์เซอร์ไม่รองรับจึงใช้ ECDSA P-256 ── */
+  var WEB_ALG = null;
+  function keyAlg(jwk) {
+    if (jwk && jwk.kty === 'OKP' && jwk.crv === 'Ed25519') return 'Ed25519';
+    if (jwk && jwk.kty === 'EC' && jwk.crv === 'P-256') return 'ECDSA-P256';
+    return null;
+  }
+  function keyParams(alg) {
+    return alg === 'Ed25519' ? { name: 'Ed25519' } : { name: 'ECDSA', namedCurve: 'P-256' };
+  }
+  function opParams(alg) {
+    return alg === 'Ed25519' ? { name: 'Ed25519' } : { name: 'ECDSA', hash: { name: 'SHA-256' } };
+  }
+  function publicJwk(jwk) {
+    var out = { kty: jwk.kty, crv: jwk.crv, x: jwk.x };
+    if (jwk.y) out.y = jwk.y;
+    return out;
+  }
+
+  /* ── canonical JSON เหมือนฝั่ง CLI ทุกไบต์ ── */
+  function sortValue(v) {
+    if (Array.isArray(v)) return v.map(sortValue);
+    if (v && typeof v === 'object') {
+      var out = {};
+      Object.keys(v).sort().forEach(function (k) { out[k] = sortValue(v[k]); });
+      return out;
+    }
+    return v;
+  }
+  function canon(v) { return JSON.stringify(sortValue(v)); }
+
+  function hex(buf) {
+    return Array.from(new Uint8Array(buf)).map(function (b) {
+      return b.toString(16).padStart(2, '0');
+    }).join('');
+  }
+  function unb64u(s) {
+    var p = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (p.length % 4) p += '=';
+    var bin = atob(p);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function bytes(n) {
+    if (n < 1024) return n + ' bytes';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  async function fingerprint(jwk) {
+    var d = await crypto.subtle.digest('SHA-256', unb64u(jwk.x));
+    return hex(d).slice(0, 32);
+  }
+  async function sha256File(file) {
+    var buf = await file.arrayBuffer();
+    return hex(await crypto.subtle.digest('SHA-256', buf));
+  }
+
+  /* ── กุญแจ ── */
+  var keyJwk = null;
+
+  function paintKey() {
+    if (!keyJwk) {
+      $('fp').textContent = 'No key yet — create one before signing';
+      $('btnSign').disabled = !signFiles.length;
+      return;
+    }
+    fingerprint(keyJwk).then(function (fp) {
+      $('fp').textContent = 'Key fingerprint ' + fp;
+    });
+    $('btnSign').disabled = !signFiles.length;
+  }
+
+  async function loadKey() {
+    var raw = localStorage.getItem(KEY_STORE);
+    if (!raw) return null;
+    try {
+      var jwk = JSON.parse(raw);
+      if (keyAlg(jwk) && jwk.d && jwk.x) return jwk;
+    } catch (e) { /* เก็บขยะไว้ไม่ดี — ทิ้ง */ }
+    return null;
+  }
+
+  async function makeKey() {
+    var pair = await crypto.subtle.generateKey(keyParams(WEB_ALG), true, ['sign', 'verify']);
+    var jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    localStorage.setItem(KEY_STORE, JSON.stringify(jwk));
+    keyJwk = jwk;
+    $('keyWarn').hidden = false;
+    paintKey();
+  }
+
+  function download(name, text) {
+    var blob = new Blob([text], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  /* ── แท็บ ── */
+  function showPanel(which) {
+    var signOn = which === 'sign';
+    $('panelSign').hidden = !signOn;
+    $('panelVerify').hidden = signOn;
+    $('tabSign').setAttribute('aria-selected', String(signOn));
+    $('tabVerify').setAttribute('aria-selected', String(!signOn));
+  }
+  $('tabSign').addEventListener('click', function () { showPanel('sign'); });
+  $('tabVerify').addEventListener('click', function () { showPanel('verify'); });
+
+  /* ── รายการไฟล์ (เซ็น) ── */
+  function paintSignList() {
+    var ul = $('listSign');
+    ul.textContent = '';
+    signFiles.forEach(function (f, i) {
+      var li = document.createElement('li');
+      var b = document.createElement('b');
+      b.textContent = f.name;
+      var s = document.createElement('span');
+      s.textContent = bytes(f.size) + '  ';
+      var x = document.createElement('button');
+      x.textContent = 'Remove';
+      x.style.padding = '2px 8px';
+      x.style.fontSize = '.72rem';
+      x.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        signFiles.splice(i, 1);
+        paintSignList();
+      });
+      li.appendChild(b); li.appendChild(s); li.appendChild(x);
+      ul.appendChild(li);
+    });
+    $('btnSign').disabled = !signFiles.length || !keyJwk;
+    $('signState').textContent = signFiles.length
+      ? 'Ready to seal ' + signFiles.length + ' file(s)'
+      : '';
+  }
+
+  function addSignFiles(list) {
+    Array.prototype.forEach.call(list, function (f) {
+      if (!signFiles.some(function (x) { return x.name === f.name && x.size === f.size && x.lastModified === f.lastModified; })) {
+        signFiles.push(f);
+      }
+    });
+    paintSignList();
+  }
+
+  /* ── ลากวาง (ใช้ร่วมกันทั้งสองช่อง) ── */
+  function wireDrop(zone, input, onFiles) {
+    zone.addEventListener('click', function () { input.click(); });
+    zone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', function () {
+      onFiles(input.files);
+      input.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(function (t) {
+      zone.addEventListener(t, function (e) { e.preventDefault(); zone.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (t) {
+      zone.addEventListener(t, function (e) { e.preventDefault(); zone.classList.remove('over'); });
+    });
+    zone.addEventListener('drop', function (e) {
+      if (e.dataTransfer && e.dataTransfer.files) onFiles(e.dataTransfer.files);
+    });
+  }
+
+  wireDrop($('dropSign'), $('inputSign'), addSignFiles);
+  wireDrop($('dropVerify'), $('inputVerify'), function (list) {
+    Array.prototype.forEach.call(list, function (f) {
+      /* ไฟล์ชื่อเดียวกันที่เพิ่งลากเข้ามาแทนของเก่า — ไม่งั้นผลตรวจรอบก่อนจะบังรอบใหม่ */
+      verifyFiles = verifyFiles.filter(function (x) { return x.name !== f.name; });
+      verifyFiles.push(f);
+    });
+    runVerify();
+  });
+
+  /* ── เซ็น ── */
+  $('btnGen').addEventListener('click', function () {
+    $('btnGen').disabled = true;
+    makeKey().catch(function (err) {
+      $('signState').textContent = 'Could not create a key: ' + err.message;
+    }).finally(function () { $('btnGen').disabled = false; });
+  });
+
+  $('btnExport').addEventListener('click', function () {
+    if (!keyJwk) { $('signState').textContent = 'No key to download yet'; return; }
+    download('seal-key.json', JSON.stringify(keyJwk, null, 2) + '\n');
+  });
+
+  $('importKey').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var jwk = JSON.parse(String(reader.result));
+        if (!keyAlg(jwk) || !jwk.d || !jwk.x) throw new Error('This file is not a usable key');
+        localStorage.setItem(KEY_STORE, JSON.stringify(jwk));
+        keyJwk = jwk;
+        paintKey();
+        $('signState').textContent = 'Key imported: ' + f.name;
+      } catch (err) {
+        $('signState').textContent = 'Import failed: ' + err.message;
+      }
+    };
+    reader.readAsText(f);
+    e.target.value = '';
+  });
+
+  $('btnForget').addEventListener('click', function () {
+    localStorage.removeItem(KEY_STORE);
+    keyJwk = null;
+    $('keyWarn').hidden = true;
+    paintKey();
+    $('signState').textContent = 'Key deleted from this machine';
+  });
+
+  $('btnClearSign').addEventListener('click', function () {
+    signFiles = [];
+    $('signOut').hidden = true;
+    paintSignList();
+  });
+
+  $('btnSign').addEventListener('click', async function () {
+    if (!keyJwk || !signFiles.length) return;
+    var btn = $('btnSign');
+    btn.disabled = true;
+    $('signState').textContent = 'Hashing and signing…';
+    try {
+      var myAlg = keyAlg(keyJwk);
+      var priv = await crypto.subtle.importKey('jwk', keyJwk, keyParams(myAlg), false, ['sign']);
+      var items = [];
+      for (var i = 0; i < signFiles.length; i++) {
+        items.push({
+          name: signFiles[i].name,
+          sha256: await sha256File(signFiles[i]),
+          size: signFiles[i].size
+        });
+      }
+      var body = { v: 1, alg: myAlg, at: new Date().toISOString(), items: items };
+      var sig = await crypto.subtle.sign(opParams(myAlg), priv, enc.encode(canon(body)));
+      var seal = {
+        body: body,
+        sig: btoa(String.fromCharCode.apply(null, new Uint8Array(sig))),
+        publicKey: publicJwk(keyJwk)
+      };
+      var name = (signFiles[0].name.replace(/\.[^.]+$/, '') || 'seal') + '.seal.json';
+      download(name, JSON.stringify(seal, null, 2) + '\n');
+      var out = $('signOut');
+      out.hidden = false;
+      out.textContent = JSON.stringify(seal, null, 2);
+      $('signState').textContent = 'Sealed: ' + name + ' · signer ' + (await fingerprint(seal.publicKey));
+    } catch (err) {
+      $('signState').textContent = 'Signing failed: ' + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* ── ตรวจ ── */
+  function resultBox(ok, title, lines) {
+    var box = document.createElement('div');
+    box.className = 'result ' + (ok ? 'ok' : 'bad');
+    var h = document.createElement('h3');
+    h.textContent = (ok ? 'PASS · ' : 'FAIL · ') + title;
+    box.appendChild(h);
+    lines.forEach(function (t) {
+      var p = document.createElement('p');
+      p.textContent = t;
+      box.appendChild(p);
+    });
+    return box;
+  }
+
+  $('btnClearVerify').addEventListener('click', function () {
+    verifyFiles = [];
+    $('verifyOut').textContent = '';
+  });
+
+  async function runVerify() {
+    var out = $('verifyOut');
+    out.textContent = '';
+    var sealFile = null;
+    var dataFiles = [];
+    verifyFiles.forEach(function (f) {
+      if (/\.seal\.json$/i.test(f.name)) sealFile = f; else dataFiles.push(f);
+    });
+    if (!sealFile) {
+      if (dataFiles.length) out.appendChild(resultBox(false, 'No seal file', ['Attach the file whose name ends with .seal.json']));
+      return;
+    }
+    var seal;
+    try {
+      seal = JSON.parse(await sealFile.text());
+      if (!seal || !seal.body || !seal.sig || !seal.publicKey) throw new Error('This is not a valid seal file');
+    } catch (err) {
+      out.appendChild(resultBox(false, 'Could not read the seal', [err.message]));
+      return;
+    }
+
+    var sigOk = false;
+    try {
+      var sealAlg = keyAlg(seal.publicKey) || seal.body.alg;
+      var pub = await crypto.subtle.importKey('jwk', seal.publicKey, keyParams(sealAlg), false, ['verify']);
+      var raw = atob(seal.sig);
+      var sig = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) sig[i] = raw.charCodeAt(i);
+      sigOk = await crypto.subtle.verify(opParams(sealAlg), pub, sig, enc.encode(canon(seal.body)));
+    } catch (err) {
+      out.appendChild(resultBox(false, 'Could not check the signature', [err.message]));
+      return;
+    }
+
+    var fp = await fingerprint(seal.publicKey);
+    if (!sigOk) {
+      out.appendChild(resultBox(false, 'Signature is not valid', [
+        'The seal was edited, or the key used to check it is not the signing key',
+        'Signer claimed by the seal: ' + fp
+      ]));
+      return;
+    }
+
+    var items = Array.isArray(seal.body.items) ? seal.body.items : [];
+    var missing = [];
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var match = null;
+      for (var k = 0; k < dataFiles.length; k++) {
+        if (dataFiles[k].name === it.name) { match = dataFiles[k]; break; }
+      }
+      if (!match) { missing.push(it.name); continue; }
+      var digest = await sha256File(match);
+      var same = digest === it.sha256;
+      out.appendChild(resultBox(same, it.name, [
+        same ? 'Every byte matches what was signed' : 'Bytes differ — altered after signing, or a different file',
+        'when signed: ' + it.sha256,
+        'now: ' + digest
+      ]));
+    }
+    if (missing.length) {
+      out.appendChild(resultBox(false, 'These files were not provided', missing));
+    }
+    var head = document.createElement('p');
+    head.className = 'hint';
+    head.textContent = 'Signed at ' + seal.body.at + ' · signer ' + fp +
+      ' · signature verified (to believe it is a particular person, compare the fingerprint with a channel you trust)';
+    out.insertBefore(head, out.firstChild);
+  }
+
+  /* ── เริ่มต้น ── */
+  async function boot() {
+    var external = false;
+    try {
+      await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify']);
+      WEB_ALG = 'Ed25519';
+    } catch (e) {
+      try {
+        await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+        WEB_ALG = 'ECDSA-P256';
+      } catch (e2) {
+        $('signState').textContent = 'This browser has no crypto.subtle — open the page over http or https, or use the command-line version';
+        $('btnSign').disabled = true;
+        $('btnGen').disabled = true;
+        return;
+      }
+    }
+    $('algNote').textContent = WEB_ALG === 'Ed25519'
+      ? 'Algorithm in this browser: Ed25519'
+      : 'This browser lacks Ed25519 — using ECDSA P-256 instead (checked by the same tool); the signature is just as valid';
+    keyJwk = await loadKey();
+    if (keyJwk && keyAlg(keyJwk) !== WEB_ALG) external = true;
+    if (external) {
+      $('algNote').textContent = 'Your existing key is ' + keyAlg(keyJwk) +
+        ' — usable, and signing with it produces ' + keyAlg(keyJwk);
+    }
+    $('keyWarn').hidden = !keyJwk;
+    paintKey();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

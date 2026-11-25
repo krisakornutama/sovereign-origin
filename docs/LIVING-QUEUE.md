@@ -432,3 +432,14 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-25 — `SEAL-003`: เพิ่มจุดค้นพบ: `release-verify.html` (บริบทตรวจไฟล์), เมนูเครื่องมือใน `projects.html`, บรรทัด "ลองของฟรีก่อน" ใน `buy.html`
   บทเรียนเดียวกับ `ATTEST-008`: หน้าใหม่ต้องมีทางเข้าจากหน้าที่คนอ่านอยู่จริง ไม่งั้นเท่ากับเผยแพร่แล้วไม่มีใครเจอ
+
+- 2026-11-25 — `SEAL-004`: หน้าอังกฤษ `portfolio/seal-en.html` สร้างจาก `seal.html` ด้วย `scripts/build-seal-en.mjs` (MAP + assert 1 ครั้งต่อข้อความ + นับอักษรไทยคงเหลือต้องเป็น 0)
+  เหตุผล: คัดลอกโค้ดเข้ารหัสให้เหมือนกันทุกไบต์ ดีกว่าเขียนหน้าอังกฤษแยกแล้ว canonical เพี้ยน; เพิ่ม `--check` ใช้เป็นด่านกันลืมรัน
+  หมายเหตุ: หน้าอังกฤษต้องมี seed สองบรรทัด (แยกต่อตระกูลฟอนต์) ไม่งั้น `audit` ฟ้องว่าฟอนต์ไทยไม่ถูกโหลด — บทเรียนเดียวกับ `SEAL-001`
+
+- 2026-11-25 — `SEAL-005`: ปล่อย `seal-v1.0.0` เป็น GitHub Release 4 ไฟล์ (`sovereign-seal-1.0.0.html`, `seal-cli-1.0.0.mjs`, `SHA256SUMS.txt`, `SHA256SUMS.txt.seal.json`)
+  ตราของ `SHA256SUMS.txt` เซ็นด้วยเครื่องมือนี้เอง กุญแจ Ed25519 fingerprint `b0ae40d0e74ea8a70f4d74887d3213d5` (กุญแจส่วนตัวอยู่ `.secrets/` นอก repo)
+  พิสูจน์จาก URL สาธารณะ: 4 ไฟล์ = 200 · `sha256sum -c` OK ทั้งคู่ · `verify` exit 0 · เติม 1 ไบต์ → exit 1 · ได้ตัวเลขดาวน์โหลดเป็นตัววัดเดียวที่ไม่ต้องมี tracking
+
+- 2026-11-25 — `SEAL-006`: หน้า `support-en.html` (อังกฤษ) + ลิงก์สลับภาษาไทย/อังกฤษทั้งสองคู่ (`seal.html` ↔ `seal-en.html`, `support.html` ↔ `support-en.html`)
+  และอัปเดต `release-verify.html` ให้ชี้ชุดดาวน์โหลดที่เซ็นแล้ว; `check:copy` PASS 85 ไฟล์ · `audit` AUDIT CLEAN
