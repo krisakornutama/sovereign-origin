@@ -154,6 +154,20 @@ export function collectTargets(site = SITE) {
     }
     const proot = path.join(parent, 'README.md');
     if (fs.existsSync(proot)) targets.push({ file: proot, markdown: true });
+    // ข้อความการตลาด (โพสต์/DM/gig) ก็ขึ้นหน้าเว็บ/ส่งถึงคนจริง ⇒ ต้องผ่านด่านคำไทยเหมือนกัน
+    const marketing = path.join(parent, 'marketing');
+    if (fs.existsSync(marketing)) {
+      for (const f of fs.readdirSync(marketing)) {
+        if (f.endsWith('.md')) targets.push({ file: path.join(marketing, f), markdown: true });
+      }
+    }
+    // ชุดข้อความตลาดต่างประเทศ (อังกฤษ) — ต้องผ่านด่านเดียวกับหน้าเว็บ
+    const marketingEn = path.join(parent, 'marketing-en');
+    if (fs.existsSync(marketingEn)) {
+      for (const f of fs.readdirSync(marketingEn)) {
+        if (f.endsWith('.md')) targets.push({ file: path.join(marketingEn, f), markdown: true });
+      }
+    }
   }
   return targets;
 }
