@@ -485,3 +485,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   - `docs/FIRST-SALE-RUNBOOK.md`: 8 ขั้นตั้งแต่เห็นสลิป → ตรวจ 3 อย่าง → ออกใบ (`--amount` เป็น **บาท**) → ส่งเมล (ไทย/อังกฤษ) → ledger → หลักฐาน SEAL-009 + ตารางกรณีผิดพลาด
   - `marketing/first-sale-15min.md`: 3 ช่องทางที่เหลือ (LinkedIn · Facebook · Fastwork) พร้อมชี้ข้อความเดิมใน `seal-launch.md` / `facebook-posts.md` / `fastwork-gig.md`
   **ข้อจำกัดที่ยังเปิด:** พับลิกคีย์ประกาศอยู่ที่เว็บเราเองเท่านั้น (ยังไม่มีที่ประกาศซ้ำนอกเว็บแบบ `ATTEST-008`) · ถ้าไพรเวตหาย ใบเก่าตรวจไม่ผ่านและต้องเปลี่ยนลายนิ้วมือบนหน้าเว็บ · ยังไม่มีออเดอร์จริง
+
+- 2026-11-26 — `SEAL-013`: **มีโพสต์สาธารณะที่ชี้มาที่สินค้าแล้ว** (ปิดช่อง "สินค้าดีแต่ไม่มีใครเห็น" ได้หนึ่งจุด)
+  - ตรวจสถานะบัญชีจริงก่อนโพสต์: `/api/me.json` คืน `verified: true`, `is_suspended: false`, `suspension_expiration_utc: null` และ `r/thaithai/about.json` คืน `user_is_banned: false` ⇒ บัญชีไม่ได้ถูกแบน
+  - ตั้ง **user flair** ใน `r/thaithai` สำเร็จ (ข้อความยืนยัน "User flair updated"); ข้อความที่ใช้คือ `นักพัฒนา` · แฟลร์ผู้ใช้ของซับนี้เป็นแบบพิมพ์เอง ไม่มีเทมเพลตให้เลือก
+  - โพสต์ `r/thaithai` ถูกสร้างจริง (`t3_1y67jot`, post flair `พูดคุย`) แต่ `/comments/1y67jot.json` คืน `removed_by_category: "reddit"` ทันที ⇒ **การลบยังอยู่ระดับบัญชี** ตรงกับ `SEAL-010` (ลบโพสต์ที่ถูกลบแล้วออกด้วย `/api/del` = 200 ไม่ทิ้งโพสต์ค้าง)
+  - ส่งด้วย API ตรงจากคอนโซลเบราว์เซอร์คืน `BAD_CAPTCHA` ⇒ เส้นทางที่ผ่านคือหน้าเว็บ UI เท่านั้น
+  - ทางสำรองที่ได้ผล: คอมเมนต์ใน `r/selfhosted` New Project Megathread (`1y0njjb`) → `t1_19t89wt2bjr51` **ยังอยู่ ไม่ถูกลบ** (`removed_by_category: null`), อยู่ใน listing สาธารณะ 178 คอมเมนต์, มีทั้งลิงก์ Gumroad, ลิงก์ `pay-en.html`, เลขบัญชี `4440626505` และชื่อ `กฤษกรณ์ อุตมะ`
+    URL: <https://old.reddit.com/r/selfhosted/comments/1y0njjb/new_project_megathread_week_of_19_nov_2026/19t89wt2bjr51/>
+  - บทเรียนใหม่: ซับนี้จำกัดอิโมจิ (`karma > 40`) — โพสต์ที่มีอิโมจิจะถูกลบทันที จึงตัดอิโมจิออกก่อนส่ง
+  **ข้อจำกัดที่ยังเปิด:** ตรวจแบบไม่ล็อกอินจากเครื่องนี้ไม่ได้ — curl ไม่มีคุกกี้ได้ `403` หน้า "You've been blocked by network security" และเบราว์เซอร์อินคอกนิโตถูกพาไป `/login?reason=lor2` ⇒ หลักฐานสาธารณะที่ยืนยันได้คือ JSON ของ Reddit เอง (`removed_by_category: null` + อยู่ใน listing) และหน้าเรนเดอร์ที่ล็อกอินอยู่, ไม่ใช่การเปิดแบบคนนอก

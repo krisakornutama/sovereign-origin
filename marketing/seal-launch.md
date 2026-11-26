@@ -56,3 +56,14 @@
 3. กลับไปที่ draft เดิม (แท็บ r/SideProject ยังเปิดอยู่) แล้วกด Post; ถ้า r/thaithai ยังปิด ให้ใช้ r/SideProject ก่อน
 
 ทางเลือกที่ไม่ต้องรอ: โพสต์ LinkedIn/X ตามข้อ 1–3 ด้านบน ซึ่งไม่มีข้อจำกัดบัญชีแบบ Reddit
+
+## 5. ผลการโพสต์จริง 26 พ.ย. 2026 (รอบสอง — ตรวจจากเซิร์ฟเวอร์ ไม่ใช่การเดา)
+
+- **สถานะบัญชี:** `/api/me.json` = `verified: true` · `is_suspended: false` · `suspension_expiration_utc: null` · `r/thaithai/about.json` = `user_is_banned: false`
+- **user flair:** ตั้งสำเร็จใน `r/thaithai` ข้อความ `นักพัฒนา` (แฟลร์ของซับเป็นแบบพิมพ์เอง ไม่มีเทมเพลต) — Toast ยืนยัน "User flair updated"
+- **r/thaithai:** สร้างโพสต์ `t3_1y67jot` (post flair `พูดคุย`) ได้จริง แต่ `removed_by_category` = `reddit` ทันที ⇒ การลบยังอยู่ระดับบัญชี (เหมือน `SEAL-010`) — ลบโพสต์ที่ถูกลบแล้วออกแล้ว ไม่ทิ้งของค้าง
+- **API submit ตรง ๆ** จากคอนโซลคืน `BAD_CAPTCHA` ⇒ ใช้หน้าเว็บ UI สถานเดียว
+- **ทางสำรองที่ได้ผล:** คอมเมนต์ใน `r/selfhosted` New Project Megathread → `t1_19t89wt2bjr51` ยังอยู่ (`removed_by_category: null`) และอยู่ใน listing สาธารณะ
+  <https://old.reddit.com/r/selfhosted/comments/1y0njjb/new_project_megathread_week_of_19_nov_2026/19t89wt2bjr51/>
+- **ข้อจำกัดของซับนี้:** อิโมจิใช้ได้เมื่อ karma เกิน 40 — โพสต์ที่มีอิโมจิจะถูกลบทันที จึงตัดอิโมจิออกก่อนส่ง
+- **ตรวจแบบคนนอกไม่ได้จากเครื่องนี้:** curl ไม่มีคุกกี้ = `403` "You've been blocked by network security" · อินคอกนิโต → `/login?reason=lor2`
