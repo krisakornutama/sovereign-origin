@@ -28,6 +28,7 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
   radial-gradient(900px 560px at 14% -10%,rgba(52,211,153,.13),transparent 62%),
   radial-gradient(820px 520px at 92% 0%,rgba(34,211,238,.09),transparent 64%)}
 a{color:var(--cyan)}
+code{font-family:var(--mono);font-size:.86em;color:#eef7f2;background:rgba(0,0,0,.38);border-radius:4px;padding:1px 5px;word-break:break-all}
 ::selection{background:rgba(52,211,153,.32);color:#ecfdf5}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
 
@@ -122,6 +123,11 @@ footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:ce
     <li><b>7-day refund</b><span>full refund if it will not run on your machine, no reason needed</span></li>
   </ul>
 
+  <p class="note">The license you receive is signed with an Ed25519 key, fingerprint
+    <code>c2eb00394eae43df781ad0592056f91c</code>. The public key is published at
+    <a href="license-pub.txt">license-pub.txt</a>, so anyone can verify the license without
+trusting my word (fingerprint = first 32 hex characters of the SHA-256 of the key's DER).</p>
+
   <h2>Three steps</h2>
   <ol class="steps">
     <li><b>Transfer</b> to Krungthai Bank, account 4440626505, name Krisakorn Utama, for the tier you want.</li>
@@ -146,8 +152,9 @@ footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:ce
     <li>I am not VAT-registered, so you get a payment receipt, not a Thai tax invoice.</li>
     <li>I work alone in Sakon Nakhon, Thailand. There is no company behind this and no 24-hour support desk.</li>
     <li>A transfer sent to the wrong account is hard to recover — check all ten digits, 4440626505, before confirming.</li>
-    <li>Prefer a card? Use the <a href="https://oweenhoper.gumroad.com/l/sovereign-os">Gumroad listing</a>
-      — instant download, and the money reaches me through their payout instead.</li>
+    <li>Prefer a card? The <a href="https://oweenhoper.gumroad.com/l/sovereign-os">Gumroad listing</a>
+      is the same product with an instant download, but that $59 sits inside Gumroad until the
+      balance reaches $100 before it is paid out to me — a direct transfer lands in my account at once.</li>
   </ul>
 
   <p>

@@ -6,6 +6,8 @@
   "scripts": {
     "queue": "node tools/queue/queue.mjs",
     "license": "node tools/license/issue.mjs",
+    "license:keygen": "node tools/license/keygen.mjs",
+    "license:drill": "node tools/license/drill.mjs",
     "license:sell": "node tools/license/sell.mjs",
     "check:copy": "node portfolio/scripts/check-copy.mjs",
     "verify": "node tools/verify.mjs",

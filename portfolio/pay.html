@@ -28,6 +28,7 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
   radial-gradient(900px 560px at 14% -10%,rgba(52,211,153,.13),transparent 62%),
   radial-gradient(820px 520px at 92% 0%,rgba(34,211,238,.09),transparent 64%)}
 a{color:var(--cyan)}
+code{font-family:var(--mono);font-size:.86em;color:#eef7f2;background:rgba(0,0,0,.38);border-radius:4px;padding:1px 5px;word-break:break-all}
 ::selection{background:rgba(52,211,153,.32);color:#ecfdf5}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
 
@@ -120,6 +121,11 @@ footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:ce
     <li><b>คืนเงิน 7 วัน</b><span>ถ้ารันบนเครื่องคุณไม่ได้ คืนเต็มจำนวน ไม่ต้องให้เหตุผล</span></li>
   </ul>
 
+  <p class="note">ไลเซนส์ที่คุณได้รับเซ็นด้วยกุญแจ Ed25519 ลายนิ้วมือ
+    <code>c2eb00394eae43df781ad0592056f91c</code> · กุญแจสาธารณะอยู่ที่
+    <a href="license-pub.txt">license-pub.txt</a> ให้ใครก็ตรวจใบเองได้ ไม่ต้องเชื่อคำผม
+    (ลายนิ้วมือ = SHA-256 ของ DER 32 ตัวแรก)</p>
+
   <h2>ขั้นตอนมีสามข้อ</h2>
   <ol class="steps">
     <li><b>โอน</b> เข้าบัญชีกรุงไทย 4440626505 ชื่อ กฤษกรณ์ อุตมะ ตามยอดของแพ็กเกจที่ต้องการ</li>
@@ -144,8 +150,9 @@ footer{border-top:1px solid rgba(52,211,153,.16);padding:18px 20px;text-align:ce
     <li>ผมยังไม่จดทะเบียนภาษีมูลค่าเพิ่ม จึงออกได้เฉพาะใบเสร็จรับเงิน ไม่ใช่ใบกำกับภาษี</li>
     <li>ผมทำคนเดียวในสกลนคร ไม่มีบริษัทอยู่ข้างหลัง และไม่มีทีมซัพพอร์ต 24 ชั่วโมง</li>
     <li>โอนผิดบัญชีแล้วเรียกคืนยาก — ตรวจเลข 4440626505 ให้ครบก่อนกดยืนยัน</li>
-    <li>ถ้าอยากจ่ายด้วยบัตรแทน เลือกได้ที่ <a href="https://oweenhoper.gumroad.com/l/sovereign-os">หน้าร้าน Gumroad</a>
-      (ไฟล์ดาวน์โหลดได้ทันที แต่เงินจะเข้าบัญชีผมผ่าน payout)</li>
+    <li>ไม่สะดวกโอน? จ่ายด้วยบัตรที่ <a href="https://oweenhoper.gumroad.com/l/sovereign-os">หน้าร้าน Gumroad</a>
+      ได้ — สินค้าเดียวกัน ไฟล์เดียวกัน แต่ยอด 59 ดอลลาร์จะค้างอยู่ใน Gumroad
+      จนกว่าจะสะสมครบ 100 ดอลลาร์ จึงจะโอนเข้าบัญชีผม (ทางโอนตรงถึงบัญชีผมทันที)</li>
   </ul>
 
   <p>
