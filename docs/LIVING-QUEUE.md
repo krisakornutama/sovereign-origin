@@ -457,3 +457,10 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   baseline 26 พ.ย. 2026: asset ของ `seal-v1.0.0` ดาวน์โหลด 3 ครั้ง/ไฟล์ (ทั้งหมดมาจากการตรวจของผู้พัฒนาเอง) · `v1.3.10` 4–5 ครั้ง · Gumroad Sales ยังไม่มีรายการ
   ทางเข้า: `index.html` และ `en.html` เพิ่มลิงก์ไปหน้า Seal แล้ว (ก่อนหน้านี้ 0 ลิงก์จากสองหน้าหลัก) + `README.md` มีหัวข้อ “เครื่องมือฟรี” ชี้หน้าภาษาไทย/อังกฤษและ release
   ค้างฝั่งเจ้าของ: (1) ตรวจ Gumroad → Payouts ว่าชี้บัญชีกรุงไทย 4440626505 และ KYC ผ่าน (ถ้าไม่ตั้ง เงินค้างใน Gumroad) (2) ยืนยันอีเมล + karma ก่อนกด Post บน Reddit (3) ตัดสินราคาเปิดตัว $29 vs $59, สินค้าชิ้นที่ 2, และ `NPM_TOKEN` สำหรับ `sovereign-vault`/`sovereign-attest`
+
+- 2026-11-26 — `SEAL-010`: ทดสอบโพสต์ Reddit จริงถึงที่สุดแล้ว ⇒ **ตัวบล็อกอยู่ที่บัญชี ไม่ใช่จุดโพสต์**
+  - r/thaithai: `Post` disabled เพราะบังคับ user flair; post flair "พูดคุย" ตั้งได้ แต่ dialog เลือก user flair ไม่เปิด (คลิกจากแถบข้าง USER FLAIR และจาก composer) ⇒ โพสต์ไม่ได้
+  - r/SideProject: `Post` enabled, กดจริง, ระบบสร้างโพสต์ `1y66kea` แล้ว redirect กลับซับ แต่ `/user/oweenhoper/submitted.json` คืน `removed_by_category: "reddit"` ทันที — และโพสต์เก่า 3 รายการของบัญชีเดียวกันก็ถูกลบด้วยเหตุเดียวกันทั้งหมด ⇒ Reddit ลบเนื้อหาระดับบัญชี (shadowban/spam filter)
+  - r/selfhosted megathread สัปดาห์ 19 พ.ย. (`1y0njjb`): เปิดได้ แต่ไม่มีกล่องคอมเมนต์ (ปิดรับแล้ว) และจะโดนลบระดับบัญชีเช่นกัน
+  - ระหว่างตรวจโดน `429` ⇒ หยุดยิงซ้ำตามแผน ไม่ทำให้บัญชีแย่ลง
+  - หลักฐานประกอบ: `gumroad.com/payouts` = "Let's get you paid / reach your $100 minimum", `settings/payments` ระบุ minimum payout ของประเทศไทย = $100 ⇒ ยอด $59 จะยังไม่โอนเข้าธนาคารจนกว่าจะสะสมถึง $100 (ต้องบอกผู้ซื้อตามจริง ไม่ใช่ "เงินเข้าทันที")
