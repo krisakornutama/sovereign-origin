@@ -451,3 +451,9 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
 
 - 2026-11-25 — `SEAL-008`: เพิ่มส่วน “ของฟรีที่ใช้ได้เดี๋ยวนี้” ใน `launch.html`, คอมเมนต์ใหม่ใน Issue #8 ([7176437333](https://github.com/krisakornutama/project-sovereign/issues/8#issuecomment-7176437333)) และเตรียมข้อความพร้อมวาง LinkedIn/X/ไทย ใน `marketing/seal-launch.md`
   พร้อมระบุสถานะ Reddit ตามจริง (ปุ่ม Post/Save Draft disabled ทั้งสองซับ = ข้อจำกัดบัญชี) และขั้นตอนปลดล็อก 3 ข้อที่เจ้าของต้องทำจากอีเมล — ไม่ยิง API ซ้ำเพราะรู้แล้วว่า `BAD_CAPTCHA`/401
+
+- 2026-11-26 — `SEAL-009`: นิยาม “สำเร็จ” ของ Seal + baseline ที่วัดได้โดยไม่มี tracking
+  **สำเร็จ = 1 ยอดที่เห็นใน Gumroad Sales หรือ 1 เงินเข้าบัญชีกรุงไทย 4440626505 (กฤษกรณ์ อุตมะ)** — ไม่นับดาวน์โหลดเป็นยอดขาย
+  baseline 26 พ.ย. 2026: asset ของ `seal-v1.0.0` ดาวน์โหลด 3 ครั้ง/ไฟล์ (ทั้งหมดมาจากการตรวจของผู้พัฒนาเอง) · `v1.3.10` 4–5 ครั้ง · Gumroad Sales ยังไม่มีรายการ
+  ทางเข้า: `index.html` และ `en.html` เพิ่มลิงก์ไปหน้า Seal แล้ว (ก่อนหน้านี้ 0 ลิงก์จากสองหน้าหลัก) + `README.md` มีหัวข้อ “เครื่องมือฟรี” ชี้หน้าภาษาไทย/อังกฤษและ release
+  ค้างฝั่งเจ้าของ: (1) ตรวจ Gumroad → Payouts ว่าชี้บัญชีกรุงไทย 4440626505 และ KYC ผ่าน (ถ้าไม่ตั้ง เงินค้างใน Gumroad) (2) ยืนยันอีเมล + karma ก่อนกด Post บน Reddit (3) ตัดสินราคาเปิดตัว $29 vs $59, สินค้าชิ้นที่ 2, และ `NPM_TOKEN` สำหรับ `sovereign-vault`/`sovereign-attest`
