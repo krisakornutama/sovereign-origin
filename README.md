@@ -19,6 +19,15 @@
 
 สตอรีบอร์ด + คำสั่งจำลองอุณหภูมิ + สคริปต์ยิง alert จริง: [`docs/PRELAUNCH-DEMO.md`](docs/PRELAUNCH-DEMO.md)
 
+## 🆓 เครื่องมือฟรี — Sovereign Seal (ตราประทับไฟล์)
+
+ของฟรีที่แยกจากตัวระบบนี้ ใช้ได้ทันทีโดยไม่ต้องติดตั้งอะไร: ลากไฟล์ใส่ → ได้ SHA-256 + ตราที่เซ็นด้วย Ed25519
+แล้วใครก็ตรวจได้เองแบบออฟไลน์ว่าเป็นไบต์เดียวกันกับตอนเซ็น (ไม่มีบัญชี ไม่มีเซิร์ฟเวอร์ ไม่มีเน็ตก็ใช้ได้)
+
+- หน้าเว็บ: [ไทย](https://sovereignoriginshop.dpdns.org/seal.html) · [English](https://sovereignoriginshop.dpdns.org/seal-en.html)
+- ดาวน์โหลด: [seal-v1.0.0](https://github.com/krisakornutama/sovereign-origin/releases/tag/seal-v1.0.0) — ไฟล์เดียวจบ + `seal-cli` สำหรับตรวจในเทอร์มินัล
+- ชุดดาวน์โหลดเซ็นด้วยเครื่องมือนี้เอง: `sha256sum -c SHA256SUMS.txt` แล้ว `node seal-cli-1.0.0.mjs verify SHA256SUMS.txt SHA256SUMS.txt.seal.json` (exit 0 = ไบต์ตรงและลายเซ็นถูก)
+
 ## 🖥️ รับช่วงต่อบนเครื่องใหม่ (clone แล้วรันได้เลย)
 
 ```bash
