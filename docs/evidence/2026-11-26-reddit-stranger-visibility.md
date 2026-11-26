@@ -59,6 +59,14 @@ GET https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.reddit.com%2F
 เนื้อหาของบัญชีไม่ถูกส่งให้คนนอกเห็นในทุกระดับ (account-level shadowban / spam filtering)
 ไม่ใช่แค่คอมเมนต์เดียวหรือซับเดียว
 
+## ความพยายามอุทธรณ์ (26 พ.ย. 2026)
+
+- เปิด `https://www.reddit.com/appeals` (เด้งไป `/appeal/`) ในเบราว์เซอร์ที่ล็อกอินเป็น `oweenhoper` — ฟอร์มขึ้นชื่อผู้ใช้ `oweenhoper` ให้อัตโนมัติ (แก้ไม่ได้) และช่อง `BRIEF DESCRIPTION` รับไม่เกิน 250 ตัวอักษร
+- กรอกข้อความ 243/250 ตัวอักษร: `All my comments are invisible to logged-out users: user/oweenhoper/comments.rss returns 0 items, and my comment in r/selfhosted's New Project Megathread never appears in the thread's 100 newest public comments. I only mention my product where subreddit rules allow. Please review.`
+- กด `Submit` 4 ครั้ง (ปุ่มจริง + คลิกผ่าน locator + `element.click()` + ปุ่ม focus แล้ว Enter) ⇒ **ไม่มี request ส่งแบบฟอร์มออกไปเลย** มีแต่ `GET /svc/shreddit/update-recaptcha?k=<base64 ของ "appeal|foregrounding_action|<renderId>">` และ `POST google.com/recaptcha/enterprise/clr` — ฟอร์มใช้ **reCAPTCHA Enterprise** และไม่ยอมให้การกดที่ไม่ได้มาจากมนุษย์จริงผ่าน จึงไม่มี POST ไปยังปลายทางอุทธรณ์
+- **ไม่ได้หลบ captcha** และไม่พยายามอ้อม: ปล่อยแท็บไว้ที่ฟอร์มที่กรอกครบแล้ว เพื่อให้เจ้าของบัญชีกด `Submit` เอง (การกระทำเดียวที่เหลือ)
+- หลังกรอกฟอร์ม ไม่มีโพสต์/คอมเมนต์ใหม่ถูกสร้างขึ้น จึงไม่มีของค้าง
+
 ## สรุป
 
 - คอมเมนต์ `t1_19t89wt2bjr51` **ไม่ปรากฏต่อคนนอก** — ยืนยันด้วยฟีดสาธารณะของ Reddit ที่ดึงจาก IP สะอาด

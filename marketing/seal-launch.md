@@ -77,3 +77,10 @@
   - <https://oweenhoper.gumroad.com/l/sovereign-os> — publish แล้ว, $59/$199/$599, ในหน้าสินค้ามีบัญชี `4440626505` ชื่อ `กฤษกรณ์ อุตมะ` และลิงก์ `pay-en.html`
   - <https://sovereignoriginshop.dpdns.org/pay-en.html> · <https://sovereignoriginshop.dpdns.org/launch.html> · <https://sovereignoriginshop.dpdns.org/buy.html>
   - excerpt: `docs/evidence/2026-11-26-public-offer-visibility.md`
+
+## 7. ลองอุทธรณ์ shadowban 26 พ.ย. 2026
+
+- ฟอร์ม <https://www.reddit.com/appeal/> ขึ้นชื่อ `oweenhoper` อัตโนมัติ (แก้ไม่ได้) รับข้อความไม่เกิน 250 ตัวอักษร — กรอก 243/250 ครบ แต่ **กด Submit แล้วไม่มี request ส่งฟอร์มออกไป** (มีแค่ `update-recaptcha` + `recaptcha/enterprise/clr`) ⇒ กันด้วย reCAPTCHA Enterprise ที่ไม่รับการกดจาก automation
+- ไม่หลบ captcha และไม่ทิ้งโพสต์ค้างเพิ่ม · **เหลือการกระทำเดียวของผู้ใช้: เปิดแท็บที่กรอกไว้แล้ว กด Submit หนึ่งครั้ง**
+- ตรวจซ้ำหลังอุทธรณ์: `user/oweenhoper/comments.rss` = 0 รายการ · ฟีดเธรด = 100 รายการ, `oweenhoper` = 0 (ยังไม่ถูกปลด)
+- ตรวจ link rot ผ่าน `r.jina.ai`: `pay-en.html` · หน้าร้าน Gumroad · `gumroad.com/checkout?product=lmwcf` · `license-pub.txt` · `release-verify.html` = `200` ทุกตัว · `npm run license:drill` ผ่าน 9/9
