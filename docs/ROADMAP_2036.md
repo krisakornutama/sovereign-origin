@@ -287,3 +287,17 @@ fabric ต้องมี identity + vault; energy/succession เป็น use c
 - **ข้อจำกัดที่ยังเปิด**: V2G dispatch และ solar forecast = `ENERGY-002`/`ENERGY-003`
 - **งานถัดไป**: `SUCC-001` (`sovereign-succession`) — heir key + policy ให้ระบบอยู่ต่อหลังเจ้าของหาย
 
+### 2026-11-26 — `sovereign-succession` M1 (SUCC-001)
+
+- **Milestone แรกของ §5.6 ปิดแล้ว**: heir access ตาม policy **โดยไม่มีเจ้าของออนไลน์**
+  - Heartbeat ที่เจ้าของเซ็นต่อเข้าห่วงโซ่; `DormancyClock` เป็นฟังก์ชันบริสุทธิ์ของ (โซ่ที่ตรวจแล้ว, policy, `now`)
+    ⇒ `active` / `dormant` / `window-open` · ไม่มีตัวจับเวลา ไม่มีบริการเวลา ไม่มีเซิร์ฟเวอร์
+  - คำขอเดียวต้องถูกเซ็นโดย heir ต่างคนครบ `threshold` และไม่มีใครถูก revoke ⇒ กุญแจหลุดหนึ่งดอกไม่พอ
+  - `grant` และ `refusal` เป็น Ed25519 receipt ในโซ่เดียวกัน **เขียนก่อนส่งคำตอบ** (เขียนไม่ได้ = `receipt-required`)
+  - Fail closed: state ถูกลบ = `invalid-state` (ไม่ใช่ reset) · head ซ้ำ/ชี้ที่ว่าง/เวลาถอยหลัง ⇒ `rollback`
+  → repo <https://github.com/krisakornutama/sovereign-succession> commit `0eddebc` · CI `45886509714` เขียว (Node 20/22)
+  → 79 tests, coverage 96.11/90.28/98.30/97.89 · red-first พิสูจน์ด้วย mutant (ปิด guard `too-early` → แดง 2 → คืนไฟล์ → เขียว 79/79)
+- **เอกสาร**: [`SOVEREIGN-SUCCESSION.md`](./SOVEREIGN-SUCCESSION.md)
+- **ข้อจำกัดที่ยังเปิด**: M1 ไม่ปลดล็อก data key (เป็น M2) · ยังไม่มี multi-channel (4G/LoRa/satellite) · ไม่มี anchor นอกโฟลเดอร์ ⇒ เขียนใหม่ทั้งโซ่ยังตรวจจับไม่ได้
+- **งานถัดไปในสายนี้**: M2 (wrapped key + rotation) → ต่อกับ `sovereign-dms` v2; คอขวดของสาย attest ยังเป็น `ATTEST-012`
+
