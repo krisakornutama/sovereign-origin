@@ -67,3 +67,13 @@
   <https://old.reddit.com/r/selfhosted/comments/1y0njjb/new_project_megathread_week_of_19_nov_2026/19t89wt2bjr51/>
 - **ข้อจำกัดของซับนี้:** อิโมจิใช้ได้เมื่อ karma เกิน 40 — โพสต์ที่มีอิโมจิจะถูกลบทันที จึงตัดอิโมจิออกก่อนส่ง
 - **ตรวจแบบคนนอกไม่ได้จากเครื่องนี้:** curl ไม่มีคุกกี้ = `403` "You've been blocked by network security" · อินคอกนิโต → `/login?reason=lor2`
+
+## 6. ตรวจซ้ำจากนอกเครื่อง 26 พ.ย. 2026 — คอมเมนต์ Reddit ไม่ปรากฏต่อคนนอก
+
+- **ผลจริง:** ฟีดสาธารณะของเธรด `1y0njjb` (`?limit=100&sort=new`) ดึงผ่าน `api.rss2json.com` (IP เขาไม่ถูกบล็อก, ไม่มีคุกกี้) ได้ **100 คอมเมนต์ ครอบ 21:49 (25 พ.ย.) → 18:09 (26 พ.ย.) แต่ `oweenhoper` = 0** · ฟีด `reddit.com/user/oweenhoper/comments.rss` = **0 รายการ** ⇒ **บัญชีถูกซ่อนระดับบัญชี (shadowban)** ไม่ใช่ปัญหาซับ
+- **ทางที่ลองแล้วไม่ให้เนื้อหา:** `r.jina.ai` = Reddit 403 network policy · `translate.goog` → `/login/?reason=lor2` · Wayback save = เก็บหน้า login · allorigins/codetabs 522 · corsproxy 401 · microlink 400 antibot · Redlib 8 ตัว = Anubis/403/418 — เก็บ raw ไว้ที่ `docs/evidence/2026-11-26-reddit-stranger-visibility.md`
+- **การตัดสินใจ:** ไม่โพสต์ซ้ำบน Reddit (จะได้ของที่ซ่อนอยู่เพิ่ม) · ไม่ลบคอมเมนต์เดิม (กู้ได้ถ้าบัญชีถูกปลด) · ยื่นอุทธรณ์ตาม §9
+- **ข้อเสนอที่คนนอกเห็นได้จริง (ยืนยันผ่าน `r.jina.ai` แบบไม่ล็อกอิน, 200, ไม่มี login wall):**
+  - <https://oweenhoper.gumroad.com/l/sovereign-os> — publish แล้ว, $59/$199/$599, ในหน้าสินค้ามีบัญชี `4440626505` ชื่อ `กฤษกรณ์ อุตมะ` และลิงก์ `pay-en.html`
+  - <https://sovereignoriginshop.dpdns.org/pay-en.html> · <https://sovereignoriginshop.dpdns.org/launch.html> · <https://sovereignoriginshop.dpdns.org/buy.html>
+  - excerpt: `docs/evidence/2026-11-26-public-offer-visibility.md`
