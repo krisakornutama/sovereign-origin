@@ -28,6 +28,10 @@
 - ดาวน์โหลด: [seal-v1.0.0](https://github.com/krisakornutama/sovereign-origin/releases/tag/seal-v1.0.0) — ไฟล์เดียวจบ + `seal-cli` สำหรับตรวจในเทอร์มินัล
 - ชุดดาวน์โหลดเซ็นด้วยเครื่องมือนี้เอง: `sha256sum -c SHA256SUMS.txt` แล้ว `node seal-cli-1.0.0.mjs verify SHA256SUMS.txt SHA256SUMS.txt.seal.json` (exit 0 = ไบต์ตรงและลายเซ็นถูก)
 
+**ซื้อระบบหลังบ้านแบบโอนตรง** (ไม่ผ่านบัตร ไม่ค้างที่ Gumroad): [pay.html](https://sovereignoriginshop.dpdns.org/pay.html) ·
+[pay-en.html](https://sovereignoriginshop.dpdns.org/pay-en.html) — โอนเข้าบัญชีกรุงไทย 4440626505 (กฤษกรณ์ อุตมะ),
+ส่งสลิปทางอีเมล, ได้ไฟล์กับไลเซนส์ภายใน 24 ชั่วโมง
+
 ## 🖥️ รับช่วงต่อบนเครื่องใหม่ (clone แล้วรันได้เลย)
 
 ```bash
