@@ -522,3 +522,12 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   **ปิดแล้ว:** `SEAL-004..013` + `SUCC-001` · ช่องทางขาย live 4 URL (`gumroad.com/checkout?product=lmwcf` = 200 · หน้าร้าน Gumroad = 200 · `sovereignoriginshop.dpdns.org` = 200 · `pay-en.html` = 200) · ไม่มี link rot · กุญแจเซ็นไลเซนส์อยู่นอก repo (`../.secrets/license-priv.pem`) และ `sales/` ยังมีแต่โฟลเดอร์ซ้อม `_drill`
   **เปิดอยู่ + เจ้าของ:** ยอดขาย 0 บาท ⇒ `SEAL-009` ยังเปิด (เกณฑ์ = เงินเข้า 4440626505) · Reddit ยังซ่อนระดับบัญชี (`user/oweenhoper/comments.rss` ผ่าน rss2json = 0 รายการ) ⇒ รอเจ้าของกด **Submit** ที่ <https://www.reddit.com/appeal/> (กรอกไว้ 243/250) · ช่องทางอื่น LinkedIn/Facebook/Fastwork ต้องล็อกอินบัญชีผู้ใช้
   **ขั้นถัดไป:** มีสลิป/ออเดอร์ → `docs/FIRST-SALE-RUNBOOK.md` 8 ขั้น (`npm run license:sell --key ../.secrets/license-priv.pem --public-key portfolio/license-pub.txt ... --amount <บาท> --paid`) แล้วปิด `SEAL-009` · งานสายเทคนิคถัดไป = `sovereign-succession` M2 หรือ `ATTEST-012` (ต้องอนุมัติแผนก่อน)
+
+- 2026-11-26 — `SEAL-014`: **ตรวจหน้าขายที่ live ว่าข้อมูลรับเงินตรงกับ repo — แก้จุดกำกวม 1 จุด**
+  ที่มา: คำสั่งเจ้าของ "พิสูจน์ว่าหน้าระบบขายที่ live รับเงินเข้าบัญชีที่ถูกต้อง และแก้ให้ถูกถ้าไม่ตรง"
+  ตรวจ: URL ขายหลักตอบ `200` ทุกตัว (`gumroad.com/checkout?product=lmwcf` · หน้าร้าน Gumroad · โดเมนหลัก · `buy.html` · `pay.html` · `support-en.html` · `support.html` · `buy-intl.html`) และเปิดผ่าน `r.jina.ai` แบบไม่ล็อกอินได้เนื้อหาจริง ไม่มี login wall/draft/404
+  ข้อมูลรับเงินบนหน้าจริงตรงกับ repo ทุกตัวอักษร: `ธนาคารกรุงไทย / Krungthai Bank` · `4440626505` · `กฤษกรณ์ อุตมะ / Krisakorn Utama` · `$59` (checkout แสดง `US$59`, Version Home, seller `Krisakorn Utama`)
+  พบไม่ตรง: `pay-en.html` อ้างว่าเลขบัญชีพิมพ์อยู่บน "pricing page (buy-intl.html)" และ "printed on every page of this site" แต่ `buy-intl.html` ไม่มีเลขบัญชีเลย (จ่ายผ่านใบแจ้งหนี้/บัตร) และหน้าแรกก็ไม่มี ⇒ ผู้ซื้อที่ไปตรวจตามคำอ้างจะเจอหน้าที่ไม่มีข้อมูล
+  แก้: ลิงก์ชี้ `buy.html#pay` ซึ่งพิมพ์เลขจริง + ถ้อยคำ lede เปลี่ยนเป็น "payment, support and pricing pages" — ไม่แตะราคา เลขบัญชี ชื่อ หรือโค้ดอื่น
+  หลักฐาน: commit `5814e6c` · Deploy portfolio run [`45890241674`](https://github.com/krisakornutama/sovereign-origin/actions/runs/45890241674) = success · หลัง deploy หน้า live มี `buy.html#pay` และ `4440626505` 5 ครั้งเท่ากับ repo · `npm run check:copy` PASS 91 ไฟล์
+  **ข้อจำกัด:** ยอดขายยัง 0 ⇒ `SEAL-009` ยังเปิด
