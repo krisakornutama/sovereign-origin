@@ -10,6 +10,8 @@
     "license:drill": "node tools/license/drill.mjs",
     "license:sell": "node tools/license/sell.mjs",
     "check:copy": "node portfolio/scripts/check-copy.mjs",
+    "outreach:check": "node tools/outreach/outreach-mail.mjs",
+    "outreach:render": "node tools/outreach/outreach-mail.mjs --render",
     "verify": "node tools/verify.mjs",
     "verify:full": "node tools/verify.mjs --e2e",
     "build:desktop": "node tools/build-desktop.mjs",
