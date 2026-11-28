@@ -103,9 +103,9 @@ function walk(rel, out) {
 let publishFiles = [];
 for (const f of fs.readdirSync(path.join(ROOT, 'portfolio'), { withFileTypes: true })) {
   if (f.name === 'node_modules' || f.name === '.git') continue;
-  if (f.isFile() && (/\.html$/.test(f.name) || /\.(css|js|mjs|png|txt|xml)$/.test(f.name) || f.name === '.nojekyll' ||
+  if (f.isFile() && (/\.html$/.test(f.name) || /\.(css|js|mjs|png|txt|xml|json)$/.test(f.name) || f.name === '.nojekyll' ||
       f.name === 'README.md' || f.name === 'package.json' || f.name === 'package-lock.json')) publishFiles.push(f.name);
-  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github' || f.name === 'evidence')) { // evidence = หลักฐานหน้างานจริงของ guardmini (รูป/คลิป/CSV) — เจ้าของทิ้งไฟล์แล้วเว็บโชว์เอง
+  if (f.isDirectory() && (f.name === 'scripts' || f.name === '.github' || f.name === 'evidence' || f.name === 'media')) { // evidence = หลักฐานหน้างานจริงของ guardmini (รูป/คลิป/CSV) — เจ้าของทิ้งไฟล์แล้วเว็บโชว์เอง · media = ภาพหน้าจอสินค้าที่หน้า reel ใช้ (ต้องขึ้น Pages ด้วย ไม่งั้นรีลเป็นกรอบว่าง)
     walk(f.name, publishFiles);
     // กันไฟล์ทดลองหลุดขึ้น production (เคยเกิดจริง: scripts/tmp-perf.mjs ถูก sync ขึ้น Pages)
     publishFiles = publishFiles.filter((r) => !/(^|\/)(tmp-[^/]*|[^/]*\.bak)$/.test(r));
