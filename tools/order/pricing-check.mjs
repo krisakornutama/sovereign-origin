@@ -68,6 +68,34 @@ for (const [name, html] of Object.entries(pages)) {
   check(foreign.length === 0, `${name}: ไม่มีเลข 10 หลักอื่น (พบ ${foreign.join(', ') || 'ไม่มี'})`);
 }
 
+/* ── โปร EARLY20: หน้าเว็บต้องผูกกับ pricing.json ไม่ใช่แก้มือหลายหน้า ──
+   order.html/buy.html มีจุดเสียบ (data-promo-note) + โหลด promo.js ซึ่งอ่าน promo.gumroadUrl
+   ถ้า URL ยังเป็น null (ยังไม่สร้างโค้ดในหลังร้าน) หน้าเว็บต้องคงข้อความ "โอนอย่างเดียว" */
+const promo = pricing.promo ?? {};
+const promoJs = readFileSync(path.join(ROOT, 'portfolio', 'promo.js'), 'utf8');
+const GUMROAD_PRODUCT = 'https://oweenhoper.gumroad.com/l/sovereign-os';
+const gumroadNull = promo.gumroadUrl === null;
+
+check(gumroadNull || typeof promo.gumroadUrl === 'string', 'promo.gumroadUrl เป็น null (ยังไม่มีโค้ด) หรือ URL เต็ม');
+
+for (const name of ['portfolio/order.html', 'portfolio/buy.html']) {
+  check(pages[name].includes('data-promo-note'), `${name}: มีจุดเสียบข้อความโปร (data-promo-note)`);
+  check(pages[name].includes('src="promo.js"'), `${name}: โหลด promo.js`);
+  check(!pages[name].includes(`${GUMROAD_PRODUCT}/${promo.code}`), `${name}: ไม่ hardcode ลิงก์โค้ด (ต้องมาจาก pricing.json)`);
+}
+check(promoJs.includes("fetch('pricing.json'"), 'promo.js: อ่าน pricing.json เป็นแหล่งความจริง');
+check(promoJs.includes('data-promo-note'), 'promo.js: เขียนโน้ตโปรลงจุดเสียบ');
+check(/^\d{4}-\d{2}-\d{2}$/.test(String(promo.expires)) && !Number.isNaN(Date.parse(promo.expires)),
+  `promo.expires เป็นวันที่จริงรูปแบบ YYYY-MM-DD (${promo.expires})`);
+
+if (gumroadNull) {
+  check(promo.channel === 'bank-transfer', 'promo.channel = bank-transfer ขณะที่ยังไม่มีโค้ด Gumroad');
+} else {
+  check(promo.gumroadUrl === `${GUMROAD_PRODUCT}/${promo.code}`, `promo.gumroadUrl ชี้สินค้า+โค้ดเดียวกัน (${GUMROAD_PRODUCT}/${promo.code})`);
+  check(/gumroad/.test(String(promo.channel)), 'promo.channel ระบุ gumroad แล้วเมื่อมีโค้ด');
+  check(Number.isInteger(promo.percent) && promo.percent > 0 && promo.percent < 100, `promo.percent = ${promo.percent}% (ต้องเป็นจำนวนเต็ม 1–99)`);
+}
+
 if (failures.length > 0) {
   process.stderr.write(`\n✗ pricing:check ไม่ผ่าน ${failures.length} ข้อ\n`);
   process.exit(1);

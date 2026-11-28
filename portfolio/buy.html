@@ -149,6 +149,8 @@ footer a{color:rgba(216,211,202,.6)}
     <p class="tier-note">ทุกฟีเจอร์ที่ปล่อยในอนาคต · ไม่จำกัดจำนวนสาขา · ประชุมติดตั้งออนไลน์ 2 ชั่วโมง</p>
   </div>
 
+  <p class="note" data-promo-note="buy" hidden></p>
+
   <p class="note">ราคาบนนี้คือราคาที่จ่ายจริงที่หน้าร้าน Gumroad (บาทอาจต่างเล็กน้อยตามอัตราแลกเปลี่ยน)
     · ระบบรุ่นฟรี (Community Edition) ยังใช้ฟีเจอร์พื้นฐานได้เหมือนเดิม — ซื้อเมื่อต้องการฟีเจอร์ธุรกิจ
     และการรับประกันการติดตั้ง</p>
@@ -188,7 +190,7 @@ footer a{color:rgba(216,211,202,.6)}
   </div>
 
   <p>
-    <a class="cta cta-primary" href="https://oweenhoper.gumroad.com/l/sovereign-os">ซื้อที่หน้าร้าน (บัตร) — เริ่ม $59</a>
+    <a class="cta cta-primary" href="https://oweenhoper.gumroad.com/l/sovereign-os" data-gumroad>ซื้อที่หน้าร้าน (บัตร) — เริ่ม $59</a>
     <a class="cta" href="me.html">ดูผลงานและช่องทางติดต่ออื่น</a>
   </p>
 
@@ -214,6 +216,7 @@ footer a{color:rgba(216,211,202,.6)}
     หรือโอนเข้าบัญชีกรุงไทย 4440626505 ชื่อ กฤษกรณ์ อุตมะ · คืนเงินเต็มจำนวนภายใน 7 วันถ้าใช้งานบนเครื่องคุณไม่ได้</p>
 </footer>
 
+<script src="promo.js" defer></script>
 <script>
 document.querySelectorAll('[data-copy]').forEach(function (btn) {
   btn.addEventListener('click', function () {

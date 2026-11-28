@@ -8,7 +8,8 @@
     "percent": 20,
     "channel": "bank-transfer",
     "expires": "2026-12-05",
-    "note": "ใช้ได้กับการโอนในประเทศเท่านั้น (โค้ดบน Gumroad ต้องสร้างในหลังร้านก่อน)"
+    "gumroadUrl": null,
+    "note": "gumroadUrl = null แปลว่ายังไม่มีโค้ดในหลังร้าน Gumroad → เว็บโชว์โปรเฉพาะการโอน ใส่ URL ของสินค้าที่มีโค้ด (https://oweenhoper.gumroad.com/l/sovereign-os/EARLY20) แล้วหน้า order.html/buy.html จะโชว์โปรบัตรและราคาหลังลดเอง — promo.js อ่านค่านี้ที่เดียว"
   },
   "referral": {
     "codesPerBuyer": 3,
