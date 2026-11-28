@@ -14,6 +14,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // สูตรจัดรูปแบบราคาตัวเดียวกับที่หน้าเว็บใช้ (portfolio/price-format.js) — ห้ามเขียนซ้ำในไฟล์นี้
 import priceFormat from '../../portfolio/price-format.js';
+// ตัวสร้าง head ของ buy.html จาก pricing.json — ใช้ตัวเดียวกันตรวจว่า head ไม่ได้ถูกแก้มือ
+import { renderHead } from './sync-head.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pricing = JSON.parse(readFileSync(path.join(ROOT, 'portfolio', 'pricing.json'), 'utf8'));
@@ -147,6 +149,11 @@ const tierDots = pricing.tiers.map((t) => `${t.name} ${usdPrice(t.usd)}`).join('
 const tierCommas = pricing.tiers.map((t) => `${t.name} ${usdPrice(t.usd)}`).join(', ');
 check(head.includes(`content="ซื้อ Sovereign OS — ${tierDots}"`), `buy.html head: og/twitter title มีราคา ${tierDots}`);
 check(head.includes(tierCommas), `buy.html head: meta description มีราคา ${tierCommas}`);
+
+/* head ทั้งก้อนต้องเป็น “ผลลัพธ์” ของ npm run pricing:head ตัวเดียวกัน (ไม่ใช่แค่มีตัวเลขถูก)
+   ⇒ ใครแก้ meta/JSON-LD มือ หรือเปลี่ยนราคาแล้วลืมรันตัวสร้าง ให้ pricing:check ล้มทันที */
+check(renderHead(buyHtml, pricing) === buyHtml,
+  'buy.html head: ตรงกับผลของ `npm run pricing:head` ทั้งก้อน (ถ้าไม่ตรง รันคำสั่งนี้แล้ว commit)');
 
 const ldJson = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(buyHtml);
 let ld = null;

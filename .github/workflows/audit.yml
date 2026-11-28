@@ -23,6 +23,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Pricing head in sync with pricing.json
+        # head (meta/og/twitter/JSON-LD) ของ buy.html ถูกสร้างจาก pricing.json — ต้องรันซ้ำหลังแก้ราคา
+        working-directory: .
+        run: node tools/order/sync-head.mjs --check
+
       - name: Copy gate (Thai spelling/markup, no browser needed)
         run: node scripts/check-copy.mjs --self-test && node scripts/check-copy.mjs
 

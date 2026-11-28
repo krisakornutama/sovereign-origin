@@ -45,6 +45,7 @@ node tools/order/fulfill.mjs \
 ## ตรวจก่อนโพสต์/ก่อนขาย
 
 ```bash
+npm run pricing:head      # สร้าง head ของ buy.html (meta/og/twitter/JSON-LD) จาก pricing.json — ต้องรันหลังแก้ราคา
 npm run pricing:check     # ราคาบนเว็บตรงกับ pricing.json + ไม่มีเลขบัญชีอื่น
 npm run check:copy        # คำผิด/คำต้องห้ามทั้งเว็บ
 node tools/license/drill.mjs   # ซ้อมออกไลเซนส์ + ตรวจซ้ำ + fail-closed

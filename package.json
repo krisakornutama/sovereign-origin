@@ -14,6 +14,7 @@
     "outreach:render": "node tools/outreach/outreach-mail.mjs --render",
     "order:fulfill": "node tools/order/fulfill.mjs",
     "pricing:check": "node tools/order/pricing-check.mjs",
+    "pricing:head": "node tools/order/sync-head.mjs",
     "outreach:verify": "node tools/outreach/verify-sources.mjs",
     "outreach:verify:ci": "node tools/outreach/verify-sources.mjs --ci",
     "verify": "node tools/verify.mjs",

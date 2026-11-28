@@ -17,12 +17,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderHead } from '../order/sync-head.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROMO_JS = fs.readFileSync(path.join(ROOT, 'portfolio', 'promo.js'), 'utf8');
 const PRICE_FORMAT_JS = fs.readFileSync(path.join(ROOT, 'portfolio', 'price-format.js'), 'utf8');
 const PRICE_CHECK_JS = fs.readFileSync(path.join(ROOT, 'tools', 'order', 'pricing-check.mjs'), 'utf8');
 const REAL_PRICING = JSON.parse(fs.readFileSync(path.join(ROOT, 'portfolio', 'pricing.json'), 'utf8'));
+const BUY_HTML = fs.readFileSync(path.join(ROOT, 'portfolio', 'buy.html'), 'utf8');
 // ตัวจริงที่ promo.js ได้รับในเบราว์เซอร์ผ่าน <script src="price-format.js">
 const priceFormat = (await import('../../portfolio/price-format.js')).default;
 const GUMROAD_PRODUCT = 'https://oweenhoper.gumroad.com/l/sovereign-os';
@@ -331,6 +333,54 @@ test('หน้าราคาโหลด price-format.js ก่อน promo.js
     assert.ok(iPromo !== -1, `${page} ต้องโหลด promo.js`);
     assert.ok(iShared < iPromo, `${page}: price-format.js ต้องมาก่อน promo.js`);
   }
+});
+
+/* ── 8) head ของ buy.html = ผลของ pricing:head (สร้างจาก pricing.json) ─────────────────── */
+test('buy.html head = ผลของ npm run pricing:head (meta/og/twitter/JSON-LD ไม่ได้พิมพ์มือ)', () => {
+  assert.equal(renderHead(BUY_HTML, REAL_PRICING), BUY_HTML,
+    'head เพี้ยนจาก pricing.json — รัน npm run pricing:head แล้ว commit buy.html');
+});
+
+test('เปลี่ยนราคาใน JSON → head ที่สร้างใหม่เปลี่ยนตามทุกจุด (description/og/twitter/JSON-LD)', () => {
+  const pricing = {
+    ...REAL_PRICING,
+    tiers: [
+      { id: 'home', name: 'Home', usd: 65, thb: 2307 },
+      { id: 'business', name: 'Business', usd: 210, thb: 7455 },
+    ],
+  };
+  const out = renderHead(BUY_HTML, pricing);
+  const headOut = out.split('</head>')[0]; // body ยังมีค่า fallback ของราคาเดิม (คนละเรื่องกับ head)
+
+  // meta description ใช้ตัวคั่น ", " · og/twitter title ใช้ " · "
+  assert.match(out, /content="ซื้อ Sovereign OS ระบบหลังบ้านร้านค้าที่ติดตั้งในเครื่องคุณ: Home \$65, Business \$210/);
+  assert.match(out, /content="ซื้อ Sovereign OS — Home \$65 · Business \$210"/);
+  assert.equal((out.match(/content="ซื้อ Sovereign OS — Home \$65 · Business \$210"/g) || []).length, 2,
+    'og:title และ twitter:title ต้องเป็นชุดเดียวกัน');
+  assert.doesNotMatch(headOut, /\$199/, 'ราคาเก่าต้องไม่เหลือใน head (รวมแพ็กเกจที่ถูกลบออกจาก tiers)');
+
+  // JSON-LD: offers ตรงกับ tiers · ฟิลด์อื่นของ Product ต้องไม่หาย
+  const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(out)[1]);
+  assert.equal(ld['@type'], 'Product');
+  assert.equal(ld.brand.name, 'Project Sovereign');
+  assert.deepEqual(ld.offers.map((o) => [o.name, o.price, o.priceCurrency]), [
+    ['Home', '65', 'USD'],
+    ['Business', '210', 'USD'],
+  ]);
+});
+
+test('pricing:head รันซ้ำได้ผลเท่าเดิม (idempotent) และไม่แตะเนื้อหน้าหรือ head ที่ไม่เกี่ยวกับราคา', () => {
+  const once = renderHead(BUY_HTML, REAL_PRICING);
+  assert.equal(renderHead(once, REAL_PRICING), once);
+  // title/canonical/og:image ไม่ใช่ของตัวสร้าง — ต้องเหมือนเดิมทุกไบต์
+  for (const marker of [
+    '<title>ซื้อ Sovereign OS — ราคา วิธีชำระ และสิ่งที่ได้รับ</title>',
+    '<link rel="canonical" href="https://sovereignoriginshop.dpdns.org/buy.html">',
+    '<meta property="og:image" content="https://sovereignoriginshop.dpdns.org/og.png">',
+  ]) {
+    assert.ok(once.includes(marker), `ห้ามแตะ ${marker}`);
+  }
+  assert.equal(once.split('</head>')[1], BUY_HTML.split('</head>')[1], 'เนื้อหน้า (หลัง </head>) ต้องไม่ถูกแตะ');
 });
 
 test('promo.js แบบไม่มี price-format.js: ไม่ throw และคงค่า fallback ไว้', async () => {
