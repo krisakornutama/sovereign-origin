@@ -9,6 +9,9 @@
 //   · gumroadUrl มีค่า         → ป้ายโปร/โน้ต/ลิงก์ ต้องมาจาก JSON (ไม่ใช่ค่าฝังในโค้ด)
 //   · โหลด pricing.json ไม่ได้ → ต้องไม่แตะหน้าเว็บ (ข้อความ static ยังจริง)
 //   · เปลี่ยน percent/tiers ใน JSON → ตัวเลขบนหน้าเว็บต้องเปลี่ยนตาม
+//
+// สูตรราคา (usdPrice/approxThb/baht) อยู่ใน portfolio/price-format.js ที่เดียว — เทสต์ชุดท้าย
+// บังคับว่าทั้ง promo.js (หน้าเว็บ) และ pricing-check.mjs (ด่านตรวจ) เรียกไฟล์นั้น ไม่ประกาศซ้ำ
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +20,11 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROMO_JS = fs.readFileSync(path.join(ROOT, 'portfolio', 'promo.js'), 'utf8');
+const PRICE_FORMAT_JS = fs.readFileSync(path.join(ROOT, 'portfolio', 'price-format.js'), 'utf8');
+const PRICE_CHECK_JS = fs.readFileSync(path.join(ROOT, 'tools', 'order', 'pricing-check.mjs'), 'utf8');
 const REAL_PRICING = JSON.parse(fs.readFileSync(path.join(ROOT, 'portfolio', 'pricing.json'), 'utf8'));
+// ตัวจริงที่ promo.js ได้รับในเบราว์เซอร์ผ่าน <script src="price-format.js">
+const priceFormat = (await import('../../portfolio/price-format.js')).default;
 const GUMROAD_PRODUCT = 'https://oweenhoper.gumroad.com/l/sovereign-os';
 
 const MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -127,8 +134,8 @@ async function runPromo(pricing, { mode = 'ok' } = {}) {
     if (mode === 'http-500') return { ok: false, json: async () => pricing };
     return { ok: true, json: async () => pricing };
   };
-  // promo.js เป็น IIFE ที่อ่าน document/fetch จากสโคปนอก — ส่งเข้าไปเป็นพารามิเตอร์ได้ตรง ๆ
-  new Function('document', 'fetch', PROMO_JS)(page.document, fetchStub);
+  // promo.js เป็น IIFE ที่อ่าน document/fetch/SovereignPriceFormat จากสโคปนอก — ส่งเข้าไปเป็นพารามิเตอร์ได้ตรง ๆ
+  new Function('document', 'fetch', 'SovereignPriceFormat', PROMO_JS)(page.document, fetchStub, priceFormat);
   await new Promise((resolve) => setImmediate(resolve)); // รอ promise chain ของ promo.js
   return page;
 }
@@ -229,7 +236,8 @@ const priceKeys = [
 
 async function priceTexts(pricing) {
   const page = makePage({ priceSlots: priceKeys });
-  new Function('document', 'fetch', PROMO_JS)(page.document, async () => ({ ok: true, json: async () => pricing }));
+  new Function('document', 'fetch', 'SovereignPriceFormat', PROMO_JS)(
+    page.document, async () => ({ ok: true, json: async () => pricing }), priceFormat);
   await new Promise((resolve) => setImmediate(resolve));
   return Object.fromEntries(page.prices.map((p) => [p.key, p.el.textContent]));
 }
@@ -279,4 +287,56 @@ test('display.approxThbRoundTo เปลี่ยนขั้นปัด: 1,990
 test('gumroadUrl เป็นสตริงว่าง: ไม่เขียนลิงก์ที่กดแล้วพัง', async () => {
   const page = await runPromo({ ...REAL_PRICING, promo: { ...REAL_PRICING.promo, gumroadUrl: '   ' } });
   assert.deepEqual(page.snapshot(), makePage().snapshot());
+});
+
+/* ── 7) price-format.js = สูตรราคาจุดเดียวของทั้งหน้าเว็บและด่านตรวจ ────────────────── */
+test('price-format.js: usdPrice/baht/approxThb ตามกติกาที่หน้าเว็บใช้', () => {
+  assert.equal(priceFormat.usdPrice(59), '$59');
+  assert.equal(priceFormat.usdPrice(640.5), '$640.50');
+  assert.equal(priceFormat.usdPrice(47.2), '$47.20');
+  assert.equal(priceFormat.baht(2000), '2,000');
+  assert.equal(priceFormat.baht(21000), '21,000');
+  assert.equal(priceFormat.approxThb(1990, 100), 2000);
+  assert.equal(priceFormat.approxThb(1990, 10), 1990);
+  assert.equal(priceFormat.approxThb(1990, 0), 2000, 'ขั้น 0/ไม่ระบุ = ค่าตั้งต้น 100');
+  assert.equal(priceFormat.roundTo(REAL_PRICING), 100);
+  assert.equal(priceFormat.roundTo({ display: {} }), 100, 'ไม่ระบุขั้นปัด = ค่าตั้งต้น');
+});
+
+test('ค่าเดียวกันจริงสองฝั่ง: priceTexts() = ตัวเลขที่ promo.js เขียนลงหน้าเว็บ', async () => {
+  const fromModule = priceFormat.priceTexts(REAL_PRICING);
+  const fromPage = await priceTexts(REAL_PRICING);
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(fromModule).map((k) => [k, fromPage[k]])),
+    fromModule
+  );
+});
+
+test('กันเขียนสูตรราคาซ้ำ: promo.js และ pricing-check.mjs ต้องใช้ price-format.js เท่านั้น', () => {
+  for (const fn of ['usdPrice', 'approxThb', 'baht']) {
+    assert.doesNotMatch(PROMO_JS, new RegExp(`function ${fn}\\b`), `promo.js ห้ามประกาศ ${fn}() เอง`);
+    assert.doesNotMatch(PRICE_CHECK_JS, new RegExp(`function ${fn}\\b`), `pricing-check.mjs ห้ามประกาศ ${fn}() เอง`);
+  }
+  assert.match(PROMO_JS, /SovereignPriceFormat/, 'promo.js ต้องอ่านสูตรจาก price-format.js');
+  assert.match(PRICE_CHECK_JS, /portfolio\/price-format\.js/, 'pricing-check.mjs ต้อง import price-format.js');
+  assert.match(PRICE_FORMAT_JS, /function priceTexts/, 'price-format.js ต้องเป็นเจ้าของแผนที่คีย์ data-price');
+});
+
+test('หน้าราคาโหลด price-format.js ก่อน promo.js (defer รันตามลำดับ)', () => {
+  for (const page of ['buy.html', 'order.html']) {
+    const html = fs.readFileSync(path.join(ROOT, 'portfolio', page), 'utf8');
+    const iShared = html.indexOf('src="price-format.js"');
+    const iPromo = html.indexOf('src="promo.js"');
+    assert.ok(iShared !== -1, `${page} ต้องโหลด price-format.js`);
+    assert.ok(iPromo !== -1, `${page} ต้องโหลด promo.js`);
+    assert.ok(iShared < iPromo, `${page}: price-format.js ต้องมาก่อน promo.js`);
+  }
+});
+
+test('promo.js แบบไม่มี price-format.js: ไม่ throw และคงค่า fallback ไว้', async () => {
+  const page = makePage({ priceSlots: priceKeys });
+  new Function('document', 'fetch', 'SovereignPriceFormat', PROMO_JS)(
+    page.document, async () => ({ ok: true, json: async () => REAL_PRICING }), null);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(page.prices.map((p) => p.el.textContent), priceKeys.map(() => 'เก่า'));
 });

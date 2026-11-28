@@ -12,11 +12,14 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// สูตรจัดรูปแบบราคาตัวเดียวกับที่หน้าเว็บใช้ (portfolio/price-format.js) — ห้ามเขียนซ้ำในไฟล์นี้
+import priceFormat from '../../portfolio/price-format.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pricing = JSON.parse(readFileSync(path.join(ROOT, 'portfolio', 'pricing.json'), 'utf8'));
 
-const thb = (n) => new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 }).format(n);
+const { usdPrice, baht, approxThb, roundTo, priceTexts } = priceFormat;
+const thb = baht;
 const promoPrice = (list) => Math.floor((list * (100 - pricing.promo.percent)) / 100 / 10) * 10;
 
 const pages = {
@@ -101,27 +104,42 @@ if (gumroadNull) {
    promo.js เขียนทับจาก JSON ตอนโหลด ⇒ ค่า fallback ที่ไม่ตรง JSON = ราคาที่คนไม่เปิด JS เห็นผิด
    ขั้นปัดราคาบาทมาจาก display.approxThbRoundTo ที่เดียว (ห้าม hardcode ใน HTML/promo.js) */
 const buyHtml = pages['portfolio/buy.html'];
-const approxStep = Number(pricing.display?.approxThbRoundTo);
-const approxThb = (n) => Math.round(Number(n) / approxStep) * approxStep;
-const bahtFmt = (n) => new Intl.NumberFormat('en-US').format(n);
-const usdPrice = (n) => {
-  const v = Math.round(Number(n) * 100) / 100;
-  return '$' + (v % 1 === 0 ? String(v) : v.toFixed(2));
-};
+const approxStep = roundTo(pricing);
+const bahtFmt = baht;
 
 check(Number.isInteger(approxStep) && approxStep > 0,
   `pricing.json: display.approxThbRoundTo = ${pricing.display?.approxThbRoundTo} (ขั้นปัดราคาบาทโดยประมาณ)`);
 
-for (const tier of pricing.tiers) {
-  check(buyHtml.includes(`data-price="usd:${tier.id}">${usdPrice(tier.usd)}<`),
-    `buy.html: ช่องราคาดอลลาร์ ${tier.name} = ${usdPrice(tier.usd)}`);
-  check(buyHtml.includes(`data-price="thb:${tier.id}">${bahtFmt(approxThb(tier.thb))}<`),
-    `buy.html: ช่องราคาบาทโดยประมาณ ${tier.name} = ${bahtFmt(approxThb(tier.thb))} (ปัดขั้น ${approxStep})`);
+/* ── สูตรราคาต้องอยู่ที่ price-format.js ที่เดียว ──
+   promo.js (หน้าเว็บ) และไฟล์นี้ (ด่านตรวจ) เรียกทั้งคู่ ⇒ แก้สูตรที่เดียวไม่มีทางเพี้ยนจากกัน
+   กันการถอยกลับ: ถ้าใครเผลอประกาศ usdPrice/approxThb/baht ซ้ำในไฟล์ใดไฟล์หนึ่ง ให้ pricing:check ล้มทันที */
+const priceFormatJs = readFileSync(path.join(ROOT, 'portfolio', 'price-format.js'), 'utf8');
+const selfSrc = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+for (const fn of ['usdPrice', 'baht', 'approxThb', 'priceTexts']) {
+  check(new RegExp(`function ${fn}\\b`).test(priceFormatJs), `price-format.js: มีสูตร ${fn}()`);
 }
-check(buyHtml.includes(`data-price="renewal:usd">${usdPrice(pricing.renewal.usd)}<`),
-  `buy.html: ช่องราคาต่ออายุ = ${usdPrice(pricing.renewal.usd)}`);
-check(buyHtml.includes(`data-price="renewal:thb">${bahtFmt(approxThb(pricing.renewal.thb))}<`),
-  `buy.html: ช่องราคาต่ออายุเป็นบาท ≈ ${bahtFmt(approxThb(pricing.renewal.thb))}`);
+check(promoJs.includes('SovereignPriceFormat'), 'promo.js: ใช้ price-format.js (ไม่ประกาศสูตรราคาเอง)');
+check(selfSrc.includes('portfolio/price-format.js'), 'pricing-check.mjs: import price-format.js (สูตรราคาจุดเดียว)');
+for (const fn of ['usdPrice', 'approxThb', 'baht']) {
+  check(!new RegExp(`function ${fn}\\b`).test(promoJs), `promo.js: ไม่ประกาศ ${fn}() ซ้ำ (ต้องใช้ price-format.js)`);
+  check(!new RegExp(`function ${fn}\\b`).test(selfSrc), `pricing-check.mjs: ไม่ประกาศ ${fn}() ซ้ำ (ต้อง import price-format.js)`);
+}
+for (const name of ['portfolio/buy.html', 'portfolio/order.html']) {
+  const html = pages[name];
+  const iShared = html.indexOf('src="price-format.js"');
+  const iPromo = html.indexOf('src="promo.js"');
+  check(iShared !== -1 && iPromo !== -1 && iShared < iPromo,
+    `${name}: โหลด price-format.js ก่อน promo.js (defer รันตามลำดับ)`);
+}
+/* ค่า fallback ใน HTML ต้องตรงกับ priceTexts() ตัวเดียวกับที่ promo.js ใช้เขียนทับ */
+for (const [key, text] of Object.entries(priceTexts(pricing))) {
+  check(buyHtml.includes(`data-price="${key}">${text}<`), `buy.html: ช่อง ${key} = ${text}`);
+}
+
+for (const tier of pricing.tiers) {
+  check(buyHtml.includes(`data-price="thb:${tier.id}">${bahtFmt(approxThb(tier.thb, approxStep))}<`),
+    `buy.html: ช่องราคาบาทโดยประมาณ ${tier.name} = ${bahtFmt(approxThb(tier.thb, approxStep))} (ปัดขั้น ${approxStep})`);
+}
 
 /* head (meta/JSON-LD) ต้องอยู่ใน HTML ดิบเพราะ scraper ไม่รัน JS → ใช้ pricing:check บังคับให้ตรง JSON */
 const head = buyHtml.split('</head>')[0];

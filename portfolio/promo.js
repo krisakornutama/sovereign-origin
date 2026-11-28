@@ -10,6 +10,9 @@
  * ราคาบน buy.html: เขียนทุกจุด [data-price="usd:<tier>" | "thb:<tier>" | "renewal:usd" | "renewal:thb"]
  *   จาก tiers[].usd / tiers[].thb / renewal แล้วปัดราคาบาทตาม display.approxThbRoundTo
  *   (HTML เก็บค่า fallback ไว้ให้ crawler/no-JS อ่าน และ pricing:check บังคับให้ค่าพวกนั้นตรงกับ JSON)
+ *
+ * สูตรจัดรูปแบบราคา (usdPrice/baht/approxThb) อยู่ใน price-format.js ที่เดียว — pricing-check.mjs
+ * เรียกไฟล์เดียวกัน ⇒ วันหลังแก้สูตรที่เดียว หน้าเว็บกับด่านตรวจไม่มีทางเพี้ยนจากกัน
  */
 (function () {
   'use strict';
@@ -34,36 +37,13 @@
     return Math.round((Number(tier.usd) * (100 - percent)) / 100 * 100) / 100;
   }
 
-  /* ราคาเต็ม: ตัด .00 ทิ้ง ($59 ไม่ใช่ $59.00) แต่ยังเก็บสตางค์เมื่อมีจริง */
-  function usdPrice(n) {
-    var v = Math.round(Number(n) * 100) / 100;
-    return '$' + (v % 1 === 0 ? String(v) : v.toFixed(2));
-  }
-
-  function baht(n) {
-    return new Intl.NumberFormat('en-US').format(n);
-  }
-
-  /* ราคาบาท "โดยประมาณ" ตามขั้นที่ pricing.json กำหนด (display.approxThbRoundTo; ค่าตั้งต้น 100) */
-  function approxThb(n, step) {
-    var s = Number(step) > 0 ? Number(step) : 100;
-    return Math.round(Number(n) / s) * s;
-  }
+  /* สูตรราคาร่วม (usdPrice/baht/approxThb/priceTexts) — price-format.js โหลดก่อนไฟล์นี้ */
+  var PRICE_FORMAT = typeof SovereignPriceFormat !== 'undefined' ? SovereignPriceFormat : null;
 
   /* เขียนราคาทุกจุดบนหน้าเว็บ — ทำงานแม้ยังไม่มีโค้ดโปร (ราคาไม่ขึ้นกับโปร) */
   function applyPrices(pricing) {
-    var tiers = Array.isArray(pricing.tiers) ? pricing.tiers : [];
-    var renewal = pricing.renewal || {};
-    var step = (pricing.display || {}).approxThbRoundTo;
-    var values = {};
-
-    tiers.forEach(function (t) {
-      if (!t || typeof t.id !== 'string' || t.id === '') return;
-      values['usd:' + t.id] = usdPrice(t.usd);
-      if (t.thb != null) values['thb:' + t.id] = baht(approxThb(t.thb, step));
-    });
-    if (renewal.usd != null) values['renewal:usd'] = usdPrice(renewal.usd);
-    if (renewal.thb != null) values['renewal:thb'] = baht(approxThb(renewal.thb, step));
+    if (!PRICE_FORMAT) return; // ไม่มี price-format.js → คงค่า fallback ที่ pricing:check บังคับให้ตรง JSON
+    var values = PRICE_FORMAT.priceTexts(pricing);
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-price]'), function (el) {
       var key = String(el.getAttribute('data-price') || '').trim();
