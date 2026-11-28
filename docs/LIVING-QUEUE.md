@@ -571,3 +571,11 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   - ช่องที่ agent ทำแทนได้หมดแล้ว: IndexNow (SEAL-015) · หน้าสั่งซื้อ/ใบเสนอราคา (SEAL-016) · ราคาแหล่งเดียว (SEAL-017) — ไม่มีงานเทคนิคค้างที่ขวางการรับเงิน
   - **ช่องว่างที่วัดได้ตอนนี้:** ยอดขาย 0 · `sales/` มีแต่ `_drill` · `site:` Google ยัง 0 · หน้า `buy.html` ไม่มีรูปสินค้าแม้แต่รูปเดียว (`<img` = 0) ทั้งที่มีภาพจริง 11 ภาพ + `demo.gif` 15 วิ อยู่ใน `docs/media/` (ผลกระทบจำกัดเพราะคนเข้ายังน้อย — แต่ทุกลิงก์ outreach ชี้มาที่หน้านี้)
   **ข้อจำกัด:** ทุกทางที่เหลือต้องล็อกอินบัญชีเจ้าของ (reddit appeal, Gumroad EARLY20, Google Search Console, LinkedIn/Facebook) หรือต้องให้เจ้าของสั่ง "ยืนยันส่ง" ก่อนส่งอีเมล 20 ฉบับ · agent ส่ง PR แทนใน awesome-selfhosted ไม่ได้ตามกติกาข้างต้น · ยอดขายยัง 0 ⇒ `SEAL-009` เปิด
+
+- 2026-11-29 — `SEAL-019`: **หน้าขายมีของจริงให้ดูแล้ว — ภาพหน้าจอ 3 ภาพ + GIF 15 วินาที ขึ้น `buy.html` และขึ้นเว็บจริง**
+  ที่มา: เจ้าของพยักหน้า "ใส่ภาพหน้าจอจริง 3 ภาพ + GIF ลงหน้า buy.html"
+  - `tools/resize-screens.mjs` (ใหม่): ย่อภาพ 3200×1900 จาก `docs/media/screens/` เป็น 1600×950 JPEG (132/88/97 KB) ด้วย Chromium ของ playwright — เครื่องนี้ไม่มี ImageMagick/ffmpeg จึงไม่ต้องติดตั้งอะไรเพิ่ม
+  - `portfolio/media/screens/01-dashboard.jpg` · `02-alerts.jpg` · `04-devices.jpg` + `portfolio/media/demo.gif` (1.0 MB, 1100×653) — เมดเดียอยู่ใต้ `media/` ซึ่ง `tools/publish-portfolio.mjs` เผยแพร่ทั้งโฟลเดอร์อยู่แล้ว
+  - `portfolio/buy.html`: เพิ่ม `<h2>หน้าจอจริงจากรุ่นที่ส่งมอบ</h2>` + แกลเลอรี 4 รูป (`<figure>` + alt/caption ภาษาไทย, `width`/`height` กันภาพกระโดด, `loading="lazy"`) วางหลังย่อหน้านำ ก่อนตารางราคา — ไม่แตะราคา ไม่แตะข้อความรับเงิน
+  - ตรวจ: `npm run pricing:head -- --check` = ตรง · `npm run pricing:check` = ผ่านทุกข้อ (ราคา/บัญชี 4440626505) · `npm run check:copy` = PASS 101 ไฟล์ · `portfolio/scripts/audit.js` = **AUDIT CLEAN** (26 หน้า, desktop+mobile, ไม่มี overflow จากภาพใหม่)
+  **ข้อจำกัด:** ภาพเป็นภาพหน้าจอจากรุ่น v1.3.10 ที่มีอยู่ ไม่ได้อัดใหม่ · ยังไม่ได้เปิดดูด้วยตาในเบราว์เซอร์ (ด่าน audit ตรวจ layout/overflow ให้แล้ว) · ยอดขายยัง 0 ⇒ `SEAL-009` เปิด

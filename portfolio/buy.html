@@ -98,6 +98,10 @@ li{margin:0 0 8px}
   border-radius:6px;border:1px solid rgba(243,234,219,.35);color:#f1ece2;margin:0 8px 10px 0}
 .cta:hover{border-color:var(--ok);color:#a9f0e1}
 .cta-primary{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.55);color:#c9f7e7}
+.gallery{display:grid;gap:16px;margin:0 0 26px}
+.shot{margin:0}
+.shot img{display:block;width:100%;height:auto;border:1px solid rgba(243,234,219,.18);border-radius:6px;background:#0b1020}
+.shot figcaption{font-size:.78rem;color:rgba(216,211,202,.55);margin:6px 2px 0}
 footer{max-width:760px;margin:0 auto;padding:0 20px 60px;font-size:.78rem;
   color:rgba(216,211,202,.45)}
 footer a{color:rgba(216,211,202,.6)}
@@ -127,6 +131,30 @@ footer a{color:rgba(216,211,202,.6)}
 
   <p class="note">ลองของฟรีก่อนได้: <a href="seal.html">ตราประทับไฟล์</a> —
     เซ็นและตรวจไฟล์แบบออฟไลน์ ไม่ต้องติดตั้ง ไม่ต้องสมัคร แล้วค่อยกลับมาดูราคาข้างล่าง</p>
+
+  <h2>หน้าจอจริงจากรุ่นที่ส่งมอบ</h2>
+  <section class="gallery" aria-label="ภาพหน้าจอโปรแกรม">
+    <figure class="shot">
+      <img src="media/demo.gif" alt="ภาพเคลื่อนไหวสั้น: เปิดแดชบอร์ด ดูค่าจากเซนเซอร์ และรับการแจ้งเตือน"
+        width="1100" height="653" loading="lazy">
+      <figcaption>ภาพรวม 15 วินาที — แดชบอร์ด เซนเซอร์ และการแจ้งเตือน (อัดจากโปรแกรมจริง รุ่น v1.3.10)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="media/screens/01-dashboard.jpg" alt="แดชบอร์ดหลัก: สถานะเครื่อง เซนเซอร์ งานค้าง และเหตุการณ์ล่าสุดในหน้าเดียว"
+        width="1600" height="950" loading="lazy">
+      <figcaption>แดชบอร์ดหลัก — สถานะเครื่อง เซนเซอร์ งานค้างในสต็อก และเหตุการณ์ล่าสุดอยู่หน้าเดียว</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="media/screens/02-alerts.jpg" alt="หน้าประวัติการแจ้งเตือน: อุณหภูมิ ความชื้น น้ำ โรงเรือน และไฟดับ พร้อมระดับความรุนแรง"
+        width="1600" height="950" loading="lazy">
+      <figcaption>แจ้งเตือนและประวัติ — อุณหภูมิ ความชื้น ระดับน้ำ โรงเรือน ไฟดับ พร้อมค่าที่วัดได้จริงกำกับ</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="media/screens/04-devices.jpg" alt="หน้าจัดการอุปกรณ์: เพิ่มเซนเซอร์ temperature humidity energy water door_state พร้อมคีย์เชื่อมต่อ"
+        width="1600" height="950" loading="lazy">
+      <figcaption>จัดการอุปกรณ์เอง — เพิ่มเซนเซอร์ temperature · humidity · energy · water · door_state ได้จากหน้านี้</figcaption>
+    </figure>
+  </section>
 
   <h2>เลือกแพ็กเกจ</h2>
 
