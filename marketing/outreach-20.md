@@ -78,29 +78,39 @@
 - ตอบทุกคนภายใน 24 ชั่วโมง ด้วย `marketing/facebook-posts.md` §5
 - มีคนขอราคาเป็นบาท → ใช้ `marketing/quotation.md` แล้วรัน `docs/FIRST-SALE-RUNBOOK.md`
 
+## 4.5 ชุดพร้อมส่งออก (outbox) — สถานะ 29 พ.ย. 2026
+
+- มีอีเมลปลายทางจริงครบ **20/20** (ยืนยันจากหน้าเว็บของธุรกิจนั้นเมื่อ 28 พ.ย. — หลักฐานรายรายการอยู่ `marketing/outreach-20-emails.md`)
+- **ยังไม่ส่งสักฉบับ**: เครื่องที่ทำงานนี้ไม่มี SMTP/Gmail credential (ไม่มีตัวแปร env, ไม่มีไฟล์ secret) — ไม่มีการเดารหัสและไม่มีการส่งจากบัญชีอื่น
+- `node tools/outreach/build-outbox.mjs` → สร้าง `outbox/` เป็นไฟล์ `.eml` 20 ฉบับ (1 ผู้รับต่อฉบับ, ไม่มี BCC, ลิงก์เดียว = `buy.html` ที่มีภาพหน้าจอแล้ว, ไม่มีเลขบัญชี)
+- ส่งด้วยคำสั่งเดียวเมื่อมี app password ของ Gmail:
+  `SMTP_USER=owenhoper3@gmail.com SMTP_PASS=******** node tools/outreach/send-outreach.mjs --send`
+  (เพดาน 5 ฉบับ/ครั้ง · ข้ามฉบับที่ส่งแล้ว · บันทึกทุกครั้งลง `marketing/outreach-log.jsonl`)
+- หรือเปิดไฟล์ `.eml` ทีละไฟล์แล้วกด Send จากโปรแกรมอีเมล — ได้ผลเท่ากัน
+
 ## 5. ตารางบันทึกผล (กรอกช่องว่างก่อนส่ง)
 
 | # | กลุ่ม | ชื่อจริง/ร้าน | ช่องทาง (อีเมล/เพจ/เบอร์) | ส่งเมื่อ | ตอบ? | ผล |
 |---|---|---|---|---|---|---|
-| 1 | ร้านค้าออนไลน์ |  |  |  |  |  |
-| 2 | ร้านค้าออนไลน์ |  |  |  |  |  |
-| 3 | ร้านค้าออนไลน์ |  |  |  |  |  |
-| 4 | ร้านค้าออนไลน์ |  |  |  |  |  |
-| 5 | ร้านค้าออนไลน์ |  |  |  |  |  |
-| 6 | โรงงาน |  |  |  |  |  |
-| 7 | โรงงาน |  |  |  |  |  |
-| 8 | โรงงาน |  |  |  |  |  |
-| 9 | โรงงาน |  |  |  |  |  |
-| 10 | ฟาร์ม/สหกรณ์ |  |  |  |  |  |
-| 11 | ฟาร์ม/สหกรณ์ |  |  |  |  |  |
-| 12 | ฟาร์ม/สหกรณ์ |  |  |  |  |  |
-| 13 | คลินิก |  |  |  |  |  |
-| 14 | คลินิก |  |  |  |  |  |
-| 15 | ร้านอาหาร |  |  |  |  |  |
-| 16 | ร้านอาหาร |  |  |  |  |  |
-| 17 | โรงเรียน |  |  |  |  |  |
-| 18 | โรงเรียน |  |  |  |  |  |
-| 19 | ออฟฟิศ/SME |  |  |  |  |  |
-| 20 | ออฟฟิศ/SME |  |  |  |  |  |
+| 1 | ร้านค้า/ขายส่งวัสดุก่อสร้าง | บริษัท ทรายทอง วัสดุภัณฑ์ จำกัด | saithong.tivanon@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/01-saithong-tivanon.eml`) |
+| 2 | ร้านค้า/ขายส่งวัสดุก่อสร้าง | โรงปูน กิจเจริญ (ร้านทวีวัฒน์โชคชัย) | kcrbuildingmaterial@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/02-kcrbuildingmaterial.eml`) |
+| 3 | ร้านค้า/ขายส่งวัสดุก่อสร้าง | ห้างหุ้นส่วนจำกัด โชคชัย ค้าส่งวัสดุ | chokchaimatenial@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/03-chokchaimatenial.eml`) |
+| 4 | ร้านค้า/ขายส่งวัสดุก่อสร้าง | เกียรติทวีค้าไม้ (Kiatthavee Homemart) | kiatthavee@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/04-kiatthavee.eml`) |
+| 5 | โรงงาน/ผู้ผลิต | กนกจิตร์คอนกรีต | ganokchitconcrete@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/05-ganokchitconcrete.eml`) |
+| 6 | โรงงาน/ผู้ผลิต | บริษัท แอล.ที.ไอ.โปรดัคท์ จำกัด | ltiproduct@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/06-ltiproduct.eml`) |
+| 7 | โรงงาน/ผู้ผลิต | บริษัท ถุงทอง ดีไซน์ จำกัด | thungthongdesign@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/07-thungthongdesign.eml`) |
+| 8 | โรงงาน/ผู้ผลิต | บริษัท รุ่งสแตนด์ จำกัด | boonyaritskm@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/08-boonyaritskm.eml`) |
+| 9 | โรงงาน/ผู้ผลิต | บริษัท สหธนพนธ์ รีเวท จำกัด | sahatanapont@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/09-sahatanapont.eml`) |
+| 10 | สหกรณ์/ฟาร์ม | ชุมนุมสหกรณ์การเกษตรแห่งประเทศไทย จำกัด | acft@co-opthai.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/10-acft.eml`) |
+| 11 | สหกรณ์/ฟาร์ม | ชุมนุมร้านสหกรณ์แห่งประเทศไทย จำกัด | info@ccft.co.th | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/11-info.eml`) |
+| 12 | คลินิก | หมอณัฐคลินิกทันตกรรม | natdental001@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/12-natdental001.eml`) |
+| 13 | คลินิก | รัสมิ์ภูมิ คลินิก (Rassapoom Clinic) | contact@rassapoomclinic.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/13-contact.eml`) |
+| 14 | ร้านอาหาร | ร้านอาหารบ้านไม้ริมน้ำ อยุธยา | baanmairimnum@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/14-baanmairimnum.eml`) |
+| 15 | ร้านอาหาร | ร้านสกุลดี (Sakuldee Thai Cuisine) | sakuldeethaicuisine@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/15-sakuldeethaicuisine.eml`) |
+| 16 | โรงเรียน | โรงเรียนทุ่งโพวิทยา | thungpho.tpw@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/16-thungpho-tpw.eml`) |
+| 17 | โรงเรียน | โรงเรียนสายน้ำผึ้ง ในพระอุปถัมภ์ฯ | sainampeung2021@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/17-sainampeung2021.eml`) |
+| 18 | โรงเรียน | โรงเรียนรัตนโกสินทร์สมโภชบางเขน | rsbcenter@rsb.ac.th | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/18-rsbcenter.eml`) |
+| 19 | โรงเรียน | โรงเรียนสฤษดิเดช จ.จันทบุรี | srd_school@hotmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/19-srd-school.eml`) |
+| 20 | โรงเรียน | โรงเรียนสา | schoolnansa@gmail.com | — | — | รอส่ง: ยังไม่มี credential (ไฟล์พร้อมที่ `outbox/20-schoolnansa.eml`) |
 
 **เกณฑ์ตัดสิน 7 วัน:** ตอบ ≥3 = ทางนี้ไปต่อ · ตอบ 0 = เปลี่ยนกลุ่มเป้าหมาย (ไม่ลดราคา ไม่ยิงแอด)

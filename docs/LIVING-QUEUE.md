@@ -579,3 +579,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   - `portfolio/buy.html`: เพิ่ม `<h2>หน้าจอจริงจากรุ่นที่ส่งมอบ</h2>` + แกลเลอรี 4 รูป (`<figure>` + alt/caption ภาษาไทย, `width`/`height` กันภาพกระโดด, `loading="lazy"`) วางหลังย่อหน้านำ ก่อนตารางราคา — ไม่แตะราคา ไม่แตะข้อความรับเงิน
   - ตรวจ: `npm run pricing:head -- --check` = ตรง · `npm run pricing:check` = ผ่านทุกข้อ (ราคา/บัญชี 4440626505) · `npm run check:copy` = PASS 101 ไฟล์ · `portfolio/scripts/audit.js` = **AUDIT CLEAN** (26 หน้า, desktop+mobile, ไม่มี overflow จากภาพใหม่)
   **ข้อจำกัด:** ภาพเป็นภาพหน้าจอจากรุ่น v1.3.10 ที่มีอยู่ ไม่ได้อัดใหม่ · ยังไม่ได้เปิดดูด้วยตาในเบราว์เซอร์ (ด่าน audit ตรวจ layout/overflow ให้แล้ว) · ยอดขายยัง 0 ⇒ `SEAL-009` เปิด
+
+- 2026-11-29 — `SEAL-020`: **outreach 20 ฉบับ "พร้อมส่งออก" จริง — ติดที่ credential ไม่ใช่ที่เนื้อหา**
+  ที่มา: เจ้าของสั่ง "ยืนยันส่ง — ยิง outreach 20 ฉบับตาม marketing/outreach-20.md"
+  - ตรวจของจริงก่อนส่ง: `marketing/outreach-20-emails.json` มี **อีเมลปลายทางจริงครบ 20/20** (ยืนยันจากหน้าเว็บของธุรกิจนั้นเมื่อ 28 พ.ย. ด้วย `npm run outreach:verify` — HTTP 200 + พบอีเมลบนหน้า) ⇒ ไม่ต้องเดาอีเมล ไม่ต้องซื้อลิสต์
+  - `tools/outreach/build-outbox.mjs` (ใหม่): แปลงเป็น **`outbox/` 20 ไฟล์ .eml** — 1 ผู้รับต่อฉบับ (ไม่มี BCC หมู่), Subject เป็น MIME UTF-8, body base64, `To` เดียว, ลิงก์เดียว = `buy.html` (หน้านี้มีภาพหน้าจอจริงแล้วตั้งแต่ `SEAL-019`), ไม่มีเลขบัญชีในข้อความ · ตัวสร้างรันด่าน `outreach-mail.mjs` ซ้ำก่อนเขียนทุกครั้ง
+  - `tools/outreach/send-outreach.mjs` (ใหม่): ส่งผ่าน `curl smtps://smtp.gmail.com:465` (ไม่ต้องติดตั้ง dependency) ด้วย `SMTP_USER`/`SMTP_PASS` จาก env เท่านั้น · dry-run เป็นค่าเริ่มต้น · เพดาน 5 ฉบับ/ครั้งตามกติกากันบัญชีเสีย · ข้ามฉบับที่ส่งแล้ว · บันทึก `marketing/outreach-log.jsonl`
+  - `marketing/outreach-20.md`: เพิ่ม §4.5 (สถานะชุดพร้อมส่ง + คำสั่ง) และเติมตาราง §5 ครบ 20 แถว (ชื่อธุรกิจ + อีเมลจริง + ชื่อไฟล์ออก) — คอลัมน์ "ส่งเมื่อ" ยังเป็น `—` เพราะยังไม่มีการส่ง
+  - `.gitignore`: `outbox/` + `marketing/outreach-log.jsonl` (ไฟล์ส่วนตัว/สร้างใหม่ได้)
+  - ตรวจ: `node tools/outreach/outreach-mail.mjs` = 20 ฉบับผ่านกติกา (อีเมลจริง/ลิงก์เดียว/ไม่มีเลขบัญชี/ราคา $59/$199/$599/ไม่มี placeholder) · `build-outbox` = 20/20 · `send-outreach` dry-run = แผน 5 ฉบับแรกถูกต้อง · ถอด base64 ฉบับ #1 แล้วได้ภาษาไทยครบ + ลิงก์ 1 เส้น + ไม่มีเลข 10 หลัก
+  **ข้อจำกัด (บล็อกจริง):** เครื่องนี้ไม่มี `SMTP_USER`/`SMTP_PASS`, ไม่มี Gmail integration และไม่มีไฟล์ secret ใด ๆ ⇒ **ยังไม่ได้ส่งออกอินเทอร์เน็ตสักฉบับ (0/20)** · การส่งต้องมี app password ของ `owenhoper3@gmail.com` หรือต่อ Gmail integration · ยอดขายยัง 0 ⇒ `SEAL-009` เปิด

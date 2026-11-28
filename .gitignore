@@ -381,3 +381,7 @@ release/Sovereign-OS-*/
 
 # ไฟล์ที่ย้ายมาจากไดรฟ์ C (ไม่เข้า git)
 _imported/
+
+# กล่องขาออก outreach (สร้างใหม่ได้ด้วย tools/outreach/build-outbox.mjs) + บันทึกการส่ง
+outbox/
+marketing/outreach-log.jsonl
