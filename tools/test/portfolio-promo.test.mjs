@@ -59,7 +59,7 @@ class El {
   }
 }
 
-function makePage({ noteKinds = ['order', 'buy'], gumroadLinks = 2 } = {}) {
+function makePage({ noteKinds = ['order', 'buy'], gumroadLinks = 2, priceSlots = [] } = {}) {
   const nodes = [];
   const label = new El('span', { 'data-promo-label': '' });
   label.textContent = 'ใช้ได้เฉพาะการโอนในประเทศ'; // ข้อความ static เดิมบนหน้าเว็บ
@@ -78,6 +78,14 @@ function makePage({ noteKinds = ['order', 'buy'], gumroadLinks = 2 } = {}) {
     return a;
   });
 
+  // ช่องราคาบน buy.html — ค่า fallback ตั้งต้นเป็นข้อความเก่า ต้องถูกเขียนทับจาก JSON
+  const prices = priceSlots.map((key) => {
+    const el = new El('span', { 'data-price': key });
+    el.textContent = 'เก่า';
+    nodes.push(el);
+    return { key, el };
+  });
+
   const all = () => [...nodes, ...nodes.flatMap((n) => n.descendants())];
   const byAttr = (name) => nodes.filter((n) => Object.prototype.hasOwnProperty.call(n.attrs, name));
 
@@ -85,6 +93,7 @@ function makePage({ noteKinds = ['order', 'buy'], gumroadLinks = 2 } = {}) {
     label,
     notes,
     links,
+    prices,
     document: {
       querySelector: (sel) => {
         const m = /^\[([\w-]+)\]$/.exec(sel);
@@ -212,7 +221,61 @@ for (const mode of ['reject', 'http-500']) {
   });
 }
 
-/* ── 5) URL ว่าง/ไม่ใช่สตริง = ถือว่ายังไม่มีโค้ด (ไม่เขียนลิงก์เปล่า) ──────── */
+/* ── 5) ราคาบน buy.html ต้องมาจาก tiers/renewal ใน pricing.json ─────────────── */
+const priceKeys = [
+  'usd:home', 'thb:home', 'usd:business', 'thb:business', 'usd:pro', 'thb:pro',
+  'renewal:usd', 'renewal:thb',
+];
+
+async function priceTexts(pricing) {
+  const page = makePage({ priceSlots: priceKeys });
+  new Function('document', 'fetch', PROMO_JS)(page.document, async () => ({ ok: true, json: async () => pricing }));
+  await new Promise((resolve) => setImmediate(resolve));
+  return Object.fromEntries(page.prices.map((p) => [p.key, p.el.textContent]));
+}
+
+test('ราคาจริงใน pricing.json: $59/$199/$599 · ≈2,000/7,000/21,000 บาท · ต่ออายุ $79/2,800', async () => {
+  assert.deepEqual(await priceTexts(REAL_PRICING), {
+    'usd:home': '$59',
+    'thb:home': '2,000',
+    'usd:business': '$199',
+    'thb:business': '7,000',
+    'usd:pro': '$599',
+    'thb:pro': '21,000',
+    'renewal:usd': '$79',
+    'renewal:thb': '2,800',
+  });
+});
+
+test('เปลี่ยนราคา/ขั้นปัดใน JSON → ตัวเลขบนหน้าเว็บเปลี่ยนตาม (ไม่ hardcode)', async () => {
+  const pricing = {
+    ...REAL_PRICING,
+    display: { approxThbRoundTo: 100 },
+    tiers: [
+      { id: 'home', name: 'Home', usd: 120, thb: 4250 },
+      { id: 'business', name: 'Business', usd: 640.5, thb: 22750 },
+    ],
+    renewal: { usd: 89, thb: 3150 },
+  };
+  assert.deepEqual(await priceTexts(pricing), {
+    'usd:home': '$120',
+    'thb:home': '4,300', // 4,250 ปัดขึ้นเป็น 4,300
+    'usd:business': '$640.50',
+    'thb:business': '22,800', // 22,750 ปัดขึ้นเป็น 22,800
+    'usd:pro': 'เก่า', // ไม่มีใน tiers = ไม่แตะ
+    'thb:pro': 'เก่า',
+    'renewal:usd': '$89',
+    'renewal:thb': '3,200', // 3,150 ปัดขึ้นเป็น 3,200
+  });
+});
+
+test('display.approxThbRoundTo เปลี่ยนขั้นปัด: 1,990 ปัดเป็น 2,000 (ขั้น 100) หรือ 1,990 (ขั้น 10)', async () => {
+  const base = { ...REAL_PRICING, tiers: [{ id: 'home', name: 'Home', usd: 59, thb: 1990 }] };
+  assert.equal((await priceTexts({ ...base, display: { approxThbRoundTo: 100 } }))['thb:home'], '2,000');
+  assert.equal((await priceTexts({ ...base, display: { approxThbRoundTo: 10 } }))['thb:home'], '1,990');
+});
+
+/* ── 6) URL ว่าง/ไม่ใช่สตริง = ถือว่ายังไม่มีโค้ด (ไม่เขียนลิงก์เปล่า) ──────── */
 test('gumroadUrl เป็นสตริงว่าง: ไม่เขียนลิงก์ที่กดแล้วพัง', async () => {
   const page = await runPromo({ ...REAL_PRICING, promo: { ...REAL_PRICING.promo, gumroadUrl: '   ' } });
   assert.deepEqual(page.snapshot(), makePage().snapshot());

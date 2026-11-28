@@ -96,6 +96,65 @@ if (gumroadNull) {
   check(Number.isInteger(promo.percent) && promo.percent > 0 && promo.percent < 100, `promo.percent = ${promo.percent}% (ต้องเป็นจำนวนเต็ม 1–99)`);
 }
 
+/* ── ราคาบน buy.html: ตัวเลขที่ลูกค้าเห็นต้องมาจาก pricing.json ──
+   buy.html เก็บค่า fallback ไว้ในช่อง [data-price] เพื่อให้ crawler/no-JS อ่านได้
+   promo.js เขียนทับจาก JSON ตอนโหลด ⇒ ค่า fallback ที่ไม่ตรง JSON = ราคาที่คนไม่เปิด JS เห็นผิด
+   ขั้นปัดราคาบาทมาจาก display.approxThbRoundTo ที่เดียว (ห้าม hardcode ใน HTML/promo.js) */
+const buyHtml = pages['portfolio/buy.html'];
+const approxStep = Number(pricing.display?.approxThbRoundTo);
+const approxThb = (n) => Math.round(Number(n) / approxStep) * approxStep;
+const bahtFmt = (n) => new Intl.NumberFormat('en-US').format(n);
+const usdPrice = (n) => {
+  const v = Math.round(Number(n) * 100) / 100;
+  return '$' + (v % 1 === 0 ? String(v) : v.toFixed(2));
+};
+
+check(Number.isInteger(approxStep) && approxStep > 0,
+  `pricing.json: display.approxThbRoundTo = ${pricing.display?.approxThbRoundTo} (ขั้นปัดราคาบาทโดยประมาณ)`);
+
+for (const tier of pricing.tiers) {
+  check(buyHtml.includes(`data-price="usd:${tier.id}">${usdPrice(tier.usd)}<`),
+    `buy.html: ช่องราคาดอลลาร์ ${tier.name} = ${usdPrice(tier.usd)}`);
+  check(buyHtml.includes(`data-price="thb:${tier.id}">${bahtFmt(approxThb(tier.thb))}<`),
+    `buy.html: ช่องราคาบาทโดยประมาณ ${tier.name} = ${bahtFmt(approxThb(tier.thb))} (ปัดขั้น ${approxStep})`);
+}
+check(buyHtml.includes(`data-price="renewal:usd">${usdPrice(pricing.renewal.usd)}<`),
+  `buy.html: ช่องราคาต่ออายุ = ${usdPrice(pricing.renewal.usd)}`);
+check(buyHtml.includes(`data-price="renewal:thb">${bahtFmt(approxThb(pricing.renewal.thb))}<`),
+  `buy.html: ช่องราคาต่ออายุเป็นบาท ≈ ${bahtFmt(approxThb(pricing.renewal.thb))}`);
+
+/* head (meta/JSON-LD) ต้องอยู่ใน HTML ดิบเพราะ scraper ไม่รัน JS → ใช้ pricing:check บังคับให้ตรง JSON */
+const head = buyHtml.split('</head>')[0];
+const tierDots = pricing.tiers.map((t) => `${t.name} ${usdPrice(t.usd)}`).join(' · ');
+const tierCommas = pricing.tiers.map((t) => `${t.name} ${usdPrice(t.usd)}`).join(', ');
+check(head.includes(`content="ซื้อ Sovereign OS — ${tierDots}"`), `buy.html head: og/twitter title มีราคา ${tierDots}`);
+check(head.includes(tierCommas), `buy.html head: meta description มีราคา ${tierCommas}`);
+
+const ldJson = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(buyHtml);
+let ld = null;
+try { ld = ldJson ? JSON.parse(ldJson[1]) : null; } catch { ld = null; }
+const offers = Array.isArray(ld?.offers) ? ld.offers : [];
+check(offers.length === pricing.tiers.length,
+  `buy.html JSON-LD: มี offers ครบ ${pricing.tiers.length} แพ็กเกจ (พบ ${offers.length})`);
+for (const tier of pricing.tiers) {
+  const offer = offers.find((o) => o?.name === tier.name);
+  check(Boolean(offer) && Number(offer.price) === Number(tier.usd) && offer.priceCurrency === 'USD',
+    `buy.html JSON-LD: ${tier.name} = $${tier.usd} USD`);
+}
+
+/* กันการเพิ่มตัวเลขใหม่แบบฝังมือ: หลังลบราคาในช่องออกแล้ว body ต้องไม่เหลือราคา */
+const body = buyHtml.split('</head>')[1] ?? '';
+const bodyNoSlots = body.replace(/data-price="[^"]*">[^<]*</g, 'data-price=""><');
+const pricePattern = (usd) => new RegExp(`\\$${String(usd).replace('.', '\\.')}(?!\\d)`);
+for (const tier of pricing.tiers) {
+  check(!pricePattern(tier.usd).test(bodyNoSlots),
+    `buy.html: ไม่มีราคา ${usdPrice(tier.usd)} ฝังนอกช่อง data-price`);
+}
+check(!pricePattern(pricing.renewal.usd).test(bodyNoSlots),
+  `buy.html: ไม่มีราคาต่ออายุ ${usdPrice(pricing.renewal.usd)} ฝังนอกช่อง data-price`);
+check(!/≈\s*[\d,]+\s*บาท/.test(bodyNoSlots),
+  'buy.html: ราคาบาทโดยประมาณทุกจุดอยู่ในช่อง data-price="thb:…" (ไม่พิมพ์มือ)');
+
 if (failures.length > 0) {
   process.stderr.write(`\n✗ pricing:check ไม่ผ่าน ${failures.length} ข้อ\n`);
   process.exit(1);
