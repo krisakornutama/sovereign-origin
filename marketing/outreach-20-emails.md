@@ -9,28 +9,28 @@
 
 ## รายชื่อเป้าหมายและแหล่งที่มาของอีเมล
 
-| # | ชื่อเป้าหมาย | ประเภทธุรกิจ | To | แหล่งที่มา (โดเมน) | ตรวจเมื่อ |
-|---|---|---|---|---|---|
-| 1 | บริษัท ทรายทอง วัสดุภัณฑ์ จำกัด | ร้านค้า/ขายส่งวัสดุก่อสร้าง | saithong.tivanon@gmail.com | saithongwassaduphan.yellowpages.co.th | 2026-11-28 |
-| 2 | โรงปูน กิจเจริญ (ร้านทวีวัฒน์โชคชัย) | ร้านค้า/ขายส่งวัสดุก่อสร้าง | kcrbuildingmaterial@gmail.com | kcrbuildingmaterial.yellowpages.co.th | 2026-11-28 |
-| 3 | ห้างหุ้นส่วนจำกัด โชคชัย ค้าส่งวัสดุ | ร้านค้า/ขายส่งวัสดุก่อสร้าง | chokchaimatenial@gmail.com | xn--12caaw7dp2gran4acow6cv5g1a5jzfly.com | 2026-11-28 |
-| 4 | เกียรติทวีค้าไม้ (Kiatthavee Homemart) | ร้านค้า/ขายส่งวัสดุก่อสร้าง | kiatthavee@gmail.com | xn--12carb5dwa3c9ac8a7ac2b2cv5gi9lwfxa.com | 2026-11-28 |
-| 5 | กนกจิตร์คอนกรีต | โรงงาน/ผู้ผลิต | ganokchitconcrete@gmail.com | ganokchitconcrete.com | 2026-11-28 |
-| 6 | บริษัท แอล.ที.ไอ.โปรดัคท์ จำกัด | โรงงาน/ผู้ผลิต | ltiproduct@gmail.com | lti-product.com | 2026-11-28 |
-| 7 | บริษัท ถุงทอง ดีไซน์ จำกัด | โรงงาน/ผู้ผลิต | thungthongdesign@gmail.com | thungthongdesign.co.th | 2026-11-28 |
-| 8 | บริษัท รุ่งสแตนด์ จำกัด | โรงงาน/ผู้ผลิต | boonyaritskm@gmail.com | rungstand.com | 2026-11-28 |
-| 9 | บริษัท สหธนพนธ์ รีเวท จำกัด | โรงงาน/ผู้ผลิต | sahatanapont@gmail.com | sahatanapontrivet.com | 2026-11-28 |
-| 10 | ชุมนุมสหกรณ์การเกษตรแห่งประเทศไทย จำกัด | สหกรณ์/ฟาร์ม | acft@co-opthai.com | co-opthai.com | 2026-11-28 |
-| 11 | ชุมนุมร้านสหกรณ์แห่งประเทศไทย จำกัด | สหกรณ์/ฟาร์ม | info@ccft.co.th | ccft.co.th | 2026-11-28 |
-| 12 | หมอณัฐคลินิกทันตกรรม | คลินิก | natdental001@gmail.com | natdentalclinic.com | 2026-11-28 |
-| 13 | คลินิกทันตกรรมดรีมสไมล์ | คลินิก | dreamsmile.clinic79@gmail.com | dreamsmiledental.net | 2026-11-28 |
-| 14 | ร้านอาหารบ้านไม้ริมน้ำ อยุธยา | ร้านอาหาร | baanmairimnum@gmail.com | baanmai.co.th | 2026-11-28 |
-| 15 | ร้านส้มตำคุณวาว (เกษตรนวมินทร์) | ร้านอาหาร | somtumwow@gmail.com | somtumwow.com | 2026-11-28 |
-| 16 | โรงเรียนทุ่งโพวิทยา | โรงเรียน | thungpho.tpw@gmail.com | thungphow.com | 2026-11-28 |
-| 17 | โรงเรียนสตรีสมุทรปราการ | โรงเรียน | sarabunssp@streesp.ac.th | streesp.ac.th | 2026-11-28 |
-| 18 | โรงเรียนบางปะกอกวิทยาคม | โรงเรียน | bangpakok@bpk.ac.th | bpk.ac.th | 2026-11-28 |
-| 19 | โรงเรียนบางพลีราษฎร์บำรุง | โรงเรียน | admin@bp-school.ac.th | bp-school.ac.th | 2026-11-28 |
-| 20 | โรงเรียนสา | โรงเรียน | schoolnansa@gmail.com | saschool.ac.th | 2026-11-28 |
+| # | ชื่อเป้าหมาย | ประเภทธุรกิจ | To | แหล่งที่มา (โดเมน) | ตรวจเมื่อ | ยืนยันสด (HTTP) |
+|---|---|---|---|---|---|---|
+| 1 | บริษัท ทรายทอง วัสดุภัณฑ์ จำกัด | ร้านค้า/ขายส่งวัสดุก่อสร้าง | saithong.tivanon@gmail.com | saithongwassaduphan.yellowpages.co.th | 2026-11-28 | 200 ✓ |
+| 2 | โรงปูน กิจเจริญ (ร้านทวีวัฒน์โชคชัย) | ร้านค้า/ขายส่งวัสดุก่อสร้าง | kcrbuildingmaterial@gmail.com | kcrbuildingmaterial.yellowpages.co.th | 2026-11-28 | 200 ✓ |
+| 3 | ห้างหุ้นส่วนจำกัด โชคชัย ค้าส่งวัสดุ | ร้านค้า/ขายส่งวัสดุก่อสร้าง | chokchaimatenial@gmail.com | xn--12caaw7dp2gran4acow6cv5g1a5jzfly.com | 2026-11-28 | 200 ✓ |
+| 4 | เกียรติทวีค้าไม้ (Kiatthavee Homemart) | ร้านค้า/ขายส่งวัสดุก่อสร้าง | kiatthavee@gmail.com | xn--12carb5dwa3c9ac8a7ac2b2cv5gi9lwfxa.com | 2026-11-28 | 200 ✓ |
+| 5 | กนกจิตร์คอนกรีต | โรงงาน/ผู้ผลิต | ganokchitconcrete@gmail.com | ganokchitconcrete.com | 2026-11-28 | 200 ✓ |
+| 6 | บริษัท แอล.ที.ไอ.โปรดัคท์ จำกัด | โรงงาน/ผู้ผลิต | ltiproduct@gmail.com | lti-product.com | 2026-11-28 | 200 ✓ |
+| 7 | บริษัท ถุงทอง ดีไซน์ จำกัด | โรงงาน/ผู้ผลิต | thungthongdesign@gmail.com | thungthongdesign.co.th | 2026-11-28 | 200 ✓ |
+| 8 | บริษัท รุ่งสแตนด์ จำกัด | โรงงาน/ผู้ผลิต | boonyaritskm@gmail.com | rungstand.com | 2026-11-28 | 200 ✓ |
+| 9 | บริษัท สหธนพนธ์ รีเวท จำกัด | โรงงาน/ผู้ผลิต | sahatanapont@gmail.com | sahatanapontrivet.com | 2026-11-28 | 200 ✓ |
+| 10 | ชุมนุมสหกรณ์การเกษตรแห่งประเทศไทย จำกัด | สหกรณ์/ฟาร์ม | acft@co-opthai.com | co-opthai.com | 2026-11-28 | 200 ✓ |
+| 11 | ชุมนุมร้านสหกรณ์แห่งประเทศไทย จำกัด | สหกรณ์/ฟาร์ม | info@ccft.co.th | ccft.co.th | 2026-11-28 | 200 ✓ |
+| 12 | หมอณัฐคลินิกทันตกรรม | คลินิก | natdental001@gmail.com | natdentalclinic.com | 2026-11-28 | 200 ✓ |
+| 13 | รัสมิ์ภูมิ คลินิก (Rassapoom Clinic) | คลินิก | contact@rassapoomclinic.com | rassapoomclinic.com | 2026-11-28 | 200 ✓ |
+| 14 | ร้านอาหารบ้านไม้ริมน้ำ อยุธยา | ร้านอาหาร | baanmairimnum@gmail.com | baanmai.co.th | 2026-11-28 | 200 ✓ |
+| 15 | ร้านสกุลดี (Sakuldee Thai Cuisine) | ร้านอาหาร | sakuldeethaicuisine@gmail.com | sakuldee-thaicuisine.com | 2026-11-28 | 200 ✓ |
+| 16 | โรงเรียนทุ่งโพวิทยา | โรงเรียน | thungpho.tpw@gmail.com | thungphow.com | 2026-11-28 | 200 ✓ |
+| 17 | โรงเรียนสายน้ำผึ้ง ในพระอุปถัมภ์ฯ | โรงเรียน | sainampeung2021@gmail.com | sainampeung.ac.th | 2026-11-28 | 200 ✓ |
+| 18 | โรงเรียนรัตนโกสินทร์สมโภชบางเขน | โรงเรียน | rsbcenter@rsb.ac.th | rsb.ac.th | 2026-11-28 | 200 ✓ |
+| 19 | โรงเรียนสฤษดิเดช จ.จันทบุรี | โรงเรียน | srd_school@hotmail.com | srd.ac.th | 2026-11-28 | 200 ✓ |
+| 20 | โรงเรียนสา | โรงเรียน | schoolnansa@gmail.com | saschool.ac.th | 2026-11-28 | 200 ✓ |
 
 ### URL หลักฐานรายรายการ
 
@@ -46,14 +46,37 @@
 10. ชุมนุมสหกรณ์การเกษตรแห่งประเทศไทย จำกัด — https://www.co-opthai.com/contact (ตรวจ 2026-11-28)
 11. ชุมนุมร้านสหกรณ์แห่งประเทศไทย จำกัด — https://www.ccft.co.th/contact.php (ตรวจ 2026-11-28)
 12. หมอณัฐคลินิกทันตกรรม — http://natdentalclinic.com/contact-us (ตรวจ 2026-11-28)
-13. คลินิกทันตกรรมดรีมสไมล์ — https://www.dreamsmiledental.net/contact (ตรวจ 2026-11-28)
+13. รัสมิ์ภูมิ คลินิก (Rassapoom Clinic) — https://rassapoomclinic.com/contact-us (ตรวจ 2026-11-28)
 14. ร้านอาหารบ้านไม้ริมน้ำ อยุธยา — https://www.baanmai.co.th/contact (ตรวจ 2026-11-28)
-15. ร้านส้มตำคุณวาว (เกษตรนวมินทร์) — https://www.somtumwow.com/contact (ตรวจ 2026-11-28)
-16. โรงเรียนทุ่งโพวิทยา — https://www.thungphow.com/ติดต่อเรา (ตรวจ 2026-11-28)
-17. โรงเรียนสตรีสมุทรปราการ — https://www.streesp.ac.th/ (ตรวจ 2026-11-28)
-18. โรงเรียนบางปะกอกวิทยาคม — https://www.bpk.ac.th/bpknews/contact.php (ตรวจ 2026-11-28)
-19. โรงเรียนบางพลีราษฎร์บำรุง — https://bp-school.ac.th/?page_id=32 (ตรวจ 2026-11-28)
-20. โรงเรียนสา — http://www.saschool.ac.th/ (ตรวจ 2026-11-28)
+15. ร้านสกุลดี (Sakuldee Thai Cuisine) — https://www.sakuldee-thaicuisine.com/ (ตรวจ 2026-11-28)
+16. โรงเรียนทุ่งโพวิทยา — https://www.thungphow.com/%E0%B8%95%E0%B8%94%E0%B8%95%E0%B8%AD%E0%B9%80%E0%B8%A3%E0%B8%B2 (ตรวจ 2026-11-28)
+17. โรงเรียนสายน้ำผึ้ง ในพระอุปถัมภ์ฯ — https://www.sainampeung.ac.th/ (ตรวจ 2026-11-28)
+18. โรงเรียนรัตนโกสินทร์สมโภชบางเขน — https://rsb.ac.th/ (ตรวจ 2026-11-28)
+19. โรงเรียนสฤษดิเดช จ.จันทบุรี — https://www.srd.ac.th/ (ตรวจ 2026-11-28)
+20. โรงเรียนสา — http://www.saschool.ac.th/contact (ตรวจ 2026-11-28)
+
+### สถานะการยืนยันแหล่งที่มา (ดึงสดด้วย `npm run outreach:verify`)
+
+1. บริษัท ทรายทอง วัสดุภัณฑ์ จำกัด — HTTP 200 · พบ saithong.tivanon@gmail.com บนหน้า · 2026-11-28T14:26:03.128Z · รอบอีเมล: “ext"> saithong.tivanon@gmail.com”
+2. โรงปูน กิจเจริญ (ร้านทวีวัฒน์โชคชัย) — HTTP 200 · พบ kcrbuildingmaterial@gmail.com บนหน้า · 2026-11-28T14:26:03.205Z · รอบอีเมล: “ne" data-pack="default" data-tags="email"> kcrbuildingmaterial@gmail.com”
+3. ห้างหุ้นส่วนจำกัด โชคชัย ค้าส่งวัสดุ — HTTP 200 · พบ chokchaimatenial@gmail.com บนหน้า · 2026-11-28T14:26:03.207Z · รอบอีเมล: “ext"> chokchaimatenial@gmail.com”
+4. เกียรติทวีค้าไม้ (Kiatthavee Homemart) — HTTP 200 · พบ kiatthavee@gmail.com บนหน้า · 2026-11-28T14:26:03.209Z · รอบอีเมล: “, kiatthavee@gmail.com”
+5. กนกจิตร์คอนกรีต — HTTP 200 · พบ ganokchitconcrete@gmail.com บนหน้า · 2026-11-28T14:26:03.211Z · รอบอีเมล: “lass="margin-bottom-fifteen text-align-left"> ganokchitconcrete@gmail.com”
+6. บริษัท แอล.ที.ไอ.โปรดัคท์ จำกัด — HTTP 200 · พบ ltiproduct@gmail.com บนหน้า · 2026-11-28T14:26:05.689Z · รอบอีเมล: “lass="margin-bottom-fifteen text-align-left"> ltiproduct@gmail.com”
+7. บริษัท ถุงทอง ดีไซน์ จำกัด — HTTP 200 · พบ thungthongdesign@gmail.com บนหน้า · 2026-11-28T14:26:08.369Z · รอบอีเมล: “lass="margin-bottom-fifteen text-align-left"> thungthongdesign@gmail.com”
+8. บริษัท รุ่งสแตนด์ จำกัด — HTTP 200 · พบ boonyaritskm@gmail.com บนหน้า · 2026-11-28T14:26:08.512Z · รอบอีเมล: “ne" data-pack="default" data-tags="email"> boonyaritskm@gmail.com”
+9. บริษัท สหธนพนธ์ รีเวท จำกัด — HTTP 200 · พบ sahatanapont@gmail.com บนหน้า · 2026-11-28T14:26:08.924Z · รอบอีเมล: “ext"> sahatanapont@gmail.com”
+10. ชุมนุมสหกรณ์การเกษตรแห่งประเทศไทย จำกัด — HTTP 200 · พบ acft@co-opthai.com บนหน้า · 2026-11-28T14:26:11.087Z · รอบอีเมล: “av nav-divided nav-uppercase header-contact"> <i class="icon-envelop" style="fon”
+11. ชุมนุมร้านสหกรณ์แห่งประเทศไทย จำกัด — HTTP 200 · พบ info@ccft.co.th บนหน้า · 2026-11-28T14:26:12.875Z · รอบอีเมล: “ign: center;">โทรศัพท์ : &nbsp;0-2001-7467 โทรสาร : 0-2941-3077 อีเมล : info@ccf”
+12. หมอณัฐคลินิกทันตกรรม — HTTP 200 · พบ natdental001@gmail.com บนหน้า · 2026-11-28T14:26:13.067Z · รอบอีเมล: “>: 038-285665 อีเมล : natdental001@gmail.com <div id="wd-65b70a5f8a658" class="”
+13. รัสมิ์ภูมิ คลินิก (Rassapoom Clinic) — HTTP 200 · พบ contact@rassapoomclinic.com บนหน้า · 2026-11-28T14:26:13.109Z · รอบอีเมล: “11000", "addressCountry": "TH" }, "telephone": "+66-82-494-6555", "email": "cont”
+14. ร้านอาหารบ้านไม้ริมน้ำ อยุธยา — HTTP 200 · พบ baanmairimnum@gmail.com บนหน้า · 2026-11-28T14:26:13.434Z · รอบอีเมล: “e="display: initial; font-weight: 400; color: rgb(255, 255, 255);" m-font-size-s”
+15. ร้านสกุลดี (Sakuldee Thai Cuisine) — HTTP 200 · พบ sakuldeethaicuisine@gmail.com บนหน้า · 2026-11-28T14:26:14.055Z · รอบอีเมล: “ss="ql-template-paragraph1"> E-mail :&nbsp;sakuldeethaicuisine@gmail.com <div cl”
+16. โรงเรียนทุ่งโพวิทยา — HTTP 200 · พบ thungpho.tpw@gmail.com บนหน้า · 2026-11-28T14:26:14.298Z · รอบอีเมล: “arabunPSK&#39;, Arial; font-variant: normal; font-weight: 400; vertical-align: b”
+17. โรงเรียนสายน้ำผึ้ง ในพระอุปถัมภ์ฯ — HTTP 200 · พบ sainampeung2021@gmail.com บนหน้า · 2026-11-28T14:26:14.689Z · รอบอีเมล: “rel="noopener nofollow"> <a href="mailto:sainampeung2021@gmail.com" data-label="”
+18. โรงเรียนรัตนโกสินทร์สมโภชบางเขน — HTTP 200 · พบ rsbcenter@rsb.ac.th บนหน้า · 2026-11-28T14:26:15.069Z · รอบอีเมล: “ร์โทร 02 948 0621 อีเมล rsbcenter@rsb.ac.th <h2 class="gb-headline gb-headline-c”
+19. โรงเรียนสฤษดิเดช จ.จันทบุรี — HTTP 200 · พบ srd_school@hotmail.com บนหน้า · 2026-11-28T14:26:15.391Z · รอบอีเมล: “ง จังหวัดจันทบุรี 22000 โทร. 0-3931-1169 โทรสาร. 0-3932-1523 E-mail: srd_school@”
+20. โรงเรียนสา — HTTP 200 · พบ schoolnansa@gmail.com บนหน้า · 2026-11-28T14:26:15.477Z · รอบอีเมล: “74 Email :schoolnansa@gmail.com <form method="post" id="user_form" name="user_fo”
 
 ---
 
@@ -441,22 +464,22 @@ https://sovereignoriginshop.dpdns.org/buy.html
 กฤษกรณ์ อุตมะ · ผู้พัฒนา Sovereign OS
 ```
 
-## 13. คลินิกทันตกรรมดรีมสไมล์
+## 13. รัสมิ์ภูมิ คลินิก (Rassapoom Clinic)
 
-คลินิก — คลินิกทันตกรรม 2 สาขา (นครปฐม/กรุงเทพฯ) ที่มีนัดหมายและวัสดุสิ้นเปลือง
+คลินิก — คลินิก 5 สาขา (สุขุมวิท 49/พระราม 2/รัตนาธิเบศร์/รามอินทรา/ทวีวัฒนา) ที่มีนัดหมายและวัสดุสิ้นเปลือง
 
-**To:** dreamsmile.clinic79@gmail.com
+**To:** contact@rassapoomclinic.com
 
-**ที่มา:** https://www.dreamsmiledental.net/contact · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://rassapoomclinic.com/contact-us · ตรวจเมื่อ 2026-11-28
 
-**หัวเรื่อง:** สองสาขา — วัสดุใกล้หมดกับนัดหมาย รู้ทันไหม
+**หัวเรื่อง:** ห้าสาขา — วัสดุใกล้หมดกับนัดหมาย รู้ทันไหม
 
 ```
 สวัสดีครับ
 
 ผมกฤษกรณ์ อุตมะ พัฒนา Sovereign OS — ระบบหลังบ้านที่รันในเครื่อง Windows ของคลินิก ข้อมูลอยู่ในความควบคุมของคุณ ไม่มีค่ารายเดือน
 
-คลินิกทันตกรรมสองสาขามักเจอ:
+คลินิกหลายสาขามักเจอ:
 - วัสดุสิ้นเปลืองหมดกลางคัน เพราะไม่มีตัวเลขสต็อกที่ไว้ใจได้
 - นัดหมายกระจายอยู่หลายที่ ลืมนัดแล้วเพิ่งรู้ตอนคนไข้มา
 - สิ้นเดือนต้องรวมรายรับเองจากหลายสมุด
@@ -505,22 +528,22 @@ https://sovereignoriginshop.dpdns.org/buy.html
 กฤษกรณ์ อุตมะ · ผู้พัฒนา Sovereign OS
 ```
 
-## 15. ร้านส้มตำคุณวาว (เกษตรนวมินทร์)
+## 15. ร้านสกุลดี (Sakuldee Thai Cuisine)
 
-ร้านอาหาร — ร้านอาหารอีสานกรุงเทพฯ ที่มีเดลิเวอรีและหน้าร้าน
+ร้านอาหาร — ร้านอาหารไทย เขตหลักสี่ กรุงเทพฯ ที่รับจองโต๊ะและมีลูกค้าประจำ
 
-**To:** somtumwow@gmail.com
+**To:** sakuldeethaicuisine@gmail.com
 
-**ที่มา:** https://www.somtumwow.com/contact · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://www.sakuldee-thaicuisine.com/ · ตรวจเมื่อ 2026-11-28
 
-**หัวเรื่อง:** ขายหน้าร้านกับเดลิเวอรี — รวมยอดกันที่ไหน
+**หัวเรื่อง:** รับจองโต๊ะทุกวัน — รวมยอดกับวัตถุดิบไว้ที่เดียว
 
 ```
 สวัสดีครับ
 
 ผมกฤษกรณ์ อุตมะ พัฒนา Sovereign OS — ระบบหลังบ้านที่ติดตั้งในเครื่อง Windows ของร้าน ข้อมูลอยู่ในเครื่องคุณ ไม่มีรายเดือน
 
-ร้านที่ขายทั้งหน้าร้านและเดลิเวอรีมักเจอ:
+ร้านที่รับจองโต๊ะและมีลูกค้าประจำมักเจอ:
 - ยอดแต่ละช่องทางแยกกัน ต้องรวมมือตอนปิดวัน
 - วัตถุดิบที่ใช้จริงกับที่บันทึกไม่ตรงกัน
 - ไม่รู้ว่าวันไหนกำไรจริง เพราะไม่หักต้นทุนวัตถุดิบ
@@ -543,7 +566,7 @@ https://sovereignoriginshop.dpdns.org/buy.html
 
 **To:** thungpho.tpw@gmail.com
 
-**ที่มา:** https://www.thungphow.com/ติดต่อเรา · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://www.thungphow.com/%E0%B8%95%E0%B8%94%E0%B8%95%E0%B8%AD%E0%B9%80%E0%B8%A3%E0%B8%B2 · ตรวจเมื่อ 2026-11-28
 
 **หัวเรื่อง:** งานธุรการโรงเรียน — ระบบที่ทำงานได้ตอนเน็ตหลุด
 
@@ -569,13 +592,13 @@ https://sovereignoriginshop.dpdns.org/buy.html
 กฤษกรณ์ อุตมะ · ผู้พัฒนา Sovereign OS
 ```
 
-## 17. โรงเรียนสตรีสมุทรปราการ
+## 17. โรงเรียนสายน้ำผึ้ง ในพระอุปถัมภ์ฯ
 
-โรงเรียน — โรงเรียนมัธยมสมุทรปราการ ที่มีหลายกลุ่มบริหาร
+โรงเรียน — โรงเรียนมัธยม เขตคลองเตย กรุงเทพฯ ที่มีหลายกลุ่มบริหาร
 
-**To:** sarabunssp@streesp.ac.th
+**To:** sainampeung2021@gmail.com
 
-**ที่มา:** https://www.streesp.ac.th/ · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://www.sainampeung.ac.th/ · ตรวจเมื่อ 2026-11-28
 
 **หัวเรื่อง:** หลายกลุ่มบริหาร หลายไฟล์ — รวมงานธุรการไว้ที่เดียว
 
@@ -601,13 +624,13 @@ https://sovereignoriginshop.dpdns.org/buy.html
 กฤษกรณ์ อุตมะ · ผู้พัฒนา Sovereign OS
 ```
 
-## 18. โรงเรียนบางปะกอกวิทยาคม
+## 18. โรงเรียนรัตนโกสินทร์สมโภชบางเขน
 
-โรงเรียน — โรงเรียนมัธยม เขตราษฎร์บูรณะ กรุงเทพฯ
+โรงเรียน — โรงเรียนมัธยม เขตบางเขน กรุงเทพฯ
 
-**To:** bangpakok@bpk.ac.th
+**To:** rsbcenter@rsb.ac.th
 
-**ที่มา:** https://www.bpk.ac.th/bpknews/contact.php · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://rsb.ac.th/ · ตรวจเมื่อ 2026-11-28
 
 **หัวเรื่อง:** รับชำระบำรุงการศึกษา — ออกใบเสร็จและสรุปยอดให้ไวขึ้น
 
@@ -633,13 +656,13 @@ https://sovereignoriginshop.dpdns.org/buy.html
 กฤษกรณ์ อุตมะ · ผู้พัฒนา Sovereign OS
 ```
 
-## 19. โรงเรียนบางพลีราษฎร์บำรุง
+## 19. โรงเรียนสฤษดิเดช จ.จันทบุรี
 
-โรงเรียน — โรงเรียนมัธยม อ.บางพลี จ.สมุทรปราการ
+โรงเรียน — โรงเรียนประจำจังหวัดจันทบุรี ที่มีงานธุรการและประชาสัมพันธ์
 
-**To:** admin@bp-school.ac.th
+**To:** srd_school@hotmail.com
 
-**ที่มา:** https://bp-school.ac.th/?page_id=32 · ตรวจเมื่อ 2026-11-28
+**ที่มา:** https://www.srd.ac.th/ · ตรวจเมื่อ 2026-11-28
 
 **หัวเรื่อง:** ข้อมูลนักเรียนกับงานประชาสัมพันธ์ — เก็บให้เป็นระบบเดียว
 
@@ -671,7 +694,7 @@ https://sovereignoriginshop.dpdns.org/buy.html
 
 **To:** schoolnansa@gmail.com
 
-**ที่มา:** http://www.saschool.ac.th/ · ตรวจเมื่อ 2026-11-28
+**ที่มา:** http://www.saschool.ac.th/contact · ตรวจเมื่อ 2026-11-28
 
 **หัวเรื่อง:** โรงเรียนที่เน็ตไม่เสถียร — ระบบที่ยังทำงานได้
 

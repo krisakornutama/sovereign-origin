@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SRC = path.join(ROOT, 'marketing', 'outreach-20-emails.json');
 const OUT = path.join(ROOT, 'marketing', 'outreach-20-emails.md');
+const VERIFIED = path.join(ROOT, 'marketing', 'outreach-20-verified.json');
 const args = process.argv.slice(2);
 const RENDER = args.includes('--render');
 const AS_JSON = args.includes('--json');
@@ -111,6 +112,16 @@ if (!AS_JSON) {
 
 if (RENDER) {
   const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return '?'; } };
+  let verifiedById = new Map();
+  try {
+    const log = JSON.parse(fs.readFileSync(VERIFIED, 'utf8'));
+    verifiedById = new Map((log.results || []).map((r) => [r.id, r]));
+  } catch { /* ไม่มีผลตรวจ = แสดงว่ายังไม่ได้ยืนยัน */ }
+  const statusOf = (id) => {
+    const v = verifiedById.get(id);
+    if (!v) return 'ยังไม่ตรวจ';
+    return `${v.httpStatus || 'ERR'}${v.emailFound ? ' ✓' : ' ✗'}`;
+  };
   const lines = [
     '# Outreach 20 — ชุดอีเมลพร้อมส่ง (สร้างจาก JSON)',
     '',
@@ -123,13 +134,23 @@ if (RENDER) {
     '',
     '## รายชื่อเป้าหมายและแหล่งที่มาของอีเมล',
     '',
-    '| # | ชื่อเป้าหมาย | ประเภทธุรกิจ | To | แหล่งที่มา (โดเมน) | ตรวจเมื่อ |',
-    '|---|---|---|---|---|---|',
-    ...emails.map((e) => `| ${e.id} | ${e.name} | ${e.segment} | ${e.to} | ${hostOf(e.sourceUrl)} | ${e.sourceChecked} |`),
+    '| # | ชื่อเป้าหมาย | ประเภทธุรกิจ | To | แหล่งที่มา (โดเมน) | ตรวจเมื่อ | ยืนยันสด (HTTP) |',
+    '|---|---|---|---|---|---|---|',
+    ...emails.map((e) => `| ${e.id} | ${e.name} | ${e.segment} | ${e.to} | ${hostOf(e.sourceUrl)} | ${e.sourceChecked} | ${statusOf(e.id)} |`),
     '',
     '### URL หลักฐานรายรายการ',
     '',
     ...emails.map((e) => `${e.id}. ${e.name} — ${e.sourceUrl} (ตรวจ ${e.sourceChecked})`),
+    '',
+    '### สถานะการยืนยันแหล่งที่มา (ดึงสดด้วย `npm run outreach:verify`)',
+    '',
+    ...emails.map((e) => {
+      const v = verifiedById.get(e.id);
+      if (!v) return `${e.id}. ${e.name} — ยังไม่ได้ตรวจ`;
+      const how = v.matchedAs === 'html-entity-decoded' ? ' (HTML entity)' : '';
+      const ctx = (v.context || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/อีเมล์/g, 'อีเมล').trim().slice(0, 80);
+      return `${e.id}. ${e.name} — HTTP ${v.httpStatus || 'ERR'} · ${v.emailFound ? `พบ ${e.to} บนหน้า${how}` : 'ไม่พบอีเมลบนหน้า'} · ${v.checkedAt}${ctx ? ` · รอบอีเมล: “${ctx}”` : ''}`;
+    }),
     '',
     '---',
     '',
