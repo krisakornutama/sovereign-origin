@@ -531,3 +531,13 @@ Repo: <https://github.com/krisakornutama/sovereign-vault> · เริ่มจ�
   แก้: ลิงก์ชี้ `buy.html#pay` ซึ่งพิมพ์เลขจริง + ถ้อยคำ lede เปลี่ยนเป็น "payment, support and pricing pages" — ไม่แตะราคา เลขบัญชี ชื่อ หรือโค้ดอื่น
   หลักฐาน: commit `5814e6c` · Deploy portfolio run [`45890241674`](https://github.com/krisakornutama/sovereign-origin/actions/runs/45890241674) = success · หลัง deploy หน้า live มี `buy.html#pay` และ `4440626505` 5 ครั้งเท่ากับ repo · `npm run check:copy` PASS 91 ไฟล์
   **ข้อจำกัด:** ยอดขายยัง 0 ⇒ `SEAL-009` ยังเปิด
+
+- 2026-11-28 — `SEAL-015`: **เปิดเครื่องจักรการมองเห็น — IndexNow ชี้โดเมนจริง, GitHub มีทางเข้าหน้าราคา, ชุด outreach พร้อมยิง**
+  ที่มา: แผนหาเงินต่อ 7 วัน (อนุมัติ 27 พ.ย. 2026) — คอขวดเดียวคือ "ไม่มีคนเห็น" ไม่ใช่ราคา
+  - **บั๊กที่พบและแก้:** `tools/indexnow-notify.mjs` ตั้ง default เป็น `krisakornutama.github.io/project-sovereign` แต่ไฟล์คีย์อยู่บน custom domain (Pages ผูก CNAME) ⇒ ทุกครั้งที่ deploy บอทได้รับ URL ที่ 301 ไปโดเมนจริง = การแจ้งเตือนค้นหาเสียเปล่ามาตลอด · แก้ default เป็น `sovereignoriginshop.dpdns.org` แล้วยิงจริงได้ **HTTP 202** (ครั้งแรก 24 URL) และ **HTTP 200** (ยิงซ้ำผ่าน default ใหม่) — คีย์ `7f3c9a1e5b2d84c6a90e4f17b3d86205.txt`
+  - `README.en.md` ได้บล็อก "Buy the full suite" ชี้ Gumroad + `pay-en.html` (ราคา $59/$199/$599) เท่ากับที่ `README.md` มีอยู่แล้ว
+  - repo meta: `project-sovereign` homepage ชี้ `github.io` → แก้เป็น `https://sovereignoriginshop.dpdns.org/` · `sovereign-origin` เพิ่ม topics `inventory`, `erp`, `offline-first` (ค้นเจอทาง GitHub)
+  - `marketing/outreach-20.md` (ใหม่): 20 ช่องเป้าหมายแบ่ง 5 กลุ่ม + วิธีหาเบอร์/อีเมลจริง (ไม่ซื้อลิสต์ ไม่เดาอีเมล) + ข้อความ 3 ฉบับ (อีเมลร้านค้า · DM โรงงาน/ฟาร์ม · ติดตามครั้งเดียว) + ตารางบันทึกผล 20 แถว
+  - `marketing/awesome-selfhosted-submission.md` (ใหม่): **ยังไม่ยื่น** เพราะกติกาจริง 2 ข้อ — (1) ต้องมี release แรกอายุ > 4 เดือน: `v1.0` = 2026-09-17 ⇒ ครบเกณฑ์ราว 2027-01-18 (2) PR template ระบุ "submission was done by a human, not a machine/LLM" ⇒ agent เซ็นแทนไม่ได้ ฝ่าฝืน = บัญชีถูกแบน · ไฟล์นี้เก็บ YAML + ข้อความ PR + ขั้นตอนไว้ให้เจ้าของกดเอง
+  - หลักฐาน: commit `1c9383c` (IndexNow + README EN) · IndexNow log `publish-indexnow.log` (gitignore) · `npm run check:copy` PASS 91 ไฟล์
+  **ข้อจำกัด:** `npm run test:tools` ไม่ได้รันจบในรอบนี้ (ค้างเกิน 295 วิ — น่าจะมีส่วนที่ต่อ DB) จึงตรวจแค่ `node --check` ผ่าน · `site:sovereignoriginshop.dpdns.org` ยัง 0 ผลลัพธ์ (IndexNow เป็นคิวให้บอท ไม่ใช่การ index ทันที) · Google ต้องยืนยัน Search Console ด้วยบัญชีเจ้าของ · ยอดขายยัง 0 ⇒ `SEAL-009` เปิด
