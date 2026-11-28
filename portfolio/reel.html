@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>รีล 75 วินาที — Sovereign OS (บันทึกหน้าจอแนวตั้ง)</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#030712">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;600;700&family=Noto+Sans+Thai+Looped:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--night:#030712;--stamp:#B3352C;--ok:#34D399;--focus:#22D3EE;
+  --thai:'IBM Plex Sans Thai Looped','Noto Sans Thai Looped','Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Noto Sans Thai Looped','IBM Plex Sans Thai Looped',monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b0b0f;color:#f1ece2;font-family:var(--thai)}
+.wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px}
+.stage{position:relative;width:min(92vw,430px);aspect-ratio:9/16;background:var(--night);border-radius:14px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid rgba(243,234,219,.14)}
+.scene{position:absolute;inset:0;padding:34px 28px 54px;display:flex;flex-direction:column;justify-content:center;gap:12px;
+  opacity:0;transform:translateY(8px);transition:opacity .45s ease,transform .45s ease;pointer-events:none}
+.scene.on{opacity:1;transform:none}
+.eyebrow{font-family:var(--mono);font-size:.58rem;letter-spacing:.28em;text-transform:uppercase;color:rgba(216,211,202,.5)}
+h1{font-size:clamp(1.5rem,7vw,2.05rem);line-height:1.3;margin:0;font-weight:700}
+h1 .accent{color:var(--ok)}
+p{margin:0;font-size:clamp(.85rem,3.4vw,1rem);color:rgba(231,226,216,.82);line-height:1.55}
+ul{margin:0;padding-left:18px;font-size:clamp(.82rem,3.2vw,.96rem);color:rgba(231,226,216,.85)}
+li{margin:0 0 6px}
+.shot{border-radius:8px;border:1px solid rgba(243,234,219,.18);width:100%;display:block;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.price{font-family:var(--mono);font-size:clamp(1.1rem,4.6vw,1.35rem);font-weight:700;color:#c9f7e7}
+.price small{display:block;font-family:var(--thai);font-size:.62rem;font-weight:400;color:rgba(216,211,202,.6);letter-spacing:0}
+.tag{display:inline-block;font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;border:1px solid rgba(52,211,153,.5);
+  color:#a9f0e1;border-radius:999px;padding:3px 9px}
+.hud{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(243,234,219,.12)}
+.hud i{display:block;height:100%;width:0;background:var(--ok)}
+.brand{position:absolute;top:14px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:.54rem;letter-spacing:.3em;color:rgba(216,211,202,.35)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{font-family:var(--thai);font-size:.82rem;padding:8px 14px;border-radius:6px;border:1px solid rgba(243,234,219,.3);
+  background:transparent;color:#e8e4da;cursor:pointer}
+button:hover{border-color:var(--ok);color:#a9f0e1}
+button.primary{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.5);color:#c9f7e7}
+.tip{font-size:.72rem;color:rgba(216,211,202,.55);text-align:center;max-width:430px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <div class="brand">PROJECT SOVEREIGN</div>
+
+    <section class="scene" data-start="0" data-end="7">
+      <span class="eyebrow">ปิดเน็ตแล้วยังขายได้ไหม</span>
+      <h1>ร้านคุณหยุดขาย<br>เพราะ <span class="accent">เน็ตหลุด</span> หรือเปล่า</h1>
+      <p>ระบบหลังบ้านที่ติดตั้งในเครื่องคุณ — ขาย รับเงิน ออกใบกำกับ ได้แม้ไม่มีสัญญาณ</p>
+    </section>
+
+    <section class="scene" data-start="7" data-end="16">
+      <span class="eyebrow">ปัญหาที่เจอทุกวัน</span>
+      <ul>
+        <li>ระบบคลาวด์ล่ม = ขายไม่ได้ทั้งวัน</li>
+        <li>ข้อมูลลูกค้าอยู่กับเจ้าของระบบ ไม่ใช่คุณ</li>
+        <li>สิ้นเดือนต้องมานั่งรวมยอดเอง</li>
+      </ul>
+      <p>ทั้งหมดแก้ได้ด้วยการย้ายระบบกลับมาที่เครื่องของคุณ</p>
+    </section>
+
+    <section class="scene" data-start="16" data-end="30">
+      <span class="eyebrow">หน้าแรก</span>
+      <img class="shot" src="media/reel/scene2-dashboard.png" alt="แดชบอร์ด Sovereign OS" loading="lazy">
+      <p>ยอดขาย · สต็อก · แจ้งเตือน อยู่ในหน้าเดียว และทำงานออฟไลน์</p>
+    </section>
+
+    <section class="scene" data-start="30" data-end="42">
+      <span class="eyebrow">สำหรับร้านและฟาร์ม</span>
+      <img class="shot" src="media/reel/farm-executive-dashboard.png" alt="รายงานผู้บริหาร ต้นทุนและกำไร" loading="lazy">
+      <p>ต้นทุน กำไร ต่อรอบ — เห็นก่อนสิ้นเดือน ไม่ต้องรอ accountant</p>
+    </section>
+
+    <section class="scene" data-start="42" data-end="52">
+      <span class="eyebrow">ทำไมเชื่อถือได้</span>
+      <h1>ไลเซนส์ตรวจเองได้ <span class="accent">แบบออฟไลน์</span></h1>
+      <ul>
+        <li>เซ็นด้วย Ed25519 — เครื่องคุณตรวจเอง</li>
+        <li>ไฟล์ติดตั้งมี SHA-256 ให้เทียบก่อนรัน</li>
+        <li>คืนเงินเต็มจำนวนภายใน 7 วัน</li>
+      </ul>
+      <img class="shot" src="media/reel/scene3-invite-signup.png" alt="หน้าจอตั้งค่าผู้ใช้และสิทธิ์" loading="lazy">
+    </section>
+
+    <section class="scene" data-start="52" data-end="66">
+      <span class="eyebrow">ราคาเดียว ไม่มีรายเดือน</span>
+      <p class="price">Home ฿1,990 <small>1 เครื่อง · อัปเดต 1 ปี</small></p>
+      <p class="price">Business ฿6,990 <small>3 เครื่อง · หน้าร้าน สต็อก บัญชี ภาษี</small></p>
+      <p class="price">Pro ฿20,990 <small>ไม่จำกัดสาขา · ซื้อขาด</small></p>
+      <span class="tag">EARLY20 ลด 20% ถึง 5 ธ.ค.</span>
+    </section>
+
+    <section class="scene" data-start="66" data-end="75">
+      <span class="eyebrow">เริ่มวันนี้</span>
+      <h1>เริ่มที่ <span class="accent">฿1,590</span><br>จ่ายครั้งเดียว</h1>
+      <p>โอนเข้าบัญชีกรุงไทย<br><strong>4440626505 · กฤษกรณ์ อุตมะ</strong></p>
+      <p style="font-family:var(--mono);font-size:.72rem;color:#9be7f3">sovereignoriginshop.dpdns.org/order.html</p>
+      <p style="font-size:.72rem;color:rgba(216,211,202,.55)">ส่งสลิป → ได้ไฟล์และไลเซนส์ภายใน 24 ชม. (ปกติ 1 ชม.)</p>
+    </section>
+
+    <div class="hud"><i id="bar"></i></div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="play">เล่น / เล่นซ้ำ (75 วิ)</button>
+    <button id="pause">หยุด</button>
+    <button id="jump" data-at="0">เริ่มใหม่</button>
+  </div>
+  <p class="tip">หน้าทำงานแทนไฟล์วิดีโอ: กดเล่นแล้วอัดหน้าจอเฉพาะกรอบ 9:16 (OBS/ตัวบันทึกหน้าจอของ Windows) เป็นไฟล์แนวตั้ง 75 วินาที
+    — ข้อความแคปชันและลำดับโพสต์อยู่ใน <span style="font-family:var(--mono)">marketing/reel-copy.md</span></p>
+</div>
+
+<script>
+(function () {
+  var TOTAL = 75;
+  var scenes = Array.prototype.slice.call(document.querySelectorAll('.scene'));
+  var bar = document.getElementById('bar');
+  var t = 0;
+  var timer = null;
+  var startedAt = 0;
+
+  function render() {
+    scenes.forEach(function (s) {
+      var a = Number(s.getAttribute('data-start'));
+      var b = Number(s.getAttribute('data-end'));
+      s.classList.toggle('on', t >= a && t < b);
+    });
+    bar.style.width = Math.min(100, (t / TOTAL) * 100) + '%';
+  }
+
+  function loop() {
+    t = Math.min(TOTAL, (Date.now() - startedAt) / 1000);
+    render();
+    if (t >= TOTAL) { stop(); return; }
+    timer = requestAnimationFrame(loop);
+  }
+
+  function play() {
+    stop();
+    startedAt = Date.now();
+    t = 0;
+    render();
+    timer = requestAnimationFrame(loop);
+  }
+
+  function stop() {
+    if (timer) cancelAnimationFrame(timer);
+    timer = null;
+  }
+
+  document.getElementById('play').addEventListener('click', play);
+  document.getElementById('pause').addEventListener('click', stop);
+  document.getElementById('jump').addEventListener('click', function () { stop(); t = 0; render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>

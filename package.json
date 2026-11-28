@@ -12,6 +12,8 @@
     "check:copy": "node portfolio/scripts/check-copy.mjs",
     "outreach:check": "node tools/outreach/outreach-mail.mjs",
     "outreach:render": "node tools/outreach/outreach-mail.mjs --render",
+    "order:fulfill": "node tools/order/fulfill.mjs",
+    "pricing:check": "node tools/order/pricing-check.mjs",
     "outreach:verify": "node tools/outreach/verify-sources.mjs",
     "outreach:verify:ci": "node tools/outreach/verify-sources.mjs --ci",
     "verify": "node tools/verify.mjs",
