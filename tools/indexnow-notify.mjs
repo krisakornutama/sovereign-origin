@@ -25,9 +25,11 @@ const VERIFY_FILES = args.filter((a) => a.startsWith('--verify-file=')).map((a) 
 const POLL_MS = Number(process.env.INDEXNOW_POLL_MS || 15000);
 const POLLS = Number(process.env.INDEXNOW_POLLS || 20); // ~5 นาที
 
-const HOST = process.env.INDEXNOW_HOST || 'krisakornutama.github.io';
+/* ต้องเป็นโดเมนจริงที่เสิร์ฟไฟล์คีย์ — ไฟล์คีย์อยู่ที่ portfolio/ ซึ่ง Pages เสิร์ฟที่ custom domain
+   (github.io/project-sovereign 301 ไปโดเมนจริง ⇒ URL ที่ส่งไปจะไม่ตรง host ของคีย์และถูกปฏิเสธ) */
+const HOST = process.env.INDEXNOW_HOST || 'sovereignoriginshop.dpdns.org';
 const REPO = process.env.INDEXNOW_REPO || 'krisakornutama/project-sovereign';
-const BASE = process.env.INDEXNOW_BASE || `https://${HOST}/project-sovereign`;
+const BASE = process.env.INDEXNOW_BASE || `https://${HOST}`;
 const ENDPOINT = process.env.INDEXNOW_ENDPOINT || 'https://api.indexnow.org/indexnow/'; // ส่งที่นี่ = ไปถึง Bing/Yandex/Seznam/Naver ทุกตัว
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);

@@ -8,6 +8,10 @@
 
 11 real screens in 15 seconds — stills are in [`docs/media/screens/`](docs/media/screens), storyboard in [`docs/PRELAUNCH-DEMO.md`](docs/PRELAUNCH-DEMO.md).
 
+**Buy the full suite** — one-time license, no subscription: [card checkout on Gumroad](https://oweenhoper.gumroad.com/l/sovereign-os)
+($59 Home · $199 Business · $599 Pro) or, to skip the card and Gumroad's $100 payout wait,
+[pay by bank transfer](https://sovereignoriginshop.dpdns.org/pay-en.html) — the account details are printed on that page and nowhere else.
+
 ## Quickstart (Docker — no Node.js on the host)
 
 ```bash
